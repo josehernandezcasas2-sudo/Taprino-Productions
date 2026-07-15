@@ -1,31 +1,59 @@
 import { useState } from 'react';
+import Link from 'next/link';
 import Stripe from 'stripe';
 import { episodes } from '../lib/episodes';
 import { verifyCookie, readCookieFromHeader } from '../lib/cookie-auth';
+import { getServerSession } from '../lib/get-session';
+import { authClient } from '../lib/auth-client';
 import VideoPlayer from '../components/VideoPlayer';
 import EpisodeShelf from '../components/EpisodeShelf';
 import SignalPanel from '../components/SignalPanel';
 
+async function hasActiveSubscription(stripe, customerId) {
+  if (!customerId) return false;
+  try {
+    const subs = await stripe.subscriptions.list({
+      customer: customerId,
+      status: 'active',
+      limit: 1,
+    });
+    return subs.data.length > 0;
+  } catch (err) {
+    return false;
+  }
+}
+
 export async function getServerSideProps({ req }) {
   let isSubscriber = false;
 
-  const customerId = verifyCookie(readCookieFromHeader(req.headers.cookie));
-  if (customerId && process.env.STRIPE_SECRET_KEY) {
-    try {
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-      const subs = await stripe.subscriptions.list({ customer: customerId, status: 'active', limit: 1 });
-      isSubscriber = subs.data.length > 0;
-    } catch (err) {
-      isSubscriber = false;
+  const session = await getServerSession(req);
+  const user = session?.user
+    ? { name: session.user.name, email: session.user.email }
+    : null;
+
+  if (process.env.STRIPE_SECRET_KEY) {
+    const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+
+    // Prefer the Stripe customer linked to the signed-in account, so membership
+    // follows the login across devices.
+    if (session?.user?.stripeCustomerId) {
+      isSubscriber = await hasActiveSubscription(stripe, session.user.stripeCustomerId);
+    }
+
+    // Fall back to the legacy signed cookie (anonymous / pre-account members).
+    if (!isSubscriber) {
+      const customerId = verifyCookie(readCookieFromHeader(req.headers.cookie));
+      isSubscriber = await hasActiveSubscription(stripe, customerId);
     }
   }
 
-  return { props: { isSubscriber } };
+  return { props: { isSubscriber, user } };
 }
 
-export default function Home({ isSubscriber }) {
+export default function Home({ isSubscriber, user }) {
   const [current, setCurrent] = useState(episodes[0]);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
 
   const locked = current.tier === 'premium' && !isSubscriber;
 
@@ -46,6 +74,16 @@ export default function Home({ isSubscriber }) {
     }
   }
 
+  async function handleSignOut() {
+    setSigningOut(true);
+    try {
+      await authClient.signOut();
+      window.location.reload();
+    } catch (err) {
+      setSigningOut(false);
+    }
+  }
+
   return (
     <>
       <header className="channel-bar">
@@ -57,8 +95,29 @@ export default function Home({ isSubscriber }) {
           TAPRINO TRANSMISSION
           <span className="sub">a Studio Taprino screening room</span>
         </div>
-        <div className="channel-mark" style={{ fontFamily: 'var(--font-mono)' }}>
-          {isSubscriber ? 'Cipher Circle member' : 'Free signal'}
+        <div className="channel-account">
+          <span className="channel-status" style={{ fontFamily: 'var(--font-mono)' }}>
+            {isSubscriber ? 'Cipher Circle member' : 'Free signal'}
+          </span>
+          {user ? (
+            <>
+              <span className="account-name" title={user.email}>
+                {user.name || user.email}
+              </span>
+              <button
+                type="button"
+                className="account-btn"
+                onClick={handleSignOut}
+                disabled={signingOut}
+              >
+                {signingOut ? 'Signing out…' : 'Sign out'}
+              </button>
+            </>
+          ) : (
+            <Link href="/sign-in" className="account-btn">
+              Sign in
+            </Link>
+          )}
         </div>
       </header>
 
@@ -84,6 +143,11 @@ export default function Home({ isSubscriber }) {
                 <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
                   {checkoutLoading ? 'Opening checkout…' : 'Join the Cipher Circle'}
                 </button>
+                {!user && (
+                  <p className="lock-hint">
+                    Already a member? <Link href="/sign-in">Sign in</Link> to unlock on this device.
+                  </p>
+                )}
               </div>
             ) : (
               <VideoPlayer episode={current} adsEnabled={current.tier === 'free'} />
