@@ -1,0 +1,25 @@
+{
+  "name": "taprino-transmission",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "migrate": "node scripts/migrate-to-supabase.js",
+    "bootstrap-admin": "node scripts/bootstrap-admin.js"
+  },
+  "dependencies": {
+    "@clerk/nextjs": "6.39.6",
+    "@supabase/supabase-js": "2.110.7",
+    "hls.js": "^1.6.16",
+    "next": "14.2.35",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "stripe": "16.8.0"
+  },
+  "devDependencies": {
+    "@clerk/backend": "3.11.7",
+    "dotenv": "^16.4.5"
+  }
+}
