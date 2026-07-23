@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { uploadArtworkImage } from '../../../lib/artworkUpload';
 
 // Every one of these has to be present and non-empty — this is the actual
 // enforcement of "creators must submit complete metadata," not just a UI
@@ -10,6 +11,16 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier', 'videoUid'];
 const VALID_TIERS = ['free', 'premium'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
+
+// Poster/thumbnail arrive as base64 data URLs in the JSON body (see
+// pages/creator.js) rather than a real multipart upload — simplest thing
+// that works given how small these files are, but it does mean the
+// default 1MB Next.js API body limit has to grow to fit two images plus
+// the video's TUS uid (which is tiny). 10MB comfortably covers a poster
+// and thumbnail even before compression.
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } }
+};
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -50,10 +61,39 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
   }
 
+  // trailerUid is optional — a creator may not have a separate trailer cut
+  // ready yet. If they uploaded one, it went through the exact same TUS
+  // flow as the main video (see get-upload-url.js), just a second time.
+  let trailerSrc = null;
+  if (body.trailerUid) {
+    trailerSrc = cloudflarePlaybackUrl(body.trailerUid);
+    if (!trailerSrc) {
+      return res.status(500).json({ error: 'Could not resolve the uploaded trailer — is Cloudflare Stream fully configured?' });
+    }
+  }
+
   // A stable, URL-safe id derived from the title — good enough for a
   // creator-facing flow; an admin can rename it during review if a
   // collision or something unreadable comes through.
   const id = `${body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
+
+  // Poster and thumbnail are both optional — a submission is still valid
+  // without them (it just shows the gradient placeholder until an admin
+  // or a follow-up submission adds artwork). Errors here (e.g. a file
+  // that's too large) DO fail the whole submission rather than silently
+  // dropping the image, so a creator finds out immediately rather than
+  // discovering a missing poster days later.
+  let poster = null;
+  let thumbnail = null;
+  try {
+    [poster, thumbnail] = await Promise.all([
+      uploadArtworkImage({ base64: body.posterBase64, fileName: body.posterFileName, pathPrefix: `${id}-poster` }),
+      uploadArtworkImage({ base64: body.thumbnailBase64, fileName: body.thumbnailFileName, pathPrefix: `${id}-thumbnail` })
+    ]);
+  } catch (err) {
+    console.error('submit-episode artwork error:', err.message);
+    return res.status(400).json({ error: err.message });
+  }
 
   // "__new__" means the creator picked "a new series not listed here" in
   // the dropdown — there's no real series row for it yet, so series_id has
@@ -79,6 +119,9 @@ export default async function handler(req, res) {
     runtime: body.runtime,
     video_type: 'html5',
     src,
+    trailer_src: trailerSrc,
+    poster,
+    thumbnail,
     status: 'pending',
     submitted_by: userId
   });

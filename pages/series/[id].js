@@ -134,8 +134,9 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                 <div key={ep.id} className="episode-row">
                   <Link href={`/episode/${ep.id}`} className={`episode-row-link ${ep.tier}`}>
                     <div className="episode-row-thumb">
+                      {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
                       <span className="episode-row-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
-                      {ep.tier === 'premium' ? '◈ locked' : '▶ preview'}
+                      {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
                     </div>
                     <div className="episode-row-info">
                       <h4>{ep.seriesOrder ? `Ep. ${ep.seriesOrder} — ` : ''}{ep.title}</h4>

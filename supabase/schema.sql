@@ -11,7 +11,12 @@ create table if not exists series (
   name text not null,
   description text,
   trailer_src text,
-  hero_image text
+  hero_image text,
+  poster text,     -- 2:3 portrait artwork, genre library grids
+  thumbnail text,  -- 16:9 landscape artwork, homepage rows
+  deletion_requested boolean not null default false,
+  deletion_reason text,
+  deletion_requested_at timestamptz
 );
 
 create table if not exists episodes (
@@ -31,7 +36,13 @@ create table if not exists episodes (
   src text,
   trailer_src text,
   hero_image text,
+  poster text,     -- 2:3 portrait artwork, genre library grids
+  thumbnail text,  -- 16:9 landscape artwork, homepage rows
   featured boolean not null default false,
+
+  deletion_requested boolean not null default false,
+  deletion_reason text,
+  deletion_requested_at timestamptz,
 
   -- The approval workflow. 'approved' is the only status the public site
   -- will ever query for — everything else stays invisible until an admin

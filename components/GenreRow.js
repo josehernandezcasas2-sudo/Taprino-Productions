@@ -32,8 +32,9 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               onClick={() => onSelect(ep)}
             >
               <div className="ep-thumb">
+                {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
-                {ep.tier === 'premium' ? '◈ locked' : '▶ preview'}
+                {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
               </div>
               <div className="ep-info">
                 <h4>{ep.title}</h4>
@@ -51,8 +52,9 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             )}
             <Link href={`/series/${info.id}`} className={`ep-card ${tier}`}>
               <div className="ep-thumb">
+                {info.thumbnail && <img src={info.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
-                ▤ series
+                {!info.thumbnail && '▤ series'}
               </div>
               <div className="ep-info">
                 <h4>{info.name}</h4>

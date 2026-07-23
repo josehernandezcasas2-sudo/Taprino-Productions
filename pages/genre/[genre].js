@@ -70,8 +70,9 @@ export default function GenreLibrary({ genre, isSubscriber, isSignedIn, wishlist
                 )}
                 <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
                   <div className="poster-art">
+                    {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
                     <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
-                    ◈
+                    {!ep.poster && '◈'}
                   </div>
                   <div className="poster-title-wrap">
                     <h4>{ep.title}</h4>

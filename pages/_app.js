@@ -2,6 +2,8 @@ import { useEffect } from 'react';
 import { ClerkProvider } from '@clerk/nextjs';
 import Script from 'next/script';
 import Head from 'next/head';
+import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
+import UploadStatusWidget from '../components/UploadStatusWidget';
 import '../styles/globals.css';
 
 export default function App({ Component, pageProps }) {
@@ -20,6 +22,14 @@ export default function App({ Component, pageProps }) {
     // fresh load, so this only forces a reload in that one situation.
     function handlePageShow(event) {
       if (event.persisted) {
+        // Don't blow away an in-progress upload just because the browser
+        // restored this page from bfcache via back/forward navigation —
+        // the reload this normally does is exactly what "survives
+        // navigation" is supposed to prevent.
+        const upload = uploadStatusRef.current;
+        if (upload && (upload.status === 'uploading' || upload.status === 'saving' || upload.status === 'requesting-url')) {
+          return;
+        }
         window.location.reload();
       }
     }
@@ -59,7 +69,10 @@ export default function App({ Component, pageProps }) {
       </Head>
       {/* Google's IMA SDK — free, this is what actually serves the pre-roll ads */}
       <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="beforeInteractive" />
-      <Component {...pageProps} />
+      <UploadProvider>
+        <Component {...pageProps} />
+        <UploadStatusWidget />
+      </UploadProvider>
     </ClerkProvider>
   );
 }
