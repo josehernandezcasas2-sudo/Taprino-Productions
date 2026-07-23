@@ -6,7 +6,14 @@ import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
-import UppyFilePicker from '../components/UppyFilePicker';
+import dynamic from 'next/dynamic';
+
+// Uppy touches browser-only APIs during its own setup — rendering it
+// during Next.js's server-side render pass (this page uses
+// getServerSideProps) throws before the page ever reaches the browser.
+// { ssr: false } skips that entirely: the component only ever renders
+// client-side, after hydration.
+const UppyFilePicker = dynamic(() => import('../components/UppyFilePicker'), { ssr: false });
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import EditSubmissionModal from '../components/EditSubmissionModal';
