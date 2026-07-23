@@ -5,6 +5,8 @@ import { getAccountContext } from '../lib/accountContext';
 import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { useUpload } from '../contexts/UploadContext';
+import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
+import UppyFilePicker from '../components/UppyFilePicker';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import EditSubmissionModal from '../components/EditSubmissionModal';
@@ -141,6 +143,8 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
   const [deleteActionError, setDeleteActionError] = useState(null);
+  const [runtimeStatus, setRuntimeStatus] = useState(null); // null | 'detecting' | 'detected' | 'failed'
+  const [pickerResetKey, setPickerResetKey] = useState(0);
 
   // Checked once on mount — if there's a leftover draft with real content
   // in it, offer to restore rather than silently discarding or silently
@@ -148,6 +152,29 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   useEffect(() => {
     if (draftHasContent(loadDraft())) setDraftAvailable(true);
   }, []);
+
+  // Reads the video's own duration the moment it's chosen — before any
+  // upload starts — and fills in the runtime field automatically. Left
+  // editable afterward on purpose: auto-detection can be wrong for oddly
+  // encoded files, and a creator should be able to just fix it rather than
+  // fight the form if that happens.
+  async function handleVideoFileChange(selectedFile) {
+    setFile(selectedFile);
+    if (!selectedFile) {
+      setRuntimeStatus(null);
+      return;
+    }
+    setRuntimeStatus('detecting');
+    try {
+      const seconds = await readVideoDuration(selectedFile);
+      update('runtime', formatRuntime(seconds));
+      setRuntimeStatus('detected');
+    } catch (err) {
+      // Not a form-blocking error — the creator can still type the runtime
+      // in by hand, same as before this existed.
+      setRuntimeStatus('failed');
+    }
+  }
 
   function update(field, value) {
     setForm((f) => {
@@ -264,6 +291,8 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     setPosterFile(null);
     setThumbnailFile(null);
     setTrailerFile(null);
+    setRuntimeStatus(null);
+    setPickerResetKey((k) => k + 1);
   }
 
   // Derived stats — computed client-side from the submissions list already
@@ -404,7 +433,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             <label>Your name / artist credit</label>
             <input type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />
 
-            <label>Runtime (e.g. 05:30)</label>
+            <label>
+              Runtime (e.g. 05:30)
+              {runtimeStatus === 'detecting' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — detecting from your video…</span>}
+              {runtimeStatus === 'detected' && <span style={{ color: '#7fbf8f', fontWeight: 'normal' }}> — auto-detected from your video, edit if needed</span>}
+              {runtimeStatus === 'failed' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — couldn&rsquo;t auto-detect, please enter it</span>}
+            </label>
             <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
 
             <label>Content type</label>
@@ -455,7 +489,13 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             </select>
 
             <label>Video file — no size limit, and upload automatically resumes if interrupted</label>
-            <input type="file" accept="video/*" onChange={(e) => setFile(e.target.files[0] || null)} required style={{ marginBottom: '0.8rem' }} />
+            <UppyFilePicker
+              key={`video-${pickerResetKey}`}
+              accept="video/*"
+              note="Any video file, no size limit"
+              onFileSelected={handleVideoFileChange}
+            />
+            {!file && <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>Required before you can submit.</p>}
 
             <label>Poster image — 2:3 portrait (roughly 400×600px or larger), optional</label>
             <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
@@ -464,7 +504,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
             <label>Trailer clip — 15–30s cut works well; used for the "Watch trailer" button and the homepage hero if this gets featured, optional</label>
-            <input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
+            <UppyFilePicker
+              key={`trailer-${pickerResetKey}`}
+              accept="video/*"
+              note="Optional — a short cut of the episode"
+              onFileSelected={setTrailerFile}
+            />
 
             <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
               Poster, thumbnail, and trailer aren&rsquo;t required to submit — but a submission with all three tends to get approved faster, since there&rsquo;s nothing left for the admin to chase down.

@@ -39,6 +39,45 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
   const [creatorAction, setCreatorAction] = useState('grant');
   const [creatorStatus, setCreatorStatus] = useState(null);
   const [rejectingId, setRejectingId] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [bulkRejecting, setBulkRejecting] = useState(false);
+  const [bulkRejectionReason, setBulkRejectionReason] = useState('');
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState(null);
+
+  function toggleSelected(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function bulkReview(decision) {
+    setBulkError(null);
+    if (decision === 'reject' && !bulkRejectionReason.trim()) {
+      setBulkError('A reason is required to reject.');
+      return;
+    }
+    setBulkLoading(true);
+    try {
+      const res = await fetch('/api/admin/bulk-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodeIds: [...selectedIds], decision, rejectionReason: bulkRejectionReason })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update these submissions.');
+      setSelectedIds(new Set());
+      setBulkRejecting(false);
+      setBulkRejectionReason('');
+      await Promise.all([loadSubmissions(), loadStats(), loadLibrary(librarySearch)]);
+    } catch (err) {
+      setBulkError(err.message);
+    }
+    setBulkLoading(false);
+  }
   const [rejectionReason, setRejectionReason] = useState('');
   const [deletions, setDeletions] = useState(null);
   const [deletionActionLoading, setDeletionActionLoading] = useState(null);
@@ -49,6 +88,19 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
   const [libraryLoading, setLibraryLoading] = useState(true);
   const [librarySearch, setLibrarySearch] = useState('');
   const [editingEpisode, setEditingEpisode] = useState(null);
+
+  async function quickRemoveFromHero(episodeId) {
+    try {
+      await fetch('/api/admin/edit-episode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodeId, featured: false })
+      });
+      await Promise.all([loadLibrary(librarySearch), loadStats()]);
+    } catch (err) {
+      alert('Could not update this.');
+    }
+  }
 
   async function loadStats() {
     try {
@@ -202,6 +254,36 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
         )}
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Hero rotation</div>
+          <h3>Homepage hero pool</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+            Every episode currently eligible for the homepage hero rotation. To add one, find it in the Library below and
+            check &ldquo;eligible for the homepage hero rotation&rdquo; in its edit modal.
+          </p>
+
+          {libraryLoading ? (
+            <p>Loading…</p>
+          ) : library.filter((e) => e.featured).length === 0 ? (
+            <p>Nothing in the rotation right now.</p>
+          ) : (
+            library.filter((e) => e.featured).map((e) => (
+              <div key={e.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.7rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div>
+                  <h4 style={{ margin: '0 0 0.2rem' }}>{e.title}</h4>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-dim)' }}>
+                    {e.status === 'approved' ? '✓ live' : e.status === 'pending' ? '⏳ pending' : '✕ rejected'}
+                    {e.status !== 'approved' && ' · won\u2019t actually show in rotation until approved'}
+                  </div>
+                </div>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => quickRemoveFromHero(e.id)}>
+                  Remove from rotation
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending review</div>
           <h3>Creator submissions</h3>
 
@@ -210,53 +292,97 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
           ) : submissions.length === 0 ? (
             <p>Nothing waiting on review right now.</p>
           ) : (
-            submissions.map((s) => (
-              <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '1rem 0' }}>
-                <h4 style={{ margin: '0 0 0.3rem' }}>{s.title}</h4>
-                <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>{s.description}</p>
-                <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
-                  {s.content_type} · {s.genre} · {s.runtime} · by {s.artist} · suggested tier: {s.tier}
-                </div>
-                <video src={s.src} controls style={{ width: '100%', maxWidth: '360px', borderRadius: '4px', marginBottom: '0.6rem' }} />
-                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                  <button
-                    className="account-btn-primary"
-                    style={{ width: 'auto' }}
-                    disabled={actionLoading === s.id}
-                    onClick={() => review(s.id, 'approve', { tierOverride: s.tier })}
-                  >
-                    {actionLoading === s.id ? 'Working…' : '✓ Approve'}
-                  </button>
-                  <button
-                    className="account-btn-secondary"
-                    style={{ width: 'auto' }}
-                    disabled={actionLoading === s.id}
-                    onClick={() => setRejectingId(rejectingId === s.id ? null : s.id)}
-                  >
-                    ✕ Reject
-                  </button>
-                </div>
-                {rejectingId === s.id && (
-                  <div style={{ marginTop: '0.6rem' }}>
-                    <input
-                      type="text"
-                      placeholder="Reason (shown to the creator)"
-                      value={rejectionReason}
-                      onChange={(e) => setRejectionReason(e.target.value)}
-                      style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
-                    />
-                    <button
-                      className="account-btn-secondary"
-                      style={{ width: 'auto' }}
-                      disabled={actionLoading === s.id}
-                      onClick={() => review(s.id, 'reject', { rejectionReason })}
-                    >
-                      Confirm rejection
+            <>
+              {selectedIds.size > 0 && (
+                <div className="dash-nudge" style={{ borderColor: 'rgba(74,168,162,0.35)', background: 'rgba(74,168,162,0.08)' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span>{selectedIds.size} selected</span>
+                    <button className="account-btn-primary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('approve')}>
+                      {bulkLoading ? 'Working…' : `✓ Approve ${selectedIds.size}`}
+                    </button>
+                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setBulkRejecting((v) => !v)}>
+                      ✕ Reject {selectedIds.size}
+                    </button>
+                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setSelectedIds(new Set())}>
+                      Clear selection
                     </button>
                   </div>
-                )}
-              </div>
-            ))
+                  {bulkRejecting && (
+                    <div style={{ marginTop: '0.6rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Reason (shown to every creator in this batch)"
+                        value={bulkRejectionReason}
+                        onChange={(e) => setBulkRejectionReason(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
+                      />
+                      <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('reject')}>
+                        Confirm rejection of {selectedIds.size}
+                      </button>
+                    </div>
+                  )}
+                  {bulkError && <p style={{ color: '#e08a6f', fontSize: '0.85rem', marginTop: '0.5rem' }}>{bulkError}</p>}
+                </div>
+              )}
+
+              {submissions.map((s) => (
+                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '1rem 0' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(s.id)}
+                      onChange={() => toggleSelected(s.id)}
+                      style={{ marginTop: '0.3rem' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.3rem' }}>{s.title}</h4>
+                      <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>{s.description}</p>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                        {s.content_type} · {s.genre} · {s.runtime} · by {s.artist} · suggested tier: {s.tier}
+                      </div>
+                      <video src={s.src} controls style={{ width: '100%', maxWidth: '360px', borderRadius: '4px', marginBottom: '0.6rem' }} />
+                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <button
+                          className="account-btn-primary"
+                          style={{ width: 'auto' }}
+                          disabled={actionLoading === s.id}
+                          onClick={() => review(s.id, 'approve', { tierOverride: s.tier })}
+                        >
+                          {actionLoading === s.id ? 'Working…' : '✓ Approve'}
+                        </button>
+                        <button
+                          className="account-btn-secondary"
+                          style={{ width: 'auto' }}
+                          disabled={actionLoading === s.id}
+                          onClick={() => setRejectingId(rejectingId === s.id ? null : s.id)}
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                      {rejectingId === s.id && (
+                        <div style={{ marginTop: '0.6rem' }}>
+                          <input
+                            type="text"
+                            placeholder="Reason (shown to the creator)"
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
+                          />
+                          <button
+                            className="account-btn-secondary"
+                            style={{ width: 'auto' }}
+                            disabled={actionLoading === s.id}
+                            onClick={() => review(s.id, 'reject', { rejectionReason })}
+                          >
+                            Confirm rejection
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
           )}
         </div>
 

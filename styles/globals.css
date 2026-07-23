@@ -1205,6 +1205,42 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink-dim);
 }
 .upload-widget-error { color: #e08a6f; }
+.upload-widget-error-title {
+  font-size: 0.78rem;
+  font-weight: bold;
+  color: #e08a6f;
+  margin-top: 0.3rem;
+}
+.upload-widget-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+.upload-widget-actions button {
+  background: none;
+  border: 1px solid rgba(234, 231, 221, 0.2);
+  color: var(--ink);
+  border-radius: 4px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.72rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+}
+.upload-widget-actions button:hover { border-color: var(--signal-amber); }
+.upload-widget-details {
+  margin-top: 0.5rem;
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+}
+.upload-widget-details summary { cursor: pointer; }
+.upload-widget-details code {
+  display: block;
+  margin-top: 0.3rem;
+  word-break: break-word;
+  white-space: pre-wrap;
+  color: var(--ink-dim);
+}
 
 /* Creator dashboard — grid of submission cards showing thumbnail, title,
    description, and both this app's approval status and Cloudflare's own

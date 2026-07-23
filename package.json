@@ -12,6 +12,9 @@
   "dependencies": {
     "@clerk/nextjs": "6.39.6",
     "@supabase/supabase-js": "2.110.7",
+    "@uppy/core": "^5.2.0",
+    "@uppy/dashboard": "^5.1.1",
+    "@uppy/react": "^5.2.0",
     "hls.js": "^1.6.16",
     "next": "14.2.35",
     "react": "18.3.1",

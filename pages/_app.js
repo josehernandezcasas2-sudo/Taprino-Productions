@@ -5,6 +5,8 @@ import Head from 'next/head';
 import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
 import UploadStatusWidget from '../components/UploadStatusWidget';
 import '../styles/globals.css';
+import '@uppy/core/css/style.css';
+import '@uppy/dashboard/css/style.css';
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {

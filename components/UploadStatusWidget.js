@@ -14,7 +14,7 @@ function formatBytes(bytes) {
 }
 
 export default function UploadStatusWidget() {
-  const { activeUpload, dismissUpload } = useUpload();
+  const { activeUpload, dismissUpload, retryUpload } = useUpload();
   const [, forceTick] = useState(0);
 
   // Re-renders once a second while uploading, purely so elapsed-time and
@@ -73,7 +73,20 @@ export default function UploadStatusWidget() {
         <div className="upload-widget-meta">It now sits with the admin for review.</div>
       )}
       {activeUpload.status === 'error' && (
-        <div className="upload-widget-meta upload-widget-error">{activeUpload.errorMessage}</div>
+        <>
+          <div className="upload-widget-error-title">{activeUpload.errorTitle}</div>
+          <div className="upload-widget-meta upload-widget-error">{activeUpload.errorMessage}</div>
+          <div className="upload-widget-actions">
+            <button onClick={() => retryUpload()}>↻ Retry</button>
+            {activeUpload.likelyBlocked && activeUpload.uploadMethod !== 'basic' && (
+              <button onClick={() => retryUpload('basic')}>Try fallback upload method</button>
+            )}
+          </div>
+          <details className="upload-widget-details">
+            <summary>Technical details (for reporting a persistent problem)</summary>
+            <code>{activeUpload.errorRaw}</code>
+          </details>
+        </>
       )}
     </div>
   );
