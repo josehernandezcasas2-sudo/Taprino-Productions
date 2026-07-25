@@ -72,7 +72,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
       setSelectedIds(new Set());
       setBulkRejecting(false);
       setBulkRejectionReason('');
-      await Promise.all([loadSubmissions(), loadStats(), loadLibrary(librarySearch)]);
+      await Promise.all([loadSubmissions(), loadStats(), loadLibrary(librarySearch), loadAuditLog()]);
     } catch (err) {
       setBulkError(err.message);
     }
@@ -82,6 +82,79 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
   const [deletions, setDeletions] = useState(null);
   const [deletionActionLoading, setDeletionActionLoading] = useState(null);
   const [deletionError, setDeletionError] = useState(null);
+  const [orphans, setOrphans] = useState(null);
+  const [orphanActionLoading, setOrphanActionLoading] = useState(null);
+  const [orphanError, setOrphanError] = useState(null);
+  const [pendingArtwork, setPendingArtwork] = useState(null);
+  const [artworkActionLoading, setArtworkActionLoading] = useState(null);
+  const [artworkError, setArtworkError] = useState(null);
+  const [auditLog, setAuditLog] = useState(null);
+
+  async function loadAuditLog() {
+    try {
+      const res = await fetch('/api/admin/audit-log');
+      const data = await res.json();
+      if (res.ok) setAuditLog(data.entries);
+    } catch (err) {
+      setAuditLog([]);
+    }
+  }
+
+  async function loadPendingArtwork() {
+    try {
+      const res = await fetch('/api/admin/pending-artwork');
+      const data = await res.json();
+      if (res.ok) setPendingArtwork(data);
+    } catch (err) {
+      setPendingArtwork({ episodes: [], series: [] });
+    }
+  }
+
+  async function resolveArtwork(type, id, decision) {
+    setArtworkActionLoading(`${type}-${id}`);
+    setArtworkError(null);
+    try {
+      const res = await fetch('/api/admin/resolve-artwork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id, decision })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not resolve this.');
+      await Promise.all([loadPendingArtwork(), loadOrphans(), loadLibrary(librarySearch), loadAuditLog()]);
+    } catch (err) {
+      setArtworkError(err.message);
+    }
+    setArtworkActionLoading(null);
+  }
+
+  async function loadOrphans() {
+    try {
+      const res = await fetch('/api/admin/orphaned-media');
+      const data = await res.json();
+      if (res.ok) setOrphans(data.orphans);
+    } catch (err) {
+      setOrphans([]);
+    }
+  }
+
+  async function cleanupOrphan(orphanId) {
+    setOrphanActionLoading(orphanId);
+    setOrphanError(null);
+    try {
+      const res = await fetch('/api/admin/cleanup-orphan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orphanId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not delete this.');
+      await Promise.all([loadOrphans(), loadAuditLog()]);
+    } catch (err) {
+      setOrphanError(err.message);
+    }
+    setOrphanActionLoading(null);
+  }
   const [stats, setStats] = useState(null);
   const [roster, setRoster] = useState(null);
   const [library, setLibrary] = useState(null);
@@ -153,7 +226,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
     }
   }
 
-  useEffect(() => { loadDeletions(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -166,7 +239,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not resolve this.');
-      await Promise.all([loadDeletions(), loadStats(), loadLibrary(librarySearch)]);
+      await Promise.all([loadDeletions(), loadStats(), loadLibrary(librarySearch), loadOrphans(), loadAuditLog()]);
     } catch (err) {
       setDeletionError(err.message);
     }
@@ -195,7 +268,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ episodeId, decision, ...extra })
       });
-      await Promise.all([loadSubmissions(), loadStats(), loadLibrary(librarySearch)]);
+      await Promise.all([loadSubmissions(), loadStats(), loadLibrary(librarySearch), loadAuditLog()]);
     } catch (err) {
       alert('Could not update this submission.');
     }
@@ -215,7 +288,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
       });
       const data = await res.json();
       setCreatorStatus(res.ok ? `Done — ${creatorEmail} ${creatorAction === 'grant' ? 'can now submit episodes.' : 'no longer has creator access.'}` : data.error);
-      if (res.ok) { loadRoster(); loadStats(); }
+      if (res.ok) { loadRoster(); loadStats(); loadAuditLog(); }
     } catch (err) {
       setCreatorStatus('Something went wrong.');
     }
@@ -425,6 +498,84 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Pending artwork changes</div>
+          <h3>Poster, thumbnail, and trailer changes awaiting approval</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+            These haven&rsquo;t gone live yet — approving replaces what&rsquo;s currently shown; denying discards the
+            upload and keeps the current one.
+          </p>
+
+          {artworkError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{artworkError}</p>}
+
+          {!pendingArtwork ? (
+            <p>Loading…</p>
+          ) : pendingArtwork.episodes.length === 0 && pendingArtwork.series.length === 0 ? (
+            <p>Nothing pending right now.</p>
+          ) : (
+            <>
+              {pendingArtwork.episodes.map((e) => (
+                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--signal-amber)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Episode</div>
+                  <h4 style={{ margin: '0 0 0.3rem' }}>{e.title}</h4>
+                  <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                    {e.pendingPoster && 'New poster staged. '}
+                    {e.pendingThumbnail && 'New thumbnail staged.'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      disabled={artworkActionLoading === `episode-${e.id}`}
+                      onClick={() => resolveArtwork('episode', e.id, 'approve')}
+                    >
+                      {artworkActionLoading === `episode-${e.id}` ? 'Working…' : '✓ Approve'}
+                    </button>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      disabled={artworkActionLoading === `episode-${e.id}`}
+                      onClick={() => resolveArtwork('episode', e.id, 'deny')}
+                    >
+                      ✕ Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {pendingArtwork.series.map((s) => (
+                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--cipher-teal)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
+                  <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
+                  <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                    {s.pendingPoster && 'New poster staged. '}
+                    {s.pendingThumbnail && 'New thumbnail staged. '}
+                    {s.pendingTrailerSrc && 'New trailer staged.'}
+                  </p>
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      disabled={artworkActionLoading === `series-${s.id}`}
+                      onClick={() => resolveArtwork('series', s.id, 'approve')}
+                    >
+                      {artworkActionLoading === `series-${s.id}` ? 'Working…' : '✓ Approve'}
+                    </button>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      disabled={artworkActionLoading === `series-${s.id}`}
+                      onClick={() => resolveArtwork('series', s.id, 'deny')}
+                    >
+                      ✕ Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending deletions</div>
           <h3>Episode and series removal requests</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -495,6 +646,43 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Orphaned media</div>
+          <h3>Files no longer referenced anywhere</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+            Left behind by confirmed deletions and by replacing a video, poster, or thumbnail — these still exist on
+            Cloudflare or in Storage, just nothing in the app points at them anymore. Deleting here is permanent.
+          </p>
+
+          {orphanError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{orphanError}</p>}
+
+          {!orphans ? (
+            <p>Loading…</p>
+          ) : orphans.length === 0 ? (
+            <p>Nothing orphaned right now.</p>
+          ) : (
+            orphans.map((o) => (
+              <div key={o.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: o.kind === 'cloudflare_video' ? 'var(--signal-amber)' : 'var(--cipher-teal)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                    {o.kind === 'cloudflare_video' ? 'Cloudflare video' : 'Storage image'}
+                  </div>
+                  <div style={{ fontSize: '0.9rem' }}>{o.context || '(no title on file)'}</div>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>{o.reason}</div>
+                </div>
+                <button
+                  className="account-btn-secondary"
+                  style={{ width: 'auto' }}
+                  disabled={orphanActionLoading === o.id}
+                  onClick={() => cleanupOrphan(o.id)}
+                >
+                  {orphanActionLoading === o.id ? 'Deleting…' : '🗑 Delete now'}
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Creator access</div>
           <h3>Roster</h3>
 
@@ -537,6 +725,31 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
           </form>
           {creatorStatus && <p style={{ marginTop: '0.6rem' }}>{creatorStatus}</p>}
         </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Audit log</div>
+          <h3>Recent admin actions</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Read-only history — approvals, rejections, deletions, artwork decisions, cleanup, and access changes.</p>
+
+          {!auditLog ? (
+            <p>Loading…</p>
+          ) : auditLog.length === 0 ? (
+            <p>Nothing logged yet.</p>
+          ) : (
+            auditLog.map((entry) => (
+              <div key={entry.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.6rem 0', fontSize: '0.8rem' }}>
+                <span style={{ color: 'var(--ink-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.68rem' }}>
+                  {new Date(entry.createdAt).toLocaleString()}
+                </span>
+                {' — '}
+                <strong>{entry.adminEmail || 'unknown admin'}</strong>
+                {' '}
+                {entry.action.replace(/_/g, ' ')}
+                {entry.details ? ` — ${entry.details}` : ''}
+              </div>
+            ))
+          )}
+        </div>
       </main>
 
       <footer className="site-footer">
@@ -553,6 +766,7 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
             loadLibrary(librarySearch);
             loadStats();
             loadSubmissions();
+            loadOrphans();
           }}
         />
       )}

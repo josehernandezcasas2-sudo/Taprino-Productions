@@ -113,6 +113,11 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
               <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
                 Poster {s.poster ? '✓' : '—'} · Thumbnail {s.thumbnail ? '✓' : '—'} · Trailer {s.trailerSrc ? '✓' : '—'}
               </p>
+              {(s.pendingPoster || s.pendingThumbnail || s.pendingTrailerSrc) && (
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
+                  ⏳ A change is awaiting admin approval and hasn&rsquo;t gone live yet.
+                </p>
+              )}
 
               {s.deletionRequested ? (
                 <>

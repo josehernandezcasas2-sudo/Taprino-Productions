@@ -2,10 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
+import { useNotifications } from '../lib/useNotifications';
 
 export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const router = useRouter();
   const { signOut } = useClerk();
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | null
   const [genreOpen, setGenreOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
@@ -148,6 +150,47 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
       </div>
 
       <div className="right-cluster">
+        {isCreator && (
+          <>
+            <button
+              className={`icon-btn ${openMenu === 'notifications' ? 'active' : ''}`}
+              aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+              onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'notifications' ? null : 'notifications')); }}
+              style={{ position: 'relative' }}
+            >
+              🔔
+              {unreadCount > 0 && (
+                <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </button>
+
+            {openMenu === 'notifications' && (
+              <div className="dropdown dropdown-right open notification-dropdown">
+                <div className="dropdown-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Notifications</span>
+                  {unreadCount > 0 && (
+                    <button className="notification-mark-all" onClick={markAllRead}>Mark all read</button>
+                  )}
+                </div>
+                {notifications.length === 0 ? (
+                  <div className="dropdown-item" style={{ cursor: 'default' }}>Nothing yet.</div>
+                ) : (
+                  notifications.map((n) => (
+                    <div
+                      key={n.id}
+                      className={`notification-item ${n.read ? '' : 'unread'}`}
+                      onClick={() => !n.read && markRead(n.id)}
+                    >
+                      <div className="notification-message">{n.message}</div>
+                      <div className="notification-time">{new Date(n.createdAt).toLocaleString()}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </>
+        )}
+
         <button
           className={`icon-btn ${openMenu === 'account' ? 'active' : ''}`}
           aria-label="Account menu"

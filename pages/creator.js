@@ -19,6 +19,7 @@ import InstallButton from '../components/InstallButton';
 import EditSubmissionModal from '../components/EditSubmissionModal';
 import ArtworkModal from '../components/ArtworkModal';
 import DeleteRequestModal from '../components/DeleteRequestModal';
+import ReplaceVideoModal from '../components/ReplaceVideoModal';
 
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
@@ -150,6 +151,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
   const [deleteActionError, setDeleteActionError] = useState(null);
+  const [replacingVideoSubmission, setReplacingVideoSubmission] = useState(null);
   const [runtimeStatus, setRuntimeStatus] = useState(null); // null | 'detecting' | 'detected' | 'failed'
   const [pickerResetKey, setPickerResetKey] = useState(0);
 
@@ -363,6 +365,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             )}
             {s.status === 'approved' && <span>👁 {s.viewCount} view{s.viewCount === 1 ? '' : 's'}</span>}
             {s.missingArtwork && s.status !== 'rejected' && <span>🖼 missing artwork</span>}
+            {s.artworkPending && <span>⏳ artwork change awaiting approval</span>}
             {s.deletionRequested && <span>🗑 pending deletion</span>}
           </div>
           {s.status === 'rejected' && s.rejectionReason && (
@@ -382,6 +385,9 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               <button onClick={() => setArtworkSubmission(s)}>
                 🖼 {s.poster || s.thumbnail ? 'Replace artwork' : 'Add artwork'}
               </button>
+            )}
+            {!s.deletionRequested && (
+              <button onClick={() => setReplacingVideoSubmission(s)}>🎬 Replace video</button>
             )}
             {s.deletionRequested ? (
               <button onClick={() => cancelEpisodeDeletion(s.id)}>Cancel deletion request</button>
@@ -648,6 +654,13 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
           itemLabel={deletingSubmission.title}
           onClose={() => setDeletingSubmission(null)}
           onConfirm={requestEpisodeDeletion}
+        />
+      )}
+
+      {replacingVideoSubmission && (
+        <ReplaceVideoModal
+          submission={replacingVideoSubmission}
+          onClose={() => { setReplacingVideoSubmission(null); loadSubmissions(); }}
         />
       )}
     </>

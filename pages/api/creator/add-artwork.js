@@ -1,13 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 
-// Deliberately NOT restricted to status = 'pending' — unlike
-// edit-submission.js, artwork is safe to add or swap on an already-live
-// episode too (it doesn't change anything an admin already reviewed and
-// approved, like tier or metadata). A creator who forgot a poster at
-// submission time shouldn't have to wait for a whole new review cycle to
-// add one.
+// Only stages for approval when the episode is already APPROVED (live) —
+// changing what the public sees without review is the actual risk. A
+// still-pending or rejected episode isn't live yet, so its artwork is
+// just part of whatever review it's already going to get; applying it
+// directly there doesn't create a new unreviewed public-facing change.
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
 };
@@ -35,7 +35,7 @@ export default async function handler(req, res) {
 
   const { data: existing, error: fetchError } = await supabase
     .from('episodes')
-    .select('id, submitted_by')
+    .select('id, title, submitted_by, status, poster, thumbnail')
     .eq('id', episodeId)
     .maybeSingle();
 
@@ -59,8 +59,29 @@ export default async function handler(req, res) {
   }
 
   const dbUpdates = {};
-  if (poster) dbUpdates.poster = poster;
-  if (thumbnail) dbUpdates.thumbnail = thumbnail;
+  const isLive = existing.status === 'approved';
+
+  if (isLive) {
+    // Staged — an admin has to approve before this replaces what's
+    // actually live. Nothing is orphaned yet, since the current live
+    // artwork is still in use until then.
+    if (poster) dbUpdates.pending_poster = poster;
+    if (thumbnail) dbUpdates.pending_thumbnail = thumbnail;
+  } else {
+    // Not live yet — applies directly, and if this is a genuine
+    // replacement (something was already there), the old file is
+    // orphaned immediately since nothing else could still be using it.
+    if (poster) dbUpdates.poster = poster;
+    if (thumbnail) dbUpdates.thumbnail = thumbnail;
+    if (poster && existing.poster) {
+      const oldPath = storagePathFromUrl(existing.poster);
+      if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'artwork replaced (poster)', context: existing.title });
+    }
+    if (thumbnail && existing.thumbnail) {
+      const oldPath = storagePathFromUrl(existing.thumbnail);
+      if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'artwork replaced (thumbnail)', context: existing.title });
+    }
+  }
 
   const { error } = await supabase
     .from('episodes')
@@ -73,5 +94,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not save the artwork.' });
   }
 
-  return res.status(200).json({ ok: true, episodeId, poster: poster || undefined, thumbnail: thumbnail || undefined });
+  return res.status(200).json({ ok: true, episodeId, staged: isLive, poster: poster || undefined, thumbnail: thumbnail || undefined });
 }

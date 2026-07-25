@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Uppy } from '@uppy/core';
-import { Dashboard } from '@uppy/react';
+import { Dashboard } from '@uppy/react/dashboard';
 
 // SCOPING NOTE, worth understanding before touching this file: Uppy is
 // used here purely as a polished drag-and-drop file picker and preview —

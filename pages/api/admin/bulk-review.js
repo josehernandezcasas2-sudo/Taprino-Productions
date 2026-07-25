@@ -1,5 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { recordAudit } from '../../../lib/auditLog';
+import { notifyCreator } from '../../../lib/notify';
 
 // Same update shape as review-submission.js, just applied to a batch.
 // Bulk reject uses one shared reason for every item in the batch — if a
@@ -13,7 +15,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, isAdmin } = await getRoleContext(req);
+  const { userId, email, isAdmin } = await getRoleContext(req);
   if (!isAdmin) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
@@ -33,6 +35,12 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
+
+  // Fetched before the update so notifications can go out to the right
+  // people — once the row's updated there's no way to tell who to notify
+  // for episodes that were already approved by someone else in the meantime.
+  const { data: targets } = await supabase.from('episodes').select('id, title, submitted_by').in('id', episodeIds).eq('status', 'pending');
+
   const updates = {
     status: decision === 'approve' ? 'approved' : 'rejected',
     reviewed_by: userId,
@@ -55,5 +63,29 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not update these submissions.' });
   }
 
-  return res.status(200).json({ ok: true, updatedCount: (data || []).length, decision });
+  const updatedCount = (data || []).length;
+
+  await recordAudit({
+    adminId: userId,
+    adminEmail: email,
+    action: decision === 'approve' ? 'bulk_approve_submissions' : 'bulk_reject_submissions',
+    targetType: 'episode',
+    targetId: null,
+    details: `${updatedCount} episode(s)${decision === 'reject' ? `, reason: ${rejectionReason}` : ''}`
+  });
+
+  await Promise.all(
+    (targets || []).map((t) =>
+      notifyCreator({
+        userId: t.submitted_by,
+        type: decision === 'approve' ? 'episode_approved' : 'episode_rejected',
+        message: decision === 'approve'
+          ? `"${t.title}" was approved and is now live.`
+          : `"${t.title}" was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+        episodeId: t.id
+      })
+    )
+  );
+
+  return res.status(200).json({ ok: true, updatedCount, decision });
 }

@@ -1,5 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { recordAudit } from '../../../lib/auditLog';
+import { notifyCreator } from '../../../lib/notify';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -7,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, isAdmin } = await getRoleContext(req);
+  const { userId, email, isAdmin } = await getRoleContext(req);
   if (!isAdmin) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
@@ -18,6 +20,8 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
+
+  const { data: existing } = await supabase.from('episodes').select('title, submitted_by').eq('id', episodeId).maybeSingle();
 
   const updates = {
     status: decision === 'approve' ? 'approved' : 'rejected',
@@ -41,6 +45,26 @@ export default async function handler(req, res) {
   if (error) {
     console.error('review-submission error:', error.message);
     return res.status(500).json({ error: 'Could not update the submission.' });
+  }
+
+  await recordAudit({
+    adminId: userId,
+    adminEmail: email,
+    action: decision === 'approve' ? 'approve_submission' : 'reject_submission',
+    targetType: 'episode',
+    targetId: episodeId,
+    details: existing ? existing.title : undefined
+  });
+
+  if (existing) {
+    await notifyCreator({
+      userId: existing.submitted_by,
+      type: decision === 'approve' ? 'episode_approved' : 'episode_rejected',
+      message: decision === 'approve'
+        ? `"${existing.title}" was approved and is now live.`
+        : `"${existing.title}" was rejected.${rejectionReason ? ` Reason: ${rejectionReason}` : ''}`,
+      episodeId
+    });
   }
 
   return res.status(200).json({ ok: true, episodeId, status: updates.status });

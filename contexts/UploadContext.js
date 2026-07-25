@@ -35,12 +35,12 @@ export function UploadProvider({ children }) {
     uploadStatusRef.current = activeUpload;
   }, [activeUpload]);
 
-  async function startUpload(file, formData, trailerFile, uploadMethod = 'tus') {
+  async function startUpload(file, formData, trailerFile, uploadMethod = 'tus', submitEndpoint = '/api/creator/submit-episode') {
     if (activeUpload && activeUpload.status === 'uploading') {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
 
-    lastAttemptRef.current = { file, formData, trailerFile };
+    lastAttemptRef.current = { file, formData, trailerFile, submitEndpoint };
 
     setActiveUpload({
       phase: 'main',
@@ -142,7 +142,7 @@ export function UploadProvider({ children }) {
 
       setActiveUpload((u) => (u ? { ...u, phase: 'saving', status: 'saving' } : u));
 
-      const submitRes = await fetch('/api/creator/submit-episode', {
+      const submitRes = await fetch(submitEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, videoUid, ...(trailerUid ? { trailerUid } : {}) })
@@ -179,7 +179,7 @@ export function UploadProvider({ children }) {
   function retryUpload(useMethod) {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
-    startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus');
+    startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus', attempt.submitEndpoint);
   }
 
   function dismissUpload() {

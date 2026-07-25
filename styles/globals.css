@@ -1444,3 +1444,43 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.75rem;
   cursor: pointer;
 }
+
+/* Notification bell — badge, dropdown list */
+.notification-badge {
+  position: absolute;
+  top: -4px; right: -4px;
+  background: var(--oxide);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 999px;
+  min-width: 14px;
+  text-align: center;
+}
+.notification-dropdown {
+  width: 300px;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.notification-mark-all {
+  background: none;
+  border: none;
+  color: var(--signal-amber);
+  font-size: 0.68rem;
+  font-family: var(--font-mono);
+  cursor: pointer;
+  padding: 0;
+}
+.notification-item {
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid rgba(234, 231, 221, 0.08);
+  cursor: pointer;
+}
+.notification-item:first-child { border-top: none; }
+.notification-item:hover { background: rgba(234, 231, 221, 0.06); }
+.notification-item.unread { background: rgba(232, 163, 61, 0.06); }
+.notification-item.unread .notification-message { font-weight: bold; }
+.notification-message { font-size: 0.82rem; margin-bottom: 0.2rem; }
+.notification-time { font-size: 0.65rem; font-family: var(--font-mono); color: var(--ink-dim); }

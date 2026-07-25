@@ -35,7 +35,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const { data: existing, error: fetchError } = await supabase
     .from('series')
-    .select('id')
+    .select('id, name, poster, thumbnail, trailer_src')
     .eq('id', seriesId)
     .maybeSingle();
 
@@ -63,10 +63,15 @@ export default async function handler(req, res) {
     }
   }
 
+  // Always staged, never applied directly — a series has no "not live
+  // yet" state the way a pending episode does, so every change here goes
+  // through pages/api/admin/resolve-artwork.js. The OLD live asset isn't
+  // orphaned yet at this point; it's still in use until an admin actually
+  // approves the swap.
   const dbUpdates = {};
-  if (poster) dbUpdates.poster = poster;
-  if (thumbnail) dbUpdates.thumbnail = thumbnail;
-  if (trailerSrc) dbUpdates.trailer_src = trailerSrc;
+  if (poster) dbUpdates.pending_poster = poster;
+  if (thumbnail) dbUpdates.pending_thumbnail = thumbnail;
+  if (trailerSrc) dbUpdates.pending_trailer_src = trailerSrc;
 
   const { error } = await supabase.from('series').update(dbUpdates).eq('id', seriesId);
 
@@ -75,5 +80,5 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not save the series media.' });
   }
 
-  return res.status(200).json({ ok: true, seriesId, poster: poster || undefined, thumbnail: thumbnail || undefined, trailerSrc: trailerSrc || undefined });
+  return res.status(200).json({ ok: true, seriesId, staged: true });
 }

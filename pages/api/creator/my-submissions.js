@@ -1,17 +1,11 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
+import { getCloudflareVideoStatus, cloudflareUidFromUrl } from '../../../lib/cloudflareUpload';
 import { getViewCounts } from '../../../lib/redis';
 
 // Extracts the Cloudflare video uid from an episode's stored src URL
 // (https://customer-XXXX.cloudflarestream.com/{uid}/manifest/video.m3u8) —
 // there's no separate column for this, so it's parsed back out here.
-function uidFromSrc(src) {
-  if (!src) return null;
-  const match = src.match(/cloudflarestream\.com\/([a-zA-Z0-9]+)\//);
-  return match ? match[1] : null;
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -29,7 +23,7 @@ export default async function handler(req, res) {
   const [{ data, error }, { data: allSeries }, viewCounts] = await Promise.all([
     supabase
       .from('episodes')
-      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at')
+      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at')
       .eq('submitted_by', userId)
       .order('created_at', { ascending: false }),
     supabase.from('series').select('id, name, poster, thumbnail'),
@@ -50,7 +44,7 @@ export default async function handler(req, res) {
   // grows into the hundreds.
   const enriched = await Promise.all(
     (data || []).map(async (ep) => {
-      const uid = uidFromSrc(ep.src);
+      const uid = cloudflareUidFromUrl(ep.src);
       const cf = uid ? await getCloudflareVideoStatus(uid) : null;
       const seriesArt = ep.series_id ? seriesArtById[ep.series_id] : null;
       const coveredBySeriesArt = !!(seriesArt && (seriesArt.poster || seriesArt.thumbnail));
@@ -81,6 +75,7 @@ export default async function handler(req, res) {
         // not intentional thumbnail art, so it's purely a fallback here.
         poster: ep.poster || null,
         thumbnail: ep.thumbnail || (cf ? cf.thumbnail : null),
+        artworkPending: !!(ep.pending_poster || ep.pending_thumbnail),
         // Whether this episode is genuinely missing artwork — a series
         // episode with no poster/thumbnail of its own isn't "missing"
         // anything if the series itself already has artwork set, since
