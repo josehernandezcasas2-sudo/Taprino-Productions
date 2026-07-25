@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Uppy } from '@uppy/core';
-import { Dashboard } from '@uppy/react/dashboard';
+// DEFAULT import, not a named one — @uppy/react/lib/Dashboard.js ends in
+// `export default Dashboard`. Importing it as `{ Dashboard }` compiles
+// without complaint but resolves to undefined at runtime, and React then
+// throws the very unhelpful minified error #130 ("element type is invalid...
+// got: undefined") from deep inside the framework bundle, with nothing in
+// the stack trace pointing back here.
+import Dashboard from '@uppy/react/dashboard';
 
 // SCOPING NOTE, worth understanding before touching this file: Uppy is
 // used here purely as a polished drag-and-drop file picker and preview —
