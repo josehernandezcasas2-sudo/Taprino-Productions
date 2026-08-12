@@ -2481,3 +2481,116 @@ button { font-family: inherit; cursor: pointer; }
 
 .house-ad-preview[src=""] { display: none; }
 img.house-ad-preview { object-fit: cover; background: #000; }
+
+/* ---------------------------------------------------------------------
+   Admin edit episode modal
+   The chrome (.modal-card, .modal-header) was already styled — the form
+   controls inside it never had any classes at all, which is why they
+   rendered as stark, unstyled browser defaults against the dark modal.
+   --------------------------------------------------------------------- */
+.admin-edit-modal { max-width: 34rem; }
+.admin-edit-sub { font-size: 0.8rem; color: var(--ink-dim); margin: -0.4rem 0 1rem; }
+
+.admin-video-status {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  border-radius: 6px;
+  padding: 0.7rem 0.85rem;
+  font-size: 0.83rem;
+  line-height: 1.5;
+  margin-bottom: 1.1rem;
+  border: 1px solid rgba(234, 231, 221, 0.14);
+  background: var(--void);
+  color: var(--ink-dim);
+}
+.admin-video-status strong { color: var(--ink); }
+.admin-video-status.good { border-color: rgba(95, 168, 114, 0.4); background: rgba(95, 168, 114, 0.08); }
+.admin-video-status.good strong { color: #7fbf8f; }
+.admin-video-status.bad { border-color: rgba(201, 97, 79, 0.45); background: rgba(201, 97, 79, 0.08); }
+.admin-video-status.bad strong { color: #e08a6f; }
+.admin-video-status.none { border-color: rgba(201, 97, 79, 0.45); background: rgba(201, 97, 79, 0.08); }
+.admin-video-status.none strong { color: #e08a6f; }
+.admin-video-status.pending { border-color: rgba(232, 163, 61, 0.35); background: rgba(232, 163, 61, 0.07); }
+.admin-video-status.pending strong { color: var(--signal-amber); }
+
+.admin-edit-form { display: flex; flex-direction: column; gap: 0.9rem; }
+.admin-field { display: flex; flex-direction: column; gap: 0.4rem; }
+.admin-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+@media (max-width: 520px) { .admin-field-row { grid-template-columns: 1fr; } }
+
+.admin-field label {
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--static-grey);
+}
+.admin-optional { text-transform: none; letter-spacing: normal; font-family: inherit; opacity: 0.7; }
+
+.admin-field input[type='text'],
+.admin-field input[type='number'],
+.admin-field select,
+.admin-field textarea {
+  width: 100%;
+  background: var(--void);
+  border: 1px solid rgba(234, 231, 221, 0.16);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 0.6rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+.admin-field textarea { min-height: 5rem; resize: vertical; }
+.admin-field input[type='file'] { font-size: 0.82rem; color: var(--ink-dim); }
+.admin-field-hint { font-size: 0.76rem; color: var(--static-grey); line-height: 1.5; margin: 0; }
+
+.admin-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+}
+.admin-checkbox input { width: 16px; height: 16px; accent-color: var(--signal-amber); }
+
+.admin-video-input-row { display: flex; gap: 0.5rem; }
+.admin-video-input-row input { flex: 1; }
+.admin-video-input-row button {
+  flex: none;
+  border: 1px solid rgba(234, 231, 221, 0.16);
+  background: var(--void-2);
+  color: var(--ink-dim);
+  border-radius: 4px;
+  padding: 0 1rem;
+  font-size: 0.82rem;
+  min-height: 42px;
+}
+.admin-video-input-row button:disabled { opacity: 0.5; }
+
+.admin-video-note { font-size: 0.8rem; margin: -0.1rem 0 0; }
+.admin-video-note.good { color: #7fbf8f; }
+.admin-video-note.bad { color: #e08a6f; }
+.admin-video-note.pending { color: var(--signal-amber); }
+
+.admin-warning {
+  border: 1px solid rgba(201, 97, 79, 0.5);
+  background: rgba(201, 97, 79, 0.1);
+  border-radius: 6px;
+  padding: 0.8rem 0.9rem;
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+}
+.admin-warning strong { color: #e08a6f; }
+
+.admin-error {
+  color: #e08a6f;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.admin-actions { display: flex; gap: 0.6rem; margin-top: 0.2rem; }
+.admin-actions button { width: auto; padding-left: 1.4rem; padding-right: 1.4rem; }

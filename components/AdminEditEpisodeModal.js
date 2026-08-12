@@ -1,6 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
+
+// Matches lib/cloudflareUpload.js's cloudflareUidFromUrl exactly, done
+// client-side so the modal can show "what's currently attached" the
+// instant it opens, without a round trip just to extract an ID from a URL
+// the browser already has in `episode.src`.
+function uidFromPlaybackUrl(url) {
+  if (!url) return null;
+  const match = url.match(/cloudflarestream\.com\/([a-zA-Z0-9]+)\//);
+  return match ? match[1] : null;
+}
 
 function readAsDataUrl(f) {
   if (!f) return Promise.resolve(null);
@@ -27,15 +37,45 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [videoUid, setVideoUid] = useState('');
-  const [videoCheck, setVideoCheck] = useState(null); // null | 'checking' | { state, errorReasonText, ... } | { error }
+  const [videoCheck, setVideoCheck] = useState(null); // null | 'checking' | { state, errorReasonText, readyToStream, ... } | { error }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [confirmNoVideo, setConfirmNoVideo] = useState(false);
+
+  const existingUid = uidFromPlaybackUrl(episode.src);
+
+  // Runs the moment the modal opens — this is what makes "is a video
+  // actually attached" something you SEE rather than something you have
+  // to trust. Checking against Cloudflare directly (not just "is src
+  // non-empty") is what catches a video that saved but never finished
+  // processing, too.
+  useEffect(() => {
+    let cancelled = false;
+    if (!existingUid) {
+      setVideoCheck({ none: true });
+      return;
+    }
+    setVideoCheck('checking');
+    fetch(`/api/admin/check-cloudflare-video?uid=${encodeURIComponent(existingUid)}`)
+      .then((r) => r.json().then((data) => ({ ok: r.ok, data })))
+      .then(({ ok, data }) => {
+        if (!cancelled) setVideoCheck(ok ? data : { error: data.error });
+      })
+      .catch(() => {
+        if (!cancelled) setVideoCheck({ error: 'Could not reach Cloudflare to check.' });
+      });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+    setConfirmNoVideo(false);
   }
 
-  async function checkVideo() {
+  async function checkNewVideo() {
     if (!videoUid.trim()) return;
     setVideoCheck('checking');
     try {
@@ -47,8 +87,25 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
     }
   }
 
+  // The actual guard against what most likely happened here: approving an
+  // episode that has no watchable video at all. Only blocks on the exact
+  // dangerous combination — status is (or is becoming) approved, AND
+  // there's neither an existing attached video nor a new one being linked
+  // in this save. Everything else saves normally, no extra click.
+  //
+  // `dangerous` reflects the data and stays stable across both clicks of
+  // the confirmation, so the warning and button label don't flicker or
+  // change meaning between the first and second press — only the actual
+  // submit behavior changes, gated separately by `confirmNoVideo`.
+  const noVideoAtAll = !existingUid && !videoUid.trim();
+  const dangerous = form.status === 'approved' && noVideoAtAll;
+
   async function handleSave(e) {
     e.preventDefault();
+    if (dangerous && !confirmNoVideo) {
+      setConfirmNoVideo(true);
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -75,93 +132,148 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card admin-edit-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Edit episode</h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
+        <p className="admin-edit-sub">
           Admin edit — works on any episode regardless of status, including changing status itself.
         </p>
 
-        <form onSubmit={handleSave}>
-          <label>Title</label>
-          <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
+        {/* The self-verifying part: what's actually attached right now,
+            checked live against Cloudflare rather than just "a src is set." */}
+        <div className={`admin-video-status ${videoCheck === 'checking' ? 'checking' : videoCheck?.error ? 'bad' : videoCheck?.none ? 'none' : videoCheck?.state === 'ready' ? 'good' : videoCheck?.state === 'error' ? 'bad' : 'pending'}`}>
+          {videoCheck === 'checking' && <span>Checking the currently attached video…</span>}
+          {videoCheck?.none && <span><strong>No video attached.</strong> This episode has nothing to play — link one below before approving it.</span>}
+          {videoCheck?.error && <span><strong>Couldn&rsquo;t verify the attached video.</strong> {videoCheck.error}</span>}
+          {videoCheck?.state === 'ready' && <span><strong>✓ Video attached and ready to stream.</strong></span>}
+          {videoCheck?.state === 'error' && <span><strong>Attached video failed on Cloudflare&rsquo;s side.</strong> {videoCheck.errorReasonText || videoCheck.errorReasonCode} — this episode won&rsquo;t play until it&rsquo;s replaced.</span>}
+          {videoCheck && videoCheck !== 'checking' && !videoCheck.none && !videoCheck.error && videoCheck.state && videoCheck.state !== 'ready' && videoCheck.state !== 'error' && (
+            <span><strong>Still processing on Cloudflare</strong> ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — not watchable yet.</span>
+          )}
+        </div>
 
-          <label>Description</label>
-          <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} style={{ width: '100%', boxSizing: 'border-box' }} />
+        <form onSubmit={handleSave} className="admin-edit-form">
+          <div className="admin-field">
+            <label>Title</label>
+            <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
+          </div>
 
-          <label>Artist credit</label>
-          <input type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />
+          <div className="admin-field">
+            <label>Description</label>
+            <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} />
+          </div>
 
-          <label>Runtime</label>
-          <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required />
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Artist credit</label>
+              <input type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />
+            </div>
+            <div className="admin-field">
+              <label>Runtime</label>
+              <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} placeholder="mm:ss" required />
+            </div>
+          </div>
 
-          <label>Main genre</label>
-          <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
-            {MAIN_GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Main genre</label>
+              <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
+                {MAIN_GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div className="admin-field">
+              <label>Specific genre</label>
+              <input type="text" value={form.genre} onChange={(e) => update('genre', e.target.value)} required />
+            </div>
+          </div>
 
-          <label>Specific genre</label>
-          <input type="text" value={form.genre} onChange={(e) => update('genre', e.target.value)} required />
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Tier</label>
+              <select value={form.tier} onChange={(e) => update('tier', e.target.value)}>
+                <option value="free">Free</option>
+                <option value="premium">Cipher Circle (premium)</option>
+              </select>
+            </div>
+            <div className="admin-field">
+              <label>Status</label>
+              <select value={form.status} onChange={(e) => update('status', e.target.value)}>
+                <option value="pending">Pending</option>
+                <option value="approved">Approved — live</option>
+                <option value="rejected">Rejected</option>
+              </select>
+            </div>
+          </div>
 
-          <label>Tier</label>
-          <select value={form.tier} onChange={(e) => update('tier', e.target.value)}>
-            <option value="free">Free</option>
-            <option value="premium">Cipher Circle (premium)</option>
-          </select>
-
-          <label>Status</label>
-          <select value={form.status} onChange={(e) => update('status', e.target.value)}>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved — live</option>
-            <option value="rejected">Rejected</option>
-          </select>
-
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
+          <label className="admin-checkbox">
             <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
             Eligible for the homepage hero rotation
           </label>
 
-          <label>Replace poster — optional</label>
-          <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.6rem' }} />
-
-          <label>Replace thumbnail — optional</label>
-          <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.6rem' }} />
-
-          <label>Replace video — Cloudflare video ID, optional</label>
-          <p style={{ fontSize: '0.75rem', color: 'var(--ink-dim)', marginTop: '-0.3rem' }}>
-            For a file uploaded directly through Cloudflare&rsquo;s own dashboard (the fallback when in-app upload keeps failing) — paste its video ID, not a URL.
-          </p>
-          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
-            <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} />
-            <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
-              {videoCheck === 'checking' ? 'Checking…' : 'Check'}
-            </button>
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Replace poster <span className="admin-optional">optional</span></label>
+              <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} />
+            </div>
+            <div className="admin-field">
+              <label>Replace thumbnail <span className="admin-optional">optional</span></label>
+              <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} />
+            </div>
           </div>
-          {videoCheck && videoCheck !== 'checking' && (
-            videoCheck.error ? (
-              <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
-            ) : videoCheck.state === 'error' ? (
-              <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
-                Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
-              </p>
-            ) : videoCheck.state === 'ready' ? (
-              <p style={{ color: '#7fbf8f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream — safe to save.</p>
-            ) : (
-              <p style={{ color: 'var(--signal-amber)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
-                Still processing on Cloudflare&rsquo;s side ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can save now, but it won&rsquo;t be watchable until this finishes.
-              </p>
-            )
+
+          <div className="admin-field">
+            <label>Replace video — Cloudflare video ID <span className="admin-optional">optional</span></label>
+            <p className="admin-field-hint">
+              For a file uploaded directly through Cloudflare&rsquo;s own dashboard (the fallback when
+              in-app upload keeps failing) — paste its video ID, not a URL.
+            </p>
+            <div className="admin-video-input-row">
+              <input
+                type="text"
+                value={videoUid}
+                onChange={(e) => { setVideoUid(e.target.value); setConfirmNoVideo(false); }}
+                placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd"
+              />
+              <button type="button" onClick={checkNewVideo} disabled={!videoUid.trim() || videoCheck === 'checking'}>
+                {videoCheck === 'checking' ? 'Checking…' : 'Check'}
+              </button>
+            </div>
+            {videoUid.trim() && videoCheck && videoCheck !== 'checking' && !videoCheck.none && (
+              videoCheck.error ? (
+                <p className="admin-video-note bad">{videoCheck.error}</p>
+              ) : videoCheck.state === 'error' ? (
+                <p className="admin-video-note bad">
+                  Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
+                </p>
+              ) : videoCheck.state === 'ready' ? (
+                <p className="admin-video-note good">✓ Ready to stream — safe to save.</p>
+              ) : (
+                <p className="admin-video-note pending">
+                  Still processing on Cloudflare&rsquo;s side ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can save now, but it won&rsquo;t be watchable until this finishes.
+                </p>
+              )
+            )}
+          </div>
+
+          {dangerous && (
+            <div className="admin-warning">
+              <strong>This episode has no video attached at all.</strong> Setting it to Approved will
+              make it appear on the site with nothing to play.{' '}
+              {confirmNoVideo
+                ? 'Click Save anyway once more to confirm.'
+                : 'Click Save anyway below to confirm you want to do this — or paste a Cloudflare video ID above first.'}
+            </div>
           )}
 
-          {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+          {error && <p className="admin-error">{error}</p>}
 
-          <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
-            <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>
-              {saving ? 'Saving…' : 'Save changes'}
+          <div className="admin-actions">
+            <button className="account-btn-primary" type="submit" disabled={saving}>
+              {saving ? 'Saving…' : dangerous ? 'Save anyway' : 'Save changes'}
             </button>
-            <button className="account-btn-secondary" type="button" onClick={onClose} disabled={saving} style={{ width: 'auto' }}>
+            <button className="account-btn-secondary" type="button" onClick={onClose} disabled={saving}>
               Cancel
             </button>
           </div>
