@@ -14,6 +14,20 @@ export default async function handler(req, res) {
   // ad, or a stale one after it's been turned off.
   res.setHeader('Cache-Control', 'no-store');
 
+  // REQUIRED, not optional: Google's IMA SDK runs from imasdk.googleapis.com
+  // and fetches this ad tag URL cross-origin — that's simply how VAST ad
+  // tags work, every real ad network's endpoint does the same. Without
+  // this header the browser blocks the request outright before it ever
+  // reaches this handler, which is exactly the CORS error this was
+  // producing. There's nothing sensitive in a VAST response to protect —
+  // it's the same public ad content regardless of who's asking.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   try {
     const ad = await pickActiveHouseAd();
     if (!ad) {

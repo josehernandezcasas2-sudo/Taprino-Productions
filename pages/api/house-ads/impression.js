@@ -9,6 +9,11 @@ import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'image/gif');
   res.setHeader('Cache-Control', 'no-store');
+  // Same reasoning as vast.js — the IMA SDK fires these tracking pixels
+  // from imasdk.googleapis.com, cross-origin, so this needs to be
+  // explicitly allowed or the browser blocks the request before it
+  // reaches this handler.
+  res.setHeader('Access-Control-Allow-Origin', '*');
 
   const { ad } = req.query;
   if (ad && typeof ad === 'string') {

@@ -18,7 +18,6 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
     function handleOutside(e) {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
         setOpenMenu(null);
-        setGenreOpen(false);
       }
     }
     document.addEventListener('click', handleOutside);
