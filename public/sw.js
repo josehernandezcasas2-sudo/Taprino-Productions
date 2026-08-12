@@ -39,27 +39,14 @@ self.addEventListener('fetch', (event) => {
   const isPageOrData =
     event.request.mode === 'navigate' || url.pathname.startsWith('/_next/data/');
 
-  // The Cache API only ever supports http/https requests. Browser
-  // extensions (password managers, wallets, and similar) commonly inject
-  // content scripts that issue their own fetches — chrome-extension://,
-  // moz-extension://, and so on — and because this handler listens for
-  // every fetch on the page, those get swept in here too. Caching one
-  // throws immediately, which is harmless to the site itself but floods
-  // the console with an error that has nothing to do with anything this
-  // app actually does. Skipping non-http(s) schemes up front avoids ever
-  // attempting it.
-  const isCacheable = url.protocol === 'http:' || url.protocol === 'https:';
-
   if (isPageOrData) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
           // Clone BEFORE handing the response back — see the note in the
           // cache-first branch below for why the ordering matters.
-          if (isCacheable) {
-            const copy = networkResponse.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           return networkResponse;
         })
         .catch(() => caches.match(event.request))
@@ -79,10 +66,8 @@ self.addEventListener('fetch', (event) => {
         // response had often already been consumed by the browser, throwing
         // "Failed to execute 'clone' on 'Response': Response body is already
         // used" on essentially every request.
-        if (isCacheable) {
-          const copy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-        }
+        const copy = networkResponse.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         return networkResponse;
       });
       // Deliberately no .catch() returning `cached` here: at this point we
