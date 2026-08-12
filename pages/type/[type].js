@@ -11,6 +11,7 @@ import HeroSpotlight from '../../components/HeroSpotlight';
 import GenreBrowseRow from '../../components/GenreBrowseRow';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
+import MobileTabBar from '../../components/MobileTabBar';
 
 const TYPE_LABELS = { series: 'Series', movie: 'Movies', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
@@ -122,7 +123,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
                   <WishlistButton isActive={isWishlisted(info.id)} onToggle={() => toggleWishlist(info.id)} />
                   <Link href={`/series/${info.id}`} className={`poster-card ${tier}`}>
                     <div className="poster-art">
-                      <span className="poster-badge">{tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+                      <span className="poster-badge">{tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
                       ▤
                     </div>
                     <div className="poster-title-wrap">
@@ -143,7 +144,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
                 <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
                   <div className="poster-art">
-                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
                     ◈
                   </div>
                   <div className="poster-title-wrap">
@@ -160,7 +161,13 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
+      <MobileTabBar />
     </>
   );
 }

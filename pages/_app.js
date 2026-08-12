@@ -65,11 +65,16 @@ export default function App({ Component, pageProps }) {
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
         <meta name="theme-color" content="#14151c" />
+        <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
       {/* Google's IMA SDK — free, this is what actually serves the pre-roll ads */}
+      {/* Lets keyboard and screen-reader users jump past the nav on every page
+          instead of tabbing through the whole header each time. Visually hidden
+          until it receives focus. */}
+      <a href="#main-content" className="skip-link">Skip to content</a>
       <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="beforeInteractive" />
       <UploadProvider>
         <Component {...pageProps} />

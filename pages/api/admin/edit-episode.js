@@ -4,6 +4,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
+import { cloudflarePlaybackUrl, cloudflareUidFromUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
 // check and no "must still be pending" restriction — an admin can fix or
@@ -29,13 +30,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, ...fields } = req.body || {};
+  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, cloudflareVideoUid, ...fields } = req.body || {};
   if (!episodeId) {
     return res.status(400).json({ error: 'episodeId is required.' });
   }
 
   const supabase = getSupabase();
-  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, status, submitted_by').eq('id', episodeId).maybeSingle();
+  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, src, status, submitted_by').eq('id', episodeId).maybeSingle();
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Episode not found.' });
   }
@@ -59,6 +60,27 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: err.message });
   }
 
+  // Manual video replacement — the fallback for when a creator's in-app
+  // upload keeps failing: the file gets uploaded directly through
+  // Cloudflare's own dashboard, and this just links the resulting video ID
+  // to the episode. Same integrity check as manual-episode.js: Cloudflare's
+  // own transcoding has to have actually succeeded before this gets wired in.
+  let newSrc;
+  if (cloudflareVideoUid) {
+    const videoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
+    if (!videoStatus) {
+      return res.status(404).json({ error: 'No Cloudflare video found with that ID.' });
+    }
+    if (videoStatus.state === 'error') {
+      return res.status(400).json({ error: `Cloudflare could not process this video: ${videoStatus.errorReasonText || videoStatus.errorReasonCode}.` });
+    }
+    newSrc = cloudflarePlaybackUrl(cloudflareVideoUid);
+    const oldUid = cloudflareUidFromUrl(existing.src);
+    if (oldUid && oldUid !== cloudflareVideoUid) {
+      await recordOrphan({ kind: 'cloudflare_video', reference: oldUid, reason: 'video manually replaced by admin', context: existing.title });
+    }
+  }
+
   const dbUpdates = {};
   for (const f of EDITABLE_FIELDS) {
     if (fields[f] === undefined) continue;
@@ -70,6 +92,7 @@ export default async function handler(req, res) {
   if (dbUpdates.status) dbUpdates.reviewed_at = new Date().toISOString();
   if (poster) dbUpdates.poster = poster;
   if (thumbnail) dbUpdates.thumbnail = thumbnail;
+  if (newSrc) dbUpdates.src = newSrc;
 
   if (poster && existing.poster) {
     const oldPath = storagePathFromUrl(existing.poster);

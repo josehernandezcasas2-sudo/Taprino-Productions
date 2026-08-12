@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
+import { getAllSeriesForCreator } from '../lib/series';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import AdminEditEpisodeModal from '../components/AdminEditEpisodeModal';
+import ManualEpisodeForm from '../components/ManualEpisodeForm';
 
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
@@ -19,9 +22,11 @@ export async function getServerSideProps({ req, res }) {
   }
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const allSeries = await getAllSeriesForCreator();
   return {
     props: {
       mainGenres,
+      allSeries,
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
       email: account.email,
@@ -31,7 +36,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const [submissions, setSubmissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -310,8 +315,13 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
         isSubscriber={isSubscriber}
       />
       <div className="install-row"><InstallButton /></div>
+      <div className="admin-tool-links">
+        <Link href="/admin/house-ads">📺 House ads →</Link>
+        <Link href="/admin/live">🔴 Go live →</Link>
+        <Link href="/admin/channel">📡 Channel schedule →</Link>
+      </div>
 
-      <main className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>
+      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Admin Portal</div>
         <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Review creator submissions and manage access.</p>
 
@@ -355,6 +365,11 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
             ))
           )}
         </div>
+
+        <ManualEpisodeForm
+          allSeries={allSeries}
+          onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
+        />
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending review</div>
@@ -755,6 +770,11 @@ export default function AdminPortal({ mainGenres, isSignedIn, isSubscriber, emai
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
 
       {editingEpisode && (

@@ -176,9 +176,105 @@ export function UploadProvider({ children }) {
   // `useMethod: 'basic'` is what the widget's "try the fallback method"
   // button does; otherwise it's a plain retry of whatever method was
   // already being used.
+  // Companion to startUpload for the "paste a link" path. Deliberately a
+  // separate function rather than a branch inside startUpload/runOneUpload:
+  // the progress model is fundamentally different (Cloudflare's own
+  // pctComplete, polled, instead of upload byte counts we control directly),
+  // and keeping them apart means this can't accidentally destabilize the
+  // TUS/basic-upload state machine above, which already has to handle a lot
+  // of real-world flakiness on its own.
+  async function startUrlImport(videoUrl, fileName, formData) {
+    if (activeUpload && activeUpload.status === 'uploading') {
+      throw new Error('An upload is already in progress — wait for it to finish before starting another.');
+    }
+
+    lastAttemptRef.current = { videoUrl, fileName, formData, submitEndpoint: '/api/creator/submit-episode', isUrlImport: true };
+
+    setActiveUpload({
+      phase: 'main',
+      fileName: fileName || videoUrl,
+      fileSize: 0,
+      bytesUploaded: 0,
+      startedAt: Date.now(),
+      status: 'requesting-url',
+      uploadMethod: 'url-import',
+      importPct: null,
+      errorTitle: null,
+      errorMessage: null,
+      likelyBlocked: false
+    });
+
+    try {
+      const startRes = await fetch('/api/creator/import-video-url', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ videoUrl, fileName })
+      });
+      const startData = await startRes.json();
+      if (!startRes.ok) throw new Error(startData.error || 'Could not start the import.');
+
+      setActiveUpload((u) => (u ? { ...u, status: 'importing' } : u));
+
+      // Cloudflare fetches and transcodes the source on its own schedule —
+      // seconds for a small file, longer for a feature-length one — so this
+      // polls rather than waiting on a single request that could otherwise
+      // sit open for minutes.
+      const videoUid = await new Promise((resolve, reject) => {
+        const poll = async () => {
+          try {
+            const statusRes = await fetch(`/api/creator/video-status?uid=${encodeURIComponent(startData.uid)}`);
+            const status = await statusRes.json();
+            if (!statusRes.ok) throw new Error(status.error || 'Lost track of the import.');
+
+            if (status.state === 'ready' || status.readyToStream) {
+              resolve(startData.uid);
+              return;
+            }
+            if (status.state === 'error') {
+              reject(new Error(status.errorReasonText || 'Cloudflare could not process that video.'));
+              return;
+            }
+            setActiveUpload((u) => (u ? { ...u, importPct: typeof status.pctComplete === 'number' ? status.pctComplete : u.importPct } : u));
+            setTimeout(poll, 3000);
+          } catch (err) {
+            reject(err);
+          }
+        };
+        poll();
+      });
+
+      setActiveUpload((u) => (u ? { ...u, phase: 'saving', status: 'saving' } : u));
+
+      const submitRes = await fetch('/api/creator/submit-episode', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, videoUid })
+      });
+      const submitData = await submitRes.json();
+      if (!submitRes.ok) throw new Error(submitData.error || 'Could not save the submission.');
+
+      setActiveUpload((u) => (u ? { ...u, status: 'done' } : u));
+      lastAttemptRef.current = null;
+    } catch (err) {
+      const described = describeUploadError(err);
+      setActiveUpload((u) => (u ? {
+        ...u,
+        status: 'error',
+        errorTitle: described.title,
+        errorMessage: described.message,
+        errorRaw: described.raw,
+        likelyBlocked: false
+      } : u));
+    }
+  }
+
   function retryUpload(useMethod) {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
+    if (attempt.isUrlImport) {
+      startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData);
+      return;
+    }
     startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus', attempt.submitEndpoint);
   }
 
@@ -189,7 +285,7 @@ export function UploadProvider({ children }) {
   }
 
   return (
-    <UploadContext.Provider value={{ activeUpload, startUpload, retryUpload, dismissUpload }}>
+    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, retryUpload, dismissUpload }}>
       {children}
     </UploadContext.Provider>
   );

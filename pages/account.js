@@ -4,6 +4,7 @@ import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
+import MobileTabBar from '../components/MobileTabBar';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -87,7 +88,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
         mainGenres={mainGenres}
       />
 
-      <main className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
+      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
         <div className="account-card">
           <div className="account-eyebrow">Your account</div>
 
@@ -161,6 +162,16 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
           )}
         </div>
       </main>
+      <footer className="site-footer">
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
+      </footer>
+      <MobileTabBar />
     </>
   );
 }

@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const [{ data, error }, { data: allSeries }, viewCounts] = await Promise.all([
     supabase
       .from('episodes')
-      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at')
+      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label')
       .eq('submitted_by', userId)
       .order('created_at', { ascending: false }),
     supabase.from('series').select('id, name, poster, thumbnail'),
@@ -70,6 +70,9 @@ export default async function handler(req, res) {
         // include either way, and saves the dashboard a second round-trip
         // the moment something does go live.
         viewCount: viewCounts[ep.id] || 0,
+        captionsUrl: ep.captions_url || null,
+        captionsLanguage: ep.captions_language || 'en',
+        captionsLabel: ep.captions_label || 'English',
         // The creator's own uploaded artwork wins if present — Cloudflare's
         // auto-generated frame is just a "something is processing" preview,
         // not intentional thumbnail art, so it's purely a fallback here.

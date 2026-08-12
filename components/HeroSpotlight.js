@@ -127,7 +127,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <h2>{ep.title}</h2>
           <p>{ep.desc}</p>
           <div className="hero-meta">
-            <span>{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+            <span>{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
             <span>{ep.runtime}</span>
             {ep.genre && <span>{ep.genre}</span>}
             {ep.artist && <span>{ep.artist}</span>}

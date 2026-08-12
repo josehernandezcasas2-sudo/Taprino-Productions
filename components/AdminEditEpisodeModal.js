@@ -26,11 +26,25 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
   });
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [videoUid, setVideoUid] = useState('');
+  const [videoCheck, setVideoCheck] = useState(null); // null | 'checking' | { state, errorReasonText, ... } | { error }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
+  }
+
+  async function checkVideo() {
+    if (!videoUid.trim()) return;
+    setVideoCheck('checking');
+    try {
+      const res = await fetch(`/api/admin/check-cloudflare-video?uid=${encodeURIComponent(videoUid.trim())}`);
+      const data = await res.json();
+      setVideoCheck(res.ok ? data : { error: data.error });
+    } catch (err) {
+      setVideoCheck({ error: 'Could not reach the check endpoint.' });
+    }
   }
 
   async function handleSave(e) {
@@ -46,7 +60,8 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
           episodeId: episode.id,
           ...form,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
-          ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {})
+          ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
+          ...(videoUid.trim() ? { cloudflareVideoUid: videoUid.trim() } : {})
         })
       });
       const data = await res.json();
@@ -113,6 +128,32 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
 
           <label>Replace thumbnail — optional</label>
           <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.6rem' }} />
+
+          <label>Replace video — Cloudflare video ID, optional</label>
+          <p style={{ fontSize: '0.75rem', color: 'var(--ink-dim)', marginTop: '-0.3rem' }}>
+            For a file uploaded directly through Cloudflare&rsquo;s own dashboard (the fallback when in-app upload keeps failing) — paste its video ID, not a URL.
+          </p>
+          <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+            <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} />
+            <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
+              {videoCheck === 'checking' ? 'Checking…' : 'Check'}
+            </button>
+          </div>
+          {videoCheck && videoCheck !== 'checking' && (
+            videoCheck.error ? (
+              <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
+            ) : videoCheck.state === 'error' ? (
+              <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
+                Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
+              </p>
+            ) : videoCheck.state === 'ready' ? (
+              <p style={{ color: '#7fbf8f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream — safe to save.</p>
+            ) : (
+              <p style={{ color: 'var(--signal-amber)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
+                Still processing on Cloudflare&rsquo;s side ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can save now, but it won&rsquo;t be watchable until this finishes.
+              </p>
+            )
+          )}
 
           {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
 

@@ -8,6 +8,7 @@ import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import SeriesHero from '../../components/SeriesHero';
+import MobileTabBar from '../../components/MobileTabBar';
 
 export async function getServerSideProps({ req, params, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -135,7 +136,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                   <Link href={`/episode/${ep.id}`} className={`episode-row-link ${ep.tier}`}>
                     <div className="episode-row-thumb">
                       {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
-                      <span className="episode-row-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+                      <span className="episode-row-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
                       {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
                     </div>
                     <div className="episode-row-info">
@@ -157,7 +158,13 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
+      <MobileTabBar />
     </>
   );
 }

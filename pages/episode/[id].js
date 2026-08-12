@@ -7,13 +7,16 @@ import { findEpisode } from '../../lib/episodes';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
-import { recordView } from '../../lib/redis';
+import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
+import { recordView, recordDailyView } from '../../lib/redis';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
+import MobileTabBar from '../../components/MobileTabBar';
+import AccessibilityPanel from '../../components/AccessibilityPanel';
 
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -25,7 +28,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   // Awaited (not fire-and-forget) — on serverless, an un-awaited call can get
   // cut off the moment the response is sent. recordView already swallows its
   // own errors internally, so this never blocks the page on a Redis hiccup.
-  await recordView(episode.id);
+  await Promise.all([recordView(episode.id), recordDailyView(episode.id, episode.submittedBy)]);
 
   const account = await getAccountContext(req);
 
@@ -37,7 +40,34 @@ export async function getServerSideProps({ req, params, query, res }) {
   // server-side, before it's ever included in props. trailerSrc is exempt
   // from this by design — trailers are meant to be freely previewable.
   const entitled = episode.tier === 'free' || account.isSubscriber;
-  const safeEpisode = { ...episode, src: entitled ? episode.src : null };
+
+  // Premium video is served through a short-lived Cloudflare signed URL
+  // rather than its permanent public one. The permanent URL is a forever
+  // link — once it leaks out of one subscriber's network tab it can't be
+  // taken back. A signed URL is minted only after the entitlement check
+  // just above, and expires on its own.
+  //
+  // Free episodes stay on the plain URL: they're meant to be shareable,
+  // and signing them would just add a Cloudflare API call to every load.
+  let playbackSrc = entitled ? episode.src : null;
+  let describedSrc = entitled ? episode.audioDescriptionSrc : null;
+  let signedPlayback = false;
+  if (entitled && episode.tier === 'premium' && episode.src) {
+    const signed = await signedSrcForStoredUrl(episode.src);
+    if (signed) {
+      playbackSrc = signed.src;
+      signedPlayback = true;
+    }
+    // The described version is a separate file and needs its own token —
+    // reusing the main one would 403, since a Cloudflare token is scoped to
+    // the single video it was minted for.
+    if (episode.audioDescriptionSrc) {
+      const signedAd = await signedSrcForStoredUrl(episode.audioDescriptionSrc);
+      if (signedAd) describedSrc = signedAd.src;
+    }
+  }
+
+  const safeEpisode = { ...episode, src: playbackSrc, audioDescriptionSrc: describedSrc };
   const publicEpisodes = await getPublicEpisodes();
 
   // Resolved server-side since findSeries is now an async Supabase query —
@@ -57,20 +87,26 @@ export async function getServerSideProps({ req, params, query, res }) {
       watchProgress: account.watchProgress,
       publicEpisodes,
       parentSeriesName: parentSeries ? parentSeries.name : null,
-      startOnTrailer: query.trailer === '1'
+      startOnTrailer: query.trailer === '1',
+      signedPlayback
     }
   };
 }
 
-export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, isAdmin, isCreator }) {
+export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, isAdmin, isCreator, signedPlayback }) {
   const router = useRouter();
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
+  const [describedActive, setDescribedActive] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
 
   const locked = episode.tier === 'premium' && !isSubscriber && !showingTrailer;
-  const playingEpisode = showingTrailer ? { ...episode, src: episode.trailerSrc } : episode;
+  const playingEpisode = showingTrailer
+    ? { ...episode, src: episode.trailerSrc }
+    : describedActive && episode.audioDescriptionSrc
+    ? { ...episode, src: episode.audioDescriptionSrc }
+    : episode;
 
   const mainGenres = [...new Set(publicEpisodes.map((e) => e.mainGenre).filter(Boolean))];
 
@@ -140,7 +176,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       />
       <div className="install-row"><InstallButton /></div>
 
-      <main className="stage stage-single">
+      <main id="main-content" className="stage stage-single">
         <div>
           <Link href="/" className="library-back" style={{ display: 'inline-block', marginBottom: '1.2rem', textDecoration: 'none' }}>
             ← Back to screening room
@@ -209,6 +245,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 episode={playingEpisode}
                 adsEnabled={!showingTrailer && episode.tier === 'free'}
                 onEnded={handleEnded}
+                signedPlayback={!showingTrailer && signedPlayback}
                 initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
                 onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
               />
@@ -217,7 +254,16 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             <div className="player-meta">
               <span>{episode.runtime}</span>
               <span>{episode.tier === 'free' ? 'Free tier · ad-supported' : 'Cipher Circle · ad-free'}</span>
+              {describedActive && <span>🔊 Audio described</span>}
             </div>
+
+            {!locked && (
+              <AccessibilityPanel
+                episode={episode}
+                describedActive={describedActive}
+                onPlayDescribed={() => setDescribedActive((d) => !d)}
+              />
+            )}
           </div>
         </div>
       </main>
@@ -225,7 +271,13 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
+      <MobileTabBar />
     </>
   );
 }

@@ -11,8 +11,12 @@ import GenreRow from '../components/GenreRow';
 import HeroSpotlight from '../components/HeroSpotlight';
 import SignalPanel from '../components/SignalPanel';
 import InstallButton from '../components/InstallButton';
+import Link from 'next/link';
 import HeaderNav from '../components/HeaderNav';
+import { getCurrentLiveStream } from '../lib/liveStreams';
+import { getChannelState } from '../lib/channelSchedule';
 import WishlistButton from '../components/WishlistButton';
+import MobileTabBar from '../components/MobileTabBar';
 
 export async function getServerSideProps({ req, res }) {
   // Personalized per visitor (newsletter status, wishlist, subscriber tier) —
@@ -20,7 +24,7 @@ export async function getServerSideProps({ req, res }) {
   // copy of their own homepage after they've changed a setting elsewhere.
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
 
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const [episodes, allSeries, liveStream, channelState] = await Promise.all([getPublicEpisodes(), getAllSeries(), getCurrentLiveStream(), getChannelState()]);
   const account = await getAccountContext(req);
 
   // Signed-out visitors who dismissed/opted out of the newsletter get a
@@ -52,6 +56,8 @@ export async function getServerSideProps({ req, res }) {
 
   return {
     props: {
+      liveStream,
+      channelOnAir: channelState.onAir ? { title: channelState.program.title } : null,
       isSubscriber: account.isSubscriber,
       isSignedIn: account.isSignedIn,
       showNewsletterPanel,
@@ -66,7 +72,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function Home({ isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator }) {
+export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -151,9 +157,25 @@ export default function Home({ isSubscriber, isSignedIn, showNewsletterPanel, he
       />
       <div className="install-row"><InstallButton /></div>
 
+      {liveStream && (
+        <Link href="/live" className="live-now-banner">
+          <i className="live-dot" aria-hidden="true" />
+          <span><strong>Live now</strong> — {liveStream.title}</span>
+          <span className="live-now-arrow">Watch →</span>
+        </Link>
+      )}
+
+      {channelOnAir && (
+        <Link href="/channel" className="live-now-banner channel-banner">
+          <i className="live-dot" aria-hidden="true" />
+          <span><strong>On the channel</strong> — {channelOnAir.title}</span>
+          <span className="live-now-arrow">Tune in →</span>
+        </Link>
+      )}
+
       <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
 
-      <main className="stage stage-single">
+      <main id="main-content" className="stage stage-single">
         <div>
           {searchResults ? (
             <>
@@ -180,7 +202,7 @@ export default function Home({ isSubscriber, isSignedIn, showNewsletterPanel, he
                     )}
                     <button className={`ep-card ${ep.tier}`} onClick={() => goToEpisode(ep)}>
                       <div className="ep-thumb">
-                        <span className="ep-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+                        <span className="ep-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
                         {ep.tier === 'premium' ? '◈ locked' : '▶ preview'}
                       </div>
                       <div className="ep-info">
@@ -246,7 +268,13 @@ export default function Home({ isSubscriber, isSignedIn, showNewsletterPanel, he
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
+      <MobileTabBar />
     </>
   );
 }

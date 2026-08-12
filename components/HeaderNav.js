@@ -9,7 +9,6 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | null
-  const [genreOpen, setGenreOpen] = useState(false);
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
   const rootRef = useRef(null);
@@ -117,29 +116,6 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
             <Link href="/type/podcast" className={`dropdown-item ${activeType === 'podcast' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
               Podcasts
             </Link>
-
-            <div className="dropdown-divider" />
-            <div className="dropdown-label">Browse by genre</div>
-            <button
-              className={`dropdown-item genre-toggle ${genreOpen ? 'open' : ''}`}
-              onClick={(e) => { e.stopPropagation(); setGenreOpen((v) => !v); }}
-            >
-              <span>All genres</span><span className="chevron">›</span>
-            </button>
-            {genreOpen && (
-              <div className="genre-submenu open">
-                {mainGenres.map((g) => (
-                  <Link
-                    key={g}
-                    href={`/genre/${encodeURIComponent(g)}`}
-                    className="dropdown-item"
-                    onClick={() => { setOpenMenu(null); setGenreOpen(false); }}
-                  >
-                    {g}
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
         )}
       </div>

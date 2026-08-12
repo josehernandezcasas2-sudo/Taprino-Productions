@@ -19,6 +19,7 @@ import InstallButton from '../components/InstallButton';
 import EditSubmissionModal from '../components/EditSubmissionModal';
 import ArtworkModal from '../components/ArtworkModal';
 import DeleteRequestModal from '../components/DeleteRequestModal';
+import CaptionUploadModal from '../components/CaptionUploadModal';
 import ReplaceVideoModal from '../components/ReplaceVideoModal';
 
 // SECURITY: same enforcement pattern as /admin — a non-creator is
@@ -134,10 +135,12 @@ function draftHasContent(draft) {
 }
 
 export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
-  const { activeUpload, startUpload } = useUpload();
+  const { activeUpload, startUpload, startUrlImport } = useUpload();
   const seriesList = allSeries;
   const [form, setForm] = useState(EMPTY_FORM);
   const [file, setFile] = useState(null);
+  const [videoSource, setVideoSource] = useState('file'); // 'file' | 'link'
+  const [videoUrl, setVideoUrl] = useState('');
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
@@ -150,6 +153,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
+  const [captionSubmission, setCaptionSubmission] = useState(null);
   const [deleteActionError, setDeleteActionError] = useState(null);
   const [replacingVideoSubmission, setReplacingVideoSubmission] = useState(null);
   const [runtimeStatus, setRuntimeStatus] = useState(null); // null | 'detecting' | 'detected' | 'failed'
@@ -260,8 +264,19 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError(null);
-    if (!file) {
+    if (videoSource === 'file' && !file) {
       setFormError('Please choose a video file.');
+      return;
+    }
+    if (videoSource === 'link' && !videoUrl.trim()) {
+      setFormError('Paste a link to your video file.');
+      return;
+    }
+    if (videoSource === 'link' && !form.runtime.trim()) {
+      // Auto-detection needs an actual File object to read — there isn't
+      // one for a link import, so this is the one field link-mode can't
+      // fill in for you.
+      setFormError('Enter the runtime (link imports can\'t detect it automatically).');
       return;
     }
     if (activeUpload && activeUpload.status !== 'done' && activeUpload.status !== 'error') {
@@ -290,13 +305,20 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     // Fire-and-forget on purpose — the upload now lives in the shared
     // context, not this page. It keeps running even if this page unmounts
     // (navigating elsewhere), which is the whole point.
-    startUpload(file, submissionData, trailerFile || undefined);
+    if (videoSource === 'link') {
+      // No trailer support for link imports yet — see UploadContext's
+      // startUrlImport for why this is a separate, simpler path.
+      startUrlImport(videoUrl.trim(), form.title ? `${form.title}.mp4` : undefined, submissionData);
+    } else {
+      startUpload(file, submissionData, trailerFile || undefined);
+    }
 
     // Reset the form immediately so the creator can start filling out a
     // new submission right away, without waiting for this one to finish.
     clearDraft();
     setForm(EMPTY_FORM);
     setFile(null);
+    setVideoUrl('');
     setPosterFile(null);
     setThumbnailFile(null);
     setTrailerFile(null);
@@ -365,6 +387,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             )}
             {s.status === 'approved' && <span>👁 {s.viewCount} view{s.viewCount === 1 ? '' : 's'}</span>}
             {s.missingArtwork && s.status !== 'rejected' && <span>🖼 missing artwork</span>}
+            {!s.captionsUrl && s.status === 'approved' && <span>💬 no captions</span>}
             {s.artworkPending && <span>⏳ artwork change awaiting approval</span>}
             {s.deletionRequested && <span>🗑 pending deletion</span>}
           </div>
@@ -388,6 +411,11 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             )}
             {!s.deletionRequested && (
               <button onClick={() => setReplacingVideoSubmission(s)}>🎬 Replace video</button>
+            )}
+            {!s.deletionRequested && (
+              <button onClick={() => setCaptionSubmission(s)}>
+                💬 {s.captionsUrl ? 'Replace captions' : 'Add captions'}
+              </button>
             )}
             {s.deletionRequested ? (
               <button onClick={() => cancelEpisodeDeletion(s.id)}>Cancel deletion request</button>
@@ -417,7 +445,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
       />
       <div className="install-row"><InstallButton /></div>
 
-      <main className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
+      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Creator Studio</div>
         <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Submit new episodes and track your review status.</p>
 
@@ -501,14 +529,59 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               <option value="premium">Cipher Circle (premium)</option>
             </select>
 
-            <label>Video file — no size limit, and upload automatically resumes if interrupted</label>
-            <UppyFilePicker
-              key={`video-${pickerResetKey}`}
-              accept="video/*"
-              note="Any video file, no size limit"
-              onFileSelected={handleVideoFileChange}
-            />
-            {!file && <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>Required before you can submit.</p>}
+            <label>Video source</label>
+            <div className="video-source-toggle" role="group" aria-label="Video source">
+              <button
+                type="button"
+                className={videoSource === 'file' ? 'on' : ''}
+                onClick={() => setVideoSource('file')}
+              >
+                Upload a file
+              </button>
+              <button
+                type="button"
+                className={videoSource === 'link' ? 'on' : ''}
+                onClick={() => setVideoSource('link')}
+              >
+                Import from a link
+              </button>
+            </div>
+
+            {videoSource === 'file' ? (
+              <>
+                <UppyFilePicker
+                  key={`video-${pickerResetKey}`}
+                  accept="video/*"
+                  note="Any video file, no size limit"
+                  onFileSelected={handleVideoFileChange}
+                />
+                {!file && <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>Required before you can submit.</p>}
+              </>
+            ) : (
+              <>
+                <input
+                  type="url"
+                  inputMode="url"
+                  placeholder="https://…/your-episode.mp4"
+                  value={videoUrl}
+                  onChange={(e) => setVideoUrl(e.target.value)}
+                  style={{ marginBottom: '0.5rem' }}
+                />
+                <p className="video-source-help">
+                  Use this if the in-app upload keeps failing on your network. Paste a direct link to
+                  the video file — a signed download link from Dropbox, Google Drive, WeTransfer, or
+                  similar works, as does any plain .mp4/.mov URL. A page that just shows a video
+                  player (like a YouTube watch link) won&rsquo;t work — there&rsquo;s no single file
+                  there to fetch.
+                </p>
+                <p className="video-source-help">
+                  The link is only used once, to bring the file in. After that it plays entirely
+                  through our own video hosting, the same as a regular upload — nobody watching ever
+                  sees or can reach the original link, and downloads stay blocked exactly like any
+                  other episode. We won&rsquo;t auto-detect the runtime for a link, so enter it below.
+                </p>
+              </>
+            )}
 
             <label>Poster image — 2:3 portrait (roughly 400×600px or larger), optional</label>
             <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
@@ -542,6 +615,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
 
         <div className="account-card" style={{ marginTop: '1.5rem' }}>
           <div className="account-eyebrow">Your submissions</div>
+          <p style={{ margin: '0 0 1rem', fontSize: '0.87rem', color: 'var(--ink-dim)' }}>
+            Want to see how they&rsquo;re doing?{' '}
+            <Link href="/creator/analytics" style={{ color: 'var(--signal-amber)' }}>
+              View your numbers →
+            </Link>
+          </p>
           <h3>What you've sent in so far</h3>
 
           {deleteActionError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{deleteActionError}</p>}
@@ -630,6 +709,11 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
 
       {editingSubmission && (
@@ -661,6 +745,14 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
         <ReplaceVideoModal
           submission={replacingVideoSubmission}
           onClose={() => { setReplacingVideoSubmission(null); loadSubmissions(); }}
+        />
+      )}
+
+      {captionSubmission && (
+        <CaptionUploadModal
+          submission={captionSubmission}
+          onClose={() => setCaptionSubmission(null)}
+          onSaved={loadSubmissions}
         />
       )}
     </>

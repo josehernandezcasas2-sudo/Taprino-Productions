@@ -34,12 +34,15 @@ export default function UploadStatusWidget() {
   const remainingBytes = Math.max(0, activeUpload.fileSize - activeUpload.bytesUploaded);
   const etaSec = uploadSpeed > 0 ? Math.round(remainingBytes / uploadSpeed) : null;
 
+  const isUrlImport = activeUpload.uploadMethod === 'url-import';
+
   const label = {
-    'requesting-url': 'Preparing upload…',
+    'requesting-url': isUrlImport ? 'Asking Cloudflare to fetch your link…' : 'Preparing upload…',
     uploading: activeUpload.phase === 'trailer' ? 'Uploading trailer (2 of 2)…' : 'Uploading…',
+    importing: 'Importing from your link…',
     saving: 'Saving submission…',
     done: '✓ Submitted for review',
-    error: '✕ Upload failed'
+    error: isUrlImport ? '✕ Import failed' : '✕ Upload failed'
   }[activeUpload.status];
 
   return (
@@ -65,6 +68,21 @@ export default function UploadStatusWidget() {
       )}
       {activeUpload.status === 'requesting-url' && (
         <div className="upload-widget-meta">Getting things ready…</div>
+      )}
+      {activeUpload.status === 'importing' && (
+        <>
+          {typeof activeUpload.importPct === 'number' ? (
+            <div className="upload-widget-bar">
+              <div className="upload-widget-bar-fill" style={{ width: `${activeUpload.importPct}%` }} />
+            </div>
+          ) : null}
+          <div className="upload-widget-meta">
+            {typeof activeUpload.importPct === 'number'
+              ? `Cloudflare is fetching your file — ${activeUpload.importPct}% so far.`
+              : 'Cloudflare is fetching your file — this can take a while for a large one.'}
+            {' '}You can leave this page; it keeps going.
+          </div>
+        </>
       )}
       {activeUpload.status === 'saving' && (
         <div className="upload-widget-meta">Almost done — saving your submission details…</div>

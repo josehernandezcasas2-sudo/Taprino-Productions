@@ -7,6 +7,7 @@ import { useWishlist } from '../lib/useWishlist';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import WishlistButton from '../components/WishlistButton';
+import MobileTabBar from '../components/MobileTabBar';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -93,7 +94,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
                 <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
                   <div className="poster-art">
-                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}</span>
+                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
                     ◈
                   </div>
                   <div className="poster-title-wrap">
@@ -110,7 +111,13 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
+      <MobileTabBar />
     </>
   );
 }

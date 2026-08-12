@@ -90,7 +90,7 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
       />
       <div className="install-row"><InstallButton /></div>
 
-      <main className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
+      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Series management</div>
         <p className="library-sub" style={{ marginBottom: '1.2rem' }}>
           Set shared trailer and artwork per series, or request a series be removed.
@@ -141,6 +141,11 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
       <footer className="site-footer">
         <span>TAPRINO TRANSMISSION</span>
         <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span className="footer-legal">
+          <a href="/terms">Terms</a>
+          <a href="/privacy">Privacy</a>
+          <a href="/cookies">Cookies</a>
+        </span>
       </footer>
 
       {deletingSeries && (
