@@ -196,8 +196,14 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
                 ) : (
                   <Link href="/account" className="dropdown-item">✦ Join the Cipher Circle</Link>
                 )}
+                {/* The self-serve upload route is retired — see /apply. Creators
+                    with work already on the platform keep their analytics; new
+                    work comes in through the application form and is ingested
+                    by the studio. */}
                 {isCreator && <div className="dropdown-divider" />}
-                {isCreator && <Link href="/creator" className="dropdown-item">🎬 Submit an Episode</Link>}
+                {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
+                <div className="dropdown-divider" />
+                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
                 <div className="dropdown-divider" />
                 <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}>↩ Sign Out</button>
               </>
@@ -206,6 +212,8 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
                 <div className="dropdown-label">Account</div>
                 <Link href="/account" className="dropdown-item">→ Log in / Create account</Link>
                 <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
+                <div className="dropdown-divider" />
+                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
               </>
             )}
           </div>

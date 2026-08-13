@@ -50,6 +50,13 @@ export default async function handler(req, res) {
       runtime: e.runtime,
       poster: e.poster,
       thumbnail: e.thumbnail,
+      // This was the bug behind "I saved a Cloudflare ID, came back, and it
+      // said there was no video." The query above always fetched `src`, but
+      // this mapping dropped it — so the edit modal received `undefined` and
+      // correctly reported "no video attached," even for episodes that had
+      // one saved perfectly well. The save path was never broken; the read
+      // path just never returned the field.
+      src: e.src,
       featured: e.featured,
       deletionRequested: e.deletion_requested,
       createdAt: e.created_at

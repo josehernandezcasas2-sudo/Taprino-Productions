@@ -2594,3 +2594,56 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 
 .admin-actions { display: flex; gap: 0.6rem; margin-top: 0.2rem; }
 .admin-actions button { width: auto; padding-left: 1.4rem; padding-right: 1.4rem; }
+
+/* ---------------------------------------------------------------------
+   Creator application form + admin review
+   --------------------------------------------------------------------- */
+.apply-form { max-width: 100%; margin-top: 1.4rem; }
+.apply-section {
+  margin: 1.6rem 0 0.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid rgba(234, 231, 221, 0.1);
+}
+.apply-section:first-of-type { margin-top: 0.6rem; border-top: none; padding-top: 0; }
+.apply-form input[type='email'],
+.apply-form input[type='url'] {
+  width: 100%;
+  background: var(--void);
+  border: 1px solid rgba(234, 231, 221, 0.16);
+  border-radius: 4px;
+  color: var(--ink);
+  padding: 0.6rem 0.7rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  min-height: 42px;
+  box-sizing: border-box;
+}
+.apply-success {
+  border: 1px solid rgba(95, 168, 114, 0.4);
+  background: rgba(95, 168, 114, 0.07);
+  border-radius: 8px;
+  padding: 1.6rem;
+  margin-top: 1.4rem;
+}
+.apply-success h2 { margin: 0 0 0.6rem; font-size: 1.3rem; }
+.apply-success p { color: var(--ink-dim); line-height: 1.65; margin: 0 0 0.8rem; }
+.apply-fineprint { font-size: 0.84rem; color: var(--static-grey) !important; }
+
+.app-card { grid-template-columns: 1fr auto; }
+.app-logline {
+  font-size: 0.88rem;
+  color: var(--ink);
+  margin: 0.5rem 0 0.4rem;
+  line-height: 1.5;
+}
+.app-detail {
+  border-left: 2px solid rgba(232, 163, 61, 0.3);
+  padding-left: 0.9rem;
+  margin: 0.6rem 0;
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  line-height: 1.6;
+}
+.app-detail p { margin: 0 0 0.5rem; word-break: break-word; }
+.app-detail a { color: var(--signal-amber); }
+.app-detail strong { color: var(--ink); }
