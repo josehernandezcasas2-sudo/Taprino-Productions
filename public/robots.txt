@@ -1,0 +1,15 @@
+# Admin and creator tooling is behind auth anyway, but there's no reason
+# to spend crawl budget on it or have it surface in search results.
+User-agent: *
+Disallow: /admin
+Disallow: /admin/
+Disallow: /creator
+Disallow: /creator/
+Disallow: /api/
+Disallow: /account
+
+Allow: /
+
+# Update this once the real domain is live — a sitemap line pointing at
+# the wrong host is worse than none at all.
+Sitemap: https://taprino-productions-gfcl.vercel.app/sitemap.xml

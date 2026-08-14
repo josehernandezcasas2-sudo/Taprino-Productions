@@ -110,7 +110,7 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
             <option value="premium">Cipher Circle (premium)</option>
           </select>
 
-          {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+          {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
             <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>

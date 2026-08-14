@@ -4,6 +4,7 @@ import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
+import { SITE } from '../lib/siteConfig';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -62,13 +63,12 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
   return (
     <>
       <Head>
-        <title>Submit your work — Taprino Transmission</title>
-        <meta name="description" content="Apply to have your film or series distributed on Taprino Transmission." />
+        <title>Submit your work — {SITE.name}</title>
+        <meta name="description" content={`Apply to have your film or series distributed on ${SITE.name}.`} />
       </Head>
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -201,9 +201,11 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

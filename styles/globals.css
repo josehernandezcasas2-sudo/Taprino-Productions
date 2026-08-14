@@ -1,15 +1,61 @@
 :root {
-  --void: #14151c;
-  --void-2: #1b1d27;
+  /* ===================================================================
+     OLIVE SYSTEM — derived from the Studio Tapa logo
+     Sampled directly from the logo artwork: the circle is #595b36 (hue 63°),
+     with rust #c85924, mint #93d0a4 and blue #8499dc as its accents. Surfaces
+     use that same 63° hue at very low lightness so the accent reads as part
+     of one family rather than sitting on an unrelated neutral. The accent
+     itself is the brand olive lifted in lightness — #595b36 as text on a
+     dark background would fail contrast outright.
+     Every colour below is checked for WCAG contrast against the surface
+     it's actually used on — body text is AAA, all accents clear AA at
+     minimum, and the tertiary grey was specifically tuned upward so it
+     stays legible on raised cards, not just on the page background.
+
+     The old token names are kept as aliases at the bottom of this block
+     so the ~2,000 existing references across the stylesheet keep working
+     and re-theme automatically. New work should use the semantic names.
+     =================================================================== */
+
+  /* Surfaces — near-black with a deliberate olive undertone rather than
+     the previous cold blue-grey, so the accent reads as part of the same
+     family instead of sitting on top of an unrelated background. */
+  --surface-0: #11110b;   /* page background */
+  --surface-1: #1c1c14;   /* raised: header, footer, panels */
+  --surface-2: #27281d;   /* cards, inputs, wells */
+  --surface-3: #353529;   /* hover states on cards */
+
+  /* Primary accent */
+  --olive: #c2c775;
+  --olive-bright: #dcdfa4;  /* hover / emphasis */
+  --olive-deep: #616336;    /* borders, dim/disabled states */
+  --olive-shadow: #2b2c1a;  /* tinted fills behind olive elements */
+
+  /* Premium tier keeps its own identity, warm against the olive */
+  --brass: #d9a441;
+  --brass-deep: #6b5219;
+
+  /* Text */
+  --ink: #ece9dd;
+  --ink-dim: #b5b3a3;
+  --ink-faint: #9b9c90;
+
+  /* Status */
+  --ok: #84cd98;
+  --warn: #e0863c;   /* deliberately distinct from --brass, which means tier, not status */
+  --danger: #d67c51;
+  --danger-deep: #5c2c22;
+
+  /* ---- Aliases: old names → new system, so nothing breaks ---- */
+  --void: var(--surface-0);
+  --void-2: var(--surface-1);
   --paper: #f1e9d8;
-  --signal-tint: #dcebe8;
-  --signal-amber: #e8a33d;
-  --cipher-teal: #4aa8a2;
-  --cipher-teal-deep: #0e5c56;
-  --oxide: #b3492f;
-  --static-grey: #8a8d97;
-  --ink: #eae7dd;
-  --ink-dim: #b6b3ab;
+  --signal-tint: #dfe6c4;
+  --signal-amber: var(--olive);
+  --cipher-teal: var(--brass);
+  --cipher-teal-deep: var(--brass-deep);
+  --oxide: var(--danger);
+  --static-grey: var(--ink-faint);
   --font-display: 'Space Grotesk', sans-serif;
   --font-body: 'Fraunces', serif;
   --font-mono: 'IBM Plex Mono', monospace;
@@ -217,7 +263,7 @@ button { font-family: inherit; cursor: pointer; }
 .season-tab.active {
   background: var(--signal-amber);
   border-color: var(--signal-amber);
-  color: #1c1305;
+  color: var(--olive-shadow);
 }
 .episode-list { display: flex; flex-direction: column; gap: 0.8rem; }
 .episode-row {
@@ -250,15 +296,15 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.6rem;
   color: rgba(234, 231, 221, 0.4);
 }
-.episode-row-link.free .episode-row-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), #191b24); }
-.episode-row-link.premium .episode-row-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), #191b24); }
+.episode-row-link.free .episode-row-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
+.episode-row-link.premium .episode-row-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), var(--surface-1)); }
 .episode-row-badge {
   position: absolute; top: 0.4rem; right: 0.4rem;
   font-family: var(--font-mono); font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.15rem 0.4rem; border-radius: 999px;
 }
 .episode-row-link.free .episode-row-badge { background: rgba(74,168,162,0.2); color: var(--cipher-teal); }
-.episode-row-link.premium .episode-row-badge { background: rgba(179,73,47,0.22); color: #e08a6f; }
+.episode-row-link.premium .episode-row-badge { background: rgba(179,73,47,0.22); color: var(--danger); }
 .episode-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 .episode-row-info h4 { margin: 0 0 0.3rem; font-family: var(--font-display); font-size: 0.95rem; font-weight: 600; }
 .episode-row-info p {
@@ -297,15 +343,15 @@ button { font-family: inherit; cursor: pointer; }
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.poster-card.free .poster-art { background: radial-gradient(circle at 35% 25%, rgba(74,168,162,0.28), #191b24 70%); }
-.poster-card.premium .poster-art { background: radial-gradient(circle at 65% 25%, rgba(179,73,47,0.28), #191b24 70%); }
+.poster-card.free .poster-art { background: radial-gradient(circle at 35% 25%, rgba(74,168,162,0.28), var(--surface-1) 70%); }
+.poster-card.premium .poster-art { background: radial-gradient(circle at 65% 25%, rgba(179,73,47,0.28), var(--surface-1) 70%); }
 .poster-badge {
   position: absolute; top: 0.5rem; right: 0.5rem;
   font-family: var(--font-mono); font-size: 0.52rem; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.2rem 0.45rem; border-radius: 999px;
 }
 .poster-card.free .poster-badge { background: rgba(74,168,162,0.2); color: var(--cipher-teal); }
-.poster-card.premium .poster-badge { background: rgba(179,73,47,0.22); color: #e08a6f; }
+.poster-card.premium .poster-badge { background: rgba(179,73,47,0.22); color: var(--danger); }
 .poster-title-wrap {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 0.8rem 0.7rem 0.7rem;
@@ -515,7 +561,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 600;
   font-size: 0.85rem;
 }
-.unlock-btn:hover { background: #5cbdb6; }
+.unlock-btn:hover { background: var(--brass); }
 .unlock-btn:disabled { opacity: 0.6; cursor: wait; }
 
 .credit-line {
@@ -651,7 +697,7 @@ button { font-family: inherit; cursor: pointer; }
 .hero-actions { display: flex; gap: 0.7rem; }
 .hero-play {
   background: var(--signal-amber);
-  color: #1c1305;
+  color: var(--olive-shadow);
   border: none;
   border-radius: 999px;
   padding: 0.6rem 1.3rem;
@@ -659,7 +705,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 600;
   font-size: 0.85rem;
 }
-.hero-play:hover { background: #f0b158; }
+.hero-play:hover { background: var(--olive-bright); }
 .hero-trailer {
   background: rgba(20,21,28,0.5);
   border: 1px solid rgba(74, 168, 162, 0.5);
@@ -808,7 +854,7 @@ button { font-family: inherit; cursor: pointer; }
 .category-pill.active {
   background: var(--signal-amber);
   border-color: var(--signal-amber);
-  color: #1c1305;
+  color: var(--olive-shadow);
   font-weight: 600;
 }
 .shelf {
@@ -875,8 +921,8 @@ button { font-family: inherit; cursor: pointer; }
   position: static;
 }
 
-.ep-card.free .ep-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), #191b24); }
-.ep-card.premium .ep-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), #191b24); }
+.ep-card.free .ep-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
+.ep-card.premium .ep-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), var(--surface-1)); }
 .ep-badge {
   position: absolute; top: 0.5rem; right: 0.5rem;
   font-family: var(--font-mono);
@@ -887,7 +933,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
 }
 .ep-card.free .ep-badge { background: rgba(74,168,162,0.18); color: var(--cipher-teal); }
-.ep-card.premium .ep-badge { background: rgba(179,73,47,0.2); color: #e08a6f; }
+.ep-card.premium .ep-badge { background: rgba(179,73,47,0.2); color: var(--danger); }
 .ep-info { padding: 0.7rem 0.8rem 0.9rem; }
 .ep-info h4 { font-family: var(--font-display); font-size: 0.88rem; margin: 0 0 0.25rem; font-weight: 600; }
 .ep-info span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
@@ -968,7 +1014,7 @@ button { font-family: inherit; cursor: pointer; }
 .account-btn-primary {
   width: 100%;
   background: var(--signal-amber);
-  color: #1c1305;
+  color: var(--olive-shadow);
   border: none;
   border-radius: 999px;
   padding: 0.7rem;
@@ -977,7 +1023,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.88rem;
   margin-bottom: 0.7rem;
 }
-.account-btn-primary:hover { background: #f0b158; }
+.account-btn-primary:hover { background: var(--olive-bright); }
 .account-btn-primary:disabled { opacity: 0.6; cursor: wait; }
 .account-btn-secondary {
   display: block;
@@ -1027,7 +1073,7 @@ button { font-family: inherit; cursor: pointer; }
 .account-error {
   background: rgba(179, 73, 47, 0.14);
   border: 1px solid rgba(179, 73, 47, 0.4);
-  color: #e08a6f;
+  color: var(--danger);
   padding: 0.6rem 0.7rem;
   border-radius: 4px;
   font-size: 0.82rem;
@@ -1036,7 +1082,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .postcard {
   background: var(--signal-tint);
-  color: #16302c;
+  color: var(--olive-shadow);
   border-radius: 2px;
   padding: 1.4rem 1.3rem 1.5rem;
   position: relative;
@@ -1047,7 +1093,7 @@ button { font-family: inherit; cursor: pointer; }
   right: 1.3rem;
   background: rgba(179, 73, 47, 0.14);
   border: 1px solid rgba(179, 73, 47, 0.3);
-  color: #8a3a2e;
+  color: var(--danger-deep);
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   font-family: var(--font-mono);
@@ -1082,13 +1128,13 @@ button { font-family: inherit; cursor: pointer; }
   background: rgba(255,255,255,0.55);
   font-family: var(--font-body);
   font-size: 0.85rem;
-  color: #16302c;
+  color: var(--olive-shadow);
   margin-bottom: 0.8rem;
 }
 .postcard button.submit {
   width: 100%;
   background: var(--oxide);
-  color: #fbe9e2;
+  color: var(--ink);
   border: none;
   border-radius: 2px;
   padding: 0.65rem;
@@ -1096,13 +1142,13 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 600;
   font-size: 0.85rem;
 }
-.postcard button.submit:hover { background: #c65a3d; }
+.postcard button.submit:hover { background: var(--danger); }
 .postcard button.submit:disabled { opacity: 0.6; cursor: wait; }
 .postcard .fineprint {
   margin-top: 0.7rem;
   font-family: var(--font-mono);
   font-size: 0.58rem;
-  color: #5a7d78;
+  color: var(--olive-deep);
   line-height: 1.5;
 }
 .confirm-msg {
@@ -1117,7 +1163,7 @@ button { font-family: inherit; cursor: pointer; }
 .error-msg {
   background: rgba(179,73,47,0.12);
   border: 1px solid rgba(179,73,47,0.4);
-  color: #6e2b17;
+  color: var(--danger-deep);
   padding: 0.6rem 0.7rem;
   border-radius: 2px;
   font-size: 0.78rem;
@@ -1204,11 +1250,11 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.68rem;
   color: var(--ink-dim);
 }
-.upload-widget-error { color: #e08a6f; }
+.upload-widget-error { color: var(--danger); }
 .upload-widget-error-title {
   font-size: 0.78rem;
   font-weight: bold;
-  color: #e08a6f;
+  color: var(--danger);
   margin-top: 0.3rem;
 }
 .upload-widget-actions {
@@ -1303,11 +1349,11 @@ button { font-family: inherit; cursor: pointer; }
   text-transform: uppercase;
   color: var(--ink-dim);
 }
-.submission-badge-error { color: #e08a6f; }
+.submission-badge-error { color: var(--danger); }
 .submission-rejection {
   margin-top: 0.5rem;
   font-size: 0.78rem;
-  color: #e08a6f;
+  color: var(--danger);
 }
 
 /* Creator dashboard: edit/artwork modals, stats strip, filters, nudges */
@@ -2041,8 +2087,8 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--static-grey);
 }
 .ca-change { margin-top: 0.9rem; font-family: var(--font-mono); font-size: 0.72rem; }
-.ca-change.up { color: #5fa872; }
-.ca-change.down { color: #c9614f; }
+.ca-change.up { color: var(--ok); }
+.ca-change.down { color: var(--danger); }
 
 .ca-chart { margin: 1.4rem 0 0.4rem; }
 .ca-chart svg { width: 100%; height: 120px; display: block; }
@@ -2089,7 +2135,7 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink-dim);
   font-size: 0.9rem;
 }
-.ca-error { border-color: rgba(201, 97, 79, 0.5); color: #e08a6f; }
+.ca-error { border-color: rgba(201, 97, 79, 0.5); color: var(--danger); }
 .ca-notice {
   border: 1px solid rgba(232, 163, 61, 0.3);
   background: rgba(232, 163, 61, 0.07);
@@ -2148,7 +2194,7 @@ button { font-family: inherit; cursor: pointer; }
 .cap-error {
   border: 1px solid rgba(201, 97, 79, 0.5);
   background: rgba(201, 97, 79, 0.1);
-  color: #e08a6f;
+  color: var(--danger);
   border-radius: 5px;
   padding: 0.7rem 0.85rem;
   font-size: 0.84rem;
@@ -2163,7 +2209,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .cap-success strong { display: block; margin-bottom: 0.3rem; color: var(--ink); }
 .cap-success span { color: var(--ink-dim); line-height: 1.55; }
-.cap-remove { color: #e08a6f !important; }
+.cap-remove { color: var(--danger) !important; }
 
 /* ---------------------------------------------------------------------
    Accessibility panel under the video
@@ -2202,7 +2248,7 @@ button { font-family: inherit; cursor: pointer; }
   font-family: var(--font-mono);
   line-height: 1.5;
 }
-.a11y-list li.yes .a11y-mark { color: #5fa872; }
+.a11y-list li.yes .a11y-mark { color: var(--ok); }
 .a11y-list li.no .a11y-mark { color: var(--static-grey); }
 .a11y-list strong { display: block; color: var(--ink); font-weight: 500; }
 .a11y-list em {
@@ -2345,7 +2391,7 @@ button { font-family: inherit; cursor: pointer; }
 .house-ad-error {
   border: 1px solid rgba(201, 97, 79, 0.5);
   background: rgba(201, 97, 79, 0.1);
-  color: #e08a6f;
+  color: var(--danger);
   border-radius: 5px;
   padding: 0.7rem 0.85rem;
   font-size: 0.84rem;
@@ -2397,7 +2443,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.78rem;
   min-width: 90px;
 }
-.house-ad-remove { color: #e08a6f !important; }
+.house-ad-remove { color: var(--danger) !important; }
 
 /* ---------------------------------------------------------------------
    Cloudflare house-ad import
@@ -2410,7 +2456,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .cf-import-file { font-size: 0.85rem; color: var(--ink); margin-bottom: 0.3rem; word-break: break-all; }
 .cf-import-stage { font-size: 0.78rem; color: var(--ink-dim); margin-bottom: 0.5rem; }
-.cf-import-done { font-size: 0.85rem; color: #7fbf8f; }
+.cf-import-done { font-size: 0.85rem; color: var(--ok); }
 
 /* ---------------------------------------------------------------------
    Live streaming
@@ -2428,14 +2474,14 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
   font-size: 0.85rem;
 }
-.live-now-banner strong { color: #e08a6f; }
-.live-now-arrow { margin-left: auto; color: #e08a6f; font-family: var(--font-mono); font-size: 0.72rem; }
+.live-now-banner strong { color: var(--danger); }
+.live-now-arrow { margin-left: auto; color: var(--danger); font-family: var(--font-mono); font-size: 0.72rem; }
 
 .live-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #e05d3f;
+  background: var(--danger);
   flex: none;
   animation: live-pulse 1.6s ease-in-out infinite;
 }
@@ -2506,11 +2552,11 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 .admin-video-status strong { color: var(--ink); }
 .admin-video-status.good { border-color: rgba(95, 168, 114, 0.4); background: rgba(95, 168, 114, 0.08); }
-.admin-video-status.good strong { color: #7fbf8f; }
+.admin-video-status.good strong { color: var(--ok); }
 .admin-video-status.bad { border-color: rgba(201, 97, 79, 0.45); background: rgba(201, 97, 79, 0.08); }
-.admin-video-status.bad strong { color: #e08a6f; }
+.admin-video-status.bad strong { color: var(--danger); }
 .admin-video-status.none { border-color: rgba(201, 97, 79, 0.45); background: rgba(201, 97, 79, 0.08); }
-.admin-video-status.none strong { color: #e08a6f; }
+.admin-video-status.none strong { color: var(--danger); }
 .admin-video-status.pending { border-color: rgba(232, 163, 61, 0.35); background: rgba(232, 163, 61, 0.07); }
 .admin-video-status.pending strong { color: var(--signal-amber); }
 
@@ -2571,8 +2617,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .admin-video-input-row button:disabled { opacity: 0.5; }
 
 .admin-video-note { font-size: 0.8rem; margin: -0.1rem 0 0; }
-.admin-video-note.good { color: #7fbf8f; }
-.admin-video-note.bad { color: #e08a6f; }
+.admin-video-note.good { color: var(--ok); }
+.admin-video-note.bad { color: var(--danger); }
 .admin-video-note.pending { color: var(--signal-amber); }
 
 .admin-warning {
@@ -2584,10 +2630,10 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   line-height: 1.55;
   color: var(--ink-dim);
 }
-.admin-warning strong { color: #e08a6f; }
+.admin-warning strong { color: var(--danger); }
 
 .admin-error {
-  color: #e08a6f;
+  color: var(--danger);
   font-size: 0.85rem;
   margin: 0;
 }
@@ -2647,3 +2693,300 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .app-detail p { margin: 0 0 0.5rem; word-break: break-word; }
 .app-detail a { color: var(--signal-amber); }
 .app-detail strong { color: var(--ink); }
+
+/* ---------------------------------------------------------------------
+   Fixes for classes referenced in JSX that had no styles defined.
+   Found by auditing every className used against every rule in this file
+   — these were rendering as unstyled browser defaults.
+   --------------------------------------------------------------------- */
+
+/* Small status pill. Used across the admin surfaces (house ads,
+   applications) — previously invisible, so status read as bare text. */
+.b {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.5rem;
+  border-radius: 3px;
+  border: 1px solid var(--olive-deep);
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.b.ok { color: var(--ok); border-color: var(--ok); background: rgba(143, 185, 106, 0.1); }
+.b.warn { color: var(--warn); border-color: var(--warn); background: rgba(217, 164, 65, 0.1); }
+.b.bad { color: var(--danger); border-color: var(--danger); background: rgba(209, 112, 90, 0.1); }
+.b.prem { color: var(--brass); border-color: var(--brass); background: rgba(217, 164, 65, 0.1); }
+
+/* Info column inside admin list cards. */
+.house-ad-info { min-width: 0; }
+.house-ad-info > * { min-width: 0; }
+
+/* Button row used by the live admin page. */
+.acts { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+/* Caption modal shell — was falling back to an unstyled div. */
+.modal-panel {
+  background: var(--surface-1);
+  border: 1px solid rgba(236, 233, 221, 0.14);
+  border-radius: 10px;
+  padding: 1.5rem;
+  max-width: 30rem;
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+}
+.modal-actions {
+  display: flex;
+  gap: 0.6rem;
+  margin-top: 1.2rem;
+  flex-wrap: wrap;
+}
+.modal-actions button {
+  border: 1px solid rgba(236, 233, 221, 0.16);
+  background: var(--surface-2);
+  color: var(--ink-dim);
+  border-radius: 4px;
+  padding: 0.6rem 1.1rem;
+  font-size: 0.85rem;
+  min-height: 42px;
+}
+.modal-actions button:hover:not(:disabled) { border-color: var(--olive); color: var(--olive); }
+.modal-actions button:disabled { opacity: 0.5; }
+
+/* "← Back" link used on episode and wishlist pages. */
+.back-link {
+  display: inline-block;
+  color: var(--ink-faint);
+  text-decoration: none;
+  font-size: 0.85rem;
+  margin-bottom: 1rem;
+}
+.back-link:hover { color: var(--olive); }
+
+/* Genre browse row wrapper. */
+.genre-browse-row { margin-bottom: 2rem; }
+
+/* Static image standing in for hero video. Has to match .hero-video's
+   own box exactly or the hero jumps height between image and video
+   candidates as the carousel rotates. */
+.hero-image { object-fit: cover; }
+
+/* ---------------------------------------------------------------------
+   Admin edit modal — current media panel
+   Shows what's already attached to an episode instead of presenting empty
+   "replace" inputs that read as "nothing here."
+   --------------------------------------------------------------------- */
+.admin-media-heading { margin: 0.4rem 0 0; }
+
+.admin-media-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.7rem;
+}
+@media (max-width: 520px) { .admin-media-grid { grid-template-columns: 1fr; } }
+
+.admin-media-slot {
+  display: flex;
+  gap: 0.7rem;
+  border: 1px solid rgba(236, 233, 221, 0.12);
+  border-radius: 6px;
+  padding: 0.6rem;
+  background: var(--surface-2);
+}
+.admin-media-slot.has { border-color: rgba(163, 181, 92, 0.3); }
+.admin-media-slot.empty { border-style: dashed; }
+.admin-media-slot.replacing {
+  border-color: var(--warn);
+  background: rgba(224, 134, 60, 0.07);
+}
+
+.admin-media-preview {
+  width: 56px;
+  flex: none;
+  aspect-ratio: 2 / 3;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--surface-0);
+  display: grid;
+  place-items: center;
+}
+.admin-media-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.admin-media-none {
+  font-family: var(--font-mono);
+  font-size: 0.55rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+
+.admin-media-body { display: flex; flex-direction: column; gap: 0.2rem; min-width: 0; }
+.admin-media-label {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.admin-media-state {
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-media-slot.replacing .admin-media-state { color: var(--warn); }
+
+/* The real file input is hidden inside this label — a bare file input
+   can't be styled consistently across browsers, and "Choose File / No file
+   chosen" says less than naming the actual action. */
+.admin-media-action {
+  margin-top: auto;
+  font-size: 0.76rem;
+  color: var(--olive);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: flex-start;
+}
+.admin-media-action input[type='file'] { display: none; }
+.admin-media-undo {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  font-size: 0.74rem;
+  color: var(--ink-faint);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  align-self: flex-start;
+}
+.admin-media-undo:hover { color: var(--ink); }
+
+/* Attached video ID */
+.admin-uid-current {
+  border: 1px solid rgba(163, 181, 92, 0.3);
+  background: rgba(163, 181, 92, 0.06);
+  border-radius: 6px;
+  padding: 0.7rem 0.8rem;
+  margin-bottom: 0.9rem;
+}
+.admin-uid-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.admin-uid-label {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+}
+.admin-uid-value {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--olive-bright);
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+.admin-uid-toggle {
+  background: none;
+  border: 1px solid rgba(236, 233, 221, 0.16);
+  border-radius: 3px;
+  color: var(--ink-dim);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  flex: none;
+}
+.admin-uid-toggle:hover { border-color: var(--olive); color: var(--olive); }
+.admin-uid-note {
+  font-size: 0.76rem;
+  color: var(--ink-dim);
+  line-height: 1.55;
+  margin: 0.55rem 0 0;
+}
+.admin-uid-note strong { color: var(--warn); }
+
+.admin-sub-label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 0.3rem;
+}
+
+/* A softer variant for "this is a consequence, not a blocker." */
+.admin-warning-soft {
+  border-color: rgba(224, 134, 60, 0.4);
+  background: rgba(224, 134, 60, 0.07);
+}
+.admin-warning-soft strong { color: var(--warn); }
+
+/* ---------------------------------------------------------------------
+   Error pages (404 / 500)
+   Standalone by design — these must render even when data fetching or the
+   header itself is what failed, so they share no components with the app.
+   --------------------------------------------------------------------- */
+.error-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 2rem 1.5rem;
+  gap: 0.4rem;
+}
+.error-code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.3em;
+  color: var(--olive);
+  margin-bottom: 0.6rem;
+}
+.error-page h1 {
+  font-size: clamp(1.5rem, 5vw, 2.2rem);
+  margin: 0 0 0.6rem;
+}
+.error-page p {
+  color: var(--ink-dim);
+  max-width: 34rem;
+  line-height: 1.65;
+  margin: 0 0 1.6rem;
+}
+.error-actions {
+  display: flex;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+.error-actions a {
+  width: auto;
+  padding: 0 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+
+/* Config warning on the admin dashboard — visible, not alarming. */
+.admin-config-warning {
+  margin: 0.8rem 1.2rem 0;
+  border: 1px solid rgba(224, 134, 60, 0.45);
+  background: rgba(224, 134, 60, 0.08);
+  border-radius: 6px;
+  padding: 0.8rem 1rem;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: var(--ink-dim);
+}
+.admin-config-warning strong { color: var(--warn); }
+.admin-config-warning code {
+  background: rgba(236, 233, 221, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+  font-size: 0.85em;
+}

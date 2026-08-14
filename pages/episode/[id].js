@@ -17,6 +17,7 @@ import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
+import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -153,9 +154,9 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
   return (
     <>
       <Head>
-        <title>{episode.title} — Taprino Transmission</title>
+        <title>{episode.title} — {SITE.name}</title>
         <meta name="description" content={episode.desc} />
-        <meta property="og:title" content={`${episode.title} — Taprino Transmission`} />
+        <meta property="og:title" content={`${episode.title} — ${SITE.name}`} />
         <meta property="og:description" content={episode.desc} />
         <meta property="og:image" content="/og-image.png" />
         <meta property="og:type" content="video.episode" />
@@ -166,7 +167,6 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={goToType}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -208,7 +208,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 <button
                   className="trailer-link"
                   onClick={() => toggleWishlist(episode.id)}
-                  style={{ borderColor: 'rgba(179,73,47,0.4)', color: isWishlisted(episode.id) ? '#e08a6f' : 'var(--ink-dim)' }}
+                  style={{ borderColor: 'rgba(179,73,47,0.4)', color: isWishlisted(episode.id) ? 'var(--danger)' : 'var(--ink-dim)' }}
                 >
                   {isWishlisted(episode.id) ? '♥ Saved to wishlist' : '♡ Add to wishlist'}
                 </button>
@@ -269,9 +269,11 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

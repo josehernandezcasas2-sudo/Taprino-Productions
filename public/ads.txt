@@ -1,0 +1,10 @@
+# Authorized Digital Sellers — https://iabtechlab.com/ads-txt/
+#
+# AdSense checks for this file at yourdomain.com/ads.txt. Without it,
+# some advertisers and exchanges won't bid on your inventory at all,
+# because they can't verify you're authorised to sell it. It's a plain
+# text file and it's required, not optional, once you're running AdSense.
+#
+# The publisher ID below must match the one in the AdSense script tag in
+# pages/_document.js. If you ever change AdSense accounts, change both.
+google.com, pub-1412100592036798, DIRECT, f08c47fec0942fa0

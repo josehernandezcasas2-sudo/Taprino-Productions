@@ -1,6 +1,7 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
+import { SITE } from '../lib/siteConfig';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // Accurate to what this codebase actually sets today. If you add analytics
@@ -8,7 +9,8 @@ import LegalLayout from '../components/LegalLayout';
 // a cookie policy that lists the wrong cookies is worse than none, because it
 // looks like you checked.
 //
-// Placeholders: [CONTACT EMAIL].
+// Contact details, address, and jurisdiction all come from
+// lib/siteConfig.js — fill them in there once, not here.
 
 export async function getServerSideProps({ req }) {
   const account = await getAccountContext(req);
@@ -108,7 +110,7 @@ export default function Cookies({ account }) {
       </p>
 
       <h2>Questions</h2>
-      <p>[CONTACT EMAIL]</p>
+      <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );
 }

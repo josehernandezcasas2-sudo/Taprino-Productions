@@ -8,6 +8,7 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
+import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -43,14 +44,13 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
   return (
     <>
       <Head>
-        <title>My Wishlist — Taprino Transmission</title>
-        <meta name="description" content="Series and episodes you've saved to watch later on Taprino Transmission." />
+        <title>My Wishlist — {SITE.name}</title>
+        <meta name="description" content={`Series and episodes you've saved to watch later on ${SITE.name}.`} />
       </Head>
 
       <HeaderNav
         activeCategory="All"
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -109,9 +109,11 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

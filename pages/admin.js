@@ -8,6 +8,7 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import AdminEditEpisodeModal from '../components/AdminEditEpisodeModal';
 import ManualEpisodeForm from '../components/ManualEpisodeForm';
+import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
@@ -302,7 +303,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   return (
     <>
       <Head>
-        <title>Admin — Taprino Transmission</title>
+        <title>Admin — {SITE.name}</title>
       </Head>
 
       <HeaderNav
@@ -315,6 +316,15 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         isSubscriber={isSubscriber}
       />
       <div className="install-row"><InstallButton /></div>
+      {siteConfigIncomplete() && (
+        <div className="admin-config-warning">
+          <strong>Legal pages aren&rsquo;t finished.</strong> These are still placeholders in{' '}
+          <code>lib/siteConfig.js</code>: {missingSiteConfigFields().join(', ')}. They show up
+          literally on your public Terms, Privacy, and Cookie pages until they&rsquo;re filled in —
+          and AdSense checks those pages during review.
+        </div>
+      )}
+
       <div className="admin-tool-links">
         <Link href="/admin/house-ads">📺 House ads →</Link>
         <Link href="/admin/live">🔴 Go live →</Link>
@@ -410,7 +420,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                       </button>
                     </div>
                   )}
-                  {bulkError && <p style={{ color: '#e08a6f', fontSize: '0.85rem', marginTop: '0.5rem' }}>{bulkError}</p>}
+                  {bulkError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{bulkError}</p>}
                 </div>
               )}
 
@@ -521,7 +531,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             upload and keeps the current one.
           </p>
 
-          {artworkError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{artworkError}</p>}
+          {artworkError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{artworkError}</p>}
 
           {!pendingArtwork ? (
             <p>Loading…</p>
@@ -598,7 +608,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             These are already hidden from the site. Confirming here permanently deletes the row; denying restores it.
           </p>
 
-          {deletionError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{deletionError}</p>}
+          {deletionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{deletionError}</p>}
 
           {!deletions ? (
             <p>Loading…</p>
@@ -669,7 +679,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             Cloudflare or in Storage, just nothing in the app points at them anymore. Deleting here is permanent.
           </p>
 
-          {orphanError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{orphanError}</p>}
+          {orphanError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{orphanError}</p>}
 
           {!orphans ? (
             <p>Loading…</p>
@@ -769,9 +779,11 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

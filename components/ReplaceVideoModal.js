@@ -50,7 +50,7 @@ export default function ReplaceVideoModal({ submission, onClose }) {
             <label style={{ display: 'block', fontSize: '0.78rem', color: 'var(--ink-dim)', margin: '0.6rem 0 0.3rem' }}>New video file</label>
             <UppyFilePicker accept="video/*" note="Any video file, no size limit" onFileSelected={setFile} />
 
-            {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+            {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 
             <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
               <button className="account-btn-primary" onClick={handleStart} style={{ width: 'auto' }}>

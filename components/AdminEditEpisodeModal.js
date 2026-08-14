@@ -12,6 +12,17 @@ function uidFromPlaybackUrl(url) {
   return match ? match[1] : null;
 }
 
+// Shows enough of a Cloudflare video ID to recognise WHICH video is
+// attached, without splashing the full credential-ish string across the
+// screen on every open. Four leading characters is comfortably enough to
+// tell two videos apart at this library's scale, and the full value is one
+// click away for anyone who needs to paste it into Cloudflare's dashboard.
+function maskUid(uid) {
+  if (!uid) return null;
+  if (uid.length <= 4) return uid;
+  return `${uid.slice(0, 4)}${'*'.repeat(Math.min(uid.length - 4, 24))}`;
+}
+
 function readAsDataUrl(f) {
   if (!f) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
@@ -41,6 +52,7 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [confirmNoVideo, setConfirmNoVideo] = useState(false);
+  const [revealUid, setRevealUid] = useState(false);
 
   const existingUid = uidFromPlaybackUrl(episode.src);
 
@@ -212,22 +224,108 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
             Eligible for the homepage hero rotation
           </label>
 
-          <div className="admin-field-row">
-            <div className="admin-field">
-              <label>Replace poster <span className="admin-optional">optional</span></label>
-              <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} />
+          <div className="eyebrow admin-media-heading">Current media</div>
+
+          <div className="admin-media-grid">
+            <div className={`admin-media-slot ${posterFile ? 'replacing' : episode.poster ? 'has' : 'empty'}`}>
+              <div className="admin-media-preview">
+                {episode.poster ? (
+                  <img src={episode.poster} alt="" />
+                ) : (
+                  <span className="admin-media-none">None</span>
+                )}
+              </div>
+              <div className="admin-media-body">
+                <div className="admin-media-label">Poster</div>
+                <div className="admin-media-state">
+                  {posterFile ? `Replacing with ${posterFile.name}` : episode.poster ? 'In use' : 'Not set'}
+                </div>
+                <label className="admin-media-action">
+                  {episode.poster ? 'Replace…' : 'Upload…'}
+                  <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} />
+                </label>
+                {posterFile && (
+                  <button type="button" className="admin-media-undo" onClick={() => setPosterFile(null)}>
+                    Keep existing
+                  </button>
+                )}
+              </div>
             </div>
-            <div className="admin-field">
-              <label>Replace thumbnail <span className="admin-optional">optional</span></label>
-              <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} />
+
+            <div className={`admin-media-slot ${thumbnailFile ? 'replacing' : episode.thumbnail ? 'has' : 'empty'}`}>
+              <div className="admin-media-preview">
+                {episode.thumbnail ? (
+                  <img src={episode.thumbnail} alt="" />
+                ) : (
+                  <span className="admin-media-none">None</span>
+                )}
+              </div>
+              <div className="admin-media-body">
+                <div className="admin-media-label">Thumbnail</div>
+                <div className="admin-media-state">
+                  {thumbnailFile ? `Replacing with ${thumbnailFile.name}` : episode.thumbnail ? 'In use' : 'Not set'}
+                </div>
+                <label className="admin-media-action">
+                  {episode.thumbnail ? 'Replace…' : 'Upload…'}
+                  <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} />
+                </label>
+                {thumbnailFile && (
+                  <button type="button" className="admin-media-undo" onClick={() => setThumbnailFile(null)}>
+                    Keep existing
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
+          {(posterFile || thumbnailFile) && (
+            <div className="admin-warning admin-warning-soft">
+              <strong>Artwork will be replaced when you save.</strong> The current image is
+              overwritten and isn&rsquo;t recoverable from here — make sure you still have the
+              original somewhere before saving.
+            </div>
+          )}
+
           <div className="admin-field">
-            <label>Replace video — Cloudflare video ID <span className="admin-optional">optional</span></label>
+            <label>Video</label>
+
+            {/* Showing WHICH video is attached, not just whether one is.
+                Previously this field sat empty even when a video was
+                perfectly well attached, which read as "nothing here" and is
+                what made it feel like saved IDs weren't sticking. */}
+            {existingUid ? (
+              <div className="admin-uid-current">
+                <div className="admin-uid-row">
+                  <span className="admin-uid-label">Attached ID</span>
+                  <code className="admin-uid-value">{revealUid ? existingUid : maskUid(existingUid)}</code>
+                  <button
+                    type="button"
+                    className="admin-uid-toggle"
+                    onClick={() => setRevealUid((r) => !r)}
+                    aria-label={revealUid ? 'Hide full video ID' : 'Show full video ID'}
+                  >
+                    {revealUid ? 'Hide' : 'Show full'}
+                  </button>
+                </div>
+                <p className="admin-uid-note">
+                  Leave the field below empty to keep this video. Pasting a new ID
+                  <strong> permanently swaps out what viewers watch</strong> — the current video is
+                  detached from this episode and any watch progress people have on it stops lining up.
+                </p>
+              </div>
+            ) : (
+              <p className="admin-field-hint">
+                No video is attached to this episode yet.
+              </p>
+            )}
+
+            <label className="admin-sub-label">
+              {existingUid ? 'Swap in a different video' : 'Attach a video'}{' '}
+              <span className="admin-optional">Cloudflare video ID, not a URL</span>
+            </label>
             <p className="admin-field-hint">
               For a file uploaded directly through Cloudflare&rsquo;s own dashboard (the fallback when
-              in-app upload keeps failing) — paste its video ID, not a URL.
+              in-app upload keeps failing) — paste its video ID.
             </p>
             <div className="admin-video-input-row">
               <input
@@ -256,6 +354,15 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
               )
             )}
           </div>
+
+          {existingUid && videoUid.trim() && videoUid.trim() !== existingUid && (
+            <div className="admin-warning">
+              <strong>You&rsquo;re replacing the video on a published episode.</strong> Once saved,
+              anyone watching this episode gets the new file instead. Saved watch positions will
+              point at the wrong moments, and if the new video is shorter, some people&rsquo;s
+              progress will sit past its end.
+            </div>
+          )}
 
           {dangerous && (
             <div className="admin-warning">

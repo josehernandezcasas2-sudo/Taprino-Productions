@@ -3,8 +3,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
+import { SITE } from '../lib/siteConfig';
 
-export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+// `onTypeSelect` used to be threaded in from every page and was never
+// called — the type links below have always been real navigation. It's
+// gone now; `activeGenre` replaces it so the current genre can be
+// highlighted the same way the current type already is.
+export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
@@ -115,13 +120,35 @@ export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSign
             <Link href="/type/podcast" className={`dropdown-item ${activeType === 'podcast' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
               Podcasts
             </Link>
+
+            {/* Genres were being passed into this component all along and
+                never rendered — so /genre/[genre] pages existed but were
+                unreachable from the nav, and browsing by genre only worked
+                on the homepage. These are real links rather than a filter
+                callback, so they work identically from any page. */}
+            {mainGenres && mainGenres.length > 0 && (
+              <>
+                <div className="dropdown-divider" />
+                <div className="dropdown-label">Browse by genre</div>
+                {mainGenres.map((g) => (
+                  <Link
+                    key={g}
+                    href={`/genre/${encodeURIComponent(g)}`}
+                    className={`dropdown-item ${activeGenre === g ? 'active-cat' : ''}`}
+                    onClick={() => setOpenMenu(null)}
+                  >
+                    {g}
+                  </Link>
+                ))}
+              </>
+            )}
           </div>
         )}
       </div>
 
       <div className="channel-title">
         TAPRINO TRANSMISSION
-        <span className="sub">a Studio Taprino screening room</span>
+        <span className="sub">a {SITE.studio} screening room</span>
       </div>
 
       <div className="right-cluster">

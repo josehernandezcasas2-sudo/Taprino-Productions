@@ -7,6 +7,7 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import LiveVideoPlayer from '../components/LiveVideoPlayer';
+import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -43,13 +44,12 @@ export default function Live({ initialStream, mainGenres, isSignedIn, isSubscrib
   return (
     <>
       <Head>
-        <title>{stream ? `${stream.title} — Live` : 'Live'} — Taprino Transmission</title>
-        <meta name="description" content={stream ? stream.description || stream.title : 'Live broadcasts from Studio Taprino.'} />
+        <title>{stream ? `${stream.title} — Live` : 'Live'} — {SITE.name}</title>
+        <meta name="description" content={stream ? stream.description || stream.title : `Live broadcasts from ${SITE.studio}.`} />
       </Head>
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -82,9 +82,11 @@ export default function Live({ initialStream, mainGenres, isSignedIn, isSubscrib
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>
