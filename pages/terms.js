@@ -1,7 +1,6 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
-import { SITE } from '../lib/siteConfig';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -10,8 +9,8 @@ import { SITE } from '../lib/siteConfig';
 // stream, not an assignment of ownership — because that's the fairer default
 // and the easier one to widen later with consent.
 //
-// Contact details, address, and jurisdiction all come from
-// lib/siteConfig.js — fill them in there once, not here.
+// Placeholders: [CONTACT EMAIL], [MAILING ADDRESS], [JURISDICTION],
+// [REVENUE SHARE TERMS].
 
 export async function getServerSideProps({ req }) {
   const account = await getAccountContext(req);
@@ -47,7 +46,7 @@ export default function Terms({ account }) {
     >
       <h2>1. Who these terms are between</h2>
       <p>
-        These terms are between you and {SITE.studio} ({SITE.mailingAddress}), which operates {SITE.name}
+        These terms are between you and Studio Taprino ([MAILING ADDRESS]), which operates Taprino
         Transmission. Using the site means you accept them. If you don&rsquo;t, please don&rsquo;t use
         it.
       </p>
@@ -75,7 +74,7 @@ export default function Terms({ account }) {
       <p>
         <strong>Refunds.</strong> Payments are generally non-refundable except where the law requires
         otherwise, or where we can&rsquo;t deliver what you paid for. If something went wrong, email
-        {SITE.contactEmail} and we&rsquo;ll deal with it fairly rather than hiding behind this paragraph.
+        [CONTACT EMAIL] and we&rsquo;ll deal with it fairly rather than hiding behind this paragraph.
       </p>
       <p>
         We may change the price with at least 30 days&rsquo; notice to existing members before it
@@ -88,12 +87,12 @@ export default function Terms({ account }) {
         This is the section that matters most, so it&rsquo;s in plain language.
       </p>
       <p>
-        <strong>You keep your copyright.</strong> Uploading to {SITE.name} does not transfer
+        <strong>You keep your copyright.</strong> Uploading to Taprino Transmission does not transfer
         ownership of your work to us. It stays yours.
       </p>
       <p>
         <strong>What you&rsquo;re granting us.</strong> A non-exclusive, worldwide, royalty-free
-        licence to host, encode, stream, and promote your work on {SITE.name} and in
+        licence to host, encode, stream, and promote your work on Taprino Transmission and in
         marketing for the platform (thumbnails, trailers, social posts, and similar). Non-exclusive
         means you remain free to put the same work anywhere else, including your own channels.
       </p>
@@ -131,7 +130,7 @@ export default function Terms({ account }) {
 
       <h2>7. Copyright complaints</h2>
       <p>
-        If something here infringes your copyright, email {SITE.contactEmail} with: what work is being
+        If something here infringes your copyright, email [CONTACT EMAIL] with: what work is being
         infringed, where it is on our site, your contact details, a statement that you believe in good
         faith the use isn&rsquo;t authorised, and a statement under penalty of perjury that your notice
         is accurate and you&rsquo;re authorised to act. We remove infringing material promptly and
@@ -163,7 +162,7 @@ export default function Terms({ account }) {
 
       <h2>11. Governing law</h2>
       <p>
-        These terms are governed by the laws of {SITE.jurisdiction}, and disputes go to the courts there.
+        These terms are governed by the laws of [JURISDICTION], and disputes go to the courts there.
       </p>
 
       <h2>12. Changes</h2>
@@ -173,7 +172,7 @@ export default function Terms({ account }) {
       </p>
 
       <h2>13. Contact</h2>
-      <p>{SITE.contactEmail}</p>
+      <p>[CONTACT EMAIL]</p>
     </LegalLayout>
   );
 }

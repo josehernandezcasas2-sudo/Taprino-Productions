@@ -8,7 +8,6 @@ import WishlistButton from '../../components/WishlistButton';
 import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
-import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, params, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -39,14 +38,14 @@ export default function GenreLibrary({ genre, isSubscriber, isSignedIn, wishlist
   return (
     <>
       <Head>
-        <title>{genre} — {SITE.name}</title>
-        <meta name="description" content={`Browse ${genre} episodes on ${SITE.name}.`} />
+        <title>{genre} — Taprino Transmission</title>
+        <meta name="description" content={`Browse ${genre} episodes on Taprino Transmission.`} />
       </Head>
 
       <HeaderNav
         activeCategory="All"
         activeType="All"
-        activeGenre={genre}
+        onTypeSelect={(t) => { window.location.href = t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`; }}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -95,11 +94,9 @@ export default function GenreLibrary({ genre, isSubscriber, isSignedIn, wishlist
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

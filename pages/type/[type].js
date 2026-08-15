@@ -12,7 +12,6 @@ import GenreBrowseRow from '../../components/GenreBrowseRow';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
-import { SITE } from '../../lib/siteConfig';
 
 const TYPE_LABELS = { series: 'Series', movie: 'Movies', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
@@ -81,12 +80,13 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
   return (
     <>
       <Head>
-        <title>{label} — {SITE.name}</title>
-        <meta name="description" content={`Browse all ${label.toLowerCase()} on ${SITE.name}.`} />
+        <title>{label} — Taprino Transmission</title>
+        <meta name="description" content={`Browse all ${label.toLowerCase()} on Taprino Transmission.`} />
       </Head>
 
       <HeaderNav
         activeType={type}
+        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -159,11 +159,9 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

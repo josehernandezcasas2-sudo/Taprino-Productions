@@ -7,7 +7,24 @@ import { SITE } from '../lib/siteConfig';
 // signal — "is a real organisation behind this, or is it a content farm."
 // A two-line placeholder reads worse than none, so this says something
 // real about what the platform is and who runs it.
-export async function getServerSideProps({ req }) {
+export async function getServerSideProps({ req, res }) {
+  // WO-2 asked whether these could become getStaticProps. They can't as
+  // written: each one fetches account context so the header nav renders
+  // correctly for signed-in users (their name, admin link, tier). Dropping
+  // that would break the header on every legal page.
+  //
+  // Caching gets the same saving without that regression. Legal text
+  // changes maybe a few times a year, so signed-out visitors — which
+  // includes every crawler, and the AdSense reviewer — can hold a copy for
+  // an hour and revalidate in the background for a day after that.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Vary', 'Cookie');
+  }
+
   const account = await getAccountContext(req);
   const episodes = await getPublicEpisodes();
   return {

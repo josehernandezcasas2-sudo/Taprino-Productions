@@ -109,7 +109,7 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
       </p>
 
       {successId && (
-        <p style={{ color: 'var(--ok)', fontSize: '0.85rem' }}>✓ Created — episode ID: {successId}</p>
+        <p style={{ color: '#7fbf8f', fontSize: '0.85rem' }}>✓ Created — episode ID: {successId}</p>
       )}
 
       <form onSubmit={handleSubmit}>
@@ -125,13 +125,13 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
         </div>
         {videoCheck && videoCheck !== 'checking' && (
           videoCheck.error ? (
-            <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
+            <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
           ) : videoCheck.state === 'error' ? (
-            <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
+            <p style={{ color: '#e08a6f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
               Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
             </p>
           ) : videoCheck.state === 'ready' ? (
-            <p style={{ color: 'var(--ok)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream.</p>
+            <p style={{ color: '#7fbf8f', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream.</p>
           ) : (
             <p style={{ color: 'var(--signal-amber)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
               Still processing ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can still create the episode, it just won&rsquo;t be watchable until this finishes.
@@ -207,7 +207,7 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
         <label>Thumbnail — optional</label>
         <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.6rem' }} />
 
-        {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
+        {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
 
         <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>
           {saving ? 'Creating…' : 'Create episode'}

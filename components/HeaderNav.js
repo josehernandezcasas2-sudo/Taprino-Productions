@@ -3,13 +3,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
-import { SITE } from '../lib/siteConfig';
 
-// `onTypeSelect` used to be threaded in from every page and was never
-// called — the type links below have always been real navigation. It's
-// gone now; `activeGenre` replaces it so the current genre can be
-// highlighted the same way the current type already is.
-export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function HeaderNav({ activeType, onTypeSelect, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
@@ -23,6 +18,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     function handleOutside(e) {
       if (rootRef.current && !rootRef.current.contains(e.target)) {
         setOpenMenu(null);
+        setGenreOpen(false);
       }
     }
     document.addEventListener('click', handleOutside);
@@ -120,35 +116,13 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             <Link href="/type/podcast" className={`dropdown-item ${activeType === 'podcast' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
               Podcasts
             </Link>
-
-            {/* Genres were being passed into this component all along and
-                never rendered — so /genre/[genre] pages existed but were
-                unreachable from the nav, and browsing by genre only worked
-                on the homepage. These are real links rather than a filter
-                callback, so they work identically from any page. */}
-            {mainGenres && mainGenres.length > 0 && (
-              <>
-                <div className="dropdown-divider" />
-                <div className="dropdown-label">Browse by genre</div>
-                {mainGenres.map((g) => (
-                  <Link
-                    key={g}
-                    href={`/genre/${encodeURIComponent(g)}`}
-                    className={`dropdown-item ${activeGenre === g ? 'active-cat' : ''}`}
-                    onClick={() => setOpenMenu(null)}
-                  >
-                    {g}
-                  </Link>
-                ))}
-              </>
-            )}
           </div>
         )}
       </div>
 
       <div className="channel-title">
         TAPRINO TRANSMISSION
-        <span className="sub">a {SITE.studio} screening room</span>
+        <span className="sub">a Studio Taprino screening room</span>
       </div>
 
       <div className="right-cluster">
@@ -223,14 +197,8 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 ) : (
                   <Link href="/account" className="dropdown-item">✦ Join the Cipher Circle</Link>
                 )}
-                {/* The self-serve upload route is retired — see /apply. Creators
-                    with work already on the platform keep their analytics; new
-                    work comes in through the application form and is ingested
-                    by the studio. */}
                 {isCreator && <div className="dropdown-divider" />}
-                {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
-                <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
+                {isCreator && <Link href="/creator" className="dropdown-item">🎬 Submit an Episode</Link>}
                 <div className="dropdown-divider" />
                 <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}>↩ Sign Out</button>
               </>
@@ -239,8 +207,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <div className="dropdown-label">Account</div>
                 <Link href="/account" className="dropdown-item">→ Log in / Create account</Link>
                 <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
-                <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
               </>
             )}
           </div>

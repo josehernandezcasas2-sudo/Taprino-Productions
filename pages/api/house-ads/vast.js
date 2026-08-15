@@ -14,31 +14,6 @@ export default async function handler(req, res) {
   // ad, or a stale one after it's been turned off.
   res.setHeader('Cache-Control', 'no-store');
 
-  // REQUIRED, not optional: Google's IMA SDK runs from imasdk.googleapis.com
-  // and fetches this ad tag URL cross-origin — that's simply how VAST ad
-  // tags work, every real ad network's endpoint does the same. Without
-  // this header the browser blocks the request outright before it ever
-  // reaches this handler, which is exactly the CORS error this was
-  // producing. There's nothing sensitive in a VAST response to protect —
-  // it's the same public ad content regardless of who's asking.
-  // Reflecting the requesting origin back, rather than the wildcard '*',
-  // is required here — the CORS spec forbids '*' once a request's
-  // credentials mode is 'include' (which is what produced the second,
-  // more specific error after the first CORS fix: "the value of
-  // Access-Control-Allow-Origin must not be the wildcard '*' when the
-  // request's credentials mode is 'include'"). This endpoint has
-  // nothing user-specific to protect, so reflecting any origin back is
-  // just as safe as '*' would have been — it only changes which exact
-  // string satisfies the browser's stricter credentialed-request check.
-  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Vary', 'Origin');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
-  }
-
   try {
     const ad = await pickActiveHouseAd();
     if (!ad) {

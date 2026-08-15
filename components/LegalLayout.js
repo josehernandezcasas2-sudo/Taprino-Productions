@@ -2,7 +2,6 @@ import Head from 'next/head';
 import Link from 'next/link';
 import HeaderNav from './HeaderNav';
 import MobileTabBar from './MobileTabBar';
-import { SITE } from '../lib/siteConfig';
 
 // Shared shell for /terms, /privacy and /cookies so the three stay visually
 // consistent and only the prose differs.
@@ -10,12 +9,13 @@ export default function LegalLayout({ title, updated, summary, children, account
   return (
     <>
       <Head>
-        <title>{title} — {SITE.name}</title>
-        <meta name="description" content={`${title} for ${SITE.name}, a ${SITE.studio} project.`} />
+        <title>{title} — Taprino Transmission</title>
+        <meta name="description" content={`${title} for Taprino Transmission, a Studio Taprino project.`} />
       </Head>
 
       <HeaderNav
         activeType="All"
+        onTypeSelect={() => {}}
         mainGenres={account.mainGenres || []}
         isSignedIn={account.isSignedIn}
         email={account.email}
@@ -37,8 +37,6 @@ export default function LegalLayout({ title, updated, summary, children, account
         <div className="legal-body">{children}</div>
 
         <nav className="legal-crosslinks" aria-label="Other policies">
-          <Link href="/about">About</Link>
-          <Link href="/contact">Contact</Link>
           <Link href="/terms">Terms of Service</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/cookies">Cookies</Link>
@@ -46,8 +44,8 @@ export default function LegalLayout({ title, updated, summary, children, account
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
       </footer>
       <MobileTabBar />
     </>

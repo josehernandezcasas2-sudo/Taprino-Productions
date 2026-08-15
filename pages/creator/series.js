@@ -8,7 +8,6 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import SeriesMediaForm from '../../components/SeriesMediaForm';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
-import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -77,7 +76,7 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
   return (
     <>
       <Head>
-        <title>Series — {SITE.name}</title>
+        <title>Series — Taprino Transmission</title>
       </Head>
 
       <HeaderNav
@@ -104,7 +103,7 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
           <div className="account-eyebrow">All series</div>
           <h3>Status and deletion requests</h3>
 
-          {actionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{actionError}</p>}
+          {actionError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{actionError}</p>}
 
           {seriesList.length === 0 && <p>No series yet — create one above.</p>}
 
@@ -140,11 +139,9 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

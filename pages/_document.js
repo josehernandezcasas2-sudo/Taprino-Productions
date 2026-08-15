@@ -7,22 +7,7 @@ import { Html, Head, Main, NextScript } from 'next/document';
 export default function Document() {
   return (
     <Html lang="en">
-      <Head>
-        {/* Google AdSense verification + ad serving.
-            Lives in _document rather than _app so it's present in the
-            server-rendered HTML on the very first request — AdSense's
-            crawler checks for this tag when reviewing the site, and a
-            script injected later by React can be missed entirely.
-
-            Note this is the DISPLAY ads script, separate from the IMA SDK
-            in _app.js that handles in-player video ads. The two don't
-            interact. */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1412100592036798"
-          crossOrigin="anonymous"
-        />
-      </Head>
+      <Head />
       <body>
         <Main />
         <NextScript />

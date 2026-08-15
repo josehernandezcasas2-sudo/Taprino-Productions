@@ -6,7 +6,6 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
-import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -144,12 +143,13 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
   return (
     <>
       <Head>
-        <title>Channel schedule — {SITE.name}</title>
+        <title>Channel schedule — Taprino Transmission</title>
         <meta name="robots" content="noindex" />
       </Head>
 
       <HeaderNav
         activeType="All"
+        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -261,11 +261,9 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

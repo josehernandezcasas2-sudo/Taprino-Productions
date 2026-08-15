@@ -43,12 +43,12 @@ export default function App({ Component, pageProps }) {
     <ClerkProvider
       appearance={{
         variables: {
-          colorPrimary: 'var(--olive)',
-          colorBackground: 'var(--surface-1)',
-          colorInputBackground: 'var(--surface-0)',
-          colorInputText: 'var(--ink)',
-          colorText: 'var(--ink)',
-          colorTextSecondary: 'var(--ink-dim)',
+          colorPrimary: '#e8a33d',
+          colorBackground: '#1b1d27',
+          colorInputBackground: '#14151c',
+          colorInputText: '#eae7dd',
+          colorText: '#eae7dd',
+          colorTextSecondary: '#b6b3ab',
           borderRadius: '4px',
           fontFamily: "'Fraunces', serif"
         }
@@ -64,7 +64,7 @@ export default function App({ Component, pageProps }) {
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
-        <meta name="theme-color" content="var(--surface-0)" />
+        <meta name="theme-color" content="#14151c" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />

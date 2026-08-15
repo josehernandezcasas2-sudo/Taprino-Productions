@@ -17,7 +17,6 @@ import { getCurrentLiveStream } from '../lib/liveStreams';
 import { getChannelState } from '../lib/channelSchedule';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
-import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   // Personalized per visitor (newsletter status, wishlist, subscriber tier) —
@@ -134,20 +133,21 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
   return (
     <>
       <Head>
-        <title>{SITE.name}</title>
-        <meta name="description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
-        <meta property="og:title" content={SITE.name} />
-        <meta property="og:description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
+        <title>Taprino Transmission</title>
+        <meta name="description" content="Studio Taprino's screening room — free episodes, ad-supported, with a Cipher Circle membership tier." />
+        <meta property="og:title" content="Taprino Transmission" />
+        <meta property="og:description" content="Studio Taprino's screening room — free episodes, ad-supported, with a Cipher Circle membership tier." />
         <meta property="og:image" content="/og-image.png" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={SITE.name} />
-        <meta name="twitter:description" content={`${SITE.studio}'s screening room.`} />
+        <meta name="twitter:title" content="Taprino Transmission" />
+        <meta name="twitter:description" content="Studio Taprino's screening room." />
         <meta name="twitter:image" content="/og-image.png" />
       </Head>
 
       <HeaderNav
         activeType={activeType}
+        onTypeSelect={handleTypeSelect}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -266,11 +266,9 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
       )}
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

@@ -21,7 +21,6 @@ import ArtworkModal from '../components/ArtworkModal';
 import DeleteRequestModal from '../components/DeleteRequestModal';
 import CaptionUploadModal from '../components/CaptionUploadModal';
 import ReplaceVideoModal from '../components/ReplaceVideoModal';
-import { SITE } from '../lib/siteConfig';
 
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
@@ -64,8 +63,8 @@ const EMPTY_FORM = {
 
 const STATUS_LABEL = {
   pending: { text: 'Pending review', color: 'var(--signal-amber)' },
-  approved: { text: 'Approved — live', color: 'var(--ok)' },
-  rejected: { text: 'Rejected', color: 'var(--danger)' }
+  approved: { text: 'Approved — live', color: '#7fbf8f' },
+  rejected: { text: 'Rejected', color: '#e08a6f' }
 };
 
 const CF_STATE_LABEL = {
@@ -432,7 +431,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   return (
     <>
       <Head>
-        <title>Submit an episode — {SITE.name}</title>
+        <title>Submit an episode — Taprino Transmission</title>
       </Head>
 
       <HeaderNav
@@ -478,7 +477,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             <label>
               Runtime (e.g. 05:30)
               {runtimeStatus === 'detecting' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — detecting from your video…</span>}
-              {runtimeStatus === 'detected' && <span style={{ color: 'var(--ok)', fontWeight: 'normal' }}> — auto-detected from your video, edit if needed</span>}
+              {runtimeStatus === 'detected' && <span style={{ color: '#7fbf8f', fontWeight: 'normal' }}> — auto-detected from your video, edit if needed</span>}
               {runtimeStatus === 'failed' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — couldn&rsquo;t auto-detect, please enter it</span>}
             </label>
             <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
@@ -607,7 +606,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             </button>
           </form>
 
-          {formError && <p style={{ marginTop: '0.8rem', color: 'var(--danger)' }}>{formError}</p>}
+          {formError && <p style={{ marginTop: '0.8rem', color: '#e08a6f' }}>{formError}</p>}
         </div>
 
         <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1.5rem' }}>
@@ -624,7 +623,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
           </p>
           <h3>What you've sent in so far</h3>
 
-          {deleteActionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{deleteActionError}</p>}
+          {deleteActionError && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{deleteActionError}</p>}
 
           {loadingSubmissions && <p>Loading…</p>}
 
@@ -708,11 +707,9 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

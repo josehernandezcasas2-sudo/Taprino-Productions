@@ -6,7 +6,6 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import ChannelPlayer from '../components/ChannelPlayer';
-import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -29,15 +28,16 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
   return (
     <>
       <Head>
-        <title>The Channel — {SITE.name}</title>
+        <title>The Channel — Taprino Transmission</title>
         <meta
           name="description"
-          content={`${SITE.studio}'s linear channel — free episodes, playing continuously, tune in any time.`}
+          content="Studio Taprino's linear channel — free episodes, playing continuously, tune in any time."
         />
       </Head>
 
       <HeaderNav
         activeType="All"
+        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -50,7 +50,7 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       <main className="stage stage-single">
         <div className="now-heading">
           <div className="eyebrow">The channel</div>
-          <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>
+          <h1>{channelState.onAir ? channelState.program.title : 'Taprino Transmission'}</h1>
           {channelState.onAir && channelState.program.description && <p>{channelState.program.description}</p>}
         </div>
 
@@ -72,11 +72,9 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

@@ -9,7 +9,6 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
-import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, params, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -65,13 +64,14 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   return (
     <>
       <Head>
-        <title>{seriesInfo.name} — {SITE.name}</title>
+        <title>{seriesInfo.name} — Taprino Transmission</title>
         <meta name="description" content={seriesInfo.desc} />
       </Head>
 
       <HeaderNav
         activeCategory="All"
         activeType="All"
+        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -103,7 +103,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
             display: 'inline-block',
             marginBottom: '0.8rem',
             borderColor: 'rgba(179,73,47,0.4)',
-            color: isWishlisted(seriesInfo.id) ? 'var(--danger)' : 'var(--ink-dim)'
+            color: isWishlisted(seriesInfo.id) ? '#e08a6f' : 'var(--ink-dim)'
           }}
         >
           {isWishlisted(seriesInfo.id) ? '♥ Saved — notify me of new episodes' : '♡ Save this series — get notified of new episodes'}
@@ -156,11 +156,9 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       </main>
 
       <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
+        <span>TAPRINO TRANSMISSION</span>
+        <span>© {new Date().getFullYear()} Studio Taprino</span>
         <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

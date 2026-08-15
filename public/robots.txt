@@ -1,15 +1,27 @@
-# Admin and creator tooling is behind auth anyway, but there's no reason
-# to spend crawl budget on it or have it surface in search results.
+# ============================================================================
+# PRE-LAUNCH: crawling is disabled site-wide.
+# ============================================================================
+# The deployment is publicly reachable, and crawler traffic generates real
+# serverless invocations with zero human audience behind it.
+#
+# ⚠️ THIS BLOCKS GOOGLE ADSENSE REVIEW. AdSense crawls the site to assess
+# it — with this in place, the application will be rejected. Before you
+# apply, replace everything below with the launch block at the bottom of
+# this file, and update the sitemap line to the real domain.
 User-agent: *
-Disallow: /admin
-Disallow: /admin/
-Disallow: /creator
-Disallow: /creator/
-Disallow: /api/
-Disallow: /account
+Disallow: /
 
-Allow: /
-
-# Update this once the real domain is live — a sitemap line pointing at
-# the wrong host is worse than none at all.
-Sitemap: https://taprino-productions-gfcl.vercel.app/sitemap.xml
+# ============================================================================
+# LAUNCH BLOCK — swap the above for this when the custom domain is live
+# and you're ready to be indexed and to apply for AdSense.
+# ============================================================================
+# User-agent: *
+# Disallow: /admin
+# Disallow: /admin/
+# Disallow: /creator
+# Disallow: /creator/
+# Disallow: /api/
+# Disallow: /account
+# Allow: /
+#
+# Sitemap: https://studiotapatv.site/sitemap.xml
