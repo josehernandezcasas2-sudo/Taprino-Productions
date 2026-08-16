@@ -17,15 +17,47 @@ import { getCurrentLiveStream } from '../lib/liveStreams';
 import { getChannelState } from '../lib/channelSchedule';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
+import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
-  // Personalized per visitor (newsletter status, wishlist, subscriber tier) —
-  // never let a browser, proxy, or CDN cache this and serve someone a stale
-  // copy of their own homepage after they've changed a setting elsewhere.
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // CDN caching, but ONLY for signed-out visitors.
+  //
+  // This page returns per-user props (email, wishlist, isAdmin,
+  // isSubscriber). Caching it publicly for everyone would let Vercel's CDN
+  // serve one visitor's rendered HTML — including their email address and
+  // admin status — to the next person for the life of the cache. That is a
+  // real data leak, not a theoretical one.
+  //
+  // Signed-out visitors, though, all receive identical HTML, and they're
+  // the overwhelming majority of traffic including every crawler. Caching
+  // just that case captures most of the invocation saving with none of the
+  // exposure. The Vary header is what keeps the two populations in
+  // separate cache entries.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Vary', 'Cookie');
+  }
 
-  const [episodes, allSeries, liveStream, channelState] = await Promise.all([getPublicEpisodes(), getAllSeries(), getCurrentLiveStream(), getChannelState()]);
-  const account = await getAccountContext(req);
+  // getAccountContext and getViewCounts are both independent of the four
+  // calls above — neither reads episodes, series, live, or channel data.
+  // Running them sequentially after the first batch means the function
+  // sits idle waiting on I/O it didn't need to wait on. Folding them into
+  // the same parallel batch overlaps that latency instead of stacking it,
+  // which shortens the function's actual running time — and Fluid
+  // compute bills for exactly that: how long the function is active,
+  // including time spent awaiting a response.
+  const needsViewCounts = isRedisConfigured();
+  const [episodes, allSeries, liveStream, channelState, account, viewCountsResult] = await Promise.all([
+    getPublicEpisodes(),
+    getAllSeries(),
+    getCurrentLiveStream(),
+    getChannelState(),
+    getAccountContext(req),
+    needsViewCounts ? getViewCounts() : Promise.resolve(null)
+  ]);
 
   // Signed-out visitors who dismissed/opted out of the newsletter get a
   // plain cookie so the panel doesn't keep reappearing on this browser —
@@ -45,7 +77,7 @@ export async function getServerSideProps({ req, res }) {
   // Redis configured, this falls back to whatever has `featured: true` set.
   let heroPool;
   if (isRedisConfigured()) {
-    const viewCounts = await getViewCounts();
+    const viewCounts = viewCountsResult;
     const candidates = buildHeroCandidates(episodes, allSeries, viewCounts);
     const ranked = candidates.filter((c) => c.views > 0).sort((a, b) => b.views - a.views);
     heroPool = ranked.length > 0 ? ranked.slice(0, 5) : buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
@@ -133,21 +165,20 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
   return (
     <>
       <Head>
-        <title>Taprino Transmission</title>
-        <meta name="description" content="Studio Taprino's screening room — free episodes, ad-supported, with a Cipher Circle membership tier." />
-        <meta property="og:title" content="Taprino Transmission" />
-        <meta property="og:description" content="Studio Taprino's screening room — free episodes, ad-supported, with a Cipher Circle membership tier." />
+        <title>{SITE.name}</title>
+        <meta name="description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
+        <meta property="og:title" content={SITE.name} />
+        <meta property="og:description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
         <meta property="og:image" content="/og-image.png" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="Taprino Transmission" />
-        <meta name="twitter:description" content="Studio Taprino's screening room." />
+        <meta name="twitter:title" content={SITE.name} />
+        <meta name="twitter:description" content={`${SITE.studio}'s screening room.`} />
         <meta name="twitter:image" content="/og-image.png" />
       </Head>
 
       <HeaderNav
         activeType={activeType}
-        onTypeSelect={handleTypeSelect}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -266,9 +297,11 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
       )}
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>
