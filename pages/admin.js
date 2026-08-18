@@ -331,6 +331,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <Link href="/admin/live">🔴 Go live →</Link>
         <Link href="/admin/channel">📡 Channel schedule →</Link>
         <Link href="/admin/applications">📥 Applications →</Link>
+        <Link href="/admin/genre-icons">🖼️ Genre icons →</Link>
       </div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>

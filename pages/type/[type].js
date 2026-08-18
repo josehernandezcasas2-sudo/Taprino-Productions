@@ -5,6 +5,7 @@ import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { useWishlist } from '../../lib/useWishlist';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
+import { getGenreIcons } from '../../lib/genreIcons';
 import { buildHeroCandidates } from '../../lib/heroCandidates';
 import HeaderNav from '../../components/HeaderNav';
 import HeroSpotlight from '../../components/HeroSpotlight';
@@ -42,7 +43,7 @@ export async function getServerSideProps({ req, params, res }) {
   if (!TYPE_LABELS[type]) {
     return { notFound: true };
   }
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const [episodes, allSeries, genreIcons] = await Promise.all([getPublicEpisodes(), getAllSeries(), getGenreIcons()]);
 
   const account = await getAccountContext(req);
 
@@ -73,12 +74,13 @@ export async function getServerSideProps({ req, params, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       episodes,
-      allSeries
+      allSeries,
+      genreIcons
     }
   };
 }
 
-export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, isAdmin, isCreator }) {
+export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, isAdmin, isCreator, genreIcons }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
@@ -126,7 +128,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       )}
 
       <main className="library-stage">
-        <GenreBrowseRow genres={mainGenres} />
+        <GenreBrowseRow genres={mainGenres} icons={genreIcons} />
 
         <div className="library-heading">{label}</div>
         <div className="library-sub">
