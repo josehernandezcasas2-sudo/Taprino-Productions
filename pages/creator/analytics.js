@@ -211,7 +211,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                       </span>
                       <span role="cell">
                         <span className={`ca-tier ${ep.tier}`}>
-                          {ep.tier === 'premium' ? 'Cipher Circle' : 'Free'}
+                          {ep.tier === 'premium' ? SITE.premiumTier : 'Free'}
                         </span>
                       </span>
                       <span role="cell" className="ca-num">{ep.views.toLocaleString()}</span>

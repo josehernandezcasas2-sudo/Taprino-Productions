@@ -132,6 +132,8 @@ export default function LiveVideoPlayer({ stream }) {
     nextBreakIndexRef.current = Math.floor((Date.now() - startedAt) / intervalMs);
 
     function check() {
+      // Don't fire an ad break into a tab nobody is looking at.
+      if (typeof document !== 'undefined' && document.hidden) return;
       const elapsed = Date.now() - startedAt;
       const dueIndex = Math.floor(elapsed / intervalMs);
       if (dueIndex > nextBreakIndexRef.current) {

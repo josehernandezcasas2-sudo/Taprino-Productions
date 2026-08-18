@@ -1,3 +1,5 @@
+import { SITE } from '../lib/siteConfig';
+
 // Shown under the episode description. Two jobs:
 //
 //   1. Tell viewers what's available BEFORE they commit to watching — whether
@@ -80,7 +82,7 @@ export default function AccessibilityPanel({ episode, onPlayDescribed, described
 
       <p className="a11y-foot">
         Something here not working for you? Tell us at{' '}
-        <a href="mailto:[CONTACT EMAIL]">[CONTACT EMAIL]</a> — we&rsquo;d rather know.
+        <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a> — we&rsquo;d rather know.
       </p>
     </section>
   );

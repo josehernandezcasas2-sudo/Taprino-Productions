@@ -65,7 +65,7 @@ export default function ArtworkModal({ submission, onClose, onSaved }) {
           <label>Thumbnail image — 16:9 landscape, optional</label>
           <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
-          {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+          {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
             <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>

@@ -61,7 +61,7 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       />
       <div className="install-row"><InstallButton /></div>
 
-      <main className="stage stage-single">
+      <main className="stage stage-single stage-wide">
         <div className="now-heading">
           <div className="eyebrow">The channel</div>
           <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>

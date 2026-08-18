@@ -87,7 +87,7 @@ export default function Privacy({ account }) {
         <li><strong>Email preferences</strong> — whether you want to hear about new drops.</li>
       </ul>
 
-      <h3>If you subscribe to Cipher Circle</h3>
+      <h3>If you subscribe to {SITE.premiumTier}</h3>
       <p>
         Payments are processed by Stripe. <strong>We never receive or store your card number.</strong>{' '}
         We keep a Stripe customer reference and your subscription status so we know what you have
@@ -139,7 +139,7 @@ export default function Privacy({ account }) {
       </ul>
       <p>
         This is Google&rsquo;s processing, not ours — we receive aggregate performance figures, not
-        profiles of individual viewers. <strong>Cipher Circle members are shown no ads</strong>, and
+        profiles of individual viewers. <strong>{SITE.premiumTier} members are shown no ads</strong>, and
         no ad request is made on their behalf, so no advertising cookies are set for them.
       </p>
       <p>

@@ -209,7 +209,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                   <div className="account-dropdown-avatar">☺</div>
                   <div>
                     <div className="account-dropdown-email">{email || 'Your account'}</div>
-                    <div className="account-dropdown-tier">{isSubscriber ? 'Cipher Circle member' : 'Free account'}</div>
+                    <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
                   </div>
                 </div>
                 <div className="dropdown-divider" />
@@ -221,7 +221,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                     💳 {portalLoading ? 'Opening…' : 'Manage Subscription'}
                   </button>
                 ) : (
-                  <Link href="/account" className="dropdown-item">✦ Join the Cipher Circle</Link>
+                  <Link href="/account" className="dropdown-item">✦ Join {SITE.premiumTier}</Link>
                 )}
                 {/* The self-serve upload route is retired — see /apply. Creators
                     with work already on the platform keep their analytics; new

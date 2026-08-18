@@ -166,9 +166,9 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
     <>
       <Head>
         <title>{SITE.name}</title>
-        <meta name="description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
+        <meta name="description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a ${SITE.premiumTier} membership tier.`} />
         <meta property="og:title" content={SITE.name} />
-        <meta property="og:description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a Cipher Circle membership tier.`} />
+        <meta property="og:description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a ${SITE.premiumTier} membership tier.`} />
         <meta property="og:image" content="/og-image.png" />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
@@ -206,7 +206,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
 
       <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
 
-      <main id="main-content" className="stage stage-single">
+      <main id="main-content" className="stage stage-single stage-wide">
         <div>
           {searchResults ? (
             <>
@@ -233,7 +233,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                     )}
                     <button className={`ep-card ${ep.tier}`} onClick={() => goToEpisode(ep)}>
                       <div className="ep-thumb">
-                        <span className="ep-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                        <span className="ep-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                         {ep.tier === 'premium' ? '◈ locked' : '▶ preview'}
                       </div>
                       <div className="ep-info">

@@ -6,7 +6,10 @@ import { getCurrentLiveStream } from '../../../lib/liveStreams';
 // sensitive, it's exactly what a signed-out visitor to /live would already
 // see rendered into the page.
 export default async function handler(req, res) {
-  res.setHeader('Cache-Control', 'no-store');
+  // Same reasoning as /api/channel/now — public, identical for everyone,
+  // and polled on a timer by every open viewer. 15s means a broadcast
+  // starting or ending still surfaces within about half a poll cycle.
+  res.setHeader('Cache-Control', 'public, s-maxage=15, stale-while-revalidate=30');
   const stream = await getCurrentLiveStream();
   if (!stream) {
     return res.status(200).json({ live: false });

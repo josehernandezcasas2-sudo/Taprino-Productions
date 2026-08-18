@@ -51,7 +51,7 @@ export default function About({ account }) {
         <>
           <strong>{SITE.name}</strong> is a streaming platform run by {SITE.studio} for independent
           film and series work. Most of what&rsquo;s here is free to watch, supported by ads.
-          Cipher Circle is an optional membership that removes them.
+          {SITE.premiumTier} is an optional membership that removes them.
         </>
       }
     >
@@ -74,7 +74,7 @@ export default function About({ account }) {
         Making a free account adds a watchlist and remembers where you left off across devices.
       </p>
       <p>
-        <strong>Cipher Circle</strong> is a paid membership that removes ads, unlocks
+        <strong>{SITE.premiumTier}</strong> is a paid membership that removes ads, unlocks
         behind-the-scenes material, and gives early access to some releases. It funds the platform
         and the work on it.
       </p>

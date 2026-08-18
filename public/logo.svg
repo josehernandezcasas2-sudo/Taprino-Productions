@@ -1,13 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 60">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 250 60">
   <defs>
     <filter id="legibility" x="-20%" y="-20%" width="140%" height="140%">
       <feDropShadow dx="0" dy="1" stdDeviation="2.5" flood-color="#000000" flood-opacity="0.7"/>
     </filter>
   </defs>
   <g filter="url(#legibility)">
-    <circle cx="20" cy="30" r="12" fill="none" stroke="#4aa8a2" stroke-width="2.5"/>
-    <circle cx="20" cy="30" r="4" fill="#b3492f"/>
-    <text x="42" y="26" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="15" fill="#eae7dd">TAPRINO</text>
-    <text x="42" y="44" font-family="IBM Plex Mono, monospace" font-weight="500" font-size="11" letter-spacing="2" fill="#e8a33d">TRANSMISSION</text>
+    <circle cx="20" cy="30" r="12" fill="none" stroke="#a3b55c" stroke-width="2.5"/>
+    <circle cx="20" cy="30" r="4" fill="#d9a441"/>
+    <text x="42" y="26" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="14" fill="#ece9dd">STUDIO TAPA</text>
+    <text x="42" y="44" font-family="IBM Plex Mono, monospace" font-weight="500" font-size="11" letter-spacing="2" fill="#c2c775">TV</text>
   </g>
 </svg>

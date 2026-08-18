@@ -23,6 +23,15 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
 
+  // This service worker exists to cache THIS APP's own pages and static
+  // assets — nothing else. It has no business intercepting requests to
+  // other origins (Clerk's auth script, Cloudflare Stream's video
+  // manifests, Google's ad SDK, and similar). Letting those through
+  // untouched means the browser handles them exactly as it would with no
+  // service worker installed at all, which is the only sane behavior for
+  // traffic this file was never designed to reason about.
+  if (url.origin !== self.location.origin) return;
+
   // Never cache API routes — checkout, membership status, and signups must
   // always hit the network live.
   if (url.pathname.startsWith('/api/')) return;
@@ -39,14 +48,27 @@ self.addEventListener('fetch', (event) => {
   const isPageOrData =
     event.request.mode === 'navigate' || url.pathname.startsWith('/_next/data/');
 
+  // The Cache API only ever supports http/https requests. Browser
+  // extensions (password managers, wallets, and similar) commonly inject
+  // content scripts that issue their own fetches — chrome-extension://,
+  // moz-extension://, and so on — and because this handler listens for
+  // every fetch on the page, those get swept in here too. Caching one
+  // throws immediately, which is harmless to the site itself but floods
+  // the console with an error that has nothing to do with anything this
+  // app actually does. Skipping non-http(s) schemes up front avoids ever
+  // attempting it.
+  const isCacheable = url.protocol === 'http:' || url.protocol === 'https:';
+
   if (isPageOrData) {
     event.respondWith(
       fetch(event.request)
         .then((networkResponse) => {
           // Clone BEFORE handing the response back — see the note in the
           // cache-first branch below for why the ordering matters.
-          const copy = networkResponse.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          if (isCacheable) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+          }
           return networkResponse;
         })
         .catch(() => caches.match(event.request))
@@ -66,8 +88,10 @@ self.addEventListener('fetch', (event) => {
         // response had often already been consumed by the browser, throwing
         // "Failed to execute 'clone' on 'Response': Response body is already
         // used" on essentially every request.
-        const copy = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        if (isCacheable) {
+          const copy = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
         return networkResponse;
       });
       // Deliberately no .catch() returning `cached` here: at this point we

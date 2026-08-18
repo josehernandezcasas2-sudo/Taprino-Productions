@@ -55,7 +55,7 @@ export default function Terms({ account }) {
       account={account}
       summary={
         <>
-          <strong>The short version.</strong> Watch the free stuff freely. Cipher Circle is a monthly
+          <strong>The short version.</strong> Watch the free stuff freely. {SITE.premiumTier} is a monthly
           subscription you can cancel any time. If you upload work, <strong>you keep ownership of
           it</strong> — you&rsquo;re giving us permission to stream it, not signing it over. Don&rsquo;t
           upload things you don&rsquo;t have the rights to, and don&rsquo;t try to rip our video.
@@ -83,9 +83,9 @@ export default function Terms({ account }) {
         automating ad playback to inflate counts is a breach of these terms.
       </p>
 
-      <h2>4. Cipher Circle membership</h2>
+      <h2>4. {SITE.premiumTier} membership</h2>
       <p>
-        Cipher Circle is a recurring monthly subscription. It renews automatically until you cancel,
+        {SITE.premiumTier} is a recurring monthly subscription. It renews automatically until you cancel,
         and you can cancel any time from your account page — access continues to the end of the
         period you&rsquo;ve already paid for.
       </p>

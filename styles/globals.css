@@ -232,7 +232,12 @@ button { font-family: inherit; cursor: pointer; }
   border-left: 1px solid rgba(234, 231, 221, 0.12);
 }
 
-.library-stage { max-width: 1180px; margin: 0 auto; padding: 1.6rem 1.5rem 5rem; }
+/* Widened per the "extend the library to the edges" request — used only
+   by genre/series/wishlist/type, which are pure card-grid browsing pages
+   with no long-form text to protect, unlike .stage which legal pages also
+   share. */
+.library-stage { max-width: none; margin: 0; padding: 1.6rem 2.4rem 5rem; }
+@media (max-width: 640px) { .library-stage { padding-left: 1.2rem; padding-right: 1.2rem; } }
 .library-back {
   display: inline-block;
   background: transparent;
@@ -446,6 +451,15 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: 1fr 320px;
   gap: 2.4rem;
 }
+/* Explicit opt-in for pages that should genuinely use the full screen width
+   — the homepage, channel, and live pages. Deliberately NOT a blanket
+   widening of .stage-single itself: that class is also used by every legal
+   page (via LegalLayout) and several admin tool pages, where a very wide
+   column would hurt paragraph readability and stretch forms/tables
+   uncomfortably rather than help anything. */
+.stage-wide { max-width: none; padding-left: 2.4rem; padding-right: 2.4rem; }
+@media (max-width: 640px) { .stage-wide { padding-left: 1.2rem; padding-right: 1.2rem; } }
+
 .stage-single {
   grid-template-columns: 1fr;
 }
@@ -462,9 +476,17 @@ button { font-family: inherit; cursor: pointer; }
   margin: 0 auto;
 }
 .site-footer {
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 1.5rem 1.5rem calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  /* Full-width border/background, centered content — without needing an
+     extra wrapper div in the 20 pages that share this exact footer markup.
+     max() falls back to flat padding on narrow screens, and grows to
+     center the content around a ~1180px column once the viewport is wide
+     enough for the gap to matter. */
+  max-width: none;
+  margin: 0;
+  padding-left: max(1.5rem, calc((100% - 1180px) / 2));
+  padding-right: max(1.5rem, calc((100% - 1180px) / 2));
+  padding-top: 1.5rem;
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid rgba(234, 231, 221, 0.08);
   display: flex;
   justify-content: space-between;
@@ -3047,3 +3069,19 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 
 /* Custom-uploaded genre image, sized to match the existing emoji circle */
 .genre-browse-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+/* Explicit "is this actually connected" status dot — poster, thumbnail,
+   and video ID labels in the admin edit modal. A literal small circle
+   reads faster at a glance than the colored banner/border alone. */
+.admin-connection-dot {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+.admin-connection-dot.connected { background: var(--ok); box-shadow: 0 0 4px rgba(132, 205, 152, 0.6); }
+.admin-connection-dot.disconnected { background: var(--danger); }
+.admin-connection-dot.checking { background: var(--warn); animation: dot-pulse 1.2s ease-in-out infinite; }
+@keyframes dot-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.35; } }
