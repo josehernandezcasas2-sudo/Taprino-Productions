@@ -10,7 +10,17 @@ import '@uppy/dashboard/css/style.css';
 
 export default function App({ Component, pageProps }) {
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
+    // Only registered in production. In dev, the whole point of editing a
+    // file is seeing the change immediately — a service worker caching JS
+    // bundles works directly against that, and unlike a normal browser
+    // cache, it persists across dev-server restarts and even across
+    // unrelated code changes, since it's stored in the browser's own
+    // registry for this origin. That's exactly what caused the "server
+    // says Studio Tapa TV, client says Taprino Transmission" hydration
+    // mismatch — the server was rendering fresh code while an old service
+    // worker kept serving a stale cached JS bundle from a much earlier
+    // test session.
+    if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       navigator.serviceWorker.register('/sw.js').catch(() => {
         // Installable/offline support is a bonus, not a requirement — fail quietly.
       });
@@ -43,12 +53,12 @@ export default function App({ Component, pageProps }) {
     <ClerkProvider
       appearance={{
         variables: {
-          colorPrimary: '#e8a33d',
-          colorBackground: '#1b1d27',
-          colorInputBackground: '#14151c',
-          colorInputText: '#eae7dd',
-          colorText: '#eae7dd',
-          colorTextSecondary: '#b6b3ab',
+          colorPrimary: 'var(--olive)',
+          colorBackground: 'var(--surface-1)',
+          colorInputBackground: 'var(--surface-0)',
+          colorInputText: 'var(--ink)',
+          colorText: 'var(--ink)',
+          colorTextSecondary: 'var(--ink-dim)',
           borderRadius: '4px',
           fontFamily: "'Fraunces', serif"
         }
@@ -64,7 +74,7 @@ export default function App({ Component, pageProps }) {
         <link rel="manifest" href="/manifest.json" />
         <link rel="icon" href="/icon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icon.svg" />
-        <meta name="theme-color" content="#14151c" />
+        <meta name="theme-color" content="var(--surface-0)" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
