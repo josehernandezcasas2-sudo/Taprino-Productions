@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
+import { SITE } from '../lib/siteConfig';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeriesForCreator } from '../lib/series';
 import HeaderNav from '../components/HeaderNav';
