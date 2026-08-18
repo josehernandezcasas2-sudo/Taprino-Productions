@@ -188,6 +188,9 @@ export default function ChannelPlayer({ initialState }) {
   // Safety-net poll — corrects drift rather than driving normal playback.
   useEffect(() => {
     safetyPoll.current = setInterval(async () => {
+      // A background tab shouldn't keep polling — one forgotten open tab
+      // otherwise generates invocations indefinitely.
+      if (typeof document !== 'undefined' && document.hidden) return;
       if (!state.onAir || onAdBreak) return;
       const fresh = await fetchState();
       if (!fresh || !fresh.onAir || !fresh.program) return;

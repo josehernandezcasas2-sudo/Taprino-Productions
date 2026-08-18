@@ -94,7 +94,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
                 <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
                   <div className="poster-art">
-                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                    <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                     ◈
                   </div>
                   <div className="poster-title-wrap">

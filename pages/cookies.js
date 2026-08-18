@@ -1,6 +1,7 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
+import { SITE } from '../lib/siteConfig';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // Accurate to what this codebase actually sets today. If you add analytics
@@ -8,9 +9,27 @@ import LegalLayout from '../components/LegalLayout';
 // a cookie policy that lists the wrong cookies is worse than none, because it
 // looks like you checked.
 //
-// Placeholders: [CONTACT EMAIL].
+// Contact details, address, and jurisdiction all come from
+// lib/siteConfig.js — fill them in there once, not here.
 
-export async function getServerSideProps({ req }) {
+export async function getServerSideProps({ req, res }) {
+  // WO-2 asked whether these could become getStaticProps. They can't as
+  // written: each one fetches account context so the header nav renders
+  // correctly for signed-in users (their name, admin link, tier). Dropping
+  // that would break the header on every legal page.
+  //
+  // Caching gets the same saving without that regression. Legal text
+  // changes maybe a few times a year, so signed-out visitors — which
+  // includes every crawler, and the AdSense reviewer — can hold a copy for
+  // an hour and revalidate in the background for a day after that.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Vary', 'Cookie');
+  }
+
   const account = await getAccountContext(req);
   const episodes = await getPublicEpisodes();
   return {
@@ -91,7 +110,7 @@ export default function Cookies({ account }) {
         .
       </p>
       <p>
-        <strong>Cipher Circle members see no ads</strong>, and no ad request is made for them, so no
+        <strong>{SITE.premiumTier} members see no ads</strong>, and no ad request is made for them, so no
         advertising cookies are set on their behalf.
       </p>
 
@@ -108,7 +127,7 @@ export default function Cookies({ account }) {
       </p>
 
       <h2>Questions</h2>
-      <p>[CONTACT EMAIL]</p>
+      <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );
 }

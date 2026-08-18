@@ -12,7 +12,7 @@
 create table if not exists channel_schedule (
   id uuid primary key default gen_random_uuid(),
   position int not null,
-  episode_id uuid not null references episodes(id) on delete cascade,
+  episode_id text not null references episodes(id) on delete cascade,
   -- Cached from the episode's runtime at the moment it's added, not
   -- re-parsed on every request. Two reasons: schedule math runs on every
   -- viewer's page load and poll, so it shouldn't depend on re-parsing free

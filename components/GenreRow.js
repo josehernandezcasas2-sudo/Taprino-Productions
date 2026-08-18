@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import WishlistButton from './WishlistButton';
+import { SITE } from '../lib/siteConfig';
 
 export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist }) {
   if (episodes.length === 0) return null;
@@ -33,7 +34,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             >
               <div className="ep-thumb">
                 {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
-                <span className="ep-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                <span className="ep-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                 {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
               </div>
               <div className="ep-info">
@@ -53,7 +54,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             <Link href={`/series/${info.id}`} className={`ep-card ${tier}`}>
               <div className="ep-thumb">
                 {info.thumbnail && <img src={info.thumbnail} alt="" className="ep-thumb-img" />}
-                <span className="ep-badge">{tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                <span className="ep-badge">{tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                 {!info.thumbnail && '▤ series'}
               </div>
               <div className="ep-info">

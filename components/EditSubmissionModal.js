@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { SITE } from '../lib/siteConfig';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 const CONTENT_TYPES = [
@@ -107,10 +108,10 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
           <label>Suggested tier — the admin has final say</label>
           <select value={form.tier} onChange={(e) => update('tier', e.target.value)} required>
             <option value="free">Free</option>
-            <option value="premium">Cipher Circle (premium)</option>
+            <option value="premium">{SITE.premiumTier} (premium)</option>
           </select>
 
-          {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+          {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
             <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>

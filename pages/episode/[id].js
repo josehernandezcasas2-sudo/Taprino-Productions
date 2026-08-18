@@ -188,7 +188,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 {showingTrailer
                   ? 'Trailer'
                   : episode.tier === 'premium'
-                  ? 'Now screening — Cipher Circle exclusive'
+                  ? `Now screening — ${SITE.premiumTier} exclusive`
                   : 'Now screening — free signal'}
               </div>
               <h1>{episode.title}</h1>
@@ -231,13 +231,13 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             {locked ? (
               <div className="lock-panel">
                 <div className="glyph">◈</div>
-                <h3>Encrypted for Cipher Circle members</h3>
+                <h3>Available to {SITE.premiumTier} members</h3>
                 <p>
                   This one only screens for people who&rsquo;ve joined the circle. Members get early
                   drops, deleted scenes, and the cipher clues before anyone else.
                 </p>
                 <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
-                  {checkoutLoading ? 'Opening checkout…' : 'Join the Cipher Circle'}
+                  {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
                 </button>
               </div>
             ) : (
@@ -253,7 +253,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
 
             <div className="player-meta">
               <span>{episode.runtime}</span>
-              <span>{episode.tier === 'free' ? 'Free tier · ad-supported' : 'Cipher Circle · ad-free'}</span>
+              <span>{episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}</span>
               {describedActive && <span>🔊 Audio described</span>}
             </div>
 

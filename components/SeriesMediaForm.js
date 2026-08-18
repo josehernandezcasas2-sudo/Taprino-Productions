@@ -180,8 +180,8 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Uploading trailer… {trailerProgress}%</p>
         )}
         {status === 'saving' && <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Saving…</p>}
-        {status === 'done' && <p style={{ fontSize: '0.8rem', color: '#7fbf8f' }}>Saved.</p>}
-        {error && <p style={{ color: '#e08a6f', fontSize: '0.85rem' }}>{error}</p>}
+        {status === 'done' && <p style={{ fontSize: '0.8rem', color: 'var(--ok)' }}>Saved.</p>}
+        {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 
         <button className="account-btn-primary" type="submit" disabled={busy} style={{ width: 'auto' }}>
           {busy ? 'Working…' : 'Save series media'}

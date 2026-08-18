@@ -527,7 +527,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             <label>Suggested tier — the admin has final say</label>
             <select value={form.tier} onChange={(e) => update('tier', e.target.value)} required>
               <option value="free">Free</option>
-              <option value="premium">Cipher Circle (premium)</option>
+              <option value="premium">{SITE.premiumTier} (premium)</option>
             </select>
 
             <label>Video source</label>

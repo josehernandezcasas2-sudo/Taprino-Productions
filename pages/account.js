@@ -95,12 +95,12 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
 
           {isSignedIn ? (
             <>
-              <h3>{isSubscriber ? 'Cipher Circle member' : 'Free account'}</h3>
+              <h3>{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</h3>
               <p>
                 {email ? <>Signed in as <strong>{email}</strong>.</> : 'Signed in.'}{' '}
                 {isSubscriber
-                  ? 'You have full access to Cipher Circle exclusives.'
-                  : "You're on the free tier — no Cipher Circle membership yet."}
+                  ? `You have full access to ${SITE.premiumTier} exclusives.`
+                  : "You&rsquo;re on the free tier — no {SITE.premiumTier} membership yet."}
               </p>
 
               {isSubscriber ? (
@@ -109,7 +109,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
                 </button>
               ) : (
                 <Link href="/" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-                  Join the Cipher Circle
+                  Join {SITE.premiumTier}
                 </Link>
               )}
 
@@ -144,7 +144,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
               <h3>Sign in or create your account</h3>
               <p>
                 Real email + password now — sign in if you've been here before, or create a free
-                account if you're new. Either way, you can upgrade to Cipher Circle any time once
+                account if you're new. Either way, you can upgrade to {SITE.premiumTier} any time once
                 signed in.
               </p>
 
@@ -156,7 +156,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
               </SignUpButton>
 
               <div className="account-fineprint">
-                A free account doesn't unlock Cipher Circle content by itself — you can upgrade any time
+                A free account doesn&rsquo;t unlock {SITE.premiumTier} content by itself — you can upgrade any time
                 from the account page once signed in.
               </div>
             </>

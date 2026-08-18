@@ -21,10 +21,24 @@ export default function CloudflareHouseAdImport({ onReady }) {
   const [error, setError] = useState(null);
   const [fileName, setFileName] = useState(null);
   const pollTimer = useRef(null);
+  // Hard ceiling on polling. A Cloudflare job that never reaches a terminal
+  // state would otherwise poll every 3s for as long as the tab stays open.
+  // 200 × 3s ≈ 10 minutes, comfortably longer than any real encode.
+  const pollCount = useRef(0);
+  const MAX_POLLS = 200;
 
   const poll = useCallback(
     (uid) => {
       const tick = async () => {
+        if (typeof document !== 'undefined' && document.hidden) {
+          pollTimer.current = setTimeout(tick, 3000);
+          return;
+        }
+        if (pollCount.current++ > MAX_POLLS) {
+          setStage('error');
+          setError('Gave up waiting for Cloudflare — check the video in your Cloudflare dashboard.');
+          return;
+        }
         try {
           const res = await fetch(`/api/admin/house-ads-cloudflare-status?uid=${encodeURIComponent(uid)}`);
           const data = await res.json();

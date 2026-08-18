@@ -63,7 +63,7 @@ export default function Contact({ account }) {
 
       <h2>Membership and billing</h2>
       <p>
-        Questions about Cipher Circle, refunds, or a charge you don&rsquo;t recognise:{' '}
+        Questions about {SITE.premiumTier}, refunds, or a charge you don&rsquo;t recognise:{' '}
         <a href={`mailto:${SITE.contactEmail}`}>{SITE.contactEmail}</a>. Include the email address
         on the account so we can find it.
       </p>

@@ -12,6 +12,22 @@ import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 export default async function handler(req, res) {
   res.setHeader('Content-Type', 'image/gif');
   res.setHeader('Cache-Control', 'no-store');
+  // Same reasoning as vast.js — the IMA SDK fires these tracking pixels
+  // from imasdk.googleapis.com, cross-origin, so this needs to be
+  // explicitly allowed or the browser blocks the request before it
+  // reaches this handler.
+  // Reflecting the requesting origin back, rather than the wildcard '*',
+  // is required here — the CORS spec forbids '*' once a request's
+  // credentials mode is 'include' (which is what produced the second,
+  // more specific error after the first CORS fix: "the value of
+  // Access-Control-Allow-Origin must not be the wildcard '*' when the
+  // request's credentials mode is 'include'"). This endpoint has
+  // nothing user-specific to protect, so reflecting any origin back is
+  // just as safe as '*' would have been — it only changes which exact
+  // string satisfies the browser's stricter credentialed-request check.
+  res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+  res.setHeader('Access-Control-Allow-Credentials', 'true');
+  res.setHeader('Vary', 'Origin');
 
   const { ad } = req.query;
   if (ad && typeof ad === 'string') {

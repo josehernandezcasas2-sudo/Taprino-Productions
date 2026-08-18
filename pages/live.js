@@ -60,7 +60,7 @@ export default function Live({ initialStream, mainGenres, isSignedIn, isSubscrib
       />
       <div className="install-row"><InstallButton /></div>
 
-      <main className="stage stage-single">
+      <main className="stage stage-single stage-wide">
         {stream ? (
           <div className="player-card">
             <div className="now-heading">

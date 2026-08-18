@@ -1,101 +1,74 @@
-# This is the full current build — not a patch
+# Full build — replace your whole project folder
 
-Everything from this whole conversation, layered together into one
-complete copy of the project: mobile tab bar, custom video player with
-signed URLs, legal pages, creator analytics, accessibility (captions +
-audio description), video-by-link import, the house-ads system (direct
-upload and Cloudflare-catalogue), live streaming, and the linear channel.
+Confirmed by diff against your actual current local copy: your repo's
+`main` branch is genuinely sitting at commit `c2b776e`, and everything
+built since — the Studio Tapa TV rebrand, the logo-derived olive palette,
+About/Contact pages, AdSense setup, the domain wiring for
+studiotapatv.site, the WO-1/WO-2 cache-header fixes, and the homepage GSSP
+parallelization — was never committed to this copy. Nothing was lost;
+none of it ever landed here in the first place.
 
-Every file in this zip compiles cleanly — I ran a full syntax check across
-every `.js` file in `pages/`, `lib/`, `components/`, and `contexts/` right
-before packaging it, not just the files touched in the most recent patch.
+This zip is everything, verified compiling clean immediately before
+packaging.
 
-## How to push this
-
-You said you haven't pushed much since we started, so the simplest and
-safest path is to **replace your local project folder's contents with
-this**, rather than try to hand-merge nine patches on top of each other.
+## Extract — Terminal only, no Finder
 
 ```bash
-# 1. Go to where your local clone lives
 cd ~/path/to/taprino-ott
-
-# 2. Make sure you're not about to lose anything of your own.
-#    If this shows changes YOU made locally that weren't part of any
-#    patch I gave you, stop and tell me before continuing.
 git status
+```
 
-# 3. Back up just in case (cheap insurance, costs nothing)
-cd ..
-cp -r taprino-ott taprino-ott-backup-$(date +%Y%m%d)
-cd taprino-ott
+If this shows anything unexpected (local edits you made that weren't from
+one of my patches), stop and tell me before continuing.
 
-# 4. Unzip this build over your project folder, replacing files
+```bash
+cd .. && cp -r taprino-ott taprino-ott-backup-$(date +%Y%m%d-%H%M) && cd taprino-ott
 unzip -o ~/Downloads/taprino-full-build.zip -d .
-#    (adjust the source path to wherever this zip actually downloaded)
+```
 
-# 5. Reinstall dependencies — nothing new was added, but this keeps
-#    node_modules in sync with package.json regardless
+## Verify by content before committing anything
+
+```bash
+grep -c "name: 'Studio Tapa TV'" lib/siteConfig.js
+grep -c "info@studiotapa.com" lib/siteConfig.js
+grep -c "studiotapatv.site" lib/siteConfig.js public/robots.txt
+grep -c "needsViewCounts" pages/index.js
+ls pages/about.js pages/contact.js
+grep -c "Taprino" pages/index.js
+```
+
+First four should print **1 or more**. The `ls` should print both paths
+back. The last should print **0** — old branding fully gone.
+
+## Push
+
+```bash
 npm install
-
-# 6. Commit everything as one push
 git add .
-git commit -m "Add player, legal pages, accessibility, house ads, live streaming, and channel"
+git commit -m "Studio Tapa TV rebrand, domain wiring, AdSense pages, cache headers, GSSP optimization"
 git push
 ```
 
-Vercel will pick up the push automatically if it's connected to this repo,
-the same as always.
+## After Vercel finishes deploying
 
-## Run these migrations, in order, before or right after you push
+- Homepage — olive palette, "Studio Tapa TV" in header and footer, not
+  "Taprino Transmission"
+- `/about` and `/contact` — new pages, both load
+- `/privacy` — shows `info@studiotapa.com` and `California, United
+  States`, not bracketed placeholders
+- `/admin` — amber warning naming exactly one remaining unfilled field:
+  `mailingAddress`
+- `/ads.txt` and `/sitemap.xml` — both load
 
-In your Supabase project's SQL editor, run whichever of these you haven't
-already applied — they're numbered and safe to run in sequence:
+## Your `.env.local` is untouched
 
-```
-009_add_captions.sql
-010_add_audio_description.sql
-011_add_house_ads.sql
-012_add_house_ad_cloudflare_uid.sql
-013_add_live_streams.sql
-014_add_channel_schedule.sql
-```
+It was correctly present in your zip and is never included in anything I
+send back — real secrets stay local, always.
 
-All additive — nullable columns and new tables only. Nothing here alters
-or drops anything that already exists, so there's no destructive step to
-be careful about.
+## Still needs you
 
-## One manual step after deploying — not optional
-
-Signed URLs protect nothing until you run this once, signed in as admin,
-from your browser console on the live site:
-
-```js
-await fetch('/api/admin/sync-stream-protection', { method: 'POST' })
-  .then(r => r.json()).then(console.log)
-```
-
-This is what actually turns on Cloudflare's `requireSignedURLs` for every
-premium episode. Skipping it means the player *looks* like it's protecting
-premium video, but the old permanent public URLs still work for anyone who
-has them.
-
-## Everything else — README pointers
-
-Each feature has its own detailed notes file, all included in this zip at
-the project root, in case you want the full reasoning behind any one of
-them without digging through the chat history:
-
-- `SIGNED-URLS-SETUP.md` — the player rebuild
-- `LEGAL-AND-ACCESSIBILITY-NOTES.md` — terms/privacy/cookies, captions v1
-- `CAPTIONS-AND-AD-NOTES.md` — caption uploads, audio description
-- `VIDEO-LINK-IMPORT-NOTES.md` — importing video by URL
-- `DOMAIN-CHECKLIST.md` — what actually needs a real domain vs. doesn't
-- `HOUSE-ADS-NOTES.md` — your own ad system
-- `HOUSE-ADS-CLOUDFLARE-CATALOGUE.md` — the resumable-upload upgrade
-- `LIVE-STREAMING-NOTES.md` — RTMPS broadcasting + timed ad breaks
-- `CHANNEL-NOTES.md` — the linear/looping channel
-
-## If `git push` gives you trouble
-
-Paste me the exact error and I'll walk through it with you.
+- `mailingAddress` in `lib/siteConfig.js` — a PO box is fine
+- Fix `CLOUDFLARE_STREAM_CUSTOMER_CODE` in Vercel to just the code, not
+  the full subdomain
+- The rest of `DOMAIN-SETUP.md`'s checklist — Clerk production mode,
+  Stripe webhook, Resend sending domain

@@ -145,7 +145,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
                   <WishlistButton isActive={isWishlisted(info.id)} onToggle={() => toggleWishlist(info.id)} />
                   <Link href={`/series/${info.id}`} className={`poster-card ${tier}`}>
                     <div className="poster-art">
-                      <span className="poster-badge">{tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                      <span className="poster-badge">{tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                       ▤
                     </div>
                     <div className="poster-title-wrap">
@@ -166,7 +166,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
                 <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
                   <div className="poster-art">
-                    <span className="poster-badge">{ep.tier === 'premium' ? 'Cipher Circle' : 'Free with ads'}</span>
+                    <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
                     ◈
                   </div>
                   <div className="poster-title-wrap">
