@@ -59,7 +59,7 @@ export default function GenreLibrary({ genre, isSubscriber, isSignedIn, wishlist
   return (
     <>
       <Head>
-        <title>{genre} — {SITE.name}</title>
+        <title>{`${genre} — ${SITE.name}`}</title>
         <meta name="description" content={`Browse ${genre} episodes on ${SITE.name}.`} />
       </Head>
 

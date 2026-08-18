@@ -85,7 +85,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   return (
     <>
       <Head>
-        <title>{seriesInfo.name} — {SITE.name}</title>
+        <title>{`${seriesInfo.name} — ${SITE.name}`}</title>
         <meta name="description" content={seriesInfo.desc} />
       </Head>
 

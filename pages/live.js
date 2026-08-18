@@ -45,7 +45,7 @@ export default function Live({ initialStream, mainGenres, isSignedIn, isSubscrib
   return (
     <>
       <Head>
-        <title>{stream ? `${stream.title} — Live` : 'Live'} — {SITE.name}</title>
+        <title>{`${stream ? `${stream.title} — Live` : 'Live'} — ${SITE.name}`}</title>
         <meta name="description" content={stream ? stream.description || stream.title : `Live broadcasts from ${SITE.studio}.`} />
       </Head>
 

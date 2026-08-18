@@ -154,7 +154,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
   return (
     <>
       <Head>
-        <title>{episode.title} — {SITE.name}</title>
+        <title>{`${episode.title} — ${SITE.name}`}</title>
         <meta name="description" content={episode.desc} />
         <meta property="og:title" content={`${episode.title} — ${SITE.name}`} />
         <meta property="og:description" content={episode.desc} />

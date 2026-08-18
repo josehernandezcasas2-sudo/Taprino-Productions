@@ -101,7 +101,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
   return (
     <>
       <Head>
-        <title>{label} — {SITE.name}</title>
+        <title>{`${label} — ${SITE.name}`}</title>
         <meta name="description" content={`Browse all ${label.toLowerCase()} on ${SITE.name}.`} />
       </Head>
 
