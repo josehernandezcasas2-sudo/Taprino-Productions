@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import CloudflareHouseAdImport from './CloudflareHouseAdImport';
+import { SITE } from '../lib/siteConfig';
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -99,17 +100,17 @@ export default function HouseAdForm({ onCreated }) {
   return (
     <form onSubmit={submit} className="house-ad-form">
       <label>Title</label>
-      <input value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="Studio Taprino Shop — Fall Drop" required />
+      <input value={form.title} onChange={(e) => update('title', e.target.value)} placeholder={`${SITE.studio} Shop — Fall Drop`} required />
 
       <label>Advertiser (just for your own records — never shown to viewers)</label>
-      <input value={form.advertiser} onChange={(e) => update('advertiser', e.target.value)} placeholder="Studio Taprino" />
+      <input value={form.advertiser} onChange={(e) => update('advertiser', e.target.value)} placeholder={SITE.studio} />
 
       <label>Where a click sends people</label>
       <input
         type="url"
         value={form.clickUrl}
         onChange={(e) => update('clickUrl', e.target.value)}
-        placeholder="https://shop.studiotaprino.com"
+        placeholder="https://shop.studiotapa.com"
         required
       />
 

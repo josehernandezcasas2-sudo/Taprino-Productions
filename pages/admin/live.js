@@ -6,6 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
+import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -40,6 +41,7 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
   useEffect(() => {
     if (!current || current.stream.status === 'ended') return;
     const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.hidden) return;
       fetch(`/api/admin/live/status?id=${current.stream.id}`)
         .then((r) => r.json())
         .then(setCfHint)
@@ -123,13 +125,12 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
   return (
     <>
       <Head>
-        <title>Go live — Taprino Transmission</title>
+        <title>Go live — {SITE.name}</title>
         <meta name="robots" content="noindex" />
       </Head>
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -144,7 +145,7 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
           <div>
             <div className="eyebrow">Admin</div>
             <h1>Live</h1>
-            <p className="ca-sub">Broadcast to Taprino Transmission with OBS or any RTMPS encoder.</p>
+            <p className="ca-sub">Broadcast to {SITE.name} with OBS or any RTMPS encoder.</p>
           </div>
           <Link href="/admin" className="library-back">← Back to admin</Link>
         </div>
@@ -257,9 +258,11 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

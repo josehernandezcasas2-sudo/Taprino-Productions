@@ -12,11 +12,32 @@ import GenreBrowseRow from '../../components/GenreBrowseRow';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
+import { SITE } from '../../lib/siteConfig';
 
 const TYPE_LABELS = { series: 'Series', movie: 'Movies', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
 export async function getServerSideProps({ req, params, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // CDN caching, but ONLY for signed-out visitors.
+  //
+  // This page returns per-user props (email, wishlist, isAdmin,
+  // isSubscriber). Caching it publicly for everyone would let Vercel's CDN
+  // serve one visitor's rendered HTML — including their email address and
+  // admin status — to the next person for the life of the cache. That is a
+  // real data leak, not a theoretical one.
+  //
+  // Signed-out visitors, though, all receive identical HTML, and they're
+  // the overwhelming majority of traffic including every crawler. Caching
+  // just that case captures most of the invocation saving with none of the
+  // exposure. The Vary header is what keeps the two populations in
+  // separate cache entries.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Vary', 'Cookie');
+  }
+
   const type = params.type;
   if (!TYPE_LABELS[type]) {
     return { notFound: true };
@@ -80,13 +101,12 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
   return (
     <>
       <Head>
-        <title>{label} — Taprino Transmission</title>
-        <meta name="description" content={`Browse all ${label.toLowerCase()} on Taprino Transmission.`} />
+        <title>{label} — {SITE.name}</title>
+        <meta name="description" content={`Browse all ${label.toLowerCase()} on ${SITE.name}.`} />
       </Head>
 
       <HeaderNav
         activeType={type}
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -159,9 +179,11 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

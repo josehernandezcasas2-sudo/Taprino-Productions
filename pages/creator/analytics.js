@@ -6,6 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
+import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -105,13 +106,12 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
   return (
     <>
       <Head>
-        <title>Your numbers — Taprino Transmission</title>
+        <title>Your numbers — {SITE.name}</title>
         <meta name="robots" content="noindex" />
       </Head>
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -126,7 +126,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
           <div>
             <div className="eyebrow">Creator dashboard</div>
             <h1>Your numbers</h1>
-            <p className="ca-sub">How your work is doing on Taprino. Only you can see this page.</p>
+            <p className="ca-sub">How your work is doing on {SITE.name}. Only you can see this page.</p>
           </div>
           <Link href="/creator" className="library-back">← Back to submissions</Link>
         </div>
@@ -231,9 +231,11 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>

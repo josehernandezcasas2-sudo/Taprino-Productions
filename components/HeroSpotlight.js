@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { SITE } from '../lib/siteConfig';
 
 const ROTATE_MS = 9000;
 
@@ -109,7 +110,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
       <div className="hero-scrim" />
 
       <div className="hero-inner">
-        <img src="/logo.svg" alt="Taprino Transmission" className="hero-logo" />
+        <img src="/logo.svg" alt={SITE.name} className="hero-logo" />
 
         {!isImageMode && (
           <div className="hero-controls">

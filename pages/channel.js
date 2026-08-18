@@ -6,9 +6,24 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import ChannelPlayer from '../components/ChannelPlayer';
+import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // Signed-out visitors get a cacheable response; signed-in ones don't.
+  // See the longer note in pages/index.js — this page also returns
+  // per-user props, so a blanket public cache would leak them.
+  //
+  // Shorter TTL than the other pages: what's playing on the channel
+  // genuinely changes as programmes roll over, so a stale 5 minutes here
+  // would show the wrong thing on air.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+    res.setHeader('Vary', 'Cookie');
+  }
+
   const account = await getAccountContext(req);
   const [channelState, episodes] = await Promise.all([getChannelState(), getPublicEpisodes()]);
   return {
@@ -28,16 +43,15 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
   return (
     <>
       <Head>
-        <title>The Channel — Taprino Transmission</title>
+        <title>The Channel — {SITE.name}</title>
         <meta
           name="description"
-          content="Studio Taprino's linear channel — free episodes, playing continuously, tune in any time."
+          content={`${SITE.studio}'s linear channel — free episodes, playing continuously, tune in any time.`}
         />
       </Head>
 
       <HeaderNav
         activeType="All"
-        onTypeSelect={() => {}}
         mainGenres={mainGenres}
         isSignedIn={isSignedIn}
         email={email}
@@ -50,7 +64,7 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       <main className="stage stage-single">
         <div className="now-heading">
           <div className="eyebrow">The channel</div>
-          <h1>{channelState.onAir ? channelState.program.title : 'Taprino Transmission'}</h1>
+          <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>
           {channelState.onAir && channelState.program.description && <p>{channelState.program.description}</p>}
         </div>
 
@@ -72,9 +86,11 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       </main>
 
       <footer className="site-footer">
-        <span>TAPRINO TRANSMISSION</span>
-        <span>© {new Date().getFullYear()} Studio Taprino</span>
+        <span>{SITE.nameUpper}</span>
+        <span>© {new Date().getFullYear()} {SITE.studio}</span>
         <span className="footer-legal">
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
           <a href="/terms">Terms</a>
           <a href="/privacy">Privacy</a>
           <a href="/cookies">Cookies</a>
