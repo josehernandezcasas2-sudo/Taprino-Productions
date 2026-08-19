@@ -17,7 +17,8 @@ export const config = {
 
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured'];
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil'];
+const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -84,7 +85,15 @@ export default async function handler(req, res) {
   const dbUpdates = {};
   for (const f of EDITABLE_FIELDS) {
     if (fields[f] === undefined) continue;
-    dbUpdates[f === 'mainGenre' ? 'main_genre' : f] = fields[f];
+    const column = FIELD_TO_COLUMN[f] || f;
+    // Date inputs send '' when cleared, not null — treat that as "remove
+    // this date" rather than trying to store an empty string in a
+    // timestamptz column, which Postgres would reject outright.
+    if ((f === 'availableFrom' || f === 'availableUntil') && fields[f] === '') {
+      dbUpdates[column] = null;
+    } else {
+      dbUpdates[column] = fields[f];
+    }
   }
   // Changing status here is a deliberate admin override outside the normal
   // approve/reject review flow — e.g. un-approving something. Stamp

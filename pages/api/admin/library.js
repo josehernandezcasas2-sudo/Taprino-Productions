@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   let query = supabase
     .from('episodes')
-    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, artist, runtime, poster, thumbnail, src, featured, deletion_requested, created_at')
+    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, artist, runtime, poster, thumbnail, src, featured, deletion_requested, created_at, available_from, available_until')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -58,6 +58,8 @@ export default async function handler(req, res) {
       // path just never returned the field.
       src: e.src,
       featured: e.featured,
+      availableFrom: e.available_from,
+      availableUntil: e.available_until,
       deletionRequested: e.deletion_requested,
       createdAt: e.created_at
     }))

@@ -8,6 +8,9 @@ import { getViewCounts, isRedisConfigured } from '../lib/redis';
 import { buildHeroCandidates } from '../lib/heroCandidates';
 import { useWishlist } from '../lib/useWishlist';
 import GenreRow from '../components/GenreRow';
+import ContinueWatchingRow from '../components/ContinueWatchingRow';
+import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../lib/contentLifecycle';
+import { getContinueWatching } from '../lib/continueWatching';
 import HeroSpotlight from '../components/HeroSpotlight';
 import SignalPanel from '../components/SignalPanel';
 import InstallButton from '../components/InstallButton';
@@ -50,14 +53,28 @@ export async function getServerSideProps({ req, res }) {
   // compute bills for exactly that: how long the function is active,
   // including time spent awaiting a response.
   const needsViewCounts = isRedisConfigured();
-  const [episodes, allSeries, liveStream, channelState, account, viewCountsResult] = await Promise.all([
+  const [episodes, allSeries, liveStream, channelState, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getCurrentLiveStream(),
     getChannelState(),
     getAccountContext(req),
-    needsViewCounts ? getViewCounts() : Promise.resolve(null)
+    needsViewCounts ? getViewCounts() : Promise.resolve(null),
+    getLifecycleSettings()
   ]);
+
+  // Continue Watching needs `episodes` to already be resolved (it maps
+  // saved positions back to real episode data), so it can't join the
+  // batch above — but it can still run alongside anything that doesn't
+  // depend on episodes, rather than sitting fully sequential after it.
+  // Reusing `hasSession` (already computed above for the cache-control
+  // decision) instead of waiting on `account.isSignedIn` avoids an extra
+  // round of sequencing just to learn something this cookie check already
+  // tells us for free.
+  const continueWatching = hasSession ? await getContinueWatching(req, episodes) : [];
+
+  const newReleases = episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays));
+  const leavingSoon = episodes.filter((e) => isLeavingSoon(e.availableUntil, lifecycleSettings.leavingSoonDays));
 
   // Signed-out visitors who dismissed/opted out of the newsletter get a
   // plain cookie so the panel doesn't keep reappearing on this browser —
@@ -99,12 +116,15 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       episodes,
-      allSeries
+      allSeries,
+      newReleases,
+      leavingSoon,
+      continueWatching
     }
   };
 }
 
-export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator }) {
+export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -208,6 +228,25 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
 
       <main id="main-content" className="stage stage-single stage-wide">
         <div>
+          <ContinueWatchingRow items={continueWatching} onSelect={goToEpisode} />
+          <GenreRow
+            title="New Releases"
+            episodes={newReleases}
+            allSeries={allSeries}
+            currentId={null}
+            onSelect={goToEpisode}
+            isWishlisted={isWishlisted}
+            onToggleWishlist={toggleWishlist}
+          />
+          <GenreRow
+            title="Leaving Soon"
+            episodes={leavingSoon}
+            allSeries={allSeries}
+            currentId={null}
+            onSelect={goToEpisode}
+            isWishlisted={isWishlisted}
+            onToggleWishlist={toggleWishlist}
+          />
           {searchResults ? (
             <>
               <div className="shelf-heading">

@@ -34,6 +34,13 @@ function readAsDataUrl(f) {
   });
 }
 
+// HTML date inputs require exactly YYYY-MM-DD — the server sends full ISO
+// timestamps, so this trims one down to what the input actually accepts.
+function toDateInputValue(iso) {
+  if (!iso) return '';
+  return iso.slice(0, 10);
+}
+
 export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: episode.title || '',
@@ -44,7 +51,9 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
     mainGenre: episode.mainGenre || MAIN_GENRES[0],
     tier: episode.tier || 'free',
     status: episode.status || 'pending',
-    featured: !!episode.featured
+    featured: !!episode.featured,
+    availableFrom: toDateInputValue(episode.availableFrom),
+    availableUntil: toDateInputValue(episode.availableUntil)
   });
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -224,6 +233,23 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
             <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
             Eligible for the homepage hero rotation
           </label>
+
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Available from <span className="admin-optional">optional</span></label>
+              <input type="date" value={form.availableFrom} onChange={(e) => update('availableFrom', e.target.value)} />
+              <p className="admin-field-hint">Counts as a &ldquo;new release&rdquo; for a while after this date.</p>
+            </div>
+            <div className="admin-field">
+              <label>Available until <span className="admin-optional">optional</span></label>
+              <input type="date" value={form.availableUntil} onChange={(e) => update('availableUntil', e.target.value)} />
+              <p className="admin-field-hint">
+                Shows as &ldquo;leaving soon&rdquo; beforehand. Once this date passes, it&rsquo;s
+                automatically flagged for deletion review — it won&rsquo;t vanish without you seeing
+                it first.
+              </p>
+            </div>
+          </div>
 
           <div className="eyebrow admin-media-heading">Current media</div>
 
