@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../../lib/roles';
+import { requireCapability } from '../../../../lib/adminAuth';
 import { moveScheduleItem, removeFromSchedule, listChannelSchedule } from '../../../../lib/channelSchedule';
 import { recordAudit } from '../../../../lib/auditLog';
 
@@ -8,10 +8,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, email, isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  const roleContext = await requireCapability(req, res, 'manage_schedule');
+  if (!roleContext) return;
+  const { userId, email } = roleContext;
 
   const { id, action } = req.body || {};
   if (!id || !['moveUp', 'moveDown', 'remove'].includes(action)) {

@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { hasCapability } from '../../lib/capabilities';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
@@ -11,7 +12,11 @@ import { SITE } from '../../lib/siteConfig';
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
-  if (!account.isAdmin) {
+  // canAccessAdmin (not isAdmin) lets sub-admins reach this page at all;
+  // hasCapability then does the real gating — a sub-admin without the
+  // manage_schedule permission bounces the same as a non-admin would,
+  // exactly like the nav entry that leads here being hidden for them too.
+  if (!account.canAccessAdmin || !hasCapability(account, 'manage_schedule')) {
     return { redirect: { destination: '/', permanent: false } };
   }
   const episodes = await getPublicEpisodes();
