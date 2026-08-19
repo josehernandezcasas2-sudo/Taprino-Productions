@@ -14,7 +14,7 @@ const EMPTY_FORM = {
   creatorEmail: '', title: '', description: '', contentType: 'short',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
-  tier: 'free', status: 'pending', featured: false
+  tier: 'free', status: 'pending', featured: false, adsEnabled: true
 };
 
 function readAsDataUrl(f) {
@@ -200,6 +200,11 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal', marginTop: '0.6rem' }}>
           <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
           Eligible for the homepage hero rotation
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
+          <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
+          Show ads on this episode {form.tier === 'premium' && '(ignored — Cipher Circle members never see ads regardless)'}
         </label>
 
         <label>Poster — optional</label>

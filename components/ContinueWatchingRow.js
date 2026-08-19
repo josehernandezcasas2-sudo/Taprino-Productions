@@ -16,25 +16,26 @@ export default function ContinueWatchingRow({ items, onSelect }) {
           const totalSeconds = parseRuntimeToSeconds(ep.runtime);
           const pct = totalSeconds ? Math.min(100, Math.round((ep.resumeSeconds / totalSeconds) * 100)) : null;
           return (
-            <div
-              key={ep.id}
-              className={`ep-card ${ep.tier}`}
-              onClick={() => onSelect(ep)}
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ep); }}
-            >
-              <div className="ep-thumb">
-                {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
-                {pct !== null && (
-                  <div className="cw-progress-track" aria-hidden="true">
-                    <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
-                  </div>
-                )}
-              </div>
-              <div className="ep-info">
-                <h4>{ep.title}</h4>
-                <span>{ep.artist}</span>
+            <div key={ep.id} className="card-wrap row-card">
+              <div
+                className={`ep-card ${ep.tier}`}
+                onClick={() => onSelect(ep)}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ep); }}
+              >
+                <div className="ep-thumb">
+                  {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
+                  {pct !== null && (
+                    <div className="cw-progress-track" aria-hidden="true">
+                      <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
+                </div>
+                <div className="ep-info">
+                  <h4>{ep.title}</h4>
+                  <span>{ep.artist}</span>
+                </div>
               </div>
             </div>
           );

@@ -176,6 +176,31 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       />
       <div className="install-row"><InstallButton /></div>
 
+      <div className="player-full-bleed">
+        {locked ? (
+          <div className="lock-panel">
+            <div className="glyph">◈</div>
+            <h3>Available to {SITE.premiumTier} members</h3>
+            <p>
+              This one only screens for people who&rsquo;ve joined the circle. Members get early
+              drops, deleted scenes, and the cipher clues before anyone else.
+            </p>
+            <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
+              {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
+            </button>
+          </div>
+        ) : (
+          <VideoPlayer
+            episode={playingEpisode}
+            adsEnabled={!showingTrailer && episode.tier === 'free' && episode.adsEnabled !== false}
+            onEnded={handleEnded}
+            signedPlayback={!showingTrailer && signedPlayback}
+            initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
+            onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+          />
+        )}
+      </div>
+
       <main id="main-content" className="stage stage-single">
         <div>
           <Link href="/" className="library-back" style={{ display: 'inline-block', marginBottom: '1.2rem', textDecoration: 'none' }}>
@@ -228,28 +253,6 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
               )}
             </div>
 
-            {locked ? (
-              <div className="lock-panel">
-                <div className="glyph">◈</div>
-                <h3>Available to {SITE.premiumTier} members</h3>
-                <p>
-                  This one only screens for people who&rsquo;ve joined the circle. Members get early
-                  drops, deleted scenes, and the cipher clues before anyone else.
-                </p>
-                <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
-                  {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
-                </button>
-              </div>
-            ) : (
-              <VideoPlayer
-                episode={playingEpisode}
-                adsEnabled={!showingTrailer && episode.tier === 'free'}
-                onEnded={handleEnded}
-                signedPlayback={!showingTrailer && signedPlayback}
-                initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
-                onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
-              />
-            )}
 
             <div className="player-meta">
               <span>{episode.runtime}</span>

@@ -131,6 +131,7 @@ export default async function handler(req, res) {
     poster,
     thumbnail,
     featured: !!body.featured,
+    ads_enabled: body.adsEnabled !== false,
     status,
     submitted_by: submittedBy,
     reviewed_by: status !== 'pending' ? userId : null,

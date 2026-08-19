@@ -53,7 +53,8 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
     status: episode.status || 'pending',
     featured: !!episode.featured,
     availableFrom: toDateInputValue(episode.availableFrom),
-    availableUntil: toDateInputValue(episode.availableUntil)
+    availableUntil: toDateInputValue(episode.availableUntil),
+    adsEnabled: episode.adsEnabled !== false
   });
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -232,6 +233,12 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
           <label className="admin-checkbox">
             <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
             Eligible for the homepage hero rotation
+          </label>
+
+          <label className="admin-checkbox">
+            <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
+            Show ads on this episode
+            {form.tier === 'premium' && <span className="admin-optional"> — ignored, Cipher Circle members never see ads regardless of tier</span>}
           </label>
 
           <div className="admin-field-row">

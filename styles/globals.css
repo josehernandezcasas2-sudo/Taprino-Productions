@@ -3139,3 +3139,12 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   color: var(--ink-dim);
 }
 .lifecycle-list li strong { color: var(--ink); }
+
+/* Video player, pulled full-bleed on the episode watch page — same
+   philosophy as the hero carousel: the player itself touches the screen
+   edges, while the title/description/controls below it stay at a normal
+   reading width inside .stage. */
+.player-full-bleed {
+  width: 100%;
+  background: #000;
+}
