@@ -17,6 +17,7 @@ export default function LiveVideoPlayer({ stream }) {
   const adsManagerRef = useRef(null);
   const breakCheckTimer = useRef(null);
   const nextBreakIndexRef = useRef(0);
+  const hideTimerRef = useRef(null);
 
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -26,6 +27,12 @@ export default function LiveVideoPlayer({ stream }) {
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [errored, setErrored] = useState(false);
+  // Same auto-hide pattern as the VOD player (components/VideoPlayer.js) —
+  // deliberately duplicated rather than shared, matching this component's
+  // existing "separate on purpose" reasoning above. Controls stay visible
+  // whenever paused; during playback they fade 3s after the mouse or a
+  // touch last moved, and mousemove/touchstart bring them straight back.
+  const [controlsVisible, setControlsVisible] = useState(true);
 
   // Attaches (or re-attaches) the live HLS stream. Called on mount, and
   // again every time an ad break ends — a fresh hls.js instance against
@@ -98,6 +105,7 @@ export default function LiveVideoPlayer({ stream }) {
       v.removeEventListener('play', onPlay);
       v.removeEventListener('pause', onPause);
       v.removeEventListener('volumechange', onVol);
+      if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     };
   }, []);
 
@@ -205,6 +213,15 @@ export default function LiveVideoPlayer({ stream }) {
     }
   }
 
+  const showControlsTemporarily = useCallback(() => {
+    setControlsVisible(true);
+    if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+    hideTimerRef.current = setTimeout(() => {
+      const v = videoRef.current;
+      if (v && !v.paused) setControlsVisible(false);
+    }, 3000);
+  }, []);
+
   function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
@@ -235,7 +252,13 @@ export default function LiveVideoPlayer({ stream }) {
   }
 
   return (
-    <div ref={shellRef} className="tp-player live-player controls-on" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={shellRef}
+      className={`tp-player live-player ${controlsVisible || !playing ? 'controls-on' : ''}`}
+      onContextMenu={(e) => e.preventDefault()}
+      onMouseMove={showControlsTemporarily}
+      onTouchStart={showControlsTemporarily}
+    >
       <video
         ref={videoRef}
         className="tp-video"

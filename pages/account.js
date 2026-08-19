@@ -100,7 +100,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
                 {email ? <>Signed in as <strong>{email}</strong>.</> : 'Signed in.'}{' '}
                 {isSubscriber
                   ? `You have full access to ${SITE.premiumTier} exclusives.`
-                  : "You&rsquo;re on the free tier — no {SITE.premiumTier} membership yet."}
+                  : `You're on the free tier — no ${SITE.premiumTier} membership yet.`}
               </p>
 
               {isSubscriber ? (

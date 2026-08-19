@@ -71,7 +71,25 @@ self.addEventListener('fetch', (event) => {
           }
           return networkResponse;
         })
-        .catch(() => caches.match(event.request))
+        .catch(async () => {
+          // A cache MISS here used to fall through as `undefined` — passing
+          // that to respondWith() isn't a valid Response, and the browser
+          // reports it back as exactly the kind of opaque "Failed to
+          // fetch" error this was producing. Most likely to happen on a
+          // page that's never been visited in this browser before (nothing
+          // to have cached yet) combined with any live-fetch hiccup, which
+          // is exactly the account/checkout flow — the first real network
+          // request most people make is often the one that matters most.
+          //
+          // Re-throwing when there's truly nothing cached lets the
+          // browser's own native network-error handling take over, which
+          // is the same outcome as if no service worker were intercepting
+          // this request at all — correct, rather than a broken worker
+          // silently eating the failure.
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          throw new Error('Network request failed and nothing is cached for this page yet.');
+        })
     );
     return;
   }

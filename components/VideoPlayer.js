@@ -50,6 +50,17 @@ export default function VideoPlayer({
   const adsLoaderRef = useRef(null);
   const hlsRef = useRef(null);
   const lastSavedRef = useRef(0);
+  // Separate from lastSavedRef, deliberately. lastSavedRef is reset to 0
+  // on episode change (line ~297) and tracks video POSITION, which is
+  // exactly right for the normal timeupdate throttle — but it offers no
+  // protection at all against the effect itself re-running repeatedly
+  // (component remount, a dependency changing every render, or unusually
+  // rapid pause/play cycling on a flaky connection), since a fresh mount
+  // starts with a fresh, zeroed ref either way. This one is wall-clock
+  // time and is NOT reset on episode change, so it protects the pause and
+  // unmount handlers below — the two that call onProgress unconditionally
+  // — against firing in a tight loop regardless of why the loop happened.
+  const lastSaveTimeRef = useRef(0);
   const hideTimerRef = useRef(null);
   const refreshingRef = useRef(false);
 
@@ -99,8 +110,24 @@ export default function VideoPlayer({
         onProgress(now, videoElement.duration);
       }
     }
+    // The 15s throttle above is exactly right for normal playback — it's
+    // driven by video position, and position only advances by watching.
+    // Pause and unmount are different: they're meant to save immediately,
+    // every time, since "I just paused" or "I just left the page" are
+    // genuinely worth capturing regardless of how recently the last save
+    // happened. The wall-clock guard here isn't replacing that intent —
+    // it's a backstop against those two firing in a tight loop if
+    // something (a remount, rapid pause/play cycling on a bad connection)
+    // ever causes this effect to re-run far faster than a person actually
+    // pausing or navigating away ever would.
+    function guardedImmediateSave(position, duration) {
+      const now = Date.now();
+      if (now - lastSaveTimeRef.current < 3000) return;
+      lastSaveTimeRef.current = now;
+      onProgress(position, duration);
+    }
     function handlePause() {
-      onProgress(videoElement.currentTime, videoElement.duration);
+      guardedImmediateSave(videoElement.currentTime, videoElement.duration);
     }
 
     videoElement.addEventListener('loadedmetadata', handleLoadedMetadata);
@@ -111,7 +138,7 @@ export default function VideoPlayer({
       videoElement.removeEventListener('timeupdate', handleTimeUpdate);
       videoElement.removeEventListener('pause', handlePause);
       if (videoElement.currentTime > 0) {
-        onProgress(videoElement.currentTime, videoElement.duration);
+        guardedImmediateSave(videoElement.currentTime, videoElement.duration);
       }
     };
   }, [episode.id, isYouTube, initialPosition, onProgress]);
