@@ -2,16 +2,30 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { getSiteSettings } from '../../../lib/siteSettings';
 
 export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   const { userId, email, isAdmin } = await getRoleContext(req);
   if (!isAdmin) {
     return res.status(403).json({ error: 'Admin access required.' });
+  }
+
+  // Admin-only GET, deliberately never cached — this is what the admin
+  // dashboard reloads from after a save, so it always reflects the real
+  // current row. The public /api/site-settings (used by HeaderNav on every
+  // page) intentionally caches for 60s, which is exactly right for a
+  // header link but exactly wrong for an admin checking their own just-
+  // saved change — reading that cached copy back here was masking real
+  // successful saves as if they'd failed or silently reverted.
+  if (req.method === 'GET') {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+    const settings = await getSiteSettings();
+    return res.status(200).json(settings);
+  }
+
+  if (req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST');
+    return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { shopEnabled, shopUrl, liveTvEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness } = req.body || {};

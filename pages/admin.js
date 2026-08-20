@@ -101,7 +101,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
 
   async function loadSiteSettings() {
     try {
-      const res = await fetch('/api/site-settings');
+      const res = await fetch('/api/admin/site-settings');
       const data = await res.json();
       setSiteSettings(data);
       setConfirmedSiteSettings(data);

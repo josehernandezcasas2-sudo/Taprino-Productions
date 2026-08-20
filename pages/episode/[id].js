@@ -99,6 +99,13 @@ export async function getServerSideProps({ req, params, query, res }) {
 export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, isAdmin, isCreator, signedPlayback }) {
   const router = useRouter();
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
+  // Series episodes are reached by explicitly picking one from the show's
+  // own page (/series/[id]) — that's already the "choose what to watch"
+  // step, so they play immediately, same as always. Standalone movies/
+  // shorts are usually reached straight from a library grid, so THIS page
+  // is their first stop — it opens on a landing view (trailer/poster,
+  // title, description) with an explicit Play action, not the player.
+  const [showPlayer, setShowPlayer] = useState(episode.contentType === 'series' || Boolean(startOnTrailer));
   const [describedActive, setDescribedActive] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -182,30 +189,89 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       />
       <div className="install-row"><InstallButton /></div>
 
-      <div className="player-full-bleed">
-        {locked ? (
-          <div className="lock-panel">
-            <div className="glyph">◈</div>
-            <h3>Available to {SITE.premiumTier} members</h3>
-            <p>
-              This one only screens for people who&rsquo;ve joined the circle. Members get early
-              drops, deleted scenes, and the cipher clues before anyone else.
-            </p>
-            <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
-              {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
-            </button>
+      {!showPlayer ? (
+        <div className="hero-carousel full-bleed">
+          {episode.trailerSrc ? (
+            <video className="hero-video" src={episode.trailerSrc} autoPlay muted loop playsInline onContextMenu={(e) => e.preventDefault()} />
+          ) : (
+            <img
+              src={episode.heroImage || episode.poster || episode.thumbnail}
+              alt=""
+              className="hero-video hero-image"
+            />
+          )}
+          <div className="hero-scrim" />
+          <div className="hero-inner">
+            <div className="hero-content">
+              <div className="hero-eyebrow">{episode.contentType === 'movie' ? 'Movie' : 'Short'}</div>
+              <h2>{episode.title}</h2>
+              <div className="hero-meta">
+                <span className="hero-badge-tier">{episode.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                {episode.artist && (
+                  <>
+                    <span className="hero-meta-dot">&bull;</span>
+                    <span>{episode.artist}</span>
+                  </>
+                )}
+                {(episode.genre || episode.runtime) && (
+                  <>
+                    <span className="hero-meta-dot">&bull;</span>
+                    <span>{[episode.genre, episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
+                  </>
+                )}
+                {episode.rating && (
+                  <>
+                    <span className="hero-meta-dot">&bull;</span>
+                    <span className="hero-rating-tag">{episode.rating}</span>
+                  </>
+                )}
+                {episode.isOriginal && (
+                  <>
+                    <span className="hero-meta-dot">&bull;</span>
+                    <span className="original-tag">Tapa Original</span>
+                  </>
+                )}
+              </div>
+              <p>{episode.desc}</p>
+              <div className="hero-actions">
+                <button className="hero-play" onClick={() => setShowPlayer(true)}>&#9654; Play</button>
+                <button
+                  className="wishlist-btn-large"
+                  onClick={() => toggleWishlist(episode.id)}
+                  aria-label={isWishlisted(episode.id) ? 'Remove from wishlist' : 'Add to wishlist'}
+                >
+                  {isWishlisted(episode.id) ? '♥' : '♡'}
+                </button>
+              </div>
+            </div>
           </div>
-        ) : (
-          <VideoPlayer
-            episode={playingEpisode}
-            adsEnabled={!showingTrailer && episode.tier === 'free' && episode.adsEnabled !== false}
-            onEnded={handleEnded}
-            signedPlayback={!showingTrailer && signedPlayback}
-            initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
-            onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
-          />
-        )}
-      </div>
+        </div>
+      ) : (
+        <div className="player-full-bleed">
+          {locked ? (
+            <div className="lock-panel">
+              <div className="glyph">◈</div>
+              <h3>Available to {SITE.premiumTier} members</h3>
+              <p>
+                This one only screens for people who&rsquo;ve joined the circle. Members get early
+                drops, deleted scenes, and creator updates before anyone else.
+              </p>
+              <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
+                {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
+              </button>
+            </div>
+          ) : (
+            <VideoPlayer
+              episode={playingEpisode}
+              adsEnabled={!showingTrailer && episode.tier === 'free' && episode.adsEnabled !== false}
+              onEnded={handleEnded}
+              signedPlayback={!showingTrailer && signedPlayback}
+              initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
+              onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+            />
+          )}
+        </div>
+      )}
 
       <main id="main-content" className="stage stage-single">
         <div>

@@ -105,6 +105,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             </Link>
           ))}
           <Link href="/wishlist" className="nav-link">My List</Link>
+          {isSignedIn && <Link href="/recs" className="nav-link">My Recs</Link>}
           {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
             <Link href="/channel" className="nav-link nav-link-live">
               <i className="live-dot" aria-hidden="true" />
@@ -136,6 +137,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               </Link>
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
+            {isSignedIn && <Link href="/recs" className="dropdown-item" onClick={() => setOpenMenu(null)}>My Recs</Link>}
             {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
               <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
             )}
@@ -265,6 +267,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <Link href="/account" className="dropdown-item">⚙ Account Settings</Link>
                 {isAdmin && <Link href="/admin" className="dropdown-item">🔒 Admin Portal</Link>}
                 <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
+                <Link href="/recs" className="dropdown-item">✨ My Recs</Link>
                 {isSubscriber ? (
                   <button className="dropdown-item" onClick={openPortal} disabled={portalLoading}>
                     💳 {portalLoading ? 'Opening…' : 'Manage Subscription'}
