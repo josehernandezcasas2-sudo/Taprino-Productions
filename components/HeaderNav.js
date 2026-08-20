@@ -93,7 +93,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             </Link>
           ))}
           <Link href="/wishlist" className="nav-link">My List</Link>
-          <Link href="/channel" className="nav-link">Live TV</Link>
+          <Link href="/channel" className="nav-link nav-link-live">
+            <i className="live-dot" aria-hidden="true" />
+            Live TV
+          </Link>
         </nav>
 
         {/* Mobile fallback + genre browsing on any screen size — the five

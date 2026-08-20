@@ -219,14 +219,6 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
         </Link>
       )}
 
-      {channelOnAir && (
-        <Link href="/channel" className="live-now-banner channel-banner">
-          <i className="live-dot" aria-hidden="true" />
-          <span><strong>On the channel</strong> — {channelOnAir.title}</span>
-          <span className="live-now-arrow">Tune in →</span>
-        </Link>
-      )}
-
       <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
 
       <main id="main-content" className="stage stage-single stage-wide">
