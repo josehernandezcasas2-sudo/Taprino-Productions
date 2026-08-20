@@ -3297,3 +3297,82 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   .promo-banner-inner { padding: 1.8rem 1.2rem; }
   .promo-banner-inner h3 { font-size: 1.3rem; }
 }
+
+/* ============================================================
+   Horizontal top nav (components/HeaderNav.js) — matches the
+   Home/Series/Films/Vertical/Podcasts/My List mockup layout.
+   ============================================================ */
+.top-nav { justify-content: flex-start; gap: 1.6rem; }
+.nav-left { display: flex; align-items: center; gap: 1.8rem; flex: 1; min-width: 0; }
+.nav-right { display: flex; align-items: center; gap: 0.7rem; flex-shrink: 0; margin-left: auto; }
+
+.brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  text-decoration: none;
+  color: var(--ink);
+  flex-shrink: 0;
+}
+.nav-logo-badge { width: 2rem; height: 2rem; font-size: 0.68rem; }
+.brand-word { font-family: var(--font-display); font-size: 1.05rem; white-space: nowrap; }
+.brand-word strong { color: var(--brass); }
+
+.nav-links { display: flex; align-items: center; gap: 1.4rem; }
+.nav-link {
+  font-size: 0.9rem;
+  color: var(--ink-dim);
+  text-decoration: none;
+  white-space: nowrap;
+  padding: 0.3rem 0;
+  border-bottom: 2px solid transparent;
+}
+.nav-link:hover { color: var(--ink); }
+.nav-link.active { color: var(--brass); border-bottom-color: var(--brass); }
+
+.nav-hamburger { display: none; }
+
+.tapa-plus-pill {
+  background: var(--brass);
+  color: #241a05;
+  font-weight: 700;
+  font-size: 0.82rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.tapa-plus-pill:hover { background: var(--olive-bright); }
+
+.avatar-btn {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--olive-deep);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.avatar-btn:hover, .avatar-btn.active { background: var(--brass-deep); }
+
+/* Below this width there's no room for the full link row — collapse to
+   logo + hamburger (which already carries every type link plus genres)
+   on the left, same search/pill/avatar cluster on the right. This mirrors
+   the mockup's mobile header, which relies on the bottom MobileTabBar for
+   primary navigation instead of a horizontal link row. */
+@media (max-width: 900px) {
+  .nav-links { display: none; }
+  .nav-hamburger { display: flex; }
+  .brand-word { font-size: 0.92rem; }
+}
+@media (max-width: 480px) {
+  .tapa-plus-pill { padding: 0.45rem 0.85rem; font-size: 0.74rem; }
+  .brand-word { display: none; }
+}

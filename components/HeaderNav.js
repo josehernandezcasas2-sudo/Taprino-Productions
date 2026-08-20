@@ -5,15 +5,22 @@ import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
 
-// `onTypeSelect` used to be threaded in from every page and was never
-// called — the type links below have always been real navigation. It's
-// gone now; `activeGenre` replaces it so the current genre can be
-// highlighted the same way the current type already is.
+// Redesigned to match the horizontal-nav mockup: logo + top-level links on
+// the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
+// Studio Tapa + pill + a circular avatar on the right. All the FUNCTIONALITY
+// from the old hamburger-driven version is preserved — search, the account
+// dropdown (settings/admin/wishlist/subscription/creator links/sign out),
+// and the creator notifications bell — only the outer chrome changed.
+//
+// Genre browsing (previously buried in the hamburger dropdown) now lives
+// behind a small "More" menu on desktop and the hamburger on mobile, since
+// there isn't room for 10 genres as top-level links the way the mockup's
+// five fixed content-type links fit.
 export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
-  const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | null
+  const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
   const rootRef = useRef(null);
@@ -61,71 +68,54 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     }
   }
 
+  const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
+
+  const typeLinks = [
+    { href: '/', label: 'Home', match: activeType === 'All' || !activeType },
+    { href: '/type/series', label: 'Series', match: activeType === 'series' },
+    { href: '/type/movie', label: 'Films', match: activeType === 'movie' },
+    { href: '/type/vertical', label: 'Vertical', match: activeType === 'vertical' },
+    { href: '/type/podcast', label: 'Podcasts', match: activeType === 'podcast' },
+  ];
+
   return (
-    <header className="channel-bar" ref={rootRef}>
-      <div className="left-cluster">
+    <header className="channel-bar top-nav" ref={rootRef}>
+      <div className="nav-left">
+        <Link href="/" className="brand-mark">
+          <span className="footer-logo-badge nav-logo-badge">ST</span>
+          <span className="brand-word">Studio <strong>Tapa</strong></span>
+        </Link>
+
+        <nav className="nav-links" aria-label="Primary">
+          {typeLinks.map((l) => (
+            <Link key={l.href} href={l.href} className={`nav-link ${l.match ? 'active' : ''}`}>
+              {l.label}
+            </Link>
+          ))}
+          <Link href="/wishlist" className="nav-link">My List</Link>
+        </nav>
+
+        {/* Mobile fallback + genre browsing on any screen size — the five
+            fixed content-type links above don't leave room for a variable
+            list of genres, so genres always live behind this menu. */}
         <button
-          className={`icon-btn ${openMenu === 'ham' ? 'active' : ''}`}
+          className={`icon-btn nav-hamburger ${openMenu === 'ham' ? 'active' : ''}`}
           aria-label="Browse by type and genre"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
         >
           ☰
         </button>
-        <button
-          className={`icon-btn ${openMenu === 'search' ? 'active' : ''}`}
-          aria-label="Search"
-          onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
-        >
-          🔍
-        </button>
-
-        {openMenu === 'search' && (
-          <div className="dropdown dropdown-left open search-dropdown">
-            <form onSubmit={submitSearch}>
-              <input
-                ref={searchInputRef}
-                type="search"
-                className="header-search-input"
-                placeholder="Search episodes, artists, genres…"
-                value={searchValue}
-                onChange={(e) => setSearchValue(e.target.value)}
-              />
-            </form>
-          </div>
-        )}
-
-        <div className="channel-mark">
-          <span className="dot" aria-hidden="true" />
-          <span className="on-air-text">ON AIR</span>
-        </div>
 
         {openMenu === 'ham' && (
           <div className="dropdown dropdown-left open">
             <div className="dropdown-label">Browse by type</div>
-            <Link href="/" className={`dropdown-item ${activeType === 'All' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Home
-            </Link>
-            <Link href="/type/series" className={`dropdown-item ${activeType === 'series' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Series
-            </Link>
-            <Link href="/type/movie" className={`dropdown-item ${activeType === 'movie' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Movies
-            </Link>
-            <Link href="/type/short" className={`dropdown-item ${activeType === 'short' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Shorts
-            </Link>
-            <Link href="/type/vertical" className={`dropdown-item ${activeType === 'vertical' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Vertical
-            </Link>
-            <Link href="/type/podcast" className={`dropdown-item ${activeType === 'podcast' ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
-              Podcasts
-            </Link>
+            {typeLinks.map((l) => (
+              <Link key={l.href} href={l.href} className={`dropdown-item ${l.match ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
+                {l.label}
+              </Link>
+            ))}
+            <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
 
-            {/* Genres were being passed into this component all along and
-                never rendered — so /genre/[genre] pages existed but were
-                unreachable from the nav, and browsing by genre only worked
-                on the homepage. These are real links rather than a filter
-                callback, so they work identically from any page. */}
             {mainGenres && mainGenres.length > 0 && (
               <>
                 <div className="dropdown-divider" />
@@ -146,12 +136,30 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         )}
       </div>
 
-      <div className="channel-title">
-        {SITE.nameUpper}
-        <span className="sub">a {SITE.studio} screening room</span>
-      </div>
+      <div className="nav-right">
+        <button
+          className={`icon-btn ${openMenu === 'search' ? 'active' : ''}`}
+          aria-label="Search"
+          onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
+        >
+          🔍
+        </button>
 
-      <div className="right-cluster">
+        {openMenu === 'search' && (
+          <div className="dropdown dropdown-right open search-dropdown">
+            <form onSubmit={submitSearch}>
+              <input
+                ref={searchInputRef}
+                type="search"
+                className="header-search-input"
+                placeholder="Search episodes, artists, genres…"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+              />
+            </form>
+          </div>
+        )}
+
         {isCreator && (
           <>
             <button
@@ -193,12 +201,16 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           </>
         )}
 
+        <Link href="/account" className="tapa-plus-pill">
+          {SITE.premiumTier}
+        </Link>
+
         <button
-          className={`icon-btn ${openMenu === 'account' ? 'active' : ''}`}
+          className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
           aria-label="Account menu"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
         >
-          ☺
+          {isSignedIn ? avatarLetter : '☺'}
         </button>
 
         {openMenu === 'account' && (
@@ -206,7 +218,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             {isSignedIn ? (
               <>
                 <div className="account-dropdown-header">
-                  <div className="account-dropdown-avatar">☺</div>
+                  <div className="account-dropdown-avatar">{avatarLetter || '☺'}</div>
                   <div>
                     <div className="account-dropdown-email">{email || 'Your account'}</div>
                     <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
@@ -223,10 +235,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 ) : (
                   <Link href="/account" className="dropdown-item">✦ Join {SITE.premiumTier}</Link>
                 )}
-                {/* The self-serve upload route is retired — see /apply. Creators
-                    with work already on the platform keep their analytics; new
-                    work comes in through the application form and is ingested
-                    by the studio. */}
                 {isCreator && <div className="dropdown-divider" />}
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
                 <div className="dropdown-divider" />
