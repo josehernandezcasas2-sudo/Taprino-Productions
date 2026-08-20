@@ -117,6 +117,7 @@ export default async function handler(req, res) {
     series_order: body.contentType === 'series' ? Number(body.seriesOrder) : null,
     artist: body.artist,
     runtime: body.runtime,
+    rating: body.rating || null,
     video_type: 'html5',
     src,
     trailer_src: trailerSrc,

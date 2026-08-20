@@ -138,6 +138,12 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
                 <span>{[ep.genre, ep.runtime].filter(Boolean).join(' \u00b7 ')}</span>
               </>
             )}
+            {ep.rating && (
+              <>
+                <span className="hero-meta-dot">&bull;</span>
+                <span className="hero-rating-tag">{ep.rating}</span>
+              </>
+            )}
             {ep.isSeries && (
               <>
                 <span className="hero-meta-dot">&bull;</span>

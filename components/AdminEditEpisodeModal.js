@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { SITE } from '../lib/siteConfig';
+import { CONTENT_RATINGS } from '../lib/contentRatings';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -46,6 +47,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
     title: episode.title || '',
     description: episode.description || '',
     contentType: episode.contentType || 'short',
+    rating: episode.rating || '',
     seriesId: episode.seriesId || '',
     season: episode.season ? String(episode.season) : '1',
     seriesOrder: episode.seriesOrder ? String(episode.seriesOrder) : '',
@@ -200,6 +202,14 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
               <option value="series">Series episode</option>
               <option value="vertical">Vertical</option>
               <option value="podcast">Podcast</option>
+            </select>
+          </div>
+
+          <div className="admin-field">
+            <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
+            <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
+              <option value="">Not set</option>
+              {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
 

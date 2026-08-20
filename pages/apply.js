@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Head from 'next/head';
+import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
@@ -78,32 +79,44 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
         isSubscriber={isSubscriber}
       />
 
-      <main id="main-content" className="stage stage-single legal-page">
-        <div className="eyebrow">For creators</div>
-        <h1>Submit your work</h1>
+      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
+        <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Submit your work</div>
+        <p className="library-sub" style={{ marginBottom: '1.2rem' }}>
+          Tell us about your film or series — we&rsquo;ll reach out if it looks like a fit.
+        </p>
+
+        {isCreator && (
+          <div className="draft-banner" style={{ marginBottom: '1.2rem' }}>
+            Already approved as a creator? Head to your{' '}
+            <Link href="/creator" style={{ color: 'var(--brass)' }}>Creator Studio →</Link>{' '}
+            to submit a new episode directly — no need to pitch it here first.
+          </div>
+        )}
 
         {sent ? (
-          <div className="apply-success">
-            <h2>Got it — thanks.</h2>
-            <p>
-              We read every application. If your work looks like a fit, we&rsquo;ll email you at{' '}
-              <strong>{form.email}</strong> to talk about next steps and how to get the files over
-              to us.
-            </p>
-            <p className="apply-fineprint">
-              We don&rsquo;t send rejections for every application — if you haven&rsquo;t heard back
-              in a few weeks, it&rsquo;s not a fit right now, but you&rsquo;re welcome to apply again
-              with something new.
-            </p>
+          <div className="account-card">
+            <div className="apply-success">
+              <h2>Got it — thanks.</h2>
+              <p>
+                We read every application. If your work looks like a fit, we&rsquo;ll email you at{' '}
+                <strong>{form.email}</strong> to talk about next steps and how to get the files over
+                to us.
+              </p>
+              <p className="apply-fineprint">
+                We don&rsquo;t send rejections for every application — if you haven&rsquo;t heard back
+                in a few weeks, it&rsquo;s not a fit right now, but you&rsquo;re welcome to apply again
+                with something new.
+              </p>
+            </div>
           </div>
         ) : (
-          <>
-            <div className="legal-summary">
-              <strong>How this works.</strong> Tell us about your work below — no file upload needed
-              here. If it looks like a fit, we&rsquo;ll reach out and arrange getting the actual
-              files from you, then handle the encoding, captions, and publishing on our end. You keep
-              ownership of everything you make.
-            </div>
+          <div className="account-card">
+            <div className="account-eyebrow">How this works</div>
+            <p style={{ marginBottom: '1.2rem' }}>
+              Tell us about your work below — no file upload needed here. If it looks like a fit,
+              we&rsquo;ll reach out and arrange getting the actual files from you, then handle the
+              encoding, captions, and publishing on our end. You keep ownership of everything you make.
+            </p>
 
             <form onSubmit={submit} className="admin-edit-form apply-form">
               <div className="eyebrow apply-section">About you</div>
@@ -197,7 +210,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
                 </button>
               </div>
             </form>
-          </>
+          </div>
         )}
       </main>
       <Footer />

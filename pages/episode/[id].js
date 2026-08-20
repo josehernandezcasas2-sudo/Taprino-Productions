@@ -223,8 +223,9 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 {episode.artist && <span>Made by {episode.artist}</span>}
                 <span>{episode.runtime}</span>
                 {episode.genre && <span>{episode.genre}</span>}
+                {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
                 {episode.contentType === 'series' ? (
-                  <Link href={`/series/${episode.seriesId}`} className="trailer-link" style={{ borderColor: 'rgba(74,168,162,0.4)', color: 'var(--cipher-teal)' }}>
+                  <Link href={`/series/${episode.seriesId}`} className="trailer-link" style={{ borderColor: 'rgba(217,143,62,0.4)', color: 'var(--brass)' }}>
                     ▤ Part of {parentSeriesName || 'a series'}
                     {episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}
                   </Link>

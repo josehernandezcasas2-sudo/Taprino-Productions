@@ -1,3 +1,4 @@
+import { SITE } from '../../lib/siteConfig';
 import fs from 'fs';
 import path from 'path';
 import Stripe from 'stripe';
@@ -15,7 +16,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 const DATA_FILE = path.join(process.cwd(), 'signals.local.json');
 
-async function saveToNotion(email, character) {
+async function saveToNotion(email, interest) {
   const res = await fetch('https://api.notion.com/v1/pages', {
     method: 'POST',
     headers: {
@@ -27,9 +28,13 @@ async function saveToNotion(email, character) {
       parent: { database_id: process.env.NOTION_DATABASE_ID },
       properties: {
         // Adjust these property names to match your Notion database's schema.
+        // Renamed from "Character" — the old fictional-character-following
+        // segmentation was placeholder data, not a real signal. If your
+        // Notion database still has the old "Character" column, rename it
+        // to "Interest" (or update this line to match whatever you use).
         Name: { title: [{ text: { content: email } }] },
-        Character: { select: { name: character } },
-        Source: { rich_text: [{ text: { content: 'Taprino Transmission signup' } }] }
+        Interest: { select: { name: interest } },
+        Source: { rich_text: [{ text: { content: `${SITE.name} signup` } }] }
       }
     })
   });
@@ -57,7 +62,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, character } = req.body || {};
+  const { email, interest } = req.body || {};
   if (!email || !email.includes('@')) {
     return res.status(400).json({ error: 'A real email address is required.' });
   }
@@ -67,16 +72,16 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many signups from this connection — please wait a bit and try again.' });
   }
 
-  const entry = { email, character: character || 'Undecided', ts: Date.now() };
+  const entry = { email, interest: interest || 'New episodes', ts: Date.now() };
 
   try {
     if (process.env.NOTION_TOKEN && process.env.NOTION_DATABASE_ID) {
-      await saveToNotion(email, entry.character);
+      await saveToNotion(email, entry.interest);
     } else {
       saveToLocalFile(entry);
     }
 
-    // If this visitor has an account (free or Cipher Circle), remember the
+    // If this visitor has an account (free or paid), remember the
     // newsletter choice against it — no separate database, just a metadata
     // field on the same Stripe customer record everything else already uses.
     const customerId = await getStripeCustomerIdFromRequest(req);

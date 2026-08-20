@@ -4,7 +4,7 @@ import { getSupabase } from '../../../lib/supabase';
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
 // is a separate feature, not this one) plus the series-specific fields.
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'contentType', 'seriesId', 'season', 'seriesOrder'];
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating'];
 const VALID_TIERS = ['free', 'premium'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
 
@@ -72,6 +72,7 @@ export default async function handler(req, res) {
   if (updates.genre !== undefined) dbUpdates.genre = updates.genre;
   if (updates.mainGenre !== undefined) dbUpdates.main_genre = updates.mainGenre;
   if (updates.tier !== undefined) dbUpdates.tier = updates.tier;
+  if (updates.rating !== undefined) dbUpdates.rating = updates.rating;
   if (updates.contentType !== undefined) dbUpdates.content_type = updates.contentType;
   if (updates.seriesId !== undefined) dbUpdates.series_id = effectiveContentType === 'series' && !isNewSeries ? updates.seriesId : null;
   if (updates.season !== undefined) dbUpdates.season = effectiveContentType === 'series' ? Number(updates.season) || 1 : null;

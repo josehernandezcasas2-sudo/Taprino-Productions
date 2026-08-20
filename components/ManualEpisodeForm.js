@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SITE } from '../lib/siteConfig';
+import { CONTENT_RATINGS } from '../lib/contentRatings';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 const CONTENT_TYPES = [
@@ -11,7 +12,7 @@ const CONTENT_TYPES = [
 ];
 
 const EMPTY_FORM = {
-  creatorEmail: '', title: '', description: '', contentType: 'short',
+  creatorEmail: '', title: '', description: '', contentType: 'short', rating: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
   tier: 'free', status: 'pending', featured: false, adsEnabled: true
@@ -152,6 +153,12 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
         <label>Content type</label>
         <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
           {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+        </select>
+
+        <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
+        <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
+          <option value="">Not set</option>
+          {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
         </select>
 
         {form.contentType === 'series' && (

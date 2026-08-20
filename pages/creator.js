@@ -22,6 +22,7 @@ import DeleteRequestModal from '../components/DeleteRequestModal';
 import CaptionUploadModal from '../components/CaptionUploadModal';
 import ReplaceVideoModal from '../components/ReplaceVideoModal';
 import { SITE } from '../lib/siteConfig';
+import { CONTENT_RATINGS } from '../lib/contentRatings';
 
 import Footer from '../components/Footer';
 // SECURITY: same enforcement pattern as /admin — a non-creator is
@@ -59,7 +60,7 @@ const CONTENT_TYPES = [
 
 const EMPTY_FORM = {
   title: '', description: '', tier: 'free',
-  genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short',
+  genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short', rating: '',
   seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: ''
 };
 
@@ -483,6 +484,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               {runtimeStatus === 'failed' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — couldn&rsquo;t auto-detect, please enter it</span>}
             </label>
             <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+
+            <label>Content rating <span style={{ fontWeight: 'normal', color: 'var(--ink-dim)' }}>optional</span></label>
+            <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
+              <option value="">Not set</option>
+              {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+            </select>
 
             <label>Content type</label>
             <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>

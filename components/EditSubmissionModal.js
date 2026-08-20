@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { SITE } from '../lib/siteConfig';
+import { CONTENT_RATINGS } from '../lib/contentRatings';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 const CONTENT_TYPES = [
@@ -20,6 +21,7 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
     artist: submission.artist || '',
     runtime: submission.runtime || '',
     contentType: submission.contentType || 'short',
+    rating: submission.rating || '',
     genre: submission.genre || '',
     mainGenre: submission.mainGenre || MAIN_GENRES[0],
     tier: submission.tier || 'free',
@@ -80,6 +82,12 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
           <label>Content type</label>
           <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
             {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </select>
+
+          <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
+          <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
+            <option value="">Not set</option>
+            {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
 
           {form.contentType === 'series' && (

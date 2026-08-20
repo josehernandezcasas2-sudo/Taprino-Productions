@@ -1151,7 +1151,7 @@ button { font-family: inherit; cursor: pointer; }
 .postcard {
   background: var(--signal-tint);
   color: var(--olive-shadow);
-  border-radius: 2px;
+  border-radius: 1rem;
   padding: 1.4rem 1.3rem 1.5rem;
   position: relative;
 }
@@ -1159,40 +1159,40 @@ button { font-family: inherit; cursor: pointer; }
   position: absolute;
   top: 1rem;
   right: 1.3rem;
-  background: rgba(179, 73, 47, 0.14);
-  border: 1px solid rgba(179, 73, 47, 0.3);
-  color: var(--danger-deep);
+  background: rgba(107, 82, 25, 0.14);
+  border: 1px solid rgba(107, 82, 25, 0.3);
+  color: var(--olive-shadow);
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.04em;
 }
-.postcard-optout:hover { background: rgba(179, 73, 47, 0.22); }
+.postcard-optout:hover { background: rgba(107, 82, 25, 0.22); }
 .postcard-eyebrow {
   font-family: var(--font-mono);
   font-size: 0.62rem;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--oxide);
+  color: var(--brass-deep);
   margin-bottom: 0.4rem;
 }
-.postcard h3 { font-family: var(--font-display); font-size: 1.15rem; margin: 0 0 0.5rem; font-weight: 700; color: var(--cipher-teal-deep); }
-.postcard p { font-size: 0.85rem; line-height: 1.5; margin: 0 0 1rem; color: #2e4a45; }
+.postcard h3 { font-family: var(--font-display); font-size: 1.15rem; margin: 0 0 0.5rem; font-weight: 700; color: var(--olive-shadow); }
+.postcard p { font-size: 0.85rem; line-height: 1.5; margin: 0 0 1rem; color: var(--olive-shadow); opacity: 0.85; }
 .field-label {
   display: block;
   font-family: var(--font-mono);
   font-size: 0.6rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #3f605b;
+  color: var(--olive-deep);
   margin-bottom: 0.3rem;
 }
 .postcard input[type=email], .postcard select {
   width: 100%;
   padding: 0.55rem 0.7rem;
-  border: 1px solid rgba(22,48,44,0.2);
-  border-radius: 2px;
+  border: 1px solid rgba(43, 44, 26, 0.2);
+  border-radius: 6px;
   background: rgba(255,255,255,0.55);
   font-family: var(--font-body);
   font-size: 0.85rem;
@@ -1201,16 +1201,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .postcard button.submit {
   width: 100%;
-  background: var(--oxide);
-  color: var(--ink);
+  background: var(--brass);
+  color: #241a05;
   border: none;
-  border-radius: 2px;
-  padding: 0.65rem;
+  border-radius: 999px;
+  padding: 0.7rem;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.85rem;
+  font-weight: 700;
+  font-size: 0.88rem;
 }
-.postcard button.submit:hover { background: var(--danger); }
+.postcard button.submit:hover { background: var(--brass-deep); color: var(--ink); }
 .postcard button.submit:disabled { opacity: 0.6; cursor: wait; }
 .postcard .fineprint {
   margin-top: 0.7rem;
@@ -3570,4 +3570,13 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   margin: 0;
   font-size: 0.85rem;
   color: var(--ink-dim);
+}
+
+/* Content rating tag in the hero meta line (components/HeroSpotlight.js) */
+.hero-rating-tag {
+  border: 1px solid rgba(234, 231, 221, 0.35);
+  border-radius: 4px;
+  padding: 0.08rem 0.4rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
 }
