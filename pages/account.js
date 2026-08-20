@@ -6,12 +6,13 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
-
 import Footer from '../components/Footer';
+
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   let newsletterStatus = 'undecided';
+  let subscriptionDetails = null;
 
   if (account.isSignedIn && process.env.STRIPE_SECRET_KEY && account.stripeCustomerId) {
     try {
@@ -19,7 +20,34 @@ export async function getServerSideProps({ req, res }) {
       const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
       const customer = await stripe.customers.retrieve(account.stripeCustomerId);
       newsletterStatus = (customer.metadata && customer.metadata.newsletter) || 'undecided';
+
+      // Real subscription details for the account card — admins/sub-admins/
+      // comped accounts never actually have a Stripe subscription (their
+      // isSubscriber comes from role/invite, not billing), so this only
+      // fetches when there's an actual paying subscription to describe.
+      if (account.isSubscriber && !account.isAdmin && !account.isSubAdmin) {
+        const subs = await stripe.subscriptions.list({
+          customer: account.stripeCustomerId,
+          status: 'active',
+          limit: 1,
+          expand: ['data.items.data.price.product']
+        });
+        const sub = subs.data[0];
+        if (sub) {
+          const item = sub.items.data[0];
+          const price = item && item.price;
+          subscriptionDetails = {
+            renewsAt: sub.current_period_end * 1000,
+            cancelsAtPeriodEnd: sub.cancel_at_period_end,
+            amount: price ? price.unit_amount : null,
+            currency: price ? price.currency : null,
+            interval: price && price.recurring ? price.recurring.interval : null,
+            productName: price && price.product && typeof price.product === 'object' ? price.product.name : null
+          };
+        }
+      }
     } catch (err) {
+      console.error('account subscription fetch error:', err.message);
       newsletterStatus = 'undecided';
     }
   }
@@ -33,14 +61,31 @@ export async function getServerSideProps({ req, res }) {
       isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
+      isSubAdmin: account.isSubAdmin,
       isCreator: account.isCreator,
+      isComped: account.isComped,
       mainGenres,
-      newsletterStatus
+      newsletterStatus,
+      subscriptionDetails
     }
   };
 }
 
-export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, newsletterStatus }) {
+function formatMoney(amountInCents, currency) {
+  if (amountInCents == null || !currency) return null;
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(amountInCents / 100);
+  } catch (err) {
+    return `$${(amountInCents / 100).toFixed(2)}`;
+  }
+}
+
+function formatDate(ms) {
+  if (!ms) return null;
+  return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails }) {
   const { signOut } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
@@ -79,6 +124,19 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
     setNewsletterLoading(false);
   }
 
+  const avatarLetter = email && email[0] ? email[0].toUpperCase() : '?';
+  const canSeeNumbers = isCreator || isAdmin || isSubAdmin;
+
+  // Priority order matters here — an account can technically match more
+  // than one (e.g. an admin is also isCreator per lib/roles.js), and we
+  // only ever want to show the single highest-privilege badge, not stack
+  // several that all describe the same person.
+  const roleBadge = isAdmin ? 'Admin' : isSubAdmin ? 'Sub-admin' : isCreator ? 'Creator' : null;
+
+  const priceLabel = subscriptionDetails
+    ? formatMoney(subscriptionDetails.amount, subscriptionDetails.currency)
+    : null;
+
   return (
     <>
       <HeaderNav
@@ -92,6 +150,13 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
         <div className="account-card">
+          {isSignedIn && (
+            <div className="account-avatar-row">
+              <div className="account-avatar">{avatarLetter}</div>
+              {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+            </div>
+          )}
+
           <div className="account-eyebrow">Your account</div>
 
           {isSignedIn ? (
@@ -102,42 +167,99 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isCr
                 {isSubscriber
                   ? `You have full access to ${SITE.premiumTier} exclusives.`
                   : `You're on the free tier — no ${SITE.premiumTier} membership yet.`}
+                {isComped && !isAdmin && !isSubAdmin && ' Your access was granted directly by the team — no subscription needed.'}
               </p>
 
-              {isSubscriber ? (
-                <button className="account-btn-primary" onClick={openPortal} disabled={portalLoading}>
-                  {portalLoading ? 'Opening…' : 'Manage subscription'}
+              {/* Section: Membership */}
+              <div className="account-section">
+                <div className="account-subheading">Membership</div>
+
+                {isSubscriber ? (
+                  <>
+                    {subscriptionDetails && (
+                      <div className="account-sub-details">
+                        {subscriptionDetails.productName && (
+                          <div className="account-sub-detail-row">
+                            <span>Plan</span>
+                            <span>{subscriptionDetails.productName}</span>
+                          </div>
+                        )}
+                        {priceLabel && (
+                          <div className="account-sub-detail-row">
+                            <span>Price</span>
+                            <span>{priceLabel}{subscriptionDetails.interval ? ` / ${subscriptionDetails.interval}` : ''}</span>
+                          </div>
+                        )}
+                        <div className="account-sub-detail-row">
+                          <span>{subscriptionDetails.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'}</span>
+                          <span>{formatDate(subscriptionDetails.renewsAt)}</span>
+                        </div>
+                        {subscriptionDetails.cancelsAtPeriodEnd && (
+                          <div className="account-sub-cancel-note">
+                            Your subscription is set to cancel — you'll keep {SITE.premiumTier} access until then.
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <button className="account-btn-primary" onClick={openPortal} disabled={portalLoading}>
+                      {portalLoading ? 'Opening…' : 'Manage subscription'}
+                    </button>
+                    <div className="account-fineprint">
+                      "Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <ul className="account-upsell-list">
+                      <li>Ad-free viewing across the whole library</li>
+                      <li>Early access to new episodes before free release</li>
+                      <li>Gated series only {SITE.premiumTier} members can watch</li>
+                      <li>Back the creators you watch, directly</li>
+                    </ul>
+                    <Link href="/" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+                      Join {SITE.premiumTier}
+                    </Link>
+                  </>
+                )}
+              </div>
+
+              {/* Section: Quick links */}
+              <div className="account-section">
+                <div className="account-subheading">Quick links</div>
+                <div className="account-quicklinks">
+                  <Link href="/wishlist" className="account-quicklink">♥ My Wishlist</Link>
+                  <Link href="/#continue-watching" className="account-quicklink">▶ Continue Watching</Link>
+                  {canSeeNumbers && (
+                    <Link href="/creator/analytics" className="account-quicklink">📊 Your Numbers</Link>
+                  )}
+                </div>
+              </div>
+
+              {/* Section: Notifications */}
+              <div className="account-section">
+                <div className="account-subheading">Newsletter</div>
+                <p style={{ marginBottom: '0.7rem' }}>
+                  {newsletter === 'subscribed' && "You're subscribed to new episode and creator-update emails."}
+                  {newsletter === 'opted_out' && "You've opted out — you won't be asked again unless you opt back in."}
+                  {newsletter === 'undecided' && "You haven't chosen yet — the signup panel will keep showing until you do."}
+                </p>
+                {newsletter === 'subscribed' ? (
+                  <button className="account-btn-secondary" onClick={() => toggleNewsletter('optOut')} disabled={newsletterLoading}>
+                    {newsletterLoading ? 'Updating…' : 'Opt out of newsletter'}
+                  </button>
+                ) : (
+                  <button className="account-btn-secondary" onClick={() => toggleNewsletter('optIn')} disabled={newsletterLoading}>
+                    {newsletterLoading ? 'Updating…' : 'Opt in to newsletter'}
+                  </button>
+                )}
+              </div>
+
+              {/* Section: Sign out — kept visually distinct/last, it's the
+                  one destructive-ish action on this page */}
+              <div className="account-section account-section-danger">
+                <button className="account-btn-secondary" onClick={() => signOut({ redirectUrl: '/' })}>
+                  Log out
                 </button>
-              ) : (
-                <Link href="/" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-                  Join {SITE.premiumTier}
-                </Link>
-              )}
-
-              <button className="account-btn-secondary" onClick={() => signOut({ redirectUrl: '/' })}>
-                Log out
-              </button>
-
-              <div className="account-divider" />
-
-              <div className="account-subheading">Newsletter</div>
-              <p style={{ marginBottom: '0.7rem' }}>
-                {newsletter === 'subscribed' && "You're subscribed to new episode and cipher-clue emails."}
-                {newsletter === 'opted_out' && "You've opted out — you won't be asked again unless you opt back in."}
-                {newsletter === 'undecided' && "You haven't chosen yet — the signup panel will keep showing until you do."}
-              </p>
-              {newsletter === 'subscribed' ? (
-                <button className="account-btn-secondary" onClick={() => toggleNewsletter('optOut')} disabled={newsletterLoading}>
-                  {newsletterLoading ? 'Updating…' : 'Opt out of newsletter'}
-                </button>
-              ) : (
-                <button className="account-btn-secondary" onClick={() => toggleNewsletter('optIn')} disabled={newsletterLoading}>
-                  {newsletterLoading ? 'Updating…' : 'Opt in to newsletter'}
-                </button>
-              )}
-
-              <div className="account-fineprint">
-                "Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.
               </div>
             </>
           ) : (

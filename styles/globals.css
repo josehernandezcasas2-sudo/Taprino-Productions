@@ -3437,3 +3437,109 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .nav-link-live .live-dot {
   box-shadow: 0 0 6px 1px rgba(214, 124, 81, 0.8);
 }
+
+/* ============================================================
+   Account page additions (pages/account.js) — avatar, role badge,
+   grouped sections, subscription details, quick links, upsell list.
+   ============================================================ */
+.account-avatar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  margin-bottom: 1rem;
+}
+.account-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--brass);
+  color: #241a05;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 1.3rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.account-role-badge {
+  background: var(--olive-shadow);
+  border: 1px solid var(--olive-deep);
+  color: var(--olive-bright);
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.3rem 0.65rem;
+  border-radius: 999px;
+}
+
+.account-section {
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid rgba(234, 231, 221, 0.1);
+}
+.account-section:first-of-type { margin-top: 1.2rem; }
+.account-section-danger { opacity: 0.85; }
+
+.account-sub-details {
+  background: var(--void);
+  border: 1px solid rgba(234, 231, 221, 0.08);
+  border-radius: 6px;
+  padding: 0.8rem 0.9rem;
+  margin-bottom: 0.9rem;
+}
+.account-sub-detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  padding: 0.25rem 0;
+  color: var(--ink-dim);
+}
+.account-sub-detail-row span:last-child { color: var(--ink); font-weight: 600; }
+.account-sub-cancel-note {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(234, 231, 221, 0.08);
+  font-size: 0.78rem;
+  color: var(--warn);
+}
+
+.account-upsell-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.account-upsell-list li {
+  font-size: 0.85rem;
+  color: var(--ink-dim);
+  padding-left: 1.4rem;
+  position: relative;
+}
+.account-upsell-list li::before {
+  content: "✓";
+  position: absolute;
+  left: 0;
+  color: var(--brass);
+  font-weight: 700;
+}
+
+.account-quicklinks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.account-quicklink {
+  display: block;
+  background: var(--void);
+  border: 1px solid rgba(234, 231, 221, 0.1);
+  border-radius: 6px;
+  padding: 0.7rem 0.9rem;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 0.88rem;
+}
+.account-quicklink:hover { border-color: var(--brass); }

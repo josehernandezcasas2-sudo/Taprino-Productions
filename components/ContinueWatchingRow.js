@@ -9,7 +9,7 @@ export default function ContinueWatchingRow({ items, onSelect }) {
   if (!items || items.length === 0) return null;
 
   return (
-    <div className="cat-row continue-watching-row">
+    <div className="cat-row continue-watching-row" id="continue-watching">
       <div className="cat-row-heading">Continue Watching</div>
       <div className="cat-row-track">
         {items.map((ep) => {
