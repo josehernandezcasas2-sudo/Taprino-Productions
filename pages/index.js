@@ -233,6 +233,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
           <ContinueWatchingRow items={continueWatching} onSelect={goToEpisode} />
           <GenreRow
             title="New Releases"
+            seeAllHref="/collection/new-releases"
             episodes={newReleases}
             allSeries={allSeries}
             currentId={null}
@@ -242,6 +243,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
           />
           <GenreRow
             title="Leaving Soon"
+            seeAllHref="/collection/leaving-soon"
             episodes={leavingSoon}
             allSeries={allSeries}
             currentId={null}
