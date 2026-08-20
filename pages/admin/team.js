@@ -30,6 +30,8 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+const REVOKE_VALUE = '__revoke__';
+
 export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const [roster, setRoster] = useState(null);
   const [error, setError] = useState(null);
@@ -37,6 +39,11 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
   const [grantEmail, setGrantEmail] = useState('');
   const [grantRole, setGrantRole] = useState('sub_admin');
   const [pendingPerms, setPendingPerms] = useState({}); // { [userId]: Set(keys) }
+
+  const [compedList, setCompedList] = useState(null);
+  const [compedEmail, setCompedEmail] = useState('');
+  const [compedReason, setCompedReason] = useState('');
+  const [compedBusyId, setCompedBusyId] = useState(null);
 
   async function loadRoster() {
     setError(null);
@@ -55,8 +62,20 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
     }
   }
 
+  async function loadComped() {
+    try {
+      const res = await fetch('/api/admin/comped-access');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load the free-access invite list.');
+      setCompedList(data.comped);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   useEffect(() => {
     loadRoster();
+    loadComped();
   }, []);
 
   function togglePerm(userId, key) {
@@ -134,6 +153,80 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
     }
   }
 
+  // Switching roles reuses the same grant endpoint — granting a role the
+  // account already sort of has (e.g. creator -> sub_admin) just overwrites
+  // publicMetadata.role in place, no separate "switch" logic needed on the
+  // API side. Picking "Revoke access" from the same dropdown routes to the
+  // existing confirm-then-revoke flow instead of a silent role change,
+  // since that one's destructive and shouldn't happen from an accidental
+  // dropdown click.
+  async function switchRole(person, newRole) {
+    if (newRole === person.role) return;
+    if (newRole === REVOKE_VALUE) {
+      await revokeAccess(person);
+      return;
+    }
+    setBusyId(person.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/manage-creators', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: person.email, action: 'grant', role: newRole })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to switch role.');
+      await loadRoster();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function addComped(e) {
+    e.preventDefault();
+    if (!compedEmail.trim()) return;
+    setCompedBusyId('add');
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/comped-access', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: compedEmail.trim(), reason: compedReason.trim() || null })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to add that email.');
+      setCompedEmail('');
+      setCompedReason('');
+      await loadComped();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCompedBusyId(null);
+    }
+  }
+
+  async function removeComped(entry) {
+    if (!confirm(`Remove free access for ${entry.email}? They'll need a paid subscription to keep watching ${SITE.premiumTier} content.`)) return;
+    setCompedBusyId(entry.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/comped-access', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: entry.email })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to remove that email.');
+      await loadComped();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setCompedBusyId(null);
+    }
+  }
+
   return (
     <div>
       <Head>
@@ -180,7 +273,7 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
           </p>
         </section>
 
-        <section>
+        <section style={{ marginBottom: 32 }}>
           <h2>Current team</h2>
           {!roster && <p>Loading…</p>}
           {roster && roster.length === 0 && <p>No creators, sub-admins, or admins yet.</p>}
@@ -193,9 +286,16 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
                     {person.role === 'sub_admin' ? 'Sub-admin' : 'Creator'}
                   </span>
                 </div>
-                <button onClick={() => revokeAccess(person)} disabled={busyId === person.id} style={{ color: '#c55' }}>
-                  Revoke all access
-                </button>
+                <select
+                  value={person.role}
+                  onChange={(e) => switchRole(person, e.target.value)}
+                  disabled={busyId === person.id}
+                  style={{ padding: 6 }}
+                >
+                  <option value="creator">Creator</option>
+                  <option value="sub_admin">Sub-admin</option>
+                  <option value={REVOKE_VALUE} style={{ color: '#c55' }}>— Revoke access —</option>
+                </select>
               </div>
 
               {person.role === 'sub_admin' && (
@@ -228,6 +328,57 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
                   </button>
                 </div>
               )}
+            </div>
+          ))}
+        </section>
+
+        <section>
+          <h2>Free access invites</h2>
+          <p style={{ opacity: 0.75, maxWidth: 640 }}>
+            Emails on this list get {SITE.premiumTier} for free — no subscription, no payment —
+            the moment they sign in with that address. Meant for students or submitters who need
+            to watch premium content without paying. This is separate from Creator/Sub-admin roles
+            above; someone can be on this list without being a creator at all.
+          </p>
+
+          <form onSubmit={addComped} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 20 }}>
+            <input
+              type="email"
+              placeholder="student@example.com"
+              value={compedEmail}
+              onChange={(e) => setCompedEmail(e.target.value)}
+              required
+              style={{ padding: 8, minWidth: 240 }}
+            />
+            <input
+              type="text"
+              placeholder="Reason (optional) — e.g. Fall 2026 class"
+              value={compedReason}
+              onChange={(e) => setCompedReason(e.target.value)}
+              style={{ padding: 8, minWidth: 240 }}
+            />
+            <button type="submit" disabled={compedBusyId === 'add'}>
+              {compedBusyId === 'add' ? 'Adding…' : 'Add to invite list'}
+            </button>
+          </form>
+
+          {!compedList && <p>Loading…</p>}
+          {compedList && compedList.length === 0 && <p>No one's been invited yet.</p>}
+          {compedList && compedList.map((entry) => (
+            <div
+              key={entry.id}
+              style={{
+                display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
+                border: '1px solid #333', borderRadius: 8, padding: 12, marginBottom: 8
+              }}
+            >
+              <div>
+                <strong>{entry.email}</strong>
+                {entry.reason && <span style={{ marginLeft: 8, opacity: 0.65, fontSize: 13 }}>{entry.reason}</span>}
+              </div>
+              <button onClick={() => removeComped(entry)} disabled={compedBusyId === entry.id} style={{ color: '#c55' }}>
+                {compedBusyId === entry.id ? 'Removing…' : 'Remove'}
+              </button>
             </div>
           ))}
         </section>
