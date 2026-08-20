@@ -572,7 +572,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
 
         <ManualEpisodeForm
           allSeries={allSeries}
-          standaloneEpisodes={library.filter((e) => ['movie', 'short'].includes(e.contentType))}
+          standaloneEpisodes={(library || []).filter((e) => ['movie', 'short'].includes(e.contentType))}
           onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
         />
 
@@ -964,7 +964,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <AdminEditEpisodeModal
           episode={editingEpisode}
           allSeries={allSeries}
-          standaloneEpisodes={library.filter((e) => ['movie', 'short'].includes(e.contentType) && e.id !== editingEpisode.id)}
+          standaloneEpisodes={(library || []).filter((e) => ['movie', 'short'].includes(e.contentType) && e.id !== editingEpisode.id)}
           onClose={() => setEditingEpisode(null)}
           onSaved={() => {
             setEditingEpisode(null);
