@@ -15,7 +15,7 @@ export default function StudioTapaPromo({ isSubscriber }) {
   if (isSubscriber) return null;
 
   return (
-    <div className="promo-banner full-bleed">
+    <div className="promo-banner">
       <div className="promo-banner-inner">
         <div>
           <span className="promo-eyebrow">{SITE.premiumTier}</span>

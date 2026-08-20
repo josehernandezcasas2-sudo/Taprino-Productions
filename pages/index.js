@@ -317,6 +317,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                   <GenreRow
                     key={g}
                     title={g}
+                    seeAllHref={`/genre/${encodeURIComponent(g)}`}
                     episodes={episodes.filter(
                       (e) => e.mainGenre === g && (activeType === 'All' || e.contentType === activeType)
                     )}

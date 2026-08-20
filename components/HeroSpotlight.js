@@ -124,7 +124,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
         )}
 
         <div className="hero-content">
-          <div className="hero-eyebrow">{ep.isSeries ? 'Spotlight series' : 'Spotlight signal'}</div>
+          <div className="hero-eyebrow">{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</div>
           <h2>{ep.title}</h2>
           <p>{ep.desc}</p>
           <div className="hero-meta">

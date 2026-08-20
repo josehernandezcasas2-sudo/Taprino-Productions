@@ -2,7 +2,7 @@ import Link from 'next/link';
 import WishlistButton from './WishlistButton';
 import { SITE } from '../lib/siteConfig';
 
-export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist }) {
+export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist, seeAllHref }) {
   if (episodes.length === 0) return null;
 
   // Never show individual series episodes side by side in a browsing row —
@@ -21,7 +21,10 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
 
   return (
     <div className="cat-row">
-      <div className="cat-row-heading">{title}</div>
+      <div className="cat-row-heading">
+        <span>{title}</span>
+        {seeAllHref && <Link href={seeAllHref} className="see-all">See all</Link>}
+      </div>
       <div className="cat-row-track">
         {standalone.map((ep) => (
           <div key={ep.id} className="card-wrap row-card">

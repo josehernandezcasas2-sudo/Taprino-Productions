@@ -818,7 +818,17 @@ button { font-family: inherit; cursor: pointer; }
   text-transform: uppercase;
   color: var(--ink-dim);
   margin-bottom: 0.7rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
+.cat-row-heading .see-all {
+  color: var(--brass);
+  text-decoration: none;
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+}
+.cat-row-heading .see-all:hover { color: var(--olive-bright); }
 .cat-row-track {
   display: flex;
   gap: 0.8rem;
