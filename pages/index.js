@@ -20,6 +20,8 @@ import { getCurrentLiveStream } from '../lib/liveStreams';
 import { getChannelState } from '../lib/channelSchedule';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
+import Footer from '../components/Footer';
+import StudioTapaPromo from '../components/StudioTapaPromo';
 import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
@@ -247,6 +249,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
             isWishlisted={isWishlisted}
             onToggleWishlist={toggleWishlist}
           />
+          <StudioTapaPromo isSubscriber={isSubscriber} />
           {searchResults ? (
             <>
               <div className="shelf-heading">
@@ -335,17 +338,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
         </div>
       )}
 
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );

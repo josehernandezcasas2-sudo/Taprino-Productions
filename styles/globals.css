@@ -3148,3 +3148,152 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   width: 100%;
   background: #000;
 }
+
+/* ============================================================
+   Rich multi-column footer (components/Footer.js)
+   ============================================================ */
+.site-footer-rich {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 2rem;
+  padding-top: 2.5rem;
+  padding-bottom: calc(2.5rem + env(safe-area-inset-bottom, 0px));
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  gap: 2rem;
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+}
+@media (max-width: 780px) {
+  .footer-grid { grid-template-columns: 1fr; gap: 1.6rem; }
+}
+.footer-brand-mark {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  color: var(--ink);
+  margin-bottom: 0.6rem;
+}
+.footer-brand-mark strong { color: var(--brass); }
+.footer-logo-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: var(--olive-shadow);
+  border: 1px solid var(--brass-deep);
+  color: var(--brass);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.footer-brand p {
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--ink-dim);
+  max-width: 30ch;
+  margin: 0;
+}
+.footer-col h4 {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 0.8rem;
+}
+.footer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+.footer-col a {
+  font-size: 0.82rem;
+  color: var(--ink-dim);
+  text-decoration: none;
+}
+.footer-col a:hover { color: var(--ink); }
+.footer-bottom {
+  max-width: 1180px;
+  margin: 0 auto;
+  width: 100%;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(234, 231, 221, 0.08);
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  color: var(--static-grey);
+}
+
+/* ============================================================
+   Studio Tapa + promo banner (components/StudioTapaPromo.js)
+   ============================================================ */
+.promo-banner {
+  background: linear-gradient(135deg, var(--brass) 0%, #c98a2c 100%);
+  border-radius: 1rem;
+  margin: 2.5rem 0;
+}
+.promo-banner.full-bleed {
+  border-radius: 0;
+  margin-left: calc(50% - 50vw);
+  margin-right: calc(50% - 50vw);
+  width: 100vw;
+}
+.promo-banner-inner {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2.4rem 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2rem;
+  flex-wrap: wrap;
+}
+.promo-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #3a2a08;
+  opacity: 0.75;
+  margin-bottom: 0.4rem;
+}
+.promo-banner-inner h3 {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin: 0 0 0.5rem;
+  color: #241a05;
+}
+.promo-banner-inner p {
+  font-size: 0.9rem;
+  color: #3a2a08;
+  max-width: 46ch;
+  margin: 0;
+}
+.promo-cta {
+  background: #1a1408;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.85rem 1.8rem;
+  font-weight: 700;
+  font-size: 0.88rem;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.promo-cta:hover { background: #000; }
+@media (max-width: 640px) {
+  .promo-banner-inner { padding: 1.8rem 1.2rem; }
+  .promo-banner-inner h3 { font-size: 1.3rem; }
+}
