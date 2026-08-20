@@ -496,6 +496,15 @@ button { font-family: inherit; cursor: pointer; }
   letter-spacing: 0.06em;
   color: var(--static-grey);
 }
+/* The rich, multi-column footer (Footer.js) supplies its own horizontal
+   padding on .footer-grid/.footer-bottom, matching the library's 2.4rem —
+   so it opts out of the centered-column formula above entirely, rather
+   than the two systems stacking and fighting each other. Only the plain
+   single-line footer still on the other ~19 pages uses the formula. */
+.site-footer.site-footer-rich {
+  padding-left: 0;
+  padding-right: 0;
+}
 .install-row {
   display: flex;
   justify-content: flex-end;
@@ -637,7 +646,6 @@ button { font-family: inherit; cursor: pointer; }
 .hero-inner {
   position: relative;
   height: 100%;
-  padding: 0 2.4rem;
 }
 .hero-video {
   position: absolute;
@@ -684,7 +692,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .hero-content {
   position: absolute;
-  left: 1.5rem; right: 1.5rem; bottom: 0;
+  left: 2.4rem; right: 2.4rem; bottom: 0;
   z-index: 2;
   padding: 0 0 1.5rem;
 }
