@@ -207,6 +207,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
         isAdmin={isAdmin}
         isCreator={isCreator}
         isSubscriber={isSubscriber}
+        liveStream={liveStream}
       />
       <div className="install-row"><InstallButton /></div>
 

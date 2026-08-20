@@ -126,18 +126,32 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
         <div className="hero-content">
           <div className="hero-eyebrow">{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</div>
           <h2>{ep.title}</h2>
-          <p>{ep.desc}</p>
           <div className="hero-meta">
-            <span>{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-            <span>{ep.runtime}</span>
-            {ep.genre && <span>{ep.genre}</span>}
-            {ep.artist && <span>{ep.artist}</span>}
-            {ep.isSeries && <span>▤ Series</span>}
+            <span className="hero-badge-tier">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+            {ep.artist && (
+              <>
+                <span className="hero-meta-dot">&bull;</span>
+                <span>{ep.artist}</span>
+              </>
+            )}
+            {(ep.genre || ep.runtime) && (
+              <>
+                <span className="hero-meta-dot">&bull;</span>
+                <span>{[ep.genre, ep.runtime].filter(Boolean).join(' \u00b7 ')}</span>
+              </>
+            )}
+            {ep.isSeries && (
+              <>
+                <span className="hero-meta-dot">&bull;</span>
+                <span>&#9636; Series</span>
+              </>
+            )}
           </div>
+          <p>{ep.desc}</p>
           <div className="hero-actions">
             <button className="hero-play" onClick={() => onPlay(ep)}>▶ {ep.isSeries ? 'View series' : 'Play'}</button>
             {!ep.isSeries && !isImageMode && ep.trailerSrc && (
-              <button className="hero-trailer" onClick={() => onTrailer(ep)}>🎬 Full trailer</button>
+              <button className="hero-trailer" onClick={() => onTrailer(ep)}>&#9432; More info</button>
             )}
           </div>
         </div>

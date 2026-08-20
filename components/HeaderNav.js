@@ -16,7 +16,7 @@ import { SITE } from '../lib/siteConfig';
 // behind a small "More" menu on desktop and the hamburger on mobile, since
 // there isn't room for 10 genres as top-level links the way the mockup's
 // five fixed content-type links fit.
-export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, liveStream }) {
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
@@ -137,6 +137,12 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       </div>
 
       <div className="nav-right">
+        {liveStream && (
+          <Link href="/live" className="header-live-badge" aria-label={`Live now: ${liveStream.title}`}>
+            <i className="live-dot" aria-hidden="true" />
+            LIVE
+          </Link>
+        )}
         <button
           className={`icon-btn ${openMenu === 'search' ? 'active' : ''}`}
           aria-label="Search"

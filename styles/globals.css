@@ -724,34 +724,48 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hero-meta {
   display: flex;
-  gap: 0.8rem;
+  align-items: center;
+  gap: 0.5rem;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   color: var(--ink-dim);
   margin-bottom: 1rem;
   text-shadow: 0 1px 6px rgba(0,0,0,0.8);
 }
+.hero-badge-tier {
+  background: var(--brass);
+  color: #241a05;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+  text-shadow: none;
+}
+.hero-meta-dot { opacity: 0.6; }
 .hero-actions { display: flex; gap: 0.7rem; }
 .hero-play {
-  background: var(--signal-amber);
-  color: var(--olive-shadow);
+  background: var(--ink);
+  color: #1a1408;
   border: none;
-  border-radius: 999px;
-  padding: 0.6rem 1.3rem;
+  border-radius: 8px;
+  padding: 0.85rem 1.7rem;
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 0.85rem;
+  font-weight: 700;
+  font-size: 0.95rem;
 }
 .hero-play:hover { background: var(--olive-bright); }
 .hero-trailer {
-  background: rgba(20,21,28,0.5);
-  border: 1px solid rgba(74, 168, 162, 0.5);
-  color: var(--cipher-teal);
-  border-radius: 999px;
-  padding: 0.6rem 1.1rem;
+  background: rgba(20,21,28,0.4);
+  border: 1px solid rgba(234, 231, 221, 0.4);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 0.85rem 1.5rem;
   font-family: var(--font-display);
-  font-size: 0.85rem;
+  font-weight: 600;
+  font-size: 0.95rem;
 }
+.hero-trailer:hover { border-color: var(--ink); background: rgba(20,21,28,0.6); }
 
 .hero-arrow {
   position: absolute;
@@ -3390,3 +3404,25 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   .tapa-plus-pill { padding: 0.45rem 0.85rem; font-size: 0.74rem; }
   .brand-word { display: none; }
 }
+
+/* Live badge in the header nav (components/HeaderNav.js). Only rendered
+   when a liveStream prop is passed — currently just the homepage, since
+   that's the only page fetching live-stream status today. Other pages
+   would need the same getServerSideProps fetch + prop wired through to
+   show this too. */
+.header-live-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--danger-deep);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.8rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-decoration: none;
+}
+.header-live-badge:hover { background: var(--danger); }
+.header-live-badge .live-dot { width: 7px; height: 7px; }
