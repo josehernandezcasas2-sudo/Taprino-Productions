@@ -93,6 +93,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             </Link>
           ))}
           <Link href="/wishlist" className="nav-link">My List</Link>
+          <Link href="/channel" className="nav-link">Live TV</Link>
         </nav>
 
         {/* Mobile fallback + genre browsing on any screen size — the five
@@ -115,6 +116,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               </Link>
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
+            <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
 
             {mainGenres && mainGenres.length > 0 && (
               <>

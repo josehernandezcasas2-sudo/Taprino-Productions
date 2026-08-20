@@ -110,8 +110,6 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
       <div className="hero-scrim" />
 
       <div className="hero-inner">
-        <img src="/logo.svg" alt={SITE.name} className="hero-logo" />
-
         {!isImageMode && (
           <div className="hero-controls">
             <button className="hero-pause-btn" onClick={() => setMuted((m) => !m)} aria-label={muted ? 'Unmute preview' : 'Mute preview'}>
@@ -150,7 +148,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <p>{ep.desc}</p>
           <div className="hero-actions">
             <button className="hero-play" onClick={() => onPlay(ep)}>▶ {ep.isSeries ? 'View series' : 'Play'}</button>
-            {!ep.isSeries && !isImageMode && ep.trailerSrc && (
+            {!ep.isSeries && (
               <button className="hero-trailer" onClick={() => onTrailer(ep)}>&#9432; More info</button>
             )}
           </div>
