@@ -11,6 +11,7 @@ import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 
+import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, res }) {
   // CDN caching, but ONLY for signed-out visitors.
   //
@@ -174,18 +175,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
           </>
         )}
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );

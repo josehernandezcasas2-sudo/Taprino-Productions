@@ -11,6 +11,7 @@ import AdminEditEpisodeModal from '../components/AdminEditEpisodeModal';
 import ManualEpisodeForm from '../components/ManualEpisodeForm';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
+import Footer from '../components/Footer';
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
 // any admin data is ever fetched or rendered — there's no client-side-only
@@ -780,18 +781,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
 
       {editingEpisode && (
         <AdminEditEpisodeModal

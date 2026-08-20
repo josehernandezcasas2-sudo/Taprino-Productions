@@ -8,6 +8,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import ChannelPlayer from '../components/ChannelPlayer';
 import { SITE } from '../lib/siteConfig';
 
+import Footer from '../components/Footer';
 export async function getServerSideProps({ req, res }) {
   // Signed-out visitors get a cacheable response; signed-in ones don't.
   // See the longer note in pages/index.js — this page also returns
@@ -84,18 +85,7 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
           where to do that.
         </p>
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );

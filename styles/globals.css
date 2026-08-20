@@ -364,7 +364,7 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 2;
 }
 .poster-card.free .poster-badge { background: var(--olive-deep); color: var(--ink); }
-.poster-card.premium .poster-badge { background: rgba(179,73,47,0.22); color: var(--danger); }
+.poster-card.premium .poster-badge { background: var(--brass); color: #241a05; }
 .poster-title-wrap {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 0.8rem 0.7rem 0.7rem;
@@ -1000,7 +1000,7 @@ button { font-family: inherit; cursor: pointer; }
    everywhere else on the site, so reusing it here would blur the exact
    distinction this badge exists to make. */
 .ep-card.free .ep-badge { background: var(--olive-deep); color: var(--ink); }
-.ep-card.premium .ep-badge { background: rgba(179,73,47,0.2); color: var(--danger); }
+.ep-card.premium .ep-badge { background: var(--brass); color: #241a05; }
 .ep-info { padding: 0.7rem 0.8rem 0.9rem; }
 .ep-info h4 { font-family: var(--font-display); font-size: 0.88rem; margin: 0 0 0.25rem; font-weight: 600; }
 .ep-info span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
@@ -3395,7 +3395,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    on the left, same search/pill/avatar cluster on the right. This mirrors
    the mockup's mobile header, which relies on the bottom MobileTabBar for
    primary navigation instead of a horizontal link row. */
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
   .nav-links { display: none; }
   .nav-hamburger { display: flex; }
   .brand-word { font-size: 0.92rem; }

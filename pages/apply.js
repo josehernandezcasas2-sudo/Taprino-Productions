@@ -6,6 +6,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
 
+import Footer from '../components/Footer';
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
 export async function getServerSideProps({ req }) {
@@ -199,18 +200,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
           </>
         )}
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );

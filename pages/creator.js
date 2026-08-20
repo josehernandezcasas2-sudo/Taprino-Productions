@@ -23,6 +23,7 @@ import CaptionUploadModal from '../components/CaptionUploadModal';
 import ReplaceVideoModal from '../components/ReplaceVideoModal';
 import { SITE } from '../lib/siteConfig';
 
+import Footer from '../components/Footer';
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
 // renders.
@@ -706,18 +707,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
           )}
         </div>
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
 
       {editingSubmission && (
         <EditSubmissionModal

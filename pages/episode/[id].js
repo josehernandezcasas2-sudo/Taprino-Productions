@@ -19,6 +19,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
 import { SITE } from '../../lib/siteConfig';
 
+import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const episode = await findEpisode(params.id);
@@ -270,18 +271,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
           </div>
         </div>
       </main>
-
-      <footer className="site-footer">
-        <span>{SITE.nameUpper}</span>
-        <span>© {new Date().getFullYear()} {SITE.studio}</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );

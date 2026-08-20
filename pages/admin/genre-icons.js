@@ -5,6 +5,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
+import Footer from '../../components/Footer';
 
 // Same 10 genres GenreBrowseRow ships default emoji for — kept in sync
 // manually since there's no single shared source for this list yet. If a
@@ -169,17 +170,7 @@ export default function GenreIconsAdmin({ mainGenres, isSignedIn, isSubscriber, 
         </div>
       </main>
 
-      <footer className="site-footer">
-        <span>STUDIO TAPA TV</span>
-        <span>© {new Date().getFullYear()} Studio Tapa</span>
-        <span className="footer-legal">
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-          <a href="/terms">Terms</a>
-          <a href="/privacy">Privacy</a>
-          <a href="/cookies">Cookies</a>
-        </span>
-      </footer>
+      <Footer />
       <MobileTabBar />
     </>
   );
