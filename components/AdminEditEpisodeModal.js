@@ -58,6 +58,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
     tier: episode.tier || 'free',
     status: episode.status || 'pending',
     featured: !!episode.featured,
+    isOriginal: !!episode.isOriginal,
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
     adsEnabled: episode.adsEnabled !== false
@@ -283,7 +284,12 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
           <label className="admin-checkbox">
             <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
             Show ads on this episode
-            {form.tier === 'premium' && <span className="admin-optional"> — ignored, Cipher Circle members never see ads regardless of tier</span>}
+            {form.tier === 'premium' && <span className="admin-optional"> — ignored, {SITE.premiumTier} members never see ads regardless of tier</span>}
+          </label>
+
+          <label className="admin-checkbox">
+            <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
+            Tapa Original <span className="admin-optional"> — exclusive to Studio Tapa, independent of free/premium tier</span>
           </label>
 
           <div className="admin-field-row">

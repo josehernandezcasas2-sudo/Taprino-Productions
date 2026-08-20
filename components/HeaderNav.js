@@ -23,8 +23,20 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
+  const [shopSettings, setShopSettings] = useState(null);
   const rootRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  // Self-fetched rather than passed as a prop — HeaderNav renders on every
+  // page, and threading a new prop through all of them just for one
+  // optional link isn't worth the sweep. This is the same reason the
+  // Shop link's on/off state lives in its own tiny public API instead.
+  useEffect(() => {
+    fetch('/api/site-settings')
+      .then((r) => r.json())
+      .then((data) => setShopSettings(data))
+      .catch(() => setShopSettings({ shopEnabled: false, shopUrl: null }));
+  }, []);
 
   useEffect(() => {
     function handleOutside(e) {
@@ -97,6 +109,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             <i className="live-dot" aria-hidden="true" />
             Live TV
           </Link>
+          {shopSettings && shopSettings.shopEnabled && shopSettings.shopUrl && (
+            <a href={shopSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="nav-link">Shop</a>
+          )}
         </nav>
 
         {/* Mobile fallback + genre browsing on any screen size — the five
@@ -120,6 +135,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
             <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
+            {shopSettings && shopSettings.shopEnabled && shopSettings.shopUrl && (
+              <a href={shopSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>
+            )}
 
             {mainGenres && mainGenres.length > 0 && (
               <>

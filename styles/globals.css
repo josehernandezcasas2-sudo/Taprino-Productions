@@ -847,7 +847,7 @@ button { font-family: inherit; cursor: pointer; }
 .cat-row-heading .see-all:hover { color: var(--olive-bright); }
 .cat-row-track {
   display: flex;
-  gap: 0.8rem;
+  gap: 1.4rem;
   overflow-x: auto;
   padding: 1.1rem 0.3rem 0.7rem;
 }
@@ -3586,4 +3586,16 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   padding: 0.08rem 0.4rem;
   font-size: 0.72rem;
   letter-spacing: 0.02em;
+}
+
+/* Tapa Originals tag — independent of tier, distinct color from both the
+   brass tier badge and the neutral rating tag so it reads as its own thing. */
+.original-tag {
+  background: var(--olive-bright);
+  color: #1a1408;
+  font-weight: 700;
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
 }

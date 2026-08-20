@@ -144,6 +144,12 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
                 <span className="hero-rating-tag">{ep.rating}</span>
               </>
             )}
+            {ep.isOriginal && (
+              <>
+                <span className="hero-meta-dot">&bull;</span>
+                <span className="original-tag">Tapa Original</span>
+              </>
+            )}
             {ep.isSeries && (
               <>
                 <span className="hero-meta-dot">&bull;</span>

@@ -224,6 +224,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 <span>{episode.runtime}</span>
                 {episode.genre && <span>{episode.genre}</span>}
                 {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
+                {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
                 {episode.contentType === 'series' ? (
                   <Link href={`/series/${episode.seriesId}`} className="trailer-link" style={{ borderColor: 'rgba(217,143,62,0.4)', color: 'var(--brass)' }}>
                     ▤ Part of {parentSeriesName || 'a series'}
