@@ -344,7 +344,7 @@ button { font-family: inherit; cursor: pointer; }
   display: block;
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
-.poster-card:hover { transform: translateY(-3px); border-color: rgba(232, 163, 61, 0.45); }
+.card-wrap:hover .poster-card { border-color: rgba(232, 163, 61, 0.55); box-shadow: 0 14px 30px rgba(0,0,0,0.5); }
 .poster-art {
   position: absolute; inset: 0;
   display: flex; align-items: center; justify-content: center;
@@ -849,7 +849,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   gap: 0.8rem;
   overflow-x: auto;
-  padding-bottom: 0.4rem;
+  padding: 1.1rem 0.3rem 0.7rem;
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
 
@@ -936,7 +936,7 @@ button { font-family: inherit; cursor: pointer; }
   transition: transform 0.15s ease, border-color 0.15s ease;
   padding: 0;
 }
-.ep-card:hover { transform: translateY(-2px); border-color: rgba(232, 163, 61, 0.4); }
+.card-wrap:hover .ep-card { border-color: rgba(232, 163, 61, 0.5); box-shadow: 0 14px 30px rgba(0,0,0,0.5); }
 .ep-card.active { border-color: var(--signal-amber); }
 .ep-thumb {
   aspect-ratio: 16 / 9;
@@ -954,7 +954,14 @@ button { font-family: inherit; cursor: pointer; }
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.card-wrap { position: relative; }
+.card-wrap {
+  position: relative;
+  transition: transform 0.18s ease, z-index 0s;
+}
+.card-wrap:hover {
+  transform: scale(1.07);
+  z-index: 6;
+}
 .card-wrap > .ep-card, .card-wrap > .poster-card { display: block; width: 100%; }
 .wishlist-btn {
   position: absolute;
