@@ -42,7 +42,7 @@ function toDateInputValue(iso) {
   return iso.slice(0, 10);
 }
 
-export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onSaved }) {
+export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEpisodes, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: episode.title || '',
     description: episode.description || '',
@@ -51,6 +51,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
     seriesId: episode.seriesId || '',
     season: episode.season ? String(episode.season) : '1',
     seriesOrder: episode.seriesOrder ? String(episode.seriesOrder) : '',
+    bonusParent: episode.bonusParentType && episode.bonusParentId ? `${episode.bonusParentType}:${episode.bonusParentId}` : '',
     artist: episode.artist || '',
     runtime: episode.runtime || '',
     genre: episode.genre || '',
@@ -140,12 +141,15 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
     setError(null);
     try {
       const [posterBase64, thumbnailBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile)]);
+      const [bonusParentType, bonusParentId] = form.bonusParent ? form.bonusParent.split(':') : [null, null];
       const res = await fetch('/api/admin/edit-episode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           episodeId: episode.id,
           ...form,
+          bonusParentType,
+          bonusParentId,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
           ...(videoUid.trim() ? { cloudflareVideoUid: videoUid.trim() } : {})
@@ -203,6 +207,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
               <option value="series">Series episode</option>
               <option value="vertical">Vertical</option>
               <option value="podcast">Podcast</option>
+              <option value="bonus">Bonus content (BTS, trailer, extra…)</option>
             </select>
           </div>
 
@@ -213,6 +218,25 @@ export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onS
               {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
           </div>
+
+          {form.contentType === 'bonus' && (
+            <div className="admin-field">
+              <label>This bonus content belongs under</label>
+              <select value={form.bonusParent} onChange={(e) => update('bonusParent', e.target.value)} required>
+                <option value="">Choose a series or movie/short…</option>
+                {(allSeries || []).length > 0 && (
+                  <optgroup label="Series">
+                    {allSeries.map((s) => <option key={`series:${s.id}`} value={`series:${s.id}`}>{s.name}</option>)}
+                  </optgroup>
+                )}
+                {(standaloneEpisodes || []).length > 0 && (
+                  <optgroup label="Movies &amp; shorts">
+                    {standaloneEpisodes.map((e) => <option key={`episode:${e.id}`} value={`episode:${e.id}`}>{e.title}</option>)}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+          )}
 
           {form.contentType === 'series' && (
             <div className="admin-field-row">

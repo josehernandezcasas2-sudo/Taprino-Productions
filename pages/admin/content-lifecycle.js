@@ -49,43 +49,6 @@ export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscr
   const [running, setRunning] = useState(false);
   const [error, setError] = useState(null);
   const [saved, setSaved] = useState(false);
-  const [shopEnabled, setShopEnabled] = useState(false);
-  const [shopUrl, setShopUrl] = useState('');
-  const [shopSaving, setShopSaving] = useState(false);
-  const [shopSaved, setShopSaved] = useState(false);
-
-  async function loadShopSettings() {
-    try {
-      const res = await fetch('/api/site-settings');
-      const data = await res.json();
-      setShopEnabled(!!data.shopEnabled);
-      setShopUrl(data.shopUrl || '');
-    } catch (err) {
-      // Non-fatal — the Shop section just starts blank/off if this fails.
-    }
-  }
-
-  async function saveShopSettings(e) {
-    e.preventDefault();
-    setShopSaving(true);
-    setShopSaved(false);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/site-settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ shopEnabled, shopUrl })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not save.');
-      setShopSaved(true);
-      setTimeout(() => setShopSaved(false), 2500);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setShopSaving(false);
-    }
-  }
 
   async function load() {
     try {
@@ -100,7 +63,7 @@ export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscr
     }
   }
 
-  useEffect(() => { load(); loadShopSettings(); }, []);
+  useEffect(() => { load(); }, []);
 
   async function save(e) {
     e.preventDefault();
@@ -270,34 +233,6 @@ export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscr
             </button>
           </>
         )}
-        <div className="ca-head" style={{ marginTop: '2rem' }}>
-          <div>
-            <div className="eyebrow">Site links</div>
-            <h1 style={{ fontSize: '1.3rem' }}>Shop link</h1>
-            <p className="ca-sub">
-              Adds a "Shop" link to the header nav (desktop and mobile) that opens in a new tab.
-              Off until you set a real URL — no placeholder link ships by accident.
-            </p>
-          </div>
-        </div>
-        <form onSubmit={saveShopSettings}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.8rem' }}>
-            <input type="checkbox" checked={shopEnabled} onChange={(e) => setShopEnabled(e.target.checked)} />
-            Show the Shop link in the header
-          </label>
-          <label>Shop URL</label>
-          <input
-            type="url"
-            value={shopUrl}
-            onChange={(e) => setShopUrl(e.target.value)}
-            placeholder="https://shop.studiotapa.com"
-            required={shopEnabled}
-          />
-          <button className="account-btn-primary" type="submit" disabled={shopSaving} style={{ marginTop: '0.8rem', width: 'auto' }}>
-            {shopSaving ? 'Saving…' : 'Save'}
-          </button>
-          {shopSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
-        </form>
       </main>
       <Footer />
       <MobileTabBar />

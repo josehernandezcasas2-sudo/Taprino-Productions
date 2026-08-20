@@ -55,7 +55,7 @@ export async function getServerSideProps({ req, res }) {
   // compute bills for exactly that: how long the function is active,
   // including time spent awaiting a response.
   const needsViewCounts = isRedisConfigured();
-  const [episodes, allSeries, liveStream, channelState, account, viewCountsResult, lifecycleSettings] = await Promise.all([
+  const [episodesWithBonus, allSeries, liveStream, channelState, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getCurrentLiveStream(),
@@ -64,6 +64,14 @@ export async function getServerSideProps({ req, res }) {
     needsViewCounts ? getViewCounts() : Promise.resolve(null),
     getLifecycleSettings()
   ]);
+
+  // Bonus content (BTS, trailers, extras) only ever shows up attached
+  // under its parent series/episode's own page — never as its own
+  // browsable card in genre rows, New Releases, or anywhere else general.
+  // Filtering it out once here, right after the fetch, means every row
+  // and filter below gets the right set automatically instead of needing
+  // its own bonus-content exclusion.
+  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
 
   // Continue Watching needs `episodes` to already be resolved (it maps
   // saved positions back to real episode data), so it can't join the

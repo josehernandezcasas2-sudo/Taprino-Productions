@@ -5,6 +5,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { findEpisode } from '../../lib/episodes';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
@@ -111,6 +112,10 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
     : episode;
 
   const mainGenres = [...new Set(publicEpisodes.map((e) => e.mainGenre).filter(Boolean))];
+
+  const bonusContent = episode.contentType === 'series' && episode.seriesId
+    ? getBonusContentFor(publicEpisodes, 'series', episode.seriesId)
+    : getBonusContentFor(publicEpisodes, 'episode', episode.id);
 
   function goToType(t) {
     router.push(t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`);
@@ -272,6 +277,27 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             )}
           </div>
         </div>
+
+        {bonusContent.length > 0 && (
+          <div className="cat-row" style={{ marginTop: '2.4rem' }}>
+            <div className="cat-row-heading"><span>Bonus Content</span></div>
+            <div className="cat-row-track">
+              {bonusContent.map((b) => (
+                <div key={b.id} className="card-wrap row-card">
+                  <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
+                    <div className="ep-thumb">
+                      {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
+                    </div>
+                    <div className="ep-info">
+                      <h4>{b.title}</h4>
+                      <span>{b.runtime}</span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
       <Footer />
       <MobileTabBar />

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { useWishlist } from '../../lib/useWishlist';
@@ -62,6 +63,8 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   const seriesEpisodes = episodes
     .filter((e) => e.seriesId === seriesInfo.id)
     .sort((a, b) => (a.seriesOrder || 0) - (b.seriesOrder || 0));
+
+  const bonusContent = getBonusContentFor(episodes, 'series', seriesInfo.id);
 
   // Group by season — episodes without an explicit season default to 1, so
   // existing single-season series don't need every episode retagged.
@@ -173,6 +176,27 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
               ))}
             </div>
           </>
+        )}
+
+        {bonusContent.length > 0 && (
+          <div className="cat-row" style={{ marginTop: '2.4rem' }}>
+            <div className="cat-row-heading"><span>Bonus Content</span></div>
+            <div className="cat-row-track">
+              {bonusContent.map((b) => (
+                <div key={b.id} className="card-wrap row-card">
+                  <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
+                    <div className="ep-thumb">
+                      {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
+                    </div>
+                    <div className="ep-info">
+                      <h4>{b.title}</h4>
+                      <span>{b.runtime}</span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
       </main>
       <Footer />

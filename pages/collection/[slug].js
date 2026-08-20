@@ -37,11 +37,12 @@ export async function getServerSideProps({ req, params, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [episodes, allSeries, lifecycleSettings] = await Promise.all([
+  const [episodesWithBonus, allSeries, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getLifecycleSettings()
   ]);
+  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
   const account = await getAccountContext(req);
 
   const matches = params.slug === 'new-releases'

@@ -93,6 +93,82 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [orphans, setOrphans] = useState(null);
   const [orphanActionLoading, setOrphanActionLoading] = useState(null);
   const [orphanError, setOrphanError] = useState(null);
+  const [siteSettings, setSiteSettings] = useState(null);
+  const [siteSettingsSaving, setSiteSettingsSaving] = useState(false);
+  const [siteSettingsSaved, setSiteSettingsSaved] = useState(false);
+  const [siteSettingsError, setSiteSettingsError] = useState(null);
+
+  async function loadSiteSettings() {
+    try {
+      const res = await fetch('/api/site-settings');
+      const data = await res.json();
+      setSiteSettings(data);
+    } catch (err) {
+      setSiteSettingsError('Could not load site settings.');
+    }
+  }
+
+  async function saveSiteSettings(overrides = {}) {
+    setSiteSettingsSaving(true);
+    setSiteSettingsSaved(false);
+    setSiteSettingsError(null);
+    try {
+      const res = await fetch('/api/admin/site-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopEnabled: siteSettings.shopEnabled,
+          shopUrl: siteSettings.shopUrl,
+          liveTvEnabled: siteSettings.liveTvEnabled,
+          ...overrides
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save.');
+      await loadSiteSettings();
+      setSiteSettingsSaved(true);
+      setTimeout(() => setSiteSettingsSaved(false), 2500);
+    } catch (err) {
+      setSiteSettingsError(err.message);
+    } finally {
+      setSiteSettingsSaving(false);
+    }
+  }
+
+  function readAsDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error('Could not read that file.'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function uploadSearchIcon(file) {
+    setSiteSettingsSaving(true);
+    setSiteSettingsError(null);
+    try {
+      const searchIconBase64 = await readAsDataUrl(file);
+      const res = await fetch('/api/admin/site-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          shopEnabled: siteSettings.shopEnabled,
+          shopUrl: siteSettings.shopUrl,
+          liveTvEnabled: siteSettings.liveTvEnabled,
+          searchIconBase64,
+          searchIconFileName: file.name
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not upload that image.');
+      await loadSiteSettings();
+    } catch (err) {
+      setSiteSettingsError(err.message);
+    } finally {
+      setSiteSettingsSaving(false);
+    }
+  }
   const [pendingArtwork, setPendingArtwork] = useState(null);
   const [artworkActionLoading, setArtworkActionLoading] = useState(null);
   const [artworkError, setArtworkError] = useState(null);
@@ -234,7 +310,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -379,6 +455,84 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </button>
               </div>
             ))
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Site settings</div>
+          <h3>Header &amp; links</h3>
+
+          {!siteSettings ? (
+            <p>Loading…</p>
+          ) : (
+            <>
+              {siteSettingsError && <p style={{ color: 'var(--danger)' }}>{siteSettingsError}</p>}
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.6rem' }}>
+                  <input
+                    type="checkbox"
+                    checked={siteSettings.shopEnabled}
+                    onChange={(e) => setSiteSettings((s) => ({ ...s, shopEnabled: e.target.checked }))}
+                  />
+                  Show &ldquo;Shop&rdquo; link in the header (opens in a new tab)
+                </label>
+                <input
+                  type="url"
+                  placeholder="https://shop.studiotapa.com"
+                  value={siteSettings.shopUrl || ''}
+                  onChange={(e) => setSiteSettings((s) => ({ ...s, shopUrl: e.target.value }))}
+                  style={{ marginBottom: '0.6rem' }}
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={siteSettings.liveTvEnabled}
+                    onChange={(e) => setSiteSettings((s) => ({ ...s, liveTvEnabled: e.target.checked }))}
+                  />
+                  Show &ldquo;Live TV&rdquo; link in the header (the /channel looping playlist)
+                </label>
+              </div>
+
+              <button
+                className="account-btn-primary"
+                style={{ width: 'auto', marginTop: '0.4rem' }}
+                onClick={() => saveSiteSettings()}
+                disabled={siteSettingsSaving}
+              >
+                {siteSettingsSaving ? 'Saving…' : 'Save'}
+              </button>
+              {siteSettingsSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+                <div style={{ marginBottom: '0.5rem' }}>Search icon</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                  Replace the default 🔍 emoji in the header with an uploaded image — same idea as genre icons.
+                </p>
+                {siteSettings.searchIconUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.6rem' }}>
+                    <img src={siteSettings.searchIconUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      onClick={() => saveSiteSettings({ clearSearchIcon: true })}
+                      disabled={siteSettingsSaving}
+                    >
+                      Reset to default
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files[0] && uploadSearchIcon(e.target.files[0])}
+                  disabled={siteSettingsSaving}
+                />
+              </div>
+            </>
           )}
         </div>
 

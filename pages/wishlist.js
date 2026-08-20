@@ -1,8 +1,12 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useState } from 'react';
+import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
+import { getContinueWatching } from '../lib/continueWatching';
+import { getWatchHistory } from '../lib/watchHistory';
 import { useWishlist } from '../lib/useWishlist';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
@@ -14,8 +18,14 @@ import Footer from '../components/Footer';
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
+  const { userId } = getAuth(req);
   const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+
+  const [continueWatching, watchHistory] = await Promise.all([
+    account.isSignedIn ? getContinueWatching(req, episodes) : [],
+    userId ? getWatchHistory(userId, episodes) : []
+  ]);
 
   return {
     props: {
@@ -27,13 +37,50 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       episodes,
-      allSeries
+      allSeries,
+      continueWatching,
+      watchHistory
     }
   };
 }
 
-export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenres, email, episodes, allSeries, isAdmin, isCreator }) {
+export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenres, email, episodes, allSeries, isAdmin, isCreator, continueWatching, watchHistory }) {
   const { ids, isWishlisted, toggle } = useWishlist(isSignedIn, wishlist);
+  const [continueList, setContinueList] = useState(continueWatching);
+  const [historyList, setHistoryList] = useState(watchHistory);
+  const [removingId, setRemovingId] = useState(null);
+
+  async function removeContinueWatching(episodeId) {
+    setRemovingId(episodeId);
+    try {
+      await fetch('/api/watch-progress', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodeId })
+      });
+      setContinueList((prev) => prev.filter((e) => e.id !== episodeId));
+    } catch (err) {
+      // Non-fatal — worst case it's still there next reload.
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
+  async function removeWatchHistory(episodeId) {
+    setRemovingId(episodeId);
+    try {
+      await fetch('/api/watch-history', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ episodeId })
+      });
+      setHistoryList((prev) => prev.filter((e) => e.id !== episodeId));
+    } catch (err) {
+      // Non-fatal — worst case it's still there next reload.
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   // A wishlisted id is either a series id (whole-show saves) or a standalone
   // movie/short episode id — never an individual series episode, since those
@@ -63,7 +110,70 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
 
       <main className="library-stage">
         <Link href="/" className="back-link">← Back to screening room</Link>
-        <div className="library-heading">My Wishlist</div>
+
+        {continueList.length > 0 && (
+          <>
+            <div className="library-heading" style={{ fontSize: '1rem', marginTop: 0 }}>Continue Watching</div>
+            <div className="poster-grid" style={{ marginBottom: '2.2rem' }}>
+              {continueList.map((ep) => (
+                <div key={ep.id} className="card-wrap">
+                  <button
+                    className="wishlist-btn"
+                    onClick={() => removeContinueWatching(ep.id)}
+                    disabled={removingId === ep.id}
+                    aria-label="Remove from Continue Watching"
+                    title="Remove from Continue Watching"
+                  >
+                    ✕
+                  </button>
+                  <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
+                    <div className="poster-art">
+                      <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                      ◈
+                    </div>
+                    <div className="poster-title-wrap">
+                      <h4>{ep.title}</h4>
+                      <span>{ep.runtime}</span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {historyList.length > 0 && (
+          <>
+            <div className="library-heading" style={{ fontSize: '1rem' }}>Previously Watched</div>
+            <div className="poster-grid" style={{ marginBottom: '2.2rem' }}>
+              {historyList.map((ep) => (
+                <div key={ep.id} className="card-wrap">
+                  <button
+                    className="wishlist-btn"
+                    onClick={() => removeWatchHistory(ep.id)}
+                    disabled={removingId === ep.id}
+                    aria-label="Remove from Previously Watched"
+                    title="Remove from Previously Watched"
+                  >
+                    ✕
+                  </button>
+                  <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
+                    <div className="poster-art">
+                      <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                      ◈
+                    </div>
+                    <div className="poster-title-wrap">
+                      <h4>{ep.title}</h4>
+                      <span>{ep.runtime}</span>
+                    </div>
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        <div className="library-heading" style={{ fontSize: '1rem' }}>My Wishlist</div>
         <div className="library-sub">
           {totalCount} saved
           {!isSignedIn && ' · saved on this device — sign in to keep it across devices and get email alerts'}

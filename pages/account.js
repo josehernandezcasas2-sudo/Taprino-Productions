@@ -240,6 +240,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                 <div className="account-subheading">Quick links</div>
                 <div className="account-quicklinks">
                   <Link href="/wishlist" className="account-quicklink">♥ My Wishlist</Link>
+                  <Link href="/recs" className="account-quicklink">✨ My Recs</Link>
                   <Link href="/#continue-watching" className="account-quicklink">▶ Continue Watching</Link>
                   {canSeeNumbers && (
                     <Link href="/creator/analytics" className="account-quicklink">📊 Your Numbers</Link>

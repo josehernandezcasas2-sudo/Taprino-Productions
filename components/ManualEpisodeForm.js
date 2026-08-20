@@ -8,11 +8,12 @@ const CONTENT_TYPES = [
   { value: 'movie', label: 'Movie' },
   { value: 'series', label: 'Series episode' },
   { value: 'vertical', label: 'Vertical' },
-  { value: 'podcast', label: 'Podcast' }
+  { value: 'podcast', label: 'Podcast' },
+  { value: 'bonus', label: 'Bonus content (BTS, trailer, extra…)' }
 ];
 
 const EMPTY_FORM = {
-  creatorEmail: '', title: '', description: '', contentType: 'short', rating: '',
+  creatorEmail: '', title: '', description: '', contentType: 'short', rating: '', bonusParent: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
   tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false
@@ -35,7 +36,7 @@ function readAsDataUrl(f) {
 // (bypasses this app's upload pipeline completely, since it's a
 // different domain/flow than what a firewall might be blocking), then
 // build the episode here from the resulting video ID.
-export default function ManualEpisodeForm({ allSeries, onCreated }) {
+export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCreated }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null);
@@ -72,11 +73,14 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
     setSaving(true);
     try {
       const [posterBase64, thumbnailBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile)]);
+      const [bonusParentType, bonusParentId] = form.bonusParent ? form.bonusParent.split(':') : [null, null];
       const res = await fetch('/api/admin/manual-episode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          bonusParentType,
+          bonusParentId,
           cloudflareVideoUid: videoUid.trim(),
           ...(trailerUid.trim() ? { trailerCloudflareUid: trailerUid.trim() } : {}),
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
@@ -174,6 +178,28 @@ export default function ManualEpisodeForm({ allSeries, onCreated }) {
             <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />
             <label>Episode number within season</label>
             <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} />
+          </>
+        )}
+
+        {form.contentType === 'bonus' && (
+          <>
+            <label>This bonus content belongs under</label>
+            <select value={form.bonusParent} onChange={(e) => update('bonusParent', e.target.value)} required>
+              <option value="">Choose a series or movie/short…</option>
+              {allSeries.length > 0 && (
+                <optgroup label="Series">
+                  {allSeries.map((s) => <option key={`series:${s.id}`} value={`series:${s.id}`}>{s.name}</option>)}
+                </optgroup>
+              )}
+              {standaloneEpisodes && standaloneEpisodes.length > 0 && (
+                <optgroup label="Movies &amp; shorts">
+                  {standaloneEpisodes.map((e) => <option key={`episode:${e.id}`} value={`episode:${e.id}`}>{e.title}</option>)}
+                </optgroup>
+              )}
+            </select>
+            <p style={{ fontSize: '0.78rem', opacity: 0.65, marginTop: '-0.4rem' }}>
+              Give it a descriptive title above — e.g. "Behind the Scenes: Episode 3" or "Official Trailer" — it'll show up in a Bonus Content section on that series or movie's page.
+            </p>
           </>
         )}
 

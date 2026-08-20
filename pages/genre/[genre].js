@@ -34,7 +34,8 @@ export async function getServerSideProps({ req, params, res }) {
   }
 
   const genre = decodeURIComponent(params.genre);
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const [episodesWithBonus, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
   const account = await getAccountContext(req);
 
   return {

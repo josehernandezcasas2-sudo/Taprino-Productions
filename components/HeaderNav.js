@@ -23,7 +23,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
-  const [shopSettings, setShopSettings] = useState(null);
+  const [siteSettings, setShopSettings] = useState(null);
   const rootRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -105,12 +105,14 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             </Link>
           ))}
           <Link href="/wishlist" className="nav-link">My List</Link>
-          <Link href="/channel" className="nav-link nav-link-live">
-            <i className="live-dot" aria-hidden="true" />
-            Live TV
-          </Link>
-          {shopSettings && shopSettings.shopEnabled && shopSettings.shopUrl && (
-            <a href={shopSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="nav-link">Shop</a>
+          {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
+            <Link href="/channel" className="nav-link nav-link-live">
+              <i className="live-dot" aria-hidden="true" />
+              Live TV
+            </Link>
+          )}
+          {siteSettings && siteSettings.shopEnabled && siteSettings.shopUrl && (
+            <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="nav-link">Shop</a>
           )}
         </nav>
 
@@ -134,9 +136,11 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               </Link>
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
-            <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
-            {shopSettings && shopSettings.shopEnabled && shopSettings.shopUrl && (
-              <a href={shopSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>
+            {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
+              <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
+            )}
+            {siteSettings && siteSettings.shopEnabled && siteSettings.shopUrl && (
+              <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>
             )}
 
             {mainGenres && mainGenres.length > 0 && (
@@ -171,7 +175,11 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           aria-label="Search"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
         >
-          🔍
+          {siteSettings && siteSettings.searchIconUrl ? (
+            <img src={siteSettings.searchIconUrl} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
+          ) : (
+            '🔍'
+          )}
         </button>
 
         {openMenu === 'search' && (

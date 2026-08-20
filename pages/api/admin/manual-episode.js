@@ -18,7 +18,7 @@ import { recordAudit } from '../../../lib/auditLog';
 const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier', 'cloudflareVideoUid'];
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
-const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
+const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
 
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
@@ -49,6 +49,9 @@ export default async function handler(req, res) {
   const status = body.status && VALID_STATUSES.includes(body.status) ? body.status : 'pending';
   if (body.contentType === 'series' && (!body.seriesId || body.seriesId === '__new__') && !body.newSeriesName) {
     return res.status(400).json({ error: 'Choose a series, or provide newSeriesName to create one.' });
+  }
+  if (body.contentType === 'bonus' && (!body.bonusParentType || !body.bonusParentId)) {
+    return res.status(400).json({ error: 'Choose which series or movie/short this bonus content belongs under.' });
   }
 
   // The whole point of this endpoint — verify Cloudflare actually
@@ -126,6 +129,8 @@ export default async function handler(req, res) {
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
+    bonus_parent_type: body.contentType === 'bonus' ? body.bonusParentType : null,
+    bonus_parent_id: body.contentType === 'bonus' ? body.bonusParentId : null,
     video_type: 'html5',
     src,
     trailer_src: trailerSrc,

@@ -10,8 +10,25 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 const MAX_TRACKED_EPISODES = 12;
 
 export default async function handler(req, res) {
+  if (req.method === 'DELETE') {
+    const customerId = await getStripeCustomerIdFromRequest(req);
+    if (!customerId) return res.status(401).json({ error: 'Not signed in.' });
+    const { episodeId } = req.body || {};
+    if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
+    try {
+      const customer = await stripe.customers.retrieve(customerId);
+      const current = parseWatchProgress(customer);
+      delete current[episodeId];
+      await stripe.customers.update(customerId, { metadata: { watchProgress: JSON.stringify(current) } });
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      console.error('watch-progress delete error:', err.message);
+      return res.status(500).json({ error: 'Could not remove that item right now.' });
+    }
+  }
+
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
