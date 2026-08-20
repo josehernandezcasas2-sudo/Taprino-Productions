@@ -94,6 +94,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [orphanActionLoading, setOrphanActionLoading] = useState(null);
   const [orphanError, setOrphanError] = useState(null);
   const [siteSettings, setSiteSettings] = useState(null);
+  const [confirmedSiteSettings, setConfirmedSiteSettings] = useState(null);
   const [siteSettingsSaving, setSiteSettingsSaving] = useState(false);
   const [siteSettingsSaved, setSiteSettingsSaved] = useState(false);
   const [siteSettingsError, setSiteSettingsError] = useState(null);
@@ -103,6 +104,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       const res = await fetch('/api/site-settings');
       const data = await res.json();
       setSiteSettings(data);
+      setConfirmedSiteSettings(data);
     } catch (err) {
       setSiteSettingsError('Could not load site settings.');
     }
@@ -120,6 +122,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           shopEnabled: siteSettings.shopEnabled,
           shopUrl: siteSettings.shopUrl,
           liveTvEnabled: siteSettings.liveTvEnabled,
+          recommendationCloseness: siteSettings.recommendationCloseness,
           ...overrides
         })
       });
@@ -476,14 +479,22 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                     onChange={(e) => setSiteSettings((s) => ({ ...s, shopEnabled: e.target.checked }))}
                   />
                   Show &ldquo;Shop&rdquo; link in the header (opens in a new tab)
+                  {confirmedSiteSettings && confirmedSiteSettings.shopEnabled && confirmedSiteSettings.shopUrl && (
+                    <span style={{ color: 'var(--brass)', fontSize: '0.72rem', fontWeight: 700 }}>✓ Connected</span>
+                  )}
                 </label>
                 <input
                   type="url"
                   placeholder="https://shop.studiotapa.com"
                   value={siteSettings.shopUrl || ''}
                   onChange={(e) => setSiteSettings((s) => ({ ...s, shopUrl: e.target.value }))}
-                  style={{ marginBottom: '0.6rem' }}
+                  style={{ marginBottom: '0.4rem' }}
                 />
+                {confirmedSiteSettings && (siteSettings.shopUrl !== confirmedSiteSettings.shopUrl || siteSettings.shopEnabled !== confirmedSiteSettings.shopEnabled) && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--signal-amber)', marginBottom: '0.4rem' }}>
+                    Unsaved changes — click Save below to apply.
+                  </div>
+                )}
               </div>
 
               <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
@@ -495,6 +506,29 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                   />
                   Show &ldquo;Live TV&rdquo; link in the header (the /channel looping playlist)
                 </label>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'block', marginBottom: '0.4rem' }}>
+                  My Recs — closeness ({siteSettings.recommendationCloseness}/10)
+                </label>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
+                  0 = wide exploration, mostly outside someone's usual pattern. 10 = closely matches their genre/artist
+                  history. Applies to everyone's "My Recs" page.
+                </p>
+                <input
+                  type="range"
+                  min="0"
+                  max="10"
+                  step="1"
+                  value={siteSettings.recommendationCloseness}
+                  onChange={(e) => setSiteSettings((s) => ({ ...s, recommendationCloseness: Number(e.target.value) }))}
+                  style={{ width: '100%' }}
+                />
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.7rem', color: 'var(--ink-dim)' }}>
+                  <span>Explore (0)</span>
+                  <span>Close match (10)</span>
+                </div>
               </div>
 
               <button
@@ -538,6 +572,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
 
         <ManualEpisodeForm
           allSeries={allSeries}
+          standaloneEpisodes={library.filter((e) => ['movie', 'short'].includes(e.contentType))}
           onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
         />
 
@@ -929,6 +964,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <AdminEditEpisodeModal
           episode={editingEpisode}
           allSeries={allSeries}
+          standaloneEpisodes={library.filter((e) => ['movie', 'short'].includes(e.contentType) && e.id !== editingEpisode.id)}
           onClose={() => setEditingEpisode(null)}
           onSaved={() => {
             setEditingEpisode(null);

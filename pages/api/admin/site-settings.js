@@ -14,7 +14,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { shopEnabled, shopUrl, liveTvEnabled, searchIconBase64, searchIconFileName, clearSearchIcon } = req.body || {};
+  const { shopEnabled, shopUrl, liveTvEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness } = req.body || {};
   if (shopEnabled && (!shopUrl || !shopUrl.trim())) {
     return res.status(400).json({ error: 'A Shop URL is required to enable the Shop link.' });
   }
@@ -42,6 +42,10 @@ export default async function handler(req, res) {
     live_tv_enabled: liveTvEnabled !== false,
     updated_at: new Date().toISOString()
   };
+  if (recommendationCloseness !== undefined) {
+    const closeness = Math.max(0, Math.min(10, Number(recommendationCloseness)));
+    updates.recommendation_closeness = Number.isFinite(closeness) ? closeness : 6;
+  }
   // Only touch search_icon_url if this request actually changed it — an
   // undefined value here means "leave the current icon alone," not "clear
   // it," which matters since this same endpoint saves Shop/Live TV changes
@@ -52,7 +56,11 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error('site-settings update error:', error.message);
-    return res.status(500).json({ error: 'Could not save site settings.' });
+    // Surfacing the real Postgres error here (not just a generic message) —
+    // this endpoint is admin-only, and a "column X does not exist" error is
+    // exactly the kind of thing that should be visible immediately rather
+    // than requiring a trip to server logs to diagnose a missed migration.
+    return res.status(500).json({ error: `Could not save site settings: ${error.message}` });
   }
 
   await recordAudit({
