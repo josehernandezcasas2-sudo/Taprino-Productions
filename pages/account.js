@@ -25,7 +25,7 @@ export async function getServerSideProps({ req, res }) {
       // comped accounts never actually have a Stripe subscription (their
       // isSubscriber comes from role/invite, not billing), so this only
       // fetches when there's an actual paying subscription to describe.
-      if (account.isSubscriber && !account.isAdmin && !account.isSubAdmin) {
+      if (account.isSubscriber && !account.isAdmin && !account.isSubAdmin && !account.isComped) {
         const subs = await stripe.subscriptions.list({
           customer: account.stripeCustomerId,
           status: 'active',
@@ -167,7 +167,6 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                 {isSubscriber
                   ? `You have full access to ${SITE.premiumTier} exclusives.`
                   : `You're on the free tier — no ${SITE.premiumTier} membership yet.`}
-                {isComped && !isAdmin && !isSubAdmin && ' Your access was granted directly by the team — no subscription needed.'}
               </p>
 
               {/* Section: Membership */}
@@ -176,37 +175,50 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
 
                 {isSubscriber ? (
                   <>
-                    {subscriptionDetails && (
-                      <div className="account-sub-details">
-                        {subscriptionDetails.productName && (
-                          <div className="account-sub-detail-row">
-                            <span>Plan</span>
-                            <span>{subscriptionDetails.productName}</span>
-                          </div>
-                        )}
-                        {priceLabel && (
-                          <div className="account-sub-detail-row">
-                            <span>Price</span>
-                            <span>{priceLabel}{subscriptionDetails.interval ? ` / ${subscriptionDetails.interval}` : ''}</span>
-                          </div>
-                        )}
-                        <div className="account-sub-detail-row">
-                          <span>{subscriptionDetails.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'}</span>
-                          <span>{formatDate(subscriptionDetails.renewsAt)}</span>
-                        </div>
-                        {subscriptionDetails.cancelsAtPeriodEnd && (
-                          <div className="account-sub-cancel-note">
-                            Your subscription is set to cancel — you'll keep {SITE.premiumTier} access until then.
-                          </div>
-                        )}
+                    {(isAdmin || isSubAdmin || isComped) ? (
+                      <div className="account-free-access-note">
+                        <span className="account-free-access-badge">Free access</span>
+                        <p>
+                          {isAdmin && `You have ${SITE.premiumTier} as part of the Studio Tapa team — no payment needed, ever.`}
+                          {!isAdmin && isSubAdmin && `You have ${SITE.premiumTier} as a sub-admin on the team — no payment needed, ever.`}
+                          {!isAdmin && !isSubAdmin && isComped && `Your access was given to you by the team — it's free, and no payment is needed.`}
+                        </p>
                       </div>
+                    ) : (
+                      <>
+                        {subscriptionDetails && (
+                          <div className="account-sub-details">
+                            {subscriptionDetails.productName && (
+                              <div className="account-sub-detail-row">
+                                <span>Plan</span>
+                                <span>{subscriptionDetails.productName}</span>
+                              </div>
+                            )}
+                            {priceLabel && (
+                              <div className="account-sub-detail-row">
+                                <span>Price</span>
+                                <span>{priceLabel}{subscriptionDetails.interval ? ` / ${subscriptionDetails.interval}` : ''}</span>
+                              </div>
+                            )}
+                            <div className="account-sub-detail-row">
+                              <span>{subscriptionDetails.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'}</span>
+                              <span>{formatDate(subscriptionDetails.renewsAt)}</span>
+                            </div>
+                            {subscriptionDetails.cancelsAtPeriodEnd && (
+                              <div className="account-sub-cancel-note">
+                                Your subscription is set to cancel — you'll keep {SITE.premiumTier} access until then.
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <button className="account-btn-primary" onClick={openPortal} disabled={portalLoading}>
+                          {portalLoading ? 'Opening…' : 'Manage subscription'}
+                        </button>
+                        <div className="account-fineprint">
+                          "Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.
+                        </div>
+                      </>
                     )}
-                    <button className="account-btn-primary" onClick={openPortal} disabled={portalLoading}>
-                      {portalLoading ? 'Opening…' : 'Manage subscription'}
-                    </button>
-                    <div className="account-fineprint">
-                      "Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.
-                    </div>
                   </>
                 ) : (
                   <>
