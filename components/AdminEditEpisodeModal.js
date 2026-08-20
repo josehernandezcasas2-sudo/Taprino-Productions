@@ -41,10 +41,14 @@ function toDateInputValue(iso) {
   return iso.slice(0, 10);
 }
 
-export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
+export default function AdminEditEpisodeModal({ episode, allSeries, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: episode.title || '',
     description: episode.description || '',
+    contentType: episode.contentType || 'short',
+    seriesId: episode.seriesId || '',
+    season: episode.season ? String(episode.season) : '1',
+    seriesOrder: episode.seriesOrder ? String(episode.seriesOrder) : '',
     artist: episode.artist || '',
     runtime: episode.runtime || '',
     genre: episode.genre || '',
@@ -187,6 +191,37 @@ export default function AdminEditEpisodeModal({ episode, onClose, onSaved }) {
             <label>Description</label>
             <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} />
           </div>
+
+          <div className="admin-field">
+            <label>Content type</label>
+            <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
+              <option value="short">Short</option>
+              <option value="movie">Movie</option>
+              <option value="series">Series episode</option>
+              <option value="vertical">Vertical</option>
+              <option value="podcast">Podcast</option>
+            </select>
+          </div>
+
+          {form.contentType === 'series' && (
+            <div className="admin-field-row">
+              <div className="admin-field">
+                <label>Series</label>
+                <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
+                  <option value="">Choose a series…</option>
+                  {(allSeries || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+              <div className="admin-field">
+                <label>Season</label>
+                <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} />
+              </div>
+              <div className="admin-field">
+                <label>Episode #</label>
+                <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} />
+              </div>
+            </div>
+          )}
 
           <div className="admin-field-row">
             <div className="admin-field">

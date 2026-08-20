@@ -17,8 +17,9 @@ export const config = {
 
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil', 'adsEnabled'];
-const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled' };
+const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil', 'adsEnabled', 'contentType', 'seriesId', 'season', 'seriesOrder'];
+const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -47,6 +48,12 @@ export default async function handler(req, res) {
   }
   if (fields.status && !VALID_STATUSES.includes(fields.status)) {
     return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+  }
+  if (fields.contentType && !VALID_CONTENT_TYPES.includes(fields.contentType)) {
+    return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });
+  }
+  if (fields.contentType === 'series' && !fields.seriesId) {
+    return res.status(400).json({ error: 'A series must be selected when content type is "series".' });
   }
 
   let poster;
@@ -91,9 +98,23 @@ export default async function handler(req, res) {
     // timestamptz column, which Postgres would reject outright.
     if ((f === 'availableFrom' || f === 'availableUntil') && fields[f] === '') {
       dbUpdates[column] = null;
+    } else if (f === 'season' || f === 'seriesOrder') {
+      // Number inputs also arrive as strings — cast for the int columns,
+      // and treat '' (cleared, only seriesOrder is realistically ever
+      // left blank) as null rather than storing NaN.
+      dbUpdates[column] = fields[f] === '' ? null : Number(fields[f]);
     } else {
       dbUpdates[column] = fields[f];
     }
+  }
+  // Switching away from 'series' leaves the episode's old series_id/season/
+  // series_order pointing at a series it's no longer part of — clear them
+  // so it doesn't keep showing up consolidated under that series' card
+  // elsewhere on the site.
+  if (dbUpdates.content_type && dbUpdates.content_type !== 'series') {
+    dbUpdates.series_id = null;
+    dbUpdates.season = null;
+    dbUpdates.series_order = null;
   }
   // Changing status here is a deliberate admin override outside the normal
   // approve/reject review flow — e.g. un-approving something. Stamp

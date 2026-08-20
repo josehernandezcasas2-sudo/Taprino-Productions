@@ -347,7 +347,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <div className="dash-stat"><div className="dash-stat-value">{stats.pendingCount}</div><div className="dash-stat-label">Pending</div></div>
             <div className="dash-stat"><div className="dash-stat-value">{stats.approvalRate === null ? '—' : `${stats.approvalRate}%`}</div><div className="dash-stat-label">Approval rate</div></div>
             <div className="dash-stat"><div className="dash-stat-value">{stats.avgTurnaroundHours === null ? '—' : `${stats.avgTurnaroundHours}h`}</div><div className="dash-stat-label">Avg. review time</div></div>
-            <div className="dash-stat"><div className="dash-stat-value">{stats.creatorCount}</div><div className="dash-stat-label">Creators</div></div>
+            <div className="dash-stat"><div className="dash-stat-value">{stats.creatorCount}</div><div className="dash-stat-label">Creator{stats.creatorCount === 1 ? '' : 's'}</div></div>
             <div className="dash-stat"><div className="dash-stat-value">{stats.totalViews}</div><div className="dash-stat-label">Total views</div></div>
           </div>
         )}
@@ -726,7 +726,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               <div key={c.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.7rem 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
                   <strong style={{ fontSize: '0.9rem' }}>{c.email || '(no email on file)'}</strong>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: c.role === 'admin' ? 'var(--cipher-teal)' : 'var(--signal-amber)' }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: c.role === 'admin' ? 'var(--brass)' : 'var(--signal-amber)' }}>
                     {c.role}
                   </span>
                 </div>
@@ -738,23 +738,10 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             ))
           )}
 
-          <h3 style={{ marginTop: '1.2rem' }}>Grant or revoke</h3>
-          <p>Only people you explicitly add here can submit episodes for review.</p>
-          <form onSubmit={submitCreatorAction}>
-            <input
-              type="email"
-              placeholder="creator@example.com"
-              value={creatorEmail}
-              onChange={(e) => setCreatorEmail(e.target.value)}
-              required
-            />
-            <select value={creatorAction} onChange={(e) => setCreatorAction(e.target.value)} style={{ margin: '0.6rem 0', width: '100%', padding: '0.6rem' }}>
-              <option value="grant">Grant creator access</option>
-              <option value="revoke">Revoke creator access</option>
-            </select>
-            <button className="account-btn-primary" type="submit">Submit</button>
-          </form>
-          {creatorStatus && <p style={{ marginTop: '0.6rem' }}>{creatorStatus}</p>}
+          <p style={{ marginTop: '1.2rem' }}>
+            To grant or revoke access — including sub-admin roles and permission toggles —
+            use <Link href="/admin/team">Team &amp; permissions →</Link>.
+          </p>
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
@@ -787,6 +774,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       {editingEpisode && (
         <AdminEditEpisodeModal
           episode={editingEpisode}
+          allSeries={allSeries}
           onClose={() => setEditingEpisode(null)}
           onSaved={() => {
             setEditingEpisode(null);
