@@ -15,8 +15,8 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  if (!body.title || !body.logline || !body.projectUrl) {
-    return res.status(400).json({ error: 'Title, logline, and project URL are required.' });
+  if (!body.title || !body.logline) {
+    return res.status(400).json({ error: 'Title and logline are required.' });
   }
   if (body.tag && !PITCH_TAGS.includes(body.tag)) {
     return res.status(400).json({ error: `tag must be one of: ${PITCH_TAGS.join(', ')}` });
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
       title: body.title,
       logline: body.logline,
       description: body.description || null,
-      project_url: body.projectUrl,
+      project_url: body.projectUrl || null,
       tag: body.tag || null,
       thumbnail,
       hero_image: heroImage,

@@ -118,8 +118,8 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
             {PITCH_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
 
-          <label>Where should "Fund this project" send people?</label>
-          <input type="url" value={form.projectUrl} onChange={(e) => update('projectUrl', e.target.value)} placeholder="https://kickstarter.com/..." required />
+          <label>Where should "Fund this project" send people? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — you can add this later</span></label>
+          <input type="url" value={form.projectUrl} onChange={(e) => update('projectUrl', e.target.value)} placeholder="https://kickstarter.com/..." />
 
           <div className="admin-field-row">
             <div className="admin-field">

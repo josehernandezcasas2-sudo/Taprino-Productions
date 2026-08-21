@@ -570,9 +570,13 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                     <span style={{ color: 'var(--brass)', fontSize: '0.72rem', fontWeight: 700 }}>✓ Connected</span>
                   )}
                 </label>
+                <p style={{ fontSize: '0.72rem', color: 'var(--ink-dim)', marginBottom: '0.4rem' }}>
+                  Any full URL works here — it doesn't need to be a studiotapatv.site subdomain. Point it at
+                  Shopify, Etsy, a Linktree, wherever your storefront actually lives.
+                </p>
                 <input
                   type="url"
-                  placeholder="https://shop.studiotapa.com"
+                  placeholder="https://your-store.example.com"
                   value={siteSettings.shopUrl || ''}
                   onChange={(e) => setSiteSettings((s) => ({ ...s, shopUrl: e.target.value }))}
                   style={{ marginBottom: '0.4rem' }}
@@ -703,8 +707,8 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <input type="text" value={pitchForm.logline} onChange={(e) => setPitchForm((f) => ({ ...f, logline: e.target.value }))} required />
             <label>Description <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
             <textarea value={pitchForm.description} onChange={(e) => setPitchForm((f) => ({ ...f, description: e.target.value }))} rows={2} style={{ width: '100%', boxSizing: 'border-box' }} />
-            <label>Project URL <span style={{ fontWeight: 'normal', opacity: 0.65 }}>where "Visit project" sends people</span></label>
-            <input type="url" value={pitchForm.projectUrl} onChange={(e) => setPitchForm((f) => ({ ...f, projectUrl: e.target.value }))} placeholder="https://kickstarter.com/..." required />
+            <label>Project URL <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — where "Fund this project" sends people</span></label>
+            <input type="url" value={pitchForm.projectUrl} onChange={(e) => setPitchForm((f) => ({ ...f, projectUrl: e.target.value }))} placeholder="https://kickstarter.com/..." />
             <div className="admin-field-row">
               <div className="admin-field">
                 <label>Creator name <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>

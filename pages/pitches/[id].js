@@ -164,7 +164,9 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             </div>
             <p>{pitch.logline}</p>
             <div className="hero-actions">
-              <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
+              {pitch.project_url && (
+                <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
+              )}
               <button className="wishlist-btn-large" onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'}>
                 {saved ? '♥' : '♡'}
               </button>

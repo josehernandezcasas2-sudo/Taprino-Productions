@@ -19,8 +19,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { title, logline, description, projectUrl, creatorName, creatorEmail, tag, fundingGoal, fundingRaised, thumbnailBase64, thumbnailFileName } = req.body || {};
-    if (!title || !logline || !projectUrl) {
-      return res.status(400).json({ error: 'Title, logline, and project URL are required.' });
+    if (!title || !logline) {
+      return res.status(400).json({ error: 'Title and logline are required.' });
     }
     if (tag && !PITCH_TAGS.includes(tag)) {
       return res.status(400).json({ error: `tag must be one of: ${PITCH_TAGS.join(', ')}` });
@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       title,
       logline,
       description: description || null,
-      project_url: projectUrl,
+      project_url: projectUrl || null,
       creator_name: creatorName || null,
       creator_email: creatorEmail || null,
       tag: tag || null,

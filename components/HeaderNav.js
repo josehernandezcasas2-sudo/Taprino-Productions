@@ -82,12 +82,26 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
   const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
 
+  // Deriving "what's active" from the real URL rather than trusting each
+  // page to pass the right activeType prop — every page that wasn't one
+  // of the 5 primary type pages was defaulting to activeType="All", which
+  // this component then read as "show Home as active" regardless of
+  // where you actually were. Home, My List, My Recs, Live TV, and Pitch
+  // Room all get their own real match now, straight from router.pathname.
+  const currentPath = router.pathname;
+  const currentTypeParam = currentPath === '/type/[type]' ? router.query.type : null;
+  const isHome = currentPath === '/' && (activeType === 'All' || !activeType);
+  const isWishlistPage = currentPath === '/wishlist';
+  const isRecsPage = currentPath === '/recs';
+  const isChannelPage = currentPath === '/channel';
+  const isPitchesPage = currentPath === '/pitches' || currentPath === '/pitches/[id]';
+
   const typeLinks = [
-    { href: '/', label: 'Home', match: activeType === 'All' || !activeType },
-    { href: '/type/series', label: 'Series', match: activeType === 'series' },
-    { href: '/type/movie', label: 'Films', match: activeType === 'movie' },
-    { href: '/type/vertical', label: 'Vertical', match: activeType === 'vertical' },
-    { href: '/type/podcast', label: 'Podcasts', match: activeType === 'podcast' },
+    { href: '/', label: 'Home', match: isHome },
+    { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
+    { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
+    { href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' },
+    { href: '/type/podcast', label: 'Podcasts', match: currentTypeParam === 'podcast' },
   ];
 
   return (
@@ -104,13 +118,13 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               {l.label}
             </Link>
           ))}
-          <Link href="/wishlist" className="nav-link">My List</Link>
-          {isSignedIn && <Link href="/recs" className="nav-link">My Recs</Link>}
+          <Link href="/wishlist" className={`nav-link ${isWishlistPage ? 'active' : ''}`}>My List</Link>
+          {isSignedIn && <Link href="/recs" className={`nav-link ${isRecsPage ? 'active' : ''}`}>My Recs</Link>}
           {siteSettings && siteSettings.elevatorPitchEnabled && (
-            <Link href="/pitches" className="nav-link">Pitch Room</Link>
+            <Link href="/pitches" className={`nav-link ${isPitchesPage ? 'active' : ''}`}>Pitch Room</Link>
           )}
           {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
-            <Link href="/channel" className="nav-link nav-link-live">
+            <Link href="/channel" className={`nav-link nav-link-live ${isChannelPage ? 'active' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
               Live TV
             </Link>
