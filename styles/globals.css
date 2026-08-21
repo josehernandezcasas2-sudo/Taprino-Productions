@@ -3824,3 +3824,41 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border-radius: 5px; padding: 0.3rem 0.5rem; font-size: 0.85rem; cursor: pointer;
 }
 .row-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Episode page — Next/Previous Episode sidebar, series episodes only.
+   Two-column below the player, matching the reference layout the user
+   shared: info stays on the left, episode navigation lives on its own
+   column on the right rather than being buried in a dropdown or requiring
+   a trip back to the series hub. */
+.player-info-row { display: flex; gap: 2.2rem; align-items: flex-start; flex-wrap: wrap; }
+.player-info-row .player-card { flex: 1; min-width: 280px; }
+.episode-nav-sidebar { width: 320px; flex-shrink: 0; }
+.side-heading {
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--ink-dim); margin-bottom: 0.7rem;
+}
+.side-ep-card {
+  display: flex; gap: 0.8rem; margin-bottom: 1.2rem; text-decoration: none;
+}
+.side-ep-thumb {
+  width: 128px; height: 72px; border-radius: 6px; flex-shrink: 0;
+  background-size: cover; background-position: center; background-color: var(--surface-2);
+  position: relative; display: flex; align-items: center; justify-content: center;
+}
+.side-ep-thumb .play-overlay { color: var(--ink); font-size: 1.4rem; opacity: 0.9; }
+.side-ep-thumb .dur-badge {
+  position: absolute; bottom: 0.3rem; right: 0.3rem; background: rgba(0,0,0,0.75);
+  color: var(--ink); font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 3px;
+}
+.side-ep-thumb .watched-badge {
+  position: absolute; bottom: 0.3rem; left: 0.3rem; background: rgba(0,0,0,0.75);
+  color: var(--brass); font-size: 0.62rem; padding: 0.1rem 0.35rem; border-radius: 3px;
+}
+.side-ep-info h5 { margin: 0 0 0.2rem; color: var(--ink); font-size: 0.85rem; }
+.side-ep-info span { color: var(--ink-dim); font-size: 0.75rem; }
+.see-all-episodes-btn {
+  display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%;
+  padding: 0.6rem; border: 1px solid rgba(234,231,221,0.2); border-radius: 6px;
+  color: var(--ink); background: none; font-size: 0.82rem; cursor: pointer; margin-top: 0.4rem;
+  text-decoration: none; box-sizing: border-box;
+}

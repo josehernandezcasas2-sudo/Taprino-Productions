@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import Head from 'next/head';
 import Link from 'next/link';
+import { getAuth } from '@clerk/nextjs/server';
 import { findEpisode } from '../../lib/episodes';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
@@ -10,6 +11,7 @@ import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
 import { recordView, recordDailyView } from '../../lib/redis';
+import { isEpisodeWatched } from '../../lib/watchHistory';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
@@ -78,6 +80,29 @@ export async function getServerSideProps({ req, params, query, res }) {
   // to be against the old static file.
   const parentSeries = episode.seriesId ? await findSeries(episode.seriesId) : null;
 
+  // Next/Previous Episode cards only make sense for series content — a
+  // standalone movie has no "next episode" to point at. Computed from the
+  // already-fetched publicEpisodes rather than a second query.
+  let nextEpisode = null;
+  let previousEpisode = null;
+  if (episode.contentType === 'series' && episode.seriesId) {
+    const seriesEpisodes = publicEpisodes
+      .filter((e) => e.contentType === 'series' && e.seriesId === episode.seriesId)
+      .sort((a, b) => {
+        const seasonDiff = (a.season || 0) - (b.season || 0);
+        if (seasonDiff !== 0) return seasonDiff;
+        return (a.seriesOrder || 0) - (b.seriesOrder || 0);
+      });
+    const idx = seriesEpisodes.findIndex((e) => e.id === episode.id);
+    if (idx !== -1) {
+      nextEpisode = seriesEpisodes[idx + 1] || null;
+      previousEpisode = seriesEpisodes[idx - 1] || null;
+    }
+  }
+
+  const { userId } = getAuth(req);
+  const previousEpisodeWatched = previousEpisode && userId ? await isEpisodeWatched(userId, previousEpisode.id) : false;
+
   return {
     props: {
       episode: safeEpisode,
@@ -90,6 +115,9 @@ export async function getServerSideProps({ req, params, query, res }) {
       watchProgress: account.watchProgress,
       publicEpisodes,
       parentSeriesName: parentSeries ? parentSeries.name : null,
+      nextEpisode,
+      previousEpisode,
+      previousEpisodeWatched,
       startOnTrailer: query.trailer === '1',
       startPlaying: query.autoplay === '1',
       signedPlayback
@@ -97,7 +125,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
+export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
   const router = useRouter();
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
   // Series episodes are reached by explicitly picking one from the show's
@@ -307,6 +335,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             ← Back to screening room
           </Link>
 
+          <div className={episode.contentType === 'series' ? 'player-info-row' : undefined}>
           <div className="player-card">
             <div className="now-heading">
               <div className="eyebrow">
@@ -369,6 +398,51 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 onPlayDescribed={() => setDescribedActive((d) => !d)}
               />
             )}
+          </div>
+
+          {episode.contentType === 'series' && (nextEpisode || previousEpisode) && (
+            <div className="episode-nav-sidebar">
+              {nextEpisode && (
+                <>
+                  <div className="side-heading">Next episode</div>
+                  <Link href={`/episode/${nextEpisode.id}`} className="side-ep-card">
+                    <div className="side-ep-thumb" style={nextEpisode.thumbnail ? { backgroundImage: `url(${nextEpisode.thumbnail})` } : {}}>
+                      <span className="play-overlay">▶</span>
+                      {nextEpisode.runtime && <span className="dur-badge">{nextEpisode.runtime}</span>}
+                    </div>
+                    <div className="side-ep-info">
+                      <h5>{nextEpisode.seriesOrder ? `S${nextEpisode.season || 1}E${nextEpisode.seriesOrder} — ` : ''}{nextEpisode.title}</h5>
+                      <span>{nextEpisode.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                    </div>
+                  </Link>
+                </>
+              )}
+
+              {previousEpisode && (
+                <>
+                  <div className="side-heading">Previous episode</div>
+                  <Link href={`/episode/${previousEpisode.id}`} className="side-ep-card">
+                    <div className="side-ep-thumb" style={previousEpisode.thumbnail ? { backgroundImage: `url(${previousEpisode.thumbnail})` } : {}}>
+                      {previousEpisodeWatched ? (
+                        <span className="watched-badge">↺ Watched</span>
+                      ) : (
+                        <span className="play-overlay">▶</span>
+                      )}
+                      {previousEpisode.runtime && <span className="dur-badge">{previousEpisode.runtime}</span>}
+                    </div>
+                    <div className="side-ep-info">
+                      <h5>{previousEpisode.seriesOrder ? `S${previousEpisode.season || 1}E${previousEpisode.seriesOrder} — ` : ''}{previousEpisode.title}</h5>
+                      <span>{previousEpisodeWatched ? 'Watched' : previousEpisode.runtime}</span>
+                    </div>
+                  </Link>
+                </>
+              )}
+
+              <Link href={`/series/${episode.seriesId}`} className="see-all-episodes-btn">
+                ▤ See all episodes
+              </Link>
+            </div>
+          )}
           </div>
         </div>
 
