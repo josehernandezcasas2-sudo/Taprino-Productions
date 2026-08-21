@@ -102,6 +102,30 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [pitchForm, setPitchForm] = useState({ title: '', logline: '', description: '', projectUrl: '', creatorName: '', creatorEmail: '' });
   const [pitchSaving, setPitchSaving] = useState(false);
   const [pitchError, setPitchError] = useState(null);
+  const [reportedComments, setReportedComments] = useState(null);
+
+  async function loadReportedComments() {
+    try {
+      const res = await fetch('/api/admin/pitch-comments');
+      const data = await res.json();
+      setReportedComments(data.comments || []);
+    } catch (err) {
+      // Non-fatal — the moderation queue just stays empty if this fails.
+    }
+  }
+
+  async function moderateComment(commentId, action) {
+    try {
+      await fetch('/api/admin/pitch-comments', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId, action })
+      });
+      await loadReportedComments();
+    } catch (err) {
+      setPitchError('Could not update that comment.');
+    }
+  }
 
   async function loadPitches() {
     try {
@@ -376,7 +400,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); loadPitches(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -654,6 +678,23 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </p>
 
           {pitchError && <p style={{ color: 'var(--danger)' }}>{pitchError}</p>}
+
+          {reportedComments && reportedComments.length > 0 && (
+            <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0', marginBottom: '0.6rem' }}>
+              <strong style={{ color: 'var(--danger)' }}>Reported comments ({reportedComments.length})</strong>
+              {reportedComments.map((c) => (
+                <div key={c.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, marginTop: 8 }}>
+                  <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 4 }}>
+                    On &ldquo;{c.pitches ? c.pitches.title : 'a pitch'}&rdquo; — {c.user_email || 'unknown'}
+                    {c.report_reason && ` — reason: ${c.report_reason}`}
+                  </div>
+                  <div style={{ fontSize: 13, marginBottom: 8 }}>{c.body}</div>
+                  <button className="account-btn-secondary" style={{ width: 'auto', marginRight: 6 }} onClick={() => moderateComment(c.id, 'keep')}>Keep</button>
+                  <button className="account-btn-secondary" style={{ width: 'auto', color: '#c55' }} onClick={() => moderateComment(c.id, 'delete')}>Delete</button>
+                </div>
+              ))}
+            </div>
+          )}
 
           <form onSubmit={addPitch} style={{ marginBottom: '1.4rem' }}>
             <label>Title</label>

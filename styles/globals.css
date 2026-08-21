@@ -3599,3 +3599,67 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   padding: 0.15rem 0.5rem;
   border-radius: 4px;
 }
+
+/* Pitch Room — library grid + shared pieces used on the detail page too */
+.pitch-grid { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+.pitch-card {
+  background: var(--surface-2);
+  border-radius: 1rem;
+  overflow: hidden;
+  border: 1px solid rgba(234,231,221,0.08);
+  width: 280px;
+  text-decoration: none;
+  display: block;
+  transition: transform 0.18s ease;
+}
+.pitch-card:hover { transform: scale(1.03); }
+.pitch-thumb {
+  height: 150px;
+  position: relative;
+  background-color: var(--surface-3);
+  background-size: cover;
+  background-position: center;
+}
+.pitch-save {
+  position: absolute; top: 0.6rem; right: 0.6rem;
+  width: 30px; height: 30px; border-radius: 50%;
+  background: rgba(17,17,11,0.65); border: none;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--ink); font-size: 0.95rem; cursor: pointer;
+}
+.pitch-tag {
+  position: absolute; top: 0.6rem; left: 0.6rem;
+  background: rgba(17,17,11,0.8); color: var(--ink);
+  font-size: 0.62rem; font-weight: 700; padding: 0.25rem 0.55rem;
+  border-radius: 5px; text-transform: uppercase; letter-spacing: 0.03em;
+}
+.pitch-info { padding: 0.9rem 1rem 1.1rem; }
+.pitch-info h4 { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--ink); }
+.pitch-info .creator { color: var(--ink-dim); font-size: 0.78rem; margin-bottom: 0.5rem; }
+.pitch-progress-track { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 0.4rem; }
+.pitch-progress-fill { height: 100%; background: var(--brass); }
+.pitch-progress-label { font-size: 0.7rem; color: var(--ink-dim); }
+
+.fund-btn {
+  background: var(--brass); color: #241a05; padding: 0.85rem 1.7rem;
+  border-radius: 8px; font-family: var(--font-display); font-weight: 700;
+  font-size: 0.95rem; text-decoration: none; display: inline-block; border: none; cursor: pointer;
+}
+.pitch-section-label {
+  font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-dim); margin: 2.2rem 0 1rem;
+}
+.pitch-team-row { display: flex; flex-wrap: wrap; gap: 1.2rem; }
+.pitch-team-card { display: flex; align-items: center; gap: 0.7rem; background: var(--surface-2); border-radius: 0.8rem; padding: 0.8rem 1.1rem; }
+.pitch-team-avatar {
+  width: 44px; height: 44px; border-radius: 50%; background: var(--brass); color: #241a05;
+  display: flex; align-items: center; justify-content: center; font-weight: 700;
+  font-family: var(--font-mono); flex-shrink: 0;
+}
+.pitch-photo-row { display: flex; flex-wrap: wrap; gap: 0.8rem; }
+.pitch-photo-item { width: 220px; height: 140px; border-radius: 0.7rem; background-size: cover; background-position: center; background-color: var(--surface-3); }
+.pitch-update-card { background: var(--surface-2); border-radius: 0.8rem; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
+.pitch-update-date { font-family: var(--font-mono); font-size: 0.68rem; color: var(--brass); letter-spacing: 0.04em; margin-bottom: 0.4rem; }
+.pitch-comment-card { background: var(--surface-2); border-radius: 0.7rem; padding: 0.9rem 1rem; margin-bottom: 0.7rem; }
+.pitch-comment-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.35rem; }
+.pitch-comment-report { background: none; border: none; color: var(--ink-dim); font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }

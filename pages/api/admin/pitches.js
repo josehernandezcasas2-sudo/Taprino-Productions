@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { getAllPitches } from '../../../lib/pitches';
+import { getAllPitches, PITCH_TAGS } from '../../../lib/pitches';
+import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
 
 export default async function handler(req, res) {
@@ -17,10 +18,23 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { title, logline, description, projectUrl, creatorName, creatorEmail } = req.body || {};
+    const { title, logline, description, projectUrl, creatorName, creatorEmail, tag, fundingGoal, fundingRaised, thumbnailBase64, thumbnailFileName } = req.body || {};
     if (!title || !logline || !projectUrl) {
       return res.status(400).json({ error: 'Title, logline, and project URL are required.' });
     }
+    if (tag && !PITCH_TAGS.includes(tag)) {
+      return res.status(400).json({ error: `tag must be one of: ${PITCH_TAGS.join(', ')}` });
+    }
+
+    let thumbnail = null;
+    if (thumbnailBase64) {
+      try {
+        thumbnail = await uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: 'pitch-thumb' });
+      } catch (err) {
+        return res.status(400).json({ error: err.message });
+      }
+    }
+
     // An admin adding this directly IS the approval — status defaults to
     // 'approved' at the table level. This will need to change to 'pending'
     // once there's an actual public submission form artists use themselves.
@@ -31,6 +45,10 @@ export default async function handler(req, res) {
       project_url: projectUrl,
       creator_name: creatorName || null,
       creator_email: creatorEmail || null,
+      tag: tag || null,
+      funding_goal: fundingGoal ? Number(fundingGoal) : null,
+      funding_raised: fundingRaised ? Number(fundingRaised) : null,
+      thumbnail,
       reviewed_by: email,
       reviewed_at: new Date().toISOString()
     });
