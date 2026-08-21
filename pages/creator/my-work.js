@@ -11,6 +11,7 @@ import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
+import RssImportPanel from '../../components/RssImportPanel';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 
@@ -62,6 +63,40 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [captionSubmission, setCaptionSubmission] = useState(null);
   const [replacingVideoSubmission, setReplacingVideoSubmission] = useState(null);
   const [deleteActionError, setDeleteActionError] = useState(null);
+  const [extractingId, setExtractingId] = useState(null);
+  const [extractProgress, setExtractProgress] = useState(null);
+
+  async function extractAudio(episodeId) {
+    setExtractingId(episodeId);
+    setExtractProgress(null);
+    // Polls every 3s, same cadence as the Cloudflare processing polls
+    // used elsewhere (CloudflareHouseAdImport, etc.) — audio extraction
+    // runs on Cloudflare's side and this just checks in on it.
+    const poll = async () => {
+      try {
+        const res = await fetch('/api/creator/extract-podcast-audio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ episodeId })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not extract audio.');
+        if (data.status === 'ready') {
+          setExtractingId(null);
+          setExtractProgress(null);
+          loadSubmissions();
+          return;
+        }
+        setExtractProgress(data.percentComplete);
+        setTimeout(poll, 3000);
+      } catch (err) {
+        setDeleteActionError(err.message);
+        setExtractingId(null);
+        setExtractProgress(null);
+      }
+    };
+    poll();
+  }
 
   async function loadSubmissions() {
     setLoadingSubmissions(true);
@@ -175,6 +210,13 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
             <p className="submission-rejection">Deletion reason: {s.deletionReason}</p>
           )}
           <div className="submission-card-actions">
+            {s.contentType === 'podcast' && s.hasVideo && !s.hasAudio && (
+              <button onClick={() => extractAudio(s.id)} disabled={extractingId === s.id}>
+                {extractingId === s.id
+                  ? `🎧 Extracting…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}`
+                  : '🎧 Extract audio from video'}
+              </button>
+            )}
             {s.status === 'pending' && !s.deletionRequested && (
               <button onClick={() => setEditingSubmission(s)}>✎ Edit</button>
             )}
@@ -230,6 +272,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
             + Submit new episode
           </Link>
         </div>
+
+        <RssImportPanel allSeries={allSeries} onImported={loadSubmissions} />
 
         <div className="account-card">
           <p style={{ margin: '0 0 1rem', fontSize: '0.87rem', color: 'var(--ink-dim)' }}>
