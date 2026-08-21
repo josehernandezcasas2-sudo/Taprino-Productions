@@ -52,8 +52,6 @@
   --paper: #f1e9d8;
   --signal-tint: #dfe6c4;
   --signal-amber: var(--olive);
-  --cipher-teal: var(--brass);
-  --cipher-teal-deep: var(--brass-deep);
   --oxide: var(--danger);
   --static-grey: var(--ink-faint);
   --font-display: 'Space Grotesk', sans-serif;
@@ -316,7 +314,7 @@ button { font-family: inherit; cursor: pointer; }
   font-family: var(--font-mono); font-size: 0.5rem; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.15rem 0.4rem; border-radius: 999px;
 }
-.episode-row-link.free .episode-row-badge { background: rgba(74,168,162,0.2); color: var(--cipher-teal); }
+.episode-row-link.free .episode-row-badge { background: rgba(74,168,162,0.2); color: var(--brass); }
 .episode-row-link.premium .episode-row-badge { background: rgba(179,73,47,0.22); color: var(--danger); }
 .episode-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: center; }
 .episode-row-info h4 { margin: 0 0 0.3rem; font-family: var(--font-display); font-size: 0.95rem; font-weight: 600; }
@@ -410,7 +408,7 @@ button { font-family: inherit; cursor: pointer; }
   font-weight: 400;
   font-size: 0.62rem;
   letter-spacing: 0.16em;
-  color: var(--cipher-teal);
+  color: var(--brass);
   text-transform: uppercase;
   margin-top: 2px;
 }
@@ -550,7 +548,7 @@ button { font-family: inherit; cursor: pointer; }
 .resume-note {
   font-family: var(--font-mono);
   font-size: 0.68rem;
-  color: var(--cipher-teal);
+  color: var(--brass);
   margin: 0 0 0.8rem;
 }
 .player-meta {
@@ -567,7 +565,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.68rem;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: var(--cipher-teal);
+  color: var(--brass);
   margin-bottom: 0.5rem;
 }
 .now-heading h1 {
@@ -592,7 +590,7 @@ button { font-family: inherit; cursor: pointer; }
 .lock-panel h3 { font-family: var(--font-display); font-size: 1.1rem; margin: 0 0 0.4rem; }
 .lock-panel p { color: var(--ink-dim); font-size: 0.85rem; max-width: 32ch; margin: 0 auto 1rem; }
 .unlock-btn {
-  background: var(--cipher-teal);
+  background: var(--brass);
   color: #08201e;
   border: none;
   border-radius: 999px;
@@ -617,7 +615,7 @@ button { font-family: inherit; cursor: pointer; }
 .trailer-link {
   background: transparent;
   border: 1px solid rgba(74, 168, 162, 0.4);
-  color: var(--cipher-teal);
+  color: var(--brass);
   border-radius: 999px;
   padding: 0.25rem 0.7rem;
   font-family: var(--font-mono);
@@ -1004,7 +1002,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 /* Solid, not a translucent tint — needs to read clearly against any
    thumbnail, including light or busy ones. Deliberately olive rather than
-   the cipher-teal/brass token — that color means "Cipher Circle" (premium)
+   the brass token — that color means Studio Tapa+ (premium)
    everywhere else on the site, so reusing it here would blur the exact
    distinction this badge exists to make. */
 .ep-card.free .ep-badge { background: var(--olive-deep); color: var(--ink); }
@@ -1013,7 +1011,7 @@ button { font-family: inherit; cursor: pointer; }
 .ep-info h4 { font-family: var(--font-display); font-size: 0.88rem; margin: 0 0 0.25rem; font-weight: 600; }
 .ep-info span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
 .type-line { display: block; margin-top: 0.25rem; font-size: 0.6rem !important; }
-.type-line.series { color: var(--cipher-teal) !important; }
+.type-line.series { color: var(--brass) !important; }
 .type-line.standalone { color: var(--static-grey) !important; }
 
 .account-card {
@@ -1035,7 +1033,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 1.2rem;
   margin: 0 0 0.6rem;
   font-weight: 700;
-  color: var(--cipher-teal);
+  color: var(--brass);
 }
 .account-card p {
   font-size: 0.9rem;
@@ -1057,6 +1055,8 @@ button { font-family: inherit; cursor: pointer; }
 .account-card input[type=text],
 .account-card input[type=number],
 .account-card input[type=file],
+.account-card input[type=url],
+.account-card input[type=date],
 .account-card select,
 .account-card textarea {
   width: 100%;
@@ -1075,7 +1075,7 @@ button { font-family: inherit; cursor: pointer; }
 .account-card select:focus,
 .account-card textarea:focus {
   outline: none;
-  border-color: var(--cipher-teal);
+  border-color: var(--brass);
 }
 .account-card label {
   display: block;
@@ -1126,7 +1126,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.68rem;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--cipher-teal);
+  color: var(--brass);
   margin-bottom: 0.5rem;
 }
 .account-fineprint {
@@ -1138,7 +1138,7 @@ button { font-family: inherit; cursor: pointer; }
 .account-confirm {
   background: rgba(74, 168, 162, 0.14);
   border: 1px solid rgba(74, 168, 162, 0.4);
-  color: var(--cipher-teal);
+  color: var(--brass);
   padding: 0.6rem 0.7rem;
   border-radius: 4px;
   font-size: 0.82rem;
@@ -1255,7 +1255,7 @@ button { font-family: inherit; cursor: pointer; }
   line-height: 1.7;
   color: var(--ink-dim);
 }
-.plumbing strong { color: var(--cipher-teal); }
+.plumbing strong { color: var(--brass); }
 
 @media (prefers-reduced-motion: reduce) {
   .ep-card, .unlock-btn { transition: none; }
@@ -1681,6 +1681,20 @@ button { font-family: inherit; cursor: pointer; }
   overflow: hidden;
   outline: none;
 }
+/* Vertical content (Shorts/Reels-style) gets its own portrait-shaped
+   player instead of being crammed into a 16:9 box — the old behavior
+   pillarboxed a 9:16 video down to a sliver in the middle of a wide
+   letterboxed frame, wasting most of the screen as black bars on both
+   sides. Height-constrained and centered rather than full-width, since a
+   9:16 box at full page width would be absurdly tall on desktop. */
+.tp-player.is-vertical {
+  aspect-ratio: 9 / 16;
+  width: auto;
+  max-width: 100%;
+  height: min(85vh, 900px);
+  margin: 0 auto;
+}
+.tp-player.is-vertical.is-fullscreen { height: 100%; width: 100%; margin: 0; }
 .tp-player:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 2px; }
 .tp-video {
   width: 100%;
@@ -2651,6 +2665,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 
 .admin-field input[type='text'],
 .admin-field input[type='number'],
+.admin-field input[type='url'],
+.admin-field input[type='date'],
 .admin-field select,
 .admin-field textarea {
   width: 100%;

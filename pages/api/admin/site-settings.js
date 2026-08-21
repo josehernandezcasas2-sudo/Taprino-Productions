@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
 import { getSiteSettings } from '../../../lib/siteSettings';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 
 export default async function handler(req, res) {
   const { userId, email, isAdmin } = await getRoleContext(req);
@@ -52,7 +53,13 @@ export default async function handler(req, res) {
 
   const updates = {
     shop_enabled: !!shopEnabled,
-    shop_url: shopUrl ? shopUrl.trim() : null,
+    // A URL typed without http(s):// (e.g. "studiotapa.com") renders as a
+    // RELATIVE link in an <a href>, which browsers resolve against the
+    // current page — that's exactly how "Shop" ended up opening
+    // studiotapatv.site/studiotapa.com instead of an external site.
+    // Normalizing here means this can never happen regardless of what
+    // gets typed into the admin field.
+    shop_url: shopUrl && shopUrl.trim() ? normalizeUrl(shopUrl) : null,
     live_tv_enabled: liveTvEnabled !== false,
     elevator_pitch_enabled: !!elevatorPitchEnabled,
     updated_at: new Date().toISOString()

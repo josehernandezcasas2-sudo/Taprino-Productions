@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
@@ -103,6 +104,8 @@ export default async function handler(req, res) {
       // and treat '' (cleared, only seriesOrder is realistically ever
       // left blank) as null rather than storing NaN.
       dbUpdates[column] = fields[f] === '' ? null : Number(fields[f]);
+    } else if (f === 'fundingUrl') {
+      dbUpdates[column] = normalizeUrl(fields[f]);
     } else {
       dbUpdates[column] = fields[f];
     }

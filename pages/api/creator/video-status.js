@@ -15,8 +15,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator } = await getRoleContext(req);
-  if (!isCreator) {
+  const { isCreator, isAdmin } = await getRoleContext(req);
+  if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 

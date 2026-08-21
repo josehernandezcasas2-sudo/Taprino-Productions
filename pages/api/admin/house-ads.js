@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadHouseAdVideo } from '../../../lib/houseAdUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { getCloudflareVideoStatus, ensureCloudflareDownloadUrl } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
 
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
     if (clickUrl && clickUrl.trim()) {
       try {
         // eslint-disable-next-line no-new
-        new URL(clickUrl.trim());
+        new URL(normalizeUrl(clickUrl));
       } catch (err) {
         return res.status(400).json({ error: 'That click-through link doesn\u2019t look like a valid URL.' });
       }
@@ -80,7 +81,7 @@ export default async function handler(req, res) {
         advertiser: advertiser ? advertiser.trim() : null,
         video_url: videoUrl,
         cloudflare_uid: cloudflareUid || null,
-        click_url: clickUrl && clickUrl.trim() ? clickUrl.trim() : null,
+        click_url: normalizeUrl(clickUrl),
         duration_seconds: resolvedDuration,
         width: width ? Number(width) : 1280,
         height: height ? Number(height) : 720,

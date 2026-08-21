@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 
 const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingRaised', 'team', 'photos'];
@@ -46,6 +47,8 @@ export default async function handler(req, res) {
       updates[column] = Number(fields[f]);
     } else if ((f === 'fundingGoal' || f === 'fundingRaised') && fields[f] === '') {
       updates[column] = null;
+    } else if (f === 'projectUrl') {
+      updates[column] = normalizeUrl(fields[f]);
     } else {
       updates[column] = fields[f];
     }

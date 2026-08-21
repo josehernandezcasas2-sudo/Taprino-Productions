@@ -2,6 +2,7 @@ import { getRoleContext, findUserByEmail } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
 
 // The manual fallback path: for when a creator's in-app upload keeps
@@ -138,7 +139,7 @@ export default async function handler(req, res) {
     thumbnail,
     featured: !!body.featured,
     is_original: !!body.isOriginal,
-    funding_url: body.fundingUrl || null,
+    funding_url: normalizeUrl(body.fundingUrl),
     ads_enabled: body.adsEnabled !== false,
     status,
     submitted_by: submittedBy,

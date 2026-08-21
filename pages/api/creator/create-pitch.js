@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 
 export default async function handler(req, res) {
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
       title: body.title,
       logline: body.logline,
       description: body.description || null,
-      project_url: body.projectUrl || null,
+      project_url: normalizeUrl(body.projectUrl),
       tag: body.tag || null,
       thumbnail,
       hero_image: heroImage,

@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getAllPitches, PITCH_TAGS } from '../../../lib/pitches';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
 
 export default async function handler(req, res) {
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
       title,
       logline,
       description: description || null,
-      project_url: projectUrl || null,
+      project_url: normalizeUrl(projectUrl),
       creator_name: creatorName || null,
       creator_email: creatorEmail || null,
       tag: tag || null,

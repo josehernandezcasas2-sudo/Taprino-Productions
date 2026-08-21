@@ -32,7 +32,7 @@ const CF_STATE_LABEL = {
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
-  if (!account.isCreator) {
+  if (!account.isCreator && !account.isAdmin) {
     return { redirect: { destination: '/', permanent: false } };
   }
   const [allSeries, episodes] = await Promise.all([getAllSeries(), getPublicEpisodes()]);

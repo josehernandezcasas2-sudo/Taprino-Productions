@@ -102,17 +102,18 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
 
         {error && <div className="house-ad-error" style={{ marginTop: '1rem' }}>{error}</div>}
 
-        <form onSubmit={handleSubmit} style={{ maxWidth: 640 }}>
-          <label>Title</label>
-          <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
+        <div className="account-card" style={{ maxWidth: 640 }}>
+          <form onSubmit={handleSubmit}>
+            <label>Title</label>
+            <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
 
-          <label>Logline <span style={{ fontWeight: 'normal', opacity: 0.65 }}>one sentence</span></label>
-          <input type="text" value={form.logline} onChange={(e) => update('logline', e.target.value)} required />
+            <label>Logline <span style={{ fontWeight: 'normal', opacity: 0.65 }}>one sentence</span></label>
+            <input type="text" value={form.logline} onChange={(e) => update('logline', e.target.value)} required />
 
-          <label>Full description <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
-          <textarea value={form.description} onChange={(e) => update('description', e.target.value)} rows={4} style={{ width: '100%', boxSizing: 'border-box' }} />
+            <label>Full description <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+            <textarea value={form.description} onChange={(e) => update('description', e.target.value)} rows={4} />
 
-          <label>Project type</label>
+            <label>Project type</label>
           <select value={form.tag} onChange={(e) => update('tag', e.target.value)} required>
             <option value="">Choose one…</option>
             {PITCH_TAGS.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -149,10 +150,11 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
             + Add team member
           </button>
 
-          <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto', display: 'block' }}>
-            {saving ? 'Submitting…' : 'Submit for review'}
-          </button>
-        </form>
+            <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto', display: 'block' }}>
+              {saving ? 'Submitting…' : 'Submit for review'}
+            </button>
+          </form>
+        </div>
       </main>
       <Footer />
     </>

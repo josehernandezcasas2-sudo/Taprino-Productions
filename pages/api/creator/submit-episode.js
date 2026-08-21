@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
+import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 
@@ -28,8 +28,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, isCreator } = await getRoleContext(req);
-  if (!isCreator) {
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
+  if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
@@ -60,6 +60,19 @@ export default async function handler(req, res) {
   if (!src) {
     return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
   }
+  // SECURITY: a videoUid arriving from this app's own upload flow (TUS or
+  // URL import) is inherently trustworthy — it's the direct result of an
+  // upload that just happened. A hand-typed video ID (the "paste a
+  // Cloudflare video ID" option) is not — there's no proof it's ready,
+  // finished processing, or even belongs to this creator, so it gets
+  // re-verified against Cloudflare directly before being trusted, same
+  // as manual episode entry and house ads already do.
+  if (body.videoIdWasManuallyEntered) {
+    const status = await getCloudflareVideoStatus(body.videoUid);
+    if (!status || !status.readyToStream) {
+      return res.status(400).json({ error: 'That video ID isn\u2019t ready to stream yet in Cloudflare — wait for it to finish processing.' });
+    }
+  }
 
   // trailerUid is optional — a creator may not have a separate trailer cut
   // ready yet. If they uploaded one, it went through the exact same TUS
@@ -69,6 +82,12 @@ export default async function handler(req, res) {
     trailerSrc = cloudflarePlaybackUrl(body.trailerUid);
     if (!trailerSrc) {
       return res.status(500).json({ error: 'Could not resolve the uploaded trailer — is Cloudflare Stream fully configured?' });
+    }
+    if (body.trailerIdWasManuallyEntered) {
+      const trailerStatus = await getCloudflareVideoStatus(body.trailerUid);
+      if (!trailerStatus || !trailerStatus.readyToStream) {
+        return res.status(400).json({ error: 'That trailer video ID isn\u2019t ready to stream yet in Cloudflare.' });
+      }
     }
   }
 

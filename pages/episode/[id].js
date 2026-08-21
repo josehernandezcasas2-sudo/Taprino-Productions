@@ -133,9 +133,29 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
       setShowingTrailer(false);
       return;
     }
-    const idx = publicEpisodes.findIndex((e) => e.id === episode.id);
-    const next = publicEpisodes[(idx + 1) % publicEpisodes.length];
-    router.push(`/episode/${next.id}`);
+    // Autoplay now only ever continues within the SAME series — it used
+    // to pick (currentIndex + 1) % allEpisodes.length across the entire
+    // public catalog, which meant finishing any video could autoplay into
+    // something completely unrelated (wrong genre, wrong creator, even a
+    // different content type). If this isn't a series episode, or it's
+    // the last episode in its series, playback just stops — no next
+    // video, no wraparound back to episode one.
+    if (episode.contentType !== 'series' || !episode.seriesId) {
+      return;
+    }
+    const seriesEpisodes = publicEpisodes
+      .filter((e) => e.contentType === 'series' && e.seriesId === episode.seriesId)
+      .sort((a, b) => {
+        const seasonDiff = (a.season || 0) - (b.season || 0);
+        if (seasonDiff !== 0) return seasonDiff;
+        return (a.seriesOrder || 0) - (b.seriesOrder || 0);
+      });
+    const idx = seriesEpisodes.findIndex((e) => e.id === episode.id);
+    const next = idx !== -1 ? seriesEpisodes[idx + 1] : null;
+    if (next) {
+      router.push(`/episode/${next.id}`);
+    }
+    // No next episode in this series — just stop. Nothing to autoplay into.
   }
 
   const { openSignIn } = useClerk();

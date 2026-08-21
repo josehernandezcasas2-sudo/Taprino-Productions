@@ -26,7 +26,7 @@ import Footer from '../components/Footer';
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
-  if (!account.isCreator) {
+  if (!account.isCreator && !account.isAdmin) {
     return { redirect: { destination: '/', permanent: false } };
   }
   const [allSeries, episodes] = await Promise.all([getAllSeries(), getPublicEpisodes()]);
@@ -122,8 +122,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   const seriesList = allSeries;
   const [form, setForm] = useState(EMPTY_FORM);
   const [file, setFile] = useState(null);
-  const [videoSource, setVideoSource] = useState('file'); // 'file' | 'link'
+  const [videoSource, setVideoSource] = useState('file'); // 'file' | 'link' | 'cloudflare-id'
   const [videoUrl, setVideoUrl] = useState('');
+  const [manualVideoUid, setManualVideoUid] = useState('');
+  const [trailerSource, setTrailerSource] = useState('file'); // 'file' | 'cloudflare-id'
+  const [manualTrailerUid, setManualTrailerUid] = useState('');
+  const [submittingManual, setSubmittingManual] = useState(false);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
@@ -199,6 +203,25 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
       setFormError('Enter the runtime (link imports can\'t detect it automatically).');
       return;
     }
+    if (videoSource === 'cloudflare-id' && !manualVideoUid.trim()) {
+      setFormError('Paste the Cloudflare video ID.');
+      return;
+    }
+    if (videoSource === 'cloudflare-id' && !form.runtime.trim()) {
+      setFormError('Enter the runtime — there\'s no file here to auto-detect it from.');
+      return;
+    }
+    if (videoSource === 'cloudflare-id' && trailerSource === 'file' && trailerFile) {
+      setFormError('A pasted video ID can\'t be combined with an uploaded trailer file — use a trailer video ID instead, or skip the trailer for now.');
+      return;
+    }
+    if (trailerSource === 'cloudflare-id' && !manualTrailerUid.trim() && trailerFile) {
+      // Belt-and-suspenders — the toggle already hides the file picker
+      // when trailerSource is 'cloudflare-id', but this guards against
+      // stale state if someone toggles back and forth.
+      setFormError('Choose one trailer source, not both.');
+      return;
+    }
     if (activeUpload && activeUpload.status !== 'done' && activeUpload.status !== 'error') {
       setFormError('An upload is already in progress — wait for it to finish (or fail) before starting another.');
       return;
@@ -219,18 +242,47 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     const submissionData = {
       ...form,
       ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
-      ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {})
+      ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
+      // A manually-typed trailer ID rides along as plain metadata — if no
+      // trailerFile is passed to startUpload, the upload context's own
+      // trailerUid (from an actual upload) stays undefined and never
+      // overwrites this, so it survives straight through to submit-episode.
+      ...(trailerSource === 'cloudflare-id' && manualTrailerUid.trim()
+        ? { trailerUid: manualTrailerUid.trim(), trailerIdWasManuallyEntered: true }
+        : {})
     };
 
-    // Fire-and-forget on purpose — the upload now lives in the shared
-    // context, not this page. It keeps running even if this page unmounts
-    // (navigating elsewhere), which is the whole point.
-    if (videoSource === 'link') {
+    if (videoSource === 'cloudflare-id') {
+      // No upload happening at all here — this goes straight to
+      // submit-episode.js as a normal POST, the same way manual episode
+      // entry works for admin. The shared upload context is specifically
+      // for tracking file uploads in progress; there's nothing to track
+      // when the video already exists in Cloudflare.
+      setSubmittingManual(true);
+      try {
+        const res = await fetch('/api/creator/submit-episode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...submissionData,
+            videoUid: manualVideoUid.trim(),
+            videoIdWasManuallyEntered: true
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not submit.');
+      } catch (err) {
+        setFormError(err.message);
+        setSubmittingManual(false);
+        return;
+      }
+      setSubmittingManual(false);
+    } else if (videoSource === 'link') {
       // No trailer support for link imports yet — see UploadContext's
       // startUrlImport for why this is a separate, simpler path.
       startUrlImport(videoUrl.trim(), form.title ? `${form.title}.mp4` : undefined, submissionData);
     } else {
-      startUpload(file, submissionData, trailerFile || undefined);
+      startUpload(file, submissionData, trailerSource === 'file' ? (trailerFile || undefined) : undefined);
     }
 
     // Reset the form immediately so the creator can start filling out a
@@ -239,6 +291,8 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     setForm(EMPTY_FORM);
     setFile(null);
     setVideoUrl('');
+    setManualVideoUid('');
+    setManualTrailerUid('');
     setPosterFile(null);
     setThumbnailFile(null);
     setTrailerFile(null);
@@ -370,9 +424,16 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               >
                 Import from a link
               </button>
+              <button
+                type="button"
+                className={videoSource === 'cloudflare-id' ? 'on' : ''}
+                onClick={() => setVideoSource('cloudflare-id')}
+              >
+                Cloudflare video ID
+              </button>
             </div>
 
-            {videoSource === 'file' ? (
+            {videoSource === 'file' && (
               <>
                 <UppyFilePicker
                   key={`video-${pickerResetKey}`}
@@ -382,7 +443,8 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 />
                 {!file && <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>Required before you can submit.</p>}
               </>
-            ) : (
+            )}
+            {videoSource === 'link' && (
               <>
                 <input
                   type="url"
@@ -407,6 +469,22 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 </p>
               </>
             )}
+            {videoSource === 'cloudflare-id' && (
+              <>
+                <input
+                  type="text"
+                  placeholder="e.g. 6b1b3f4a2e9c4d0a8f7e1c2d3b4a5f6e"
+                  value={manualVideoUid}
+                  onChange={(e) => setManualVideoUid(e.target.value)}
+                  style={{ marginBottom: '0.5rem' }}
+                />
+                <p className="video-source-help">
+                  For a video that's already uploaded to Cloudflare Stream — it has to already say
+                  &ldquo;ready to stream&rdquo; before this will work. We won&rsquo;t auto-detect the
+                  runtime here either, so enter it below.
+                </p>
+              </>
+            )}
 
             <label>Poster image — 2:3 portrait (roughly 400×600px or larger), optional</label>
             <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
@@ -415,18 +493,51 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
             <label>Trailer clip — 15–30s cut works well; used for the "Watch trailer" button and the homepage hero if this gets featured, optional</label>
-            <UppyFilePicker
-              key={`trailer-${pickerResetKey}`}
-              accept="video/*"
-              note="Optional — a short cut of the episode"
-              onFileSelected={setTrailerFile}
-            />
+            <div className="video-source-toggle" role="group" aria-label="Trailer source">
+              <button
+                type="button"
+                className={trailerSource === 'file' ? 'on' : ''}
+                onClick={() => setTrailerSource('file')}
+                disabled={videoSource === 'cloudflare-id'}
+              >
+                Upload a file
+              </button>
+              <button
+                type="button"
+                className={trailerSource === 'cloudflare-id' ? 'on' : ''}
+                onClick={() => setTrailerSource('cloudflare-id')}
+              >
+                Cloudflare video ID
+              </button>
+            </div>
+            {videoSource === 'cloudflare-id' && (
+              <p style={{ fontSize: '0.76rem', color: 'var(--ink-dim)', marginTop: '-0.4rem', marginBottom: '0.5rem' }}>
+                A pasted main video can't be paired with an uploaded trailer file — use a trailer video ID instead, or skip the trailer.
+              </p>
+            )}
+            {trailerSource === 'file' ? (
+              <UppyFilePicker
+                key={`trailer-${pickerResetKey}`}
+                accept="video/*"
+                note="Optional — a short cut of the episode"
+                onFileSelected={setTrailerFile}
+              />
+            ) : (
+              <input
+                type="text"
+                placeholder="e.g. 9f8e7d6c5b4a3f2e1d0c9b8a7f6e5d4c"
+                value={manualTrailerUid}
+                onChange={(e) => setManualTrailerUid(e.target.value)}
+                style={{ marginBottom: '0.5rem' }}
+              />
+            )}
 
             <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
               Poster, thumbnail, and trailer aren&rsquo;t required to submit — but a submission with all three tends to get approved faster, since there&rsquo;s nothing left for the admin to chase down.
             </p>
 
-            <button className="account-btn-primary" type="submit">
+            <button className="account-btn-primary" type="submit" disabled={submittingManual}>
+              {submittingManual ? 'Submitting…' : 'Submit for review'}
               Submit for review
             </button>
           </form>
