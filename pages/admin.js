@@ -494,6 +494,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       )}
 
       <div className="admin-tool-links">
+        <Link href="/creator">🎬 Creator Studio →</Link>
         <Link href="/admin/team">👥 Team &amp; permissions →</Link>
         <Link href="/admin/house-ads">📺 House ads →</Link>
         <Link href="/admin/live">🔴 Go live →</Link>

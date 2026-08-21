@@ -297,8 +297,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 )}
                 {isCreator && <div className="dropdown-divider" />}
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
-                <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
+                {(isCreator || isAdmin) && <div className="dropdown-divider" />}
+                {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item">🎬 Submit your work</Link>}
+                {!isCreator && !isAdmin && <div className="dropdown-divider" />}
+                {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>}
                 <div className="dropdown-divider" />
                 <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}>↩ Sign Out</button>
               </>
@@ -308,7 +310,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <Link href="/account" className="dropdown-item">→ Log in / Create account</Link>
                 <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
                 <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item">🎬 Submit your work</Link>
+                <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>
               </>
             )}
           </div>

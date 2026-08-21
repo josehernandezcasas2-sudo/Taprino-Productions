@@ -23,15 +23,19 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { title, advertiser, clickUrl, durationSeconds, width, height, videoBase64, videoFileName, cloudflareUid } = req.body || {};
+    const { title, advertiser, clickUrl, durationSeconds, width, height, videoBase64, videoFileName, cloudflareUid, startDate, endDate } = req.body || {};
 
     if (!title || !title.trim()) return res.status(400).json({ error: 'Give the ad a title.' });
-    if (!clickUrl || !clickUrl.trim()) return res.status(400).json({ error: 'Where should a click send people?' });
-    try {
-      // eslint-disable-next-line no-new
-      new URL(clickUrl.trim());
-    } catch (err) {
-      return res.status(400).json({ error: 'That click-through link doesn\u2019t look like a valid URL.' });
+    if (clickUrl && clickUrl.trim()) {
+      try {
+        // eslint-disable-next-line no-new
+        new URL(clickUrl.trim());
+      } catch (err) {
+        return res.status(400).json({ error: 'That click-through link doesn\u2019t look like a valid URL.' });
+      }
+    }
+    if (endDate && startDate && endDate < startDate) {
+      return res.status(400).json({ error: 'End date has to be after the start date.' });
     }
     if (!videoBase64 && !cloudflareUid) {
       return res.status(400).json({ error: 'Choose a video for this ad.' });
@@ -76,10 +80,12 @@ export default async function handler(req, res) {
         advertiser: advertiser ? advertiser.trim() : null,
         video_url: videoUrl,
         cloudflare_uid: cloudflareUid || null,
-        click_url: clickUrl.trim(),
+        click_url: clickUrl && clickUrl.trim() ? clickUrl.trim() : null,
         duration_seconds: resolvedDuration,
         width: width ? Number(width) : 1280,
         height: height ? Number(height) : 720,
+        start_date: startDate || null,
+        end_date: endDate || null,
         created_by: userId
       })
       .select()

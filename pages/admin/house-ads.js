@@ -192,9 +192,18 @@ export default function HouseAdsAdmin({ mainGenres, isSignedIn, isSubscriber, em
                     {ad.impressions.toLocaleString()} impressions · {ad.clicks.toLocaleString()} clicks
                     {ctr(ad) !== null && ` · ${ctr(ad)}% CTR`}
                   </div>
-                  <a href={ad.click_url} target="_blank" rel="noopener noreferrer" className="house-ad-link">
-                    {ad.click_url}
-                  </a>
+                  {ad.click_url && (
+                    <a href={ad.click_url} target="_blank" rel="noopener noreferrer" className="house-ad-link">
+                      {ad.click_url}
+                    </a>
+                  )}
+                  {(ad.start_date || ad.end_date) && (
+                    <div className="house-ad-meta">
+                      {ad.start_date && `From ${ad.start_date}`}
+                      {ad.start_date && ad.end_date && ' · '}
+                      {ad.end_date && `Until ${ad.end_date}`}
+                    </div>
+                  )}
                 </div>
                 <div className="house-ad-actions">
                   <span className={`b ${ad.active ? 'ok' : 'warn'}`}>{ad.active ? 'Active' : 'Paused'}</span>

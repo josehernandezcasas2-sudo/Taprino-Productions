@@ -11,13 +11,14 @@ function readAsDataUrl(file) {
   });
 }
 
-const EMPTY = { title: '', advertiser: '', clickUrl: '', durationSeconds: '', width: '1280', height: '720' };
+const EMPTY = { title: '', advertiser: '', clickUrl: '', durationSeconds: '', width: '1280', height: '720', startDate: '', endDate: '' };
 
 export default function HouseAdForm({ onCreated }) {
   const [form, setForm] = useState(EMPTY);
-  const [source, setSource] = useState('quick'); // 'quick' | 'cloudflare'
+  const [source, setSource] = useState('quick'); // 'quick' | 'cloudflare' | 'manual'
   const [file, setFile] = useState(null);
   const [cloudflareReady, setCloudflareReady] = useState(null); // { cloudflareUid, duration } | null
+  const [manualUid, setManualUid] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
@@ -60,6 +61,10 @@ export default function HouseAdForm({ onCreated }) {
       setError('Wait for the Cloudflare import to finish first.');
       return;
     }
+    if (source === 'manual' && !manualUid.trim()) {
+      setError('Paste the Cloudflare video ID.');
+      return;
+    }
 
     setBusy(true);
     try {
@@ -72,6 +77,13 @@ export default function HouseAdForm({ onCreated }) {
         if (!body.durationSeconds && cloudflareReady.duration) {
           body.durationSeconds = String(Math.round(cloudflareReady.duration));
         }
+      } else if (source === 'manual') {
+        // Same as manual episode entry — a video already sitting in
+        // Cloudflare Stream from some other upload path, just referenced
+        // by its UID rather than uploaded again through this form. The
+        // API re-verifies this UID against Cloudflare directly before
+        // trusting it for anything.
+        body.cloudflareUid = manualUid.trim();
       } else {
         body.videoBase64 = await readAsDataUrl(file);
         body.videoFileName = file.name;
@@ -88,6 +100,7 @@ export default function HouseAdForm({ onCreated }) {
       setForm(EMPTY);
       setFile(null);
       setCloudflareReady(null);
+      setManualUid('');
       e.target.reset();
       if (onCreated) onCreated(data.ad);
     } catch (err) {
@@ -105,13 +118,12 @@ export default function HouseAdForm({ onCreated }) {
       <label>Advertiser (just for your own records — never shown to viewers)</label>
       <input value={form.advertiser} onChange={(e) => update('advertiser', e.target.value)} placeholder={SITE.studio} />
 
-      <label>Where a click sends people</label>
+      <label>Where a click sends people <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — leave blank for a pure awareness clip with nowhere to click through to</span></label>
       <input
         type="url"
         value={form.clickUrl}
         onChange={(e) => update('clickUrl', e.target.value)}
         placeholder="https://shop.studiotapa.com"
-        required
       />
 
       <label>Video</label>
@@ -122,9 +134,12 @@ export default function HouseAdForm({ onCreated }) {
         <button type="button" className={source === 'cloudflare' ? 'on' : ''} onClick={() => setSource('cloudflare')}>
           Import via Cloudflare
         </button>
+        <button type="button" className={source === 'manual' ? 'on' : ''} onClick={() => setSource('manual')}>
+          Cloudflare video ID
+        </button>
       </div>
 
-      {source === 'quick' ? (
+      {source === 'quick' && (
         <>
           <input type="file" accept="video/mp4,video/quicktime,video/webm" onChange={(e) => handleFile(e.target.files[0] || null)} required={source === 'quick'} />
           <small className="house-ad-hint">
@@ -132,8 +147,24 @@ export default function HouseAdForm({ onCreated }) {
             fits comfortably. Duration and dimensions fill in automatically once you choose a file.
           </small>
         </>
-      ) : (
+      )}
+      {source === 'cloudflare' && (
         <CloudflareHouseAdImport onReady={(result) => setCloudflareReady(result)} />
+      )}
+      {source === 'manual' && (
+        <>
+          <input
+            type="text"
+            value={manualUid}
+            onChange={(e) => setManualUid(e.target.value)}
+            placeholder="e.g. 6b1b3f4a2e9c4d0a8f7e1c2d3b4a5f6e"
+          />
+          <small className="house-ad-hint">
+            For a video that's already uploaded to Cloudflare Stream — from another episode's video, or
+            uploaded directly in the Cloudflare dashboard. It has to already say &ldquo;ready to stream&rdquo;
+            before this will work.
+          </small>
+        </>
       )}
 
       <div className="house-ad-row">
@@ -154,6 +185,17 @@ export default function HouseAdForm({ onCreated }) {
         <div>
           <label>Height</label>
           <input type="number" min="1" value={form.height} onChange={(e) => update('height', e.target.value)} />
+        </div>
+      </div>
+
+      <div className="house-ad-row">
+        <div>
+          <label>Start date <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — runs immediately if blank</span></label>
+          <input type="date" value={form.startDate} onChange={(e) => update('startDate', e.target.value)} />
+        </div>
+        <div>
+          <label>End date <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — runs indefinitely if blank</span></label>
+          <input type="date" value={form.endDate} onChange={(e) => update('endDate', e.target.value)} />
         </div>
       </div>
 
