@@ -11,7 +11,9 @@ import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
 import { recordView, recordDailyView } from '../../lib/redis';
-import { isEpisodeWatched } from '../../lib/watchHistory';
+import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
+import { getRecommendations } from '../../lib/recommendations';
+import { getSiteSettings } from '../../lib/siteSettings';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
@@ -103,6 +105,48 @@ export async function getServerSideProps({ req, params, query, res }) {
   const { userId } = getAuth(req);
   const previousEpisodeWatched = previousEpisode && userId ? await isEpisodeWatched(userId, previousEpisode.id) : false;
 
+  // Standalone content (movie/short/vertical) has no "next episode" to
+  // point at, but the same sidebar real estate is too valuable to leave
+  // empty — filled instead with a short "Watch Next" list blending
+  // whatever's still sitting unwatched in this viewer's wishlist with
+  // their personalized recommendations, same algorithm and admin-tunable
+  // closeness dial as the My Recs page itself.
+  let watchNext = [];
+  if (episode.contentType !== 'series' && userId) {
+    const browsable = publicEpisodes.filter((e) => e.contentType !== 'bonus' && e.id !== episode.id);
+    const watchHistoryList = await getWatchHistory(userId, browsable);
+    const watchedIds = new Set(watchHistoryList.map((e) => e.id));
+
+    // Wishlist entries can be series ids too, which "watched" doesn't
+    // cleanly apply to — those are treated as always eligible rather
+    // than silently dropped.
+    const unwatchedWishlist = account.wishlist
+      .map((id) => browsable.find((e) => e.id === id))
+      .filter((e) => e && !watchedIds.has(e.id));
+
+    const excludeIds = [...account.wishlist, ...watchHistoryList.map((e) => e.id), episode.id];
+    const siteSettings = await getSiteSettings();
+    const recommended = getRecommendations({
+      episodes: browsable,
+      tasteIds: [...account.wishlist, ...watchHistoryList.map((e) => e.id)],
+      excludeIds,
+      closeness: siteSettings.recommendationCloseness,
+      count: 4
+    });
+
+    // Unwatched wishlist items lead — someone already told us they want
+    // to see this by saving it — then recommendations fill any remaining
+    // slots, capped at 4 total so the sidebar doesn't run longer than the
+    // player itself.
+    const combined = [...unwatchedWishlist, ...recommended];
+    const seen = new Set();
+    watchNext = combined.filter((e) => {
+      if (seen.has(e.id)) return false;
+      seen.add(e.id);
+      return true;
+    }).slice(0, 4);
+  }
+
   return {
     props: {
       episode: safeEpisode,
@@ -118,6 +162,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       nextEpisode,
       previousEpisode,
       previousEpisodeWatched,
+      watchNext,
       startOnTrailer: query.trailer === '1',
       startPlaying: query.autoplay === '1',
       signedPlayback
@@ -125,7 +170,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
+export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
   const router = useRouter();
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
   // Series episodes are reached by explicitly picking one from the show's
@@ -335,7 +380,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             ← Back to screening room
           </Link>
 
-          <div className={episode.contentType === 'series' ? 'player-info-row' : undefined}>
+          <div className="player-info-row">
           <div className="player-card">
             <div className="now-heading">
               <div className="eyebrow">
@@ -405,7 +450,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
               {nextEpisode && (
                 <>
                   <div className="side-heading">Next episode</div>
-                  <Link href={`/episode/${nextEpisode.id}`} className="side-ep-card">
+                  <Link href={`/episode/${nextEpisode.id}?autoplay=1`} className="side-ep-card">
                     <div className="side-ep-thumb" style={nextEpisode.thumbnail ? { backgroundImage: `url(${nextEpisode.thumbnail})` } : {}}>
                       <span className="play-overlay">▶</span>
                       {nextEpisode.runtime && <span className="dur-badge">{nextEpisode.runtime}</span>}
@@ -421,7 +466,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
               {previousEpisode && (
                 <>
                   <div className="side-heading">Previous episode</div>
-                  <Link href={`/episode/${previousEpisode.id}`} className="side-ep-card">
+                  <Link href={`/episode/${previousEpisode.id}?autoplay=1`} className="side-ep-card">
                     <div className="side-ep-thumb" style={previousEpisode.thumbnail ? { backgroundImage: `url(${previousEpisode.thumbnail})` } : {}}>
                       {previousEpisodeWatched ? (
                         <span className="watched-badge">↺ Watched</span>
@@ -441,6 +486,24 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
               <Link href={`/series/${episode.seriesId}`} className="see-all-episodes-btn">
                 ▤ See all episodes
               </Link>
+            </div>
+          )}
+
+          {episode.contentType !== 'series' && watchNext.length > 0 && (
+            <div className="episode-nav-sidebar">
+              <div className="side-heading">Watch next</div>
+              {watchNext.map((item) => (
+                <Link key={item.id} href={`/episode/${item.id}?autoplay=1`} className="side-ep-card">
+                  <div className="side-ep-thumb" style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}}>
+                    <span className="play-overlay">▶</span>
+                    {item.runtime && <span className="dur-badge">{item.runtime}</span>}
+                  </div>
+                  <div className="side-ep-info">
+                    <h5>{item.title}</h5>
+                    <span>{item.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                  </div>
+                </Link>
+              ))}
             </div>
           )}
           </div>
