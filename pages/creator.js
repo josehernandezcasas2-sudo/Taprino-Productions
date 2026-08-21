@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
 import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -50,7 +51,8 @@ const CONTENT_TYPES = [
   { value: 'movie', label: 'Movie' },
   { value: 'series', label: 'Series episode' },
   { value: 'vertical', label: 'Vertical' },
-  { value: 'podcast', label: 'Podcast' }
+  { value: 'podcast', label: 'Podcast' },
+  { value: 'bonus', label: 'Bonus content (BTS, trailer, extra…)' }
 ];
 
 const EMPTY_FORM = {
@@ -119,8 +121,27 @@ function draftHasContent(draft) {
 
 export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const { activeUpload, startUpload, startUrlImport } = useUpload();
+  const router = useRouter();
   const seriesList = allSeries;
   const [form, setForm] = useState(EMPTY_FORM);
+
+  // Supports deep links like /creator?contentType=bonus&seriesId=X (used
+  // by the "＋ Add bonus content" option on a show's settings dropdown in
+  // /creator/my-work) — pre-fills the form instead of landing on a blank
+  // one the creator has to reconfigure by hand. Only runs once router is
+  // actually ready (query isn't populated on the very first render).
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { contentType, seriesId } = router.query;
+    if (contentType && CONTENT_TYPES.some((t) => t.value === contentType)) {
+      setForm((f) => ({
+        ...f,
+        contentType: String(contentType),
+        ...(seriesId ? { seriesId: String(seriesId) } : {})
+      }));
+    }
+  }, [router.isReady]);
+
   const [file, setFile] = useState(null);
   const [videoSource, setVideoSource] = useState('file'); // 'file' | 'link' | 'cloudflare-id'
   const [videoUrl, setVideoUrl] = useState('');
@@ -433,6 +454,21 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />
                 <label>Episode number within season</label>
                 <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} required />
+              </>
+            )}
+
+            {form.contentType === 'bonus' && (
+              <>
+                <label>Which show is this bonus content for?</label>
+                <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
+                  <option value="">Choose a series or show…</option>
+                  {seriesList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+                <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.5rem' }}>
+                  Give it a descriptive title above — e.g. &ldquo;Behind the Scenes: Episode 3&rdquo; or
+                  &ldquo;Official Trailer&rdquo; — it&rsquo;ll show up in a Bonus Content section on that show&rsquo;s page.
+                  This one isn&rsquo;t part of the show&rsquo;s own numbered episodes, so no season/episode number needed.
+                </p>
               </>
             )}
 

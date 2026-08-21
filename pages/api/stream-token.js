@@ -1,6 +1,7 @@
 import { findEpisode } from '../../lib/episodes';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
+import { SITE } from '../../lib/siteConfig';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.
 //
@@ -34,7 +35,7 @@ export default async function handler(req, res) {
   const account = await getAccountContext(req);
   const entitled = episode.tier === 'free' || account.isSubscriber;
   if (!entitled) {
-    return res.status(403).json({ error: 'This episode is for Cipher Circle members.' });
+    return res.status(403).json({ error: `This episode is for ${SITE.premiumTier} members.` });
   }
 
   if (!episode.src) {

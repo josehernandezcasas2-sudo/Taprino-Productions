@@ -1,4 +1,5 @@
 import Stripe from 'stripe';
+import { SITE } from '../../lib/siteConfig';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -39,10 +40,10 @@ export default async function handler(req, res) {
   // a Discord ping, etc.
   switch (event.type) {
     case 'checkout.session.completed':
-      console.log('New Cipher Circle member. Stripe customer:', event.data.object.customer);
+      console.log(`New ${SITE.premiumTier} member. Stripe customer:`, event.data.object.customer);
       break;
     case 'customer.subscription.deleted':
-      console.log('Cipher Circle member cancelled. Stripe customer:', event.data.object.customer);
+      console.log(`${SITE.premiumTier} member cancelled. Stripe customer:`, event.data.object.customer);
       break;
     case 'invoice.payment_failed':
       console.log('Payment failed for customer:', event.data.object.customer);

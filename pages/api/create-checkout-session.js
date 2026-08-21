@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
+import { SITE } from '../../lib/siteConfig';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -26,7 +27,7 @@ export default async function handler(req, res) {
   // Stripe customer instead of ever creating an orphaned one.
   const existingCustomerId = await getStripeCustomerIdFromRequest(req);
   if (!existingCustomerId) {
-    return res.status(401).json({ error: 'Please sign in first, then join the Cipher Circle.' });
+    return res.status(401).json({ error: `Please sign in first, then join ${SITE.premiumTier}.` });
   }
 
   try {

@@ -12,6 +12,7 @@ import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RssImportPanel from '../../components/RssImportPanel';
+import RequestEditModal from '../../components/RequestEditModal';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 
@@ -66,6 +67,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [deleteActionError, setDeleteActionError] = useState(null);
   const [extractingId, setExtractingId] = useState(null);
   const [extractProgress, setExtractProgress] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(null); // 'episode:<id>' | 'series:<id>' | null
+  const [editRequestTarget, setEditRequestTarget] = useState(null); // { type, currentValues }
 
   async function extractAudio(episodeId) {
     setExtractingId(episodeId);
@@ -226,6 +229,33 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 offer both, without opening anything. */}
             {s.hasVideo && <span className="episode-media-icon" title="Has video">🎬</span>}
             {s.hasAudio && <span className="episode-media-icon" title="Has audio">🎧</span>}
+            {!s.deletionRequested && (
+              <span style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setOpenDropdown(openDropdown === `episode:${s.id}` ? null : `episode:${s.id}`)}
+                  style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}
+                  aria-label="Episode settings"
+                >
+                  ⚙
+                </button>
+                {openDropdown === `episode:${s.id}` && (
+                  <div className="dropdown dropdown-left open">
+                    <button
+                      className="dropdown-item"
+                      onClick={() => {
+                        setEditRequestTarget({
+                          type: 'episode',
+                          currentValues: { id: s.id, title: s.title, description: s.description || '' }
+                        });
+                        setOpenDropdown(null);
+                      }}
+                    >
+                      ✎ Edit title &amp; description
+                    </button>
+                  </div>
+                )}
+              </span>
+            )}
           </div>
           <div className="episode-meta">
             {s.cloudflareState && s.cloudflareState !== 'ready'
@@ -396,6 +426,42 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                         <div className="project-title">
                           {group.label}
                           {group.typeTag && <span className="project-type-tag">{group.typeTag}</span>}
+                          {group.isGrouped && (
+                            <span style={{ position: 'relative' }}>
+                              <button
+                                onClick={() => setOpenDropdown(openDropdown === `series:${group.key}` ? null : `series:${group.key}`)}
+                                style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                aria-label="Show settings"
+                              >
+                                ⚙
+                              </button>
+                              {openDropdown === `series:${group.key}` && (
+                                <div className="dropdown dropdown-left open">
+                                  <button
+                                    className="dropdown-item"
+                                    onClick={() => {
+                                      const seriesId = group.key.replace('series:', '');
+                                      const seriesRecord = (allSeries || []).find((s) => s.id === seriesId);
+                                      setEditRequestTarget({
+                                        type: 'series',
+                                        currentValues: { id: seriesId, name: group.label, description: (seriesRecord && seriesRecord.desc) || '' }
+                                      });
+                                      setOpenDropdown(null);
+                                    }}
+                                  >
+                                    ✎ Edit show details
+                                  </button>
+                                  <Link
+                                    href={`/creator?contentType=bonus&seriesId=${group.key.replace('series:', '')}`}
+                                    className="dropdown-item"
+                                    onClick={() => setOpenDropdown(null)}
+                                  >
+                                    ＋ Add bonus content
+                                  </Link>
+                                </div>
+                              )}
+                            </span>
+                          )}
                         </div>
                         <div className="project-sub">
                           {group.items.length} episode{group.items.length === 1 ? '' : 's'}
@@ -453,6 +519,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           submission={captionSubmission}
           onClose={() => setCaptionSubmission(null)}
           onSaved={loadSubmissions}
+        />
+      )}
+
+      {editRequestTarget && (
+        <RequestEditModal
+          type={editRequestTarget.type}
+          currentValues={editRequestTarget.currentValues}
+          onClose={() => setEditRequestTarget(null)}
+          onSubmitted={loadSubmissions}
         />
       )}
     </>

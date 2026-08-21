@@ -260,6 +260,38 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
   const [pendingArtwork, setPendingArtwork] = useState(null);
+  const [pendingEdits, setPendingEdits] = useState(null);
+  const [editActionLoading, setEditActionLoading] = useState(null);
+  const [editError, setEditError] = useState(null);
+
+  async function loadPendingEdits() {
+    try {
+      const res = await fetch('/api/admin/pending-edits');
+      const data = await res.json();
+      if (res.ok) setPendingEdits(data);
+    } catch (err) {
+      setPendingEdits({ episodes: [], series: [] });
+    }
+  }
+
+  async function resolveEdit(type, id, decision) {
+    setEditActionLoading(`${type}-${id}`);
+    setEditError(null);
+    try {
+      const res = await fetch('/api/admin/resolve-edit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id, decision })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not resolve this.');
+      await Promise.all([loadPendingEdits(), loadLibrary(librarySearch), loadAuditLog()]);
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditActionLoading(null);
+    }
+  }
   const [artworkActionLoading, setArtworkActionLoading] = useState(null);
   const [artworkError, setArtworkError] = useState(null);
   const [auditLog, setAuditLog] = useState(null);
@@ -400,7 +432,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -947,7 +979,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
 
               {pendingArtwork.series.map((s) => (
                 <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--cipher-teal)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
                     {s.pendingPoster && 'New poster staged. '}
@@ -968,6 +1000,93 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                       style={{ width: 'auto' }}
                       disabled={artworkActionLoading === `series-${s.id}`}
                       onClick={() => resolveArtwork('series', s.id, 'deny')}
+                    >
+                      ✕ Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Pending edits</div>
+          <h3>Title &amp; description changes awaiting approval</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+            A creator requested a change to something already live. Denying leaves the current title/description
+            untouched; approving replaces it with what they proposed.
+          </p>
+
+          {editError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{editError}</p>}
+
+          {!pendingEdits ? (
+            <p>Loading…</p>
+          ) : pendingEdits.episodes.length === 0 && pendingEdits.series.length === 0 ? (
+            <p>Nothing pending right now.</p>
+          ) : (
+            <>
+              {pendingEdits.episodes.map((e) => (
+                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--signal-amber)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Episode</div>
+                  {e.pendingTitle && (
+                    <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>
+                      <strong>Title:</strong> {e.currentTitle} <span style={{ color: 'var(--ink-dim)' }}>→</span> {e.pendingTitle}
+                    </p>
+                  )}
+                  {e.pendingDescription && (
+                    <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                      <strong>Description:</strong> {e.currentDescription} <span>→</span> {e.pendingDescription}
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      disabled={editActionLoading === `episode-${e.id}`}
+                      onClick={() => resolveEdit('episode', e.id, 'approve')}
+                    >
+                      {editActionLoading === `episode-${e.id}` ? 'Working…' : '✓ Approve'}
+                    </button>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      disabled={editActionLoading === `episode-${e.id}`}
+                      onClick={() => resolveEdit('episode', e.id, 'deny')}
+                    >
+                      ✕ Deny
+                    </button>
+                  </div>
+                </div>
+              ))}
+
+              {pendingEdits.series.map((s) => (
+                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Show / series</div>
+                  {s.pendingName && (
+                    <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>
+                      <strong>Name:</strong> {s.currentName} <span style={{ color: 'var(--ink-dim)' }}>→</span> {s.pendingName}
+                    </p>
+                  )}
+                  {s.pendingDescription && (
+                    <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                      <strong>Description:</strong> {s.currentDescription} <span>→</span> {s.pendingDescription}
+                    </p>
+                  )}
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      disabled={editActionLoading === `series-${s.id}`}
+                      onClick={() => resolveEdit('series', s.id, 'approve')}
+                    >
+                      {editActionLoading === `series-${s.id}` ? 'Working…' : '✓ Approve'}
+                    </button>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      disabled={editActionLoading === `series-${s.id}`}
+                      onClick={() => resolveEdit('series', s.id, 'deny')}
                     >
                       ✕ Deny
                     </button>
@@ -1021,7 +1140,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
 
               {deletions.series.map((s) => (
                 <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--cipher-teal)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {s.reason}</p>
                   <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
@@ -1066,7 +1185,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             orphans.map((o) => (
               <div key={o.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <div>
-                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: o.kind === 'cloudflare_video' ? 'var(--signal-amber)' : 'var(--cipher-teal)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
+                  <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: o.kind === 'cloudflare_video' ? 'var(--signal-amber)' : 'var(--brass)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
                     {o.kind === 'cloudflare_video' ? 'Cloudflare video' : 'Storage image'}
                   </div>
                   <div style={{ fontSize: '0.9rem' }}>{o.context || '(no title on file)'}</div>

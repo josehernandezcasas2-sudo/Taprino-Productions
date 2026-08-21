@@ -57,6 +57,11 @@ export default async function handler(req, res) {
   if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || !body.seriesOrder)) {
     return res.status(400).json({ error: `${body.contentType === 'podcast' ? 'Podcast' : 'Series'} episodes need a show/series and an episode number.` });
   }
+  // Bonus content attaches to a show but isn't part of its own numbered
+  // episode sequence — no season/order needed, just which show it's for.
+  if (body.contentType === 'bonus' && !body.seriesId) {
+    return res.status(400).json({ error: 'Choose which show this bonus content is for.' });
+  }
 
   // Every episode needs at least one way to actually play — a video, an
   // audio file, or both (podcasts specifically can be either/or/both;
@@ -148,6 +153,8 @@ export default async function handler(req, res) {
     series_id: (body.contentType === 'series' || body.contentType === 'podcast') && !isNewSeries ? body.seriesId : null,
     season: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.season) || 1 : null,
     series_order: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.seriesOrder) : null,
+    bonus_parent_type: body.contentType === 'bonus' ? 'series' : null,
+    bonus_parent_id: body.contentType === 'bonus' ? body.seriesId : null,
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
