@@ -8,7 +8,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 // enforcement of "creators must submit complete metadata," not just a UI
 // nicety. A form can be bypassed by anyone calling this endpoint directly;
 // this check can't be.
-const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier', 'videoUid'];
+const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier'];
 const VALID_TIERS = ['free', 'premium'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
 
@@ -50,27 +50,41 @@ export default async function handler(req, res) {
   if (!VALID_CONTENT_TYPES.includes(body.contentType)) {
     return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });
   }
-  // Series-specific fields are only required when contentType is 'series' —
-  // a standalone movie/short/vertical/podcast has no season or order.
-  if (body.contentType === 'series' && (!body.seriesId || !body.seriesOrder)) {
-    return res.status(400).json({ error: 'Series episodes need seriesId and seriesOrder.' });
+  // Series-specific fields are required for 'series' AND 'podcast' — a
+  // podcast episode always belongs to a show (even a show with only one
+  // episode so far), same reasoning as a series episode always belonging
+  // to a series. Standalone movie/short/vertical has no season or order.
+  if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || !body.seriesOrder)) {
+    return res.status(400).json({ error: `${body.contentType === 'podcast' ? 'Podcast' : 'Series'} episodes need a show/series and an episode number.` });
   }
 
-  const src = cloudflarePlaybackUrl(body.videoUid);
-  if (!src) {
-    return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
+  // Every episode needs at least one way to actually play — a video, an
+  // audio file, or both (podcasts specifically can be either/or/both;
+  // every other content type is video-only in practice, but this check
+  // doesn't need to special-case that since a video-only submission
+  // naturally satisfies it).
+  if (!body.videoUid && !body.audioUrl) {
+    return res.status(400).json({ error: 'Add a video, an audio file, or both — there\u2019s nothing to play otherwise.' });
   }
-  // SECURITY: a videoUid arriving from this app's own upload flow (TUS or
-  // URL import) is inherently trustworthy — it's the direct result of an
-  // upload that just happened. A hand-typed video ID (the "paste a
-  // Cloudflare video ID" option) is not — there's no proof it's ready,
-  // finished processing, or even belongs to this creator, so it gets
-  // re-verified against Cloudflare directly before being trusted, same
-  // as manual episode entry and house ads already do.
-  if (body.videoIdWasManuallyEntered) {
-    const status = await getCloudflareVideoStatus(body.videoUid);
-    if (!status || !status.readyToStream) {
-      return res.status(400).json({ error: 'That video ID isn\u2019t ready to stream yet in Cloudflare — wait for it to finish processing.' });
+
+  let src = null;
+  if (body.videoUid) {
+    src = cloudflarePlaybackUrl(body.videoUid);
+    if (!src) {
+      return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
+    }
+    // SECURITY: a videoUid arriving from this app's own upload flow (TUS or
+    // URL import) is inherently trustworthy — it's the direct result of an
+    // upload that just happened. A hand-typed video ID (the "paste a
+    // Cloudflare video ID" option) is not — there's no proof it's ready,
+    // finished processing, or even belongs to this creator, so it gets
+    // re-verified against Cloudflare directly before being trusted, same
+    // as manual episode entry and house ads already do.
+    if (body.videoIdWasManuallyEntered) {
+      const status = await getCloudflareVideoStatus(body.videoUid);
+      if (!status || !status.readyToStream) {
+        return res.status(400).json({ error: 'That video ID isn\u2019t ready to stream yet in Cloudflare — wait for it to finish processing.' });
+      }
     }
   }
 
@@ -131,14 +145,15 @@ export default async function handler(req, res) {
     genre: body.genre,
     main_genre: body.mainGenre,
     content_type: body.contentType,
-    series_id: body.contentType === 'series' && !isNewSeries ? body.seriesId : null,
-    season: body.contentType === 'series' ? Number(body.season) || 1 : null,
-    series_order: body.contentType === 'series' ? Number(body.seriesOrder) : null,
+    series_id: (body.contentType === 'series' || body.contentType === 'podcast') && !isNewSeries ? body.seriesId : null,
+    season: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.season) || 1 : null,
+    series_order: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.seriesOrder) : null,
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
     video_type: 'html5',
     src,
+    audio_url: body.audioUrl || null,
     trailer_src: trailerSrc,
     poster,
     thumbnail,

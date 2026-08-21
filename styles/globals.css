@@ -3679,3 +3679,96 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .pitch-comment-card { background: var(--surface-2); border-radius: 0.7rem; padding: 0.9rem 1rem; margin-bottom: 0.7rem; }
 .pitch-comment-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.35rem; }
 .pitch-comment-report { background: none; border: none; color: var(--ink-dim); font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }
+
+/* Podcasts — persistent mini-player, survives navigation via
+   PodcastPlayerContext + _app.js. Fixed to the bottom of the viewport on
+   every page, not scoped to podcast pages specifically, since the whole
+   point is being able to keep listening while browsing elsewhere. */
+.mini-player {
+  position: fixed; bottom: 0; left: 0; right: 0; height: 72px;
+  background: var(--surface-2);
+  border-top: 1px solid rgba(234,231,221,0.12);
+  display: flex; align-items: center;
+  padding: 0 1.4rem;
+  gap: 1rem;
+  z-index: 60;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.mini-player-art-link { flex-shrink: 0; }
+.mini-player-art {
+  width: 48px; height: 48px; border-radius: 6px; flex-shrink: 0;
+  background-color: var(--surface-3); background-size: cover; background-position: center;
+}
+.mini-player-info { min-width: 0; flex: 0 0 200px; }
+.mini-player-info .t { color: var(--ink); font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-player-info .s { color: var(--ink-dim); font-size: 0.72rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mini-player-controls { display: flex; align-items: center; gap: 0.9rem; color: var(--ink); flex-shrink: 0; }
+.mini-player-controls button { background: none; border: none; color: var(--ink); cursor: pointer; padding: 0.3rem; }
+.mini-player-scrub { flex: 1; display: flex; align-items: center; gap: 0.6rem; min-width: 0; }
+.mini-player-track { flex: 1; height: 4px; background: rgba(255,255,255,0.15); border-radius: 2px; position: relative; cursor: pointer; }
+.mini-player-fill { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brass); border-radius: 2px; }
+.mini-player-time { font-size: 0.7rem; color: var(--ink-dim); font-family: var(--font-mono); flex-shrink: 0; }
+.mini-player-speed {
+  font-size: 0.72rem; color: var(--ink-dim); background: none;
+  border: 1px solid rgba(234,231,221,0.2); border-radius: 5px; padding: 0.2rem 0.5rem; cursor: pointer; flex-shrink: 0;
+}
+.mini-player-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 0.9rem; flex-shrink: 0; }
+body { padding-bottom: 0; }
+body:has(.mini-player) { padding-bottom: 72px; }
+@media (max-width: 720px) {
+  .mini-player { padding: 0 0.8rem; gap: 0.6rem; }
+  .mini-player-info { flex: 0 0 90px; }
+  .mini-player-scrub .mini-player-time { display: none; }
+}
+
+/* Podcasts — browse grid (square show art, distinct from 2:3 movie posters) */
+.show-grid { display: flex; flex-wrap: wrap; gap: 1.6rem; }
+.show-card { width: 220px; text-decoration: none; display: block; }
+.show-art {
+  width: 220px; height: 220px; border-radius: 0.9rem; position: relative;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  background-color: var(--surface-3); background-size: cover; background-position: center;
+}
+.show-media-tag {
+  position: absolute; bottom: 0.6rem; left: 0.6rem;
+  background: rgba(17,17,11,0.8); color: var(--ink);
+  font-size: 0.62rem; font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 5px;
+  text-transform: uppercase; letter-spacing: 0.03em; display: flex; align-items: center; gap: 4px;
+}
+.show-info { padding-top: 0.7rem; }
+.show-info h4 { margin: 0 0 0.2rem; font-size: 0.95rem; color: var(--ink); }
+.show-info .host { color: var(--ink-dim); font-size: 0.78rem; margin-bottom: 0.3rem; }
+.show-info .ep-count { color: var(--brass); font-size: 0.72rem; }
+
+/* Podcasts — show detail page */
+.show-header { display: flex; gap: 1.8rem; margin-bottom: 2rem; flex-wrap: wrap; }
+.show-header-art {
+  width: 200px; height: 200px; border-radius: 1rem; flex-shrink: 0;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  background-color: var(--surface-3); background-size: cover; background-position: center;
+}
+.show-header-info { display: flex; flex-direction: column; justify-content: flex-end; }
+.show-header-info h1 { margin: 0 0 0.4rem; color: var(--ink); }
+.show-header-info .host { color: var(--ink-dim); font-size: 0.9rem; margin-bottom: 0.8rem; }
+.show-header-info p { color: var(--ink); opacity: 0.85; font-size: 0.88rem; max-width: 60ch; margin-bottom: 1rem; }
+
+.podcast-episode-row { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 0; border-bottom: 1px solid rgba(234,231,221,0.08); }
+.podcast-episode-row .ep-play-btn {
+  width: 40px; height: 40px; border-radius: 50%; background: var(--surface-2);
+  display: flex; align-items: center; justify-content: center; color: var(--ink);
+  flex-shrink: 0; font-size: 1rem; border: none; cursor: pointer;
+}
+.podcast-episode-row .ep-play-btn.playing { background: var(--brass); color: #241a05; }
+.podcast-episode-row .ep-play-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.podcast-episode-row-info { flex: 1; min-width: 0; }
+.podcast-episode-row-info h4 { margin: 0 0 0.2rem; font-size: 0.92rem; color: var(--ink); }
+.podcast-episode-row-info p { margin: 0; font-size: 0.78rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 520px; }
+.podcast-episode-row-meta { display: flex; flex-direction: column; align-items: flex-end; gap: 0.2rem; flex-shrink: 0; }
+.podcast-episode-row-meta .date { font-size: 0.72rem; color: var(--ink-dim); }
+.podcast-episode-row-meta .dur { font-size: 0.78rem; color: var(--ink); }
+.podcast-watch-toggle { display: flex; gap: 0.4rem; margin-bottom: 1.2rem; }
+.podcast-watch-toggle button {
+  padding: 0.4rem 0.9rem; border-radius: 999px; font-size: 0.8rem; font-weight: 600;
+  border: 1px solid rgba(234,231,221,0.2); background: none; color: var(--ink-dim); cursor: pointer;
+}
+.podcast-watch-toggle button.on { background: var(--brass); color: #241a05; border-color: var(--brass); }

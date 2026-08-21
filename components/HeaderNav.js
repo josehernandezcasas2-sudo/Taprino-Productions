@@ -101,7 +101,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
     { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
     { href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' },
-    { href: '/type/podcast', label: 'Podcasts', match: currentTypeParam === 'podcast' },
+    { href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' },
   ];
 
   return (

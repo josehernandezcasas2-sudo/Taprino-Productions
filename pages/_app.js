@@ -3,7 +3,9 @@ import { ClerkProvider } from '@clerk/nextjs';
 import Script from 'next/script';
 import Head from 'next/head';
 import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
+import { PodcastPlayerProvider } from '../contexts/PodcastPlayerContext';
 import UploadStatusWidget from '../components/UploadStatusWidget';
+import PodcastMiniPlayer from '../components/PodcastMiniPlayer';
 import '../styles/globals.css';
 import '@uppy/core/css/style.css';
 import '@uppy/dashboard/css/style.css';
@@ -87,8 +89,11 @@ export default function App({ Component, pageProps }) {
       <a href="#main-content" className="skip-link">Skip to content</a>
       <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="beforeInteractive" />
       <UploadProvider>
-        <Component {...pageProps} />
-        <UploadStatusWidget />
+        <PodcastPlayerProvider>
+          <Component {...pageProps} />
+          <UploadStatusWidget />
+          <PodcastMiniPlayer />
+        </PodcastPlayerProvider>
       </UploadProvider>
     </ClerkProvider>
   );

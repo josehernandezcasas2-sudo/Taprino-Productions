@@ -48,8 +48,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });
   }
   const status = body.status && VALID_STATUSES.includes(body.status) ? body.status : 'pending';
-  if (body.contentType === 'series' && (!body.seriesId || body.seriesId === '__new__') && !body.newSeriesName) {
-    return res.status(400).json({ error: 'Choose a series, or provide newSeriesName to create one.' });
+  if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || body.seriesId === '__new__') && !body.newSeriesName) {
+    return res.status(400).json({ error: `Choose a ${body.contentType === 'podcast' ? 'show' : 'series'}, or provide newSeriesName to create one.` });
   }
   if (body.contentType === 'bonus' && (!body.bonusParentType || !body.bonusParentId)) {
     return res.status(400).json({ error: 'Choose which series or movie/short this bonus content belongs under.' });
@@ -90,7 +90,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
 
   let seriesId = null;
-  if (body.contentType === 'series') {
+  if (body.contentType === 'series' || body.contentType === 'podcast') {
     if (body.newSeriesName) {
       seriesId = `${body.newSeriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
       const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: body.newSeriesName });
@@ -125,8 +125,8 @@ export default async function handler(req, res) {
     main_genre: body.mainGenre,
     content_type: body.contentType,
     series_id: seriesId,
-    season: body.contentType === 'series' ? (Number(body.season) || 1) : null,
-    series_order: body.contentType === 'series' ? (Number(body.seriesOrder) || null) : null,
+    season: (body.contentType === 'series' || body.contentType === 'podcast') ? (Number(body.season) || 1) : null,
+    series_order: (body.contentType === 'series' || body.contentType === 'podcast') ? (Number(body.seriesOrder) || null) : null,
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
@@ -140,6 +140,7 @@ export default async function handler(req, res) {
     featured: !!body.featured,
     is_original: !!body.isOriginal,
     funding_url: normalizeUrl(body.fundingUrl),
+    audio_url: body.audioUrl || null,
     ads_enabled: body.adsEnabled !== false,
     status,
     submitted_by: submittedBy,

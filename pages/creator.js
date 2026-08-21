@@ -128,6 +128,12 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   const [trailerSource, setTrailerSource] = useState('file'); // 'file' | 'cloudflare-id'
   const [manualTrailerUid, setManualTrailerUid] = useState('');
   const [submittingManual, setSubmittingManual] = useState(false);
+  const [includeAudio, setIncludeAudio] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [audioImporting, setAudioImporting] = useState(false);
+  const [audioImportedUrl, setAudioImportedUrl] = useState(null);
+  const [audioError, setAudioError] = useState(null);
+  const [skipVideo, setSkipVideo] = useState(false);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
@@ -188,30 +194,38 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
   async function handleSubmit(e) {
     e.preventDefault();
     setFormError(null);
-    if (videoSource === 'file' && !file) {
+    if (skipVideo && !audioImportedUrl) {
+      setFormError('Import an audio file first, or uncheck "Audio only" to add a video instead.');
+      return;
+    }
+    if (!skipVideo && videoSource === 'file' && !file) {
       setFormError('Please choose a video file.');
       return;
     }
-    if (videoSource === 'link' && !videoUrl.trim()) {
+    if (!skipVideo && videoSource === 'link' && !videoUrl.trim()) {
       setFormError('Paste a link to your video file.');
       return;
     }
-    if (videoSource === 'link' && !form.runtime.trim()) {
+    if (!skipVideo && videoSource === 'link' && !form.runtime.trim()) {
       // Auto-detection needs an actual File object to read — there isn't
       // one for a link import, so this is the one field link-mode can't
       // fill in for you.
       setFormError('Enter the runtime (link imports can\'t detect it automatically).');
       return;
     }
-    if (videoSource === 'cloudflare-id' && !manualVideoUid.trim()) {
+    if (!skipVideo && videoSource === 'cloudflare-id' && !manualVideoUid.trim()) {
       setFormError('Paste the Cloudflare video ID.');
       return;
     }
-    if (videoSource === 'cloudflare-id' && !form.runtime.trim()) {
+    if (!skipVideo && videoSource === 'cloudflare-id' && !form.runtime.trim()) {
       setFormError('Enter the runtime — there\'s no file here to auto-detect it from.');
       return;
     }
-    if (videoSource === 'cloudflare-id' && trailerSource === 'file' && trailerFile) {
+    if (skipVideo && !form.runtime.trim()) {
+      setFormError('Enter the runtime — there\'s no video here to auto-detect it from.');
+      return;
+    }
+    if (!skipVideo && videoSource === 'cloudflare-id' && trailerSource === 'file' && trailerFile) {
       setFormError('A pasted video ID can\'t be combined with an uploaded trailer file — use a trailer video ID instead, or skip the trailer for now.');
       return;
     }
@@ -249,10 +263,34 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
       // overwrites this, so it survives straight through to submit-episode.
       ...(trailerSource === 'cloudflare-id' && manualTrailerUid.trim()
         ? { trailerUid: manualTrailerUid.trim(), trailerIdWasManuallyEntered: true }
-        : {})
+        : {}),
+      // Same idea for audio — already imported and verified server-side
+      // by this point (see the Import button above), so this is just the
+      // resulting URL riding along as metadata, not a new upload.
+      ...(audioImportedUrl ? { audioUrl: audioImportedUrl } : {})
     };
 
-    if (videoSource === 'cloudflare-id') {
+    if (skipVideo) {
+      // Audio-only podcast episode — no video at all, so there's nothing
+      // for the shared upload context to track. Goes straight to
+      // submit-episode.js as a plain POST, same shape as the
+      // cloudflare-id path below.
+      setSubmittingManual(true);
+      try {
+        const res = await fetch('/api/creator/submit-episode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(submissionData)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Could not submit.');
+      } catch (err) {
+        setFormError(err.message);
+        setSubmittingManual(false);
+        return;
+      }
+      setSubmittingManual(false);
+    } else if (videoSource === 'cloudflare-id') {
       // No upload happening at all here — this goes straight to
       // submit-episode.js as a normal POST, the same way manual episode
       // entry works for admin. The shared upload context is specifically
@@ -293,6 +331,10 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     setVideoUrl('');
     setManualVideoUid('');
     setManualTrailerUid('');
+    setSkipVideo(false);
+    setAudioUrl('');
+    setAudioImportedUrl(null);
+    setAudioError(null);
     setPosterFile(null);
     setThumbnailFile(null);
     setTrailerFile(null);
@@ -366,28 +408,28 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
             </select>
 
-            {form.contentType === 'series' && (
+            {(form.contentType === 'series' || form.contentType === 'podcast') && (
               <>
-                <label>Series</label>
+                <label>{form.contentType === 'podcast' ? 'Show' : 'Series'}</label>
                 <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
-                  <option value="">Choose a series…</option>
+                  <option value="">Choose a {form.contentType === 'podcast' ? 'show' : 'series'}…</option>
                   {seriesList.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                  <option value="__new__">A new series not listed here</option>
+                  <option value="__new__">A new {form.contentType === 'podcast' ? 'show' : 'series'} not listed here</option>
                 </select>
                 {form.seriesId === '__new__' && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.5rem' }}>
-                    Prefer setting this up properly first? Use the &ldquo;Series info&rdquo; section below to create the series with its own trailer and artwork — then it&rsquo;ll show up in this dropdown.
+                    Prefer setting this up properly first? Use the &ldquo;Series info&rdquo; section below to create the {form.contentType === 'podcast' ? 'show' : 'series'} with its own trailer and artwork — then it&rsquo;ll show up in this dropdown.
                   </p>
                 )}
                 {form.seriesId && form.seriesId !== '__new__' && (() => {
                   const s = seriesList.find((x) => x.id === form.seriesId);
                   return s && (s.poster || s.thumbnail || s.trailerSrc) ? (
                     <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.5rem' }}>
-                      This series already has its own artwork/trailer — you can leave poster, thumbnail, and trailer blank below unless this specific episode needs its own.
+                      This {form.contentType === 'podcast' ? 'show' : 'series'} already has its own artwork/trailer — you can leave poster, thumbnail, and trailer blank below unless this specific episode needs its own.
                     </p>
                   ) : null;
                 })()}
-                <label>Season</label>
+                <label>{form.contentType === 'podcast' ? 'Season (use 1 if this show doesn\u2019t have seasons)' : 'Season'}</label>
                 <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />
                 <label>Episode number within season</label>
                 <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} required />
@@ -408,7 +450,15 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               <option value="premium">{SITE.premiumTier} (premium)</option>
             </select>
 
-            <label>Video source</label>
+            {form.contentType === 'podcast' && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal', marginBottom: '0.8rem' }}>
+                <input type="checkbox" checked={skipVideo} onChange={(e) => setSkipVideo(e.target.checked)} />
+                Audio only — no video for this episode
+              </label>
+            )}
+
+            {!skipVideo && <label>Video source</label>}
+            {!skipVideo && (
             <div className="video-source-toggle" role="group" aria-label="Video source">
               <button
                 type="button"
@@ -432,8 +482,9 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 Cloudflare video ID
               </button>
             </div>
+            )}
 
-            {videoSource === 'file' && (
+            {!skipVideo && videoSource === 'file' && (
               <>
                 <UppyFilePicker
                   key={`video-${pickerResetKey}`}
@@ -444,7 +495,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 {!file && <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>Required before you can submit.</p>}
               </>
             )}
-            {videoSource === 'link' && (
+            {!skipVideo && videoSource === 'link' && (
               <>
                 <input
                   type="url"
@@ -469,7 +520,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 </p>
               </>
             )}
-            {videoSource === 'cloudflare-id' && (
+            {!skipVideo && videoSource === 'cloudflare-id' && (
               <>
                 <input
                   type="text"
@@ -483,6 +534,66 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                   &ldquo;ready to stream&rdquo; before this will work. We won&rsquo;t auto-detect the
                   runtime here either, so enter it below.
                 </p>
+              </>
+            )}
+
+            {form.contentType === 'podcast' && (
+              <>
+                <label>
+                  Audio {skipVideo ? '' : <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — add it alongside video, or skip video above for audio-only</span>}
+                </label>
+                {audioImportedUrl ? (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--ok)', marginBottom: '0.8rem' }}>
+                    ✓ Audio file ready.{' '}
+                    <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                      Remove
+                    </button>
+                  </p>
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                      <input
+                        type="url"
+                        inputMode="url"
+                        placeholder="https://…/your-episode.mp3"
+                        value={audioUrl}
+                        onChange={(e) => setAudioUrl(e.target.value)}
+                        style={{ flex: 1, marginBottom: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className="account-btn-secondary"
+                        style={{ width: 'auto' }}
+                        disabled={audioImporting || !audioUrl.trim()}
+                        onClick={async () => {
+                          setAudioImporting(true);
+                          setAudioError(null);
+                          try {
+                            const res = await fetch('/api/creator/import-audio-url', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ audioUrl: audioUrl.trim() })
+                            });
+                            const data = await res.json();
+                            if (!res.ok) throw new Error(data.error || 'Could not import that audio file.');
+                            setAudioImportedUrl(data.audioUrl);
+                          } catch (err) {
+                            setAudioError(err.message);
+                          } finally {
+                            setAudioImporting(false);
+                          }
+                        }}
+                      >
+                        {audioImporting ? 'Importing…' : 'Import'}
+                      </button>
+                    </div>
+                    {audioError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.3rem' }}>{audioError}</p>}
+                    <p className="video-source-help">
+                      Paste a direct link to your audio file — a signed download link from Dropbox, Google
+                      Drive, WeTransfer, or similar, or any plain .mp3/.m4a/.wav URL. Capped at 150MB.
+                    </p>
+                  </>
+                )}
               </>
             )}
 
