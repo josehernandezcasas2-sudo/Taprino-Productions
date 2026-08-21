@@ -722,7 +722,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               {reportedComments.map((c) => (
                 <div key={c.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, marginTop: 8 }}>
                   <div style={{ fontSize: 12, opacity: 0.65, marginBottom: 4 }}>
-                    On &ldquo;{c.pitches ? c.pitches.title : 'a pitch'}&rdquo; — {c.user_email || 'unknown'}
+                    On &ldquo;{c.pitches ? c.pitches.title : 'a pitch'}&rdquo; — {c.displayName || 'A viewer'}
                     {c.report_reason && ` — reason: ${c.report_reason}`}
                   </div>
                   <div style={{ fontSize: 13, marginBottom: 8 }}>{c.body}</div>

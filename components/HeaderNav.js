@@ -288,6 +288,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {isAdmin && <Link href="/admin" className="dropdown-item">🔒 Admin Portal</Link>}
                 <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
                 <Link href="/recs" className="dropdown-item">✨ My Recs</Link>
+                {siteSettings && siteSettings.elevatorPitchEnabled && (
+                  <Link href="/pitches" className="dropdown-item">🎯 Pitch Room</Link>
+                )}
                 {isSubscriber ? (
                   <button className="dropdown-item" onClick={openPortal} disabled={portalLoading}>
                     💳 {portalLoading ? 'Opening…' : 'Manage Subscription'}

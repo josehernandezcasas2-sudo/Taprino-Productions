@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { getAccountContext } from '../lib/accountContext';
@@ -90,6 +90,39 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [profile, setProfile] = useState(null);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/account/profile')
+      .then((r) => r.json())
+      .then((data) => setProfile(data))
+      .catch(() => setProfile({ displayName: '', gender: '', age: '' }));
+  }, []);
+
+  async function saveProfile(e) {
+    e.preventDefault();
+    setProfileSaving(true);
+    setProfileSaved(false);
+    setProfileError(null);
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profile)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save.');
+      setProfileSaved(true);
+      setTimeout(() => setProfileSaved(false), 2500);
+    } catch (err) {
+      setProfileError(err.message);
+    } finally {
+      setProfileSaving(false);
+    }
+  }
 
   async function openPortal() {
     setPortalLoading(true);
@@ -232,6 +265,61 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       Join {SITE.premiumTier}
                     </Link>
                   </>
+                )}
+              </div>
+
+              {/* Section: Public profile + private metadata */}
+              <div className="account-section">
+                <div className="account-subheading">Your profile</div>
+                {!profile ? (
+                  <p>Loading…</p>
+                ) : (
+                  <form onSubmit={saveProfile}>
+                    {profileError && <p style={{ color: 'var(--danger)' }}>{profileError}</p>}
+
+                    <label>Display name <span style={{ fontWeight: 'normal', opacity: 0.65 }}>public — shown instead of your email anywhere your name appears, like Pitch Room comments</span></label>
+                    <input
+                      type="text"
+                      value={profile.displayName || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
+                      maxLength={60}
+                      placeholder="How you'd like to appear publicly"
+                    />
+
+                    <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', margin: '1rem 0 0.6rem' }}>
+                      The two fields below are private — only Studio Tapa can see them, for our own understanding
+                      of who's using the platform. They're never shown to other users, on comments, or anywhere
+                      public. Both are optional.
+                    </p>
+
+                    <div className="admin-field-row">
+                      <div className="admin-field">
+                        <label>Gender <span style={{ fontWeight: 'normal', opacity: 0.65 }}>private</span></label>
+                        <select value={profile.gender || ''} onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}>
+                          <option value="">Prefer not to answer</option>
+                          <option value="female">Female</option>
+                          <option value="male">Male</option>
+                          <option value="nonbinary">Non-binary</option>
+                          <option value="prefer_not_to_say">Prefer not to say</option>
+                        </select>
+                      </div>
+                      <div className="admin-field">
+                        <label>Age <span style={{ fontWeight: 'normal', opacity: 0.65 }}>private</span></label>
+                        <input
+                          type="number"
+                          min="13"
+                          max="120"
+                          value={profile.age || ''}
+                          onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <button className="account-btn-primary" type="submit" disabled={profileSaving} style={{ width: 'auto', marginTop: '0.8rem' }}>
+                      {profileSaving ? 'Saving…' : 'Save profile'}
+                    </button>
+                    {profileSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
+                  </form>
                 )}
               </div>
 

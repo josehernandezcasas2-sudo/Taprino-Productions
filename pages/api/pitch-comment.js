@@ -1,5 +1,4 @@
 import { getAuth } from '@clerk/nextjs/server';
-import { clerkClient } from '@clerk/nextjs/server';
 import { getSupabase } from '../../lib/supabase';
 
 const MAX_LENGTH = 1000;
@@ -19,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Sign in to leave a comment.' });
   }
 
-  const { pitchId, body } = req.body || {};
+  const { pitchId, body, parentCommentId } = req.body || {};
   if (!pitchId || !body || !body.trim()) {
     return res.status(400).json({ error: 'A comment body is required.' });
   }
@@ -27,15 +26,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Comments are limited to ${MAX_LENGTH} characters.` });
   }
 
-  const client = await clerkClient();
-  const user = await client.users.getUser(userId);
-  const email = user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : null;
-
   const supabase = getSupabase();
+
+  // A reply has to actually point at a real comment on the SAME pitch —
+  // otherwise nothing stops a reply from being wired to an arbitrary id on
+  // a different pitch entirely, which would show it in the wrong thread.
+  if (parentCommentId) {
+    const { data: parent } = await supabase.from('pitch_comments').select('pitch_id').eq('id', parentCommentId).maybeSingle();
+    if (!parent || parent.pitch_id !== pitchId) {
+      return res.status(400).json({ error: 'That comment no longer exists.' });
+    }
+  }
+
+  // PRIVACY: no email is looked up or stored here anymore — the
+  // commenter's public identity is resolved from their display name
+  // (user_profiles) at READ time instead, never baked into the comment
+  // row itself. See lib/userProfiles.js.
   const { error } = await supabase.from('pitch_comments').insert({
     pitch_id: pitchId,
     user_id: userId,
-    user_email: email,
+    parent_comment_id: parentCommentId || null,
     body: body.trim()
   });
 

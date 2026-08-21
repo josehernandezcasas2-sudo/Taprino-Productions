@@ -3676,9 +3676,41 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .pitch-photo-item { width: 220px; height: 140px; border-radius: 0.7rem; background-size: cover; background-position: center; background-color: var(--surface-3); }
 .pitch-update-card { background: var(--surface-2); border-radius: 0.8rem; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
 .pitch-update-date { font-family: var(--font-mono); font-size: 0.68rem; color: var(--brass); letter-spacing: 0.04em; margin-bottom: 0.4rem; }
-.pitch-comment-card { background: var(--surface-2); border-radius: 0.7rem; padding: 0.9rem 1rem; margin-bottom: 0.7rem; }
-.pitch-comment-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.35rem; }
-.pitch-comment-report { background: none; border: none; color: var(--ink-dim); font-size: 0.7rem; cursor: pointer; text-decoration: underline; padding: 0; }
+.pitch-comment-card { background: var(--surface-2); border-radius: 0.7rem; padding: 1rem 1.1rem; margin-bottom: 0.8rem; }
+.pitch-comment-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.5rem; }
+.pitch-comment-meta span:first-child { font-weight: 700; color: var(--ink); }
+.pitch-comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.5; margin-bottom: 0.6rem; }
+.pitch-comment-actions { display: flex; align-items: center; gap: 1rem; }
+.pitch-comment-report, .pitch-comment-reply-btn {
+  background: none; border: none; color: var(--ink-dim); font-size: 0.75rem;
+  cursor: pointer; text-decoration: underline; padding: 0;
+}
+.pitch-comment-report:hover, .pitch-comment-reply-btn:hover { color: var(--brass); }
+
+/* Comment/reply form fields — the pitch page isn't wrapped in
+   .account-card like most forms elsewhere, so without these the comment
+   and reply textareas were rendering with zero styling at all (raw
+   browser defaults) — the single biggest reason the page read as
+   unfinished. */
+.pitch-comment-form textarea,
+.pitch-reply-form textarea {
+  width: 100%; box-sizing: border-box; padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(234, 231, 221, 0.18); border-radius: 8px;
+  background: var(--void); font-family: var(--font-body); font-size: 0.9rem;
+  color: var(--ink); resize: vertical; margin-bottom: 0.6rem;
+}
+.pitch-comment-form textarea:focus,
+.pitch-reply-form textarea:focus { outline: none; border-color: var(--brass); }
+.pitch-reply-form { margin: 0.8rem 0 0.4rem; padding-top: 0.8rem; border-top: 1px solid rgba(234,231,221,0.08); }
+.pitch-reply-list { margin: 0.9rem 0 0 1.6rem; padding-left: 1rem; border-left: 2px solid rgba(234,231,221,0.1); }
+.pitch-reply-card { background: var(--surface-3); margin-bottom: 0.6rem; }
+.pitch-discussion-empty { color: var(--ink-dim); font-size: 0.85rem; padding: 1.5rem; text-align: center; background: var(--surface-2); border-radius: 0.7rem; }
+
+/* Slightly more breathing room between the major sections generally —
+   previously every .pitch-section-label sat right on top of the content
+   above it with no real separation, which read as cramped. */
+.pitch-section-label { margin: 2.6rem 0 1.1rem; }
+.pitch-section-label:first-of-type { margin-top: 1.8rem; }
 
 /* Podcasts — persistent mini-player, survives navigation via
    PodcastPlayerContext + _app.js. Fixed to the bottom of the viewport on
