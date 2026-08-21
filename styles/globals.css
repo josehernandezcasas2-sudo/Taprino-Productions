@@ -3772,3 +3772,55 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border: 1px solid rgba(234,231,221,0.2); background: none; color: var(--ink-dim); cursor: pointer;
 }
 .podcast-watch-toggle button.on { background: var(--brass); color: #241a05; border-color: var(--brass); }
+
+/* Your Work — grouped-by-project redesign, replacing the old flat card grid */
+.yourwork-toolbar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.6rem; flex-wrap: wrap; }
+.yourwork-toolbar input[type=search] {
+  flex: 1; min-width: 200px; background: var(--surface-3); border: 1px solid rgba(234,231,221,0.15);
+  border-radius: 6px; padding: 0.5rem 0.8rem; color: var(--ink); font-size: 0.85rem;
+}
+.filter-pill {
+  padding: 0.35rem 0.8rem; border-radius: 999px; font-size: 0.78rem;
+  border: 1px solid rgba(234,231,221,0.2); background: none; color: var(--ink-dim); cursor: pointer;
+}
+.filter-pill.on { background: var(--brass); color: #241a05; border-color: var(--brass); }
+
+.project-group { background: var(--surface-3); border-radius: 1rem; margin-bottom: 1.2rem; overflow: hidden; }
+.project-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.2rem; border-bottom: 1px solid rgba(234,231,221,0.08); }
+.project-art {
+  width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
+  background-size: cover; background-position: center; background-color: var(--surface-2);
+}
+.project-title-wrap { flex: 1; min-width: 0; }
+.project-title { color: var(--ink); font-weight: 700; font-size: 1rem; display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.project-type-tag { font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; background: rgba(234,231,221,0.1); color: var(--ink-dim); padding: 0.15rem 0.45rem; border-radius: 4px; }
+.project-sub { font-size: 0.76rem; color: var(--ink-dim); margin-top: 0.15rem; }
+.project-badges { display: flex; gap: 0.5rem; align-items: center; flex-shrink: 0; }
+.project-badge { font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 999px; white-space: nowrap; }
+.project-badge.pending { background: rgba(255,183,77,0.15); color: #ffb74d; }
+.project-badge.missing { background: rgba(255,255,255,0.08); color: var(--ink-dim); }
+
+.episode-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 1.2rem; border-bottom: 1px solid rgba(234,231,221,0.05); flex-wrap: wrap; }
+.episode-row:last-child { border-bottom: none; }
+.episode-thumb {
+  width: 56px; height: 32px; border-radius: 4px; flex-shrink: 0;
+  background-size: cover; background-position: center; background-color: var(--surface-2);
+  display: flex; align-items: center; justify-content: center; font-size: 0.9rem;
+}
+.episode-row-main { flex: 1; min-width: 160px; }
+.episode-title { color: var(--ink); font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; }
+.episode-media-icon { font-size: 0.8rem; opacity: 0.85; }
+.episode-meta { color: var(--ink-dim); font-size: 0.72rem; }
+.status-pill { font-size: 0.68rem; padding: 0.15rem 0.5rem; border-radius: 999px; flex-shrink: 0; white-space: nowrap; }
+.status-pill.approved { background: rgba(129,199,132,0.15); color: #81c784; }
+.status-pill.pending { background: rgba(255,183,77,0.15); color: #ffb74d; }
+.status-pill.rejected { background: rgba(229,115,115,0.15); color: #e57373; }
+.row-flags { display: flex; gap: 0.35rem; flex-shrink: 0; }
+.row-flag { font-size: 0.9rem; opacity: 0.7; }
+.row-views { color: var(--ink-dim); font-size: 0.72rem; width: 60px; flex-shrink: 0; text-align: right; }
+.row-actions { display: flex; gap: 0.35rem; margin-left: auto; flex-shrink: 0; }
+.row-actions button {
+  background: none; border: 1px solid rgba(234,231,221,0.15); color: var(--ink-dim);
+  border-radius: 5px; padding: 0.3rem 0.5rem; font-size: 0.85rem; cursor: pointer;
+}
+.row-actions button:disabled { opacity: 0.5; cursor: not-allowed; }

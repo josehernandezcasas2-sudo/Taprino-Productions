@@ -56,7 +56,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [submissions, setSubmissions] = useState(null);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [groupBySeries, setGroupBySeries] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
@@ -159,46 +160,77 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     ? submissions.filter((s) => s.status !== 'rejected' && s.missingArtwork).length
     : 0;
 
-  const filteredSubmissions = (submissions || []).filter((s) => statusFilter === 'all' || s.status === statusFilter);
+  const filteredSubmissions = (submissions || []).filter((s) => {
+    if (statusFilter !== 'all' && s.status !== statusFilter) return false;
+    if (searchQuery.trim() && !s.title.toLowerCase().includes(searchQuery.trim().toLowerCase())) return false;
+    if (needsAttentionOnly) {
+      const needsIt = s.status === 'pending' || (s.missingArtwork && s.status !== 'rejected') || (s.status === 'approved' && s.contentType !== 'podcast' && !s.captionsUrl);
+      if (!needsIt) return false;
+    }
+    return true;
+  });
 
-  const groupedSubmissions = groupBySeries
-    ? filteredSubmissions.reduce((groups, s) => {
-        const key = s.seriesName || 'Standalone';
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(s);
-        return groups;
-      }, {})
-    : null;
+  const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
-  function renderCard(s) {
+  // Grouped by project always — a show/series/podcast gets its own
+  // section keyed by seriesId (podcast episodes always belong to a show,
+  // same as series episodes), and anything without one (standalone
+  // movies/shorts/vertical) gets grouped by content type instead, so a
+  // creator with several different kinds of standalone work still sees
+  // it organized rather than one undifferentiated pile.
+  const groupsByKey = {};
+  for (const s of filteredSubmissions) {
+    const isGrouped = !!s.seriesId;
+    const key = isGrouped ? `series:${s.seriesId}` : `type:${s.contentType}`;
+    if (!groupsByKey[key]) {
+      groupsByKey[key] = {
+        key,
+        isGrouped,
+        label: isGrouped ? (s.seriesName || 'Untitled show') : (STANDALONE_TYPE_LABELS[s.contentType] || 'Other'),
+        typeTag: s.contentType === 'podcast' ? '🎧 Podcast' : (s.contentType === 'series' ? 'Series' : null),
+        items: []
+      };
+    }
+    groupsByKey[key].items.push(s);
+  }
+  // Shows/series/podcasts first (alphabetical), then standalone-by-type
+  // groups after, in that same fixed Films/Shorts/Vertical/Podcasts order
+  // used everywhere else on the site.
+  const typeOrder = Object.keys(STANDALONE_TYPE_LABELS);
+  const projectGroups = Object.values(groupsByKey).sort((a, b) => {
+    if (a.isGrouped !== b.isGrouped) return a.isGrouped ? -1 : 1;
+    if (!a.isGrouped && !b.isGrouped) {
+      return typeOrder.indexOf(a.items[0].contentType) - typeOrder.indexOf(b.items[0].contentType);
+    }
+    return a.label.localeCompare(b.label);
+  });
+
+  function renderEpisodeRow(s) {
+    const flags = [];
+    if (s.missingArtwork && s.status !== 'rejected') flags.push({ icon: '🖼', title: 'Missing artwork' });
+    if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ icon: '💬', title: 'No captions' });
+    if (s.artworkPending) flags.push({ icon: '⏳', title: 'Artwork change awaiting approval' });
+    if (s.deletionRequested) flags.push({ icon: '🗑', title: 'Pending deletion' });
+
     return (
-      <div key={s.id} className="submission-card">
-        <div className="submission-thumb">
-          {s.thumbnail ? (
-            <img src={s.thumbnail} alt="" />
-          ) : (
-            <div className="submission-thumb-placeholder">
-              {s.cloudflareState === 'error' ? '⚠' : '⏳'}
-            </div>
-          )}
+      <div key={s.id} className="episode-row">
+        <div className="episode-thumb" style={s.thumbnail ? { backgroundImage: `url(${s.thumbnail})` } : {}}>
+          {!s.thumbnail && (s.cloudflareState === 'error' ? '⚠' : '⏳')}
         </div>
-        <div className="submission-info">
-          <h4>{s.title}</h4>
-          <p>{s.description}</p>
-          <div className="submission-badges">
-            <span style={{ color: (STATUS_LABEL[s.status] || {}).color }}>
-              {(STATUS_LABEL[s.status] || {}).text || s.status}
-            </span>
-            {s.cloudflareState && (
-              <span className={s.cloudflareState === 'error' ? 'submission-badge-error' : ''}>
-                {CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState}
-              </span>
-            )}
-            {s.status === 'approved' && <span>👁 {s.viewCount} view{s.viewCount === 1 ? '' : 's'}</span>}
-            {s.missingArtwork && s.status !== 'rejected' && <span>🖼 missing artwork</span>}
-            {!s.captionsUrl && s.status === 'approved' && <span>💬 no captions</span>}
-            {s.artworkPending && <span>⏳ artwork change awaiting approval</span>}
-            {s.deletionRequested && <span>🗑 pending deletion</span>}
+        <div className="episode-row-main">
+          <div className="episode-title">
+            {s.title}
+            {/* For a podcast with both audio and video, showing both icons
+                here is the whole point — at a glance, a creator can tell
+                which of their episodes are audio-only, video-only, or
+                offer both, without opening anything. */}
+            {s.hasVideo && <span className="episode-media-icon" title="Has video">🎬</span>}
+            {s.hasAudio && <span className="episode-media-icon" title="Has audio">🎧</span>}
+          </div>
+          <div className="episode-meta">
+            {s.cloudflareState && s.cloudflareState !== 'ready'
+              ? (CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState)
+              : (s.runtime || s.description)}
           </div>
           {s.status === 'rejected' && s.rejectionReason && (
             <p className="submission-rejection">Admin's note: {s.rejectionReason}</p>
@@ -206,39 +238,38 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           {s.cloudflareState === 'error' && s.cloudflareError && (
             <p className="submission-rejection">Upload problem: {s.cloudflareError} — this file likely needs to be re-exported and re-submitted.</p>
           )}
-          {s.deletionRequested && (
-            <p className="submission-rejection">Deletion reason: {s.deletionReason}</p>
-          )}
-          <div className="submission-card-actions">
-            {s.contentType === 'podcast' && s.hasVideo && !s.hasAudio && (
-              <button onClick={() => extractAudio(s.id)} disabled={extractingId === s.id}>
-                {extractingId === s.id
-                  ? `🎧 Extracting…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}`
-                  : '🎧 Extract audio from video'}
-              </button>
-            )}
-            {s.status === 'pending' && !s.deletionRequested && (
-              <button onClick={() => setEditingSubmission(s)}>✎ Edit</button>
-            )}
-            {!s.deletionRequested && (
-              <button onClick={() => setArtworkSubmission(s)}>
-                🖼 {s.poster || s.thumbnail ? 'Replace artwork' : 'Add artwork'}
-              </button>
-            )}
-            {!s.deletionRequested && (
-              <button onClick={() => setReplacingVideoSubmission(s)}>🎬 Replace video</button>
-            )}
-            {!s.deletionRequested && (
-              <button onClick={() => setCaptionSubmission(s)}>
-                💬 {s.captionsUrl ? 'Replace captions' : 'Add captions'}
-              </button>
-            )}
-            {s.deletionRequested ? (
-              <button onClick={() => cancelEpisodeDeletion(s.id)}>Cancel deletion request</button>
-            ) : (
-              <button onClick={() => setDeletingSubmission(s)}>🗑 Request deletion</button>
-            )}
+          {s.deletionRequested && <p className="submission-rejection">Deletion reason: {s.deletionReason}</p>}
+        </div>
+        <span className={`status-pill ${s.status}`}>{(STATUS_LABEL[s.status] || {}).text || s.status}</span>
+        <div className="row-views">{s.status === 'approved' ? `👁 ${s.viewCount}` : '—'}</div>
+        {flags.length > 0 && (
+          <div className="row-flags">
+            {flags.map((f) => <span key={f.icon} className="row-flag" title={f.title}>{f.icon}</span>)}
           </div>
+        )}
+        <div className="row-actions">
+          {s.contentType === 'podcast' && s.hasVideo && !s.hasAudio && (
+            <button onClick={() => extractAudio(s.id)} disabled={extractingId === s.id} title="Extract audio from video">
+              {extractingId === s.id ? `…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}` : '🎧+'}
+            </button>
+          )}
+          {s.status === 'pending' && !s.deletionRequested && (
+            <button onClick={() => setEditingSubmission(s)} title="Edit">✎</button>
+          )}
+          {!s.deletionRequested && (
+            <button onClick={() => setArtworkSubmission(s)} title={s.poster || s.thumbnail ? 'Replace artwork' : 'Add artwork'}>🖼</button>
+          )}
+          {!s.deletionRequested && (
+            <button onClick={() => setReplacingVideoSubmission(s)} title={s.hasVideo ? 'Replace video' : 'Add video'}>🎬</button>
+          )}
+          {!s.deletionRequested && s.contentType !== 'podcast' && (
+            <button onClick={() => setCaptionSubmission(s)} title={s.captionsUrl ? 'Replace captions' : 'Add captions'}>💬</button>
+          )}
+          {s.deletionRequested ? (
+            <button onClick={() => cancelEpisodeDeletion(s.id)} title="Cancel deletion request">↺</button>
+          ) : (
+            <button onClick={() => setDeletingSubmission(s)} title="Request deletion">🗑</button>
+          )}
         </div>
       </div>
     );
@@ -322,22 +353,27 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 </div>
               )}
 
-              <div className="dash-controls">
+              <div className="yourwork-toolbar">
+                <input
+                  type="search"
+                  placeholder="Search your titles…"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
                 {['all', 'pending', 'approved', 'rejected'].map((f) => (
                   <button
                     key={f}
-                    className={`dash-filter-btn ${statusFilter === f ? 'active' : ''}`}
+                    className={`filter-pill ${statusFilter === f ? 'on' : ''}`}
                     onClick={() => setStatusFilter(f)}
                   >
                     {f === 'all' ? 'All' : STATUS_LABEL[f].text}
                   </button>
                 ))}
                 <button
-                  className={`dash-filter-btn ${groupBySeries ? 'active' : ''}`}
-                  onClick={() => setGroupBySeries((v) => !v)}
-                  style={{ marginLeft: 'auto' }}
+                  className={`filter-pill ${needsAttentionOnly ? 'on' : ''}`}
+                  onClick={() => setNeedsAttentionOnly((v) => !v)}
                 >
-                  {groupBySeries ? '▤ Grouped by series' : '☰ Group by series'}
+                  ⚠ Needs attention
                 </button>
               </div>
 
@@ -345,22 +381,35 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 <p>Nothing matches this filter.</p>
               )}
 
-              {groupBySeries ? (
-                <div className="submission-grid">
-                  {Object.entries(groupedSubmissions).map(([seriesName, items]) => (
-                    <div key={seriesName} style={{ gridColumn: '1 / -1' }}>
-                      <div className="dash-group-heading">{seriesName} ({items.length})</div>
-                      <div className="submission-grid">
-                        {items.map(renderCard)}
+              {projectGroups.map((group) => {
+                const pendingInGroup = group.items.filter((s) => s.status === 'pending').length;
+                const missingArtworkInGroup = group.items.filter((s) => s.missingArtwork && s.status !== 'rejected').length;
+                const groupArt = group.items.find((s) => s.thumbnail || s.poster);
+                return (
+                  <div key={group.key} className="project-group">
+                    <div className="project-header">
+                      <div
+                        className="project-art"
+                        style={groupArt ? { backgroundImage: `url(${groupArt.thumbnail || groupArt.poster})` } : {}}
+                      />
+                      <div className="project-title-wrap">
+                        <div className="project-title">
+                          {group.label}
+                          {group.typeTag && <span className="project-type-tag">{group.typeTag}</span>}
+                        </div>
+                        <div className="project-sub">
+                          {group.items.length} episode{group.items.length === 1 ? '' : 's'}
+                        </div>
+                      </div>
+                      <div className="project-badges">
+                        {pendingInGroup > 0 && <span className="project-badge pending">{pendingInGroup} pending</span>}
+                        {missingArtworkInGroup > 0 && <span className="project-badge missing">{missingArtworkInGroup} needs artwork</span>}
                       </div>
                     </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="submission-grid">
-                  {filteredSubmissions.map(renderCard)}
-                </div>
-              )}
+                    {group.items.map(renderEpisodeRow)}
+                  </div>
+                );
+              })}
             </>
           )}
         </div>
