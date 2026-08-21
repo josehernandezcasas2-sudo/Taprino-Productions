@@ -242,6 +242,11 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                 >
                   {isWishlisted(episode.id) ? '♥' : '♡'}
                 </button>
+                {episode.fundingUrl && (
+                  <a href={episode.fundingUrl} target="_blank" rel="noopener noreferrer" className="hero-trailer">
+                    &#9670; Back this project
+                  </a>
+                )}
               </div>
             </div>
           </div>

@@ -60,6 +60,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     status: episode.status || 'pending',
     featured: !!episode.featured,
     isOriginal: !!episode.isOriginal,
+    fundingUrl: episode.fundingUrl || '',
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
     adsEnabled: episode.adsEnabled !== false
@@ -315,6 +316,11 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
             Tapa Original <span className="admin-optional"> — exclusive to Studio Tapa, independent of free/premium tier</span>
           </label>
+
+          <div className="admin-field">
+            <label>Funding link <span className="admin-optional">optional — the creator's own project/funding page</span></label>
+            <input type="url" value={form.fundingUrl} onChange={(e) => update('fundingUrl', e.target.value)} placeholder="https://kickstarter.com/..." />
+          </div>
 
           <div className="admin-field-row">
             <div className="admin-field">

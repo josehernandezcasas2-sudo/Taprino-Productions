@@ -106,6 +106,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           ))}
           <Link href="/wishlist" className="nav-link">My List</Link>
           {isSignedIn && <Link href="/recs" className="nav-link">My Recs</Link>}
+          {siteSettings && siteSettings.elevatorPitchEnabled && (
+            <Link href="/pitches" className="nav-link">Pitch Room</Link>
+          )}
           {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
             <Link href="/channel" className="nav-link nav-link-live">
               <i className="live-dot" aria-hidden="true" />
@@ -138,6 +141,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
             {isSignedIn && <Link href="/recs" className="dropdown-item" onClick={() => setOpenMenu(null)}>My Recs</Link>}
+            {siteSettings && siteSettings.elevatorPitchEnabled && (
+              <Link href="/pitches" className="dropdown-item" onClick={() => setOpenMenu(null)}>Pitch Room</Link>
+            )}
             {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
               <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
             )}

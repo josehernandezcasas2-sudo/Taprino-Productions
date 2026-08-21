@@ -98,6 +98,68 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [siteSettingsSaving, setSiteSettingsSaving] = useState(false);
   const [siteSettingsSaved, setSiteSettingsSaved] = useState(false);
   const [siteSettingsError, setSiteSettingsError] = useState(null);
+  const [pitches, setPitches] = useState(null);
+  const [pitchForm, setPitchForm] = useState({ title: '', logline: '', description: '', projectUrl: '', creatorName: '', creatorEmail: '' });
+  const [pitchSaving, setPitchSaving] = useState(false);
+  const [pitchError, setPitchError] = useState(null);
+
+  async function loadPitches() {
+    try {
+      const res = await fetch('/api/admin/pitches');
+      const data = await res.json();
+      setPitches(data.pitches || []);
+    } catch (err) {
+      setPitchError('Could not load pitches.');
+    }
+  }
+
+  async function addPitch(e) {
+    e.preventDefault();
+    setPitchSaving(true);
+    setPitchError(null);
+    try {
+      const res = await fetch('/api/admin/pitches', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pitchForm)
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not add pitch.');
+      setPitchForm({ title: '', logline: '', description: '', projectUrl: '', creatorName: '', creatorEmail: '' });
+      await loadPitches();
+    } catch (err) {
+      setPitchError(err.message);
+    } finally {
+      setPitchSaving(false);
+    }
+  }
+
+  async function setPitchStatus(pitchId, status) {
+    try {
+      await fetch('/api/admin/pitches', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId, status })
+      });
+      await loadPitches();
+    } catch (err) {
+      setPitchError('Could not update that pitch.');
+    }
+  }
+
+  async function deletePitch(pitchId) {
+    if (!confirm('Delete this pitch permanently?')) return;
+    try {
+      await fetch('/api/admin/pitches', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId })
+      });
+      await loadPitches();
+    } catch (err) {
+      setPitchError('Could not delete that pitch.');
+    }
+  }
 
   async function loadSiteSettings() {
     try {
@@ -123,6 +185,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           shopUrl: siteSettings.shopUrl,
           liveTvEnabled: siteSettings.liveTvEnabled,
           recommendationCloseness: siteSettings.recommendationCloseness,
+          elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
           ...overrides
         })
       });
@@ -313,7 +376,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadAuditLog(); loadSiteSettings(); loadPitches(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -509,6 +572,17 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               </div>
 
               <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={siteSettings.elevatorPitchEnabled}
+                    onChange={(e) => setSiteSettings((s) => ({ ...s, elevatorPitchEnabled: e.target.checked }))}
+                  />
+                  Show &ldquo;Pitch Room&rdquo; link in the header (projects seeking funding — no money changes hands on Studio Tapa itself)
+                </label>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'block', marginBottom: '0.4rem' }}>
                   My Recs — closeness ({siteSettings.recommendationCloseness}/10)
                 </label>
@@ -567,6 +641,69 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 />
               </div>
             </>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Pitch Room</div>
+          <h3>Projects seeking funding</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            Adding one here approves it immediately — there's no public submission form yet, so for now
+            this is how pitches get onto the page. Toggle the "Pitch Room" link on above once you've got
+            at least one up.
+          </p>
+
+          {pitchError && <p style={{ color: 'var(--danger)' }}>{pitchError}</p>}
+
+          <form onSubmit={addPitch} style={{ marginBottom: '1.4rem' }}>
+            <label>Title</label>
+            <input type="text" value={pitchForm.title} onChange={(e) => setPitchForm((f) => ({ ...f, title: e.target.value }))} required />
+            <label>Logline <span style={{ fontWeight: 'normal', opacity: 0.65 }}>one sentence</span></label>
+            <input type="text" value={pitchForm.logline} onChange={(e) => setPitchForm((f) => ({ ...f, logline: e.target.value }))} required />
+            <label>Description <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+            <textarea value={pitchForm.description} onChange={(e) => setPitchForm((f) => ({ ...f, description: e.target.value }))} rows={2} style={{ width: '100%', boxSizing: 'border-box' }} />
+            <label>Project URL <span style={{ fontWeight: 'normal', opacity: 0.65 }}>where "Visit project" sends people</span></label>
+            <input type="url" value={pitchForm.projectUrl} onChange={(e) => setPitchForm((f) => ({ ...f, projectUrl: e.target.value }))} placeholder="https://kickstarter.com/..." required />
+            <div className="admin-field-row">
+              <div className="admin-field">
+                <label>Creator name <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+                <input type="text" value={pitchForm.creatorName} onChange={(e) => setPitchForm((f) => ({ ...f, creatorName: e.target.value }))} />
+              </div>
+              <div className="admin-field">
+                <label>Creator email <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+                <input type="email" value={pitchForm.creatorEmail} onChange={(e) => setPitchForm((f) => ({ ...f, creatorEmail: e.target.value }))} />
+              </div>
+            </div>
+            <button className="account-btn-primary" type="submit" disabled={pitchSaving} style={{ width: 'auto', marginTop: '0.6rem' }}>
+              {pitchSaving ? 'Adding…' : 'Add pitch'}
+            </button>
+          </form>
+
+          {!pitches ? (
+            <p>Loading…</p>
+          ) : pitches.length === 0 ? (
+            <p>No pitches yet.</p>
+          ) : (
+            pitches.map((p) => (
+              <div key={p.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 12, marginBottom: 10 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+                  <div>
+                    <strong>{p.title}</strong>
+                    <span style={{ marginLeft: 8, fontSize: 12, opacity: 0.65, textTransform: 'uppercase' }}>{p.status}</span>
+                  </div>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {p.status !== 'approved' && (
+                      <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setPitchStatus(p.id, 'approved')}>Approve</button>
+                    )}
+                    {p.status !== 'rejected' && (
+                      <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setPitchStatus(p.id, 'rejected')}>Reject</button>
+                    )}
+                    <button className="account-btn-secondary" style={{ width: 'auto', color: '#c55' }} onClick={() => deletePitch(p.id)}>Delete</button>
+                  </div>
+                </div>
+                <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{p.logline}</div>
+              </div>
+            ))
           )}
         </div>
 

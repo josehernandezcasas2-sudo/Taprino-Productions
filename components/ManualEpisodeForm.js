@@ -16,7 +16,7 @@ const EMPTY_FORM = {
   creatorEmail: '', title: '', description: '', contentType: 'short', rating: '', bonusParent: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
-  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false
+  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: ''
 };
 
 function readAsDataUrl(f) {
@@ -244,6 +244,9 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
           Tapa Original <span style={{ opacity: 0.65 }}>— exclusive to Studio Tapa, independent of free/premium tier</span>
         </label>
+
+        <label>Funding link <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — the creator's own project/funding page</span></label>
+        <input type="url" value={form.fundingUrl} onChange={(e) => update('fundingUrl', e.target.value)} placeholder="https://kickstarter.com/..." />
 
         <label>Poster — optional</label>
         <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.6rem' }} />

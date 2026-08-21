@@ -138,6 +138,7 @@ export default async function handler(req, res) {
     thumbnail,
     featured: !!body.featured,
     is_original: !!body.isOriginal,
+    funding_url: body.fundingUrl || null,
     ads_enabled: body.adsEnabled !== false,
     status,
     submitted_by: submittedBy,
