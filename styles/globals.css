@@ -3894,3 +3894,42 @@ body:has(.mini-player) { padding-bottom: 72px; }
   color: var(--ink); background: none; font-size: 0.82rem; cursor: pointer; margin-top: 0.4rem;
   text-decoration: none; box-sizing: border-box;
 }
+
+/* Consistent legibility scrim across EVERY card thumbnail sitewide —
+   posters, browse rows, pitch cards, podcast show art, and the episode
+   Next/Previous/Watch Next sidebar. None of these had this before: any
+   bright or busy thumbnail image (including a wrongly-uploaded one) could
+   make an overlaid title, tag, duration, or play icon unreadable, or look
+   like it's "clashing" with the image underneath. A subtle bottom-to-top
+   gradient now sits behind every overlay consistently, and every badge/
+   icon gets a z-index bump so it always paints above that gradient
+   regardless of which specific card type it's on. This doesn't fix a
+   wrongly-uploaded thumbnail image itself — that's a data problem, fixed
+   by replacing the actual file — but it keeps the UI legible and
+   consistent no matter what image ends up underneath it. */
+.poster-art::after,
+.ep-thumb::after,
+.pitch-thumb::after,
+.show-art::after,
+.side-ep-thumb::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 55%;
+  background: linear-gradient(to top, rgba(10,9,5,0.75) 0%, rgba(10,9,5,0.15) 60%, transparent 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.poster-art { overflow: hidden; }
+.ep-thumb { overflow: hidden; position: relative; }
+.pitch-thumb, .show-art, .side-ep-thumb { overflow: hidden; }
+
+.poster-badge,
+.pitch-tag, .pitch-save,
+.show-media-tag {
+  z-index: 2;
+}
+.side-ep-thumb .play-overlay { position: relative; z-index: 2; }
+.side-ep-thumb .dur-badge, .side-ep-thumb .watched-badge {
+  z-index: 2;
+}
