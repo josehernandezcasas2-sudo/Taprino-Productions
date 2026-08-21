@@ -299,6 +299,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}
                 {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item">🎬 Submit your work</Link>}
+                {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item">🗂️ Your work</Link>}
                 {!isCreator && !isAdmin && <div className="dropdown-divider" />}
                 {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>}
                 <div className="dropdown-divider" />
