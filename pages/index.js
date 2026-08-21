@@ -185,11 +185,18 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
     if (ep.isSeries) {
       router.push(`/series/${ep.id}`);
     } else {
-      router.push(`/episode/${ep.id}`);
+      // ?autoplay=1 tells the episode page to skip its landing view and
+      // jump straight into playback — clicking Play should mean "start
+      // watching now," not "show me the info page first."
+      router.push(`/episode/${ep.id}?autoplay=1`);
     }
   }
   function goToTrailer(ep) {
-    router.push(`/episode/${ep.id}?trailer=1`);
+    // No query param at all — this lands on the standalone landing view
+    // (trailer plays ambiently in the background, same as the hero does),
+    // where the actual Play button lives. More Info should inform, not
+    // immediately commit to playing something.
+    router.push(`/episode/${ep.id}`);
   }
 
   return (

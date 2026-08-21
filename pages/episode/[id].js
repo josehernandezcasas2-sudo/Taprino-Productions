@@ -91,21 +91,24 @@ export async function getServerSideProps({ req, params, query, res }) {
       publicEpisodes,
       parentSeriesName: parentSeries ? parentSeries.name : null,
       startOnTrailer: query.trailer === '1',
+      startPlaying: query.autoplay === '1',
       signedPlayback
     }
   };
 }
 
-export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, isAdmin, isCreator, signedPlayback }) {
+export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
   const router = useRouter();
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
   // Series episodes are reached by explicitly picking one from the show's
   // own page (/series/[id]) — that's already the "choose what to watch"
   // step, so they play immediately, same as always. Standalone movies/
-  // shorts are usually reached straight from a library grid, so THIS page
-  // is their first stop — it opens on a landing view (trailer/poster,
-  // title, description) with an explicit Play action, not the player.
-  const [showPlayer, setShowPlayer] = useState(episode.contentType === 'series' || Boolean(startOnTrailer));
+  // shorts default to the landing view (trailer/poster, title,
+  // description) UNLESS the hero's own "Play" button sent them here with
+  // ?autoplay=1, which means the choice to watch was already made —
+  // landing on an info page after clicking Play would defeat the point of
+  // having a separate Play button at all.
+  const [showPlayer, setShowPlayer] = useState(episode.contentType === 'series' || Boolean(startOnTrailer) || Boolean(startPlaying));
   const [describedActive, setDescribedActive] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
