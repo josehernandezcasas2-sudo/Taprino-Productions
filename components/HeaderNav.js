@@ -100,8 +100,16 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     { href: '/', label: 'Home', match: isHome },
     { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
     { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
-    { href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' },
-    { href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' },
+    // Both default to visible (matches the site-wide "on by default"
+    // convention for Live TV/Shop) if settings haven't loaded yet, so the
+    // nav doesn't flash empty on first paint while the client-side fetch
+    // is still in flight.
+    ...((!siteSettings || siteSettings.verticalEnabled !== false)
+      ? [{ href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' }]
+      : []),
+    ...((!siteSettings || siteSettings.podcastsEnabled !== false)
+      ? [{ href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' }]
+      : [])
   ];
 
   return (

@@ -15,6 +15,7 @@ import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
 import { getRecommendations } from '../../lib/recommendations';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { useRowCarousel } from '../../lib/useRowCarousel';
+import { parseRuntimeToSeconds } from '../../lib/videoMetadata';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
@@ -416,6 +417,16 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                     ◆ Standalone {episode.contentType === 'movie' ? 'Movie' : episode.contentType === 'vertical' ? 'Vertical' : 'Short'}
                   </span>
                 )}
+                {/* Tier/ads and audio-described used to live in a completely
+                    separate .player-meta row below this one, which also
+                    repeated the runtime a second time — everything about
+                    this episode's status now lives in this one row. */}
+                <span className="trailer-link" style={{ borderColor: 'rgba(234,231,221,0.18)' }}>
+                  {episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
+                </span>
+                {describedActive && (
+                  <span className="trailer-link" style={{ borderColor: 'rgba(234,231,221,0.18)' }}>🔊 Audio described</span>
+                )}
                 <button
                   className="trailer-link"
                   onClick={() => toggleWishlist(episode.id)}
@@ -427,23 +438,26 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                   <button className="trailer-link" onClick={() => setShowingTrailer(true)}>🎬 Watch trailer</button>
                 )}
               </div>
-              {!showingTrailer && getPosition(episode.id) > 0 && (
-                <div className="resume-note">
-                  ↺ Resuming from {Math.floor(getPosition(episode.id) / 60)}:{String(Math.floor(getPosition(episode.id) % 60)).padStart(2, '0')}
-                </div>
-              )}
+              {!showingTrailer && getPosition(episode.id) > 0 && (() => {
+                const totalSeconds = parseRuntimeToSeconds(episode.runtime);
+                const posSeconds = getPosition(episode.id);
+                const pct = totalSeconds ? Math.min(100, Math.round((posSeconds / totalSeconds) * 100)) : null;
+                return (
+                  <div className="resume-note">
+                    <span>↺ Resuming from {Math.floor(posSeconds / 60)}:{String(Math.floor(posSeconds % 60)).padStart(2, '0')}</span>
+                    {pct !== null && (
+                      <div className="resume-note-track" aria-hidden="true">
+                        <div className="resume-note-fill" style={{ width: `${pct}%` }} />
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
               {showingTrailer && (
                 <button className="trailer-link" onClick={() => setShowingTrailer(false)}>
                   ▶ Back to full episode
                 </button>
               )}
-            </div>
-
-
-            <div className="player-meta">
-              <span>{episode.runtime}</span>
-              <span>{episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}</span>
-              {describedActive && <span>🔊 Audio described</span>}
             </div>
 
             {!locked && (

@@ -561,11 +561,22 @@ button { font-family: inherit; cursor: pointer; }
   border: 1px solid rgba(234, 231, 221, 0.08);
 }
 .resume-note {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
+  font-size: 0.7rem;
   color: var(--brass);
-  margin: 0 0 0.8rem;
+  margin: 0 0 1.1rem;
 }
+.resume-note-track {
+  width: 100px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(234, 231, 221, 0.15);
+  overflow: hidden;
+}
+.resume-note-fill { height: 100%; background: var(--brass); }
 .player-meta {
   display: flex;
   justify-content: space-between;
@@ -4189,3 +4200,20 @@ body:has(.mini-player) { padding-bottom: 72px; }
   flex-wrap: wrap;
 }
 .admin-preview-banner a { color: var(--brass); text-decoration: underline; font-weight: 600; }
+
+/* Admin dashboard section dividers — the page grew into a long stack of
+   unrelated-looking cards across many separate additions over time, with
+   nothing visually grouping related ones. These headers break it into
+   scannable zones without moving or touching any individual card's own
+   markup or logic. */
+.admin-section-divider {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 2.6rem 0 1rem;
+  padding-bottom: 0.6rem;
+  border-bottom: 1px solid rgba(217, 143, 62, 0.25);
+}
+.admin-section-divider:first-of-type { margin-top: 0.5rem; }

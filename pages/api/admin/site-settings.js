@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { shopEnabled, shopUrl, liveTvEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled } = req.body || {};
+  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled } = req.body || {};
   if (shopEnabled && (!shopUrl || !shopUrl.trim())) {
     return res.status(400).json({ error: 'A Shop URL is required to enable the Shop link.' });
   }
@@ -61,6 +61,8 @@ export default async function handler(req, res) {
     // gets typed into the admin field.
     shop_url: shopUrl && shopUrl.trim() ? normalizeUrl(shopUrl) : null,
     live_tv_enabled: liveTvEnabled !== false,
+    vertical_enabled: verticalEnabled !== false,
+    podcasts_enabled: podcastsEnabled !== false,
     elevator_pitch_enabled: !!elevatorPitchEnabled,
     updated_at: new Date().toISOString()
   };

@@ -208,6 +208,8 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           shopEnabled: siteSettings.shopEnabled,
           shopUrl: siteSettings.shopUrl,
           liveTvEnabled: siteSettings.liveTvEnabled,
+          verticalEnabled: siteSettings.verticalEnabled,
+          podcastsEnabled: siteSettings.podcastsEnabled,
           recommendationCloseness: siteSettings.recommendationCloseness,
           elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
           ...overrides
@@ -246,6 +248,17 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           shopEnabled: siteSettings.shopEnabled,
           shopUrl: siteSettings.shopUrl,
           liveTvEnabled: siteSettings.liveTvEnabled,
+          verticalEnabled: siteSettings.verticalEnabled,
+          podcastsEnabled: siteSettings.podcastsEnabled,
+          // These two were missing from this specific save path before —
+          // since the API treats an omitted field as its "off" default
+          // rather than "leave unchanged," uploading a search icon was
+          // silently resetting Pitch Room's toggle and the recs closeness
+          // dial back to their defaults every time. Found while adding the
+          // two new toggles above and fixed at the same time, since a new
+          // field would have had the exact same silent-reset bug otherwise.
+          elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
+          recommendationCloseness: siteSettings.recommendationCloseness,
           searchIconBase64,
           searchIconFileName: file.name
         })
@@ -551,6 +564,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </div>
         )}
 
+        <div className="admin-section-divider">Overview &amp; Navigation</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Hero rotation</div>
           <h3>Homepage hero pool</h3>
@@ -607,6 +621,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </div>
         </div>
 
+        <div className="admin-section-divider">Site Configuration</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Site settings</div>
           <h3>Header &amp; links</h3>
@@ -658,6 +673,28 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                     onChange={(e) => setSiteSettings((s) => ({ ...s, liveTvEnabled: e.target.checked }))}
                   />
                   Show &ldquo;Live TV&rdquo; link in the header (the /channel looping playlist)
+                </label>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={siteSettings.verticalEnabled}
+                    onChange={(e) => setSiteSettings((s) => ({ ...s, verticalEnabled: e.target.checked }))}
+                  />
+                  Show &ldquo;Vertical&rdquo; link in the header
+                </label>
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={siteSettings.podcastsEnabled}
+                    onChange={(e) => setSiteSettings((s) => ({ ...s, podcastsEnabled: e.target.checked }))}
+                  />
+                  Show &ldquo;Podcasts&rdquo; link in the header
                 </label>
               </div>
 
@@ -820,6 +857,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
         />
 
+        <div className="admin-section-divider">Content Review &amp; Library</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending review</div>
           <h3>Creator submissions</h3>
@@ -1233,6 +1271,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
+        <div className="admin-section-divider">Access &amp; History</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Creator access</div>
           <h3>Roster</h3>
