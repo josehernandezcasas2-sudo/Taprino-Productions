@@ -62,6 +62,11 @@ export default function VideoPlayer({
   // — against firing in a tight loop regardless of why the loop happened.
   const lastSaveTimeRef = useRef(0);
   const hideTimerRef = useRef(null);
+  // Tracks whether the mouse is currently resting on the controls bar
+  // itself, as distinct from moving anywhere over the video. A ref, not
+  // state — this is read inside a setTimeout closure and doesn't need to
+  // trigger a re-render on its own.
+  const hoveringControlsRef = useRef(false);
   const refreshingRef = useRef(false);
 
   const [started, setStarted] = useState(false);
@@ -465,10 +470,30 @@ export default function VideoPlayer({
     setControlsVisible(true);
     if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
     hideTimerRef.current = setTimeout(() => {
+      // Don't hide out from under a mouse that's just sitting still on the
+      // controls (e.g. mid-drag on the volume slider, or simply resting
+      // there) — moving the mouse is what re-arms this timer elsewhere,
+      // but resting motionless on the bar itself never fires a mousemove
+      // event, so without this check the bar could vanish underneath an
+      // actively-hovering cursor.
+      if (hoveringControlsRef.current) return;
       const v = videoRef.current;
       if (v && !v.paused) setControlsVisible(false);
-    }, 5000);
+    }, 2000);
   }, []);
+
+  const handleControlsMouseEnter = useCallback(() => {
+    hoveringControlsRef.current = true;
+    showControlsTemporarily();
+  }, [showControlsTemporarily]);
+
+  const handleControlsMouseLeave = useCallback(() => {
+    hoveringControlsRef.current = false;
+    // Restart the countdown fresh from the moment the mouse actually
+    // leaves, rather than leaving whatever time was left on the timer
+    // that got armed before the mouse entered.
+    showControlsTemporarily();
+  }, [showControlsTemporarily]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -733,7 +758,7 @@ export default function VideoPlayer({
       )}
 
       {started && !adState && (
-        <div className="tp-controls">
+        <div className="tp-controls" onMouseEnter={handleControlsMouseEnter} onMouseLeave={handleControlsMouseLeave}>
           <div className="tp-scrub">
             <div className="tp-track">
               <div className="tp-track-buffered" style={{ width: `${bufferedPct}%` }} />
