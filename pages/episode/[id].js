@@ -364,7 +364,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
           ) : (
             <VideoPlayer
               episode={playingEpisode}
-              adsEnabled={!showingTrailer && episode.tier === 'free' && episode.adsEnabled !== false}
+              adsEnabled={!showingTrailer && !isSubscriber && !isAdmin && episode.tier === 'free' && episode.adsEnabled !== false}
               onEnded={handleEnded}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}

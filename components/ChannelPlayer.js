@@ -16,7 +16,7 @@ function formatClock(seconds) {
 // latter) but its actual state machine — "what should be on right now,
 // re-derived from the server on a timer" — doesn't belong wedged into
 // either.
-export default function ChannelPlayer({ initialState }) {
+export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const adContainerRef = useRef(null);
@@ -110,7 +110,10 @@ export default function ChannelPlayer({ initialState }) {
 
   async function transitionTo(fresh) {
     setState(fresh);
-    if (fresh.adsEnabled) {
+    // SECURITY/BILLING: same bug fixed on the main VOD player and Live TV
+    // — this checked only the channel's own ads_enabled setting, never
+    // whether the viewer is a subscriber or admin.
+    if (fresh.adsEnabled && !isSubscriber && !isAdmin) {
       runAdBreak(() => {
         attachProgram(fresh.program);
         scheduleTransition(fresh.program);

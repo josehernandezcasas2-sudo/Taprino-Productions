@@ -69,7 +69,7 @@ export default function Live({ initialStream, mainGenres, isSignedIn, isSubscrib
               <h1>{stream.title}</h1>
               {stream.description && <p>{stream.description}</p>}
             </div>
-            <LiveVideoPlayer stream={stream} />
+            <LiveVideoPlayer stream={stream} isSubscriber={isSubscriber} isAdmin={isAdmin} />
             <div className="player-meta">
               <span>Live</span>
               <span>{stream.adsEnabled ? 'Ad-supported' : 'No ads on this stream'}</span>

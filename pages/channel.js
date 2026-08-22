@@ -70,7 +70,7 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
         </div>
 
         <div className="player-card">
-          <ChannelPlayer initialState={channelState} />
+          <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
           {channelState.onAir && (
             <div className="player-meta">
               <span>Playing now</span>

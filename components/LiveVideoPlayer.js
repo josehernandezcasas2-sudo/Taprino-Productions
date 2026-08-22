@@ -9,7 +9,7 @@ const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
 // of that through the VOD player's already-substantial state machine would
 // risk destabilizing something that works today, for a feature that's
 // genuinely a different shape.
-export default function LiveVideoPlayer({ stream }) {
+export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const adContainerRef = useRef(null);
@@ -127,7 +127,12 @@ export default function LiveVideoPlayer({ stream }) {
    * need a small polling or pub-sub channel — just not this version.
    * ------------------------------------------------------------------ */
   useEffect(() => {
-    if (!stream.adsEnabled || !stream.startedAt) return;
+    // SECURITY/BILLING: same category of bug that was just fixed on the
+    // main VOD player — this previously checked only the stream's own
+    // ads_enabled flag, never who was actually watching. A Studio Tapa+
+    // subscriber or an admin got ad breaks on Live TV regardless of their
+    // status, exactly like the episode player did before.
+    if (!stream.adsEnabled || !stream.startedAt || isSubscriber || isAdmin) return;
 
     const intervalMs = Math.max(120, stream.adBreakSeconds || 600) * 1000;
     const startedAt = new Date(stream.startedAt).getTime();
@@ -152,7 +157,7 @@ export default function LiveVideoPlayer({ stream }) {
     breakCheckTimer.current = setInterval(check, 8000);
     return () => clearInterval(breakCheckTimer.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream.adsEnabled, stream.startedAt, stream.adBreakSeconds]);
+  }, [stream.adsEnabled, stream.startedAt, stream.adBreakSeconds, isSubscriber, isAdmin]);
 
   function startAdBreak() {
     const v = videoRef.current;
