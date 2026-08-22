@@ -584,6 +584,9 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Site settings</div>
           <h3>Header &amp; links</h3>
+          <Link href="/admin/theme" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1rem' }}>
+            🎨 Edit theme colors
+          </Link>
 
           {!siteSettings ? (
             <p>Loading…</p>

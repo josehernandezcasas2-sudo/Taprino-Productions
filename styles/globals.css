@@ -132,6 +132,9 @@ button { font-family: inherit; cursor: pointer; }
 .dropdown-left { left: 0; }
 .dropdown-right { right: 0; }
 .search-dropdown { min-width: 280px; padding: 0.6rem; }
+@media (max-width: 480px) {
+  .search-dropdown { min-width: 0; width: min(82vw, 320px); }
+}
 .header-search-input {
   width: 100%;
   background: var(--void);
@@ -182,6 +185,18 @@ button { font-family: inherit; cursor: pointer; }
 .dropdown-item:disabled:hover { background: transparent; }
 
 .account-dropdown { min-width: 240px; }
+@media (max-width: 480px) {
+  .account-dropdown {
+    /* min-width: 240px could exceed available space to the left of a
+       right-anchored (.dropdown-right) trigger near the screen edge on
+       narrow phones, pushing the dropdown's own edge past the viewport
+       and causing the whole page to gain horizontal scroll/expand. Same
+       root cause as the hamburger menu fix — width needs a mobile-aware
+       cap instead of an unconditional fixed minimum. */
+    min-width: 0;
+    width: min(78vw, 300px);
+  }
+}
 .account-dropdown-header {
   display: flex;
   align-items: center;
