@@ -3895,6 +3895,13 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .player-info-row { display: flex; gap: 2.2rem; align-items: flex-start; flex-wrap: wrap; }
 .player-info-row .player-card { flex: 1; min-width: 280px; }
 .episode-nav-sidebar { width: 320px; flex-shrink: 0; }
+@media (max-width: 720px) {
+  /* Below this width, 280px (player-card) + 320px (sidebar) + the gap
+     can't fit side by side, and the sidebar's fixed 320px was never
+     given a mobile-aware size — it could run wider than the actual
+     viewport. Full width and stacked below the info card instead. */
+  .episode-nav-sidebar { width: 100%; }
+}
 .side-heading {
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em;
   text-transform: uppercase; color: var(--ink-dim); margin-bottom: 0.7rem;

@@ -404,7 +404,15 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
                     {episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}
                   </Link>
                 ) : (
-                  <span>◆ Standalone {episode.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+                  // Same badge treatment as the series link above — this used
+                  // to be a bare, unstyled <span>, which is why it visibly
+                  // didn't match between a series episode and a standalone
+                  // movie/short. Not a link (there's no page to send it to),
+                  // but styled identically so the two feel like the same
+                  // system rather than two different ones.
+                  <span className="trailer-link" style={{ borderColor: 'rgba(217,143,62,0.4)', color: 'var(--brass)' }}>
+                    ◆ Standalone {episode.contentType === 'movie' ? 'Movie' : episode.contentType === 'vertical' ? 'Vertical' : 'Short'}
+                  </span>
                 )}
                 <button
                   className="trailer-link"
