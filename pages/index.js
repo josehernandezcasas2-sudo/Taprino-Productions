@@ -103,8 +103,8 @@ export async function getServerSideProps({ req, res }) {
   // can out-rank a single episode and pull people into bingeing it. Without
   // Redis configured, this falls back to whatever has `featured: true` set.
   let heroPool;
+  const viewCounts = viewCountsResult || {};
   if (isRedisConfigured()) {
-    const viewCounts = viewCountsResult;
     const candidates = buildHeroCandidates(episodes, allSeries, viewCounts);
     const ranked = candidates.filter((c) => c.views > 0).sort((a, b) => b.views - a.views);
     heroPool = ranked.length > 0 ? ranked.slice(0, 5) : buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
@@ -129,12 +129,13 @@ export async function getServerSideProps({ req, res }) {
       allSeries,
       newReleases,
       leavingSoon,
-      continueWatching
+      continueWatching,
+      viewCounts
     }
   };
 }
 
-export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching }) {
+export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching, viewCounts }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const router = useRouter();
   const [query, setQuery] = useState('');
@@ -251,6 +252,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
             onSelect={goToEpisode}
             isWishlisted={isWishlisted}
             onToggleWishlist={toggleWishlist}
+            viewCounts={viewCounts}
           />
           <GenreRow
             title="Leaving Soon"
@@ -261,6 +263,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
             onSelect={goToEpisode}
             isWishlisted={isWishlisted}
             onToggleWishlist={toggleWishlist}
+            viewCounts={viewCounts}
           />
           <StudioTapaPromo isSubscriber={isSubscriber} />
           {searchResults ? (
@@ -339,6 +342,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                     onSelect={goToEpisode}
                     isWishlisted={isWishlisted}
                     onToggleWishlist={toggleWishlist}
+                    viewCounts={viewCounts}
                   />
                 ))}
             </>

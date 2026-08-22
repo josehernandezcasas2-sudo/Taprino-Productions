@@ -874,8 +874,44 @@ button { font-family: inherit; cursor: pointer; }
   gap: 1.4rem;
   overflow-x: auto;
   padding: 1.1rem 0.3rem 0.7rem;
+  scroll-behavior: smooth;
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
+
+.cat-row-carousel { position: relative; }
+.cat-row-carousel .cat-row-track { scrollbar-width: none; }
+.cat-row-carousel .cat-row-track::-webkit-scrollbar { display: none; }
+.cat-row-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(234, 231, 221, 0.25);
+  /* Deliberately solid/opaque, not a translucent tint of the row behind
+     it — cards can be any color depending on their thumbnail, and a
+     see-through arrow would sometimes vanish against a matching card. */
+  background: rgba(15, 15, 10, 0.88);
+  color: var(--ink);
+  font-size: 1.3rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+}
+.cat-row-arrow:hover { background: rgba(15, 15, 10, 0.98); border-color: var(--brass); }
+.cat-row-arrow.left { left: -4px; }
+.cat-row-arrow.right { right: -4px; }
+@media (max-width: 640px) {
+  /* Arrows are a mouse/trackpad affordance — on touch, swiping the row
+     directly is the natural interaction and a floating circle over the
+     first/last card just gets in the way. */
+  .cat-row-arrow { display: none; }
+}
 
 .genre-browse-track { display: flex; gap: 1.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
 .genre-browse-item {
