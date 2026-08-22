@@ -873,7 +873,18 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   gap: 1.4rem;
   overflow-x: auto;
-  padding: 1.1rem 0.3rem 0.7rem;
+  /* Setting overflow-x to anything but visible implicitly makes
+     overflow-y non-visible too (a CSS quirk, not a choice) — there's no
+     way to have horizontal scroll without vertical clipping applying to
+     this same box. .card-wrap:hover grows the card via transform:
+     scale(1.07) and adds a "0 14px 30px" shadow, both of which extend
+     past the card's own layout box without changing this container's
+     scroll height, so they were getting cut off top/bottom by the very
+     box that's supposed to just scroll sideways. The fix isn't fighting
+     the overflow linkage — it's giving this box enough vertical padding
+     that the grown card and its shadow always fit entirely inside it.
+  */
+  padding: 2rem 0.3rem 3.6rem;
   scroll-behavior: smooth;
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
@@ -883,7 +894,11 @@ button { font-family: inherit; cursor: pointer; }
 .cat-row-carousel .cat-row-track::-webkit-scrollbar { display: none; }
 .cat-row-arrow {
   position: absolute;
-  top: 50%;
+  /* The track's padding is asymmetric now (more room below for the hover
+     shadow than above), so the card's own visual center sits a bit above
+     the track box's true 50% — this offset keeps the arrow aligned with
+     the card, not the padded box. */
+  top: calc(50% - 13px);
   transform: translateY(-50%);
   /* Must beat .card-wrap:hover's z-index: 6 (the card's own hover
      scale-up effect) — moving the mouse toward the arrow naturally
