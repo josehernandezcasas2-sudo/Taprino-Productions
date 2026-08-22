@@ -123,7 +123,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
         <HeroSpotlight
           pool={heroPool}
           onPlay={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : `/episode/${item.id}?autoplay=1`; }}
-          onTrailer={(item) => { window.location.href = `/episode/${item.id}`; }}
+          onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`; }}
           fullBleed
         />
       )}

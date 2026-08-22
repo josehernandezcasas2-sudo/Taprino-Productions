@@ -146,7 +146,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         </button>
 
         {openMenu === 'ham' && (
-          <div className="dropdown dropdown-left open">
+          <div className="dropdown dropdown-left open hamburger-dropdown">
             <div className="dropdown-label">Browse by type</div>
             {typeLinks.map((l) => (
               <Link key={l.href} href={l.href} className={`dropdown-item ${l.match ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>

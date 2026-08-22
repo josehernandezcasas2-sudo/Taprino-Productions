@@ -192,11 +192,14 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
     }
   }
   function goToTrailer(ep) {
+    // Series has no "trailer landing page" of its own the way a movie
+    // does — /series/[id] already IS the info page (seasons, episodes,
+    // description), so More Info on a series just goes straight there.
     // No query param at all — this lands on the standalone landing view
     // (trailer plays ambiently in the background, same as the hero does),
     // where the actual Play button lives. More Info should inform, not
     // immediately commit to playing something.
-    router.push(`/episode/${ep.id}`);
+    router.push(ep.isSeries ? `/series/${ep.id}` : `/episode/${ep.id}`);
   }
 
   return (

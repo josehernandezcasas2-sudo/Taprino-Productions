@@ -328,7 +328,7 @@ button { font-family: inherit; cursor: pointer; }
   .episode-row-link { flex-direction: column; }
   .episode-row-thumb { flex-basis: auto; width: 100%; }
 }
-.poster-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 1.3rem; }
+.poster-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.3rem; }
 .poster-card {
   position: relative;
   aspect-ratio: 2 / 3;
@@ -919,7 +919,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .shelf {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 0.9rem;
 }
 .ep-card {
@@ -1368,7 +1368,7 @@ button { font-family: inherit; cursor: pointer; }
    real processing state. */
 .submission-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }
@@ -3087,7 +3087,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    --------------------------------------------------------------------- */
 .genre-icon-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 1rem;
   margin-top: 1.4rem;
 }
@@ -3932,4 +3932,24 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .side-ep-thumb .play-overlay { position: relative; z-index: 2; }
 .side-ep-thumb .dur-badge, .side-ep-thumb .watched-badge {
   z-index: 2;
+}
+
+/* Hamburger "Browse by type/genre" menu — mobile-specific treatment.
+   This menu holds a lot more content than any other dropdown (5 content
+   types + My List/Recs/Pitch Room/Live TV/Shop + every main genre), so
+   the generic .dropdown sizing (min-width: 210px, no max-height) that
+   works fine for the small account/search dropdowns was never enough
+   here — on a real phone this either felt cramped and narrow, or ran
+   taller than the viewport with no way to scroll it. */
+@media (max-width: 640px) {
+  .hamburger-dropdown {
+    /* Deliberately NOT overriding position/top here — the base .dropdown
+       rule (position: absolute; top: calc(100% + 8px)) already anchors
+       correctly just below the hamburger button on any device. A fixed
+       pixel top value would be wrong on devices with different safe-area
+       insets (notch sizes vary), so only width/height/scroll change here. */
+    width: min(86vw, 340px);
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
+  }
 }

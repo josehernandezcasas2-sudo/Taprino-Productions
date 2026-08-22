@@ -160,9 +160,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <p>{ep.desc}</p>
           <div className="hero-actions">
             <button className="hero-play" onClick={() => onPlay(ep)}>▶ {ep.isSeries ? 'View series' : 'Play'}</button>
-            {!ep.isSeries && (
-              <button className="hero-trailer" onClick={() => onTrailer(ep)}>&#9432; More info</button>
-            )}
+            <button className="hero-trailer" onClick={() => onTrailer(ep)}>&#9432; More info</button>
           </div>
         </div>
 
