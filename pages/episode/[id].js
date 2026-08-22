@@ -453,6 +453,18 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             )}
           </div>
 
+          {episode.contentType === 'series' && !nextEpisode && !previousEpisode && (
+            <div className="episode-nav-sidebar">
+              <div className="side-heading">Episodes</div>
+              <p style={{ color: 'var(--ink-dim)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                This is the only episode in this show so far.
+              </p>
+              <Link href={`/series/${episode.seriesId}`} className="see-all-episodes-btn">
+                ▤ See show page
+              </Link>
+            </div>
+          )}
+
           {episode.contentType === 'series' && (nextEpisode || previousEpisode) && (
             <div className="episode-nav-sidebar">
               {nextEpisode && (
@@ -497,7 +509,16 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
             </div>
           )}
 
-          {episode.contentType !== 'series' && watchNext.length > 0 && (
+          {episode.contentType !== 'series' && !isSignedIn && (
+            <div className="episode-nav-sidebar">
+              <div className="side-heading">Watch next</div>
+              <p style={{ color: 'var(--ink-dim)', fontSize: '0.82rem', lineHeight: 1.5 }}>
+                Sign in to get picks based on your wishlist and what you've watched.
+              </p>
+            </div>
+          )}
+
+          {episode.contentType !== 'series' && isSignedIn && watchNext.length > 0 && (
             <div className="episode-nav-sidebar">
               <div className="side-heading">Watch next</div>
               {watchNext.map((item) => (
