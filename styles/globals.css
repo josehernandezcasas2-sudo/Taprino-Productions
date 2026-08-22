@@ -1642,35 +1642,39 @@ button { font-family: inherit; cursor: pointer; }
 
 @media (max-width: 900px) {
   body {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+    /* Pill height (~64px) + its 18px bottom offset + a little breathing
+       room, so page content never sits directly under the floating bar. */
+    padding-bottom: calc(90px + env(safe-area-inset-bottom, 0px));
   }
   .tabbar {
     position: fixed;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: calc(16px + env(safe-area-inset-left, 0px));
+    right: calc(16px + env(safe-area-inset-right, 0px));
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
     z-index: 60;
     display: flex;
-    background: rgba(20, 21, 28, 0.96);
+    background: rgba(41, 39, 25, 0.94);
     backdrop-filter: blur(10px);
-    border-top: 1px solid rgba(234, 231, 221, 0.1);
-    padding: 0.45rem 0.25rem calc(0.55rem + env(safe-area-inset-bottom, 0px));
-    padding-left: calc(0.25rem + env(safe-area-inset-left, 0px));
-    padding-right: calc(0.25rem + env(safe-area-inset-right, 0px));
+    border: 1px solid rgba(234, 231, 221, 0.08);
+    border-radius: 999px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    padding: 0.5rem 0.6rem;
   }
   .tabbar-item {
     flex: 1;
-    min-height: 48px;
+    min-height: 44px;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     gap: 3px;
     text-decoration: none;
-    color: var(--static-grey);
-    transition: color 0.12s ease;
+    color: var(--ink-dim);
+    border-radius: 999px;
+    margin: 0 0.1rem;
+    transition: color 0.12s ease, background-color 0.12s ease;
   }
-  .tabbar-item.active { color: var(--signal-amber); }
+  .tabbar-item.active { color: #241a05; background: var(--brass); }
   .tabbar-glyph {
     font-size: 1rem;
     line-height: 1;
@@ -1685,7 +1689,7 @@ button { font-family: inherit; cursor: pointer; }
     line-height: 1;
   }
   /* The floating upload widget has to clear the bar, not hide behind it. */
-  .upload-status-widget { bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+  .upload-status-widget { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 }
 
 @media (prefers-reduced-motion: reduce) {
