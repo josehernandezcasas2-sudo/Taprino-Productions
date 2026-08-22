@@ -3664,6 +3664,11 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   flex-direction: column;
   gap: 0.5rem;
 }
+.admin-quicklinks-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.5rem;
+}
 .account-quicklink {
   display: block;
   background: var(--void);
@@ -4109,3 +4114,22 @@ body:has(.mini-player) { padding-bottom: 72px; }
   letter-spacing: 0.06em; color: var(--ink-dim); margin-bottom: 0.35rem;
 }
 .series-about-box .value { color: var(--ink); font-size: 0.92rem; }
+
+/* Admin-only "you're viewing a disabled page" banner — shown on pages
+   that would normally 404 for everyone when their site-setting toggle is
+   off, but stay reachable for admins so a toggle can be checked/previewed
+   without switching it on for the public first. */
+.admin-preview-banner {
+  background: rgba(217, 143, 62, 0.15);
+  border-bottom: 1px solid rgba(217, 143, 62, 0.35);
+  color: var(--brass);
+  padding: 0.7rem 1.5rem;
+  font-size: 0.85rem;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.8rem;
+  flex-wrap: wrap;
+}
+.admin-preview-banner a { color: var(--brass); text-decoration: underline; font-weight: 600; }

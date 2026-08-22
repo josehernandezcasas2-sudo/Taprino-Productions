@@ -15,8 +15,11 @@ import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res, params }) {
+  const account = await getAccountContext(req);
   const siteSettings = await getSiteSettings();
-  if (!siteSettings.elevatorPitchEnabled) {
+  const bypassingDisabled = !siteSettings.elevatorPitchEnabled && account.isAdmin;
+
+  if (!siteSettings.elevatorPitchEnabled && !account.isAdmin) {
     return { notFound: true };
   }
 
@@ -26,7 +29,6 @@ export async function getServerSideProps({ req, res, params }) {
   }
 
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
   const { userId } = getAuth(req);
   const [similar, updates, comments, episodes, saved] = await Promise.all([
     getSimilarPitches(pitch.tag, pitch.id),
@@ -43,6 +45,7 @@ export async function getServerSideProps({ req, res, params }) {
       isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
+      bypassingDisabled,
       isCreator: account.isCreator,
       mainGenres,
       pitch,
@@ -54,7 +57,7 @@ export async function getServerSideProps({ req, res, params }) {
   };
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled }) {
   const [saved, setSaved] = useState(initialSaved);
   const [commentList, setCommentList] = useState(comments);
   const [commentText, setCommentText] = useState('');
@@ -174,6 +177,12 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
         isSubscriber={isSubscriber}
       />
       <div className="install-row"><InstallButton /></div>
+      {bypassingDisabled && (
+        <div className="admin-preview-banner">
+          ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
+          <Link href="/admin">Go turn it back on</Link>
+        </div>
+      )}
 
       <div className="hero-carousel full-bleed">
         {pitch.hero_image || pitch.thumbnail ? (

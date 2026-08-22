@@ -582,6 +582,32 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Quick links</div>
+          <h3>Jump to any page</h3>
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            Everything reachable from the header, plus the toggle-able pages (Pitch Room, Live TV) —
+            those stay open to admins even when their toggle below is off, so you can check how a
+            disabled page looks without turning it on for everyone first.
+          </p>
+          <div className="admin-quicklinks-grid">
+            <Link href="/" className="account-quicklink">Home</Link>
+            <Link href="/type/series" className="account-quicklink">Series</Link>
+            <Link href="/type/movie" className="account-quicklink">Films</Link>
+            <Link href="/type/vertical" className="account-quicklink">Vertical</Link>
+            <Link href="/podcasts" className="account-quicklink">Podcasts</Link>
+            <Link href="/wishlist" className="account-quicklink">My List</Link>
+            <Link href="/recs" className="account-quicklink">My Recs</Link>
+            <Link href="/pitches" className="account-quicklink">Pitch Room{!siteSettings?.elevatorPitchEnabled ? ' (off)' : ''}</Link>
+            <Link href="/channel" className="account-quicklink">Live TV{!siteSettings?.liveTvEnabled ? ' (off)' : ''}</Link>
+            <Link href="/live" className="account-quicklink">Live stream page</Link>
+            <Link href="/account" className="account-quicklink">Account</Link>
+            <Link href="/apply" className="account-quicklink">Apply (creator)</Link>
+            <Link href="/creator" className="account-quicklink">Submit work</Link>
+            <Link href="/creator/my-work" className="account-quicklink">Your work</Link>
+          </div>
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Site settings</div>
           <h3>Header &amp; links</h3>
           <Link href="/admin/theme" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1rem' }}>

@@ -13,13 +13,24 @@ import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
+  const account = await getAccountContext(req);
   const siteSettings = await getSiteSettings();
-  if (!siteSettings.elevatorPitchEnabled) {
+  const bypassingDisabled = !siteSettings.elevatorPitchEnabled && account.isAdmin;
+
+  if (!siteSettings.elevatorPitchEnabled && !account.isAdmin) {
     return { notFound: true };
   }
 
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
-  const account = await getAccountContext(req);
+  // SECURITY: the admin bypass view must never be cacheable. If this got
+  // the same public s-maxage as the normal page, a CDN could serve an
+  // admin's "disabled page, viewing anyway" response to the very next
+  // anonymous visitor within the cache window — exactly the audience this
+  // toggle exists to hide the page from.
+  res.setHeader(
+    'Cache-Control',
+    bypassingDisabled ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=300'
+  );
+
   const { userId } = getAuth(req);
   const [pitches, episodes, savedIds] = await Promise.all([
     getApprovedPitches(),
@@ -37,12 +48,13 @@ export async function getServerSideProps({ req, res }) {
       isCreator: account.isCreator,
       mainGenres,
       pitches,
-      savedIds
+      savedIds,
+      bypassingDisabled
     }
   };
 }
 
-export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, savedIds }) {
+export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, savedIds, bypassingDisabled }) {
   const [saved, setSaved] = useState(new Set(savedIds));
   const [activeTag, setActiveTag] = useState('All');
 
@@ -80,6 +92,12 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         isSubscriber={isSubscriber}
       />
       <div className="install-row"><InstallButton /></div>
+      {bypassingDisabled && (
+        <div className="admin-preview-banner">
+          ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
+          <Link href="/admin">Go turn it back on</Link>
+        </div>
+      )}
 
       <main className="library-stage">
         <Link href="/" className="back-link">&larr; Back to screening room</Link>
