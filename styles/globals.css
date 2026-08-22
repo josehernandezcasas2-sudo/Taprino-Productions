@@ -1927,6 +1927,11 @@ button { font-family: inherit; cursor: pointer; }
 .tp-time-sep { opacity: 0.45; margin: 0 0.25rem; }
 .tp-time-total { opacity: 0.7; }
 
+/* Old horizontal inline volume slider — kept for LiveVideoPlayer.js and
+   ChannelPlayer.js (Live TV / channel scheduler), which still use this
+   exact markup. Only the main episode/movie player (VideoPlayer.js) was
+   redesigned to the popup-based vertical slider below; these two weren't
+   part of that request and must keep working unchanged. */
 .tp-volume { display: flex; align-items: center; margin-left: auto; }
 .tp-volume-range {
   width: 72px;
@@ -1962,7 +1967,81 @@ button { font-family: inherit; cursor: pointer; }
   border: none;
 }
 
+.tp-volume-wrap { position: relative; margin-left: auto; }
+.tp-volume-popup {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  background: var(--void-2);
+  border: 1px solid rgba(234, 231, 221, 0.14);
+  border-radius: 8px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+  padding: 0.9rem 0.6rem;
+  z-index: 6;
+}
+.tp-volume-range-vertical {
+  /* Vertical range track — writing-mode is the actually-supported way to
+     do this across Chrome/Safari/Firefox; the `orientation="vertical"`
+     HTML attribute some examples show doesn't work in any of them. */
+  writing-mode: vertical-lr;
+  direction: rtl;
+  width: 20px;
+  height: 90px;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.tp-volume-range-vertical::-webkit-slider-runnable-track {
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(234, 231, 221, 0.3);
+}
+.tp-volume-range-vertical::-moz-range-track {
+  width: 3px;
+  border-radius: 2px;
+  background: rgba(234, 231, 221, 0.3);
+}
+.tp-volume-range-vertical::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+  margin-left: -4px;
+}
+.tp-volume-range-vertical::-moz-range-thumb {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--ink);
+  border: none;
+}
+.tp-volume-mute-toggle {
+  background: none; border: none; color: var(--ink); font-size: 1rem;
+  cursor: pointer; padding: 0;
+}
+
 .tp-settings-wrap { position: relative; }
+.tp-cc-wrap { position: relative; }
+.tp-cc-popup {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  min-width: 132px;
+  max-height: 260px;
+  overflow-y: auto;
+  background: var(--void-2);
+  border: 1px solid rgba(234, 231, 221, 0.14);
+  border-radius: 6px;
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.5);
+  padding: 0.35rem;
+  z-index: 6;
+}
 .tp-settings {
   position: absolute;
   right: 0;

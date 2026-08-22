@@ -75,6 +75,8 @@ export default function VideoPlayer({
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [volumePopupOpen, setVolumePopupOpen] = useState(false);
+  const [ccPopupOpen, setCcPopupOpen] = useState(false);
   const [levels, setLevels] = useState([]);
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [rate, setRate] = useState(1);
@@ -465,7 +467,7 @@ export default function VideoPlayer({
     hideTimerRef.current = setTimeout(() => {
       const v = videoRef.current;
       if (v && !v.paused) setControlsVisible(false);
-    }, 3000);
+    }, 5000);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -772,31 +774,73 @@ export default function VideoPlayer({
               <span className="tp-time-total">{formatTime(duration)}</span>
             </div>
 
-            <div className="tp-volume">
-              <button className="tp-btn" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                {muted || volume === 0 ? '◁' : '◀'}
+            <div className="tp-volume-wrap">
+              <button
+                className={`tp-btn ${volumePopupOpen ? 'active' : ''}`}
+                onClick={() => setVolumePopupOpen((v) => !v)}
+                aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
+                aria-expanded={volumePopupOpen}
+              >
+                {muted || volume === 0 ? '🔇' : '🔊'}
               </button>
-              <input
-                className="tp-volume-range"
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={muted ? 0 : volume}
-                onChange={(e) => changeVolume(parseFloat(e.target.value))}
-                aria-label="Volume"
-              />
+              {volumePopupOpen && (
+                <div className="tp-volume-popup">
+                  <input
+                    className="tp-volume-range-vertical"
+                    type="range"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={muted ? 0 : volume}
+                    onChange={(e) => changeVolume(parseFloat(e.target.value))}
+                    aria-label="Volume"
+                    // Vertical orientation is set via CSS (writing-mode) rather
+                    // than the non-standard `orientation` attribute, which
+                    // Chrome and Safari don't actually honor on <input type=range>.
+                  />
+                  <button className="tp-volume-mute-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
+                    {muted || volume === 0 ? '🔇' : '🔊'}
+                  </button>
+                </div>
+              )}
             </div>
 
             {textTracks.length > 0 && (
-              <button
-                className={`tp-btn tp-cc ${activeTrack !== -1 ? 'active' : ''}`}
-                onClick={() => selectTextTrack(activeTrack === -1 ? textTracks[0] : null)}
-                aria-label={activeTrack === -1 ? 'Turn on captions' : 'Turn off captions'}
-                aria-pressed={activeTrack !== -1}
-              >
-                CC
-              </button>
+              <div className="tp-cc-wrap">
+                <button
+                  className={`tp-btn tp-cc ${activeTrack !== -1 ? 'active' : ''}`}
+                  onClick={() => setCcPopupOpen((v) => !v)}
+                  aria-label="Captions and audio"
+                  aria-expanded={ccPopupOpen}
+                >
+                  CC
+                </button>
+                {ccPopupOpen && (
+                  <div className="tp-cc-popup">
+                    <div className="tp-settings-label">Captions</div>
+                    <button
+                      className={`tp-settings-item ${activeTrack === -1 ? 'on' : ''}`}
+                      onClick={() => { selectTextTrack(null); setCcPopupOpen(false); }}
+                    >
+                      Off
+                    </button>
+                    {textTracks.map((t) => (
+                      <button
+                        key={`${t.source}-${t.index}`}
+                        className={`tp-settings-item ${activeTrack === t.index ? 'on' : ''}`}
+                        onClick={() => { selectTextTrack(t); setCcPopupOpen(false); }}
+                      >
+                        {t.label}
+                      </button>
+                    ))}
+                    {/* Audio track switching (dub vs sub, alternate languages) isn't
+                        wired up yet — this app has one audio stream per episode
+                        right now, no multi-track source. This section is scoped
+                        to be where that goes the moment multi-audio exists, rather
+                        than adding a second, separately-built menu later. */}
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="tp-settings-wrap">
