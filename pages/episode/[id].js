@@ -14,6 +14,7 @@ import { recordView, recordDailyView } from '../../lib/redis';
 import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
 import { getRecommendations } from '../../lib/recommendations';
 import { getSiteSettings } from '../../lib/siteSettings';
+import { useRowCarousel } from '../../lib/useRowCarousel';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
@@ -182,6 +183,7 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
   // landing on an info page after clicking Play would defeat the point of
   // having a separate Play button at all.
   const [showPlayer, setShowPlayer] = useState(episode.contentType === 'series' || Boolean(startOnTrailer) || Boolean(startPlaying));
+  const { trackRef: bonusTrackRef, scroll: scrollBonus } = useRowCarousel();
   const [describedActive, setDescribedActive] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -541,20 +543,32 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
         {bonusContent.length > 0 && (
           <div className="cat-row" style={{ marginTop: '2.4rem' }}>
             <div className="cat-row-heading"><span>Bonus Content</span></div>
-            <div className="cat-row-track">
-              {bonusContent.map((b) => (
-                <div key={b.id} className="card-wrap row-card">
-                  <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
-                    <div className="ep-thumb">
-                      {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
-                    </div>
-                    <div className="ep-info">
-                      <h4>{b.title}</h4>
-                      <span>{b.runtime}</span>
-                    </div>
-                  </Link>
-                </div>
-              ))}
+            <div className="cat-row-carousel">
+              {bonusContent.length > 1 && (
+                <button className="cat-row-arrow left" onClick={() => scrollBonus('prev')} aria-label="Scroll Bonus Content left">
+                  ‹
+                </button>
+              )}
+              <div className="cat-row-track" ref={bonusTrackRef}>
+                {bonusContent.map((b) => (
+                  <div key={b.id} className="card-wrap row-card">
+                    <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
+                      <div className="ep-thumb">
+                        {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
+                      </div>
+                      <div className="ep-info">
+                        <h4>{b.title}</h4>
+                        <span>{b.runtime}</span>
+                      </div>
+                    </Link>
+                  </div>
+                ))}
+              </div>
+              {bonusContent.length > 1 && (
+                <button className="cat-row-arrow right" onClick={() => scrollBonus('next')} aria-label="Scroll Bonus Content right">
+                  ›
+                </button>
+              )}
             </div>
           </div>
         )}

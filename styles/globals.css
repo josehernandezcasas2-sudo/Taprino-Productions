@@ -885,7 +885,12 @@ button { font-family: inherit; cursor: pointer; }
   position: absolute;
   top: 50%;
   transform: translateY(-50%);
-  z-index: 3;
+  /* Must beat .card-wrap:hover's z-index: 6 (the card's own hover
+     scale-up effect) — moving the mouse toward the arrow naturally
+     hovers the edge card first, which was elevating that card above the
+     arrow and silently eating the click before it ever reached the
+     button underneath. */
+  z-index: 10;
   width: 40px;
   height: 40px;
   border-radius: 50%;

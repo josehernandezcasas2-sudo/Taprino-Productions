@@ -1,17 +1,12 @@
 import Link from 'next/link';
-import { useRef } from 'react';
 import WishlistButton from './WishlistButton';
 import { SITE } from '../lib/siteConfig';
+import { useRowCarousel } from '../lib/useRowCarousel';
 
 const MAX_CARDS = 15;
-// Matches .row-card's width (190px) + .cat-row-track's gap (1.4rem ≈ 22px)
-// in styles/globals.css — used to scroll by a sensible "page" of cards
-// rather than an arbitrary pixel amount that doesn't line up with the
-// actual card boundaries.
-const CARD_STEP_PX = 212;
 
 export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist, seeAllHref, viewCounts }) {
-  const trackRef = useRef(null);
+  const { trackRef, scroll } = useRowCarousel();
 
   if (episodes.length === 0) return null;
 
@@ -55,24 +50,6 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
   const cards = [...standaloneCards, ...seriesCards]
     .sort((a, b) => b.rank - a.rank)
     .slice(0, MAX_CARDS);
-
-  function scroll(direction) {
-    const track = trackRef.current;
-    if (!track) return;
-    const visibleCards = Math.max(1, Math.floor(track.clientWidth / CARD_STEP_PX));
-    const amount = CARD_STEP_PX * visibleCards;
-
-    if (direction === 'next') {
-      // Loops: clicking past the last card wraps back to the start rather
-      // than doing nothing, so the row reads as an endless carousel even
-      // though it's really just a fixed, ranked list of up to 15 items.
-      const atEnd = track.scrollLeft + track.clientWidth >= track.scrollWidth - 4;
-      track.scrollTo({ left: atEnd ? 0 : track.scrollLeft + amount, behavior: 'smooth' });
-    } else {
-      const atStart = track.scrollLeft <= 4;
-      track.scrollTo({ left: atStart ? track.scrollWidth : track.scrollLeft - amount, behavior: 'smooth' });
-    }
-  }
 
   return (
     <div className="cat-row">
