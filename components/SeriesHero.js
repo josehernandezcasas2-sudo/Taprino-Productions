@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 
-export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay }) {
+export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
   const [muted, setMuted] = useState(true);
@@ -59,13 +59,13 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
     });
   }
 
-  if (!videoSrc && !imageSrc) return null;
+  const hasMedia = Boolean(videoSrc || imageSrc);
 
   return (
     <div className="hero-carousel full-bleed">
       {isImageMode ? (
         <img src={imageSrc} alt={title} className="hero-video hero-image" />
-      ) : (
+      ) : hasMedia ? (
         <video
           ref={videoRef}
           className="hero-video"
@@ -75,10 +75,16 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
           playsInline
           onContextMenu={(e) => e.preventDefault()}
         />
+      ) : (
+        // No trailer or hero image set for this show at all — rather than
+        // the page falling back to a plain heading with no visual weight
+        // (the old behavior), every series now gets the same rich hero
+        // treatment, just with a gradient standing in for footage.
+        <div className="hero-video series-hero-fallback-bg" />
       )}
       <div className="hero-scrim" />
       <div className="hero-inner">
-        {!isImageMode && (
+        {!isImageMode && hasMedia && (
           <div className="hero-controls">
             <button className="hero-pause-btn" onClick={() => setMuted((m) => !m)} aria-label={muted ? 'Unmute preview' : 'Mute preview'}>
               {muted ? '🔇' : '🔊'}
@@ -89,11 +95,25 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
           </div>
         )}
         <div className="hero-content">
-          <div className="hero-eyebrow">Series</div>
+          <div className="hero-eyebrow">Series{isOriginal ? ' · Tapa Original' : ''}</div>
           <h2>{title}</h2>
           <p>{desc}</p>
+          <div className="series-hero-meta">
+            {tierLabel && <span className="series-hero-meta-pill">{tierLabel}</span>}
+            {(seasonCount || episodeCount) && (
+              <span>
+                {seasonCount > 1 ? `${seasonCount} seasons · ` : ''}{episodeCount} episode{episodeCount === 1 ? '' : 's'}
+              </span>
+            )}
+            {artist && <span>Made by {artist}</span>}
+          </div>
           <div className="hero-actions">
             <button className="hero-play" onClick={onPlay}>▶ {playLabel || 'Play first episode'}</button>
+            {onToggleSave && (
+              <button className="hero-trailer" onClick={onToggleSave}>
+                {isSaved ? '♥ Saved' : '♡ Save this series'}
+              </button>
+            )}
           </div>
         </div>
       </div>

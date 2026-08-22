@@ -70,6 +70,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   // existing single-season series don't need every episode retagged.
   const seasonNumbers = [...new Set(seriesEpisodes.map((e) => e.season || 1))].sort((a, b) => a - b);
   const [activeSeason, setActiveSeason] = useState(seasonNumbers[0] || 1);
+  const [activeTab, setActiveTab] = useState('episodes');
 
   const activeSeasonEpisodes = seriesEpisodes
     .filter((e) => (e.season || 1) === activeSeason)
@@ -85,6 +86,15 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   // clicks into an episode page.
   const heroSrc = seriesInfo.trailerSrc || (heroEpisode && heroEpisode.trailerSrc);
   const heroImage = seriesInfo.heroImage || (heroEpisode && heroEpisode.heroImage);
+
+  // About tab content — genre/rating aren't series-level fields (only
+  // episodes carry them), so they're derived from what's actually in this
+  // show rather than left blank. Genre is every distinct genre across the
+  // show's own episodes, not the sitewide list used for header nav.
+  const seriesGenres = [...new Set(seriesEpisodes.map((e) => e.genre).filter(Boolean))];
+  const representativeRating = seriesEpisodes.find((e) => e.rating)?.rating;
+  const seriesArtist = seriesInfo.artist || heroEpisode?.artist;
+  const isOriginal = seriesInfo.isOriginal || seriesEpisodes.some((e) => e.isOriginal);
 
   return (
     <>
@@ -105,96 +115,109 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       />
       <div className="install-row"><InstallButton /></div>
 
-      {(heroSrc || heroImage) && (
-        <SeriesHero
-          title={seriesInfo.name}
-          desc={seriesInfo.desc}
-          videoSrc={heroSrc}
-          imageSrc={heroImage}
-          playLabel={heroEpisode ? `Play ${heroEpisode.title}` : 'Play'}
-          onPlay={() => { if (heroEpisode) window.location.href = `/episode/${heroEpisode.id}`; }}
-        />
-      )}
+      <SeriesHero
+        title={seriesInfo.name}
+        desc={seriesInfo.desc}
+        videoSrc={heroSrc}
+        imageSrc={heroImage}
+        playLabel={heroEpisode ? `${heroEpisode.seriesOrder ? `S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : heroEpisode.title}` : 'Play'}
+        onPlay={() => { if (heroEpisode) window.location.href = `/episode/${heroEpisode.id}?autoplay=1`; }}
+        tierLabel={heroEpisode ? (heroEpisode.tier === 'premium' ? SITE.premiumTier : 'Free with ads') : null}
+        episodeCount={seriesEpisodes.length}
+        seasonCount={seasonNumbers.length}
+        artist={seriesArtist}
+        isOriginal={isOriginal}
+        isSaved={isWishlisted(seriesInfo.id)}
+        onToggleSave={() => toggleWishlist(seriesInfo.id)}
+      />
 
       <main className="library-stage">
         <Link href="/" className="back-link">← Back to screening room</Link>
-        {!heroSrc && !heroImage && <div className="library-heading">{seriesInfo.name}</div>}
-        {!heroSrc && !heroImage && <p className="series-desc">{seriesInfo.desc}</p>}
-        <button
-          className="trailer-link"
-          onClick={() => toggleWishlist(seriesInfo.id)}
-          style={{
-            display: 'inline-block',
-            marginBottom: '0.8rem',
-            borderColor: 'rgba(179,73,47,0.4)',
-            color: isWishlisted(seriesInfo.id) ? 'var(--danger)' : 'var(--ink-dim)'
-          }}
-        >
-          {isWishlisted(seriesInfo.id) ? '♥ Saved — notify me of new episodes' : '♡ Save this series — get notified of new episodes'}
-        </button>
-        <div className="library-sub">
-          {seriesEpisodes.length} episode{seriesEpisodes.length === 1 ? '' : 's'} across {seasonNumbers.length} season{seasonNumbers.length === 1 ? '' : 's'}
+
+        <div className="series-tabs">
+          <button className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>
+          {bonusContent.length > 0 && (
+            <button className={`series-tab ${activeTab === 'bonus' ? 'on' : ''}`} onClick={() => setActiveTab('bonus')}>Bonus Content</button>
+          )}
+          <button className={`series-tab ${activeTab === 'about' ? 'on' : ''}`} onClick={() => setActiveTab('about')}>About</button>
         </div>
 
-        {seriesEpisodes.length === 0 ? (
-          <div className="poster-empty">Nothing published in this series yet — check back soon.</div>
-        ) : (
-          <>
-            {seasonNumbers.length > 1 && (
-              <div className="season-tabs">
-                {seasonNumbers.map((num) => (
-                  <button
-                    key={num}
-                    className={`season-tab ${num === activeSeason ? 'active' : ''}`}
-                    onClick={() => setActiveSeason(num)}
-                  >
-                    Season {num}
-                  </button>
+        {activeTab === 'episodes' && (
+          seriesEpisodes.length === 0 ? (
+            <div className="poster-empty">Nothing published in this series yet — check back soon.</div>
+          ) : (
+            <>
+              {seasonNumbers.length > 1 && (
+                <div className="season-tabs">
+                  {seasonNumbers.map((num) => (
+                    <button
+                      key={num}
+                      className={`season-tab ${num === activeSeason ? 'active' : ''}`}
+                      onClick={() => setActiveSeason(num)}
+                    >
+                      Season {num}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {seasonNumbers.length <= 1 && <div className="series-season-heading">Season {activeSeason}</div>}
+
+              <div className="episode-list">
+                {activeSeasonEpisodes.map((ep) => (
+                  <div key={ep.id} className="episode-row">
+                    <Link href={`/episode/${ep.id}?autoplay=1`} className={`episode-row-link ${ep.tier}`}>
+                      <div className="episode-row-thumb">
+                        {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
+                        <span className="episode-row-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                        {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
+                      </div>
+                      <div className="episode-row-info">
+                        <h4>{ep.seriesOrder ? `Ep. ${ep.seriesOrder} — ` : ''}{ep.title}</h4>
+                        <p>{ep.desc}</p>
+                        <div className="episode-row-meta">
+                          <span>{ep.runtime}</span>
+                          {ep.genre && <span>{ep.genre}</span>}
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
                 ))}
               </div>
-            )}
-
-            <div className="episode-list">
-              {activeSeasonEpisodes.map((ep) => (
-                <div key={ep.id} className="episode-row">
-                  <Link href={`/episode/${ep.id}`} className={`episode-row-link ${ep.tier}`}>
-                    <div className="episode-row-thumb">
-                      {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
-                      <span className="episode-row-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                      {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
-                    </div>
-                    <div className="episode-row-info">
-                      <h4>{ep.seriesOrder ? `Ep. ${ep.seriesOrder} — ` : ''}{ep.title}</h4>
-                      <p>{ep.desc}</p>
-                      <div className="episode-row-meta">
-                        <span>{ep.runtime}</span>
-                        {ep.genre && <span>{ep.genre}</span>}
-                      </div>
-                    </div>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          </>
+            </>
+          )
         )}
 
-        {bonusContent.length > 0 && (
-          <div className="cat-row" style={{ marginTop: '2.4rem' }}>
-            <div className="cat-row-heading"><span>Bonus Content</span></div>
-            <div className="cat-row-track">
-              {bonusContent.map((b) => (
-                <div key={b.id} className="card-wrap row-card">
-                  <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
-                    <div className="ep-thumb">
-                      {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
-                    </div>
-                    <div className="ep-info">
-                      <h4>{b.title}</h4>
-                      <span>{b.runtime}</span>
-                    </div>
-                  </Link>
+        {activeTab === 'bonus' && (
+          <div className="series-bonus-grid">
+            {bonusContent.map((b) => (
+              <Link key={b.id} href={`/episode/${b.id}?autoplay=1`} className="series-bonus-card">
+                <div className="series-bonus-thumb">
+                  {b.thumbnail && <img src={b.thumbnail} alt="" />}
                 </div>
-              ))}
+                <h6>{b.title}</h6>
+                <span>{b.runtime}</span>
+              </Link>
+            ))}
+          </div>
+        )}
+
+        {activeTab === 'about' && (
+          <div className="series-about-grid">
+            <div className="series-about-box">
+              <div className="label">Genre</div>
+              <div className="value">{seriesGenres.length > 0 ? seriesGenres.join(', ') : '—'}</div>
+            </div>
+            <div className="series-about-box">
+              <div className="label">Creator</div>
+              <div className="value">{seriesArtist || '—'}</div>
+            </div>
+            <div className="series-about-box">
+              <div className="label">Rating</div>
+              <div className="value">{representativeRating || 'Not rated'}</div>
+            </div>
+            <div className="series-about-box">
+              <div className="label">Episodes</div>
+              <div className="value">{seriesEpisodes.length} across {seasonNumbers.length} season{seasonNumbers.length === 1 ? '' : 's'}</div>
             </div>
           </div>
         )}
