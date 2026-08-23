@@ -685,23 +685,18 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 0;
   border-left: none;
   border-right: none;
-  aspect-ratio: 21 / 9;
-}
-/* This used to be a single jump straight from 21:9 to 4:5 at 640px — at
-   700px wide the hero was ~300px tall; one pixel narrower, it became
-   ~799px tall. A 499px height change from a single pixel of viewport
-   width is exactly the kind of "something looks wrong at a certain size"
-   jolt that's actually a chain of two responsive rules with nothing
-   between them. Spread across three progressively taller ratios instead,
-   so no single step moves more than roughly 150–200px. */
-@media (max-width: 900px) {
-  .hero-carousel.full-bleed { aspect-ratio: 16 / 9; }
-}
-@media (max-width: 640px) {
-  .hero-carousel.full-bleed { aspect-ratio: 5 / 4; }
-}
-@media (max-width: 480px) {
-  .hero-carousel.full-bleed { aspect-ratio: 4 / 5; }
+  /* Replaced discrete aspect-ratio breakpoints entirely. Three fixed
+     steps (21:9 → 16:9 → 5:4 → 4:5) were an improvement over the original
+     single 499px cliff, but each step is still a discrete jump — resizing
+     smoothly through 900px, 640px, or 480px still snaps instead of
+     flowing. This is a genuinely continuous formula instead: height
+     decreases linearly as viewport width increases, with no breakpoints
+     to snap across at all. Solved for two reference points (1400px wide
+     -> ~380px tall; 380px wide -> ~530px tall) and clamped so it never
+     gets absurdly short on an ultra-wide monitor or absurdly tall on a
+     very old small phone. */
+  aspect-ratio: unset;
+  height: clamp(300px, calc(586px - 14.7vw), 560px);
 }
 .hero-inner {
   position: relative;
