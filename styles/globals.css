@@ -525,6 +525,14 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0.5rem 1.5rem 0;
   padding-right: calc(1.5rem + env(safe-area-inset-right, 0px));
 }
+@media (max-width: 640px) {
+  /* Matches .stage-wide/.library-stage's own 640px padding reduction —
+     without this, the content area below narrows its side padding at
+     this breakpoint while this row (sitting directly above the hero)
+     didn't, so which element was more inset from the edge silently
+     flipped right at 640px instead of the two staying in sync. */
+  .install-row { padding-right: calc(1.2rem + env(safe-area-inset-right, 0px)); }
+}
 .library-back {
   background: transparent;
   border: 1px solid rgba(234, 231, 221, 0.18);
@@ -665,7 +673,20 @@ button { font-family: inherit; cursor: pointer; }
   border-right: none;
   aspect-ratio: 21 / 9;
 }
+/* This used to be a single jump straight from 21:9 to 4:5 at 640px — at
+   700px wide the hero was ~300px tall; one pixel narrower, it became
+   ~799px tall. A 499px height change from a single pixel of viewport
+   width is exactly the kind of "something looks wrong at a certain size"
+   jolt that's actually a chain of two responsive rules with nothing
+   between them. Spread across three progressively taller ratios instead,
+   so no single step moves more than roughly 150–200px. */
+@media (max-width: 900px) {
+  .hero-carousel.full-bleed { aspect-ratio: 16 / 9; }
+}
 @media (max-width: 640px) {
+  .hero-carousel.full-bleed { aspect-ratio: 5 / 4; }
+}
+@media (max-width: 480px) {
   .hero-carousel.full-bleed { aspect-ratio: 4 / 5; }
 }
 .hero-inner {
