@@ -343,7 +343,21 @@ button { font-family: inherit; cursor: pointer; }
   .episode-row-link { flex-direction: column; }
   .episode-row-thumb { flex-basis: auto; width: 100%; }
 }
-.poster-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1.3rem; }
+.poster-grid {
+  display: grid;
+  /* Was minmax(160px, 1fr) — 1fr has no ceiling, so on any page with few
+     items (which describes most of Films/Vertical/genre pages right now)
+     the grid had nothing to divide the remaining space among except the
+     few real cards, stretching them to fill the whole row. With only 2
+     items in a 1180px-wide row that meant each poster ballooned to
+     roughly 580x869px. Capping the upper bound means a poster is always
+     somewhere in the 160-200px range, the same "fixed size regardless of
+     count" behavior the homepage's carousel cards already have — extra
+     row width from too few items now stays blank on the right instead of
+     inflating the cards that do exist. */
+  grid-template-columns: repeat(auto-fit, minmax(160px, 200px));
+  gap: 1.3rem;
+}
 .poster-card {
   position: relative;
   aspect-ratio: 2 / 3;
@@ -1033,7 +1047,10 @@ button { font-family: inherit; cursor: pointer; }
 }
 .shelf {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  /* Same fix as .poster-grid — unbounded 1fr meant a narrow search that
+     returns only 1-2 results would stretch those cards to fill the whole
+     row instead of staying a normal size. */
+  grid-template-columns: repeat(auto-fit, minmax(200px, 230px));
   gap: 0.9rem;
 }
 .ep-card {
@@ -4179,7 +4196,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 
 .series-bonus-grid {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 210px));
   gap: 1rem;
 }
 .series-bonus-card { text-decoration: none; display: block; }
