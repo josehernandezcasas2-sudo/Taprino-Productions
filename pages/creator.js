@@ -383,7 +383,14 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Creator Studio</div>
-        <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Submit new episodes and track your review status.</p>
+        <p className="library-sub" style={{ marginBottom: '1rem' }}>Submit new episodes and track your review status.</p>
+        <Link
+          href="/creator/series"
+          className="account-btn-secondary"
+          style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1.5rem' }}
+        >
+          ▤ Series management
+        </Link>
 
         {draftAvailable && (
           <div className="draft-banner">
@@ -439,7 +446,8 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 </select>
                 {form.seriesId === '__new__' && (
                   <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.5rem' }}>
-                    Prefer setting this up properly first? Use the &ldquo;Series info&rdquo; section below to create the {form.contentType === 'podcast' ? 'show' : 'series'} with its own trailer and artwork — then it&rsquo;ll show up in this dropdown.
+                    Prefer setting this up properly first? Use <Link href="/creator/series" style={{ color: 'var(--signal-amber)' }}>Series management</Link> to
+                    create the {form.contentType === 'podcast' ? 'show' : 'series'} with its own trailer and artwork — then it&rsquo;ll show up in this dropdown.
                   </p>
                 )}
                 {form.seriesId && form.seriesId !== '__new__' && (() => {
@@ -691,10 +699,6 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
 
           {formError && <p style={{ marginTop: '0.8rem', color: 'var(--danger)' }}>{formError}</p>}
         </div>
-
-        <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1.5rem' }}>
-          Setting up a series trailer or artwork, or need to remove a series? Head to <Link href="/creator/series" style={{ color: 'var(--signal-amber)' }}>Series management</Link>.
-        </p>
 
         <div className="account-card" style={{ marginTop: '1.5rem' }}>
           <div className="account-eyebrow">Your work</div>
