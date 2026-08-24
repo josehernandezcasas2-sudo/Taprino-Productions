@@ -58,7 +58,8 @@ const CONTENT_TYPES = [
 const EMPTY_FORM = {
   title: '', description: '', tier: 'free',
   genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short', rating: '',
-  seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: ''
+  seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: '',
+  featured: false, adsEnabled: true, isOriginal: false, fundingUrl: ''
 };
 
 // Reads an image file as a base64 data URL — small enough (posters/
@@ -640,6 +641,24 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
                 )}
               </>
             )}
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal', marginTop: '0.6rem' }}>
+              <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
+              Request homepage hero rotation <span style={{ opacity: 0.65 }}>— admin has final say on what actually rotates through</span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
+              <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
+              Show ads on this episode {form.tier === 'premium' && `(ignored — ${SITE.premiumTier} members never see ads regardless)`}
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
+              <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
+              Tapa Original <span style={{ opacity: 0.65 }}>— exclusive to Studio Tapa, independent of free/premium tier</span>
+            </label>
+
+            <label>Funding link <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — your own project/funding page</span></label>
+            <input type="url" value={form.fundingUrl} onChange={(e) => update('fundingUrl', e.target.value)} placeholder="https://kickstarter.com/..." style={{ marginBottom: '0.8rem' }} />
 
             <label>Poster image — 2:3 portrait (roughly 400×600px or larger), optional</label>
             <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />

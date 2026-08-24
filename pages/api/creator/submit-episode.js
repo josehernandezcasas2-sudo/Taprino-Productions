@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeUrl } from '../../../lib/normalizeUrl';
 
 // Every one of these has to be present and non-empty — this is the actual
 // enforcement of "creators must submit complete metadata," not just a UI
@@ -164,6 +165,15 @@ export default async function handler(req, res) {
     trailer_src: trailerSrc,
     poster,
     thumbnail,
+    // These three used to be admin-only. Creator submissions still go to
+    // 'pending' regardless of what's checked here (see status below), so
+    // none of them bypass review — a creator requesting hero rotation or
+    // marking something Tapa Original doesn't make it live or featured by
+    // itself, admin still has to approve the submission either way.
+    featured: !!body.featured,
+    ads_enabled: body.adsEnabled !== false,
+    is_original: !!body.isOriginal,
+    funding_url: body.fundingUrl && body.fundingUrl.trim() ? normalizeUrl(body.fundingUrl) : null,
     status: 'pending',
     submitted_by: userId
   });
