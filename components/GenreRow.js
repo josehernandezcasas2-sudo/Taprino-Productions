@@ -1,13 +1,10 @@
 import Link from 'next/link';
 import WishlistButton from './WishlistButton';
 import { SITE } from '../lib/siteConfig';
-import { useRowCarousel } from '../lib/useRowCarousel';
 
 const MAX_CARDS = 15;
 
 export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist, seeAllHref, viewCounts }) {
-  const { trackRef, scroll } = useRowCarousel();
-
   if (episodes.length === 0) return null;
 
   // Never show individual series episodes side by side in a browsing row —
@@ -58,61 +55,47 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
         {seeAllHref && <Link href={seeAllHref} className="see-all">See all</Link>}
       </div>
 
-      <div className="cat-row-carousel">
-        {cards.length > 1 && (
-          <button className="cat-row-arrow left" onClick={() => scroll('prev')} aria-label={`Scroll ${title} left`}>
-            ‹
-          </button>
-        )}
-
-        <div className="cat-row-track" ref={trackRef}>
-          {cards.map((card) => card.type === 'standalone' ? (
-            <div key={card.key} className="card-wrap row-card">
-              {onToggleWishlist && (
-                <WishlistButton isActive={isWishlisted(card.ep.id)} onToggle={() => onToggleWishlist(card.ep.id)} />
-              )}
-              <button
-                className={`ep-card ${card.ep.tier} ${card.ep.id === currentId ? 'active' : ''}`}
-                onClick={() => onSelect(card.ep)}
-              >
-                <div className="ep-thumb">
-                  {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
-                  <span className="ep-badge">{card.ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                  {!card.ep.thumbnail && (card.ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
-                </div>
-                <div className="ep-info">
-                  <h4>{card.ep.title}</h4>
-                  <span>{card.ep.runtime}</span>
-                  <span className="type-line standalone">◆ Standalone {card.ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
-                </div>
-              </button>
-            </div>
-          ) : (
-            <div key={card.key} className="card-wrap row-card">
-              {onToggleWishlist && (
-                <WishlistButton isActive={isWishlisted(card.info.id)} onToggle={() => onToggleWishlist(card.info.id)} />
-              )}
-              <Link href={`/series/${card.info.id}`} className={`ep-card ${card.tier}`}>
-                <div className="ep-thumb">
-                  {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
-                  <span className="ep-badge">{card.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                  {!card.info.thumbnail && '▤ series'}
-                </div>
-                <div className="ep-info">
-                  <h4>{card.info.name}</h4>
-                  <span>{card.count} episode{card.count === 1 ? '' : 's'}</span>
-                  <span className="type-line series">▤ Series</span>
-                </div>
-              </Link>
-            </div>
-          ))}
-        </div>
-
-        {cards.length > 1 && (
-          <button className="cat-row-arrow right" onClick={() => scroll('next')} aria-label={`Scroll ${title} right`}>
-            ›
-          </button>
-        )}
+      <div className="cat-row-track">
+        {cards.map((card) => card.type === 'standalone' ? (
+          <div key={card.key} className="card-wrap row-card">
+            {onToggleWishlist && (
+              <WishlistButton isActive={isWishlisted(card.ep.id)} onToggle={() => onToggleWishlist(card.ep.id)} />
+            )}
+            <button
+              className={`ep-card ${card.ep.tier} ${card.ep.id === currentId ? 'active' : ''}`}
+              onClick={() => onSelect(card.ep)}
+            >
+              <div className="ep-thumb">
+                {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
+                <span className="ep-badge">{card.ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                {!card.ep.thumbnail && (card.ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
+              </div>
+              <div className="ep-info">
+                <h4>{card.ep.title}</h4>
+                <span>{card.ep.runtime}</span>
+                <span className="type-line standalone">◆ Standalone {card.ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+              </div>
+            </button>
+          </div>
+        ) : (
+          <div key={card.key} className="card-wrap row-card">
+            {onToggleWishlist && (
+              <WishlistButton isActive={isWishlisted(card.info.id)} onToggle={() => onToggleWishlist(card.info.id)} />
+            )}
+            <Link href={`/series/${card.info.id}`} className={`ep-card ${card.tier}`}>
+              <div className="ep-thumb">
+                {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
+                <span className="ep-badge">{card.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                {!card.info.thumbnail && '▤ series'}
+              </div>
+              <div className="ep-info">
+                <h4>{card.info.name}</h4>
+                <span>{card.count} episode{card.count === 1 ? '' : 's'}</span>
+                <span className="type-line series">▤ Series</span>
+              </div>
+            </Link>
+          </div>
+        ))}
       </div>
     </div>
   );
