@@ -5,6 +5,8 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
+import { getOwnProfile } from '../../lib/userProfiles';
+import { filterByAgeRating } from '../../lib/ageGate';
 import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
@@ -35,12 +37,23 @@ export async function getServerSideProps({ req, params, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [episodes, seriesInfo] = await Promise.all([getPublicEpisodes(), findSeries(params.id)]);
+  const [episodesRaw, seriesInfo] = await Promise.all([getPublicEpisodes(), findSeries(params.id)]);
   if (!seriesInfo) {
     return { notFound: true };
   }
 
   const account = await getAccountContext(req);
+
+  // hasSession false means this response may be served from cache to many
+  // different anonymous visitors — using null (unknown age) for that case
+  // keeps the cached HTML identical and safe for everyone in that
+  // population, exactly like the cache-control split above already
+  // assumes. Signed-in responses are never cached (private, no-store
+  // above), so resolving a real profile age here doesn't leak across
+  // visitors.
+  const viewerProfile = hasSession && account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesRaw : filterByAgeRating(episodesRaw, viewerAge);
 
   return {
     props: {

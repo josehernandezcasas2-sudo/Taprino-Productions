@@ -2,6 +2,8 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAccountContext } from '../../lib/accountContext';
+import { getOwnProfile } from '../../lib/userProfiles';
+import { filterByAgeRating } from '../../lib/ageGate';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
@@ -42,8 +44,15 @@ export async function getServerSideProps({ req, params, res }) {
     getAllSeries(),
     getLifecycleSettings()
   ]);
-  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  const episodesNoBonus = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
   const account = await getAccountContext(req);
+
+  // Same reasoning as series/[id].js — null age for the cacheable
+  // signed-out path (shared across visitors), real profile age only for
+  // the never-cached signed-in path.
+  const viewerProfile = hasSession && account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesNoBonus : filterByAgeRating(episodesNoBonus, viewerAge);
 
   const matches = params.slug === 'new-releases'
     ? episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays))

@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
+import { filterByAgeRating } from '../lib/ageGate';
 import { getPodcastShows } from '../lib/podcastShow';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
@@ -12,7 +13,14 @@ import { SITE } from '../lib/siteConfig';
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   const account = await getAccountContext(req);
-  const [shows, episodes] = await Promise.all([getPodcastShows(), getPublicEpisodes()]);
+  const [shows, episodesRaw] = await Promise.all([getPodcastShows(), getPublicEpisodes()]);
+  // This response is cached publicly with no Vary: Cookie split (unlike
+  // series/[id].js and index.js), so it's shared across every visitor
+  // regardless of who's signed in. Resolving a specific viewer's age here
+  // would bake their personal restricted/unrestricted view into a cache
+  // entry served to everyone else too - null is the only safe choice
+  // until that caching gap gets its own fix.
+  const episodes = filterByAgeRating(episodesRaw, null);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   return {

@@ -4,6 +4,8 @@ import Head from 'next/head';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
+import { getOwnProfile } from '../lib/userProfiles';
+import { filterByAgeRating } from '../lib/ageGate';
 import { getViewCounts, isRedisConfigured } from '../lib/redis';
 import { buildHeroCandidates } from '../lib/heroCandidates';
 import { useWishlist } from '../lib/useWishlist';
@@ -71,7 +73,14 @@ export async function getServerSideProps({ req, res }) {
   // Filtering it out once here, right after the fetch, means every row
   // and filter below gets the right set automatically instead of needing
   // its own bonus-content exclusion.
-  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  const episodesWithBonusRemoved = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+
+  // Same "filter once here, everything below inherits it" approach as the
+  // bonus-content filter above. Admins skip this — they need to see and
+  // manage the full library regardless of their own profile's age.
+  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesWithBonusRemoved : filterByAgeRating(episodesWithBonusRemoved, viewerAge);
 
   // Continue Watching needs `episodes` to already be resolved (it maps
   // saved positions back to real episode data), so it can't join the

@@ -9,6 +9,8 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
+import { getOwnProfile } from '../../lib/userProfiles';
+import { meetsAgeRequirement } from '../../lib/ageGate';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
 import { recordView, recordDailyView } from '../../lib/redis';
 import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
@@ -40,6 +42,27 @@ export async function getServerSideProps({ req, params, query, res }) {
   await Promise.all([recordView(episode.id), recordDailyView(episode.id, episode.submittedBy)]);
 
   const account = await getAccountContext(req);
+
+  // Age gate — the actual access-control point, not just a listing filter.
+  // A listing can be worked around by a direct link; this can't. Admins
+  // bypass this since they need to review and manage content regardless
+  // of their own profile's age setting. Unknown age (signed out, or
+  // signed in without ever setting an age) fails closed — see
+  // lib/ageGate.js for why "unknown" isn't treated as "assume adult."
+  if (!account.isAdmin) {
+    const profile = account.isSignedIn ? await getOwnProfile(account.userId) : null;
+    const viewerAge = profile && profile.age != null ? profile.age : null;
+    if (!meetsAgeRequirement(viewerAge, episode.rating)) {
+      res.statusCode = 403;
+      return {
+        props: {
+          ageRestricted: true,
+          requiredRating: episode.rating || 'Not Rated',
+          isSignedIn: account.isSignedIn
+        }
+      };
+    }
+  }
 
   // SECURITY: never send the real video file to the client unless they're
   // actually entitled to it. Next.js embeds page props directly in the HTML
@@ -172,8 +195,17 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating }) {
   const router = useRouter();
+  // Falls back to an empty object rather than leaving `episode` undefined
+  // when age-restricted — every hook below (and there are several) has to
+  // run in the exact same order on every render regardless of this prop,
+  // so they can't be skipped with an early return the way a plain
+  // component could. This keeps every `episode.x` access safe (undefined
+  // rather than a crash) while hooks execute completely normally; the
+  // actual restricted-content UI is a conditional JSX branch in the
+  // return statement further down, which is the safe place for it.
+  const episode = episodeProp || {};
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
   // Series episodes are reached by explicitly picking one from the show's
   // own page (/series/[id]) — that's already the "choose what to watch"
@@ -189,6 +221,39 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
+  const { openSignIn } = useClerk();
+
+  // Safe here — every hook the component uses has already run above,
+  // unconditionally, on every render. Nothing below this point is a hook,
+  // so branching on ageRestricted from here on doesn't violate the Rules
+  // of Hooks the way returning before those calls would have.
+  if (ageRestricted) {
+    return (
+      <>
+        <Head><title>Content restricted — {SITE.name}</title></Head>
+        <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+          <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
+            <div className="account-eyebrow">Content restricted</div>
+            <h1 style={{ fontSize: '1.4rem', marginBottom: '0.6rem' }}>This title is rated {requiredRating}</h1>
+            <p style={{ color: 'var(--ink-dim)', marginBottom: '1.2rem' }}>
+              {isSignedIn
+                ? 'Your account settings don\u2019t meet the age requirement for this rating. You can update your age in Account settings if it\u2019s incorrect.'
+                : 'This content has an age restriction. Sign in and set your age in Account settings to see if it\u2019s available to you.'}
+            </p>
+            {isSignedIn ? (
+              <Link href="/account" className="account-btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>Go to account settings</Link>
+            ) : (
+              <button className="account-btn-primary" onClick={() => openSignIn({ redirectUrl: router.asPath })}>Sign in</button>
+            )}
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>← Back to screening room</Link>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
 
   const locked = episode.tier === 'premium' && !isSubscriber && !showingTrailer;
   const playingEpisode = showingTrailer
@@ -236,8 +301,6 @@ export default function EpisodePage({ episode, isSubscriber, isSignedIn, wishlis
     }
     // No next episode in this series — just stop. Nothing to autoplay into.
   }
-
-  const { openSignIn } = useClerk();
 
   async function startCheckout() {
     if (!isSignedIn) {

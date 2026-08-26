@@ -1,6 +1,8 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
+import { getOwnProfile } from '../../lib/userProfiles';
+import { filterByAgeRating } from '../../lib/ageGate';
 import { findSeries } from '../../lib/series';
 import { getPodcastShowEpisodes } from '../../lib/podcastShow';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -17,12 +19,16 @@ export async function getServerSideProps({ req, res, params }) {
 
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
-  const [episodes, allEpisodes] = await Promise.all([
+  const [episodesRaw, allEpisodes] = await Promise.all([
     getPodcastShowEpisodes(params.id, account.isSubscriber),
     getPublicEpisodes()
   ]);
 
-  if (episodes.length === 0) return { notFound: true };
+  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesRaw : filterByAgeRating(episodesRaw, viewerAge);
+
+  if (episodesRaw.length === 0) return { notFound: true };
 
   const mainGenres = [...new Set(allEpisodes.map((e) => e.mainGenre).filter(Boolean))];
 

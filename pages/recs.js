@@ -4,6 +4,8 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
+import { getOwnProfile } from '../lib/userProfiles';
+import { filterByAgeRating } from '../lib/ageGate';
 import { getWatchHistory } from '../lib/watchHistory';
 import { getSiteSettings } from '../lib/siteSettings';
 import { getRecommendations } from '../lib/recommendations';
@@ -25,7 +27,10 @@ export async function getServerSideProps({ req, res }) {
     getAllSeries(),
     getSiteSettings()
   ]);
-  const episodes = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  const episodesNoBonus = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesNoBonus : filterByAgeRating(episodesNoBonus, viewerAge);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   let recommendations = [];

@@ -94,16 +94,28 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
+  // Tracks what was actually loaded from the server, separate from the
+  // live form value — this is what lets the warning appear only when the
+  // person has actually changed their age this session, not just because
+  // they have one on file already.
+  const [originalAge, setOriginalAge] = useState(null);
+  const [ageChangeConfirmed, setAgeChangeConfirmed] = useState(false);
 
   useEffect(() => {
     fetch('/api/account/profile')
       .then((r) => r.json())
-      .then((data) => setProfile(data))
+      .then((data) => { setProfile(data); setOriginalAge(data.age ?? null); })
       .catch(() => setProfile({ displayName: '', gender: '', age: '' }));
   }, []);
 
+  const ageWasChanged = originalAge !== null && String(profile.age || '') !== String(originalAge || '') && profile.age !== '';
+
   async function saveProfile(e) {
     e.preventDefault();
+    if (ageWasChanged && !ageChangeConfirmed) {
+      setProfileError('Please confirm the age change below before saving.');
+      return;
+    }
     setProfileSaving(true);
     setProfileSaved(false);
     setProfileError(null);
@@ -116,6 +128,8 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save.');
       setProfileSaved(true);
+      setOriginalAge(profile.age ?? null);
+      setAgeChangeConfirmed(false);
       setTimeout(() => setProfileSaved(false), 2500);
     } catch (err) {
       setProfileError(err.message);
@@ -310,10 +324,28 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                           min="13"
                           max="120"
                           value={profile.age || ''}
-                          onChange={(e) => setProfile((p) => ({ ...p, age: e.target.value }))}
+                          onChange={(e) => { setProfile((p) => ({ ...p, age: e.target.value })); setAgeChangeConfirmed(false); }}
                         />
                       </div>
                     </div>
+
+                    {ageWasChanged && (
+                      <div style={{ background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+                        <p style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
+                          <strong>Before you save this change:</strong> the age you provide here determines
+                          which age-restricted titles are shown to you — content rated for adults won&rsquo;t
+                          appear for an account listed as a minor. By changing your age, you&rsquo;re confirming
+                          the new value is accurate. Providing an inaccurate age to access content that
+                          wouldn&rsquo;t otherwise be shown to you may violate our Terms of Service and
+                          applicable law, and {SITE.name} is not responsible for content viewed as a result
+                          of inaccurate age information you provided.
+                        </p>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 'normal' }}>
+                          <input type="checkbox" checked={ageChangeConfirmed} onChange={(e) => setAgeChangeConfirmed(e.target.checked)} />
+                          I confirm this age is accurate.
+                        </label>
+                      </div>
+                    )}
 
                     <button className="account-btn-primary" type="submit" disabled={profileSaving} style={{ width: 'auto', marginTop: '0.8rem' }}>
                       {profileSaving ? 'Saving…' : 'Save profile'}

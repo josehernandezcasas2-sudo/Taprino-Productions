@@ -5,6 +5,8 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
+import { getOwnProfile } from '../lib/userProfiles';
+import { filterByAgeRating } from '../lib/ageGate';
 import { getContinueWatching } from '../lib/continueWatching';
 import { getWatchHistory } from '../lib/watchHistory';
 import { useWishlist } from '../lib/useWishlist';
@@ -19,7 +21,10 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   const { userId } = getAuth(req);
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const [episodesRaw, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
+  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
+  const episodes = account.isAdmin ? episodesRaw : filterByAgeRating(episodesRaw, viewerAge);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   const [continueWatching, watchHistory] = await Promise.all([
