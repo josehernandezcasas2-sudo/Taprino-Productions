@@ -20,8 +20,8 @@ export default async function handler(req, res) {
       .or('pending_poster.not.is.null,pending_thumbnail.not.is.null'),
     supabase
       .from('series')
-      .select('id, name, poster, thumbnail, trailer_src, pending_poster, pending_thumbnail, pending_trailer_src')
-      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null,pending_trailer_src.not.is.null')
+      .select('id, name, poster, thumbnail, trailer_src, hero_image, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image')
+      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null,pending_trailer_src.not.is.null,pending_hero_image.not.is.null')
   ]);
 
   if (episodesResult.error || seriesResult.error) {
@@ -44,9 +44,11 @@ export default async function handler(req, res) {
       currentPoster: s.poster,
       currentThumbnail: s.thumbnail,
       currentTrailerSrc: s.trailer_src,
+      currentHeroImage: s.hero_image,
       pendingPoster: s.pending_poster,
       pendingThumbnail: s.pending_thumbnail,
-      pendingTrailerSrc: s.pending_trailer_src
+      pendingTrailerSrc: s.pending_trailer_src,
+      pendingHeroImage: s.pending_hero_image
     }))
   });
 }

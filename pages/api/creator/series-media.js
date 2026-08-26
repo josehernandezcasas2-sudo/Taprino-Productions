@@ -24,18 +24,18 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, trailerUid } = req.body || {};
+  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, trailerUid } = req.body || {};
   if (!seriesId) {
     return res.status(400).json({ error: 'seriesId is required.' });
   }
-  if (!posterBase64 && !thumbnailBase64 && !trailerUid) {
-    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, or trailer.' });
+  if (!posterBase64 && !thumbnailBase64 && !heroImageBase64 && !trailerUid) {
+    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, hero image, or trailer.' });
   }
 
   const supabase = getSupabase();
   const { data: existing, error: fetchError } = await supabase
     .from('series')
-    .select('id, name, poster, thumbnail, trailer_src')
+    .select('id, name, poster, thumbnail, hero_image, trailer_src')
     .eq('id', seriesId)
     .maybeSingle();
 
@@ -45,10 +45,12 @@ export default async function handler(req, res) {
 
   let poster;
   let thumbnail;
+  let heroImage;
   try {
-    [poster, thumbnail] = await Promise.all([
+    [poster, thumbnail, heroImage] = await Promise.all([
       uploadArtworkImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: `series-${seriesId}-poster` }),
-      uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `series-${seriesId}-thumbnail` })
+      uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `series-${seriesId}-thumbnail` }),
+      uploadArtworkImage({ base64: heroImageBase64, fileName: heroImageFileName, pathPrefix: `series-${seriesId}-hero` })
     ]);
   } catch (err) {
     console.error('series-media upload error:', err.message);
@@ -71,6 +73,7 @@ export default async function handler(req, res) {
   const dbUpdates = {};
   if (poster) dbUpdates.pending_poster = poster;
   if (thumbnail) dbUpdates.pending_thumbnail = thumbnail;
+  if (heroImage) dbUpdates.pending_hero_image = heroImage;
   if (trailerSrc) dbUpdates.pending_trailer_src = trailerSrc;
 
   const { error } = await supabase.from('series').update(dbUpdates).eq('id', seriesId);

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
@@ -8,6 +8,7 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import SeriesMediaForm from '../../components/SeriesMediaForm';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
+import RequestEditModal from '../../components/RequestEditModal';
 import { SITE } from '../../lib/siteConfig';
 
 import Footer from '../../components/Footer';
@@ -36,6 +37,22 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
   const [seriesList, setSeriesList] = useState(allSeries);
   const [deletingSeries, setDeletingSeries] = useState(null);
   const [actionError, setActionError] = useState(null);
+  const [openDropdown, setOpenDropdown] = useState(null);
+  const [editingNameDesc, setEditingNameDesc] = useState(null);
+  // Bumping this forces SeriesMediaForm to remount with fresh initial
+  // props (via the key trick below) — simpler and safer than converting
+  // its internal mode/seriesId state to be fully controlled from here,
+  // for what's just a "jump down and pre-select" interaction.
+  const [mediaFormTarget, setMediaFormTarget] = useState(null); // { seriesId, bump }
+  const mediaFormRef = useRef(null);
+
+  function openMediaFormFor(seriesId) {
+    setOpenDropdown(null);
+    setMediaFormTarget((prev) => ({ seriesId, bump: (prev?.bump || 0) + 1 }));
+    requestAnimationFrame(() => {
+      mediaFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }
 
   async function refreshSeriesList() {
     try {
@@ -99,7 +116,15 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
           For uploading shorts and episodes, head to <Link href="/creator" style={{ color: 'var(--signal-amber)' }}>Creator Studio</Link>.
         </p>
 
-        <SeriesMediaForm allSeries={seriesList} onSaved={refreshSeriesList} />
+        <div ref={mediaFormRef}>
+          <SeriesMediaForm
+            key={mediaFormTarget ? `${mediaFormTarget.seriesId}-${mediaFormTarget.bump}` : 'default'}
+            allSeries={seriesList}
+            onSaved={refreshSeriesList}
+            initialMode={mediaFormTarget ? 'existing' : undefined}
+            initialSeriesId={mediaFormTarget ? mediaFormTarget.seriesId : undefined}
+          />
+        </div>
 
         <div className="account-card" style={{ marginTop: '1.5rem' }}>
           <div className="account-eyebrow">All series</div>
@@ -111,13 +136,42 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
 
           {seriesList.map((s) => (
             <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
-              <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
+                <span style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setOpenDropdown(openDropdown === s.id ? null : s.id)}
+                    style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                    aria-label={`Settings for ${s.name}`}
+                  >
+                    ⚙
+                  </button>
+                  {openDropdown === s.id && (
+                    <div className="dropdown dropdown-left open">
+                      <button
+                        className="dropdown-item"
+                        onClick={() => { setEditingNameDesc(s); setOpenDropdown(null); }}
+                      >
+                        ✎ Edit name &amp; description
+                      </button>
+                      <button className="dropdown-item" onClick={() => openMediaFormFor(s.id)}>
+                        🖼 Edit images &amp; trailer
+                      </button>
+                    </div>
+                  )}
+                </span>
+              </div>
               <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
-                Poster {s.poster ? '✓' : '—'} · Thumbnail {s.thumbnail ? '✓' : '—'} · Trailer {s.trailerSrc ? '✓' : '—'}
+                Poster {s.poster ? '✓' : '—'} · Thumbnail {s.thumbnail ? '✓' : '—'} · Hero image {s.heroImage ? '✓' : '—'} · Trailer {s.trailerSrc ? '✓' : '—'}
               </p>
-              {(s.pendingPoster || s.pendingThumbnail || s.pendingTrailerSrc) && (
+              {(s.pendingPoster || s.pendingThumbnail || s.pendingHeroImage || s.pendingTrailerSrc) && (
                 <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
                   ⏳ A change is awaiting admin approval and hasn&rsquo;t gone live yet.
+                </p>
+              )}
+              {(s.pendingName || s.pendingDescription) && (
+                <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
+                  ⏳ A name/description change is awaiting admin approval.
                 </p>
               )}
 
@@ -146,6 +200,15 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
           itemLabel={deletingSeries.name}
           onClose={() => setDeletingSeries(null)}
           onConfirm={requestDeletion}
+        />
+      )}
+
+      {editingNameDesc && (
+        <RequestEditModal
+          type="series"
+          currentValues={{ id: editingNameDesc.id, name: editingNameDesc.name, description: editingNameDesc.desc || '' }}
+          onClose={() => setEditingNameDesc(null)}
+          onSubmitted={refreshSeriesList}
         />
       )}
     </>

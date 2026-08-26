@@ -41,13 +41,14 @@ async function uploadTrailer(file, onProgress) {
   return urlData.uid;
 }
 
-export default function SeriesMediaForm({ allSeries, onSaved }) {
-  const [mode, setMode] = useState(allSeries.length > 0 ? 'existing' : 'new');
-  const [seriesId, setSeriesId] = useState(allSeries[0] ? allSeries[0].id : '');
+export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initialSeriesId }) {
+  const [mode, setMode] = useState(initialMode || (allSeries.length > 0 ? 'existing' : 'new'));
+  const [seriesId, setSeriesId] = useState(initialSeriesId || (allSeries[0] ? allSeries[0].id : ''));
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [heroImageFile, setHeroImageFile] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
   const [status, setStatus] = useState(null); // null | 'uploading-trailer' | 'saving' | 'done' | 'error'
   const [trailerProgress, setTrailerProgress] = useState(0);
@@ -67,8 +68,8 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
       setError('Choose a series.');
       return;
     }
-    if (!posterFile && !thumbnailFile && !trailerFile) {
-      setError('Add at least a poster, thumbnail, or trailer.');
+    if (!posterFile && !thumbnailFile && !heroImageFile && !trailerFile) {
+      setError('Add at least a poster, thumbnail, hero image, or trailer.');
       return;
     }
 
@@ -94,7 +95,11 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
       }
 
       setStatus('saving');
-      const [posterBase64, thumbnailBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile)]);
+      const [posterBase64, thumbnailBase64, heroImageBase64] = await Promise.all([
+        readAsDataUrl(posterFile),
+        readAsDataUrl(thumbnailFile),
+        readAsDataUrl(heroImageFile)
+      ]);
       const res = await fetch('/api/creator/series-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -102,6 +107,7 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
           seriesId: targetSeriesId,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
+          ...(heroImageBase64 ? { heroImageBase64, heroImageFileName: heroImageFile.name } : {}),
           ...(trailerUid ? { trailerUid } : {})
         })
       });
@@ -111,6 +117,7 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
       setStatus('done');
       setPosterFile(null);
       setThumbnailFile(null);
+      setHeroImageFile(null);
       setTrailerFile(null);
       setNewName('');
       setNewDescription('');
@@ -154,7 +161,7 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
             </select>
             {selectedSeries && (
               <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
-                Currently has: {selectedSeries.poster ? 'poster ✓' : 'poster —'}, {selectedSeries.thumbnail ? 'thumbnail ✓' : 'thumbnail —'}, {selectedSeries.trailerSrc ? 'trailer ✓' : 'trailer —'}
+                Currently has: {selectedSeries.poster ? 'poster ✓' : 'poster —'}, {selectedSeries.thumbnail ? 'thumbnail ✓' : 'thumbnail —'}, {selectedSeries.heroImage ? 'hero image ✓' : 'hero image —'}, {selectedSeries.trailerSrc ? 'trailer ✓' : 'trailer —'}
               </p>
             )}
           </>
@@ -172,6 +179,9 @@ export default function SeriesMediaForm({ allSeries, onSaved }) {
 
         <label>Series thumbnail — 16:9 landscape, optional</label>
         <input type="file" accept="image/*" onChange={(e) => setThumbnailFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
+
+        <label>Series hero image <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— the background behind the title on this show's own page, optional</span></label>
+        <input type="file" accept="image/*" onChange={(e) => setHeroImageFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
         <label>Series trailer — plays in the homepage hero if a title from this series gets featured, optional</label>
         <input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
