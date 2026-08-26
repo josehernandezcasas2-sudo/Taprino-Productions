@@ -122,7 +122,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       {heroPool.length > 0 && (
         <HeroSpotlight
           pool={heroPool}
-          onPlay={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : `/episode/${item.id}?autoplay=1`; }}
+          onPlay={(item) => { window.location.href = item.isSeries ? (item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`) : `/episode/${item.id}?autoplay=1`; }}
           onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`; }}
           fullBleed
         />

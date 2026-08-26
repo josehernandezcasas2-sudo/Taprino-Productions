@@ -184,7 +184,15 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
 
   function goToEpisode(ep) {
     if (ep.isSeries) {
-      router.push(`/series/${ep.id}`);
+      // Play should mean "start watching," same as it does for standalone
+      // content — jump straight to episode 1 rather than the series'
+      // overview page. Falls back to the overview only if a series
+      // somehow has no episodes at all (shouldn't happen in practice).
+      if (ep.firstEpisodeId) {
+        router.push(`/episode/${ep.firstEpisodeId}?autoplay=1`);
+      } else {
+        router.push(`/series/${ep.id}`);
+      }
     } else {
       // ?autoplay=1 tells the episode page to skip its landing view and
       // jump straight into playback — clicking Play should mean "start
