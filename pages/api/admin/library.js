@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   let query = supabase
     .from('episodes')
-    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, rating, poster, thumbnail, src, featured, is_original, funding_url, deletion_requested, created_at, available_from, available_until, ads_enabled')
+    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, rating, poster, thumbnail, src, featured, is_original, funding_url, deletion_requested, created_at, available_from, available_until, ads_enabled, ad_break_seconds')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -66,6 +66,7 @@ export default async function handler(req, res) {
       availableFrom: e.available_from,
       availableUntil: e.available_until,
       adsEnabled: e.ads_enabled !== false,
+      adBreakSeconds: Array.isArray(e.ad_break_seconds) && e.ad_break_seconds.length > 0 ? e.ad_break_seconds : [0],
       deletionRequested: e.deletion_requested,
       createdAt: e.created_at
     }))

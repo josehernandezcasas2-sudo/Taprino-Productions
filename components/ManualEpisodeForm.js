@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { parseAdBreaksInput } from '../lib/adBreaks';
 import { SITE } from '../lib/siteConfig';
 import { CONTENT_RATINGS } from '../lib/contentRatings';
 
@@ -16,7 +17,7 @@ const EMPTY_FORM = {
   creatorEmail: '', title: '', description: '', contentType: 'short', rating: '', bonusParent: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
-  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: ''
+  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
 };
 
 function readAsDataUrl(f) {
@@ -79,6 +80,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form,
+          adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
           bonusParentType,
           bonusParentId,
           cloudflareVideoUid: videoUid.trim(),
@@ -239,6 +241,19 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
           Show ads on this episode {form.tier === 'premium' && `(ignored — ${SITE.premiumTier} members never see ads regardless)`}
         </label>
+
+        {form.adsEnabled && (
+          <>
+            <label>Ad break times <span style={{ fontWeight: 'normal', opacity: 0.65 }}>comma-separated MM:SS, e.g. "0:00, 10:00, 20:30" — defaults to pre-roll only if left as-is</span></label>
+            <input
+              type="text"
+              value={form.adBreaksText}
+              onChange={(e) => update('adBreaksText', e.target.value)}
+              placeholder="0:00"
+              style={{ marginBottom: '0.8rem' }}
+            />
+          </>
+        )}
 
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
           <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />

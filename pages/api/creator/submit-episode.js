@@ -172,6 +172,7 @@ export default async function handler(req, res) {
     // itself, admin still has to approve the submission either way.
     featured: !!body.featured,
     ads_enabled: body.adsEnabled !== false,
+    ad_break_seconds: Array.isArray(body.adBreakSeconds) && body.adBreakSeconds.length > 0 ? body.adBreakSeconds : [0],
     is_original: !!body.isOriginal,
     funding_url: body.fundingUrl && body.fundingUrl.trim() ? normalizeUrl(body.fundingUrl) : null,
     status: 'pending',

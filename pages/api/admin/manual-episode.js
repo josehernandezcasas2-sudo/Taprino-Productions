@@ -142,6 +142,7 @@ export default async function handler(req, res) {
     funding_url: normalizeUrl(body.fundingUrl),
     audio_url: body.audioUrl || null,
     ads_enabled: body.adsEnabled !== false,
+    ad_break_seconds: Array.isArray(body.adBreakSeconds) && body.adBreakSeconds.length > 0 ? body.adBreakSeconds : [0],
     status,
     submitted_by: submittedBy,
     reviewed_by: status !== 'pending' ? userId : null,

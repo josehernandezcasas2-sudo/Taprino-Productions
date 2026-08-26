@@ -7,6 +7,7 @@ import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
+import { parseAdBreaksInput } from '../lib/adBreaks';
 import dynamic from 'next/dynamic';
 
 // Uppy touches browser-only APIs during its own setup — rendering it
@@ -59,7 +60,7 @@ const EMPTY_FORM = {
   title: '', description: '', tier: 'free',
   genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short', rating: '',
   seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: '',
-  featured: false, adsEnabled: true, isOriginal: false, fundingUrl: ''
+  featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
 };
 
 // Reads an image file as a base64 data URL — small enough (posters/
@@ -277,6 +278,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
 
     const submissionData = {
       ...form,
+      adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
       ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
       ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
       // A manually-typed trailer ID rides along as plain metadata — if no
@@ -651,6 +653,19 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />
               Show ads on this episode {form.tier === 'premium' && `(ignored — ${SITE.premiumTier} members never see ads regardless)`}
             </label>
+
+            {form.adsEnabled && (
+              <>
+                <label>Ad break times <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — comma-separated MM:SS, e.g. "0:00, 10:00, 20:30". Leave blank for a single ad at the start.</span></label>
+                <input
+                  type="text"
+                  value={form.adBreaksText}
+                  onChange={(e) => update('adBreaksText', e.target.value)}
+                  placeholder="0:00"
+                  style={{ marginBottom: '0.8rem' }}
+                />
+              </>
+            )}
 
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
               <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />

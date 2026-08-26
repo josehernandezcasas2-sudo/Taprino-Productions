@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { SITE } from '../lib/siteConfig';
 import { CONTENT_RATINGS } from '../lib/contentRatings';
+import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -63,7 +64,8 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     fundingUrl: episode.fundingUrl || '',
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
-    adsEnabled: episode.adsEnabled !== false
+    adsEnabled: episode.adsEnabled !== false,
+    adBreaksText: formatAdBreaksForInput(episode.adBreakSeconds)
   });
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -149,6 +151,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
         body: JSON.stringify({
           episodeId: episode.id,
           ...form,
+          adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
           bonusParentType,
           bonusParentId,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
@@ -311,6 +314,18 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             Show ads on this episode
             {form.tier === 'premium' && <span className="admin-optional"> — ignored, {SITE.premiumTier} members never see ads regardless of tier</span>}
           </label>
+
+          {form.adsEnabled && (
+            <>
+              <label>Ad break times <span className="admin-optional">comma-separated MM:SS, e.g. &ldquo;0:00, 10:00, 20:30&rdquo;</span></label>
+              <input
+                type="text"
+                value={form.adBreaksText}
+                onChange={(e) => update('adBreaksText', e.target.value)}
+                placeholder="0:00"
+              />
+            </>
+          )}
 
           <label className="admin-checkbox">
             <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />

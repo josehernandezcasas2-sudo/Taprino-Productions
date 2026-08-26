@@ -48,6 +48,10 @@ export default function VideoPlayer({
   const adContainerRef = useRef(null);
   const adsManagerRef = useRef(null);
   const adsLoaderRef = useRef(null);
+  // Tracks which ad-break second-offsets have already fired this playback
+  // session, so a timeupdate event near the threshold (or scrubbing back
+  // and forward across it) doesn't retrigger the same break repeatedly.
+  const consumedBreaksRef = useRef(new Set());
   const hlsRef = useRef(null);
   const lastSavedRef = useRef(0);
   // Separate from lastSavedRef, deliberately. lastSavedRef is reset to 0
@@ -450,6 +454,44 @@ export default function VideoPlayer({
     }
   }, []);
 
+  /* ------------------------------------------------------------------ *
+   * Mid-roll ad breaks — admin/creator-configured second-offsets into
+   * the video (episode.adBreakSeconds), not anything read from the ad
+   * server's own response. Pre-roll (offset 0) is handled separately in
+   * togglePlay, since that one fires on first play rather than from
+   * playback position. This only ever handles offsets > 0. Placed here,
+   * after startAds is declared — startAds is a `const`, so referencing
+   * it in an effect's dependency array any earlier in the file would hit
+   * the temporal dead zone and throw at render time.
+   * ------------------------------------------------------------------ */
+  useEffect(() => {
+    consumedBreaksRef.current = new Set();
+  }, [episode.id]);
+
+  useEffect(() => {
+    if (isYouTube || !adsEnabled) return;
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
+    const midRolls = breaks.filter((s) => s > 0);
+    if (midRolls.length === 0) return;
+
+    function handleMidRollCheck() {
+      const now = videoElement.currentTime;
+      for (const breakSeconds of midRolls) {
+        if (now >= breakSeconds && !consumedBreaksRef.current.has(breakSeconds)) {
+          consumedBreaksRef.current.add(breakSeconds);
+          startAds();
+          break; // one break at a time - startAds() pauses content itself
+        }
+      }
+    }
+
+    videoElement.addEventListener('timeupdate', handleMidRollCheck);
+    return () => videoElement.removeEventListener('timeupdate', handleMidRollCheck);
+  }, [episode.id, episode.adBreakSeconds, isYouTube, adsEnabled, startAds]);
+
   useEffect(() => {
     return () => {
       if (adsManagerRef.current) {
@@ -503,7 +545,13 @@ export default function VideoPlayer({
       setStarted(true);
       // Free tier: try the ad first. If IMA isn't available (blocked, still
       // loading, or misconfigured) fall straight through to the content.
-      if (adsEnabled) {
+      // Pre-roll only fires if 0 is actually in the configured ad breaks —
+      // this used to be unconditional on adsEnabled alone, which meant a
+      // mid-roll-only configuration (say, just "10:00") would still get an
+      // uninvited pre-roll on top of it.
+      const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
+      if (adsEnabled && breaks.includes(0)) {
+        consumedBreaksRef.current.add(0);
         const requested = startAds();
         if (requested) return;
       }
@@ -513,7 +561,7 @@ export default function VideoPlayer({
     if (v.paused) v.play();
     else v.pause();
     showControlsTemporarily();
-  }, [adsEnabled, started, startAds, showControlsTemporarily]);
+  }, [adsEnabled, started, startAds, showControlsTemporarily, episode.adBreakSeconds]);
 
   const seekTo = useCallback((t) => {
     const v = videoRef.current;

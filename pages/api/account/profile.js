@@ -1,5 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
-import { getOwnProfile, upsertOwnProfile } from '../../../lib/userProfiles';
+import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken } from '../../../lib/userProfiles';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 
@@ -22,6 +22,13 @@ export default async function handler(req, res) {
     const { displayName, gender, age } = req.body || {};
     if (displayName !== undefined && displayName !== null && String(displayName).trim().length > 60) {
       return res.status(400).json({ error: 'Display name is limited to 60 characters.' });
+    }
+    if (displayName && displayName.trim()) {
+      const current = await getOwnProfile(userId);
+      const unchanged = current && current.display_name && current.display_name.toLowerCase() === displayName.trim().toLowerCase();
+      if (!unchanged && await isDisplayNameTaken(displayName, userId)) {
+        return res.status(409).json({ error: 'That name is already taken — try another. Note that changing your name later won\u2019t guarantee you can get this one back if someone else claims it.' });
+      }
     }
     if (gender !== undefined && gender !== null && gender !== '' && !VALID_GENDERS.includes(gender)) {
       return res.status(400).json({ error: 'Invalid gender value.' });
