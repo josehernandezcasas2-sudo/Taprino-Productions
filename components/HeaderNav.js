@@ -100,14 +100,18 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     { href: '/', label: 'Home', match: isHome },
     { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
     { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
-    // Both default to visible (matches the site-wide "on by default"
-    // convention for Live TV/Shop) if settings haven't loaded yet, so the
-    // nav doesn't flash empty on first paint while the client-side fetch
-    // is still in flight.
-    ...((!siteSettings || siteSettings.verticalEnabled !== false)
+    // Fail CLOSED while settings are still loading (siteSettings === null),
+    // matching Shop and Pitch Room below. This used to fail OPEN (show by
+    // default), which meant an admin-disabled link would flash visible on
+    // every single page load until the client-side fetch resolved, then
+    // vanish — looking exactly like a bug that "keeps randomly popping
+    // up." Failing closed means the opposite, much less confusing
+    // direction instead: a legitimate enabled link can be briefly absent
+    // for a moment, then appears — never the other way around.
+    ...(siteSettings && siteSettings.verticalEnabled !== false
       ? [{ href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' }]
       : []),
-    ...((!siteSettings || siteSettings.podcastsEnabled !== false)
+    ...(siteSettings && siteSettings.podcastsEnabled !== false
       ? [{ href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' }]
       : [])
   ];
@@ -131,7 +135,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           {siteSettings && siteSettings.elevatorPitchEnabled && (
             <Link href="/pitches" className={`nav-link ${isPitchesPage ? 'active' : ''}`}>Pitch Room</Link>
           )}
-          {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
+          {/* Fails closed like everything else here now — same fix as
+              Vertical/Podcasts above, see that comment for why. */}
+          {siteSettings && siteSettings.liveTvEnabled !== false && (
             <Link href="/channel" className={`nav-link nav-link-live ${isChannelPage ? 'active' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
               Live TV
@@ -166,7 +172,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             {siteSettings && siteSettings.elevatorPitchEnabled && (
               <Link href="/pitches" className="dropdown-item" onClick={() => setOpenMenu(null)}>Pitch Room</Link>
             )}
-            {(!siteSettings || siteSettings.liveTvEnabled !== false) && (
+            {siteSettings && siteSettings.liveTvEnabled !== false && (
               <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
             )}
             {siteSettings && siteSettings.shopEnabled && siteSettings.shopUrl && (
