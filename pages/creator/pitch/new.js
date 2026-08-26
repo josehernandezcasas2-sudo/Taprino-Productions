@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useDraftAutosave } from '../../../lib/useDraftAutosave';
 import { useRouter } from 'next/router';
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
@@ -48,6 +49,29 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
   const [heroFile, setHeroFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const { existingDraft, scheduleSave, clearDraft, dismissDraft } = useDraftAutosave('pitch');
+  const [draftApplied, setDraftApplied] = useState(false);
+
+  // Waits for the existing-draft check to resolve (undefined = still
+  // loading) before ever autosaving, so a fresh page load can't race
+  // ahead and silently overwrite a draft the person hasn't seen yet.
+  // Once resolved — whether that's "confirmed there was nothing to
+  // resume" or "the person made a decision" — autosave stays active for
+  // the rest of the session.
+  const readyToAutosave = existingDraft === null || draftApplied;
+  useEffect(() => {
+    if (readyToAutosave && (form.title.trim() || form.logline.trim())) {
+      scheduleSave({ form, team });
+    }
+  }, [form, team, readyToAutosave, scheduleSave]);
+
+  function resumeDraft() {
+    if (existingDraft) {
+      if (existingDraft.form) setForm(existingDraft.form);
+      if (existingDraft.team) setTeam(existingDraft.team);
+    }
+    setDraftApplied(true);
+  }
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -77,6 +101,7 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not submit your project.');
+      clearDraft();
       router.push('/creator/pitch/dashboard');
     } catch (err) {
       setError(err.message);
@@ -101,6 +126,14 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
         </p>
 
         {error && <div className="house-ad-error" style={{ marginTop: '1rem' }}>{error}</div>}
+
+        {existingDraft && !draftApplied && (
+          <div className="account-card" style={{ maxWidth: 640, background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)' }}>
+            <p style={{ margin: '0 0 0.8rem' }}>You have an unsaved draft of a project pitch. Resume where you left off?</p>
+            <button className="account-btn-primary" type="button" style={{ width: 'auto', marginRight: '0.6rem' }} onClick={resumeDraft}>Resume draft</button>
+            <button className="account-btn-secondary" type="button" style={{ width: 'auto' }} onClick={dismissDraft}>Start fresh</button>
+          </div>
+        )}
 
         <div className="account-card" style={{ maxWidth: 640 }}>
           <form onSubmit={handleSubmit}>

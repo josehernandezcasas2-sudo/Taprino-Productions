@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { parseAdBreaksInput } from '../lib/adBreaks';
+import { useDraftAutosave } from '../lib/useDraftAutosave';
 import { SITE } from '../lib/siteConfig';
 import { CONTENT_RATINGS } from '../lib/contentRatings';
 
@@ -39,6 +40,20 @@ function readAsDataUrl(f) {
 // build the episode here from the resulting video ID.
 export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCreated }) {
   const [form, setForm] = useState(EMPTY_FORM);
+  const { existingDraft, scheduleSave, clearDraft, dismissDraft } = useDraftAutosave('admin_episode');
+  const [draftApplied, setDraftApplied] = useState(false);
+
+  const readyToAutosave = existingDraft === null || draftApplied;
+  useEffect(() => {
+    if (readyToAutosave && form.title.trim()) {
+      scheduleSave({ form });
+    }
+  }, [form, readyToAutosave, scheduleSave]);
+
+  function resumeDraft() {
+    if (existingDraft && existingDraft.form) setForm(existingDraft.form);
+    setDraftApplied(true);
+  }
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null);
   const [trailerUid, setTrailerUid] = useState('');
@@ -93,6 +108,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       if (!res.ok) throw new Error(data.error || 'Could not create the episode.');
 
       setSuccessId(data.episodeId);
+      clearDraft();
       setForm(EMPTY_FORM);
       setVideoUid('');
       setVideoCheck(null);
@@ -118,6 +134,14 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
 
       {successId && (
         <p style={{ color: 'var(--ok)', fontSize: '0.85rem' }}>✓ Created — episode ID: {successId}</p>
+      )}
+
+      {existingDraft && !draftApplied && (
+        <div className="account-card" style={{ maxWidth: 'none', background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)' }}>
+          <p style={{ margin: '0 0 0.8rem' }}>You have an unsaved draft of an episode submission. Resume where you left off?</p>
+          <button className="account-btn-primary" type="button" style={{ width: 'auto', marginRight: '0.6rem' }} onClick={resumeDraft}>Resume draft</button>
+          <button className="account-btn-secondary" type="button" style={{ width: 'auto' }} onClick={dismissDraft}>Start fresh</button>
+        </div>
       )}
 
       <form onSubmit={handleSubmit}>
