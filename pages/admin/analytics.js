@@ -33,17 +33,50 @@ export default function WatchAnalytics() {
       .catch(() => setError('Could not load analytics.'));
   }, []);
 
+  const [testResult, setTestResult] = useState(null);
+  const [testing, setTesting] = useState(false);
+
+  async function testConnection() {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/admin/test-redis');
+      const result = await res.json();
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({ connected: false, reason: 'request_failed', message: err.message });
+    } finally {
+      setTesting(false);
+    }
+  }
+
   return (
     <>
       <Head><title>Watch analytics — Admin</title></Head>
       <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1.5rem 4rem', fontFamily: 'var(--font-body)', color: 'var(--ink)' }}>
         <Link href="/admin" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem', textDecoration: 'none' }}>← Back to admin</Link>
         <h1 style={{ fontFamily: 'var(--font-display)', marginTop: '0.6rem' }}>Watch analytics</h1>
-        <p style={{ color: 'var(--ink-dim)', fontSize: '0.88rem', marginBottom: '1.8rem' }}>
+        <p style={{ color: 'var(--ink-dim)', fontSize: '0.88rem', marginBottom: '1rem' }}>
           Minutes actually watched, not just page views — pulled from real playback progress. This only
           captures signed-in viewing (anonymous progress never reaches the server today), so treat these
           as a meaningful trend line rather than an exact total.
         </p>
+
+        <div className="account-card" style={{ maxWidth: 'none', marginBottom: '1.8rem' }}>
+          <div className="account-eyebrow">Upstash Redis</div>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', margin: '0 0 0.8rem' }}>
+            Checks whether this environment can actually reach and write to Upstash right now — not just
+            whether the env vars are present, but whether the credentials are genuinely valid.
+          </p>
+          <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={testConnection} disabled={testing}>
+            {testing ? 'Testing…' : 'Test connection'}
+          </button>
+          {testResult && (
+            <p style={{ marginTop: '0.8rem', color: testResult.connected ? 'var(--ok)' : 'var(--danger)', fontSize: '0.85rem' }}>
+              {testResult.connected ? '✓ ' : '✕ '}{testResult.message}
+            </p>
+          )}
+        </div>
 
         {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
 
