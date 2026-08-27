@@ -143,6 +143,13 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
               {d} days
             </button>
           ))}
+          <button
+            className={`ca-range-btn ${days === 'all' ? 'on' : ''}`}
+            onClick={() => setDays('all')}
+            aria-pressed={days === 'all'}
+          >
+            All time
+          </button>
         </div>
 
         {loading && <div className="ca-empty">Loading your numbers…</div>}
@@ -162,10 +169,12 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                 <b>{t.views.toLocaleString()}</b>
                 <small>Views all time</small>
               </div>
-              <div className="ca-stat">
-                <b>{t.windowViews.toLocaleString()}</b>
-                <small>Last {data.days} days</small>
-              </div>
+              {!data.isAllTime && (
+                <div className="ca-stat">
+                  <b>{t.windowViews.toLocaleString()}</b>
+                  <small>Last {data.days} days</small>
+                </div>
+              )}
               <div className="ca-stat">
                 <b>{t.published}</b>
                 <small>Published</small>
@@ -176,7 +185,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
               </div>
             </div>
 
-            {t.changePct !== null && (
+            {!data.isAllTime && t.changePct !== null && (
               <div className={`ca-change ${t.changePct >= 0 ? 'up' : 'down'}`}>
                 {t.changePct >= 0 ? '▲' : '▼'} {Math.abs(t.changePct)}% vs the {Math.floor(data.days / 2)} days
                 before that

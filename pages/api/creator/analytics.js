@@ -18,7 +18,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 7), 90);
+  // 'all' is a distinct request, not just a bigger number — capped at 365
+  // rather than truly unbounded, since getDailyViews fetches one Redis
+  // call per day in parallel; a year is already far more than this
+  // early-stage site's entire history, and an unbounded lookback would
+  // only grow that request count forever as time passes.
+  const isAllTime = req.query.days === 'all';
+  const days = isAllTime ? 365 : Math.min(Math.max(parseInt(req.query.days, 10) || 30, 7), 90);
   const supabase = getSupabase();
 
   // A creator's numbers now cover two things, not just one: episodes they
@@ -98,6 +104,7 @@ export default async function handler(req, res) {
     // than silently implying this creator has zero audience.
     tracking: isRedisConfigured(),
     days,
+    isAllTime,
     totals: {
       views: totalViews,
       windowViews,
