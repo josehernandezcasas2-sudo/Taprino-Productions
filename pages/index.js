@@ -209,6 +209,18 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
       router.push(`/episode/${ep.id}?autoplay=1`);
     }
   }
+
+  // Browsing a library row is a different action than pressing Play —
+  // clicking a card here means "tell me more about this," not "start
+  // playing it immediately." Series cards in GenreRow already link
+  // straight to /series/[id] on their own (no onSelect involved at all),
+  // so this only ever runs for standalone movies/shorts — landing on
+  // the same info page the episode route already shows by default when
+  // there's no autoplay/trailer query param, letting someone read the
+  // description and decide before committing to watching.
+  function goToEpisodeInfo(ep) {
+    router.push(`/episode/${ep.id}`);
+  }
   function goToTrailer(ep) {
     // Series has no "trailer landing page" of its own the way a movie
     // does — /series/[id] already IS the info page (seasons, episodes,
@@ -266,7 +278,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
             episodes={newReleases}
             allSeries={allSeries}
             currentId={null}
-            onSelect={goToEpisode}
+            onSelect={goToEpisodeInfo}
             isWishlisted={isWishlisted}
             onToggleWishlist={toggleWishlist}
             viewCounts={viewCounts}
@@ -277,7 +289,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
             episodes={leavingSoon}
             allSeries={allSeries}
             currentId={null}
-            onSelect={goToEpisode}
+            onSelect={goToEpisodeInfo}
             isWishlisted={isWishlisted}
             onToggleWishlist={toggleWishlist}
             viewCounts={viewCounts}
@@ -356,7 +368,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                     )}
                     allSeries={allSeries}
                     currentId={null}
-                    onSelect={goToEpisode}
+                    onSelect={goToEpisodeInfo}
                     isWishlisted={isWishlisted}
                     onToggleWishlist={toggleWishlist}
                     viewCounts={viewCounts}
