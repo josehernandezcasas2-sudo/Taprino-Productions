@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Not signed in.' });
   }
 
-  const { episodeId, position } = req.body || {};
+  const { episodeId, position, finished } = req.body || {};
   if (!episodeId || typeof position !== 'number') {
     return res.status(400).json({ error: 'episodeId and position are required.' });
   }
@@ -65,7 +65,12 @@ export default async function handler(req, res) {
     // object key order is insertion order for string keys in JS, which is
     // what the trim step below relies on.
     delete current[episodeId];
-    if (position > 0) {
+    // Same "worth resuming" rule that used to live client-side (>=10s in,
+    // not yet finished) — moved here now that the client always reports
+    // the real position instead of pre-zeroing it when finished. A
+    // finished or barely-started episode just resets to the beginning
+    // next time, which is the intended behavior, not a bug.
+    if (!finished && position >= 10) {
       current[episodeId] = position;
     }
 
