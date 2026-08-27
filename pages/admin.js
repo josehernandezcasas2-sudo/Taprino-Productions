@@ -276,6 +276,39 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [pendingEdits, setPendingEdits] = useState(null);
   const [editActionLoading, setEditActionLoading] = useState(null);
   const [editError, setEditError] = useState(null);
+  const [seriesOwnership, setSeriesOwnership] = useState(null);
+  const [ownershipInputs, setOwnershipInputs] = useState({});
+  const [ownershipSaving, setOwnershipSaving] = useState(null);
+  const [ownershipError, setOwnershipError] = useState(null);
+
+  async function loadSeriesOwnership() {
+    try {
+      const res = await fetch('/api/admin/series-ownership');
+      const data = await res.json();
+      if (res.ok) setSeriesOwnership(data.series);
+    } catch (err) {
+      setSeriesOwnership([]);
+    }
+  }
+
+  async function saveOwnership(seriesId) {
+    setOwnershipSaving(seriesId);
+    setOwnershipError(null);
+    try {
+      const res = await fetch('/api/admin/series-ownership', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seriesId, ownerEmail: ownershipInputs[seriesId] || '' })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update ownership.');
+      await loadSeriesOwnership();
+    } catch (err) {
+      setOwnershipError(err.message);
+    } finally {
+      setOwnershipSaving(null);
+    }
+  }
 
   async function loadPendingEdits() {
     try {
@@ -445,7 +478,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); loadSeriesOwnership(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -1305,6 +1338,50 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             To grant or revoke access — including sub-admin roles and permission toggles —
             use <Link href="/admin/team">Team &amp; permissions →</Link>.
           </p>
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Series ownership</div>
+          <h3>Who owns each show</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            Connects a show to a specific creator so they can see it in their own &ldquo;Your work&rdquo;
+            and &ldquo;Your numbers&rdquo; pages — including shows they didn&rsquo;t personally upload, like one
+            you set up or added episodes to on their behalf. Leave blank to unassign.
+          </p>
+          {!seriesOwnership ? (
+            <p>Loading…</p>
+          ) : seriesOwnership.length === 0 ? (
+            <p>No shows yet.</p>
+          ) : (
+            <>
+              {ownershipError && <p style={{ color: 'var(--danger)' }}>{ownershipError}</p>}
+              {seriesOwnership.map((s) => (
+                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 200px' }}>
+                    <div style={{ fontSize: '0.9rem' }}>{s.name}</div>
+                    <div style={{ fontSize: '0.75rem', color: s.ownerEmail ? 'var(--ink-dim)' : 'var(--signal-amber)' }}>
+                      {s.ownerEmail ? `Owner: ${s.ownerEmail}` : 'Unassigned'}
+                    </div>
+                  </div>
+                  <input
+                    type="email"
+                    placeholder="creator@example.com"
+                    defaultValue={s.ownerEmail && s.ownerEmail !== '(account not found)' ? s.ownerEmail : ''}
+                    onChange={(e) => setOwnershipInputs((prev) => ({ ...prev, [s.id]: e.target.value }))}
+                    style={{ flex: '1 1 200px' }}
+                  />
+                  <button
+                    className="account-btn-secondary"
+                    style={{ width: 'auto' }}
+                    disabled={ownershipSaving === s.id}
+                    onClick={() => saveOwnership(s.id)}
+                  >
+                    {ownershipSaving === s.id ? 'Saving…' : 'Save'}
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>

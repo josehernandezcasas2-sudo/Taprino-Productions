@@ -21,10 +21,32 @@ export default async function handler(req, res) {
   const days = Math.min(Math.max(parseInt(req.query.days, 10) || 30, 7), 90);
   const supabase = getSupabase();
 
+  // A creator's numbers now cover two things, not just one: episodes they
+  // personally submitted (submitted_by), AND every episode inside any show
+  // they're the owner of (series.creator_id) — even episodes someone else
+  // submitted into that show, or that admin uploaded on their behalf
+  // because they couldn't do it themselves. That second case is exactly
+  // why series needed their own direct owner field instead of only ever
+  // inferring it from who happened to submit which episode.
+  const { data: ownedSeries, error: seriesError } = await supabase
+    .from('series')
+    .select('id')
+    .eq('creator_id', userId);
+  if (seriesError) {
+    console.error('creator analytics owned-series error:', seriesError.message);
+    return res.status(500).json({ error: 'Could not load your numbers.' });
+  }
+  const ownedSeriesIds = (ownedSeries || []).map((s) => s.id);
+
+  const orConditions = [`submitted_by.eq.${userId}`];
+  if (ownedSeriesIds.length > 0) {
+    orConditions.push(`series_id.in.(${ownedSeriesIds.join(',')})`);
+  }
+
   const { data: episodes, error } = await supabase
     .from('episodes')
-    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at')
-    .eq('submitted_by', userId)
+    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by')
+    .or(orConditions.join(','))
     .order('created_at', { ascending: false });
 
   if (error) {

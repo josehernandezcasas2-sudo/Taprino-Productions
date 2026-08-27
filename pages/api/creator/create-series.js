@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator } = await getRoleContext(req);
+  const { userId, isCreator } = await getRoleContext(req);
   if (!isCreator) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -31,7 +31,8 @@ export default async function handler(req, res) {
   const { error } = await supabase.from('series').insert({
     id,
     name,
-    description: description || null
+    description: description || null,
+    creator_id: userId
   });
 
   if (error) {

@@ -20,18 +20,18 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const { data: series, error: fetchError } = await supabase
     .from('series')
-    .select('name, description')
+    .select('name, description, creator_id')
     .eq('id', seriesId)
     .maybeSingle();
   if (fetchError || !series) {
     return res.status(404).json({ error: 'Show not found.' });
   }
 
-  // Series has no direct owner column — ownership is proven by having at
-  // least one of your own episodes in it. This matches how a creator
-  // "owns" a show in every other part of the app (e.g. it's how "your
-  // shows" groups on /creator/my-work in the first place).
-  if (!isAdmin) {
+  // Series now has a direct creator_id (see migration 038) — check that
+  // first since it's the real, authoritative link. Fall back to the old
+  // indirect "do you have an episode in it" check for any series created
+  // before that column existed and never got backfilled.
+  if (!isAdmin && series.creator_id !== userId) {
     const { data: ownEpisode } = await supabase
       .from('episodes')
       .select('id')

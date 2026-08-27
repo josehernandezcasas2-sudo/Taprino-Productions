@@ -93,7 +93,7 @@ export default async function handler(req, res) {
   if (body.contentType === 'series' || body.contentType === 'podcast') {
     if (body.newSeriesName) {
       seriesId = `${body.newSeriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
-      const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: body.newSeriesName });
+      const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: body.newSeriesName, creator_id: submittedBy });
       if (seriesError) {
         console.error('manual-episode series create error:', seriesError.message);
         return res.status(500).json({ error: 'Could not create the new series.' });
