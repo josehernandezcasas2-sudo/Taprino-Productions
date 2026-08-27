@@ -103,6 +103,18 @@ export function UploadProvider({ children }) {
             endpoint: urlData.uploadUrl,
             retryDelays: [0, 3000, 5000, 10000, 20000],
             metadata: { filename: targetFile.name, filetype: targetFile.type },
+            // Cloudflare Stream's own docs require a minimum 5MB chunk
+            // size for resumable TUS uploads and explicitly recommend
+            // 50MB for reliable connections — without this, tus-js-client
+            // defaults to Infinity (the whole file as one PATCH request).
+            // For a large file that takes 30+ minutes, sending it as one
+            // giant unchunked request means any brief interruption near
+            // the end has no smaller boundary to resume from, so the
+            // whole thing has to restart from scratch — this is almost
+            // certainly what "restarts shortly after completing" actually
+            // is. Must be a multiple of 256KiB per Cloudflare's
+            // requirement; 52428800 (50MB) divides evenly.
+            chunkSize: 52428800,
             onError: (error) => reject(error),
             onProgress: (bytesUploaded, bytesTotal) => {
               setActiveUpload((u) => (u ? { ...u, bytesUploaded, fileSize: bytesTotal } : u));

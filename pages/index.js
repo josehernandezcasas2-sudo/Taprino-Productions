@@ -379,12 +379,6 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
         </div>
       </main>
 
-      {showNewsletterPanel && (
-        <div className="signup-strip full-bleed">
-          <SignalPanel isSignedIn={isSignedIn} />
-        </div>
-      )}
-
       <Footer />
       <MobileTabBar />
     </>

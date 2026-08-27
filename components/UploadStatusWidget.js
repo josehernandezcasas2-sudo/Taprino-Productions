@@ -41,18 +41,24 @@ export default function UploadStatusWidget() {
     uploading: activeUpload.phase === 'trailer' ? 'Uploading trailer (2 of 2)…' : 'Uploading…',
     importing: 'Importing from your link…',
     saving: 'Saving submission…',
-    done: '✓ Submitted for review',
-    error: isUrlImport ? '✕ Import failed' : '✕ Upload failed'
+    done: 'Submitted for review',
+    error: isUrlImport ? 'Import failed' : 'Upload failed'
   }[activeUpload.status];
 
   return (
     <div className="upload-widget">
-      <div className="upload-widget-header">
+      <div className={`upload-widget-header ${activeUpload.status === 'done' ? 'is-done' : ''} ${activeUpload.status === 'error' ? 'is-error' : ''}`}>
         <span>{label}</span>
         {(activeUpload.status === 'done' || activeUpload.status === 'error') && (
           <button className="upload-widget-dismiss" onClick={dismissUpload} aria-label="Dismiss">✕</button>
         )}
       </div>
+      {activeUpload.status === 'done' && (
+        <div className="upload-widget-icon upload-widget-icon-done" aria-hidden="true">✓</div>
+      )}
+      {activeUpload.status === 'error' && (
+        <div className="upload-widget-icon upload-widget-icon-error" aria-hidden="true">✕</div>
+      )}
       <div className="upload-widget-filename">{activeUpload.fileName}</div>
 
       {activeUpload.status === 'uploading' && (

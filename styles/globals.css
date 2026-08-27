@@ -1381,6 +1381,20 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--signal-amber);
   margin-bottom: 0.3rem;
 }
+/* In-progress states (uploading, saving, etc.) keep the amber they always
+   had. Done/error get their own color here too, not just the big icon —
+   so the distinction is visible even if someone's eye goes straight to
+   the header text first. */
+.upload-widget-header.is-done { color: var(--ok); }
+.upload-widget-header.is-error { color: var(--danger); }
+.upload-widget-icon {
+  font-size: 2.2rem;
+  line-height: 1;
+  text-align: center;
+  margin: 0.4rem 0 0.6rem;
+}
+.upload-widget-icon-done { color: var(--ok); }
+.upload-widget-icon-error { color: var(--danger); }
 .upload-widget-dismiss {
   background: none;
   border: none;
