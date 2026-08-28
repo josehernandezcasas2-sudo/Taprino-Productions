@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../lib/accountContext';
+import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import { getApprovedPitches, getSavedPitchIds, PITCH_TAGS } from '../lib/pitches';
 import { getSiteSettings } from '../lib/siteSettings';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -55,6 +56,7 @@ export async function getServerSideProps({ req, res }) {
 }
 
 export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, savedIds, bypassingDisabled }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [saved, setSaved] = useState(new Set(savedIds));
   const [activeTag, setActiveTag] = useState('All');
 
@@ -152,7 +154,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                       className="pitch-save"
                       onClick={(e) => { e.preventDefault(); toggleSave(p.id); }}
                     >
-                      {saved.has(p.id) ? '♥' : '♡'}
+                      <HeartIcon size={16} active={saved.has(p.id)} src={saved.has(p.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} />
                     </button>
                   </div>
                   <div className="pitch-info">

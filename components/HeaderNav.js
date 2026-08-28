@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
+import { SearchIcon, BellIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -17,6 +18,7 @@ import { SITE } from '../lib/siteConfig';
 // there isn't room for 10 genres as top-level links the way the mockup's
 // five fixed content-type links fit.
 export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, liveStream }) {
+  const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const { signOut } = useClerk();
   const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
@@ -211,10 +213,14 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           aria-label="Search"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
         >
-          {siteSettings && siteSettings.searchIconUrl ? (
-            <img src={siteSettings.searchIconUrl} alt="" style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }} />
+          {iconOverrides.search || (siteSettings && siteSettings.searchIconUrl) ? (
+            <img
+              src={iconOverrides.search || siteSettings.searchIconUrl}
+              alt=""
+              style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }}
+            />
           ) : (
-            '🔍'
+            <SearchIcon />
           )}
         </button>
 
@@ -241,7 +247,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'notifications' ? null : 'notifications')); }}
               style={{ position: 'relative' }}
             >
-              🔔
+              <BellIcon src={iconOverrides.notification} />
               {unreadCount > 0 && (
                 <span className="notification-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
               )}

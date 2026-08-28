@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SITE } from '../lib/siteConfig';
-import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, InfoIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
 
@@ -161,8 +161,12 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           </div>
           <p>{ep.desc}</p>
           <div className="hero-actions">
-            <button className="hero-play" onClick={() => onPlay(ep)}>▶ {ep.isSeries ? 'Play first episode' : 'Play'}</button>
-            <button className="hero-trailer" onClick={() => onTrailer(ep)}>&#9432; More info</button>
+            <button className="hero-play" onClick={() => onPlay(ep)}>
+              <PlayIcon size={16} src={iconOverrides.play} /> {ep.isSeries ? 'Play first episode' : 'Play'}
+            </button>
+            <button className="hero-trailer" onClick={() => onTrailer(ep)}>
+              <InfoIcon size={16} src={iconOverrides.info} /> More info
+            </button>
           </div>
         </div>
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
+import { PlayIcon, HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAuth } from '@clerk/nextjs/server';
@@ -220,6 +221,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
   const { openSignIn } = useClerk();
+  const iconOverrides = usePlayerIconOverrides();
 
   // Safe here — every hook the component uses has already run above,
   // unconditionally, on every render. Nothing below this point is a hook,
@@ -394,13 +396,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               </div>
               <p>{episode.desc}</p>
               <div className="hero-actions">
-                <button className="hero-play" onClick={() => setShowPlayer(true)}>&#9654; Play</button>
+                <button className="hero-play" onClick={() => setShowPlayer(true)}>
+                  <PlayIcon size={16} src={iconOverrides.play} /> Play
+                </button>
                 <button
                   className="wishlist-btn-large"
                   onClick={() => toggleWishlist(episode.id)}
                   aria-label={isWishlisted(episode.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
-                  {isWishlisted(episode.id) ? '♥' : '♡'}
+                  <HeartIcon active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} />
                 </button>
                 {episode.fundingUrl && (
                   <a href={episode.fundingUrl} target="_blank" rel="noopener noreferrer" className="hero-trailer">
@@ -493,7 +497,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   onClick={() => toggleWishlist(episode.id)}
                   style={{ borderColor: 'rgba(179,73,47,0.4)', color: isWishlisted(episode.id) ? 'var(--danger)' : 'var(--ink-dim)' }}
                 >
-                  {isWishlisted(episode.id) ? '♥ Saved to wishlist' : '♡ Add to wishlist'}
+                  <HeartIcon size={14} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved to wishlist' : 'Add to wishlist'}
                 </button>
                 {!showingTrailer && episode.trailerSrc && (
                   <button className="trailer-link" onClick={() => setShowingTrailer(true)}>🎬 Watch trailer</button>

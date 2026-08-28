@@ -817,6 +817,9 @@ button { font-family: inherit; cursor: pointer; }
   background: linear-gradient(135deg, var(--olive-shadow), var(--surface-1) 70%);
 }
 .hero-play {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   background: var(--ink);
   color: #1a1408;
   border: none;
@@ -828,6 +831,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hero-play:hover { background: var(--olive-bright); }
 .hero-trailer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   background: rgba(20,21,28,0.4);
   border: 1px solid rgba(234, 231, 221, 0.4);
   color: var(--ink);

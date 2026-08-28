@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -18,7 +18,12 @@ const ICON_DEFS = [
   { key: 'volume_muted', label: 'Volume (muted)', Default: () => <VolumeIcon size={22} muted /> },
   { key: 'settings', label: 'Settings gear', Default: () => <SettingsIcon size={22} /> },
   { key: 'fullscreen_enter', label: 'Fullscreen (enter)', Default: () => <FullscreenIcon size={22} expanded={false} /> },
-  { key: 'fullscreen_exit', label: 'Fullscreen (exit)', Default: () => <FullscreenIcon size={22} expanded /> }
+  { key: 'fullscreen_exit', label: 'Fullscreen (exit)', Default: () => <FullscreenIcon size={22} expanded /> },
+  { key: 'search', label: 'Search', Default: () => <SearchIcon size={22} /> },
+  { key: 'notification', label: 'Notification bell', Default: () => <BellIcon size={22} /> },
+  { key: 'info', label: '"More info"', Default: () => <InfoIcon size={22} /> },
+  { key: 'heart_active', label: 'Wishlist (saved)', Default: () => <HeartIcon size={22} active /> },
+  { key: 'heart_inactive', label: 'Wishlist (not saved)', Default: () => <HeartIcon size={22} active={false} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {
@@ -113,7 +118,7 @@ export default function PlayerIconsAdmin({ mainGenres, isSignedIn, isSubscriber,
   return (
     <>
       <Head>
-        <title>Player icons — Admin</title>
+        <title>Icons — Admin</title>
         <meta name="robots" content="noindex" />
       </Head>
 
@@ -131,13 +136,24 @@ export default function PlayerIconsAdmin({ mainGenres, isSignedIn, isSubscriber,
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
-            <h1>Player icons</h1>
+            <h1>Icons</h1>
             <p className="ca-sub">
-              Replace any of the video player&rsquo;s icons with an uploaded image. Icons left alone
-              keep showing the default — nothing changes until you upload something for it. Applies
-              everywhere that control appears (the main player, Live TV, the channel, and both hero
-              banners), not just one player.
+              Replace any of these icons with an uploaded image — the video player&rsquo;s controls, plus
+              search, notifications, &ldquo;More info,&rdquo; and the wishlist heart everywhere they appear
+              across the site. Icons left alone keep showing the default — nothing changes until you
+              upload something for it.
             </p>
+            <p className="ca-sub">
+              <strong>Note:</strong> Search previously had its own separate upload field on the main
+              Site Settings page. That old field still technically works, but this page now takes
+              priority over it — upload here going forward rather than there.
+            </p>
+            <div style={{ background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+              <strong>Sizing recommendation:</strong> square images, at least 64×64px (128×128px or
+              larger holds up better on high-density/retina screens). Transparent PNG or SVG works
+              best — these render small (typically 18–32px), so simple, bold shapes read far more
+              clearly than fine detail or thin lines, which tend to blur or disappear at that size.
+            </div>
           </div>
           <Link href="/admin" className="library-back">← Back to admin</Link>
         </div>

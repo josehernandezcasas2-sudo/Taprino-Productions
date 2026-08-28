@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
+import { HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import {
   getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
 } from '../../lib/pitches';
@@ -58,6 +59,7 @@ export async function getServerSideProps({ req, res, params }) {
 }
 
 export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [saved, setSaved] = useState(initialSaved);
   const [commentList, setCommentList] = useState(comments);
   const [commentText, setCommentText] = useState('');
@@ -216,7 +218,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
               )}
               <button className="wishlist-btn-large" onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'}>
-                {saved ? '♥' : '♡'}
+                {<HeartIcon active={saved} src={saved ? iconOverrides.heart_active : iconOverrides.heart_inactive} />}
               </button>
               <button className="wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
                 {shareCopied ? '✓' : '⇪'}
