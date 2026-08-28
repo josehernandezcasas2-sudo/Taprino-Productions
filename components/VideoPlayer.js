@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
 // the fallback needs `window.location.origin`, which doesn't exist during
@@ -46,6 +46,7 @@ export default function VideoPlayer({
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
+  const iconOverrides = usePlayerIconOverrides();
   const adContainerRef = useRef(null);
   const adsManagerRef = useRef(null);
   const adsLoaderRef = useRef(null);
@@ -790,7 +791,7 @@ export default function VideoPlayer({
 
       {!started && !adState && (
         <button className="tp-bigplay" onClick={togglePlay} aria-label="Play">
-          <span className="tp-bigplay-glyph"><PlayIcon size={32} /></span>
+          <span className="tp-bigplay-glyph"><PlayIcon size={32} src={iconOverrides.play} /></span>
           {adsEnabled && <span className="tp-bigplay-note">Starts with a short ad</span>}
         </button>
       )}
@@ -833,7 +834,7 @@ export default function VideoPlayer({
 
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? <PauseIcon /> : <PlayIcon />}
+              {playing ? <PauseIcon src={iconOverrides.pause} /> : <PlayIcon src={iconOverrides.play} />}
             </button>
             <button className="tp-btn" onClick={() => skip(-SKIP_SECONDS)} aria-label="Back 10 seconds">
               ↺
@@ -855,7 +856,7 @@ export default function VideoPlayer({
                 aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
                 aria-expanded={volumePopupOpen}
               >
-                <VolumeIcon muted={muted || volume === 0} />
+                <VolumeIcon muted={muted || volume === 0} src={muted || volume === 0 ? iconOverrides.volume_muted : iconOverrides.volume_on} />
               </button>
               {volumePopupOpen && (
                 <div className="tp-volume-popup">
@@ -873,7 +874,7 @@ export default function VideoPlayer({
                     // Chrome and Safari don't actually honor on <input type=range>.
                   />
                   <button className="tp-volume-mute-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                    <VolumeIcon muted={muted || volume === 0} />
+                    <VolumeIcon muted={muted || volume === 0} src={muted || volume === 0 ? iconOverrides.volume_muted : iconOverrides.volume_on} />
                   </button>
                 </div>
               )}
@@ -924,7 +925,7 @@ export default function VideoPlayer({
                 aria-label="Playback settings"
                 aria-expanded={settingsOpen}
               >
-                <SettingsIcon />
+                <SettingsIcon src={iconOverrides.settings} />
               </button>
               {settingsOpen && (
                 <div className="tp-settings">
@@ -983,7 +984,7 @@ export default function VideoPlayer({
               onClick={toggleFullscreen}
               aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             >
-              <FullscreenIcon expanded={fullscreen} />
+              <FullscreenIcon expanded={fullscreen} src={fullscreen ? iconOverrides.fullscreen_exit : iconOverrides.fullscreen_enter} />
             </button>
           </div>
         </div>

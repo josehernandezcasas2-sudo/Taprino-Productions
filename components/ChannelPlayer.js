@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PlayIcon, PauseIcon } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
@@ -18,6 +18,7 @@ function formatClock(seconds) {
 // re-derived from the server on a timer" — doesn't belong wedged into
 // either.
 export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
+  const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const adContainerRef = useRef(null);
@@ -319,11 +320,11 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
           </div>
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? <PauseIcon /> : <PlayIcon />}
+              {playing ? <PauseIcon src={iconOverrides.pause} /> : <PlayIcon src={iconOverrides.play} />}
             </button>
             <div className="tp-volume">
               <button className="tp-btn" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                {muted || volume === 0 ? '◁' : '◀'}
+                <VolumeIcon muted={muted || volume === 0} src={muted || volume === 0 ? iconOverrides.volume_muted : iconOverrides.volume_on} />
               </button>
               <input
                 className="tp-volume-range"

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PlayIcon, PauseIcon } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // A separate component from components/VideoPlayer.js on purpose, rather
 // than one player branching heavily on a `live` prop. Live has no
@@ -9,6 +9,7 @@ import { PlayIcon, PauseIcon } from './PlayerIcons';
 // risk destabilizing something that works today, for a feature that's
 // genuinely a different shape.
 export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
+  const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const adContainerRef = useRef(null);
@@ -301,11 +302,11 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
         <div className="tp-controls">
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? <PauseIcon /> : <PlayIcon />}
+              {playing ? <PauseIcon src={iconOverrides.pause} /> : <PlayIcon src={iconOverrides.play} />}
             </button>
             <div className="tp-volume">
               <button className="tp-btn" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                {muted || volume === 0 ? '◁' : '◀'}
+                <VolumeIcon muted={muted || volume === 0} src={muted || volume === 0 ? iconOverrides.volume_muted : iconOverrides.volume_on} />
               </button>
               <input
                 className="tp-volume-range"

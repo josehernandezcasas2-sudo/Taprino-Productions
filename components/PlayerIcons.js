@@ -1,11 +1,43 @@
+import { useEffect, useState } from 'react';
+
 // Emoji and unicode symbols (🔊, ▶, ⚙, ⤢, etc.) render using each
 // device's own font/emoji set, which is exactly why the same character
 // looks different on iOS vs Android vs Windows vs a Samsung phone. These
 // are plain inline SVGs instead — every path is drawn by this app, not
 // by the OS, so they look identical everywhere. currentColor means each
 // one automatically matches whatever text color its button already has.
+//
+// Each icon also accepts an optional `src` — when admin has uploaded a
+// replacement image for that specific icon (see /admin/player-icons),
+// this renders that image instead of the built-in SVG. Every consumer
+// gets this behavior automatically via usePlayerIconOverrides() below,
+// without needing its own fetch or fallback logic.
 
-export function PlayIcon({ size = 18 }) {
+// Self-fetches admin-uploaded icon overrides once, shared by every player
+// component that renders these icons. Same self-fetch pattern HeaderNav
+// already uses for site settings — simpler than threading this through
+// every page's getServerSideProps just because it happens to render a
+// player somewhere on it. Missing/unset icons simply return undefined,
+// which each icon component treats as "use the default SVG."
+export function usePlayerIconOverrides() {
+  const [overrides, setOverrides] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/player-icons')
+      .then((r) => (r.ok ? r.json() : { icons: {} }))
+      .then((d) => { if (!cancelled) setOverrides(d.icons || {}); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, []);
+  return overrides;
+}
+
+function IconImage({ src, size }) {
+  return <img src={src} width={size} height={size} style={{ objectFit: 'contain', display: 'block' }} alt="" />;
+}
+
+export function PlayIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <path d="M8 5v14l11-7z" />
@@ -13,7 +45,8 @@ export function PlayIcon({ size = 18 }) {
   );
 }
 
-export function PauseIcon({ size = 18 }) {
+export function PauseIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
       <rect x="6" y="5" width="4" height="14" />
@@ -22,7 +55,8 @@ export function PauseIcon({ size = 18 }) {
   );
 }
 
-export function VolumeIcon({ muted, size = 18 }) {
+export function VolumeIcon({ muted, src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polygon points="3 9 3 15 8 15 13 20 13 4 8 9 3 9" fill="currentColor" stroke="none" />
@@ -41,7 +75,8 @@ export function VolumeIcon({ muted, size = 18 }) {
   );
 }
 
-export function SettingsIcon({ size = 18 }) {
+export function SettingsIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="12" cy="12" r="3" />
@@ -53,7 +88,8 @@ export function SettingsIcon({ size = 18 }) {
 // expanded=true means "currently fullscreen" -> show the exit (inward
 // arrows) icon. expanded=false means "not fullscreen yet" -> show the
 // enter (outward arrows) icon.
-export function FullscreenIcon({ expanded, size = 18 }) {
+export function FullscreenIcon({ expanded, src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
   return expanded ? (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M8 3v3a2 2 0 0 1-2 2H3" />

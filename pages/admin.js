@@ -579,6 +579,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <Link href="/admin/channel">📡 Channel schedule →</Link>
         <Link href="/admin/applications">📥 Applications →</Link>
         <Link href="/admin/genre-icons">🖼️ Genre icons →</Link>
+        <Link href="/admin/player-icons">🎛️ Player icons →</Link>
         <Link href="/admin/content-lifecycle">📅 Content lifecycle →</Link>
       </div>
 

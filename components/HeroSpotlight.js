@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SITE } from '../lib/siteConfig';
-import { PlayIcon, PauseIcon, VolumeIcon } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
 
@@ -15,6 +15,7 @@ const ROTATE_MS = 9000;
 // still instead of forcing video. If both are present, video wins; image is
 // the fallback for content without a trailer ready yet.
 export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [index, setIndex] = useState(Math.max(pool.length - 1, 0));
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(true);
@@ -114,10 +115,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
         {!isImageMode && (
           <div className="hero-controls">
             <button className="hero-pause-btn" onClick={() => setMuted((m) => !m)} aria-label={muted ? 'Unmute preview' : 'Mute preview'}>
-              <VolumeIcon muted={muted} />
+              <VolumeIcon muted={muted} src={muted ? iconOverrides.volume_muted : iconOverrides.volume_on} />
             </button>
             <button className="hero-pause-btn" onClick={togglePause} aria-label={paused ? 'Play preview' : 'Pause preview'}>
-              {paused ? <PlayIcon /> : <PauseIcon />}
+              {paused ? <PlayIcon src={iconOverrides.play} /> : <PauseIcon src={iconOverrides.pause} />}
             </button>
           </div>
         )}
