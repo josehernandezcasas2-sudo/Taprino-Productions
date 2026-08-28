@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
   const iconOverrides = usePlayerIconOverrides();
@@ -113,7 +113,7 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
             <button className="hero-play" onClick={onPlay}>▶ {playLabel || 'Play first episode'}</button>
             {onToggleSave && (
               <button className="hero-trailer" onClick={onToggleSave}>
-                {isSaved ? '♥ Saved' : '♡ Save this series'}
+                <HeartIcon size={16} active={isSaved} src={isSaved ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isSaved ? 'Saved' : 'Save this series'}
               </button>
             )}
           </div>

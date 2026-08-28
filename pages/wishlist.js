@@ -15,6 +15,7 @@ import InstallButton from '../components/InstallButton';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
+import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 
 import Footer from '../components/Footer';
 export async function getServerSideProps({ req, res }) {
@@ -50,6 +51,7 @@ export async function getServerSideProps({ req, res }) {
 }
 
 export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenres, email, episodes, allSeries, isAdmin, isCreator, continueWatching, watchHistory }) {
+  const iconOverrides = usePlayerIconOverrides();
   const { ids, isWishlisted, toggle } = useWishlist(isSignedIn, wishlist);
   const [continueList, setContinueList] = useState(continueWatching);
   const [historyList, setHistoryList] = useState(watchHistory);
@@ -186,7 +188,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
 
         {totalCount === 0 ? (
           <div className="poster-empty">
-            Nothing here yet — tap ♡ on a series, movie, or short to save it for later.
+            Nothing here yet — tap <span style={{ display: 'inline-flex', verticalAlign: 'middle' }}><HeartIcon size={14} active={false} src={iconOverrides.heart_inactive} /></span> on a series, movie, or short to save it for later.
           </div>
         ) : (
           <div className="poster-grid">

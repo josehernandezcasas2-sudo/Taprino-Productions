@@ -6,6 +6,7 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
+import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
 
 export async function getServerSideProps({ req, res }) {
@@ -86,6 +87,7 @@ function formatDate(ms) {
 }
 
 export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails }) {
+  const iconOverrides = usePlayerIconOverrides();
   const { signOut } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
@@ -359,7 +361,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
               <div className="account-section">
                 <div className="account-subheading">Quick links</div>
                 <div className="account-quicklinks">
-                  <Link href="/wishlist" className="account-quicklink">♥ My Wishlist</Link>
+                  <Link href="/wishlist" className="account-quicklink"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                   <Link href="/recs" className="account-quicklink">✨ My Recs</Link>
                   <Link href="/#continue-watching" className="account-quicklink">▶ Continue Watching</Link>
                   {canSeeNumbers && (

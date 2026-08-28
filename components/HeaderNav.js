@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
-import { SearchIcon, BellIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -306,7 +306,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <div className="dropdown-divider" />
                 <Link href="/account" className="dropdown-item">⚙ Account Settings</Link>
                 {isAdmin && <Link href="/admin" className="dropdown-item">🔒 Admin Portal</Link>}
-                <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
+                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <Link href="/recs" className="dropdown-item">✨ My Recs</Link>
                 {siteSettings && siteSettings.elevatorPitchEnabled && (
                   <Link href="/pitches" className="dropdown-item">🎯 Pitch Room</Link>
@@ -332,7 +332,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               <>
                 <div className="dropdown-label">Account</div>
                 <Link href="/account" className="dropdown-item">→ Log in / Create account</Link>
-                <Link href="/wishlist" className="dropdown-item">♥ My Wishlist</Link>
+                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <div className="dropdown-divider" />
                 <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>
               </>

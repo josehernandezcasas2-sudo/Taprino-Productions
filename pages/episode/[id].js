@@ -400,11 +400,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   <PlayIcon size={16} src={iconOverrides.play} /> Play
                 </button>
                 <button
-                  className="wishlist-btn-large"
+                  className="hero-trailer"
                   onClick={() => toggleWishlist(episode.id)}
                   aria-label={isWishlisted(episode.id) ? 'Remove from wishlist' : 'Add to wishlist'}
                 >
-                  <HeartIcon active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} />
+                  <HeartIcon size={16} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved' : 'Save for later'}
                 </button>
                 {episode.fundingUrl && (
                   <a href={episode.fundingUrl} target="_blank" rel="noopener noreferrer" className="hero-trailer">
