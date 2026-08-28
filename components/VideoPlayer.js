@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon } from './PlayerIcons';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
 // the fallback needs `window.location.origin`, which doesn't exist during
@@ -789,7 +790,7 @@ export default function VideoPlayer({
 
       {!started && !adState && (
         <button className="tp-bigplay" onClick={togglePlay} aria-label="Play">
-          <span className="tp-bigplay-glyph">▶</span>
+          <span className="tp-bigplay-glyph"><PlayIcon size={32} /></span>
           {adsEnabled && <span className="tp-bigplay-note">Starts with a short ad</span>}
         </button>
       )}
@@ -832,7 +833,7 @@ export default function VideoPlayer({
 
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? '❚❚' : '▶'}
+              {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
             <button className="tp-btn" onClick={() => skip(-SKIP_SECONDS)} aria-label="Back 10 seconds">
               ↺
@@ -854,7 +855,7 @@ export default function VideoPlayer({
                 aria-label={muted || volume === 0 ? 'Unmute' : 'Mute'}
                 aria-expanded={volumePopupOpen}
               >
-                {muted || volume === 0 ? '🔇' : '🔊'}
+                <VolumeIcon muted={muted || volume === 0} />
               </button>
               {volumePopupOpen && (
                 <div className="tp-volume-popup">
@@ -872,7 +873,7 @@ export default function VideoPlayer({
                     // Chrome and Safari don't actually honor on <input type=range>.
                   />
                   <button className="tp-volume-mute-toggle" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
-                    {muted || volume === 0 ? '🔇' : '🔊'}
+                    <VolumeIcon muted={muted || volume === 0} />
                   </button>
                 </div>
               )}
@@ -923,7 +924,7 @@ export default function VideoPlayer({
                 aria-label="Playback settings"
                 aria-expanded={settingsOpen}
               >
-                ⚙
+                <SettingsIcon />
               </button>
               {settingsOpen && (
                 <div className="tp-settings">
@@ -982,7 +983,7 @@ export default function VideoPlayer({
               onClick={toggleFullscreen}
               aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
             >
-              {fullscreen ? '⤡' : '⤢'}
+              <FullscreenIcon expanded={fullscreen} />
             </button>
           </div>
         </div>

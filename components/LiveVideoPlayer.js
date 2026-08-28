@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-
-const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
+import { PlayIcon, PauseIcon } from './PlayerIcons';
 
 // A separate component from components/VideoPlayer.js on purpose, rather
 // than one player branching heavily on a `live` prop. Live has no
@@ -302,7 +301,7 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
         <div className="tp-controls">
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? '❚❚' : '▶'}
+              {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
             <div className="tp-volume">
               <button className="tp-btn" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>

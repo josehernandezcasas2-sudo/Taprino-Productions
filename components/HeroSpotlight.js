@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { SITE } from '../lib/siteConfig';
+import { PlayIcon, PauseIcon, VolumeIcon } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
 
@@ -113,10 +114,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
         {!isImageMode && (
           <div className="hero-controls">
             <button className="hero-pause-btn" onClick={() => setMuted((m) => !m)} aria-label={muted ? 'Unmute preview' : 'Mute preview'}>
-              {muted ? '🔇' : '🔊'}
+              <VolumeIcon muted={muted} />
             </button>
             <button className="hero-pause-btn" onClick={togglePause} aria-label={paused ? 'Play preview' : 'Pause preview'}>
-              {paused ? '▶' : '❚❚'}
+              {paused ? <PlayIcon /> : <PauseIcon />}
             </button>
           </div>
         )}

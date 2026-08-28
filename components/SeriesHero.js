@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { PlayIcon, PauseIcon, VolumeIcon } from './PlayerIcons';
 
 export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
   const videoRef = useRef(null);
@@ -87,10 +88,10 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
         {!isImageMode && hasMedia && (
           <div className="hero-controls">
             <button className="hero-pause-btn" onClick={() => setMuted((m) => !m)} aria-label={muted ? 'Unmute preview' : 'Mute preview'}>
-              {muted ? '🔇' : '🔊'}
+              <VolumeIcon muted={muted} />
             </button>
             <button className="hero-pause-btn" onClick={togglePause} aria-label={paused ? 'Play preview' : 'Pause preview'}>
-              {paused ? '▶' : '❚❚'}
+              {paused ? <PlayIcon /> : <PauseIcon />}
             </button>
           </div>
         )}

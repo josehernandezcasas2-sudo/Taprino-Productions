@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { PlayIcon, PauseIcon } from './PlayerIcons';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
@@ -318,7 +319,7 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
           </div>
           <div className="tp-buttons">
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
-              {playing ? '❚❚' : '▶'}
+              {playing ? <PauseIcon /> : <PlayIcon />}
             </button>
             <div className="tp-volume">
               <button className="tp-btn" onClick={toggleMute} aria-label={muted ? 'Unmute' : 'Mute'}>
