@@ -216,7 +216,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     if (s.deletionRequested) flags.push({ icon: '🗑', title: 'Pending deletion' });
 
     return (
-      <div key={s.id} className="episode-row">
+      <div key={s.id} className="work-episode-row">
         <div className="episode-thumb" style={s.thumbnail ? { backgroundImage: `url(${s.thumbnail})` } : {}}>
           {!s.thumbnail && (s.cloudflareState === 'error' ? '⚠' : '⏳')}
         </div>

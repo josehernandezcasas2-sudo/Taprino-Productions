@@ -291,11 +291,22 @@ button { font-family: inherit; cursor: pointer; }
   border-color: var(--signal-amber);
   color: var(--olive-shadow);
 }
-.episode-list { display: flex; flex-direction: column; gap: 0.8rem; }
+/* auto-fill + minmax: the browser fits as many 340px-minimum columns as the
+   row has room for, and the 1fr max stretches those columns to use up any
+   leftover width rather than leaving a dead gap at the right edge. That's
+   what makes this scale from one column on a phone to many on an ultrawide
+   monitor without a single explicit breakpoint. */
+.episode-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 0.8rem;
+  align-items: stretch;
+}
 .episode-row {
   display: block;
   border-radius: 4px;
   overflow: hidden;
+  height: 100%;
 }
 .episode-row-link {
   display: flex;
@@ -307,6 +318,7 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
   padding: 0.7rem;
   transition: border-color 0.15s ease;
+  height: 100%;
 }
 .episode-row-link:hover { border-color: rgba(232, 163, 61, 0.4); }
 .episode-row-thumb {
@@ -4034,8 +4046,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .project-badge.pending { background: rgba(255,183,77,0.15); color: #ffb74d; }
 .project-badge.missing { background: rgba(255,255,255,0.08); color: var(--ink-dim); }
 
-.episode-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 1.2rem; border-bottom: 1px solid rgba(234,231,221,0.05); flex-wrap: wrap; }
-.episode-row:last-child { border-bottom: none; }
+.work-episode-row { display: flex; align-items: center; gap: 0.9rem; padding: 0.65rem 1.2rem; border-bottom: 1px solid rgba(234,231,221,0.05); flex-wrap: wrap; }
+.work-episode-row:last-child { border-bottom: none; }
 .episode-thumb {
   width: 56px; height: 32px; border-radius: 4px; flex-shrink: 0;
   background-size: cover; background-position: center; background-color: var(--surface-2);
