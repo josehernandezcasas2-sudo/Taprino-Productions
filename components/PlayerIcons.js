@@ -224,6 +224,11 @@ export function ArrowRightIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+// expanded=true means "currently fullscreen" -> show the exit (inward
+// arrows) icon. expanded=false means "not fullscreen yet" -> show the
+// enter (outward arrows) icon.
+export function FullscreenIcon({ expanded, src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return expanded ? (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
