@@ -4,8 +4,6 @@ import Head from 'next/head';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
-import { getOwnProfile } from '../lib/userProfiles';
-import { filterByAgeRating } from '../lib/ageGate';
 import { getViewCounts, isRedisConfigured } from '../lib/redis';
 import { buildHeroCandidates } from '../lib/heroCandidates';
 import { useWishlist } from '../lib/useWishlist';
@@ -75,12 +73,13 @@ export async function getServerSideProps({ req, res }) {
   // its own bonus-content exclusion.
   const episodesWithBonusRemoved = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
 
-  // Same "filter once here, everything below inherits it" approach as the
-  // bonus-content filter above. Admins skip this — they need to see and
-  // manage the full library regardless of their own profile's age.
-  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
-  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
-  const episodes = account.isAdmin ? episodesWithBonusRemoved : filterByAgeRating(episodesWithBonusRemoved, viewerAge);
+  // Age restriction is enforced at the point someone actually tries to
+  // watch (pages/episode/[id].js), not here. Hiding cards from browsing
+  // entirely made age-restricted titles invisible even to adults who just
+  // hadn't signed in yet, and gave no path to the "sign up, confirm your
+  // age" flow that's supposed to convert that visit into an account.
+  // Showing the card and gating the click is the better funnel.
+  const episodes = episodesWithBonusRemoved;
 
   // Continue Watching needs `episodes` to already be resolved (it maps
   // saved positions back to real episode data), so it can't join the

@@ -3,8 +3,6 @@ import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
-import { getOwnProfile } from '../../lib/userProfiles';
-import { filterByAgeRating } from '../../lib/ageGate';
 import { useWishlist } from '../../lib/useWishlist';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import { getGenreIcons } from '../../lib/genreIcons';
@@ -53,9 +51,7 @@ export async function getServerSideProps({ req, params, res }) {
   // Same pattern as the homepage — filter once here so the type-specific
   // slice below and everything derived from it inherits the right view
   // automatically.
-  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
-  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
-  const episodes = account.isAdmin ? episodesRaw : filterByAgeRating(episodesRaw, viewerAge);
+  const episodes = episodesRaw;
 
   const typeEpisodes = episodes.filter((e) => e.contentType === type);
 

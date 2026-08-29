@@ -2,8 +2,6 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAccountContext } from '../../lib/accountContext';
-import { getOwnProfile } from '../../lib/userProfiles';
-import { filterByAgeRating } from '../../lib/ageGate';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
@@ -40,9 +38,7 @@ export async function getServerSideProps({ req, params, res }) {
   const episodesNoBonus = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
   const account = await getAccountContext(req);
 
-  const viewerProfile = account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
-  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
-  const episodes = account.isAdmin ? episodesNoBonus : filterByAgeRating(episodesNoBonus, viewerAge);
+  const episodes = episodesNoBonus;
 
   return {
     props: {

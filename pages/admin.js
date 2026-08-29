@@ -1026,6 +1026,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-dim)' }}>
                     {e.status === 'approved' ? '✓ live' : e.status === 'pending' ? '⏳ pending' : '✕ rejected'}
                     {' · '}{e.tier}{e.featured ? ' · ⭐ hero-eligible' : ''}{e.deletionRequested ? ' · 🗑 pending deletion' : ''}
+                    {!e.rating && <span style={{ color: 'var(--signal-amber)' }}> · no rating set (treated as 17+)</span>}
                   </div>
                 </div>
                 <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setEditingEpisode(e)}>

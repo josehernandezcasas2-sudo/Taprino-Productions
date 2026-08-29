@@ -5,8 +5,6 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
-import { getOwnProfile } from '../../lib/userProfiles';
-import { filterByAgeRating } from '../../lib/ageGate';
 import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
@@ -51,9 +49,7 @@ export async function getServerSideProps({ req, params, res }) {
   // assumes. Signed-in responses are never cached (private, no-store
   // above), so resolving a real profile age here doesn't leak across
   // visitors.
-  const viewerProfile = hasSession && account.isSignedIn && !account.isAdmin ? await getOwnProfile(account.userId) : null;
-  const viewerAge = viewerProfile && viewerProfile.age != null ? viewerProfile.age : null;
-  const episodes = account.isAdmin ? episodesRaw : filterByAgeRating(episodesRaw, viewerAge);
+  const episodes = episodesRaw;
 
   return {
     props: {

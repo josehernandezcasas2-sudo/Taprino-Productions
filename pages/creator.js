@@ -433,6 +433,11 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               <option value="">Not set</option>
               {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
             </select>
+            {!form.rating && (
+              <p style={{ fontSize: '0.78rem', color: 'var(--signal-amber)', marginTop: '-0.4rem', marginBottom: '1rem' }}>
+                Leaving this unset treats the title as 17+: viewers will have to create an account and confirm their age before they can watch it. Pick a rating here if that&rsquo;s not what you want.
+              </p>
+            )}
 
             <label>Content type</label>
             <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>

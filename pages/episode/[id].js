@@ -11,7 +11,7 @@ import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { getOwnProfile } from '../../lib/userProfiles';
-import { meetsAgeRequirement } from '../../lib/ageGate';
+import { meetsAgeRequirement, MIN_AGE_BY_RATING } from '../../lib/ageGate';
 import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
 import { recordView, recordDailyView } from '../../lib/redis';
 import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
@@ -220,7 +220,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
-  const { openSignIn } = useClerk();
+  const { openSignIn, openSignUp } = useClerk();
   const iconOverrides = usePlayerIconOverrides();
 
   // Safe here — every hook the component uses has already run above,
@@ -228,22 +228,42 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
   // so branching on ageRestricted from here on doesn't violate the Rules
   // of Hooks the way returning before those calls would have.
   if (ageRestricted) {
+    const requiredAge = MIN_AGE_BY_RATING[requiredRating] ?? 17;
     return (
       <>
         <Head><title>Content restricted — {SITE.name}</title></Head>
         <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
           <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
-            <div className="account-eyebrow">Content restricted</div>
-            <h1 style={{ fontSize: '1.4rem', marginBottom: '0.6rem' }}>This title is rated {requiredRating}</h1>
+            <div className="account-eyebrow">Age-restricted content</div>
+            <h1 style={{ fontSize: '1.4rem', marginBottom: '0.6rem' }}>
+              {requiredAge >= 17 ? 'This title is for mature audiences (17+)' : `This title is rated ${requiredRating} (${requiredAge}+)`}
+            </h1>
             <p style={{ color: 'var(--ink-dim)', marginBottom: '1.2rem' }}>
               {isSignedIn
                 ? 'Your account settings don\u2019t meet the age requirement for this rating. You can update your age in Account settings if it\u2019s incorrect.'
-                : 'This content has an age restriction. Sign in and set your age in Account settings to see if it\u2019s available to you.'}
+                : 'Create a free account and confirm your age to watch. It only takes a minute, and it\u2019s how we keep age-restricted titles limited to viewers old enough to see them.'}
             </p>
             {isSignedIn ? (
               <Link href="/account" className="account-btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>Go to account settings</Link>
             ) : (
-              <button className="account-btn-primary" onClick={() => openSignIn({ redirectUrl: router.asPath })}>Sign in</button>
+              <>
+                <button className="account-btn-primary" onClick={() => openSignUp({ redirectUrl: router.asPath })}>Create a free account</button>
+                <p style={{ fontSize: '0.75rem', color: 'var(--ink-dim)', marginTop: '0.7rem' }}>
+                  By signing up you agree to our{' '}
+                  <Link href="/terms" style={{ color: 'var(--ink-dim)', textDecoration: 'underline' }}>Terms of Service</Link>
+                  {' '}and{' '}
+                  <Link href="/privacy" style={{ color: 'var(--ink-dim)', textDecoration: 'underline' }}>Privacy Policy</Link>.
+                </p>
+                <p style={{ fontSize: '0.8rem', marginTop: '0.9rem' }}>
+                  Already have an account?{' '}
+                  <button
+                    onClick={() => openSignIn({ redirectUrl: router.asPath })}
+                    style={{ background: 'none', border: 'none', padding: 0, color: 'var(--signal-amber)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
+                  >
+                    Sign in
+                  </button>
+                </p>
+              </>
             )}
             <div style={{ marginTop: '1rem' }}>
               <Link href="/" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>← Back to screening room</Link>
