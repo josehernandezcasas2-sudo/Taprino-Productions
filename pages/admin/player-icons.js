@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -23,7 +23,16 @@ const ICON_DEFS = [
   { key: 'notification', label: 'Notification bell', Default: () => <BellIcon size={22} /> },
   { key: 'info', label: '"More info"', Default: () => <InfoIcon size={22} /> },
   { key: 'heart_active', label: 'Wishlist (saved)', Default: () => <HeartIcon size={22} active /> },
-  { key: 'heart_inactive', label: 'Wishlist (not saved)', Default: () => <HeartIcon size={22} active={false} /> }
+  { key: 'heart_inactive', label: 'Wishlist (not saved)', Default: () => <HeartIcon size={22} active={false} /> },
+  { key: 'admin_lock', label: 'Admin portal', Default: () => <LockIcon size={22} /> },
+  { key: 'sparkle', label: 'Recs / upgrade', Default: () => <SparkleIcon size={22} /> },
+  { key: 'target', label: 'Pitch Room', Default: () => <TargetIcon size={22} /> },
+  { key: 'card', label: 'Manage subscription', Default: () => <CardIcon size={22} /> },
+  { key: 'bar_chart', label: 'Creator analytics', Default: () => <BarChartIcon size={22} /> },
+  { key: 'clapperboard', label: 'Submit / become a creator', Default: () => <ClapperboardIcon size={22} /> },
+  { key: 'folder', label: 'Your work', Default: () => <FolderIcon size={22} /> },
+  { key: 'logout', label: 'Sign out', Default: () => <LogoutIcon size={22} /> },
+  { key: 'arrow_right', label: 'Log in', Default: () => <ArrowRightIcon size={22} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {

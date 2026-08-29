@@ -183,6 +183,7 @@ button { font-family: inherit; cursor: pointer; }
 .dropdown-item:hover { background: rgba(234, 231, 221, 0.06); }
 .dropdown-item:disabled { opacity: 0.55; cursor: wait; }
 .dropdown-item:disabled:hover { background: transparent; }
+.dropdown-item svg, .dropdown-item img { vertical-align: -3px; margin-right: 0.5rem; }
 
 .account-dropdown { min-width: 240px; }
 @media (max-width: 480px) {

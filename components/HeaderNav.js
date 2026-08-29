@@ -4,7 +4,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
-import { SearchIcon, BellIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -304,37 +304,37 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                   </div>
                 </div>
                 <div className="dropdown-divider" />
-                <Link href="/account" className="dropdown-item">⚙ Account Settings</Link>
-                {isAdmin && <Link href="/admin" className="dropdown-item">🔒 Admin Portal</Link>}
-                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
-                <Link href="/recs" className="dropdown-item">✨ My Recs</Link>
+                <Link href="/account" className="dropdown-item"><SettingsIcon size={15} src={iconOverrides.settings} /> Account Settings</Link>
+                {isAdmin && <Link href="/admin" className="dropdown-item"><LockIcon size={15} src={iconOverrides.admin_lock} /> Admin Portal</Link>}
+                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
+                <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
                 {siteSettings && siteSettings.elevatorPitchEnabled && (
-                  <Link href="/pitches" className="dropdown-item">🎯 Pitch Room</Link>
+                  <Link href="/pitches" className="dropdown-item"><TargetIcon size={15} src={iconOverrides.target} /> Pitch Room</Link>
                 )}
                 {isSubscriber ? (
                   <button className="dropdown-item" onClick={openPortal} disabled={portalLoading}>
-                    💳 {portalLoading ? 'Opening…' : 'Manage Subscription'}
+                    <CardIcon size={15} src={iconOverrides.card} /> {portalLoading ? 'Opening…' : 'Manage Subscription'}
                   </button>
                 ) : (
-                  <Link href="/account" className="dropdown-item">✦ Join {SITE.premiumTier}</Link>
+                  <Link href="/account" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> Join {SITE.premiumTier}</Link>
                 )}
                 {isCreator && <div className="dropdown-divider" />}
-                {isCreator && <Link href="/creator/analytics" className="dropdown-item">📊 Your numbers</Link>}
+                {isCreator && <Link href="/creator/analytics" className="dropdown-item"><BarChartIcon size={15} src={iconOverrides.bar_chart} /> Your numbers</Link>}
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}
-                {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item">🎬 Submit your work</Link>}
-                {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item">🗂️ Your work</Link>}
+                {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Submit your work</Link>}
+                {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item"><FolderIcon size={15} src={iconOverrides.folder} /> Your work</Link>}
                 {!isCreator && !isAdmin && <div className="dropdown-divider" />}
-                {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>}
+                {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>}
                 <div className="dropdown-divider" />
-                <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}>↩ Sign Out</button>
+                <button className="dropdown-item" onClick={() => signOut({ redirectUrl: '/' })}><LogoutIcon size={15} src={iconOverrides.logout} /> Sign Out</button>
               </>
             ) : (
               <>
                 <div className="dropdown-label">Account</div>
-                <Link href="/account" className="dropdown-item">→ Log in / Create account</Link>
-                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
+                <Link href="/account" className="dropdown-item"><ArrowRightIcon size={15} src={iconOverrides.arrow_right} /> Log in / Create account</Link>
+                <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <div className="dropdown-divider" />
-                <Link href="/apply" className="dropdown-item">🎬 Become a creator</Link>
+                <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>
               </>
             )}
           </div>
