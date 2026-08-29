@@ -4070,7 +4070,18 @@ body:has(.mini-player) { padding-bottom: 72px; }
    column on the right rather than being buried in a dropdown or requiring
    a trip back to the series hub. */
 .player-info-row { display: flex; gap: 2.2rem; align-items: flex-start; flex-wrap: wrap; }
-.player-info-row .player-card { flex: 1; min-width: 280px; }
+/* Scoped to .player-info-row so this only touches the episode page's info
+   card — .player-card is reused on live.js/channel.js to wrap the actual
+   video element, where padding would put an unwanted gap around the
+   player itself. */
+.player-info-row .player-card {
+  flex: 1;
+  min-width: 280px;
+  border-radius: 16px;
+  padding: 1.75rem;
+  border-color: rgba(234, 231, 221, 0.1);
+}
+.player-info-row .now-heading { padding: 0; }
 .episode-nav-sidebar { width: 320px; flex-shrink: 0; }
 @media (max-width: 720px) {
   /* Below this width, 280px (player-card) + 320px (sidebar) + the gap
