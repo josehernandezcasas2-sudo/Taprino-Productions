@@ -185,12 +185,15 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                         {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
                       </div>
                       <div className="episode-row-info">
-                        <h4>{ep.seriesOrder ? `Ep. ${ep.seriesOrder} — ` : ''}{ep.title}</h4>
-                        <p>{ep.desc}</p>
+                        <h4>{ep.title}</h4>
                         <div className="episode-row-meta">
-                          <span>{ep.runtime}</span>
-                          {ep.genre && <span>{ep.genre}</span>}
+                          <span>{ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : `Season ${ep.season || 1}`}</span>
+                          {ep.runtime && <span>{ep.runtime}</span>}
+                          {ep.rating && <span className="meta-pill">{ep.rating}</span>}
+                          {ep.hasAudioDescription && <span className="meta-pill" title="Audio description available">AD</span>}
+                          {ep.hasCaptions && <span className="meta-pill" title="Captions available">CC</span>}
                         </div>
+                        <p>{ep.desc}</p>
                       </div>
                     </Link>
                   </div>
