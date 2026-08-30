@@ -4105,7 +4105,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
   background-size: cover; background-position: center; background-color: var(--surface-2);
   position: relative; display: flex; align-items: center; justify-content: center;
 }
-.side-ep-thumb .play-overlay { color: var(--ink); font-size: 1.4rem; opacity: 0.9; }
+.side-ep-thumb .play-overlay { color: var(--ink); opacity: 0.9; }
 .side-ep-thumb .dur-badge {
   position: absolute; bottom: 0.3rem; right: 0.3rem; background: rgba(0,0,0,0.75);
   color: var(--ink); font-size: 0.65rem; padding: 0.1rem 0.35rem; border-radius: 3px;

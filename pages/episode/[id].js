@@ -573,7 +573,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   <div className="side-heading">Next episode</div>
                   <Link href={`/episode/${nextEpisode.id}?autoplay=1`} className="side-ep-card">
                     <div className="side-ep-thumb" style={nextEpisode.thumbnail ? { backgroundImage: `url(${nextEpisode.thumbnail})` } : {}}>
-                      <span className="play-overlay">▶</span>
+                      <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
                       {nextEpisode.runtime && <span className="dur-badge">{nextEpisode.runtime}</span>}
                     </div>
                     <div className="side-ep-info">
@@ -592,7 +592,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                       {previousEpisodeWatched ? (
                         <span className="watched-badge">↺ Watched</span>
                       ) : (
-                        <span className="play-overlay">▶</span>
+                        <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
                       )}
                       {previousEpisode.runtime && <span className="dur-badge">{previousEpisode.runtime}</span>}
                     </div>
@@ -625,7 +625,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               {watchNext.map((item) => (
                 <Link key={item.id} href={`/episode/${item.id}?autoplay=1`} className="side-ep-card">
                   <div className="side-ep-thumb" style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}}>
-                    <span className="play-overlay">▶</span>
+                    <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
                     {item.runtime && <span className="dur-badge">{item.runtime}</span>}
                   </div>
                   <div className="side-ep-info">
