@@ -514,3 +514,13 @@ export function LinkIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+export function TicketIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.7 1.7 0 0 0 0 3.2v1.6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.6a1.7 1.7 0 0 0 0-3.2z" />
+      <path d="M15 6.5v11" strokeDasharray="1.6 1.6" />
+    </svg>
+  );
+}

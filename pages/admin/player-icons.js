@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon, TicketIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -57,7 +57,8 @@ const ICON_DEFS = [
   { key: 'eye', label: 'Creator dashboard — view count', Default: () => <EyeIcon size={22} /> },
   { key: 'undo', label: 'Creator dashboard — cancel deletion', Default: () => <UndoIcon size={22} /> },
   { key: 'external_link', label: 'Creator dashboard — view public page', Default: () => <ExternalLinkIcon size={22} /> },
-  { key: 'link', label: 'Creator dashboard — copy link', Default: () => <LinkIcon size={22} /> }
+  { key: 'link', label: 'Creator dashboard — copy link', Default: () => <LinkIcon size={22} /> },
+  { key: 'ticket', label: 'Admin nav — Promo codes', Default: () => <TicketIcon size={22} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {

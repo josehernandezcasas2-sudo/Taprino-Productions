@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { getAccountContext } from '../lib/accountContext';
+import { getPromoAccessExpiry } from '../lib/promoCodes';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
@@ -55,6 +56,7 @@ export async function getServerSideProps({ req, res }) {
 
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const promoAccessExpiresAt = account.isSignedIn ? await getPromoAccessExpiry(account.userId) : null;
 
   return {
     props: {
@@ -67,7 +69,8 @@ export async function getServerSideProps({ req, res }) {
       isComped: account.isComped,
       mainGenres,
       newsletterStatus,
-      subscriptionDetails
+      subscriptionDetails,
+      promoAccessExpiresAt
     }
   };
 }
@@ -86,12 +89,16 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails }) {
+export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt }) {
   const iconOverrides = usePlayerIconOverrides();
   const { signOut } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [redeemInput, setRedeemInput] = useState('');
+  const [redeeming, setRedeeming] = useState(false);
+  const [redeemError, setRedeemError] = useState(null);
+  const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
@@ -154,6 +161,37 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
     } catch (err) {
       alert('Could not open subscription settings.');
       setPortalLoading(false);
+    }
+  }
+
+  async function handleRedeemCode(e) {
+    e.preventDefault();
+    setRedeemError(null);
+    setRedeemSuccess(null);
+    setRedeeming(true);
+    try {
+      const res = await fetch('/api/account/redeem-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: redeemInput.trim() })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setRedeemError(data.error || 'Could not redeem that code.');
+        setRedeeming(false);
+        return;
+      }
+      setRedeemSuccess(data.expiresAt);
+      setRedeemInput('');
+      // A full reload rather than local state juggling — isSubscriber and
+      // the subscription-details branch above both come from
+      // getServerSideProps, so this is the simplest way to make the rest
+      // of the page (nav pill, membership section) reflect the new access
+      // immediately rather than only updating this one form.
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (err) {
+      setRedeemError('Could not redeem that code — try again.');
+      setRedeeming(false);
     }
   }
 
@@ -233,6 +271,14 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                           {!isAdmin && !isSubAdmin && isComped && `Your access was given to you by the team — it's free, and no payment is needed.`}
                         </p>
                       </div>
+                    ) : promoAccessExpiresAt ? (
+                      <div className="account-free-access-note">
+                        <span className="account-free-access-badge">Free access</span>
+                        <p>
+                          You have {SITE.premiumTier} from a redeemed code, through {formatDate(promoAccessExpiresAt)}.
+                          Redeeming another code before then adds to this instead of replacing it.
+                        </p>
+                      </div>
                     ) : (
                       <>
                         {subscriptionDetails && (
@@ -282,6 +328,29 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                     </Link>
                   </>
                 )}
+
+                <div className="account-redeem-code">
+                  <div className="account-subheading" style={{ fontSize: '0.85rem', marginTop: '1.2rem' }}>Have a code?</div>
+                  <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.5rem' }}>
+                    <input
+                      type="text"
+                      value={redeemInput}
+                      onChange={(e) => setRedeemInput(e.target.value)}
+                      placeholder="XXXX-XXXX-XXXX"
+                      style={{ flex: 1 }}
+                      disabled={redeeming}
+                    />
+                    <button className="account-btn-secondary" type="submit" style={{ width: 'auto' }} disabled={redeeming || !redeemInput.trim()}>
+                      {redeeming ? 'Checking…' : 'Redeem'}
+                    </button>
+                  </form>
+                  {redeemError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{redeemError}</p>}
+                  {redeemSuccess && (
+                    <p style={{ color: 'var(--ok)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
+                      Code accepted — you now have {SITE.premiumTier} through {formatDate(redeemSuccess)}. Refreshing…
+                    </p>
+                  )}
+                </div>
               </div>
 
               {/* Section: Public profile + private metadata */}
