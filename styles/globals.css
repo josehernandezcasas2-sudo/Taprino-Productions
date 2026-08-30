@@ -4074,7 +4074,11 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 .filter-pill.on { background: var(--brass); color: #241a05; border-color: var(--brass); }
 
-.project-group { background: var(--surface-3); border-radius: 1rem; margin-bottom: 1.2rem; overflow: hidden; }
+/* No overflow:hidden here — the rounded corners come from border-radius
+   alone (that's independent of overflow in CSS), and hiding overflow was
+   clipping the gear icon's dropdown menu, which needs to render past this
+   card's bottom edge to be visible at all. */
+.project-group { background: var(--surface-3); border-radius: 1rem; margin-bottom: 1.2rem; }
 .project-header { display: flex; align-items: center; gap: 1rem; padding: 1rem 1.2rem; border-bottom: 1px solid rgba(234,231,221,0.08); }
 .project-art {
   width: 52px; height: 52px; border-radius: 8px; flex-shrink: 0;
