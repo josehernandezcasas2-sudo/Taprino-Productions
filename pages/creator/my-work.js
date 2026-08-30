@@ -8,13 +8,14 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
 import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
+import CreatorSubmissionForm from '../../components/CreatorSubmissionForm';
 import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
 import Footer from '../../components/Footer';
-import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, CloseIcon, UndoIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 const STATUS_LABEL = {
@@ -64,6 +65,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [fullEditSubmission, setFullEditSubmission] = useState(null);
+  const [bonusContentSeriesId, setBonusContentSeriesId] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
   const [captionSubmission, setCaptionSubmission] = useState(null);
@@ -504,13 +506,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                                   >
                                     <PencilIcon size={12} src={iconOverrides.pencil} /> Edit show details
                                   </button>
-                                  <Link
-                                    href={`/creator?contentType=bonus&seriesId=${group.key.replace('series:', '')}`}
+                                  <button
                                     className="dropdown-item"
-                                    onClick={() => setOpenDropdown(null)}
+                                    onClick={() => {
+                                      setBonusContentSeriesId(group.key.replace('series:', ''));
+                                      setOpenDropdown(null);
+                                    }}
                                   >
                                     ＋ Add bonus content
-                                  </Link>
+                                  </button>
                                 </div>
                               )}
                             </span>
@@ -556,6 +560,29 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           onClose={() => setFullEditSubmission(null)}
           onSaved={() => { setFullEditSubmission(null); loadSubmissions(); }}
         />
+      )}
+
+      {bonusContentSeriesId && (
+        <div className="modal-backdrop" onClick={() => setBonusContentSeriesId(null)}>
+          <div className="modal-card bonus-content-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Add bonus content</h3>
+              <button className="modal-close" onClick={() => setBonusContentSeriesId(null)} aria-label="Close">
+                <CloseIcon size={16} src={iconOverrides.close} />
+              </button>
+            </div>
+            <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+              Same form as a regular submission, pre-set to bonus content for this show — give it a
+              descriptive title (e.g. &ldquo;Behind the Scenes&rdquo; or &ldquo;Official Trailer&rdquo;) below.
+            </p>
+            <CreatorSubmissionForm
+              allSeries={allSeries}
+              initialContentType="bonus"
+              initialSeriesId={bonusContentSeriesId}
+              onSubmitted={() => { setBonusContentSeriesId(null); loadSubmissions(); }}
+            />
+          </div>
+        </div>
       )}
 
       {artworkSubmission && (

@@ -2875,6 +2875,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    rendered as stark, unstyled browser defaults against the dark modal.
    --------------------------------------------------------------------- */
 .admin-edit-modal { max-width: 34rem; }
+.bonus-content-modal { max-width: 40rem; }
 .admin-edit-sub { font-size: 0.8rem; color: var(--ink-dim); margin: -0.4rem 0 1rem; }
 
 .admin-video-status {
