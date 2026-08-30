@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -32,7 +32,10 @@ const ICON_DEFS = [
   { key: 'clapperboard', label: 'Submit / become a creator', Default: () => <ClapperboardIcon size={22} /> },
   { key: 'folder', label: 'Your work', Default: () => <FolderIcon size={22} /> },
   { key: 'logout', label: 'Sign out', Default: () => <LogoutIcon size={22} /> },
-  { key: 'arrow_right', label: 'Log in', Default: () => <ArrowRightIcon size={22} /> }
+  { key: 'arrow_right', label: 'Log in', Default: () => <ArrowRightIcon size={22} /> },
+  { key: 'tab_home', label: 'Mobile tab bar — Home', Default: () => <DiamondIcon size={22} /> },
+  { key: 'tab_series', label: 'Mobile tab bar — Series', Default: () => <SeriesListIcon size={22} /> },
+  { key: 'tab_account', label: 'Mobile tab bar — Account', Default: () => <AccountIcon size={22} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {

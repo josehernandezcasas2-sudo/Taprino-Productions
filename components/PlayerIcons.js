@@ -246,3 +246,33 @@ export function FullscreenIcon({ expanded, src, size = 18 }) {
     </svg>
   );
 }
+
+export function DiamondIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 3l9 9-9 9-9-9z" />
+    </svg>
+  );
+}
+
+export function SeriesListIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4.5" width="18" height="4" rx="1" />
+      <rect x="3" y="10" width="18" height="4" rx="1" />
+      <rect x="3" y="15.5" width="18" height="4" rx="1" />
+    </svg>
+  );
+}
+
+export function AccountIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M4.5 20c1.4-3.5 4.2-5.5 7.5-5.5s6.1 2 7.5 5.5" />
+    </svg>
+  );
+}

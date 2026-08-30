@@ -1771,6 +1771,9 @@ button { font-family: inherit; cursor: pointer; }
   .tabbar-glyph {
     font-size: 1rem;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
     transition: transform 0.12s ease;
   }
   .tabbar-item:active .tabbar-glyph { transform: scale(0.9); }
@@ -4176,6 +4179,13 @@ body:has(.mini-player) { padding-bottom: 72px; }
     width: min(86vw, 340px);
     max-height: calc(100vh - 140px);
     overflow-y: auto;
+  }
+  /* Two-class selector so this wins over the shared .dropdown-left rule
+     (left: -1rem, which pulls it toward the screen edge) without editing
+     that rule itself — nothing else currently uses .dropdown-left, but
+     this keeps it that way safely if something does later. */
+  .hamburger-dropdown.dropdown-left {
+    left: max(1rem, env(safe-area-inset-left, 0px));
   }
 }
 
