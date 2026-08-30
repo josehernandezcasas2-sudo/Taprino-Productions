@@ -7,6 +7,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
+import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
 import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
@@ -62,6 +63,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [editingSubmission, setEditingSubmission] = useState(null);
+  const [fullEditSubmission, setFullEditSubmission] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
   const [captionSubmission, setCaptionSubmission] = useState(null);
@@ -261,18 +263,30 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 </button>
                 {openDropdown === `episode:${s.id}` && (
                   <div className="dropdown dropdown-left open">
-                    <button
-                      className="dropdown-item"
-                      onClick={() => {
-                        setEditRequestTarget({
-                          type: 'episode',
-                          currentValues: { id: s.id, title: s.title, description: s.description || '' }
-                        });
-                        setOpenDropdown(null);
-                      }}
-                    >
-                      <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
-                    </button>
+                    {isAdmin ? (
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setFullEditSubmission(s);
+                          setOpenDropdown(null);
+                        }}
+                      >
+                        <PencilIcon size={12} src={iconOverrides.pencil} /> Edit full details
+                      </button>
+                    ) : (
+                      <button
+                        className="dropdown-item"
+                        onClick={() => {
+                          setEditRequestTarget({
+                            type: 'episode',
+                            currentValues: { id: s.id, title: s.title, description: s.description || '' }
+                          });
+                          setOpenDropdown(null);
+                        }}
+                      >
+                        <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
+                      </button>
+                    )}
                     {s.status === 'approved' && (
                       <>
                         <a
@@ -527,6 +541,20 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           allSeries={allSeries}
           onClose={() => setEditingSubmission(null)}
           onSaved={() => { setEditingSubmission(null); loadSubmissions(); }}
+        />
+      )}
+
+      {fullEditSubmission && (
+        <AdminEditEpisodeModal
+          episode={fullEditSubmission}
+          allSeries={allSeries}
+          // Scoped to this creator's own work rather than the whole site's
+          // library (which is what admin.js itself passes in) — bonus
+          // content here is meant to extend one of the creator's own
+          // standalone pieces, not anyone else's.
+          standaloneEpisodes={(submissions || []).filter((sub) => ['movie', 'short'].includes(sub.contentType) && sub.id !== fullEditSubmission.id)}
+          onClose={() => setFullEditSubmission(null)}
+          onSaved={() => { setFullEditSubmission(null); loadSubmissions(); }}
         />
       )}
 
