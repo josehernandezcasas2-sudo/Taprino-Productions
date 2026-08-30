@@ -1,5 +1,5 @@
 import { getRoleContext } from '../../../lib/roles';
-import { generatePromoCodes, listPromoCodes } from '../../../lib/promoCodes';
+import { generatePromoCodes, listPromoCodes, setPromoCodeNoted } from '../../../lib/promoCodes';
 
 const MAX_QUANTITY = 100;
 const MAX_DURATION_DAYS = 3650; // 10 years — generous ceiling, not a real-world expectation
@@ -36,6 +36,20 @@ export default async function handler(req, res) {
     }
   }
 
-  res.setHeader('Allow', 'GET, POST');
+  if (req.method === 'PATCH') {
+    const { id, noted } = req.body || {};
+    if (!id || typeof id !== 'string') {
+      return res.status(400).json({ error: 'id is required.' });
+    }
+    try {
+      const code = await setPromoCodeNoted(id, noted);
+      return res.status(200).json({ code });
+    } catch (err) {
+      console.error('setPromoCodeNoted error:', err.message);
+      return res.status(500).json({ error: 'Could not update that code. Try again.' });
+    }
+  }
+
+  res.setHeader('Allow', 'GET, POST, PATCH');
   return res.status(405).json({ error: 'Method not allowed' });
 }

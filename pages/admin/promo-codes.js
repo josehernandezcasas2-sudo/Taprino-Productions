@@ -102,6 +102,27 @@ export default function PromoCodesAdmin({ mainGenres, isSignedIn, isSubscriber, 
     }).catch(() => {});
   }
 
+  function toggleNoted(id, currentValue) {
+    // Optimistic — flips immediately in the list rather than waiting on
+    // the round-trip, then reverts on failure so the checkbox never lies
+    // about what's actually saved.
+    setCodes((prev) => prev.map((c) => (c.id === id ? { ...c, noted: !currentValue } : c)));
+    fetch('/api/admin/promo-codes', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, noted: !currentValue })
+    })
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.error) {
+          setCodes((prev) => prev.map((c) => (c.id === id ? { ...c, noted: currentValue } : c)));
+        }
+      })
+      .catch(() => {
+        setCodes((prev) => prev.map((c) => (c.id === id ? { ...c, noted: currentValue } : c)));
+      });
+  }
+
   const filteredCodes = (codes || []).filter((c) => {
     if (filter === 'unused') return !c.redeemed_by;
     if (filter === 'redeemed') return !!c.redeemed_by;
@@ -225,6 +246,7 @@ export default function PromoCodesAdmin({ mainGenres, isSignedIn, isSubscriber, 
               <span role="columnheader">Grants</span>
               <span role="columnheader">Status</span>
               <span role="columnheader">Note</span>
+              <span role="columnheader" style={{ textAlign: 'center' }}>Noted</span>
             </div>
             {filteredCodes.map((c) => (
               <div className="ca-tr" role="row" key={c.id}>
@@ -242,6 +264,16 @@ export default function PromoCodesAdmin({ mainGenres, isSignedIn, isSubscriber, 
                   )}
                 </span>
                 <span role="cell" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>{c.note || '—'}</span>
+                <span role="cell" style={{ textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={!!c.noted}
+                    onChange={() => toggleNoted(c.id, !!c.noted)}
+                    title="Written down / added to a product"
+                    aria-label={`Mark ${c.code} as noted`}
+                    style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  />
+                </span>
               </div>
             ))}
           </div>

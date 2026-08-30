@@ -2483,6 +2483,11 @@ button { font-family: inherit; cursor: pointer; }
 .ca-detail-close { background: none; border: none; color: var(--ink-dim); cursor: pointer; font-size: 0.8rem; padding: 0.2rem; }
 .ca-detail-close:hover { color: var(--ink); }
 .ca-detail .ca-stats { margin-bottom: 1.2rem; }
+/* Different content shape than the analytics table .ca-tr was designed
+   for (Status/Note need real width, not the 5rem/6rem numeric columns
+   built for view counts) — scoped to this table only via the descendant
+   selector's higher specificity. */
+.promo-table .ca-tr { grid-template-columns: 11rem 5rem 1fr 1fr 4.5rem; }
 .ca-empty {
   border: 1px dashed rgba(234, 231, 221, 0.16);
   border-radius: 6px;
