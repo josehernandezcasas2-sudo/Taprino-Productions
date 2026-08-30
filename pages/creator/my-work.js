@@ -11,9 +11,9 @@ import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
-import RssImportPanel from '../../components/RssImportPanel';
 import RequestEditModal from '../../components/RequestEditModal';
 import Footer from '../../components/Footer';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 const STATUS_LABEL = {
@@ -54,6 +54,7 @@ export async function getServerSideProps({ req, res }) {
 }
 
 export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, allSeries }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [submissions, setSubmissions] = useState(null);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -190,7 +191,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
         key,
         isGrouped,
         label: isGrouped ? (s.seriesName || 'Untitled show') : (STANDALONE_TYPE_LABELS[s.contentType] || 'Other'),
-        typeTag: s.contentType === 'podcast' ? '🎧 Podcast' : (s.contentType === 'series' ? 'Series' : null),
+        typeTag: s.contentType === 'podcast' ? 'podcast' : (s.contentType === 'series' ? 'series' : null),
         items: []
       };
     }
@@ -210,15 +211,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
 
   function renderEpisodeRow(s) {
     const flags = [];
-    if (s.missingArtwork && s.status !== 'rejected') flags.push({ icon: '🖼', title: 'Missing artwork' });
-    if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ icon: '💬', title: 'No captions' });
-    if (s.artworkPending) flags.push({ icon: '⏳', title: 'Artwork change awaiting approval' });
-    if (s.deletionRequested) flags.push({ icon: '🗑', title: 'Pending deletion' });
+    if (s.missingArtwork && s.status !== 'rejected') flags.push({ type: 'artwork', title: 'Missing artwork', Icon: ImageIcon, iconKey: 'image' });
+    if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ type: 'captions', title: 'No captions', Icon: ChatIcon, iconKey: 'chat' });
+    if (s.artworkPending) flags.push({ type: 'pending', title: 'Artwork change awaiting approval', Icon: ClockIcon, iconKey: 'clock' });
+    if (s.deletionRequested) flags.push({ type: 'deletion', title: 'Pending deletion', Icon: TrashIcon, iconKey: 'trash' });
 
     return (
       <div key={s.id} className="work-episode-row">
         <div className="episode-thumb" style={s.thumbnail ? { backgroundImage: `url(${s.thumbnail})` } : {}}>
-          {!s.thumbnail && (s.cloudflareState === 'error' ? '⚠' : '⏳')}
+          {!s.thumbnail && (s.cloudflareState === 'error' ? <WarningIcon size={16} src={iconOverrides.warning} /> : <ClockIcon size={16} src={iconOverrides.clock} />)}
         </div>
         <div className="episode-row-main">
           <div className="episode-title">
@@ -227,16 +228,16 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 here is the whole point — at a glance, a creator can tell
                 which of their episodes are audio-only, video-only, or
                 offer both, without opening anything. */}
-            {s.hasVideo && <span className="episode-media-icon" title="Has video">🎬</span>}
-            {s.hasAudio && <span className="episode-media-icon" title="Has audio">🎧</span>}
+            {s.hasVideo && <span className="episode-media-icon" title="Has video"><ClapperboardIcon size={12} src={iconOverrides.clapperboard} /></span>}
+            {s.hasAudio && <span className="episode-media-icon" title="Has audio"><HeadphonesIcon size={12} src={iconOverrides.headphones} /></span>}
             {!s.deletionRequested && (
               <span style={{ position: 'relative' }}>
                 <button
                   onClick={() => setOpenDropdown(openDropdown === `episode:${s.id}` ? null : `episode:${s.id}`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', fontSize: '0.8rem', padding: 0 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', padding: 0, display: 'inline-flex' }}
                   aria-label="Episode settings"
                 >
-                  ⚙
+                  <SettingsIcon size={14} src={iconOverrides.settings} />
                 </button>
                 {openDropdown === `episode:${s.id}` && (
                   <div className="dropdown dropdown-left open">
@@ -250,7 +251,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                         setOpenDropdown(null);
                       }}
                     >
-                      ✎ Edit title &amp; description
+                      <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
                     </button>
                   </div>
                 )}
@@ -271,34 +272,34 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           {s.deletionRequested && <p className="submission-rejection">Deletion reason: {s.deletionReason}</p>}
         </div>
         <span className={`status-pill ${s.status}`}>{(STATUS_LABEL[s.status] || {}).text || s.status}</span>
-        <div className="row-views">{s.status === 'approved' ? `👁 ${s.viewCount}` : '—'}</div>
+        <div className="row-views">{s.status === 'approved' ? <><EyeIcon size={12} src={iconOverrides.eye} /> {s.viewCount}</> : '—'}</div>
         {flags.length > 0 && (
           <div className="row-flags">
-            {flags.map((f) => <span key={f.icon} className="row-flag" title={f.title}>{f.icon}</span>)}
+            {flags.map((f) => <span key={f.type} className="row-flag" title={f.title}><f.Icon size={12} src={iconOverrides[f.iconKey]} /></span>)}
           </div>
         )}
         <div className="row-actions">
           {s.contentType === 'podcast' && s.hasVideo && !s.hasAudio && (
             <button onClick={() => extractAudio(s.id)} disabled={extractingId === s.id} title="Extract audio from video">
-              {extractingId === s.id ? `…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}` : '🎧+'}
+              {extractingId === s.id ? `…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}` : <><HeadphonesIcon size={14} src={iconOverrides.headphones} />+</>}
             </button>
           )}
           {s.status === 'pending' && !s.deletionRequested && (
-            <button onClick={() => setEditingSubmission(s)} title="Edit">✎</button>
+            <button onClick={() => setEditingSubmission(s)} title="Edit"><PencilIcon size={14} src={iconOverrides.pencil} /></button>
           )}
           {!s.deletionRequested && (
-            <button onClick={() => setArtworkSubmission(s)} title={s.poster || s.thumbnail ? 'Replace artwork' : 'Add artwork'}>🖼</button>
+            <button onClick={() => setArtworkSubmission(s)} title={s.poster || s.thumbnail ? 'Replace artwork' : 'Add artwork'}><ImageIcon size={14} src={iconOverrides.image} /></button>
           )}
           {!s.deletionRequested && (
-            <button onClick={() => setReplacingVideoSubmission(s)} title={s.hasVideo ? 'Replace video' : 'Add video'}>🎬</button>
+            <button onClick={() => setReplacingVideoSubmission(s)} title={s.hasVideo ? 'Replace video' : 'Add video'}><ClapperboardIcon size={14} src={iconOverrides.clapperboard} /></button>
           )}
           {!s.deletionRequested && s.contentType !== 'podcast' && (
-            <button onClick={() => setCaptionSubmission(s)} title={s.captionsUrl ? 'Replace captions' : 'Add captions'}>💬</button>
+            <button onClick={() => setCaptionSubmission(s)} title={s.captionsUrl ? 'Replace captions' : 'Add captions'}><ChatIcon size={14} src={iconOverrides.chat} /></button>
           )}
           {s.deletionRequested ? (
-            <button onClick={() => cancelEpisodeDeletion(s.id)} title="Cancel deletion request">↺</button>
+            <button onClick={() => cancelEpisodeDeletion(s.id)} title="Cancel deletion request"><UndoIcon size={14} src={iconOverrides.undo} /></button>
           ) : (
-            <button onClick={() => setDeletingSubmission(s)} title="Request deletion">🗑</button>
+            <button onClick={() => setDeletingSubmission(s)} title="Request deletion"><TrashIcon size={14} src={iconOverrides.trash} /></button>
           )}
         </div>
       </div>
@@ -333,8 +334,6 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
             + Submit new episode
           </Link>
         </div>
-
-        <RssImportPanel allSeries={allSeries} onImported={loadSubmissions} />
 
         <div className="account-card">
           <p style={{ margin: '0 0 1rem', fontSize: '0.87rem', color: 'var(--ink-dim)' }}>
@@ -379,7 +378,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
 
               {missingArtworkCount > 0 && (
                 <div className="dash-nudge">
-                  🖼 {missingArtworkCount} submission{missingArtworkCount === 1 ? '' : 's'} still missing a poster or thumbnail — use &ldquo;Add artwork&rdquo; below on any of them, pending or already live.
+                  <ImageIcon size={13} src={iconOverrides.image} /> {missingArtworkCount} submission{missingArtworkCount === 1 ? '' : 's'} still missing a poster or thumbnail — use &ldquo;Add artwork&rdquo; below on any of them, pending or already live.
                 </div>
               )}
 
@@ -403,7 +402,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                   className={`filter-pill ${needsAttentionOnly ? 'on' : ''}`}
                   onClick={() => setNeedsAttentionOnly((v) => !v)}
                 >
-                  ⚠ Needs attention
+                  <WarningIcon size={12} src={iconOverrides.warning} /> Needs attention
                 </button>
               </div>
 
@@ -425,15 +424,19 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                       <div className="project-title-wrap">
                         <div className="project-title">
                           {group.label}
-                          {group.typeTag && <span className="project-type-tag">{group.typeTag}</span>}
+                          {group.typeTag && (
+                            <span className="project-type-tag">
+                              {group.typeTag === 'podcast' ? <><HeadphonesIcon size={11} src={iconOverrides.headphones} /> Podcast</> : 'Series'}
+                            </span>
+                          )}
                           {group.isGrouped && (
                             <span style={{ position: 'relative' }}>
                               <button
                                 onClick={() => setOpenDropdown(openDropdown === `series:${group.key}` ? null : `series:${group.key}`)}
-                                style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', fontSize: '0.9rem' }}
+                                style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', display: 'inline-flex' }}
                                 aria-label="Show settings"
                               >
-                                ⚙
+                                <SettingsIcon size={14} src={iconOverrides.settings} />
                               </button>
                               {openDropdown === `series:${group.key}` && (
                                 <div className="dropdown dropdown-left open">
@@ -449,7 +452,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                                       setOpenDropdown(null);
                                     }}
                                   >
-                                    ✎ Edit show details
+                                    <PencilIcon size={12} src={iconOverrides.pencil} /> Edit show details
                                   </button>
                                   <Link
                                     href={`/creator?contentType=bonus&seriesId=${group.key.replace('series:', '')}`}

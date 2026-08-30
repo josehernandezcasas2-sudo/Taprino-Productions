@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -47,7 +47,15 @@ const ICON_DEFS = [
   { key: 'image', label: 'Admin nav — Genre icons', Default: () => <ImageIcon size={22} /> },
   { key: 'sliders', label: 'Admin nav — Icons page', Default: () => <SlidersIcon size={22} /> },
   { key: 'calendar', label: 'Admin nav — Content lifecycle', Default: () => <CalendarIcon size={22} /> },
-  { key: 'palette', label: 'Admin nav — Theme colors', Default: () => <PaletteIcon size={22} /> }
+  { key: 'palette', label: 'Admin nav — Theme colors', Default: () => <PaletteIcon size={22} /> },
+  { key: 'headphones', label: 'Creator dashboard — has audio / podcast', Default: () => <HeadphonesIcon size={22} /> },
+  { key: 'chat', label: 'Creator dashboard — captions', Default: () => <ChatIcon size={22} /> },
+  { key: 'trash', label: 'Creator dashboard — delete', Default: () => <TrashIcon size={22} /> },
+  { key: 'warning', label: 'Creator dashboard — needs attention', Default: () => <WarningIcon size={22} /> },
+  { key: 'clock', label: 'Creator dashboard — pending', Default: () => <ClockIcon size={22} /> },
+  { key: 'pencil', label: 'Creator dashboard — edit', Default: () => <PencilIcon size={22} /> },
+  { key: 'eye', label: 'Creator dashboard — view count', Default: () => <EyeIcon size={22} /> },
+  { key: 'undo', label: 'Creator dashboard — cancel deletion', Default: () => <UndoIcon size={22} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {
