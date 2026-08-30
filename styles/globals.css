@@ -1152,7 +1152,11 @@ button { font-family: inherit; cursor: pointer; }
 .ep-info span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
 .type-line { display: block; margin-top: 0.25rem; font-size: 0.6rem !important; }
 .type-line.series { color: var(--brass) !important; }
-.type-line.standalone { color: var(--static-grey) !important; }
+.type-line.movie { color: var(--mint) !important; }
+.type-line.short { color: var(--sky) !important; }
+.type-line.vertical { color: var(--rust) !important; }
+.type-line.podcast { color: var(--olive) !important; }
+.type-line.bonus { color: var(--ink-faint) !important; }
 
 .account-card {
   background: var(--void-2);

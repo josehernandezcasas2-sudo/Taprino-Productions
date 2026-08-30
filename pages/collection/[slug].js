@@ -11,6 +11,7 @@ import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { contentTypeTag } from '../../lib/contentTypeTags';
 
 // Destination for the "See all" link on the homepage's New Releases and
 // Leaving Soon rows — same filtering logic as the homepage (isNewRelease/
@@ -122,7 +123,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
                         &#9636; {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
                       </span>
                     ) : (
-                      <span className="type-line standalone">&#9670; Standalone {ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+                      <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
                     )}
                   </div>
                 </Link>

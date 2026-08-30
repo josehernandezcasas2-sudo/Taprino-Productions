@@ -27,19 +27,7 @@ import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
 import { SITE } from '../../lib/siteConfig';
-
-// Labels + colors for every non-series content type this page can render.
-// Movie/short/vertical were the only cases handled before, which silently
-// mislabeled podcast and bonus content (both reachable here directly by
-// URL, even though neither is meant to be browsed as a standalone card)
-// as "Short".
-const CONTENT_TYPE_TAG = {
-  movie: { label: 'Movie' },
-  short: { label: 'Short' },
-  vertical: { label: 'Vertical' },
-  podcast: { label: 'Podcast' },
-  bonus: { label: 'Bonus content' }
-};
+import { contentTypeTag } from '../../lib/contentTypeTags';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, query, res }) {
@@ -505,8 +493,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                     {episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}
                   </Link>
                 ) : (
-                  <span className={`content-type-tag ${CONTENT_TYPE_TAG[episode.contentType] ? episode.contentType : 'short'}`}>
-                    {(CONTENT_TYPE_TAG[episode.contentType] || CONTENT_TYPE_TAG.short).label}
+                  <span className={`content-type-tag ${contentTypeTag(episode.contentType).key}`}>
+                    {contentTypeTag(episode.contentType).label}
                   </span>
                 )}
                 {/* Tier/ads and audio-described used to live in a completely

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import WishlistButton from './WishlistButton';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { contentTypeTag } from '../lib/contentTypeTags';
 import { SITE } from '../lib/siteConfig';
 
 const MAX_CARDS = 15;
@@ -75,7 +76,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               <div className="ep-info">
                 <h4>{card.ep.title}</h4>
                 <span>{card.ep.runtime}</span>
-                <span className="type-line standalone">◆ Standalone {card.ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+                <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
               </div>
             </button>
           </div>

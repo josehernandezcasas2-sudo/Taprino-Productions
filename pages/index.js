@@ -24,6 +24,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import StudioTapaPromo from '../components/StudioTapaPromo';
 import { SITE } from '../lib/siteConfig';
+import { contentTypeTag } from '../lib/contentTypeTags';
 
 export async function getServerSideProps({ req, res }) {
   // CDN caching, but ONLY for signed-out visitors.
@@ -332,7 +333,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                             ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
                           </span>
                         ) : (
-                          <span className="type-line standalone">◆ Standalone {ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+                          <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
                         )}
                       </div>
                     </button>

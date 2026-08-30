@@ -9,6 +9,7 @@ import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { contentTypeTag } from '../../lib/contentTypeTags';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, res }) {
@@ -108,7 +109,7 @@ export default function GenreLibrary({ genre, isSubscriber, isSignedIn, wishlist
                         ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
                       </span>
                     ) : (
-                      <span className="type-line standalone">◆ Standalone {ep.contentType === 'movie' ? 'Movie' : 'Short'}</span>
+                      <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
                     )}
                   </div>
                 </Link>
