@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { getViewCounts, getDailyViews, isRedisConfigured } from '../../../lib/redis';
+import { getViewCounts, getDailyViews, getWatchSecondsTotals, isRedisConfigured } from '../../../lib/redis';
 
 // Everything a creator can see about how their own work is performing.
 //
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
   const myIds = new Set(mine.map((e) => e.id));
   const approved = mine.filter((e) => e.status === 'approved');
 
-  const [totals, daily] = await Promise.all([getViewCounts(), getDailyViews(days)]);
+  const [totals, daily, watchTotals] = await Promise.all([getViewCounts(), getDailyViews(days), getWatchSecondsTotals()]);
 
   // Per-episode lifetime totals, biggest first.
   const perEpisode = approved
@@ -78,7 +78,12 @@ export default async function handler(req, res) {
       season: e.season,
       seriesOrder: e.series_order,
       publishedAt: e.created_at,
-      views: totals[e.id] || 0
+      views: totals[e.id] || 0,
+      // null (not 0) when there's nothing to compute from yet — the page
+      // shows that as "—" rather than a misleading "0:00".
+      avgWatchSeconds: totals[e.id] > 0 && watchTotals[e.id] != null
+        ? Math.round(watchTotals[e.id] / totals[e.id])
+        : null
     }))
     .sort((a, b) => b.views - a.views);
 

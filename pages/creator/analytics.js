@@ -8,6 +8,7 @@ import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
+import { formatRuntime } from '../../lib/videoMetadata';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, res }) {
@@ -205,6 +206,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                 <div className="ca-tr ca-th" role="row">
                   <span role="columnheader">Episode</span>
                   <span role="columnheader">Tier</span>
+                  <span role="columnheader" className="ca-num">Avg watch</span>
                   <span role="columnheader" className="ca-num">Views</span>
                 </div>
                 {data.perEpisode.map((ep) => {
@@ -214,8 +216,10 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                       <span role="cell" className="ca-title">
                         <Link href={`/episode/${ep.id}`}>{ep.title}</Link>
                         {ep.seriesOrder ? <em> · Ep. {ep.seriesOrder}</em> : null}
-                        {/* The bar makes the spread obvious at a glance — which is
-                            usually the real question, not the raw number. */}
+                        {/* Shown as actual text now, not just a bar with nothing
+                            to read — a screen reader (or anyone skimming past
+                            the visual) gets the same information either way. */}
+                        <span className="ca-share-label">{share.toFixed(0)}% of your total views</span>
                         <span className="ca-bar" aria-hidden="true">
                           <i style={{ width: `${share}%` }} />
                         </span>
@@ -225,6 +229,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                           {tierBadge(ep.tier, ep.adsEnabled).label}
                         </span>
                       </span>
+                      <span role="cell" className="ca-num">{ep.avgWatchSeconds != null ? formatRuntime(ep.avgWatchSeconds) : '—'}</span>
                       <span role="cell" className="ca-num">{ep.views.toLocaleString()}</span>
                     </div>
                   );
@@ -233,9 +238,11 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
             )}
 
             <p className="ca-foot">
-              A view is counted once per episode page load. It doesn&rsquo;t yet tell you how much of an
-              episode people actually watched — watch-through time is the more useful number, and
-              it&rsquo;s the next thing to add here.
+              A view is counted once per episode page load. Avg watch is the average time spent per
+              view — it only reflects signed-in viewers (anonymous playback isn&rsquo;t tracked
+              server-side yet), and it&rsquo;s a raw duration rather than a percentage of the episode&rsquo;s
+              length, so a longer episode will naturally show a bigger number for the same level of
+              engagement.
             </p>
           </>
         )}
