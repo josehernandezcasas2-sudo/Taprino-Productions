@@ -492,3 +492,25 @@ export function UndoIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+export function ExternalLinkIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 5H5.5A1.5 1.5 0 0 0 4 6.5v12A1.5 1.5 0 0 0 5.5 20h12a1.5 1.5 0 0 0 1.5-1.5V15" />
+      <path d="M14 4h6v6" />
+      <path d="M20 4l-9.5 9.5" />
+    </svg>
+  );
+}
+
+export function LinkIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.5 14.5l5-5" />
+      <path d="M13 6l1.5-1.5a3.5 3.5 0 0 1 5 5L18 11" />
+      <path d="M11 18l-1.5 1.5a3.5 3.5 0 0 1-5-5L6 13" />
+    </svg>
+  );
+}

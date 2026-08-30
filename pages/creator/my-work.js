@@ -13,7 +13,7 @@ import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
 import Footer from '../../components/Footer';
-import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 const STATUS_LABEL = {
@@ -60,6 +60,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
+  const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
@@ -101,6 +102,25 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
       }
     };
     poll();
+  }
+
+  // Podcast episodes don't get their own page — they're played inline from
+  // their show's page — so "view live" has to point there for podcasts and
+  // at the episode page itself for everything else.
+  function publicUrlFor(s) {
+    const path = s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
+    return `${SITE.productionDomain}${path}`;
+  }
+
+  async function copyPublicLink(s) {
+    try {
+      await navigator.clipboard.writeText(publicUrlFor(s));
+      setCopiedLinkId(s.id);
+      setTimeout(() => setCopiedLinkId((current) => (current === s.id ? null : current)), 2000);
+    } catch (err) {
+      // Clipboard access can fail (permissions, insecure context, etc.) —
+      // not worth surfacing an error for a nice-to-have convenience action.
+    }
   }
 
   async function loadSubmissions() {
@@ -253,6 +273,22 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                     >
                       <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
                     </button>
+                    {s.status === 'approved' && (
+                      <>
+                        <a
+                          className="dropdown-item"
+                          href={publicUrlFor(s)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => setOpenDropdown(null)}
+                        >
+                          <ExternalLinkIcon size={12} src={iconOverrides.external_link} /> View public page
+                        </a>
+                        <button className="dropdown-item" onClick={() => copyPublicLink(s)}>
+                          <LinkIcon size={12} src={iconOverrides.link} /> {copiedLinkId === s.id ? 'Link copied!' : 'Copy public link'}
+                        </button>
+                      </>
+                    )}
                   </div>
                 )}
               </span>
