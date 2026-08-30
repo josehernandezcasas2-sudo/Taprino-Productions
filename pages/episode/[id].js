@@ -17,7 +17,7 @@ import { recordView, recordDailyView } from '../../lib/redis';
 import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
 import { getRecommendations } from '../../lib/recommendations';
 import { getSiteSettings } from '../../lib/siteSettings';
-import { parseRuntimeToSeconds } from '../../lib/videoMetadata';
+import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadata';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
@@ -27,6 +27,7 @@ import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
 import { SITE } from '../../lib/siteConfig';
+import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
 
 import Footer from '../../components/Footer';
@@ -389,17 +390,17 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               <div className="hero-eyebrow">{episode.contentType === 'movie' ? 'Movie' : 'Short'}</div>
               <h2>{episode.title}</h2>
               <div className="hero-meta">
-                <span className="hero-badge-tier">{episode.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                <span className={`hero-badge-tier ${tierBadge(episode.tier, episode.adsEnabled).key}`}>{tierBadge(episode.tier, episode.adsEnabled).label}</span>
                 {episode.artist && (
                   <>
                     <span className="hero-meta-dot">&bull;</span>
                     <span>{episode.artist}</span>
                   </>
                 )}
-                {(episode.genre || episode.runtime) && (
+                {(episode.genre || episode.releaseYear || episode.runtime) && (
                   <>
                     <span className="hero-meta-dot">&bull;</span>
-                    <span>{[episode.genre, episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
+                    <span>{[episode.genre, episode.releaseYear, formatRuntimeLong(episode.runtime) || episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
                   </>
                 )}
                 {episode.rating && (

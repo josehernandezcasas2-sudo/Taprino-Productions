@@ -159,6 +159,7 @@ export default async function handler(req, res) {
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
+    release_year: body.releaseYear && Number.isInteger(Number(body.releaseYear)) ? Number(body.releaseYear) : null,
     video_type: 'html5',
     src,
     audio_url: body.audioUrl || null,

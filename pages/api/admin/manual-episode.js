@@ -130,6 +130,7 @@ export default async function handler(req, res) {
     artist: body.artist,
     runtime: body.runtime,
     rating: body.rating || null,
+    release_year: body.releaseYear && Number.isInteger(Number(body.releaseYear)) ? Number(body.releaseYear) : null,
     bonus_parent_type: body.contentType === 'bonus' ? body.bonusParentType : null,
     bonus_parent_id: body.contentType === 'bonus' ? body.bonusParentId : null,
     video_type: 'html5',

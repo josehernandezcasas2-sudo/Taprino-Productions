@@ -19,8 +19,8 @@ export const config = {
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'fundingUrl', 'audioUrl'];
-const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', fundingUrl: 'funding_url', audioUrl: 'audio_url' };
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'fundingUrl', 'audioUrl', 'releaseYear'];
+const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', fundingUrl: 'funding_url', audioUrl: 'audio_url', releaseYear: 'release_year' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -104,6 +104,9 @@ export default async function handler(req, res) {
       // and treat '' (cleared, only seriesOrder is realistically ever
       // left blank) as null rather than storing NaN.
       dbUpdates[column] = fields[f] === '' ? null : Number(fields[f]);
+    } else if (f === 'releaseYear') {
+      const year = Number(fields[f]);
+      dbUpdates[column] = fields[f] === '' || !Number.isInteger(year) ? null : year;
     } else if (f === 'fundingUrl') {
       dbUpdates[column] = normalizeUrl(fields[f]);
     } else {

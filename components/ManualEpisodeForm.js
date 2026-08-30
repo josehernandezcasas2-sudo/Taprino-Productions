@@ -17,7 +17,7 @@ const CONTENT_TYPES = [
 const EMPTY_FORM = {
   creatorEmail: '', title: '', description: '', contentType: 'short', rating: '', bonusParent: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
-  genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '',
+  genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '', releaseYear: '',
   tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
 };
 
@@ -247,6 +247,16 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
 
         <label>Runtime (e.g. 05:30)</label>
         <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+
+        <label>Year created <span style={{ fontWeight: 'normal' }}>optional</span></label>
+        <input
+          type="number"
+          value={form.releaseYear}
+          onChange={(e) => update('releaseYear', e.target.value)}
+          placeholder={String(new Date().getFullYear())}
+          min="1900"
+          max={new Date().getFullYear() + 1}
+        />
 
         <label>Tier</label>
         <select value={form.tier} onChange={(e) => update('tier', e.target.value)}>

@@ -23,7 +23,7 @@ export default async function handler(req, res) {
   const [{ data, error }, { data: allSeries }, viewCounts] = await Promise.all([
     supabase
       .from('episodes')
-      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label')
+      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label, release_year, ads_enabled')
       .eq('submitted_by', userId)
       .order('created_at', { ascending: false }),
     supabase.from('series').select('id, name, poster, thumbnail'),
@@ -64,6 +64,8 @@ export default async function handler(req, res) {
         seriesOrder: ep.series_order,
         artist: ep.artist,
         runtime: ep.runtime,
+        releaseYear: ep.release_year || null,
+        adsEnabled: ep.ads_enabled !== false,
         createdAt: ep.created_at,
         reviewedAt: ep.reviewed_at,
         // Only meaningful once approved and actually live — but harmless to

@@ -843,6 +843,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 6px;
   text-shadow: none;
 }
+.hero-badge-tier.free-noads { background: var(--ok); color: #14261a; }
 .hero-meta-dot { opacity: 0.6; }
 .hero-actions { display: flex; gap: 0.7rem; }
 .series-hero-meta {

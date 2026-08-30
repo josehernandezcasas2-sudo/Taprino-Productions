@@ -59,7 +59,7 @@ const CONTENT_TYPES = [
 const EMPTY_FORM = {
   title: '', description: '', tier: 'free',
   genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short', rating: '',
-  seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: '',
+  seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: '', releaseYear: '',
   featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
 };
 
@@ -427,6 +427,16 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
               {runtimeStatus === 'failed' && <span style={{ color: 'var(--ink-dim)', fontWeight: 'normal' }}> — couldn&rsquo;t auto-detect, please enter it</span>}
             </label>
             <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+
+            <label>Year created <span style={{ fontWeight: 'normal', color: 'var(--ink-dim)' }}>optional</span></label>
+            <input
+              type="number"
+              value={form.releaseYear}
+              onChange={(e) => update('releaseYear', e.target.value)}
+              placeholder={String(new Date().getFullYear())}
+              min="1900"
+              max={new Date().getFullYear() + 1}
+            />
 
             <label>Content rating <span style={{ fontWeight: 'normal', color: 'var(--ink-dim)' }}>optional</span></label>
             <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>

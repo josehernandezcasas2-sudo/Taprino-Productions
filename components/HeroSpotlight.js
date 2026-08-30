@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { SITE } from '../lib/siteConfig';
+import { tierBadge } from '../lib/tierBadge';
+import { formatRuntimeLong } from '../lib/videoMetadata';
 import { PlayIcon, PauseIcon, VolumeIcon, InfoIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
@@ -127,17 +128,17 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <div className="hero-eyebrow">{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</div>
           <h2>{ep.title}</h2>
           <div className="hero-meta">
-            <span className="hero-badge-tier">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+            <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>
             {ep.artist && (
               <>
                 <span className="hero-meta-dot">&bull;</span>
                 <span>{ep.artist}</span>
               </>
             )}
-            {(ep.genre || ep.runtime) && (
+            {(ep.genre || ep.releaseYear || ep.runtime) && (
               <>
                 <span className="hero-meta-dot">&bull;</span>
-                <span>{[ep.genre, ep.runtime].filter(Boolean).join(' \u00b7 ')}</span>
+                <span>{[ep.genre, ep.releaseYear, formatRuntimeLong(ep.runtime) || ep.runtime].filter(Boolean).join(' \u00b7 ')}</span>
               </>
             )}
             {ep.rating && (

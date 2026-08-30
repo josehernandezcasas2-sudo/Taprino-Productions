@@ -20,6 +20,7 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
     description: submission.description || '',
     artist: submission.artist || '',
     runtime: submission.runtime || '',
+    releaseYear: submission.releaseYear || '',
     contentType: submission.contentType || 'short',
     rating: submission.rating || '',
     genre: submission.genre || '',
@@ -78,6 +79,16 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
 
           <label>Runtime (e.g. 05:30)</label>
           <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+
+          <label>Year created <span style={{ fontWeight: 'normal' }}>optional</span></label>
+          <input
+            type="number"
+            value={form.releaseYear}
+            onChange={(e) => update('releaseYear', e.target.value)}
+            placeholder={String(new Date().getFullYear())}
+            min="1900"
+            max={new Date().getFullYear() + 1}
+          />
 
           <label>Content type</label>
           <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>

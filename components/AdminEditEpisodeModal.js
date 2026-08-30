@@ -55,6 +55,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     bonusParent: episode.bonusParentType && episode.bonusParentId ? `${episode.bonusParentType}:${episode.bonusParentId}` : '',
     artist: episode.artist || '',
     runtime: episode.runtime || '',
+    releaseYear: episode.releaseYear || '',
     genre: episode.genre || '',
     mainGenre: episode.mainGenre || MAIN_GENRES[0],
     tier: episode.tier || 'free',
@@ -270,6 +271,20 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <div className="admin-field">
               <label>Runtime</label>
               <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} placeholder="mm:ss" required />
+            </div>
+          </div>
+
+          <div className="admin-field-row">
+            <div className="admin-field">
+              <label>Year created <span style={{ fontWeight: 'normal' }}>optional</span></label>
+              <input
+                type="number"
+                value={form.releaseYear}
+                onChange={(e) => update('releaseYear', e.target.value)}
+                placeholder={String(new Date().getFullYear())}
+                min="1900"
+                max={new Date().getFullYear() + 1}
+              />
             </div>
           </div>
 
