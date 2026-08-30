@@ -10,6 +10,7 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
+import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 import Footer from '../../components/Footer';
@@ -67,6 +68,7 @@ export async function getServerSideProps({ req, params, res }) {
 
 export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, episodes, isAdmin, isCreator }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
+  const iconOverrides = usePlayerIconOverrides();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   const seriesEpisodes = episodes
@@ -178,7 +180,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                       <div className="episode-row-thumb">
                         {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
                         <span className="episode-row-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                        {!ep.thumbnail && (ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
+                        {!ep.thumbnail && (ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
                       </div>
                       <div className="episode-row-info">
                         <h4>{ep.title}</h4>

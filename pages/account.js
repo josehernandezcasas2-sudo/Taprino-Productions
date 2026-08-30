@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
-import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { HeartIcon, SparkleIcon, PlayIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
 
 export async function getServerSideProps({ req, res }) {
@@ -362,10 +362,10 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                 <div className="account-subheading">Quick links</div>
                 <div className="account-quicklinks">
                   <Link href="/wishlist" className="account-quicklink"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
-                  <Link href="/recs" className="account-quicklink">✨ My Recs</Link>
-                  <Link href="/#continue-watching" className="account-quicklink">▶ Continue Watching</Link>
+                  <Link href="/recs" className="account-quicklink"><SparkleIcon size={14} src={iconOverrides.sparkle} /> My Recs</Link>
+                  <Link href="/#continue-watching" className="account-quicklink"><PlayIcon size={14} src={iconOverrides.play} /> Continue Watching</Link>
                   {canSeeNumbers && (
-                    <Link href="/creator/analytics" className="account-quicklink">📊 Your Numbers</Link>
+                    <Link href="/creator/analytics" className="account-quicklink"><BarChartIcon size={14} src={iconOverrides.bar_chart} /> Your Numbers</Link>
                   )}
                 </div>
               </div>

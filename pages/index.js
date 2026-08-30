@@ -8,6 +8,7 @@ import { getViewCounts, isRedisConfigured } from '../lib/redis';
 import { buildHeroCandidates } from '../lib/heroCandidates';
 import { useWishlist } from '../lib/useWishlist';
 import GenreRow from '../components/GenreRow';
+import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import ContinueWatchingRow from '../components/ContinueWatchingRow';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../lib/contentLifecycle';
 import { getContinueWatching } from '../lib/continueWatching';
@@ -145,6 +146,7 @@ export async function getServerSideProps({ req, res }) {
 
 export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching, viewCounts }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
+  const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [activeGenre, setActiveGenre] = useState('All');
@@ -320,7 +322,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                     <button className={`ep-card ${ep.tier}`} onClick={() => goToEpisode(ep)}>
                       <div className="ep-thumb">
                         <span className="ep-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                        {ep.tier === 'premium' ? '◈ locked' : '▶ preview'}
+                        {ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>}
                       </div>
                       <div className="ep-info">
                         <h4>{ep.title}</h4>

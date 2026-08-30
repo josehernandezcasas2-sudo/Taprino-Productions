@@ -12,6 +12,7 @@ import ManualEpisodeForm from '../components/ManualEpisodeForm';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
 import Footer from '../components/Footer';
+import { ClapperboardIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
 // any admin data is ever fetched or rendered — there's no client-side-only
@@ -40,6 +41,7 @@ export async function getServerSideProps({ req, res }) {
 }
 
 export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [submissions, setSubmissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -572,15 +574,15 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       )}
 
       <div className="admin-tool-links">
-        <Link href="/creator">🎬 Creator Studio →</Link>
-        <Link href="/admin/team">👥 Team &amp; permissions →</Link>
-        <Link href="/admin/house-ads">📺 House ads →</Link>
-        <Link href="/admin/live">🔴 Go live →</Link>
-        <Link href="/admin/channel">📡 Channel schedule →</Link>
-        <Link href="/admin/applications">📥 Applications →</Link>
-        <Link href="/admin/genre-icons">🖼️ Genre icons →</Link>
-        <Link href="/admin/player-icons">🎛️ Icons →</Link>
-        <Link href="/admin/content-lifecycle">📅 Content lifecycle →</Link>
+        <Link href="/creator"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Creator Studio →</Link>
+        <Link href="/admin/team"><TeamIcon size={15} src={iconOverrides.team} /> Team &amp; permissions →</Link>
+        <Link href="/admin/house-ads"><TvIcon size={15} src={iconOverrides.tv} /> House ads →</Link>
+        <Link href="/admin/live"><LiveDotIcon size={15} src={iconOverrides.live_dot} /> Go live →</Link>
+        <Link href="/admin/channel"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel schedule →</Link>
+        <Link href="/admin/applications"><InboxIcon size={15} src={iconOverrides.inbox} /> Applications →</Link>
+        <Link href="/admin/genre-icons"><ImageIcon size={15} src={iconOverrides.image} /> Genre icons →</Link>
+        <Link href="/admin/player-icons"><SlidersIcon size={15} src={iconOverrides.sliders} /> Icons →</Link>
+        <Link href="/admin/content-lifecycle"><CalendarIcon size={15} src={iconOverrides.calendar} /> Content lifecycle →</Link>
       </div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>
@@ -660,10 +662,10 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           <div className="account-eyebrow">Site settings</div>
           <h3>Header &amp; links</h3>
           <Link href="/admin/theme" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1rem', marginRight: '0.6rem' }}>
-            🎨 Edit theme colors
+            <PaletteIcon size={14} src={iconOverrides.palette} /> Edit theme colors
           </Link>
           <Link href="/admin/analytics" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1rem' }}>
-            📊 Watch analytics
+            <BarChartIcon size={14} src={iconOverrides.bar_chart} /> Watch analytics
           </Link>
 
           {!siteSettings ? (

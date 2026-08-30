@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { usePodcastPlayer } from '../contexts/PodcastPlayerContext';
+import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) return '0:00';
@@ -12,6 +13,7 @@ const RATES = [1, 1.25, 1.5, 1.75, 2];
 
 export default function PodcastMiniPlayer() {
   const player = usePodcastPlayer();
+  const iconOverrides = usePlayerIconOverrides();
   if (!player || !player.currentEpisode) return null;
 
   const { currentEpisode, isPlaying, position, duration, playbackRate, togglePlayPause, seekTo, setPlaybackRate, closePlayer } = player;
@@ -38,11 +40,11 @@ export default function PodcastMiniPlayer() {
         <div className="s">{currentEpisode.showTitle}</div>
       </div>
       <div className="mini-player-controls">
-        <button onClick={() => seekTo(Math.max(0, position - 15))} aria-label="Back 15 seconds">⏮</button>
-        <button onClick={togglePlayPause} aria-label={isPlaying ? 'Pause' : 'Play'} style={{ fontSize: '1.3rem' }}>
-          {isPlaying ? '⏸' : '▶'}
+        <button onClick={() => seekTo(Math.max(0, position - 15))} aria-label="Back 15 seconds"><SkipBackIcon size={17} src={iconOverrides.skip_back} /></button>
+        <button onClick={togglePlayPause} aria-label={isPlaying ? 'Pause' : 'Play'}>
+          {isPlaying ? <PauseIcon size={21} src={iconOverrides.pause} /> : <PlayIcon size={21} src={iconOverrides.play} />}
         </button>
-        <button onClick={() => seekTo(Math.min(duration, position + 30))} aria-label="Forward 30 seconds">⏭</button>
+        <button onClick={() => seekTo(Math.min(duration, position + 30))} aria-label="Forward 30 seconds"><SkipForwardIcon size={17} src={iconOverrides.skip_forward} /></button>
       </div>
       <div className="mini-player-scrub">
         <span className="mini-player-time">{formatTime(position)}</span>
@@ -52,7 +54,7 @@ export default function PodcastMiniPlayer() {
         <span className="mini-player-time">{formatTime(duration)}</span>
       </div>
       <button className="mini-player-speed" onClick={cycleRate}>{playbackRate}x</button>
-      <button className="mini-player-close" onClick={closePlayer} aria-label="Close player">✕</button>
+      <button className="mini-player-close" onClick={closePlayer} aria-label="Close player"><CloseIcon size={16} src={iconOverrides.close} /></button>
     </div>
   );
 }

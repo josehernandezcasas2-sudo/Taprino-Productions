@@ -2628,6 +2628,7 @@ button { font-family: inherit; cursor: pointer; }
   text-decoration: none;
 }
 .admin-tool-links a:hover { border-color: var(--signal-amber); color: var(--signal-amber); }
+.admin-tool-links a svg, .admin-tool-links a img { vertical-align: -3px; margin-right: 0.35rem; }
 
 .house-ad-notice {
   border: 1px solid rgba(232, 163, 61, 0.3);
@@ -3776,6 +3777,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   font-size: 0.88rem;
 }
 .account-quicklink:hover { border-color: var(--brass); }
+.account-quicklink svg, .account-quicklink img { vertical-align: -3px; margin-right: 0.4rem; }
 
 /* Free-access note for admin/sub-admin/comped accounts on the account page —
    distinct from a real paid subscription, no Stripe portal button since

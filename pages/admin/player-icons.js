@@ -6,7 +6,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon } from '../../components/PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DiamondIcon, SeriesListIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon } from '../../components/PlayerIcons';
 
 // Each entry: the icon_key stored in the database, a human label for the
 // admin UI, and the default SVG to show as a live preview alongside
@@ -35,7 +35,19 @@ const ICON_DEFS = [
   { key: 'arrow_right', label: 'Log in', Default: () => <ArrowRightIcon size={22} /> },
   { key: 'tab_home', label: 'Mobile tab bar — Home', Default: () => <DiamondIcon size={22} /> },
   { key: 'tab_series', label: 'Mobile tab bar — Series', Default: () => <SeriesListIcon size={22} /> },
-  { key: 'tab_account', label: 'Mobile tab bar — Account', Default: () => <AccountIcon size={22} /> }
+  { key: 'tab_account', label: 'Mobile tab bar — Account', Default: () => <AccountIcon size={22} /> },
+  { key: 'skip_back', label: 'Podcast player — skip back 15s', Default: () => <SkipBackIcon size={22} /> },
+  { key: 'skip_forward', label: 'Podcast player — skip forward 30s', Default: () => <SkipForwardIcon size={22} /> },
+  { key: 'close', label: 'Podcast player — close', Default: () => <CloseIcon size={22} /> },
+  { key: 'team', label: 'Admin nav — Team & permissions', Default: () => <TeamIcon size={22} /> },
+  { key: 'tv', label: 'Admin nav — House ads', Default: () => <TvIcon size={22} /> },
+  { key: 'live_dot', label: 'Admin nav — Go live', Default: () => <LiveDotIcon size={22} /> },
+  { key: 'antenna', label: 'Admin nav — Channel schedule', Default: () => <AntennaIcon size={22} /> },
+  { key: 'inbox', label: 'Admin nav — Applications', Default: () => <InboxIcon size={22} /> },
+  { key: 'image', label: 'Admin nav — Genre icons', Default: () => <ImageIcon size={22} /> },
+  { key: 'sliders', label: 'Admin nav — Icons page', Default: () => <SlidersIcon size={22} /> },
+  { key: 'calendar', label: 'Admin nav — Content lifecycle', Default: () => <CalendarIcon size={22} /> },
+  { key: 'palette', label: 'Admin nav — Theme colors', Default: () => <PaletteIcon size={22} /> }
 ];
 
 export async function getServerSideProps({ req, res }) {

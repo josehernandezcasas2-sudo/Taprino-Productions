@@ -9,6 +9,7 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
+import { PlayIcon, PauseIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res, params }) {
@@ -48,6 +49,7 @@ function formatDate(iso) {
 
 export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, show, episodes }) {
   const player = usePodcastPlayer();
+  const iconOverrides = usePlayerIconOverrides();
   const firstEpisode = episodes[0];
   const host = firstEpisode ? firstEpisode.artist : null;
 
@@ -107,13 +109,13 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
           return (
             <div key={ep.id} className="podcast-episode-row">
               {ep.locked ? (
-                <button className="ep-play-btn" disabled title={`${SITE.premiumTier} required`}>🔒</button>
+                <button className="ep-play-btn" disabled title={`${SITE.premiumTier} required`}><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
               ) : hasAudio ? (
                 <button className={`ep-play-btn ${playing ? 'playing' : ''}`} onClick={() => playAudio(ep)} aria-label={playing ? 'Pause' : 'Play'}>
-                  {playing ? '⏸' : '▶'}
+                  {playing ? <PauseIcon size={15} src={iconOverrides.pause} /> : <PlayIcon size={15} src={iconOverrides.play} />}
                 </button>
               ) : (
-                <Link href={`/episode/${ep.id}`} className="ep-play-btn" style={{ textDecoration: 'none' }} aria-label="Watch">▶</Link>
+                <Link href={`/episode/${ep.id}`} className="ep-play-btn" style={{ textDecoration: 'none' }} aria-label="Watch"><PlayIcon size={15} src={iconOverrides.play} /></Link>
               )}
               <div className="podcast-episode-row-info">
                 <h4>{ep.title}</h4>

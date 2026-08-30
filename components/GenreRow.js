@@ -1,10 +1,12 @@
 import Link from 'next/link';
 import WishlistButton from './WishlistButton';
+import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { SITE } from '../lib/siteConfig';
 
 const MAX_CARDS = 15;
 
 export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist, seeAllHref, viewCounts }) {
+  const iconOverrides = usePlayerIconOverrides();
   if (episodes.length === 0) return null;
 
   // Never show individual series episodes side by side in a browsing row —
@@ -68,7 +70,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               <div className="ep-thumb">
                 {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{card.ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
-                {!card.ep.thumbnail && (card.ep.tier === 'premium' ? '◈ locked' : '▶ preview')}
+                {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
               </div>
               <div className="ep-info">
                 <h4>{card.ep.title}</h4>
