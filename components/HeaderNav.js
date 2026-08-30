@@ -280,9 +280,11 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           </>
         )}
 
-        <Link href="/account" className="tapa-plus-pill">
-          {SITE.premiumTier}
-        </Link>
+        {!isSubscriber && (
+          <Link href="/account" className="tapa-plus-pill">
+            {SITE.premiumTier}
+          </Link>
+        )}
 
         <button
           className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
