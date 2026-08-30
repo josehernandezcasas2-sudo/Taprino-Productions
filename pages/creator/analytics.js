@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
@@ -81,6 +81,41 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
   const [days, setDays] = useState(30);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [selectedEpisodeId, setSelectedEpisodeId] = useState(null);
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
+  const latestRequestRef = useRef(null);
+
+  function toggleEpisode(episodeId) {
+    if (selectedEpisodeId === episodeId) {
+      setSelectedEpisodeId(null);
+      setDetail(null);
+      latestRequestRef.current = null;
+      return;
+    }
+    setSelectedEpisodeId(episodeId);
+    setDetail(null);
+    setDetailError(null);
+    setDetailLoading(true);
+    latestRequestRef.current = episodeId;
+    fetch(`/api/creator/episode-detail-analytics?episodeId=${episodeId}`)
+      .then((r) => r.json())
+      .then((d) => {
+        // A second click on a different episode before this slower first
+        // request finished would otherwise let it resolve later and
+        // overwrite the panel with the wrong episode's numbers.
+        if (latestRequestRef.current !== episodeId) return;
+        if (d.error) setDetailError(d.error);
+        else setDetail(d);
+        setDetailLoading(false);
+      })
+      .catch(() => {
+        if (latestRequestRef.current !== episodeId) return;
+        setDetailError('Could not load this episode\u2019s numbers.');
+        setDetailLoading(false);
+      });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -211,10 +246,19 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                 </div>
                 {data.perEpisode.map((ep) => {
                   const share = t.views > 0 ? (ep.views / t.views) * 100 : 0;
+                  const selected = selectedEpisodeId === ep.id;
                   return (
-                    <div className="ca-tr" role="row" key={ep.id}>
+                    <div
+                      className={`ca-tr ca-tr-clickable ${selected ? 'selected' : ''}`}
+                      role="row"
+                      key={ep.id}
+                      onClick={() => toggleEpisode(ep.id)}
+                      tabIndex={0}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleEpisode(ep.id); } }}
+                      aria-pressed={selected}
+                    >
                       <span role="cell" className="ca-title">
-                        <Link href={`/episode/${ep.id}`}>{ep.title}</Link>
+                        <Link href={`/episode/${ep.id}`} onClick={(e) => e.stopPropagation()}>{ep.title}</Link>
                         {ep.seriesOrder ? <em> · Ep. {ep.seriesOrder}</em> : null}
                         {/* Shown as actual text now, not just a bar with nothing
                             to read — a screen reader (or anyone skimming past
@@ -223,6 +267,14 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                         <span className="ca-bar" aria-hidden="true">
                           <i style={{ width: `${share}%` }} />
                         </span>
+                        {ep.watchThroughPct != null && (
+                          <>
+                            <span className="ca-share-label">{ep.watchThroughPct}% watched through on average</span>
+                            <span className="ca-bar ca-bar-watch" aria-hidden="true">
+                              <i style={{ width: `${ep.watchThroughPct}%` }} />
+                            </span>
+                          </>
+                        )}
                       </span>
                       <span role="cell">
                         <span className={`ca-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
@@ -234,6 +286,47 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {selectedEpisodeId && (
+              <div className="ca-detail">
+                {detailLoading && <div className="ca-empty">Loading this episode&rsquo;s numbers…</div>}
+                {detailError && <div className="ca-empty ca-error">{detailError}</div>}
+                {detail && !detailLoading && (
+                  <>
+                    <div className="ca-detail-head">
+                      <div>
+                        <div className="eyebrow">Since it was uploaded</div>
+                        <h3>{detail.episode.title}</h3>
+                      </div>
+                      <button className="ca-detail-close" onClick={() => toggleEpisode(selectedEpisodeId)} aria-label="Close">
+                        Close ✕
+                      </button>
+                    </div>
+
+                    <div className="ca-stats">
+                      <div className="ca-stat">
+                        <b>{detail.totals.views.toLocaleString()}</b>
+                        <small>Views all time</small>
+                      </div>
+                      <div className="ca-stat">
+                        <b>{detail.totals.avgWatchSeconds != null ? formatRuntime(detail.totals.avgWatchSeconds) : '—'}</b>
+                        <small>Avg watch time</small>
+                      </div>
+                      <div className="ca-stat">
+                        <b>{detail.totals.watchThroughPct != null ? `${detail.totals.watchThroughPct}%` : '—'}</b>
+                        <small>Watched through</small>
+                      </div>
+                    </div>
+
+                    {detail.trend.length > 0 ? (
+                      <Sparkline trend={detail.trend} />
+                    ) : (
+                      <div className="ca-empty">No day-by-day data yet — check back once it&rsquo;s had some views.</div>
+                    )}
+                  </>
+                )}
               </div>
             )}
 

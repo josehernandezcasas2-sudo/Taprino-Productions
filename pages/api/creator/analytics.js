@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, isRedisConfigured } from '../../../lib/redis';
+import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 
 // Everything a creator can see about how their own work is performing.
 //
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
 
   const { data: episodes, error } = await supabase
     .from('episodes')
-    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by, ads_enabled')
+    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by, ads_enabled, runtime')
     .or(orConditions.join(','))
     .order('created_at', { ascending: false });
 
@@ -83,7 +84,16 @@ export default async function handler(req, res) {
       // shows that as "—" rather than a misleading "0:00".
       avgWatchSeconds: totals[e.id] > 0 && watchTotals[e.id] != null
         ? Math.round(watchTotals[e.id] / totals[e.id])
-        : null
+        : null,
+      // How much of the episode people watch on average, as a percentage
+      // of its own runtime — capped at 100 since a viewer rewinding and
+      // re-watching part of it can otherwise push the raw ratio past
+      // that, which would read as a bug rather than genuine re-watching.
+      watchThroughPct: (() => {
+        const runtimeSeconds = parseRuntimeToSeconds(e.runtime);
+        const avgSeconds = totals[e.id] > 0 && watchTotals[e.id] != null ? watchTotals[e.id] / totals[e.id] : null;
+        return runtimeSeconds && avgSeconds != null ? Math.min(100, Math.round((avgSeconds / runtimeSeconds) * 100)) : null;
+      })()
     }))
     .sort((a, b) => b.views - a.views);
 
