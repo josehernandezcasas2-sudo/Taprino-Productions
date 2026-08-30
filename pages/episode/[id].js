@@ -574,7 +574,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                     </div>
                     <div className="side-ep-info">
                       <h5>{nextEpisode.seriesOrder ? `S${nextEpisode.season || 1}E${nextEpisode.seriesOrder} — ` : ''}{nextEpisode.title}</h5>
-                      <span>{nextEpisode.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                      <span className={`side-tier-label ${tierBadge(nextEpisode.tier, nextEpisode.adsEnabled).key}`}>{tierBadge(nextEpisode.tier, nextEpisode.adsEnabled).label}</span>
                     </div>
                   </Link>
                 </>
@@ -626,7 +626,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   </div>
                   <div className="side-ep-info">
                     <h5>{item.title}</h5>
-                    <span>{item.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                    <span className={`side-tier-label ${tierBadge(item.tier, item.adsEnabled).key}`}>{tierBadge(item.tier, item.adsEnabled).label}</span>
                   </div>
                 </Link>
               ))}

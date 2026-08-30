@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
 
-export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
+export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -101,7 +101,7 @@ export default function SeriesHero({ title, desc, videoSrc, imageSrc, playLabel,
           <h2>{title}</h2>
           <p>{desc}</p>
           <div className="series-hero-meta">
-            {tierLabel && <span className="series-hero-meta-pill">{tierLabel}</span>}
+            {tierLabel && <span className={`series-hero-meta-pill ${tierKey || ''}`}>{tierLabel}</span>}
             {(seasonCount || episodeCount) && (
               <span>
                 {seasonCount > 1 ? `${seasonCount} seasons · ` : ''}{episodeCount} episode{episodeCount === 1 ? '' : 's'}

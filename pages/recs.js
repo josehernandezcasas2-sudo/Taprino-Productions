@@ -14,6 +14,7 @@ import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
+import { tierBadge } from '../lib/tierBadge';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -97,9 +98,9 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
               {recommendations.map((ep) => (
                 <div key={ep.id} className="card-wrap">
                   <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
-                  <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : `/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
+                  <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : `/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                     <div className="poster-art">
-                      <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                      <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                       {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
                       {!ep.poster && '◈'}
                     </div>

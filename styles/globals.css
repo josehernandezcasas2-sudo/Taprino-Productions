@@ -331,14 +331,15 @@ button { font-family: inherit; cursor: pointer; }
   color: rgba(234, 231, 221, 0.4);
   transition: box-shadow 0.15s ease;
 }
-.episode-row-link.free .episode-row-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
+.episode-row-link.free-ads .episode-row-thumb, .episode-row-link.free-noads .episode-row-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
 .episode-row-link.premium .episode-row-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), var(--surface-1)); }
 .episode-row-badge {
   position: absolute; top: 0.5rem; right: 0.5rem;
   font-family: var(--font-mono); font-size: 0.55rem; letter-spacing: 0.06em; text-transform: uppercase;
   padding: 0.2rem 0.5rem; border-radius: 999px;
 }
-.episode-row-link.free .episode-row-badge { background: rgba(74,168,162,0.2); color: var(--brass); }
+.episode-row-link.free-ads .episode-row-badge { background: rgba(74,168,162,0.2); color: var(--brass); }
+.episode-row-link.free-noads .episode-row-badge { background: rgba(132,205,152,0.22); color: var(--ok); }
 .episode-row-link.premium .episode-row-badge { background: rgba(179,73,47,0.22); color: var(--danger); }
 .episode-row-info { flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: flex-start; padding-top: 0.2rem; }
 .episode-row-info h4 { margin: 0 0 0.4rem; font-family: var(--font-display); font-size: 1.15rem; font-weight: 600; }
@@ -397,7 +398,7 @@ button { font-family: inherit; cursor: pointer; }
   width: 100%; height: 100%;
   object-fit: cover;
 }
-.poster-card.free .poster-art { background: radial-gradient(circle at 35% 25%, rgba(74,168,162,0.28), var(--surface-1) 70%); }
+.poster-card.free-ads .poster-art, .poster-card.free-noads .poster-art { background: radial-gradient(circle at 35% 25%, rgba(74,168,162,0.28), var(--surface-1) 70%); }
 .poster-card.premium .poster-art { background: radial-gradient(circle at 65% 25%, rgba(179,73,47,0.28), var(--surface-1) 70%); }
 .poster-badge {
   position: absolute; top: 0.5rem; left: 0.5rem;
@@ -405,7 +406,8 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0.2rem 0.45rem; border-radius: 999px;
   z-index: 2;
 }
-.poster-card.free .poster-badge { background: var(--olive-deep); color: var(--ink); }
+.poster-card.free-ads .poster-badge { background: var(--olive-deep); color: var(--ink); }
+.poster-card.free-noads .poster-badge { background: var(--ok); color: #14261a; }
 .poster-card.premium .poster-badge { background: var(--brass); color: #241a05; }
 .poster-title-wrap {
   position: absolute; left: 0; right: 0; bottom: 0;
@@ -854,6 +856,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--brass); color: #241a05; padding: 0.25rem 0.7rem;
   border-radius: 999px; font-weight: 700; font-size: 0.8rem;
 }
+.series-hero-meta-pill.free-noads { background: var(--ok); color: #14261a; }
 .series-hero-fallback-bg {
   background: linear-gradient(135deg, var(--olive-shadow), var(--surface-1) 70%);
 }
@@ -1129,7 +1132,7 @@ button { font-family: inherit; cursor: pointer; }
   position: static;
 }
 
-.ep-card.free .ep-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
+.ep-card.free-ads .ep-thumb, .ep-card.free-noads .ep-thumb { background: radial-gradient(circle at 30% 30%, rgba(74,168,162,0.22), var(--surface-1)); }
 .ep-card.premium .ep-thumb { background: radial-gradient(circle at 70% 30%, rgba(179,73,47,0.22), var(--surface-1)); }
 .ep-badge {
   position: absolute; top: 0.5rem; left: 0.5rem;
@@ -1146,7 +1149,8 @@ button { font-family: inherit; cursor: pointer; }
    the brass token — that color means Studio Tapa+ (premium)
    everywhere else on the site, so reusing it here would blur the exact
    distinction this badge exists to make. */
-.ep-card.free .ep-badge { background: var(--olive-deep); color: var(--ink); }
+.ep-card.free-ads .ep-badge { background: var(--olive-deep); color: var(--ink); }
+.ep-card.free-noads .ep-badge { background: var(--ok); color: #14261a; }
 .ep-card.premium .ep-badge { background: var(--brass); color: #241a05; }
 .ep-info { padding: 0.7rem 0.8rem 0.9rem; }
 .ep-info h4 { font-family: var(--font-display); font-size: 0.88rem; margin: 0 0 0.25rem; font-weight: 600; }
@@ -2461,6 +2465,7 @@ button { font-family: inherit; cursor: pointer; }
 .ca-num { text-align: right; font-family: var(--font-mono); font-size: 0.85rem; }
 .ca-tier { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--static-grey); }
 .ca-tier.premium { color: var(--signal-amber); }
+.ca-tier.free-noads { color: var(--ok); }
 .ca-empty {
   border: 1px dashed rgba(234, 231, 221, 0.16);
   border-radius: 6px;
@@ -4158,6 +4163,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 .side-ep-info h5 { margin: 0 0 0.2rem; color: var(--ink); font-size: 0.85rem; }
 .side-ep-info span { color: var(--ink-dim); font-size: 0.75rem; }
+.side-tier-label.free-ads { color: var(--brass); }
+.side-tier-label.free-noads { color: var(--ok); }
+.side-tier-label.premium { color: var(--danger); }
 .see-all-episodes-btn {
   display: flex; align-items: center; gap: 0.5rem; justify-content: center; width: 100%;
   padding: 0.6rem; border: 1px solid rgba(234,231,221,0.2); border-radius: 6px;

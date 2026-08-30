@@ -1,4 +1,5 @@
 import { parseRuntimeToSeconds } from '../lib/videoMetadata';
+import { tierBadge } from '../lib/tierBadge';
 
 const MAX_CARDS = 15;
 
@@ -31,7 +32,7 @@ export default function ContinueWatchingRow({ items, onSelect }) {
           return (
             <div key={ep.id} className="card-wrap row-card">
               <div
-                className={`ep-card ${ep.tier}`}
+                className={`ep-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}
                 onClick={() => onSelect(ep)}
                 role="button"
                 tabIndex={0}

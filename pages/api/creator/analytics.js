@@ -51,7 +51,7 @@ export default async function handler(req, res) {
 
   const { data: episodes, error } = await supabase
     .from('episodes')
-    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by')
+    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by, ads_enabled')
     .or(orConditions.join(','))
     .order('created_at', { ascending: false });
 
@@ -72,6 +72,7 @@ export default async function handler(req, res) {
       id: e.id,
       title: e.title,
       tier: e.tier,
+      adsEnabled: e.ads_enabled !== false,
       contentType: e.content_type,
       seriesId: e.series_id,
       season: e.season,

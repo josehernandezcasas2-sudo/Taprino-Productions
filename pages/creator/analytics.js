@@ -7,6 +7,7 @@ import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { tierBadge } from '../../lib/tierBadge';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, res }) {
@@ -220,8 +221,8 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                         </span>
                       </span>
                       <span role="cell">
-                        <span className={`ca-tier ${ep.tier}`}>
-                          {ep.tier === 'premium' ? SITE.premiumTier : 'Free'}
+                        <span className={`ca-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                          {tierBadge(ep.tier, ep.adsEnabled).label}
                         </span>
                       </span>
                       <span role="cell" className="ca-num">{ep.views.toLocaleString()}</span>

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import WishlistButton from './WishlistButton';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { contentTypeTag } from '../lib/contentTypeTags';
-import { SITE } from '../lib/siteConfig';
+import { tierBadge } from '../lib/tierBadge';
 
 const MAX_CARDS = 15;
 
@@ -39,7 +39,13 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
       // lightly-watched standalone short, which a per-episode-only
       // comparison wouldn't reflect.
       const rank = eps.reduce((sum, e) => sum + (vc[e.id] || 0), 0);
-      return { type: 'series', key: info.id, rank, info, count: eps.length, tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free' };
+      return {
+        type: 'series', key: info.id, rank, info, count: eps.length,
+        tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free',
+        // Ad-free only if every episode is — one ad-supported episode is
+        // enough to call the whole show ad-supported.
+        adsEnabled: eps.some((e) => e.adsEnabled !== false)
+      };
     })
     .filter(Boolean);
 
@@ -65,12 +71,12 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               <WishlistButton isActive={isWishlisted(card.ep.id)} onToggle={() => onToggleWishlist(card.ep.id)} />
             )}
             <button
-              className={`ep-card ${card.ep.tier} ${card.ep.id === currentId ? 'active' : ''}`}
+              className={`ep-card ${tierBadge(card.ep.tier, card.ep.adsEnabled).key} ${card.ep.id === currentId ? 'active' : ''}`}
               onClick={() => onSelect(card.ep)}
             >
               <div className="ep-thumb">
                 {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
-                <span className="ep-badge">{card.ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                <span className="ep-badge">{tierBadge(card.ep.tier, card.ep.adsEnabled).label}</span>
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
               </div>
               <div className="ep-info">
@@ -85,10 +91,10 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             {onToggleWishlist && (
               <WishlistButton isActive={isWishlisted(card.info.id)} onToggle={() => onToggleWishlist(card.info.id)} />
             )}
-            <Link href={`/series/${card.info.id}`} className={`ep-card ${card.tier}`}>
+            <Link href={`/series/${card.info.id}`} className={`ep-card ${tierBadge(card.tier, card.adsEnabled).key}`}>
               <div className="ep-thumb">
                 {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
-                <span className="ep-badge">{card.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
                 {!card.info.thumbnail && '▤ series'}
               </div>
               <div className="ep-info">

@@ -12,6 +12,7 @@ import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { tierBadge } from '../../lib/tierBadge';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, res }) {
@@ -133,7 +134,8 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         imageSrc={heroImage}
         playLabel={heroEpisode ? `${heroEpisode.seriesOrder ? `S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : heroEpisode.title}` : 'Play'}
         onPlay={() => { if (heroEpisode) window.location.href = `/episode/${heroEpisode.id}?autoplay=1`; }}
-        tierLabel={heroEpisode ? (heroEpisode.tier === 'premium' ? SITE.premiumTier : 'Free with ads') : null}
+        tierLabel={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).label : null}
+        tierKey={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).key : null}
         episodeCount={seriesEpisodes.length}
         seasonCount={seasonNumbers.length}
         artist={seriesArtist}
@@ -176,10 +178,10 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
               <div className="episode-list">
                 {activeSeasonEpisodes.map((ep) => (
                   <div key={ep.id} className="episode-row">
-                    <Link href={`/episode/${ep.id}?autoplay=1`} className={`episode-row-link ${ep.tier}`}>
+                    <Link href={`/episode/${ep.id}?autoplay=1`} className={`episode-row-link ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                       <div className="episode-row-thumb">
                         {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
-                        <span className="episode-row-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                        <span className="episode-row-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                         {!ep.thumbnail && (ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
                       </div>
                       <div className="episode-row-info">

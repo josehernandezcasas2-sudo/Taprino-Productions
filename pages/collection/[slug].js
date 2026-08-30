@@ -11,6 +11,7 @@ import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
 
 // Destination for the "See all" link on the homepage's New Releases and
@@ -109,10 +110,10 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
                 {ep.contentType !== 'series' && (
                   <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
                 )}
-                <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
+                <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                   <div className="poster-art">
                     {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
-                    <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                    <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                     {!ep.poster && '◈'}
                   </div>
                   <div className="poster-title-wrap">

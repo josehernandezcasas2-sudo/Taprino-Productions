@@ -14,6 +14,7 @@ import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { tierBadge } from '../../lib/tierBadge';
 
 import Footer from '../../components/Footer';
 const TYPE_LABELS = { series: 'Series', movie: 'Movies', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
@@ -101,7 +102,11 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
         .map((sid) => {
           const info = allSeries.find((s) => s.id === sid);
           const eps = typeEpisodes.filter((e) => e.seriesId === sid);
-          return info ? { info, count: eps.length, tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free' } : null;
+          return info ? {
+            info, count: eps.length,
+            tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free',
+            adsEnabled: eps.some((e) => e.adsEnabled !== false)
+          } : null;
         })
         .filter(Boolean)
     : [];
@@ -146,12 +151,12 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
             <div className="poster-empty">No series yet — check back soon.</div>
           ) : (
             <div className="poster-grid">
-              {seriesCards.map(({ info, count, tier }) => (
+              {seriesCards.map(({ info, count, tier, adsEnabled }) => (
                 <div key={info.id} className="card-wrap">
                   <WishlistButton isActive={isWishlisted(info.id)} onToggle={() => toggleWishlist(info.id)} />
-                  <Link href={`/series/${info.id}`} className={`poster-card ${tier}`}>
+                  <Link href={`/series/${info.id}`} className={`poster-card ${tierBadge(tier, adsEnabled).key}`}>
                     <div className="poster-art">
-                      <span className="poster-badge">{tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                      <span className="poster-badge">{tierBadge(tier, adsEnabled).label}</span>
                       ▤
                     </div>
                     <div className="poster-title-wrap">
@@ -170,9 +175,9 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
             {typeEpisodes.map((ep) => (
               <div key={ep.id} className="card-wrap">
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
-                <Link href={`/episode/${ep.id}`} className={`poster-card ${ep.tier}`}>
+                <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                   <div className="poster-art">
-                    <span className="poster-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                    <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                     ◈
                   </div>
                   <div className="poster-title-wrap">

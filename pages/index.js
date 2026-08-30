@@ -25,6 +25,7 @@ import Footer from '../components/Footer';
 import StudioTapaPromo from '../components/StudioTapaPromo';
 import { SITE } from '../lib/siteConfig';
 import { contentTypeTag } from '../lib/contentTypeTags';
+import { tierBadge } from '../lib/tierBadge';
 
 export async function getServerSideProps({ req, res }) {
   // CDN caching, but ONLY for signed-out visitors.
@@ -320,9 +321,9 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                     {ep.contentType !== 'series' && (
                       <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
                     )}
-                    <button className={`ep-card ${ep.tier}`} onClick={() => goToEpisode(ep)}>
+                    <button className={`ep-card ${tierBadge(ep.tier, ep.adsEnabled).key}`} onClick={() => goToEpisode(ep)}>
                       <div className="ep-thumb">
-                        <span className="ep-badge">{ep.tier === 'premium' ? SITE.premiumTier : 'Free with ads'}</span>
+                        <span className="ep-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                         {ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>}
                       </div>
                       <div className="ep-info">
