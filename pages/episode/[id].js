@@ -28,6 +28,19 @@ import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
 import { SITE } from '../../lib/siteConfig';
 
+// Labels + colors for every non-series content type this page can render.
+// Movie/short/vertical were the only cases handled before, which silently
+// mislabeled podcast and bonus content (both reachable here directly by
+// URL, even though neither is meant to be browsed as a standalone card)
+// as "Short".
+const CONTENT_TYPE_TAG = {
+  movie: { label: 'Movie' },
+  short: { label: 'Short' },
+  vertical: { label: 'Vertical' },
+  podcast: { label: 'Podcast' },
+  bonus: { label: 'Bonus content' }
+};
+
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -487,19 +500,13 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                 {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
                 {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
                 {episode.contentType === 'series' ? (
-                  <Link href={`/series/${episode.seriesId}`} className="trailer-link" style={{ borderColor: 'rgba(217,143,62,0.4)', color: 'var(--brass)' }}>
+                  <Link href={`/series/${episode.seriesId}`} className="content-type-tag series">
                     ▤ Part of {parentSeriesName || 'a series'}
                     {episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}
                   </Link>
                 ) : (
-                  // Same badge treatment as the series link above — this used
-                  // to be a bare, unstyled <span>, which is why it visibly
-                  // didn't match between a series episode and a standalone
-                  // movie/short. Not a link (there's no page to send it to),
-                  // but styled identically so the two feel like the same
-                  // system rather than two different ones.
-                  <span className="trailer-link" style={{ borderColor: 'rgba(217,143,62,0.4)', color: 'var(--brass)' }}>
-                    ◆ Standalone {episode.contentType === 'movie' ? 'Movie' : episode.contentType === 'vertical' ? 'Vertical' : 'Short'}
+                  <span className={`content-type-tag ${CONTENT_TYPE_TAG[episode.contentType] ? episode.contentType : 'short'}`}>
+                    {(CONTENT_TYPE_TAG[episode.contentType] || CONTENT_TYPE_TAG.short).label}
                   </span>
                 )}
                 {/* Tier/ads and audio-described used to live in a completely

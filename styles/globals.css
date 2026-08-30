@@ -35,6 +35,15 @@
   --brass: #d98f3e;
   --brass-deep: #6b5219;
 
+  /* Content-type accents — mint and blue are sampled directly from the
+     logo (see comment above) but were never exposed as variables until
+     now; rust is the logo's third accent. Used only for the small
+     movie/short/vertical tag on the episode page, kept separate from
+     --warn/--danger so they never read as a status/error color. */
+  --mint: #93d0a4;
+  --sky: #8499dc;
+  --rust: #c85924;
+
   /* Text */
   --ink: #f4ecda;
   --ink-dim: #b5b3a3;
@@ -675,6 +684,32 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.68rem;
 }
 .trailer-link:hover { background: rgba(74, 168, 162, 0.1); }
+
+/* Smaller and more specific than .trailer-link (which is also used for
+   the Watch Trailer button and Audio Described badge on this same page)
+   — resizing that shared class would've changed those too. */
+.content-type-tag {
+  background: transparent;
+  border-style: solid;
+  border-width: 1px;
+  border-radius: 999px;
+  padding: 0.18rem 0.55rem;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  transition: filter 0.15s ease;
+}
+.content-type-tag:hover { filter: brightness(1.2); }
+.content-type-tag.series { color: var(--brass); border-color: rgba(217, 143, 62, 0.4); }
+.content-type-tag.movie { color: var(--mint); border-color: rgba(147, 208, 164, 0.4); }
+.content-type-tag.short { color: var(--sky); border-color: rgba(132, 153, 220, 0.4); }
+.content-type-tag.vertical { color: var(--rust); border-color: rgba(200, 89, 36, 0.4); }
+.content-type-tag.podcast { color: var(--olive); border-color: rgba(194, 199, 117, 0.4); }
+.content-type-tag.bonus { color: var(--ink-faint); border-color: rgba(155, 156, 144, 0.4); }
 
 .hero-carousel {
   position: relative;
