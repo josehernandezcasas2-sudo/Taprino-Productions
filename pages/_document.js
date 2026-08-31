@@ -6,10 +6,16 @@ import { buildThemeStyleTag } from '../lib/themeColors';
 // back to the user's system language and will happily read English content in
 // a Spanish voice — it's a WCAG 2.1 Level A failure (3.1.1 Language of Page)
 // and one of the cheapest to fix.
-export default function Document({ themeStyleTag }) {
+export default function Document({ themeStyleTag, faviconUrl }) {
   return (
     <Html lang="en">
       <Head>
+        {/* No favicon.ico exists in /public and nothing linked one before
+            this — browsers were showing a blank/generic tab icon. Falls
+            back to the static /icon.svg (same one manifest.json already
+            uses) until an admin uploads a real one from
+            /admin/site-icons. */}
+        <link rel="icon" href={faviconUrl || '/icon.svg'} />
         {/* Google AdSense verification + ad serving.
             Lives in _document rather than _app so it's present in the
             server-rendered HTML on the very first request — AdSense's
@@ -45,5 +51,5 @@ Document.getInitialProps = async (ctx) => {
     ctx.defaultGetInitialProps(ctx),
     getSiteSettings()
   ]);
-  return { ...initialProps, themeStyleTag: buildThemeStyleTag(siteSettings.themeOverrides) };
+  return { ...initialProps, themeStyleTag: buildThemeStyleTag(siteSettings.themeOverrides), faviconUrl: siteSettings.faviconUrl };
 };

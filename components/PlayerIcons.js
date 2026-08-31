@@ -524,3 +524,14 @@ export function TicketIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+export function BrowserTabIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <path d="M2.5 9h19" />
+      <circle cx="6.5" cy="7" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}

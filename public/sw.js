@@ -1,8 +1,11 @@
-// Bumped from v1 — the activate handler below deletes any cache whose name
-// doesn't match, so changing this name is what actually forces every
-// previously-cached (and possibly stale) response to be thrown away.
-const CACHE_NAME = 'taprino-shell-v2';
-const SHELL_ASSETS = ['/manifest.json', '/icon.svg'];
+// Bumped from v2 — /manifest.json (the static file) no longer exists,
+// replaced by /api/manifest so an admin-uploaded app icon can actually
+// take effect. Not precaching it here: the fetch handler below
+// deliberately skips every /api/ route, so a precached copy would sit in
+// this cache and never once actually get served from it — worth
+// precaching only if that bypass rule changes.
+const CACHE_NAME = 'taprino-shell-v3';
+const SHELL_ASSETS = ['/icon.svg'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
