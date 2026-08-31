@@ -27,7 +27,17 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   if (pool.length === 0) return null;
 
   const ep = pool[index % pool.length];
-  const isImageMode = !!ep.heroImage;
+  // Priority: a purpose-built hero image, then an autoplaying trailer, then
+  // falling back to whatever regular poster/thumbnail the card already has
+  // rather than showing nothing. Before this fallback existed, any title
+  // with neither a hero image nor a trailer set (true of most freshly
+  // submitted or test content) rendered a plain solid-black box — the
+  // <video> tag had nothing to play and there was no image to show
+  // instead, so .hero-carousel's own CSS background (#000, meant only as
+  // a brief loading-state color) was all that was ever visible.
+  const fallbackImage = !ep.trailerSrc ? (ep.poster || ep.thumbnail) : null;
+  const imageSrc = ep.heroImage || fallbackImage;
+  const isImageMode = !!imageSrc;
   const bgSrc = ep.trailerSrc; // candidates never carry the real `src` — see lib/heroCandidates.js
 
   useEffect(() => {
@@ -97,7 +107,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   return (
     <div className={`hero-carousel ${fullBleed ? 'full-bleed' : ''}`}>
       {isImageMode ? (
-        <img key={ep.id} src={ep.heroImage} alt={ep.title} className="hero-video hero-image" />
+        <img key={ep.id} src={imageSrc} alt={ep.title} className="hero-video hero-image" />
       ) : (
         <video
           key={ep.id}
