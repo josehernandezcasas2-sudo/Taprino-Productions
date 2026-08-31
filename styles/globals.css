@@ -1100,9 +1100,20 @@ button { font-family: inherit; cursor: pointer; }
   position: relative;
   transition: transform 0.18s ease, z-index 0s;
 }
-.card-wrap:hover {
-  transform: scale(1.07);
-  z-index: 6;
+/* Only on devices with real hover (mouse/trackpad) — on a touchscreen,
+   :hover has no reliable "leave" event to clear it after a tap, so this
+   scale+elevate effect can get permanently stuck on whatever card was
+   last touched. Since .card-wrap's ancestors (.cat-row, .cat-row-track)
+   never establish their own stacking context, that stuck z-index:6 isn't
+   contained to its own row — it competes globally on the page and can
+   float visually above completely unrelated sections further down,
+   overlapping them. Gating this to real hover removes the possibility
+   entirely rather than trying to contain the z-index after the fact. */
+@media (hover: hover) and (pointer: fine) {
+  .card-wrap:hover {
+    transform: scale(1.07);
+    z-index: 6;
+  }
 }
 .card-wrap > .ep-card, .card-wrap > .poster-card { display: block; width: 100%; }
 .wishlist-btn {
