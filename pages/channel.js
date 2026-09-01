@@ -67,12 +67,6 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
           <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
         </div>
 
-        <div className="now-heading" style={{ marginTop: '1.2rem' }}>
-          <div className="eyebrow">The channel</div>
-          <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>
-          {channelState.onAir && channelState.program.description && <p>{channelState.program.description}</p>}
-        </div>
-
         <p className="ca-foot" style={{ marginTop: '1.2rem' }}>
           The channel plays free episodes back to back, on a loop — like a TV channel, not on-demand.
           There&rsquo;s no rewinding or picking what&rsquo;s on; if you want to choose, the homepage is

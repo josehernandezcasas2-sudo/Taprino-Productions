@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { tierBadge } from '../lib/tierBadge';
+import { formatRuntimeLong } from '../lib/videoMetadata';
+import { SITE } from '../lib/siteConfig';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
@@ -374,22 +376,39 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
       <div className="player-meta">
         <span>
           Playing now — {state.program.title}
-          {' '}
+          {timeRemaining != null && ` · ${formatClock(timeRemaining)} left`}
+        </span>
+        {state.next && <span>Up next: {state.next.title}</span>}
+      </div>
+    )}
+
+    <div className="now-heading">
+      <div className="eyebrow">The channel</div>
+      <h1>{state.onAir ? state.program.title : SITE.name}</h1>
+      {state.onAir && (
+        <div className="hero-meta" style={{ margin: '0.4rem 0 0.7rem' }}>
           <span className={`ca-tier ${tierBadge(state.program.tier, state.adsEnabled).key}`}>
             {tierBadge(state.program.tier, state.adsEnabled).label}
           </span>
-          {state.program.genre && ` · ${state.program.genre}`}
-          {timeRemaining != null && ` · ${formatClock(timeRemaining)} left`}
-        </span>
-        {state.next && (
-          <span>
-            Up next: {state.next.title}
-            {state.next.genre && ` · ${state.next.genre}`}
-            {state.next.runtime && ` · ${state.next.runtime}`}
-          </span>
-        )}
-      </div>
-    )}
+          {(state.program.genre || state.program.releaseYear || state.program.runtime) && (
+            <>
+              <span className="hero-meta-dot">&bull;</span>
+              <span>
+                {[state.program.genre, state.program.releaseYear, formatRuntimeLong(state.program.runtime) || state.program.runtime]
+                  .filter(Boolean).join(' \u00b7 ')}
+              </span>
+            </>
+          )}
+          {state.program.rating && (
+            <>
+              <span className="hero-meta-dot">&bull;</span>
+              <span className="hero-rating-tag">{state.program.rating}</span>
+            </>
+          )}
+        </div>
+      )}
+      {state.onAir && state.program.description && <p>{state.program.description}</p>}
+    </div>
     </>
   );
 }
