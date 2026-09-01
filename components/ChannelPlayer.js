@@ -197,6 +197,17 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
       // otherwise generates invocations indefinitely.
       if (typeof document !== 'undefined' && document.hidden) return;
       if (!state.onAir || onAdBreak) return;
+      // A deliberate pause is expected to make the video "drift" from the
+      // live schedule almost immediately — the feed keeps advancing in
+      // real time while the paused video stays frozen. Without this
+      // check, transitionTo (which resumes playback as part of
+      // reattaching) would force the video back to playing within a poll
+      // cycle or two of the user pausing it, which is exactly the bug
+      // this is fixing rather than a deliberate design choice. Catching
+      // up to the correct live position now happens when the user
+      // presses play again instead (see togglePlay below).
+      const v = videoRef.current;
+      if (v && v.paused) return;
       const fresh = await fetchState();
       if (!fresh || !fresh.onAir || !fresh.program) return;
       const drift = Math.abs(fresh.program.offsetSeconds - (state.program.offsetSeconds || 0));
@@ -240,11 +251,19 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
     };
   }, []);
 
-  function togglePlay() {
+  async function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
-    if (v.paused) v.play();
-    else v.pause();
+    if (v.paused) {
+      const fresh = await fetchState();
+      if (fresh && fresh.onAir && fresh.program) {
+        transitionTo(fresh);
+      } else {
+        v.play();
+      }
+    } else {
+      v.pause();
+    }
   }
   function toggleMute() {
     const v = videoRef.current;
