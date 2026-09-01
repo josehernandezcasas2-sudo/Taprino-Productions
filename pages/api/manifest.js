@@ -1,4 +1,5 @@
 import { getSiteSettings } from '../../lib/siteSettings';
+import { SITE } from '../../lib/siteConfig';
 
 // Was a static /public/manifest.json before this — meaning the "app icon"
 // shown when someone adds the site to their home screen could never be
@@ -17,7 +18,7 @@ export default async function handler(req, res) {
   const manifest = {
     name: 'Studio Tapa TV',
     short_name: 'Tapa TV',
-    description: 'Studio Tapa\u2019s screening room \u2014 free episodes, ad-supported, with a Studio Tapa + membership tier.',
+    description: `Studio Tapa\u2019s screening room \u2014 free episodes, ad-supported, with a ${SITE.premiumTier} membership tier.`,
     start_url: '/',
     display: 'standalone',
     background_color: '#11110b',
