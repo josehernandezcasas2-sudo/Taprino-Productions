@@ -391,10 +391,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               <h2>{episode.title}</h2>
               <div className="hero-meta">
                 <span className={`hero-badge-tier ${tierBadge(episode.tier, episode.adsEnabled).key}`}>{tierBadge(episode.tier, episode.adsEnabled).label}</span>
-                {(episode.genre || episode.releaseYear || episode.runtime) && (
+                {(episode.mainGenre || episode.releaseYear || episode.runtime) && (
                   <>
                     <span className="hero-meta-dot">&bull;</span>
-                    <span>{[episode.genre, episode.releaseYear, formatRuntimeLong(episode.runtime) || episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
+                    <span>{[episode.mainGenre, episode.releaseYear, formatRuntimeLong(episode.runtime) || episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
                   </>
                 )}
                 {episode.rating && (
