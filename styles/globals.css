@@ -1912,6 +1912,20 @@ button { font-family: inherit; cursor: pointer; }
 .tp-ad-layer { position: absolute; inset: 0; }
 .tp-player.is-fullscreen { aspect-ratio: auto; width: 100%; height: 100%; }
 
+/* Trial: 75% of viewport height instead of the shared 16:9 aspect-ratio,
+   scoped to only the channel player for now — if this looks good, the
+   same change can be applied to .channel-player's siblings (the episode
+   player, series hero player, and live player) afterward, but none of
+   those are touched by this rule. object-fit: contain on .tp-video
+   still letterboxes/pillarboxes as needed to preserve the actual video's
+   native aspect ratio inside this taller box. */
+.tp-player.channel-player {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 75vh;
+}
+.tp-player.channel-player.is-fullscreen { height: 100%; }
+
 /* Big centre play button, shown until the first press. */
 .tp-bigplay {
   position: absolute;
