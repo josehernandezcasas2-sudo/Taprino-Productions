@@ -799,6 +799,15 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 2;
   padding: 0 0 1.5rem;
 }
+@media (max-width: 640px) {
+  /* Same 640px breakpoint as .stage-wide/.install-row, for the same
+     reason documented on .install-row: without this, how far content sits
+     from the screen edge silently flips between the hero and everything
+     below it right at this width, instead of staying in sync. This was
+     the one remaining place still using a flat 2.4rem with no reduction
+     at all. */
+  .hero-content { left: 1.2rem; right: 1.2rem; }
+}
 .hero-eyebrow {
   font-family: var(--font-mono);
   font-size: 0.68rem;
@@ -827,8 +836,9 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hero-meta {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.5rem 0.6rem;
   font-family: var(--font-mono);
   font-size: 0.78rem;
   color: var(--ink-dim);
@@ -2863,7 +2873,14 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.85rem;
 }
 .live-now-banner strong { color: var(--danger); }
-.live-now-arrow { margin-left: auto; color: var(--danger); font-family: var(--font-mono); font-size: 0.72rem; }
+.live-now-banner > span:not(.live-now-arrow) {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.live-now-arrow { margin-left: auto; flex: none; color: var(--danger); font-family: var(--font-mono); font-size: 0.72rem; }
 
 .live-dot {
   width: 8px;
@@ -3524,6 +3541,13 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 @media (max-width: 780px) {
   .footer-grid { grid-template-columns: 1fr; gap: 1.6rem; }
 }
+@media (max-width: 640px) {
+  /* Same 640px breakpoint/reduction as .stage-wide, .install-row, and
+     .hero-content — this was the one place still stuck at a flat 2.4rem
+     with no reduction at all, so the footer sat visibly more inset from
+     the screen edge than everything above it on a phone. */
+  .footer-grid { padding: 0 1.2rem; }
+}
 .footer-brand-mark {
   display: flex;
   align-items: center;
@@ -3586,6 +3610,9 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   font-size: 0.68rem;
   letter-spacing: 0.04em;
   color: var(--static-grey);
+}
+@media (max-width: 640px) {
+  .footer-bottom { padding: 1.5rem 1.2rem 0; }
 }
 
 /* ============================================================
