@@ -139,12 +139,6 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <h2>{ep.title}</h2>
           <div className="hero-meta">
             <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-            {ep.artist && (
-              <>
-                <span className="hero-meta-dot">&bull;</span>
-                <span>{ep.artist}</span>
-              </>
-            )}
             {(ep.genre || ep.releaseYear || ep.runtime) && (
               <>
                 <span className="hero-meta-dot">&bull;</span>
