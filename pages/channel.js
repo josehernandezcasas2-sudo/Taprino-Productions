@@ -65,12 +65,6 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       <main className="stage stage-single stage-wide">
         <div className="player-card">
           <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
-          {channelState.onAir && (
-            <div className="player-meta">
-              <span>Playing now</span>
-              <span>Up next: {channelState.next.title}</span>
-            </div>
-          )}
         </div>
 
         <div className="now-heading" style={{ marginTop: '1.2rem' }}>

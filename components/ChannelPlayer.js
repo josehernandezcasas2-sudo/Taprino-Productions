@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { tierBadge } from '../lib/tierBadge';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
@@ -33,6 +34,7 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
   const [onAdBreak, setOnAdBreak] = useState(false);
   const [errored, setErrored] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(null);
 
   const fetchState = useCallback(async () => {
     try {
@@ -229,7 +231,10 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
       setMuted(v.muted);
     };
     const onTime = () => {
-      if (state.program) setProgressPct(Math.min(100, (v.currentTime / state.program.durationSeconds) * 100));
+      if (state.program) {
+        setProgressPct(Math.min(100, (v.currentTime / state.program.durationSeconds) * 100));
+        setTimeRemaining(Math.max(0, state.program.durationSeconds - v.currentTime));
+      }
     };
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
@@ -293,6 +298,7 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
   }
 
   return (
+    <>
     <div ref={shellRef} className="tp-player channel-player controls-on" onContextMenu={(e) => e.preventDefault()}>
       <video
         ref={videoRef}
@@ -363,5 +369,27 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
         </div>
       )}
     </div>
+
+    {state.onAir && state.program && (
+      <div className="player-meta">
+        <span>
+          Playing now — {state.program.title}
+          {' '}
+          <span className={`ca-tier ${tierBadge(state.program.tier, state.adsEnabled).key}`}>
+            {tierBadge(state.program.tier, state.adsEnabled).label}
+          </span>
+          {state.program.genre && ` · ${state.program.genre}`}
+          {timeRemaining != null && ` · ${formatClock(timeRemaining)} left`}
+        </span>
+        {state.next && (
+          <span>
+            Up next: {state.next.title}
+            {state.next.genre && ` · ${state.next.genre}`}
+            {state.next.runtime && ` · ${state.next.runtime}`}
+          </span>
+        )}
+      </div>
+    )}
+    </>
   );
 }

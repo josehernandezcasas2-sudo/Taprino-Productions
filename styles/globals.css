@@ -617,11 +617,14 @@ button { font-family: inherit; cursor: pointer; }
 .resume-note-fill { height: 100%; background: var(--brass); }
 .player-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 0.4rem 1rem;
   padding: 0.9rem 1.1rem;
   font-family: var(--font-mono);
   font-size: 0.72rem;
   color: var(--ink-dim);
+  align-items: center;
 }
 .now-heading { padding: 1.1rem 1.1rem 0; }
 .now-heading .eyebrow {
