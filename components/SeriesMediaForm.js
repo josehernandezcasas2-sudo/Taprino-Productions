@@ -41,9 +41,9 @@ async function uploadTrailer(file, onProgress) {
   return urlData.uid;
 }
 
-export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initialSeriesId }) {
-  const [mode, setMode] = useState(initialMode || (allSeries.length > 0 ? 'existing' : 'new'));
-  const [seriesId, setSeriesId] = useState(initialSeriesId || (allSeries[0] ? allSeries[0].id : ''));
+export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initialSeriesId, lockedSeriesId, compact }) {
+  const [mode, setMode] = useState(lockedSeriesId ? 'existing' : (initialMode || (allSeries.length > 0 ? 'existing' : 'new')));
+  const [seriesId, setSeriesId] = useState(lockedSeriesId || initialSeriesId || (allSeries[0] ? allSeries[0].id : ''));
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [posterFile, setPosterFile] = useState(null);
@@ -68,13 +68,18 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
       setError('Choose a series.');
       return;
     }
-    if (!posterFile && !thumbnailFile && !heroImageFile && !trailerFile) {
+    // Only required in "existing" mode — a create with no artwork at all
+    // is a completely normal flow (add art later from the same page), but
+    // an "edit" with nothing attached would be a pointless no-op save.
+    if (mode === 'existing' && !posterFile && !thumbnailFile && !heroImageFile && !trailerFile) {
       setError('Add at least a poster, thumbnail, hero image, or trailer.');
       return;
     }
 
     try {
       let targetSeriesId = seriesId;
+      const hasAnyArt = !!(posterFile || thumbnailFile || heroImageFile || trailerFile);
+
       if (mode === 'new') {
         setStatus('saving');
         const res = await fetch('/api/creator/create-series', {
@@ -85,6 +90,17 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Could not create the series.');
         targetSeriesId = data.id;
+
+        // Name-only creation, no artwork attached — nothing left to upload,
+        // so skip straight to done rather than calling series-media with
+        // an empty payload.
+        if (!hasAnyArt) {
+          setStatus('done');
+          setNewName('');
+          setNewDescription('');
+          onSaved(targetSeriesId);
+          return;
+        }
       }
 
       let trailerUid;
@@ -130,37 +146,34 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
 
   const busy = status === 'uploading-trailer' || status === 'saving';
 
-  return (
-    <div className="account-card" style={{ marginTop: '1.5rem' }}>
-      <div className="account-eyebrow">Series info</div>
-      <h3>Set a trailer and artwork once per series</h3>
-      <p>
-        A series&rsquo; own trailer, poster, and thumbnail are used everywhere an episode of it appears — the homepage row,
-        the genre grid, and the series page hero — so individual episodes in that series don&rsquo;t each need their own artwork.
-        An episode&rsquo;s own artwork (if you add it) still takes priority for that one episode.
-      </p>
-
-      <form onSubmit={handleSubmit}>
-        <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.6rem' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 'normal' }}>
-            <input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} disabled={allSeries.length === 0} />
-            Existing series
-          </label>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 'normal' }}>
-            <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
-            New series
-          </label>
-        </div>
+  const formBody = (
+    <form onSubmit={handleSubmit}>
+        {!lockedSeriesId && (
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '0.6rem' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 'normal' }}>
+              <input type="radio" checked={mode === 'existing'} onChange={() => setMode('existing')} disabled={allSeries.length === 0} />
+              Existing series
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.3rem', fontWeight: 'normal' }}>
+              <input type="radio" checked={mode === 'new'} onChange={() => setMode('new')} />
+              New series
+            </label>
+          </div>
+        )}
 
         {mode === 'existing' ? (
           <>
-            <label>Series</label>
-            <select value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
-              {allSeries.length === 0 && <option value="">No series yet — create one instead</option>}
-              {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
+            {!lockedSeriesId && (
+              <>
+                <label>Series</label>
+                <select value={seriesId} onChange={(e) => setSeriesId(e.target.value)}>
+                  {allSeries.length === 0 && <option value="">No series yet — create one instead</option>}
+                  {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </>
+            )}
             {selectedSeries && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
+              <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: lockedSeriesId ? 0 : '-0.4rem' }}>
                 Currently has: {selectedSeries.poster ? 'poster ✓' : 'poster —'}, {selectedSeries.thumbnail ? 'thumbnail ✓' : 'thumbnail —'}, {selectedSeries.heroImage ? 'hero image ✓' : 'hero image —'}, {selectedSeries.trailerSrc ? 'trailer ✓' : 'trailer —'}
               </p>
             )}
@@ -196,7 +209,21 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
         <button className="account-btn-primary" type="submit" disabled={busy} style={{ width: 'auto' }}>
           {busy ? 'Working…' : 'Save series media'}
         </button>
-      </form>
+    </form>
+  );
+
+  if (compact) return formBody;
+
+  return (
+    <div className="account-card" style={{ marginTop: '1.5rem' }}>
+      <div className="account-eyebrow">Series info</div>
+      <h3>Set a trailer and artwork once per series</h3>
+      <p>
+        A series&rsquo; own trailer, poster, and thumbnail are used everywhere an episode of it appears — the homepage row,
+        the genre grid, and the series page hero — so individual episodes in that series don&rsquo;t each need their own artwork.
+        An episode&rsquo;s own artwork (if you add it) still takes priority for that one episode.
+      </p>
+      {formBody}
     </div>
   );
 }

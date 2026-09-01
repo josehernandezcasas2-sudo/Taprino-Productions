@@ -1246,6 +1246,21 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink-dim);
   margin-bottom: 0.3rem;
 }
+.series-mgmt-header { display: flex; gap: 0.9rem; align-items: flex-start; }
+.series-mgmt-poster {
+  width: 56px; height: 84px; border-radius: 6px; flex-shrink: 0;
+  background-size: cover; background-position: center; background-color: var(--surface-1);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); text-align: center;
+}
+.series-mgmt-pills { display: flex; gap: 0.7rem; flex-wrap: wrap; margin: 0.5rem 0 0.7rem; font-family: var(--font-mono); font-size: 0.7rem; }
+.series-mgmt-pills span.on { color: var(--ok); }
+.series-mgmt-pills span.off { color: var(--static-grey); }
+.series-mgmt-panel {
+  margin-top: 1rem; padding-top: 1rem; border-top: 1px solid rgba(234,231,221,0.1);
+}
+.series-mgmt-panel.add { background: rgba(232,163,61,0.05); margin: 1rem -1.2rem -1.2rem; padding: 1rem 1.2rem 1.2rem; border-radius: 0 0 10px 10px; }
+.series-mgmt-panel.edit { background: rgba(163,156,136,0.06); margin: 1rem -1.2rem -1.2rem; padding: 1rem 1.2rem 1.2rem; border-radius: 0 0 10px 10px; }
 .account-btn-primary {
   width: 100%;
   background: var(--signal-amber);
