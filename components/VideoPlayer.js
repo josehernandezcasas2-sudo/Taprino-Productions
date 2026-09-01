@@ -740,7 +740,7 @@ export default function VideoPlayer({
   return (
     <div
       ref={shellRef}
-      className={`tp-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''}`}
+      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''}`}
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
       onKeyDown={onKeyDown}

@@ -718,7 +718,17 @@ button { font-family: inherit; cursor: pointer; }
   margin: 2rem 0;
   border-radius: 6px;
   overflow: hidden;
-  aspect-ratio: 16 / 8;
+  /* Same 75% of viewport height treatment approved for the other
+     players, rolled out here too. clamp() keeps the same 300px floor
+     the old mobile formula had (so a very short window never crushes
+     the hero down further), and adds a 900px ceiling so a very tall
+     monitor doesn't get an absurdly dominant hero — matching the same
+     min/max-capping precedent already used on .tp-player.is-vertical.
+     This also fully replaces the old aspect-ratio + 900px-breakpoint
+     approach: a height-based clamp works identically at every width,
+     so there's no longer a transition point between "mobile formula"
+     and "desktop aspect-ratio" to keep in sync. */
+  height: clamp(300px, 75vh, 900px);
   background: #000;
   border: 1px solid rgba(234, 231, 221, 0.08);
 }
@@ -727,24 +737,6 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 0;
   border-left: none;
   border-right: none;
-  /* My first attempt at fixing the 640px jump replaced this with a single
-     calc() formula across the ENTIRE width range — which fixed the mobile
-     transition but broke desktop badly: at 2048px wide it clamped the
-     hero down to just 300px tall, versus ~878px with this ratio. The
-     21:9 ratio was never actually the problem; it scales perfectly
-     smoothly with width on its own. The only real jump was in the
-     transition INTO mobile at 640-900px. This keeps 21:9 for anything
-     above 900px (unchanged, exactly as it always worked) and only
-     replaces the range below that with a continuous formula — solved so
-     it starts at EXACTLY the same value 21:9 gives at 900px (385.7px),
-     so there's no seam at that boundary either. */
-  aspect-ratio: 21 / 9;
-}
-@media (max-width: 900px) {
-  .hero-carousel.full-bleed {
-    aspect-ratio: unset;
-    height: clamp(300px, calc(635.4px - 27.75vw), 560px);
-  }
 }
 .hero-inner {
   position: relative;
@@ -1925,6 +1917,27 @@ button { font-family: inherit; cursor: pointer; }
   height: 75vh;
 }
 .tp-player.channel-player.is-fullscreen { height: 100%; }
+
+/* Same treatment, rolled out from the channel player trial. Explicit
+   :not(.is-vertical) rather than relying on stylesheet order — episode
+   playback genuinely can be vertical content, and that combination must
+   never lose its portrait sizing to this rule regardless of where either
+   rule happens to sit in the file. */
+.tp-player.episode-player:not(.is-vertical) {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 75vh;
+}
+.tp-player.episode-player:not(.is-vertical).is-fullscreen { height: 100%; }
+
+/* Live streams are never marked is-vertical (see LiveVideoPlayer.js), so
+   no guard needed here the way episode-player needs one. */
+.tp-player.live-player {
+  aspect-ratio: auto;
+  width: 100%;
+  height: 75vh;
+}
+.tp-player.live-player.is-fullscreen { height: 100%; }
 
 /* Big centre play button, shown until the first press. */
 .tp-bigplay {
