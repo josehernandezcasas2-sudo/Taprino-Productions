@@ -63,12 +63,6 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
       <div className="install-row"><InstallButton /></div>
 
       <main className="stage stage-single stage-wide">
-        <div className="now-heading">
-          <div className="eyebrow">The channel</div>
-          <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>
-          {channelState.onAir && channelState.program.description && <p>{channelState.program.description}</p>}
-        </div>
-
         <div className="player-card">
           <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
           {channelState.onAir && (
@@ -77,6 +71,12 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
               <span>Up next: {channelState.next.title}</span>
             </div>
           )}
+        </div>
+
+        <div className="now-heading" style={{ marginTop: '1.2rem' }}>
+          <div className="eyebrow">The channel</div>
+          <h1>{channelState.onAir ? channelState.program.title : SITE.name}</h1>
+          {channelState.onAir && channelState.program.description && <p>{channelState.program.description}</p>}
         </div>
 
         <p className="ca-foot" style={{ marginTop: '1.2rem' }}>
