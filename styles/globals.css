@@ -731,7 +731,23 @@ button { font-family: inherit; cursor: pointer; }
      approach: a height-based clamp works identically at every width,
      so there's no longer a transition point between "mobile formula"
      and "desktop aspect-ratio" to keep in sync. */
+  /* Fallback for browsers that don't understand svh — if the next
+     declaration below is understood, it wins; if not, this is what
+     actually applies. */
   height: clamp(300px, 75vh, 900px);
+  /* svh (small viewport height), not plain vh: on mobile, plain vh
+     locks to the LARGEST possible viewport height (address bar
+     collapsed) rather than tracking what's actually visible. On first
+     page load — when the address bar is typically still expanded — that
+     meant this hero could size itself taller than the actually-visible
+     screen, pushing the Play button and meta line below the fold until
+     the visitor scrolled. svh sizes against the guaranteed-visible area
+     instead, which is the current recommended unit specifically for
+     hero sections. (dvh was considered too — it tracks the viewport
+     live as the address bar animates, but that has documented visual
+     jank issues in Safari, which svh's fixed-to-smallest approach
+     avoids entirely.) */
+  height: clamp(300px, 75svh, 900px);
   background: #000;
   border: 1px solid rgba(234, 231, 221, 0.08);
 }
@@ -1007,6 +1023,13 @@ button { font-family: inherit; cursor: pointer; }
 @media (hover: none) and (pointer: coarse) {
   .cat-row-track {
     scroll-snap-type: x mandatory;
+    /* scroll-behavior:smooth (set unconditionally above, for desktop's
+       benefit) is a documented WebKit bug magnet when combined with
+       scroll-snap — see bugs.webkit.org #238497 — and it isn't doing
+       anything useful here anyway: a finger swipe is already smooth via
+       the OS's own momentum scrolling, regardless of this property.
+       This is very likely why snap wasn't visibly engaging on iPhone. */
+    scroll-behavior: auto;
   }
   .row-card {
     scroll-snap-align: start;
@@ -1933,7 +1956,8 @@ button { font-family: inherit; cursor: pointer; }
 .tp-player.channel-player {
   aspect-ratio: auto;
   width: 100%;
-  height: 75vh;
+  height: 75vh; /* fallback for browsers without svh support */
+  height: 75svh; /* see .hero-carousel's comment for why svh, not vh */
 }
 .tp-player.channel-player.is-fullscreen { height: 100%; }
 
@@ -1946,6 +1970,7 @@ button { font-family: inherit; cursor: pointer; }
   aspect-ratio: auto;
   width: 100%;
   height: 75vh;
+  height: 75svh;
 }
 .tp-player.episode-player:not(.is-vertical).is-fullscreen { height: 100%; }
 
@@ -1955,6 +1980,7 @@ button { font-family: inherit; cursor: pointer; }
   aspect-ratio: auto;
   width: 100%;
   height: 75vh;
+  height: 75svh;
 }
 .tp-player.live-player.is-fullscreen { height: 100%; }
 
