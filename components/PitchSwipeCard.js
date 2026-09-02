@@ -117,6 +117,8 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
         <Link
           href={`/pitches/${pitch.id}`}
           className="swipe-card-learn-more"
+          target="_blank"
+          rel="noopener noreferrer"
           // A tap here is "show me the full page," not a swipe — it must
           // never register as a drag start on the card underneath it.
           onPointerDown={(e) => e.stopPropagation()}

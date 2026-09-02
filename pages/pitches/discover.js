@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { getAuth } from '@clerk/nextjs/server';
@@ -11,6 +11,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import PitchSwipeCard, { SwipeButtons } from '../../components/PitchSwipeCard';
 import { SITE } from '../../lib/siteConfig';
+import { readLocalProgress, saveLocalProgress, clearLocalProgress, reconstructFromIds } from '../../lib/swipeProgressStorage';
 
 export async function getServerSideProps({ req, res }) {
   const account = await getAccountContext(req);
@@ -54,14 +55,130 @@ function shuffled(arr) {
 }
 
 export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, bypassingDisabled, requireSignIn }) {
-  const [deck, setDeck] = useState(() => shuffled(pitches));
+  // Starts empty/loading rather than synchronously shuffling — whether to
+  // resume a saved deck or start fresh can't be known until the mount
+  // effect below checks (an API call for signed-in users, localStorage
+  // for everyone else), and neither of those exists during server
+  // rendering, so the very first client render has to match the server's
+  // and stay neutral until then.
+  const [loading, setLoading] = useState(true);
+  const [deck, setDeck] = useState([]);
   const [secondChance, setSecondChance] = useState([]);
   const [round, setRound] = useState(1);
   const [likedPitches, setLikedPitches] = useState([]);
-  const [finished, setFinished] = useState(pitches.length === 0);
+  const [finished, setFinished] = useState(false);
   const [saveError, setSaveError] = useState(null);
 
   const current = deck[0];
+
+  // Restore progress on mount, or start a fresh shuffled deck if there's
+  // nothing to restore.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadProgress() {
+      let saved = null;
+      if (isSignedIn) {
+        try {
+          const res = await fetch('/api/pitch-swipe-progress');
+          if (res.ok) {
+            const data = await res.json();
+            saved = data.progress;
+          }
+        } catch {
+          // Falls through to a fresh deck below — a failed load shouldn't
+          // block using the page, just means resuming isn't possible
+          // this time.
+        }
+      } else {
+        saved = readLocalProgress();
+      }
+
+      if (cancelled) return;
+
+      const hasSavedContent = saved && ((saved.deckIds && saved.deckIds.length) || (saved.secondChanceIds && saved.secondChanceIds.length));
+      if (hasSavedContent) {
+        const restored = reconstructFromIds(pitches, saved);
+        if (restored.deck.length > 0) {
+          setDeck(restored.deck);
+          setSecondChance(restored.secondChance);
+          setRound(restored.round);
+          setLikedPitches(restored.likedPitches);
+          setFinished(false);
+        } else if (restored.round === 1 && restored.secondChance.length > 0) {
+          // The saved deck came back empty — most likely every pitch in
+          // it has since been deleted or unapproved — but the
+          // second-chance queue still has valid ones. Move straight into
+          // round 2 rather than marking this finished and quietly
+          // losing pitches the user hadn't actually gotten a second look
+          // at yet.
+          setDeck(shuffled(restored.secondChance));
+          setSecondChance([]);
+          setRound(2);
+          setLikedPitches(restored.likedPitches);
+          setFinished(false);
+        } else {
+          setLikedPitches(restored.likedPitches);
+          setFinished(true);
+        }
+      } else {
+        setDeck(shuffled(pitches));
+        setFinished(pitches.length === 0);
+      }
+      setLoading(false);
+    }
+
+    loadProgress();
+    return () => { cancelled = true; };
+    // Deliberately once-on-mount — isSignedIn/pitches are stable for the
+    // life of this page (a real change means a fresh navigation, which
+    // remounts the component anyway).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Keep progress up to date as the user swipes, in whichever store fits
+  // their sign-in state. Skipped entirely until the initial load above
+  // has finished — otherwise this would immediately overwrite whatever
+  // was just restored with the still-empty pre-load state.
+  useEffect(() => {
+    if (loading) return;
+    if (finished) {
+      if (isSignedIn) {
+        fetch('/api/pitch-swipe-progress', { method: 'DELETE' }).catch(() => {});
+      } else {
+        clearLocalProgress();
+      }
+      return;
+    }
+    const progress = {
+      deckIds: deck.map((p) => p.id),
+      secondChanceIds: secondChance.map((p) => p.id),
+      round,
+      likedIds: likedPitches.map((p) => p.id)
+    };
+    if (isSignedIn) {
+      fetch('/api/pitch-swipe-progress', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(progress)
+      }).catch(() => {
+        // A failed save here isn't worth interrupting the swiping
+        // experience over — worst case, resuming later starts fresh
+        // instead, same as if nothing had ever been saved.
+      });
+    } else {
+      saveLocalProgress(progress);
+    }
+  }, [deck, secondChance, round, likedPitches, finished, loading, isSignedIn]);
+
+  async function startOver() {
+    if (isSignedIn) {
+      await fetch('/api/pitch-swipe-progress', { method: 'DELETE' }).catch(() => {});
+    } else {
+      clearLocalProgress();
+    }
+    window.location.reload();
+  }
 
   async function trySave(pitch) {
     try {
@@ -154,7 +271,9 @@ export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin
         )}
 
         <div className="swipe-deck-wrap">
-          {finished || !current ? (
+          {loading ? (
+            <div className="poster-empty">Loading your deck…</div>
+          ) : finished || !current ? (
             <div className="swipe-summary">
               <h3>That&rsquo;s everything for now.</h3>
               {likedPitches.length > 0 ? (
@@ -175,7 +294,7 @@ export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin
                 <Link href="/pitches" className="account-btn-primary" style={{ width: 'auto', display: 'inline-block', textDecoration: 'none' }}>
                   Browse Pitch Room
                 </Link>
-                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => window.location.reload()}>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={startOver}>
                   Start over
                 </button>
               </div>
