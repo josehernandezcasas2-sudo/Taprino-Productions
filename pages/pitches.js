@@ -92,6 +92,23 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
     return Math.min(100, Math.round(((p.funding_raised || 0) / p.funding_goal) * 100));
   }
 
+  // Whole calendar days until the deadline date, comparing dates only
+  // (not time-of-day) so "the deadline is tomorrow" reads as 1 day left,
+  // not 2. A deadline of today floors to 1 rather than 0, so it reads as
+  // "last day" instead of looking already-expired. Returns null once the
+  // deadline has passed rather than a negative number — this is
+  // self-reported, informal metadata, not an authoritative cutoff, so
+  // it's treated the same as "no deadline set" instead of implying the
+  // project is definitively over.
+  function daysLeft(p) {
+    if (!p.funding_deadline) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadline = new Date(p.funding_deadline + 'T00:00:00');
+    const diffDays = Math.round((deadline - today) / 86400000);
+    return diffDays < 0 ? null : Math.max(1, diffDays);
+  }
+
   const q = searchQuery.trim().toLowerCase();
   const visiblePitches = pitches
     .filter((p) => activeTag === 'All' || p.tag === activeTag)
@@ -207,6 +224,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
           <div className="pitch-grid">
             {visiblePitches.map((p) => {
               const pct = fundingPct(p);
+              const remaining = daysLeft(p);
               return (
                 <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
                   <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
@@ -228,6 +246,16 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                           ${Number(p.funding_raised || 0).toLocaleString()} of ${Number(p.funding_goal).toLocaleString()} goal
                         </div>
                       </>
+                    )}
+                    {remaining !== null && (
+                      <div className="pitch-deadline">
+                        {remaining === 1 ? 'Last day' : `${remaining} days left`}
+                      </div>
+                    )}
+                    {p.savedCount > 0 && (
+                      <div className="pitch-saved-count">
+                        {p.savedCount} {p.savedCount === 1 ? 'person' : 'people'} following this
+                      </div>
                     )}
                   </div>
                 </Link>

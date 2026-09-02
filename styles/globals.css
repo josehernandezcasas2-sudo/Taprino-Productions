@@ -2999,6 +2999,10 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .admin-edit-form { display: flex; flex-direction: column; gap: 0.9rem; }
 .admin-field { display: flex; flex-direction: column; gap: 0.4rem; }
 .admin-field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.9rem; }
+.admin-field-row.cols-3 { grid-template-columns: 1fr 1fr 1fr; }
+@media (max-width: 640px) {
+  .admin-field-row.cols-3 { grid-template-columns: 1fr; }
+}
 @media (max-width: 520px) { .admin-field-row { grid-template-columns: 1fr; } }
 
 .admin-field label {
@@ -4033,6 +4037,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .pitch-progress-track { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 0.4rem; }
 .pitch-progress-fill { height: 100%; background: var(--brass); }
 .pitch-progress-label { font-size: 0.7rem; color: var(--ink-dim); }
+.pitch-deadline { font-size: 0.7rem; color: var(--signal-amber); margin-top: 0.3rem; font-weight: 600; }
+.pitch-saved-count { font-size: 0.7rem; color: var(--ink-dim); margin-top: 0.3rem; }
 
 .fund-btn {
   background: var(--brass); color: #241a05; padding: 0.85rem 1.7rem;

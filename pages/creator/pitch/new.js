@@ -43,7 +43,7 @@ function readAsDataUrl(file) {
 
 export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres }) {
   const router = useRouter();
-  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingRaised: '' });
+  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingRaised: '', fundingDeadline: '' });
   const [team, setTeam] = useState([{ name: '', role: '' }]);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [heroFile, setHeroFile] = useState(null);
@@ -155,7 +155,7 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
           <label>Where should "Fund this project" send people? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — you can add this later</span></label>
           <input type="url" value={form.projectUrl} onChange={(e) => update('projectUrl', e.target.value)} placeholder="https://kickstarter.com/..." />
 
-          <div className="admin-field-row">
+          <div className="admin-field-row cols-3">
             <div className="admin-field">
               <label>Funding goal <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional, self-reported</span></label>
               <input type="number" min="0" value={form.fundingGoal} onChange={(e) => update('fundingGoal', e.target.value)} />
@@ -163,6 +163,10 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
             <div className="admin-field">
               <label>Raised so far <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
               <input type="number" min="0" value={form.fundingRaised} onChange={(e) => update('fundingRaised', e.target.value)} />
+            </div>
+            <div className="admin-field">
+              <label>Funding deadline <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+              <input type="date" value={form.fundingDeadline} onChange={(e) => update('fundingDeadline', e.target.value)} />
             </div>
           </div>
 

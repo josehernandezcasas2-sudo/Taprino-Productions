@@ -52,6 +52,7 @@ export default async function handler(req, res) {
       hero_image: heroImage,
       funding_goal: body.fundingGoal ? Number(body.fundingGoal) : null,
       funding_raised: body.fundingRaised ? Number(body.fundingRaised) : null,
+      funding_deadline: body.fundingDeadline || null,
       team: Array.isArray(body.team) ? body.team : [],
       status: 'pending',
       created_by: userId,

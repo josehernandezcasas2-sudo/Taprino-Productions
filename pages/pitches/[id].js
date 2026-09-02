@@ -73,6 +73,19 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
 
   const pct = pitch.funding_goal ? Math.min(100, Math.round(((pitch.funding_raised || 0) / pitch.funding_goal) * 100)) : null;
 
+  // Same calendar-date-only logic as pages/pitches.js — see that file's
+  // comment for why "tomorrow" reads as 1 day left rather than 2, why
+  // today floors to 1 instead of 0, and why a passed deadline returns
+  // null instead of a negative number.
+  const remaining = (() => {
+    if (!pitch.funding_deadline) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const deadline = new Date(pitch.funding_deadline + 'T00:00:00');
+    const diffDays = Math.round((deadline - today) / 86400000);
+    return diffDays < 0 ? null : Math.max(1, diffDays);
+  })();
+
   async function toggleSave() {
     if (!isSignedIn) return;
     setSaved((s) => !s);
@@ -209,6 +222,12 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 <>
                   <span className="hero-meta-dot">&bull;</span>
                   <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
+                </>
+              )}
+              {remaining !== null && (
+                <>
+                  <span className="hero-meta-dot">&bull;</span>
+                  <span style={{ color: 'var(--signal-amber)', fontWeight: 600 }}>{remaining === 1 ? 'Last day' : `${remaining} days left`}</span>
                 </>
               )}
             </div>

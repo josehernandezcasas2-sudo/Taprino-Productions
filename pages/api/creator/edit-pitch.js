@@ -4,8 +4,8 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 
-const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingRaised', 'team', 'photos'];
-const FIELD_TO_COLUMN = { projectUrl: 'project_url', fundingGoal: 'funding_goal', fundingRaised: 'funding_raised' };
+const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingRaised', 'fundingDeadline', 'team', 'photos'];
+const FIELD_TO_COLUMN = { projectUrl: 'project_url', fundingGoal: 'funding_goal', fundingRaised: 'funding_raised', fundingDeadline: 'funding_deadline' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -47,6 +47,8 @@ export default async function handler(req, res) {
       updates[column] = Number(fields[f]);
     } else if ((f === 'fundingGoal' || f === 'fundingRaised') && fields[f] === '') {
       updates[column] = null;
+    } else if (f === 'fundingDeadline') {
+      updates[column] = fields[f] || null;
     } else if (f === 'projectUrl') {
       updates[column] = normalizeUrl(fields[f]);
     } else {
