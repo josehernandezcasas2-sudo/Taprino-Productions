@@ -5,6 +5,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../lib/accountContext';
 import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import { getApprovedPitches, getSavedPitchIds, PITCH_TAGS } from '../lib/pitches';
+import { getSupabase } from '../lib/supabase';
 import { getSiteSettings } from '../lib/siteSettings';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
@@ -40,6 +41,16 @@ export async function getServerSideProps({ req, res }) {
   ]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
+  // Save count per pitch, for the "Most saved" sort option — a separate,
+  // lightweight query (just pitch_id) rather than pulling full save rows.
+  const supabase = getSupabase();
+  const { data: saveRows } = await supabase.from('pitch_saves').select('pitch_id');
+  const saveCountsByPitchId = {};
+  for (const row of saveRows || []) {
+    saveCountsByPitchId[row.pitch_id] = (saveCountsByPitchId[row.pitch_id] || 0) + 1;
+  }
+  const pitchesWithSaveCounts = pitches.map((p) => ({ ...p, savedCount: saveCountsByPitchId[p.id] || 0 }));
+
   return {
     props: {
       isSignedIn: account.isSignedIn,
@@ -48,7 +59,7 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       mainGenres,
-      pitches,
+      pitches: pitchesWithSaveCounts,
       savedIds,
       bypassingDisabled
     }
@@ -59,6 +70,8 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
   const iconOverrides = usePlayerIconOverrides();
   const [saved, setSaved] = useState(new Set(savedIds));
   const [activeTag, setActiveTag] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('newest'); // 'newest' | 'closest' | 'saved'
 
   async function toggleSave(pitchId) {
     if (!isSignedIn) return;
@@ -74,7 +87,31 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
     }).catch(() => {});
   }
 
-  const visiblePitches = activeTag === 'All' ? pitches : pitches.filter((p) => p.tag === activeTag);
+  function fundingPct(p) {
+    if (!p.funding_goal) return null;
+    return Math.min(100, Math.round(((p.funding_raised || 0) / p.funding_goal) * 100));
+  }
+
+  const q = searchQuery.trim().toLowerCase();
+  const visiblePitches = pitches
+    .filter((p) => activeTag === 'All' || p.tag === activeTag)
+    .filter((p) => !q || p.title.toLowerCase().includes(q) || (p.creator_name || '').toLowerCase().includes(q))
+    .sort((a, b) => {
+      if (sortBy === 'saved') return (b.savedCount || 0) - (a.savedCount || 0);
+      if (sortBy === 'closest') {
+        // Pitches with no funding goal at all aren't "close to" anything —
+        // sort them after every pitch that actually has a goal, rather
+        // than letting a null goal accidentally sort as if it were 0% or
+        // land ahead of real, nearly-funded projects by chance.
+        const pctA = fundingPct(a);
+        const pctB = fundingPct(b);
+        if (pctA === null && pctB === null) return 0;
+        if (pctA === null) return 1;
+        if (pctB === null) return -1;
+        return pctB - pctA;
+      }
+      return 0; // 'newest' — already the server's own order, nothing to re-sort
+    });
   const usedTags = ['All', ...PITCH_TAGS.filter((t) => pitches.some((p) => p.tag === t))];
 
   return (
@@ -121,6 +158,26 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
           </div>
         )}
 
+        <div style={{ display: 'flex', gap: '0.7rem', flexWrap: 'wrap', marginBottom: '1rem' }}>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search by title or creator…"
+            className="pitch-search-input"
+            style={{ flex: '1 1 220px' }}
+          />
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="pitch-sort-select"
+          >
+            <option value="newest">Newest</option>
+            <option value="closest">Closest to goal</option>
+            <option value="saved">Most saved</option>
+          </select>
+        </div>
+
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.4rem' }}>
           {usedTags.map((t) => (
             <button
@@ -141,11 +198,15 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         </div>
 
         {visiblePitches.length === 0 ? (
-          <div className="poster-empty">Nothing here yet — check back soon.</div>
+          <div className="poster-empty">
+            {pitches.length === 0
+              ? 'Nothing here yet — check back soon.'
+              : 'No projects match your search or filter.'}
+          </div>
         ) : (
           <div className="pitch-grid">
             {visiblePitches.map((p) => {
-              const pct = p.funding_goal ? Math.min(100, Math.round(((p.funding_raised || 0) / p.funding_goal) * 100)) : null;
+              const pct = fundingPct(p);
               return (
                 <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
                   <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>

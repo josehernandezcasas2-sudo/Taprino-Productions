@@ -3981,6 +3981,21 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 
 /* Pitch Room — library grid + shared pieces used on the detail page too */
 .pitch-grid { display: flex; flex-wrap: wrap; gap: 1.4rem; }
+.pitch-search-input, .pitch-sort-select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid rgba(234, 231, 221, 0.18);
+  border-radius: 4px;
+  background: var(--void);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  color: var(--ink);
+  box-sizing: border-box;
+}
+.pitch-search-input:focus, .pitch-sort-select:focus {
+  outline: none;
+  border-color: var(--signal-amber);
+}
+.pitch-sort-select { flex: 0 0 auto; cursor: pointer; }
 .pitch-card {
   background: var(--surface-2);
   border-radius: 1rem;
