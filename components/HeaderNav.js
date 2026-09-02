@@ -21,7 +21,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const { signOut } = useClerk();
-  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isCreator);
+  const { notifications, unreadCount, markRead, markAllRead } = useNotifications(isSignedIn);
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
@@ -239,7 +239,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           </div>
         )}
 
-        {isCreator && (
+        {isSignedIn && (
           <>
             <button
               className={`icon-btn ${openMenu === 'notifications' ? 'active' : ''}`}
