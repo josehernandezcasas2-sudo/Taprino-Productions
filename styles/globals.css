@@ -996,6 +996,22 @@ button { font-family: inherit; cursor: pointer; }
   padding: 2rem 0.3rem 3.6rem;
   scroll-behavior: smooth;
 }
+/* Snap-to-card scrolling, touch devices only — matches Jose's request
+   that "computer people can [just] scroll" while tablet/phone gets a
+   more deliberate slide. hover:none + pointer:coarse is genuine touch
+   capability, not a screen-width guess: a wide tablet in landscape still
+   correctly gets snap, and a narrow desktop window (mouse-driven, just
+   resized small) correctly doesn't — same reasoning already used for the
+   .card-wrap:hover fix above this file's card system. Nothing here
+   changes desktop's existing plain overflow-x:auto scroll at all. */
+@media (hover: none) and (pointer: coarse) {
+  .cat-row-track {
+    scroll-snap-type: x mandatory;
+  }
+  .row-card {
+    scroll-snap-align: start;
+  }
+}
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
 .genre-browse-track { display: flex; gap: 1.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
 .genre-browse-item {
