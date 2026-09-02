@@ -23,14 +23,17 @@ export async function getServerSideProps({ req, res }) {
     return { notFound: true };
   }
 
-  // SECURITY: the admin bypass view must never be cacheable. If this got
-  // the same public s-maxage as the normal page, a CDN could serve an
-  // admin's "disabled page, viewing anyway" response to the very next
-  // anonymous visitor within the cache window — exactly the audience this
-  // toggle exists to hide the page from.
+  // SECURITY: this response embeds personalized account data (email,
+  // admin/creator status) for any signed-in user, not just during the
+  // admin bypass — a public, shared cache could serve one signed-in
+  // user's personalized page to a completely different visitor within
+  // the cache window. Only genuinely anonymous visitors, who have
+  // nothing personal in the response, get the cached public path.
+  // (bypassingDisabled implies isSignedIn — you can't be an admin
+  // without being signed in — so this one check safely covers both.)
   res.setHeader(
     'Cache-Control',
-    bypassingDisabled ? 'private, no-store' : 'public, s-maxage=60, stale-while-revalidate=300'
+    account.isSignedIn ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=60, stale-while-revalidate=300'
   );
 
   const { userId } = getAuth(req);
@@ -164,9 +167,15 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
           notified when they post an update.
         </div>
 
+        <div style={{ margin: '1rem 0 1.4rem' }}>
+          <Link href="/pitches/discover" className="account-btn-primary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
+            🔀 Discover — swipe through ideas
+          </Link>
+        </div>
+
         {isCreator && (
-          <div style={{ margin: '1rem 0 1.6rem' }}>
-            <Link href="/creator/pitch/new" className="account-btn-primary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
+          <div style={{ margin: '0 0 1.6rem' }}>
+            <Link href="/creator/pitch/new" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
               Submit your project
             </Link>
             <Link href="/creator/pitch/dashboard" className="account-btn-secondary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginLeft: '0.7rem' }}>
