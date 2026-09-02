@@ -495,6 +495,17 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: 1fr 320px;
   gap: 2.4rem;
 }
+/* Grid items default to min-width:auto, meaning a child with wide
+   content (like a horizontally-scrolling card row) can force the grid
+   track — and the whole page — to stretch past the viewport instead of
+   letting that child's own overflow-x:auto contain the excess
+   internally. This was the actual cause of the homepage "library
+   stretches the screen while the hero stays responsive" bug: the hero
+   has no such wide content to trigger it, the row-filled div below it
+   did. Applied to every .stage child rather than just the homepage's,
+   since it's a no-op wherever there's nothing wide enough to trigger it
+   and protects any current or future .stage page from the same trap. */
+.stage > * { min-width: 0; }
 /* Explicit opt-in for pages that should genuinely use the full screen width
    — the homepage, channel, and live pages. Deliberately NOT a blanket
    widening of .stage-single itself: that class is also used by every legal
