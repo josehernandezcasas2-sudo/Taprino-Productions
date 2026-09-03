@@ -1041,9 +1041,33 @@ button { font-family: inherit; cursor: pointer; }
        the OS's own momentum scrolling, regardless of this property.
        This is very likely why snap wasn't visibly engaging on iPhone. */
     scroll-behavior: auto;
+    /* Full-bleed to the true screen edge instead of stopping at
+       .stage-wide's own right padding (2.4rem at this width). Without
+       this, the row's own container was the thing doing the cropping —
+       a card would visibly stop short of the actual edge of the phone,
+       which read as an accidental cutoff rather than a deliberate
+       "more to slide to" bleed. The negative margin pulls the
+       scrollable box itself out to the edge; the matching padding
+       after it means the crop still lands with a little breathing
+       room rather than slicing a card exactly at the boundary. Left
+       edge is untouched on purpose — the first card should stay
+       aligned with the row's own heading text, only the right side is
+       meant to bleed. */
+    margin-right: -2.4rem;
+    padding-right: 2.4rem;
   }
   .row-card {
     scroll-snap-align: start;
+  }
+}
+/* .stage-wide halves its side padding at this width (2.4rem down to
+   1.2rem) — this mirrors that exact change for the bleed amount above,
+   so the two stay in sync instead of the bleed becoming a rem too wide
+   once the page's own padding shrinks. */
+@media (hover: none) and (pointer: coarse) and (max-width: 640px) {
+  .cat-row-track {
+    margin-right: -1.2rem;
+    padding-right: 1.2rem;
   }
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
