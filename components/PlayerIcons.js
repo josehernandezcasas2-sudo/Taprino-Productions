@@ -535,3 +535,14 @@ export function BrowserTabIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+export function RowsIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="4.5" width="18" height="4.5" rx="1.2" />
+      <rect x="3" y="10.75" width="18" height="4.5" rx="1.2" />
+      <rect x="3" y="17" width="18" height="4.5" rx="1.2" />
+    </svg>
+  );
+}

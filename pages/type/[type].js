@@ -1,5 +1,5 @@
+import { useRouter } from 'next/router';
 import Head from 'next/head';
-import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
@@ -7,14 +7,15 @@ import { useWishlist } from '../../lib/useWishlist';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import { getGenreIcons } from '../../lib/genreIcons';
 import { buildHeroCandidates } from '../../lib/heroCandidates';
+import { getCuratedRowsForPage } from '../../lib/curatedGroups';
+import { getSiteSettings } from '../../lib/siteSettings';
 import HeaderNav from '../../components/HeaderNav';
 import HeroSpotlight from '../../components/HeroSpotlight';
+import GenreRow from '../../components/GenreRow';
 import GenreBrowseRow from '../../components/GenreBrowseRow';
 import InstallButton from '../../components/InstallButton';
-import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
-import { tierBadge } from '../../lib/tierBadge';
 
 import Footer from '../../components/Footer';
 const TYPE_LABELS = { series: 'Series', movie: 'Movies', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
@@ -45,7 +46,7 @@ export async function getServerSideProps({ req, params, res }) {
   if (!TYPE_LABELS[type]) {
     return { notFound: true };
   }
-  const [episodesRaw, allSeries, genreIcons] = await Promise.all([getPublicEpisodes(), getAllSeries(), getGenreIcons()]);
+  const [episodesRaw, allSeries, genreIcons, siteSettings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getGenreIcons(), getSiteSettings()]);
 
   const account = await getAccountContext(req);
 
@@ -55,6 +56,7 @@ export async function getServerSideProps({ req, params, res }) {
   const episodes = episodesRaw;
 
   const typeEpisodes = episodes.filter((e) => e.contentType === type);
+  const curatedRows = await getCuratedRowsForPage(`type:${type}`, typeEpisodes, siteSettings.curatedRowsRandomOrder);
 
   // For the Series type page, this naturally produces series-only candidates
   // (aggregated views across each series' episodes) since typeEpisodes only
@@ -82,34 +84,23 @@ export async function getServerSideProps({ req, params, res }) {
       isCreator: account.isCreator,
       episodes,
       allSeries,
-      genreIcons
+      genreIcons,
+      curatedRows
     }
   };
 }
 
-export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, isAdmin, isCreator, genreIcons }) {
+export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, isAdmin, isCreator, genreIcons, curatedRows }) {
+  const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   const typeEpisodes = episodes.filter((e) => e.contentType === type);
   const label = TYPE_LABELS[type];
 
-  // For Series: one card per series (not per episode) — clicking goes to the
-  // series hub, not straight into a video. For Movies/Shorts: one card per
-  // standalone episode, clicking goes straight to that episode's page.
-  const seriesCards = type === 'series'
-    ? [...new Set(typeEpisodes.map((e) => e.seriesId))]
-        .map((sid) => {
-          const info = allSeries.find((s) => s.id === sid);
-          const eps = typeEpisodes.filter((e) => e.seriesId === sid);
-          return info ? {
-            info, count: eps.length,
-            tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free',
-            adsEnabled: eps.some((e) => e.adsEnabled !== false)
-          } : null;
-        })
-        .filter(Boolean)
-    : [];
+  function goToInfo(ep) {
+    router.push(`/episode/${ep.id}`);
+  }
 
   return (
     <>
@@ -143,51 +134,27 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
 
         <div className="library-heading">{label}</div>
         <div className="library-sub">
-          {type === 'series' ? `${seriesCards.length} series` : `${typeEpisodes.length} title${typeEpisodes.length === 1 ? '' : 's'}`}
+          {type === 'series'
+            ? `${new Set(typeEpisodes.map((e) => e.seriesId)).size} series`
+            : `${typeEpisodes.length} title${typeEpisodes.length === 1 ? '' : 's'}`}
         </div>
 
-        {type === 'series' ? (
-          seriesCards.length === 0 ? (
-            <div className="poster-empty">No series yet — check back soon.</div>
-          ) : (
-            <div className="poster-grid">
-              {seriesCards.map(({ info, count, tier, adsEnabled }) => (
-                <div key={info.id} className="card-wrap">
-                  <WishlistButton isActive={isWishlisted(info.id)} onToggle={() => toggleWishlist(info.id)} />
-                  <Link href={`/series/${info.id}`} className={`poster-card ${tierBadge(tier, adsEnabled).key}`}>
-                    <div className="poster-art">
-                      <span className="poster-badge">{tierBadge(tier, adsEnabled).label}</span>
-                      ▤
-                    </div>
-                    <div className="poster-title-wrap">
-                      <h4>{info.name}</h4>
-                      <span>{count} episode{count === 1 ? '' : 's'}</span>
-                    </div>
-                  </Link>
-                </div>
-              ))}
-            </div>
-          )
-        ) : typeEpisodes.length === 0 ? (
+        {curatedRows.length === 0 ? (
           <div className="poster-empty">Nothing in {label} yet — check back soon.</div>
         ) : (
-          <div className="poster-grid">
-            {typeEpisodes.map((ep) => (
-              <div key={ep.id} className="card-wrap">
-                <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
-                <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
-                  <div className="poster-art">
-                    <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-                    ◈
-                  </div>
-                  <div className="poster-title-wrap">
-                    <h4>{ep.title}</h4>
-                    <span>{ep.runtime}</span>
-                  </div>
-                </Link>
-              </div>
-            ))}
-          </div>
+          curatedRows.map((row) => (
+            <GenreRow
+              key={row.id}
+              title={row.title}
+              seeAllHref={row.groupType === 'genre' ? `/genre/${encodeURIComponent(row.genreName)}` : undefined}
+              episodes={row.episodes}
+              allSeries={allSeries}
+              currentId={null}
+              onSelect={goToInfo}
+              isWishlisted={isWishlisted}
+              onToggleWishlist={toggleWishlist}
+            />
+          ))
         )}
       </main>
       <Footer />
