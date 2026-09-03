@@ -34,7 +34,7 @@ create index if not exists curated_groups_scope_idx on curated_groups (scope, po
 create table if not exists curated_group_items (
   id uuid primary key default gen_random_uuid(),
   group_id uuid not null references curated_groups(id) on delete cascade,
-  episode_id uuid not null references episodes(id) on delete cascade,
+  episode_id text not null references episodes(id) on delete cascade,
   position integer not null default 0,
   unique (group_id, episode_id)
 );
