@@ -139,9 +139,9 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
             : `${typeEpisodes.length} title${typeEpisodes.length === 1 ? '' : 's'}`}
         </div>
 
-        {curatedRows.length === 0 ? (
+        {typeEpisodes.length === 0 ? (
           <div className="poster-empty">Nothing in {label} yet — check back soon.</div>
-        ) : (
+        ) : curatedRows.length > 0 ? (
           curatedRows.map((row) => (
             <GenreRow
               key={row.id}
@@ -155,6 +155,22 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
               onToggleWishlist={toggleWishlist}
             />
           ))
+        ) : (
+          // Real content exists but the curated-rows system produced
+          // nothing — almost certainly a setup problem (e.g. migration
+          // 046 not yet applied) rather than an actual empty section.
+          // Falling back to one plain row showing everything means a
+          // broken curated-rows layer degrades to "looks like before,"
+          // never to a blank page hiding content that's actually there.
+          <GenreRow
+            title={label}
+            episodes={typeEpisodes}
+            allSeries={allSeries}
+            currentId={null}
+            onSelect={goToInfo}
+            isWishlisted={isWishlisted}
+            onToggleWishlist={toggleWishlist}
+          />
         )}
       </main>
       <Footer />
