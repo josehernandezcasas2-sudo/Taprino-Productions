@@ -12,7 +12,7 @@ import ManualEpisodeForm from '../components/ManualEpisodeForm';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
 import Footer from '../components/Footer';
-import { ClapperboardIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, BarChartIcon, TicketIcon, BrowserTabIcon, RowsIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { ClapperboardIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, BarChartIcon, TicketIcon, BrowserTabIcon, RowsIcon, SparkleIcon, PlayIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
 // any admin data is ever fetched or rendered — there's no client-side-only
@@ -586,6 +586,8 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <Link href="/admin/promo-codes"><TicketIcon size={15} src={iconOverrides.ticket} /> Promo codes →</Link>
         <Link href="/admin/site-icons"><BrowserTabIcon size={15} src={iconOverrides.browser_tab} /> Site icons →</Link>
         <Link href="/admin/curated-rows"><RowsIcon size={15} /> Curated rows →</Link>
+        <Link href="/pitches/discover"><SparkleIcon size={15} /> Preview: Pitch Discover →</Link>
+        <Link href="/vertical/discover"><PlayIcon size={15} src={iconOverrides.play} /> Preview: Vertical Discover →</Link>
       </div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>
