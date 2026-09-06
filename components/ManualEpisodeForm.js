@@ -57,6 +57,11 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null);
   const [trailerUid, setTrailerUid] = useState('');
+  const [skipVideo, setSkipVideo] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [audioImporting, setAudioImporting] = useState(false);
+  const [audioImportedUrl, setAudioImportedUrl] = useState(null);
+  const [audioError, setAudioError] = useState(null);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -82,8 +87,12 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
   async function handleSubmit(e) {
     e.preventDefault();
     setError(null);
-    if (!videoUid.trim()) {
-      setError('Paste the Cloudflare video ID first.');
+    if (skipVideo && !audioImportedUrl) {
+      setError('Import an audio file first, or uncheck "Audio only" to link a video instead.');
+      return;
+    }
+    if (!skipVideo && !videoUid.trim()) {
+      setError('Paste the Cloudflare video ID first, or check "Audio only" above for an audio-only episode.');
       return;
     }
     setSaving(true);
@@ -98,7 +107,8 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
           bonusParentType,
           bonusParentId,
-          cloudflareVideoUid: videoUid.trim(),
+          ...(skipVideo ? {} : { cloudflareVideoUid: videoUid.trim() }),
+          ...(audioImportedUrl ? { audioUrl: audioImportedUrl } : {}),
           ...(trailerUid.trim() ? { trailerCloudflareUid: trailerUid.trim() } : {}),
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {})
@@ -113,6 +123,10 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       setVideoUid('');
       setVideoCheck(null);
       setTrailerUid('');
+      setSkipVideo(false);
+      setAudioUrl('');
+      setAudioImportedUrl(null);
+      setAudioError(null);
       setPosterFile(null);
       setThumbnailFile(null);
       onCreated();
@@ -148,14 +162,23 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
         <label>Attribute to creator — email, optional (defaults to you)</label>
         <input type="email" value={form.creatorEmail} onChange={(e) => update('creatorEmail', e.target.value)} placeholder="creator@example.com" />
 
-        <label>Cloudflare video ID — required</label>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
-          <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} required />
-          <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
-            {videoCheck === 'checking' ? 'Checking…' : 'Check'}
-          </button>
-        </div>
-        {videoCheck && videoCheck !== 'checking' && (
+        {form.contentType === 'podcast' && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal', marginBottom: '0.8rem' }}>
+            <input type="checkbox" checked={skipVideo} onChange={(e) => setSkipVideo(e.target.checked)} />
+            Audio only — no video for this episode
+          </label>
+        )}
+
+        {!skipVideo && (
+          <>
+            <label>Cloudflare video ID{form.contentType !== 'podcast' && ' — required'}</label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+              <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} required={form.contentType !== 'podcast'} />
+              <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
+                {videoCheck === 'checking' ? 'Checking…' : 'Check'}
+              </button>
+            </div>
+            {videoCheck && videoCheck !== 'checking' && (
           videoCheck.error ? (
             <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
           ) : videoCheck.state === 'error' ? (
@@ -173,6 +196,71 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
 
         <label>Trailer — Cloudflare video ID, optional</label>
         <input type="text" value={trailerUid} onChange={(e) => setTrailerUid(e.target.value)} placeholder="Only if a trailer was also manually uploaded" style={{ marginBottom: '0.8rem' }} />
+          </>
+        )}
+
+        {form.contentType === 'podcast' && (
+          <>
+            <label>
+              Audio {skipVideo ? '' : <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — add it alongside video, or check &ldquo;Audio only&rdquo; above for audio-only</span>}
+            </label>
+            {audioImportedUrl ? (
+              <p style={{ fontSize: '0.85rem', color: 'var(--ok)', marginBottom: '0.8rem' }}>
+                ✓ Audio file ready.{' '}
+                <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                  Remove
+                </button>
+              </p>
+            ) : (
+              <>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input
+                    type="url"
+                    inputMode="url"
+                    placeholder="https://…/your-episode.mp3"
+                    value={audioUrl}
+                    onChange={(e) => setAudioUrl(e.target.value)}
+                    style={{ flex: 1, marginBottom: 0 }}
+                  />
+                  <button
+                    type="button"
+                    className="account-btn-secondary"
+                    style={{ width: 'auto' }}
+                    disabled={audioImporting || !audioUrl.trim()}
+                    onClick={async () => {
+                      setAudioImporting(true);
+                      setAudioError(null);
+                      try {
+                        // Same endpoint the creator-facing form already uses —
+                        // it accepts isAdmin as well as isCreator, so this
+                        // works identically from this admin tool.
+                        const res = await fetch('/api/creator/import-audio-url', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ audioUrl: audioUrl.trim() })
+                        });
+                        const data = await res.json();
+                        if (!res.ok) throw new Error(data.error || 'Could not import that audio file.');
+                        setAudioImportedUrl(data.audioUrl);
+                      } catch (err) {
+                        setAudioError(err.message);
+                      } finally {
+                        setAudioImporting(false);
+                      }
+                    }}
+                  >
+                    {audioImporting ? 'Importing…' : 'Import'}
+                  </button>
+                </div>
+                {audioError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.3rem' }}>{audioError}</p>}
+                <p className="video-source-help">
+                  Paste a direct link to the audio file — a signed download link from Dropbox, Google
+                  Drive, WeTransfer, or similar, or any plain .mp3/.m4a/.wav URL. Capped at 150MB.
+                </p>
+              </>
+            )}
+          </>
+        )}
 
         <label>Title</label>
         <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
@@ -196,14 +284,14 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           </p>
         )}
 
-        {form.contentType === 'series' && (
+        {(form.contentType === 'series' || form.contentType === 'podcast') && (
           <>
-            <label>Series</label>
+            <label>{form.contentType === 'podcast' ? 'Show' : 'Series'}</label>
             <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)}>
-              <option value="">Choose a series…</option>
+              <option value="">Choose a {form.contentType === 'podcast' ? 'show' : 'series'}…</option>
               {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
-            <label>Or create a new series</label>
+            <label>Or create a new {form.contentType === 'podcast' ? 'show' : 'series'}</label>
             <input type="text" value={form.newSeriesName} onChange={(e) => update('newSeriesName', e.target.value)} placeholder="Leave blank if you picked one above" />
             <label>Season</label>
             <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />

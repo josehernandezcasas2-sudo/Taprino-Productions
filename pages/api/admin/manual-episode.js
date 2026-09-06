@@ -16,7 +16,7 @@ import { recordAudit } from '../../../lib/auditLog';
 // This is admin-only, not creator-facing, for a concrete reason: it
 // requires values (attributing submitted_by, setting status/tier
 // directly) that only make sense with admin trust already established.
-const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier', 'cloudflareVideoUid'];
+const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier'];
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
@@ -41,6 +41,9 @@ export default async function handler(req, res) {
   if (missing.length > 0) {
     return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
   }
+  if (!body.cloudflareVideoUid && !body.audioUrl) {
+    return res.status(400).json({ error: 'Provide either a Cloudflare video ID or an imported audio file.' });
+  }
   if (!VALID_TIERS.includes(body.tier)) {
     return res.status(400).json({ error: `tier must be one of: ${VALID_TIERS.join(', ')}` });
   }
@@ -58,16 +61,21 @@ export default async function handler(req, res) {
   // The whole point of this endpoint — verify Cloudflare actually
   // processed the file before an episode gets built around it. A video
   // that failed transcoding (corrupted file, wrong format) shouldn't
-  // silently become a published episode with a broken player.
-  const videoStatus = await getCloudflareVideoStatus(body.cloudflareVideoUid);
-  if (!videoStatus) {
-    return res.status(404).json({ error: 'No Cloudflare video found with that ID — check it was copied correctly.' });
+  // silently become a published episode with a broken player. Skipped
+  // entirely for an audio-only podcast episode, since there's no video to
+  // check in that case at all.
+  let videoStatus = null;
+  let src = null;
+  if (body.cloudflareVideoUid) {
+    videoStatus = await getCloudflareVideoStatus(body.cloudflareVideoUid);
+    if (!videoStatus) {
+      return res.status(404).json({ error: 'No Cloudflare video found with that ID — check it was copied correctly.' });
+    }
+    if (videoStatus.state === 'error') {
+      return res.status(400).json({ error: `Cloudflare could not process this video: ${videoStatus.errorReasonText || videoStatus.errorReasonCode}. Re-export and re-upload it before linking.` });
+    }
+    src = cloudflarePlaybackUrl(body.cloudflareVideoUid);
   }
-  if (videoStatus.state === 'error') {
-    return res.status(400).json({ error: `Cloudflare could not process this video: ${videoStatus.errorReasonText || videoStatus.errorReasonCode}. Re-export and re-upload it before linking.` });
-  }
-
-  const src = cloudflarePlaybackUrl(body.cloudflareVideoUid);
   let trailerSrc = null;
   if (body.trailerCloudflareUid) {
     trailerSrc = cloudflarePlaybackUrl(body.trailerCloudflareUid);
@@ -161,8 +169,8 @@ export default async function handler(req, res) {
     action: 'manual_episode_created',
     targetType: 'episode',
     targetId: id,
-    details: `${body.title} — via manually-linked Cloudflare video ${body.cloudflareVideoUid}${body.creatorEmail ? `, attributed to ${body.creatorEmail}` : ''}`
+    details: `${body.title} — via ${body.cloudflareVideoUid ? `manually-linked Cloudflare video ${body.cloudflareVideoUid}` : 'imported audio file'}${body.creatorEmail ? `, attributed to ${body.creatorEmail}` : ''}`
   });
 
-  return res.status(200).json({ ok: true, episodeId: id, videoState: videoStatus.state });
+  return res.status(200).json({ ok: true, episodeId: id, videoState: videoStatus ? videoStatus.state : null });
 }
