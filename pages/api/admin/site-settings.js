@@ -51,22 +51,32 @@ export default async function handler(req, res) {
     }
   }
 
-  const updates = {
-    shop_enabled: !!shopEnabled,
+  const updates = { updated_at: new Date().toISOString() };
+  // Every field below only gets written if this request actually included
+  // it — an omitted field means "leave it alone," never "reset it to a
+  // default." This used to be inconsistent: shop/live-tv/vertical/
+  // podcasts/pitch-room defaulted an omitted field to true-or-false
+  // depending on the field, which meant any caller that didn't send the
+  // complete set (uploading a search icon, adjusting the curated-rows
+  // order toggle, etc.) would silently reset whichever fields it left
+  // out. Two real instances of this had already been individually
+  // patched before; this makes the whole class of bug impossible instead
+  // of relying on every future caller remembering to send everything.
+  if (shopEnabled !== undefined) updates.shop_enabled = !!shopEnabled;
+  if (shopUrl !== undefined) {
     // A URL typed without http(s):// (e.g. "studiotapa.com") renders as a
     // RELATIVE link in an <a href>, which browsers resolve against the
     // current page — that's exactly how "Shop" ended up opening
     // studiotapatv.site/studiotapa.com instead of an external site.
     // Normalizing here means this can never happen regardless of what
     // gets typed into the admin field.
-    shop_url: shopUrl && shopUrl.trim() ? normalizeUrl(shopUrl) : null,
-    live_tv_enabled: liveTvEnabled !== false,
-    vertical_enabled: verticalEnabled !== false,
-    podcasts_enabled: podcastsEnabled !== false,
-    elevator_pitch_enabled: !!elevatorPitchEnabled,
-    curated_rows_random_order: !!curatedRowsRandomOrder,
-    updated_at: new Date().toISOString()
-  };
+    updates.shop_url = shopUrl && shopUrl.trim() ? normalizeUrl(shopUrl) : null;
+  }
+  if (liveTvEnabled !== undefined) updates.live_tv_enabled = !!liveTvEnabled;
+  if (verticalEnabled !== undefined) updates.vertical_enabled = !!verticalEnabled;
+  if (podcastsEnabled !== undefined) updates.podcasts_enabled = !!podcastsEnabled;
+  if (elevatorPitchEnabled !== undefined) updates.elevator_pitch_enabled = !!elevatorPitchEnabled;
+  if (curatedRowsRandomOrder !== undefined) updates.curated_rows_random_order = !!curatedRowsRandomOrder;
   if (recommendationCloseness !== undefined) {
     const closeness = Math.max(0, Math.min(10, Number(recommendationCloseness)));
     updates.recommendation_closeness = Number.isFinite(closeness) ? closeness : 6;
@@ -93,7 +103,7 @@ export default async function handler(req, res) {
     adminEmail: email,
     action: 'update_site_settings',
     targetType: 'site_settings',
-    details: `shop_enabled=${!!shopEnabled}, live_tv_enabled=${liveTvEnabled !== false}${searchIconUrl !== undefined ? `, search_icon=${searchIconUrl ? 'custom' : 'default'}` : ''}`
+    details: Object.keys(updates).filter((k) => k !== 'updated_at').map((k) => `${k}=${updates[k]}`).join(', ') || 'no fields changed'
   });
 
   return res.status(200).json({ ok: true });

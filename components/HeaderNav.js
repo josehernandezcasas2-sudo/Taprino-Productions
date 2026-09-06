@@ -33,12 +33,22 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   // page, and threading a new prop through all of them just for one
   // optional link isn't worth the sweep. This is the same reason the
   // Shop link's on/off state lives in its own tiny public API instead.
+  //
+  // Admins bypass the cache entirely (a unique query param guarantees a
+  // miss at the CDN, not just the browser) — otherwise toggling Shop or
+  // Live TV off in admin and then checking the site can show the old,
+  // cached value for up to 60s (and up to 5 minutes under
+  // stale-while-revalidate), which reads as "the toggle doesn't work"
+  // when it actually saved correctly the whole time. Regular visitors
+  // keep the cached read, since they have no reason to need
+  // second-by-second freshness here.
   useEffect(() => {
-    fetch('/api/site-settings')
+    const url = isAdmin ? `/api/site-settings?t=${Date.now()}` : '/api/site-settings';
+    fetch(url)
       .then((r) => r.json())
       .then((data) => setShopSettings(data))
       .catch(() => setShopSettings({ shopEnabled: false, shopUrl: null }));
-  }, []);
+  }, [isAdmin]);
 
   useEffect(() => {
     function handleOutside(e) {
