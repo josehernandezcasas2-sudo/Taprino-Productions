@@ -70,7 +70,8 @@ export async function getServerSideProps({ req, res }) {
       mainGenres,
       newsletterStatus,
       subscriptionDetails,
-      promoAccessExpiresAt
+      promoAccessExpiresAt,
+      userId: account.userId || null
     }
   };
 }
@@ -89,7 +90,7 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt }) {
+export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId }) {
   const iconOverrides = usePlayerIconOverrides();
   const { signOut } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
@@ -114,7 +115,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
     fetch('/api/account/profile')
       .then((r) => r.json())
       .then((data) => { setProfile(data); setOriginalAge(data.age ?? null); })
-      .catch(() => setProfile({ displayName: '', gender: '', age: '' }));
+      .catch(() => setProfile({ displayName: '', gender: '', age: '', bio: '', avatarUrl: null, socialLinks: [] }));
   }, []);
 
   const ageWasChanged = originalAge !== null && String(profile.age || '') !== String(originalAge || '') && profile.age !== '';
@@ -136,6 +137,13 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save.');
+      setProfile((p) => ({
+        ...p,
+        avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl,
+        avatarBase64: null,
+        avatarFileName: null,
+        removeAvatar: false
+      }));
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
       setAgeChangeConfirmed(false);
@@ -370,6 +378,96 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       maxLength={60}
                       placeholder="How you'd like to appear publicly"
                     />
+
+                    {userId && (
+                      <Link href={`/profile/${userId}`} style={{ fontSize: '0.78rem', display: 'inline-block', margin: '0.4rem 0 0.8rem' }}>
+                        View your public profile →
+                      </Link>
+                    )}
+
+                    <label style={{ marginTop: '1rem' }}>Avatar <span style={{ fontWeight: 'normal', opacity: 0.65 }}>public — shown on your profile page</span></label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
+                      <div className="account-avatar" style={{ backgroundImage: profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {!profile.avatarUrl && avatarLetter}
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={(e) => {
+                          const file = e.target.files && e.target.files[0];
+                          if (!file) return;
+                          const reader = new FileReader();
+                          reader.onload = () => setProfile((p) => ({ ...p, avatarBase64: reader.result, avatarFileName: file.name, removeAvatar: false }));
+                          reader.readAsDataURL(file);
+                        }}
+                      />
+                      {profile.avatarUrl && (
+                        <button
+                          type="button"
+                          className="account-btn-secondary"
+                          style={{ width: 'auto' }}
+                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true }))}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <label>Bio <span style={{ fontWeight: 'normal', opacity: 0.65 }}>public, optional, up to 400 characters</span></label>
+                    <textarea
+                      value={profile.bio || ''}
+                      onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
+                      maxLength={400}
+                      placeholder="A line or two about what you make"
+                      style={{ minHeight: '4rem' }}
+                    />
+
+                    <label style={{ marginTop: '0.6rem' }}>Links <span style={{ fontWeight: 'normal', opacity: 0.65 }}>public — up to 6, shown on your profile page</span></label>
+                    {(profile.socialLinks || []).map((link, i) => (
+                      <div key={i} className="admin-field-row" style={{ marginBottom: '0.5rem' }}>
+                        <input
+                          type="text"
+                          value={link.platform || ''}
+                          placeholder="Instagram"
+                          onChange={(e) => setProfile((p) => {
+                            const next = [...(p.socialLinks || [])];
+                            next[i] = { ...next[i], platform: e.target.value };
+                            return { ...p, socialLinks: next };
+                          })}
+                        />
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <input
+                            type="text"
+                            value={link.url || ''}
+                            placeholder="https://instagram.com/you"
+                            style={{ flex: 1 }}
+                            onChange={(e) => setProfile((p) => {
+                              const next = [...(p.socialLinks || [])];
+                              next[i] = { ...next[i], url: e.target.value };
+                              return { ...p, socialLinks: next };
+                            })}
+                          />
+                          <button
+                            type="button"
+                            className="account-btn-secondary"
+                            style={{ width: 'auto' }}
+                            onClick={() => setProfile((p) => ({ ...p, socialLinks: (p.socialLinks || []).filter((_, idx) => idx !== i) }))}
+                          >
+                            &times;
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                    {(profile.socialLinks || []).length < 6 && (
+                      <button
+                        type="button"
+                        className="account-btn-secondary"
+                        style={{ width: 'auto', marginBottom: '0.6rem' }}
+                        onClick={() => setProfile((p) => ({ ...p, socialLinks: [...(p.socialLinks || []), { platform: '', url: '' }] }))}
+                      >
+                        + Add link
+                      </button>
+                    )}
 
                     <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', margin: '1rem 0 0.6rem' }}>
                       The two fields below are private — only Studio Tapa can see them, for our own understanding
