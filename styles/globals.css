@@ -1234,6 +1234,27 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 999px;
   z-index: 2;
 }
+.new-episode-banner {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  z-index: 3;
+  background: var(--sky);
+  color: var(--surface-0);
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  text-align: center;
+  padding: 0.3rem 0;
+}
+/* The tier badge and wishlist heart both otherwise sit right where this
+   banner needs to go — shift them down to clear it instead of letting
+   either overlap. :has() reaches the wishlist heart even though it lives
+   in a sibling branch of the DOM (card-wrap > WishlistButton) rather
+   than inside .ep-thumb itself alongside the banner. */
+.ep-thumb:has(.new-episode-banner) .ep-badge { top: 1.7rem; }
+.card-wrap:has(.new-episode-banner) .wishlist-btn { top: 1.7rem; }
 /* Solid, not a translucent tint — needs to read clearly against any
    thumbnail, including light or busy ones. Deliberately olive rather than
    the brass token — that color means Studio Tapa+ (premium)

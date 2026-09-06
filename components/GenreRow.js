@@ -3,6 +3,7 @@ import WishlistButton from './WishlistButton';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { contentTypeTag } from '../lib/contentTypeTags';
 import { tierBadge } from '../lib/tierBadge';
+import { isRecentlyAdded } from '../lib/newBadge';
 
 const MAX_CARDS = 15;
 
@@ -27,6 +28,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
     type: 'standalone',
     key: ep.id,
     rank: vc[ep.id] || 0,
+    hasNew: isRecentlyAdded(ep.createdAt),
     ep
   }));
   const seriesCards = seriesIds
@@ -44,7 +46,11 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
         tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free',
         // Ad-free only if every episode is — one ad-supported episode is
         // enough to call the whole show ad-supported.
-        adsEnabled: eps.some((e) => e.adsEnabled !== false)
+        adsEnabled: eps.some((e) => e.adsEnabled !== false),
+        // True the moment any single episode in the show is within the
+        // new-episode window — the whole point is "this show has
+        // something new," not "this show is itself new."
+        hasNew: eps.some((e) => isRecentlyAdded(e.createdAt))
       };
     })
     .filter(Boolean);
@@ -75,6 +81,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               onClick={() => onSelect(card.ep)}
             >
               <div className="ep-thumb">
+                {card.hasNew && <span className="new-episode-banner">New episode</span>}
                 {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.ep.tier, card.ep.adsEnabled).label}</span>
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
@@ -93,6 +100,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             )}
             <Link href={`/series/${card.info.id}`} className={`ep-card ${tierBadge(card.tier, card.adsEnabled).key}`}>
               <div className="ep-thumb">
+                {card.hasNew && <span className="new-episode-banner">New episode</span>}
                 {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
                 {!card.info.thumbnail && '▤ series'}
