@@ -4687,3 +4687,96 @@ body:has(.mini-player) { padding-bottom: 72px; }
   .swipe-btn { width: 50px; height: 50px; }
   .swipe-btn-like { width: 60px; height: 60px; }
 }
+
+/* ============================================================
+   Vertical Discover reel feed (pages/vertical/discover.js,
+   components/ReelPlayer.js)
+   ============================================================ */
+.reel-feed {
+  height: 100vh;
+  height: 100svh;
+  width: 100%;
+  overflow-y: scroll;
+  scroll-snap-type: y mandatory;
+  background: #000;
+  /* No scroll-behavior:smooth here on purpose — combined with
+     scroll-snap it's a documented WebKit bug magnet (see the touch-row
+     fix earlier in this file). JS-driven scrollTo({behavior:'smooth'})
+     calls elsewhere in discover.js work independently of this CSS
+     property, so smooth programmatic scrolling still works without it. */
+}
+.reel-slide {
+  position: relative;
+  height: 100vh;
+  height: 100svh;
+  width: 100%;
+  scroll-snap-align: start;
+  /* Forces the scroll to land on one slide per gesture even on a fast
+     flick — without this, scroll-snap can let a strong swipe glide past
+     several slides in one motion, breaking the "one at a time" feel a
+     reel feed depends on. */
+  scroll-snap-stop: always;
+  overflow: hidden;
+}
+
+.reel-video-wrap { position: absolute; inset: 0; background: #000; }
+.reel-video, .reel-video-poster {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: cover;
+}
+
+.reel-close {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 1rem;
+  z-index: 4;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.35);
+  color: var(--ink);
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.reel-caption {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 3;
+  padding: 3.5rem 1.2rem 2.2rem;
+  background: linear-gradient(to top, rgba(10,10,14,0.9) 0%, rgba(10,10,14,0.3) 60%, transparent 100%);
+}
+.reel-caption-series { font-family: var(--font-mono); font-size: 0.7rem; color: var(--brass); font-weight: 700; letter-spacing: 0.08em; margin-bottom: 0.2rem; }
+.reel-caption-title { font-family: var(--font-body); font-size: 1.05rem; font-weight: 700; color: var(--ink); margin-bottom: 0.3rem; }
+.reel-caption-progress { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); }
+
+.reel-end-card {
+  position: absolute; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(to bottom, var(--surface-1) 0%, var(--void) 100%);
+  text-align: center;
+}
+.reel-end-icon { font-size: 2rem; color: var(--ink-dim); margin-bottom: 1rem; }
+.reel-end-title { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; color: var(--ink); margin-bottom: 0.4rem; }
+.reel-end-sub { font-family: var(--font-body); font-size: 0.85rem; color: var(--ink-dim); margin-bottom: 1.8rem; }
+.reel-end-btn {
+  display: block;
+  width: 100%;
+  max-width: 300px;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  margin-bottom: 0.7rem;
+  border: 1.5px solid transparent;
+}
+.reel-end-btn.primary { background: var(--olive); color: var(--void); border-color: var(--olive); }
+.reel-end-btn.secondary { background: transparent; color: var(--ink); border-color: rgba(234,231,221,0.4); }
+.reel-end-home { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); text-decoration: underline; margin-top: 0.4rem; }

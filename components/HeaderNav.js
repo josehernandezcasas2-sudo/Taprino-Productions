@@ -111,7 +111,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     // direction instead: a legitimate enabled link can be briefly absent
     // for a moment, then appears — never the other way around.
     ...(siteSettings && siteSettings.verticalEnabled !== false
-      ? [{ href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' }]
+      ? [
+          { href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' },
+          { href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }
+        ]
       : []),
     ...(siteSettings && siteSettings.podcastsEnabled !== false
       ? [{ href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' }]
