@@ -4741,6 +4741,28 @@ body:has(.mini-player) { padding-bottom: 72px; }
   cursor: pointer;
 }
 
+.reel-action-rail {
+  position: absolute;
+  right: 0.8rem;
+  bottom: 9rem;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  align-items: center;
+}
+.reel-action-btn {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.35);
+  color: var(--ink);
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.reel-action-btn.active { color: #e8503d; }
+
 .reel-caption {
   position: absolute;
   left: 0; right: 0; bottom: 0;
@@ -4780,3 +4802,53 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .reel-end-btn.primary { background: var(--olive); color: var(--void); border-color: var(--olive); }
 .reel-end-btn.secondary { background: transparent; color: var(--ink); border-color: rgba(234,231,221,0.4); }
 .reel-end-home { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); text-decoration: underline; margin-top: 0.4rem; }
+
+/* ============================================================
+   Browse other vertical series (pages/vertical/browse.js)
+   ============================================================ */
+.reel-browse { min-height: 100vh; min-height: 100svh; padding: 1.2rem 1.2rem 3rem; background: var(--void); }
+.reel-browse-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
+.reel-browse-back { color: var(--ink); font-size: 1.2rem; text-decoration: none; }
+.reel-browse-title { font-family: var(--font-mono); font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim); }
+.reel-browse-discover-btn {
+  display: block;
+  text-align: center;
+  padding: 0.9rem;
+  border-radius: 8px;
+  background: var(--olive);
+  color: var(--void);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.92rem;
+  text-decoration: none;
+  margin-bottom: 1rem;
+}
+.reel-browse-search {
+  width: 100%;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(234,231,221,0.18);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  margin-bottom: 1.4rem;
+}
+.reel-browse-search:focus { outline: none; border-color: var(--signal-amber); }
+.reel-browse-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+.reel-browse-card { text-decoration: none; color: var(--ink); display: block; }
+.reel-browse-card-art {
+  aspect-ratio: 2 / 3;
+  border-radius: 8px;
+  background-color: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 0.4rem;
+}
+.reel-browse-card-title { font-size: 0.78rem; font-weight: 700; line-height: 1.25; margin-bottom: 0.15rem; }
+.reel-browse-card-count { font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); }

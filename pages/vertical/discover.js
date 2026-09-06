@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
-import { buildVerticalUnits, pickNextUnit, expandUnitToSlides } from '../../lib/verticalFeed';
+import { useWishlist } from '../../lib/useWishlist';
+import { buildVerticalUnits, pickNextUnit, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
 import ReelPlayer from '../../components/ReelPlayer';
 import { SITE } from '../../lib/siteConfig';
 
@@ -14,12 +15,8 @@ export async function getServerSideProps({ req, res }) {
   const account = await getAccountContext(req);
   const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
 
-  // Premium vertical content is filtered out of the deck entirely for
-  // non-subscribers here, rather than included and shown as a locked
-  // card mid-scroll — a paywall interruption doesn't fit a feed that's
-  // supposed to feel frictionless. Subscribers and admins see everything.
   const entitled = account.isSubscriber || account.isAdmin;
-  const verticalEpisodes = episodes.filter((e) => e.contentType === 'vertical' && (entitled || e.tier === 'free'));
+  const verticalEpisodes = filterEntitledVertical(episodes, entitled);
 
   const seriesNameById = {};
   for (const s of allSeries) seriesNameById[s.id] = s.name;
@@ -27,13 +24,17 @@ export async function getServerSideProps({ req, res }) {
   return {
     props: {
       verticalEpisodes,
-      seriesNameById
+      seriesNameById,
+      isSignedIn: account.isSignedIn,
+      wishlist: account.wishlist
     }
   };
 }
 
-export default function VerticalDiscover({ verticalEpisodes, seriesNameById }) {
+export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist }) {
   const router = useRouter();
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
+  const [shareCopiedKey, setShareCopiedKey] = useState(null);
   const containerRef = useRef(null);
   const slideRefs = useRef({});
   const [deck, setDeck] = useState([]);
@@ -43,15 +44,24 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById }) {
   const seenSeriesIds = useRef(new Set());
   const unitsRef = useRef([]);
 
-  // Build the unit pool once and seed the deck with a first random pick.
+  // Build the unit pool once and seed the deck — either with the specific
+  // series requested via ?series=id (from the browse-series picker), or a
+  // random pick for the plain nav entry point. Waits on router.isReady
+  // since router.query isn't reliably populated before that on first
+  // render.
   useEffect(() => {
+    if (!router.isReady) return;
     unitsRef.current = buildVerticalUnits(verticalEpisodes);
-    const first = pickNextUnit(unitsRef.current, seenSeriesIds.current);
+    const requestedSeriesId = router.query.series;
+    const requested = requestedSeriesId
+      ? unitsRef.current.find((u) => u.type === 'series' && u.seriesId === requestedSeriesId)
+      : null;
+    const first = requested || pickNextUnit(unitsRef.current, seenSeriesIds.current);
     if (!first) return;
     if (first.type === 'series') seenSeriesIds.current.add(first.seriesId);
     setDeck(expandUnitToSlides(first));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [router.isReady]);
 
   const extendDeck = useCallback(() => {
     const next = pickNextUnit(unitsRef.current, seenSeriesIds.current);
@@ -116,6 +126,26 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById }) {
     return () => { document.body.style.overflow = prev; };
   }, []);
 
+  function share(slide) {
+    // Series episodes: link back into the reel feed, starting that series
+    // from episode 1 — there's no per-episode deep link into the feed
+    // itself, so this is honest about what it actually does rather than
+    // implying it jumps to this exact clip. Standalone clips: the regular
+    // episode page, since the discover feed has no "start on this one
+    // specific standalone clip" mode to link into.
+    const url = slide.seriesId
+      ? `${window.location.origin}/vertical/discover?series=${slide.seriesId}`
+      : `${window.location.origin}/episode/${slide.episode.id}`;
+    if (navigator.share) {
+      navigator.share({ title: slide.episode.title, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareCopiedKey(slide.key);
+        setTimeout(() => setShareCopiedKey(null), 2000);
+      });
+    }
+  }
+
   function handleDiscoverFromEndCard() {
     extendDeck();
   }
@@ -161,6 +191,22 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById }) {
                   }}
                 />
                 <button className="reel-close" onClick={() => router.push('/')}>&times;</button>
+                <div className="reel-action-rail">
+                  <button
+                    className={`reel-action-btn ${isWishlisted(slide.episode.id) ? 'active' : ''}`}
+                    onClick={() => toggleWishlist(slide.episode.id)}
+                    aria-label={isWishlisted(slide.episode.id) ? 'Remove from My List' : 'Add to My List'}
+                  >
+                    {isWishlisted(slide.episode.id) ? '\u2665' : '\u2661'}
+                  </button>
+                  <button
+                    className="reel-action-btn"
+                    onClick={() => share(slide)}
+                    aria-label="Share"
+                  >
+                    {shareCopiedKey === slide.key ? '\u2713' : '\u2197'}
+                  </button>
+                </div>
                 <div className="reel-caption">
                   {slide.seriesId && (
                     <div className="reel-caption-series">{(seriesNameById[slide.seriesId] || '').toUpperCase()}</div>
