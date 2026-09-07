@@ -642,7 +642,8 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <Link href="/admin/team"><TeamIcon size={15} src={iconOverrides.team} /> Team &amp; permissions →</Link>
         <Link href="/admin/house-ads"><TvIcon size={15} src={iconOverrides.tv} /> House ads →</Link>
         <Link href="/admin/live"><LiveDotIcon size={15} src={iconOverrides.live_dot} /> Go live →</Link>
-        <Link href="/admin/channel"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel schedule →</Link>
+        <Link href="/admin/channel"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel schedule (loop) →</Link>
+        <Link href="/admin/weekly-schedule"><CalendarIcon size={15} src={iconOverrides.calendar} /> Weekly schedule →</Link>
         <Link href="/admin/applications"><InboxIcon size={15} src={iconOverrides.inbox} /> Applications →</Link>
         <Link href="/admin/genre-icons"><ImageIcon size={15} src={iconOverrides.image} /> Genre icons →</Link>
         <Link href="/admin/player-icons"><SlidersIcon size={15} src={iconOverrides.sliders} /> Icons →</Link>

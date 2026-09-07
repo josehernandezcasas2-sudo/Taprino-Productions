@@ -2,10 +2,12 @@ import Head from 'next/head';
 import { getAccountContext } from '../lib/accountContext';
 import { getChannelState } from '../lib/channelSchedule';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
+import { listWeeklySchedule, getCurrentChannelProgram, CHANNEL_TIMEZONE } from '../lib/weeklySchedule';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import ChannelPlayer from '../components/ChannelPlayer';
+import ChannelSchedule from '../components/ChannelSchedule';
 import { SITE } from '../lib/siteConfig';
 
 import Footer from '../components/Footer';
@@ -26,10 +28,22 @@ export async function getServerSideProps({ req, res }) {
   }
 
   const account = await getAccountContext(req);
-  const [channelState, episodes] = await Promise.all([getChannelState(), getPublicEpisodes()]);
+  const [channelState, episodes, weeklySchedule, currentProgram] = await Promise.all([
+    getChannelState(),
+    getPublicEpisodes(),
+    listWeeklySchedule(),
+    getCurrentChannelProgram()
+  ]);
+  const todaysDayOfWeek = new Intl.DateTimeFormat('en-US', { timeZone: CHANNEL_TIMEZONE, weekday: 'long' }).format(new Date()).toLowerCase();
   return {
     props: {
       channelState,
+      weeklySchedule,
+      todaysDayOfWeek,
+      // Only meaningful when the weekly schedule is actually what's airing
+      // right now — null whenever the loop is serving as the fallback,
+      // since there's no specific slot to highlight in that case.
+      nowOnAirSlotId: currentProgram.source === 'weekly_schedule' ? currentProgram.slotId : null,
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
@@ -40,7 +54,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function Channel({ channelState, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek, nowOnAirSlotId, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   return (
     <>
       <Head>
@@ -72,6 +86,8 @@ export default function Channel({ channelState, mainGenres, isSignedIn, isSubscr
           There&rsquo;s no rewinding or picking what&rsquo;s on; if you want to choose, the homepage is
           where to do that.
         </p>
+
+        <ChannelSchedule schedule={weeklySchedule} todaysDayOfWeek={todaysDayOfWeek} nowOnAirSlotId={nowOnAirSlotId} />
       </main>
       <Footer />
       <MobileTabBar />
