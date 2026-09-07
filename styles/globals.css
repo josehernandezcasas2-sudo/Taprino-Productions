@@ -1936,8 +1936,29 @@ button { font-family: inherit; cursor: pointer; }
     border-radius: 999px;
     margin: 0 0.1rem;
     transition: color 0.12s ease, background-color 0.12s ease;
+    /* Watch/Discover/Account are <button> elements now (they open a menu
+       rather than linking directly), so this resets the browser's default
+       button chrome to look identical to Home's <Link>. */
+    background: none;
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .tabbar-item.active { color: #241a05; background: var(--brass); }
+  /* Discover stays visually distinct even at rest — a permanent signal
+     that this tab is a different kind of thing (curated swipe/reel
+     discovery) rather than just another destination, not merely an
+     active-state indicator like the other three. */
+  .tabbar-item.tabbar-discover { color: var(--sky); }
+  .tabbar-item.tabbar-discover.active { color: #241a05; background: var(--brass); }
+  .tabbar-caret {
+    display: inline-block;
+    font-size: 0.55em;
+    margin-left: 2px;
+    transition: transform 0.15s ease;
+  }
+  .tabbar-item.open .tabbar-caret { transform: rotate(180deg); }
   .tabbar-glyph {
     font-size: 1rem;
     line-height: 1;
@@ -1954,6 +1975,39 @@ button { font-family: inherit; cursor: pointer; }
     text-transform: uppercase;
     line-height: 1;
   }
+  /* Drop-up menus — positioned above the bar itself (bottom: 100% of the
+     fixed-positioned .tabbar), roughly aligned over whichever tab opened
+     them. Exact alignment against a specific phone's tab widths may want
+     a small nudge once this is live and testable. */
+  .tabbar-dropup {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    background: rgba(41, 39, 25, 0.97);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(234, 231, 221, 0.1);
+    border-radius: 18px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    padding: 0.4rem 0;
+    min-width: 180px;
+    display: flex;
+    flex-direction: column;
+    animation: tabbar-dropup-in 0.14s ease;
+  }
+  @keyframes tabbar-dropup-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .tabbar-dropup-discover { left: 4px; }
+  .tabbar-dropup-watch { left: 50%; transform: translateX(-42%); }
+  .tabbar-dropup-account { right: 4px; }
+  .tabbar-dropup-item {
+    padding: 0.7rem 1.1rem;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .tabbar-dropup-item:active { background: rgba(217, 143, 62, 0.15); }
   /* The floating upload widget has to clear the bar, not hide behind it. */
   .upload-status-widget { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 }

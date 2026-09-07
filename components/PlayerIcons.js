@@ -536,6 +536,47 @@ export function BrowserTabIcon({ src, size = 18 }) {
   );
 }
 
+// A literal house — more immediately recognizable as "Home" in a bottom
+// tab bar than an abstract shape, matching the convention most apps use
+// for this exact spot.
+export function HouseIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 11L12 4l9 7" />
+      <path d="M5 10v9a1 1 0 001 1h4v-6h4v6h4a1 1 0 001-1v-9" />
+    </svg>
+  );
+}
+
+// A screen with a play triangle inside it — distinct from the bare play
+// triangle used elsewhere for actual playback controls, so this reads as
+// "go watch something" (a nav destination) rather than "press play"
+// (a transport control) at a glance.
+export function WatchTabIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="4" width="19" height="13" rx="1.5" />
+      <path d="M9 20h6M12 17v3" />
+      <path d="M10 8.3v6.4l5.5-3.2z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+// A compass rose — the established convention for "explore/discover" tabs
+// (Instagram, Pinterest, etc. all use a compass here), distinguishing this
+// tab's purpose (browse curated new things) from Home's (your usual spot).
+export function CompassIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 6.5l1.9 4.1L18 12.5l-4.1 1.9L12 18.5l-1.9-4.1L6 12.5l4.1-1.9z" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
 export function RowsIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (
