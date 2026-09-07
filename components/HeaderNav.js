@@ -135,7 +135,11 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     <header className="channel-bar top-nav" ref={rootRef}>
       <div className="nav-left">
         <Link href="/" className="brand-mark">
-          <span className="footer-logo-badge nav-logo-badge">ST</span>
+          {siteSettings && siteSettings.logoUrl ? (
+            <img src={siteSettings.logoUrl} alt="" className="nav-logo-image" />
+          ) : (
+            <span className="footer-logo-badge nav-logo-badge">ST</span>
+          )}
           <span className="brand-word">Studio <strong>Tapa</strong></span>
         </Link>
 

@@ -274,6 +274,31 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       setSiteSettingsSaving(false);
     }
   }
+
+  async function uploadLogo(file) {
+    setSiteSettingsSaving(true);
+    setSiteSettingsError(null);
+    try {
+      const logoBase64 = await readAsDataUrl(file);
+      const res = await fetch('/api/admin/site-settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        // Only these two fields — the API only ever touches a field it
+        // actually receives, so there's no need to resend every other
+        // setting just to upload an image, unlike uploadSearchIcon above
+        // which predates that fix.
+        body: JSON.stringify({ logoBase64, logoFileName: file.name })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not upload that image.');
+      await loadSiteSettings();
+    } catch (err) {
+      setSiteSettingsError(err.message);
+    } finally {
+      setSiteSettingsSaving(false);
+    }
+  }
+
   const [pendingArtwork, setPendingArtwork] = useState(null);
   const [pendingEdits, setPendingEdits] = useState(null);
   const [editActionLoading, setEditActionLoading] = useState(null);
@@ -808,6 +833,33 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                   type="file"
                   accept="image/*"
                   onChange={(e) => e.target.files[0] && uploadSearchIcon(e.target.files[0])}
+                  disabled={siteSettingsSaving}
+                />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+                <div style={{ marginBottom: '0.5rem' }}>Site logo</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                  Replace the plain "ST" text badge in the header with your actual logo. Square or wide
+                  images both work — it renders at a fixed height in the nav bar either way.
+                </p>
+                {siteSettings.logoUrl && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.6rem' }}>
+                    <img src={siteSettings.logoUrl} alt="" style={{ height: 32, maxWidth: 120 }} />
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto' }}
+                      onClick={() => saveSiteSettings({ clearLogo: true })}
+                      disabled={siteSettingsSaving}
+                    >
+                      Reset to "ST" text
+                    </button>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => e.target.files[0] && uploadLogo(e.target.files[0])}
                   disabled={siteSettingsSaving}
                 />
               </div>

@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder } = req.body || {};
+  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo } = req.body || {};
   if (shopEnabled && (!shopUrl || !shopUrl.trim())) {
     return res.status(400).json({ error: 'A Shop URL is required to enable the Shop link.' });
   }
@@ -45,6 +45,21 @@ export default async function handler(req, res) {
         base64: searchIconBase64,
         fileName: searchIconFileName,
         pathPrefix: 'search-icon'
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+
+  let logoUrl;
+  if (clearLogo) {
+    logoUrl = null;
+  } else if (logoBase64) {
+    try {
+      logoUrl = await uploadArtworkImage({
+        base64: logoBase64,
+        fileName: logoFileName,
+        pathPrefix: 'site-logo'
       });
     } catch (err) {
       return res.status(400).json({ error: err.message });
@@ -86,6 +101,7 @@ export default async function handler(req, res) {
   // it," which matters since this same endpoint saves Shop/Live TV changes
   // far more often than icon changes.
   if (searchIconUrl !== undefined) updates.search_icon_url = searchIconUrl;
+  if (logoUrl !== undefined) updates.site_logo_url = logoUrl;
 
   const { error } = await supabase.from('site_settings').update(updates).eq('id', 1);
 
