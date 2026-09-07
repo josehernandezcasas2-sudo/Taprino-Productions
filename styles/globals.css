@@ -4988,3 +4988,28 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .channel-schedule-item-title { font-size: 0.9rem; font-weight: bold; color: var(--ink); }
 .channel-schedule-item-sub { font-size: 0.76rem; color: var(--ink-dim); margin-top: 0.1rem; }
 .channel-schedule-tz-note { font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.8rem; text-align: right; }
+.channel-schedule-onair-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.7rem 1rem;
+  border-radius: 10px;
+  background: rgba(217,143,62,0.15);
+  border: 1px solid var(--brass);
+  color: var(--ink);
+  font-size: 0.88rem;
+  margin-bottom: 1.2rem;
+}
+.channel-schedule-onair-banner.loop { background: var(--surface-2); border-color: rgba(234,231,221,0.15); }
+.channel-schedule-onair-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brass);
+  flex-shrink: 0;
+  animation: channel-onair-pulse 2s ease-in-out infinite;
+}
+.channel-schedule-onair-banner.loop .channel-schedule-onair-dot { background: var(--ink-dim); animation: none; }
+@keyframes channel-onair-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.channel-schedule-onair-note { color: var(--ink-dim); font-size: 0.82rem; }
+.channel-schedule-gap-note { font-size: 0.78rem; color: var(--ink-dim); font-style: italic; margin-top: 0.3rem; }

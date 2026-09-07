@@ -8,13 +8,30 @@ const DAY_LABELS = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 
 // channel timezone (America/Los_Angeles) rather than the visitor's own
 // browser clock, which could be a different day entirely for someone
 // checking late at night from a different timezone.
-export default function ChannelSchedule({ schedule, todaysDayOfWeek, nowOnAirSlotId }) {
+//
+// `currentProgramSource` / `currentProgramTitle` cover the case a plain
+// per-row highlight can't: when the current moment falls in a gap between
+// scheduled slots (or a day with nothing scheduled at all), no row in the
+// list corresponds to what's actually on air. Without this banner, that
+// case showed no "on now" indicator anywhere on the page — technically
+// correct (nothing IS scheduled right then) but reads as broken rather
+// than as the honest "regular rotation is filling this gap" answer it
+// actually is.
+export default function ChannelSchedule({ schedule, todaysDayOfWeek, nowOnAirSlotId, currentProgramSource, currentProgramTitle }) {
   const [activeDay, setActiveDay] = useState(todaysDayOfWeek);
   const daySlots = schedule[activeDay] || [];
   const isToday = activeDay === todaysDayOfWeek;
 
   return (
     <div className="channel-schedule">
+      {isToday && currentProgramTitle && (
+        <div className={`channel-schedule-onair-banner ${currentProgramSource === 'loop' ? 'loop' : ''}`}>
+          <span className="channel-schedule-onair-dot" />
+          On now: <strong>{currentProgramTitle}</strong>
+          {currentProgramSource === 'loop' && <span className="channel-schedule-onair-note"> — regular rotation, not on today's schedule</span>}
+        </div>
+      )}
+
       <h2 className="channel-schedule-title">{isToday ? "Today's Schedule" : `${activeDay[0].toUpperCase()}${activeDay.slice(1)}'s Schedule`}</h2>
 
       <div className="channel-schedule-tabs">
@@ -54,6 +71,11 @@ export default function ChannelSchedule({ schedule, todaysDayOfWeek, nowOnAirSlo
               </div>
             );
           })}
+          {isToday && currentProgramSource === 'loop' && (
+            <p className="channel-schedule-gap-note">
+              Between scheduled slots right now — the regular rotation is filling the gap.
+            </p>
+          )}
         </div>
       )}
       <p className="channel-schedule-tz-note">All times Pacific.</p>

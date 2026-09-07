@@ -44,6 +44,15 @@ export async function getServerSideProps({ req, res }) {
       // right now — null whenever the loop is serving as the fallback,
       // since there's no specific slot to highlight in that case.
       nowOnAirSlotId: currentProgram.source === 'weekly_schedule' ? currentProgram.slotId : null,
+      // Passed separately so the schedule display can say what's actually
+      // on air even when it's the loop filling a gap between scheduled
+      // slots (or a day with nothing scheduled at all) — without this,
+      // that case would show no "on now" indicator anywhere in the
+      // schedule section at all, which reads as broken/uninformative
+      // rather than as the correct, honest "nothing scheduled here"
+      // answer it actually is.
+      currentProgramSource: currentProgram.source,
+      currentProgramTitle: currentProgram.episode ? currentProgram.episode.title : null,
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
@@ -54,7 +63,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek, nowOnAirSlotId, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek, nowOnAirSlotId, currentProgramSource, currentProgramTitle, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   return (
     <>
       <Head>
@@ -87,7 +96,13 @@ export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek,
           where to do that.
         </p>
 
-        <ChannelSchedule schedule={weeklySchedule} todaysDayOfWeek={todaysDayOfWeek} nowOnAirSlotId={nowOnAirSlotId} />
+        <ChannelSchedule
+          schedule={weeklySchedule}
+          todaysDayOfWeek={todaysDayOfWeek}
+          nowOnAirSlotId={nowOnAirSlotId}
+          currentProgramSource={currentProgramSource}
+          currentProgramTitle={currentProgramTitle}
+        />
       </main>
       <Footer />
       <MobileTabBar />
