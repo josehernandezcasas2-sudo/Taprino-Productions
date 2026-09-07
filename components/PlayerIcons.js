@@ -587,3 +587,15 @@ export function RowsIcon({ src, size = 18 }) {
     </svg>
   );
 }
+
+// The site-wide "Back" button icon — a circled chevron, real SVG shapes
+// rather than a text arrow character, matching every other icon here.
+export function BackArrowIcon({ src, size = 16 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9.5" />
+      <path d="M13.5 8.5L10 12l3.5 3.5" />
+    </svg>
+  );
+}

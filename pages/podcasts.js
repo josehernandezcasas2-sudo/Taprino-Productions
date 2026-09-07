@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import BackButton from '../components/BackButton';
 import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
 import { getPodcastShows } from '../lib/podcastShow';
@@ -49,6 +50,7 @@ export default function Podcasts({ isSignedIn, isSubscriber, email, isAdmin, isC
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
+        <BackButton fallbackHref="/" />
         <div className="library-heading">Podcasts</div>
         <div className="library-sub">
           Audio and video shows, side by side — the little headphone or camera icon tells you which

@@ -4,6 +4,7 @@ import { useClerk } from '@clerk/nextjs';
 import { PlayIcon, HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getAuth } from '@clerk/nextjs/server';
 import { findEpisode } from '../../lib/episodes';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -268,7 +269,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               </>
             )}
             <div style={{ marginTop: '1rem' }}>
-              <Link href="/" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>← Back to screening room</Link>
+              <BackButton fallbackHref="/" />
             </div>
           </div>
         </main>
@@ -460,9 +461,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
 
       <main id="main-content" className="stage stage-single">
         <div>
-          <Link href="/" className="library-back" style={{ display: 'inline-block', marginBottom: '1.2rem', textDecoration: 'none' }}>
-            ← Back to screening room
-          </Link>
+          <BackButton
+            fallbackHref={
+              episode.contentType === 'series' && episode.seriesId
+                ? `/series/${episode.seriesId}`
+                : episode.contentType === 'podcast'
+                ? '/podcasts'
+                : '/'
+            }
+          />
 
           <div className="player-info-row">
           <div className="player-card">

@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile } from '../../lib/userProfiles';
@@ -63,6 +64,7 @@ export default function PublicProfile({ profile, mainGenres, isSignedIn, isSubsc
       />
 
       <main id="main-content" className="stage stage-single" style={{ maxWidth: '480px' }}>
+        <BackButton fallbackHref="/" />
         <div className="profile-header">
           <div
             className="profile-avatar"

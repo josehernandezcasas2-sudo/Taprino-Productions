@@ -8,6 +8,7 @@ import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import ChannelPlayer from '../components/ChannelPlayer';
 import ChannelSchedule from '../components/ChannelSchedule';
+import BackButton from '../components/BackButton';
 import { SITE } from '../lib/siteConfig';
 
 import Footer from '../components/Footer';
@@ -86,6 +87,7 @@ export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek,
       <div className="install-row"><InstallButton /></div>
 
       <main className="stage stage-single stage-wide">
+        <BackButton fallbackHref="/" />
         <div className="player-card">
           <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
         </div>

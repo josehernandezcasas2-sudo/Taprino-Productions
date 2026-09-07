@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -113,7 +114,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <Link href="/" className="back-link">← Back to screening room</Link>
+        <BackButton fallbackHref="/" />
 
         {continueList.length > 0 && (
           <>

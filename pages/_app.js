@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useRouter } from 'next/router';
 import { ClerkProvider } from '@clerk/nextjs';
 import Script from 'next/script';
 import Head from 'next/head';
@@ -11,6 +12,30 @@ import '@uppy/core/css/style.css';
 import '@uppy/dashboard/css/style.css';
 
 export default function App({ Component, pageProps }) {
+  const router = useRouter();
+
+  // Powers the site-wide Back button (components/BackButton.js). A plain
+  // document.referrer check doesn't work here — it only reflects whatever
+  // page linked to the very first page loaded this tab, and never updates
+  // across Next.js's client-side route changes. This sessionStorage flag
+  // does update on every in-site navigation, so it reliably answers "is
+  // there actually somewhere on this site to go back to" regardless of
+  // how many pages the person has clicked through since arriving.
+  useEffect(() => {
+    function markNavigated() {
+      try {
+        sessionStorage.setItem('st_has_navigated', '1');
+      } catch {
+        // Storage can throw in locked-down browser contexts (private
+        // mode with storage disabled, some in-app webviews) — the Back
+        // button just falls back to its default destination every time
+        // in that case, which is a safe, if slightly less smart, outcome.
+      }
+    }
+    router.events.on('routeChangeComplete', markNavigated);
+    return () => router.events.off('routeChangeComplete', markNavigated);
+  }, [router.events]);
+
   useEffect(() => {
     // Only registered in production. In dev, the whole point of editing a
     // file is seeing the change immediately — a service worker caching JS

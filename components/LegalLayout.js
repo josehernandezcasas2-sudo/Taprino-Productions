@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from './BackButton';
 import HeaderNav from './HeaderNav';
 import MobileTabBar from './MobileTabBar';
 import { SITE } from '../lib/siteConfig';
@@ -25,9 +26,7 @@ export default function LegalLayout({ title, updated, summary, children, account
       />
 
       <main className="stage stage-single legal-page">
-        <Link href="/" className="library-back" style={{ display: 'inline-block', marginBottom: '1.2rem' }}>
-          ← Back to screening room
-        </Link>
+        <BackButton fallbackHref="/" />
 
         <div className="eyebrow">Legal</div>
         <h1>{title}</h1>

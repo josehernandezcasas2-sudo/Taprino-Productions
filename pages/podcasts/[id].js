@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { findSeries } from '../../lib/series';
 import { getPodcastShowEpisodes } from '../../lib/podcastShow';
@@ -86,7 +87,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <Link href="/podcasts" className="back-link">&larr; Back to Podcasts</Link>
+        <BackButton fallbackHref="/podcasts" />
 
         <div className="show-header">
           <div className="show-header-art" style={(show.poster || show.thumbnail) ? { backgroundImage: `url(${show.poster || show.thumbnail})` } : {}} />

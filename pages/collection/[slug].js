@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAccountContext } from '../../lib/accountContext';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
@@ -97,7 +98,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <Link href="/" className="library-back">&larr; Back to screening room</Link>
+        <BackButton fallbackHref="/" />
         <div className="library-heading">{label}</div>
         <div className="library-sub">{episodes.length} title{episodes.length === 1 ? '' : 's'}</div>
 

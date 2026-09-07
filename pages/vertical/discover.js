@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useSmartBack } from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
@@ -43,6 +44,11 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   const [srcByEpisodeId, setSrcByEpisodeId] = useState({});
   const seenSeriesIds = useRef(new Set());
   const unitsRef = useRef([]);
+  // Smart-back for the "×" close button below — this feed has no room for
+  // the standard pill button (it would obstruct the video), but should
+  // still return to wherever the person actually came from rather than
+  // always hardcoding the homepage.
+  const goBack = useSmartBack('/');
 
   // Build the unit pool once and seed the deck — either with the specific
   // series requested via ?series=id (from the browse-series picker), or a
@@ -190,7 +196,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                     if (container && nextEl) container.scrollTo({ top: nextEl.offsetTop, behavior: 'smooth' });
                   }}
                 />
-                <button className="reel-close" onClick={() => router.push('/')}>&times;</button>
+                <button className="reel-close" onClick={goBack}>&times;</button>
                 <div className="reel-action-rail">
                   <button
                     className={`reel-action-btn ${isWishlisted(slide.episode.id) ? 'active' : ''}`}
@@ -219,7 +225,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
               </>
             ) : (
               <div className="reel-end-card">
-                <button className="reel-close" onClick={() => router.push('/')}>&times;</button>
+                <button className="reel-close" onClick={goBack}>&times;</button>
                 <div className="reel-end-icon">&#9635;</div>
                 <div className="reel-end-title">That&rsquo;s the whole series</div>
                 <div className="reel-end-sub">

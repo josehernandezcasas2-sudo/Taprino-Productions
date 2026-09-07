@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
@@ -130,6 +131,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       )}
 
       <main className="library-stage">
+        <BackButton fallbackHref="/" />
         <GenreBrowseRow genres={mainGenres} icons={genreIcons} />
 
         <div className="library-heading">{label}</div>

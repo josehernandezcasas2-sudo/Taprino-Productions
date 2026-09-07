@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../components/BackButton';
 import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
@@ -80,7 +81,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <Link href="/" className="back-link">&larr; Back to screening room</Link>
+        <BackButton fallbackHref="/" />
         <div className="library-heading">My Recs</div>
 
         {!isSignedIn ? (

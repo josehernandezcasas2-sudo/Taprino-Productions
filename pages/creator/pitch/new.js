@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../../components/BackButton';
 import { useState, useEffect } from 'react';
 import { useDraftAutosave } from '../../../lib/useDraftAutosave';
 import { useRouter } from 'next/router';
@@ -118,7 +119,7 @@ export default function NewPitch({ isSignedIn, isSubscriber, email, isAdmin, isC
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
       <main className="stage stage-single">
-        <Link href="/pitches" className="library-back">&larr; Back to Pitch Room</Link>
+        <BackButton fallbackHref="/pitches" />
         <h1>Submit a project</h1>
         <p className="ca-sub">
           This goes to Studio Tapa for review before it appears in the Pitch Room — you'll see its

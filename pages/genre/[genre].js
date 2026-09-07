@@ -1,5 +1,6 @@
 import { useRouter } from 'next/router';
 import Head from 'next/head';
+import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
@@ -141,6 +142,7 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
 
       <main id="main-content" className="stage stage-single stage-wide">
         <div>
+          <BackButton fallbackHref="/" />
           {episodes.length === 0 ? (
             <div className="poster-empty">Nothing tagged {genre} yet — check back soon.</div>
           ) : (

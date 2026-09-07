@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import BackButton from '../components/BackButton';
 import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
 import { getAccountContext } from '../lib/accountContext';
 import { getPromoAccessExpiry } from '../lib/promoCodes';
@@ -244,6 +245,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       />
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
+        <BackButton fallbackHref="/" />
         <div className="account-card">
           {isSignedIn && (
             <div className="account-avatar-row">

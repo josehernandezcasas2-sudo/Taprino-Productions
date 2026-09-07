@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches } from '../../lib/pitches';
@@ -254,7 +255,7 @@ export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin
       )}
 
       <main className="library-stage discover-stage">
-        <Link href="/pitches" className="back-link">&larr; Back to Pitch Room</Link>
+        <BackButton fallbackHref="/pitches" />
         <div className="library-heading">Discover</div>
         <div className="library-sub">
           Swipe right to like and follow a project, left if it's not for you, or down to skip it for

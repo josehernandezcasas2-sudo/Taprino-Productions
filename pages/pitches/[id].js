@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
@@ -248,6 +249,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
       </div>
 
       <main className="library-stage">
+        <BackButton fallbackHref="/pitches" />
         {pitch.description && (
           <>
             <div className="pitch-section-label">The project</div>

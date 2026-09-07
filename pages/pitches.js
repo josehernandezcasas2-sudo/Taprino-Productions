@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../lib/accountContext';
@@ -159,7 +160,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
       )}
 
       <main className="library-stage">
-        <Link href="/" className="back-link">&larr; Back to screening room</Link>
+        <BackButton fallbackHref="/" />
         <div className="library-heading">Pitch Room</div>
         <div className="library-sub">
           Projects looking for backing. Studio Tapa doesn&rsquo;t handle any of this funding directly —

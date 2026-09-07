@@ -5013,3 +5013,27 @@ body:has(.mini-player) { padding-bottom: 72px; }
 @keyframes channel-onair-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
 .channel-schedule-onair-note { color: var(--ink-dim); font-size: 0.82rem; }
 .channel-schedule-gap-note { font-size: 0.78rem; color: var(--ink-dim); font-style: italic; margin-top: 0.3rem; }
+
+/* ============================================================
+   Standard site-wide Back button (components/BackButton.js)
+   ============================================================ */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 14px;
+  border-radius: 999px;
+  border: 1.4px solid var(--olive);
+  color: var(--olive);
+  text-decoration: none;
+  font-family: var(--font-mono);
+  font-size: 0.66rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  line-height: 1;
+  margin-bottom: 1.2rem;
+  transition: background-color 0.12s ease, color 0.12s ease;
+}
+.back-button:hover { background: rgba(194,199,117,0.12); }
+.back-button svg { flex-shrink: 0; }

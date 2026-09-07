@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
 import { findSeries } from '../../lib/series';
@@ -145,7 +146,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       />
 
       <main className="library-stage">
-        <Link href="/" className="back-link">← Back to screening room</Link>
+        <BackButton fallbackHref="/" />
 
         <div className="series-tabs">
           <button className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>

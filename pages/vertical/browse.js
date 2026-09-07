@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
@@ -48,7 +49,7 @@ export default function BrowseVerticalSeries({ series }) {
 
       <div className="reel-browse">
         <div className="reel-browse-header">
-          <Link href="/vertical/discover" className="reel-browse-back">&larr;</Link>
+          <BackButton fallbackHref="/vertical/discover" style={{ marginBottom: 0 }} />
           <div className="reel-browse-title">More vertical series</div>
         </div>
 

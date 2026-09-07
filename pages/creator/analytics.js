@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
@@ -166,7 +167,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
             <h1>Your numbers</h1>
             <p className="ca-sub">How your work is doing on {SITE.name}. Only you can see this page.</p>
           </div>
-          <Link href="/creator" className="library-back">← Back to submissions</Link>
+          <BackButton fallbackHref="/creator" />
         </div>
 
         <div className="ca-range" role="group" aria-label="Time range">
