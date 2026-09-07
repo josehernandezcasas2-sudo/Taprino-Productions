@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { useState, useEffect } from 'react';
 import { SITE } from '../lib/siteConfig';
 
 // Full-bleed, four-column footer — replaces the old single-line version
@@ -13,12 +14,30 @@ import { SITE } from '../lib/siteConfig';
 // actually exist; linking to them now would either 404 or ship something
 // that hasn't been cleared.
 export default function Footer() {
+  const [logoUrl, setLogoUrl] = useState(null);
+
+  // Self-fetched rather than passed as a prop, same reasoning as
+  // HeaderNav's own settings fetch — Footer renders bare on every page,
+  // and this is the one place that also needs to know about the logo now
+  // that it's admin-uploadable. Public and cached, so this costs nothing
+  // extra beyond what HeaderNav is already fetching on the same page.
+  useEffect(() => {
+    fetch('/api/site-settings')
+      .then((r) => r.json())
+      .then((data) => setLogoUrl(data.logoUrl || null))
+      .catch(() => {});
+  }, []);
+
   return (
     <footer className="site-footer site-footer-rich">
       <div className="footer-grid">
         <div className="footer-brand">
           <div className="footer-brand-mark">
-            <span className="footer-logo-badge">ST</span>
+            {logoUrl ? (
+              <img src={logoUrl} alt="" className="footer-logo-image" />
+            ) : (
+              <span className="footer-logo-badge">ST</span>
+            )}
             <span>
               Studio <strong>Tapa</strong>
             </span>

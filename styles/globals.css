@@ -3745,6 +3745,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   margin-bottom: 0.6rem;
 }
 .footer-brand-mark strong { color: var(--brass); }
+.footer-logo-image { height: 2rem; width: auto; max-width: 8rem; object-fit: contain; flex-shrink: 0; }
 .footer-logo-badge {
   display: inline-flex;
   align-items: center;

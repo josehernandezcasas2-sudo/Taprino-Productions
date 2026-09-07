@@ -299,6 +299,45 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
+  const [placeholderBusy, setPlaceholderBusy] = useState(false);
+  const [placeholderResult, setPlaceholderResult] = useState(null);
+  const [placeholderError, setPlaceholderError] = useState(null);
+
+  async function generatePlaceholders() {
+    setPlaceholderBusy(true);
+    setPlaceholderError(null);
+    setPlaceholderResult(null);
+    try {
+      const res = await fetch('/api/admin/placeholder-content', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not generate placeholder content.');
+      setPlaceholderResult(`Created ${data.created.length} items: ${data.created.map((c) => c.contentType).join(', ')}. Check the homepage and browse pages now.`);
+    } catch (err) {
+      setPlaceholderError(err.message);
+    } finally {
+      setPlaceholderBusy(false);
+    }
+  }
+
+  async function removePlaceholders() {
+    if (!window.confirm('Permanently delete every placeholder episode and series? This cannot be undone.')) {
+      return;
+    }
+    setPlaceholderBusy(true);
+    setPlaceholderError(null);
+    setPlaceholderResult(null);
+    try {
+      const res = await fetch('/api/admin/placeholder-content', { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not remove placeholder content.');
+      setPlaceholderResult(`Removed ${data.removed} placeholder rows.`);
+    } catch (err) {
+      setPlaceholderError(err.message);
+    } finally {
+      setPlaceholderBusy(false);
+    }
+  }
+
   const [pendingArtwork, setPendingArtwork] = useState(null);
   const [pendingEdits, setPendingEdits] = useState(null);
   const [editActionLoading, setEditActionLoading] = useState(null);
@@ -862,6 +901,39 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                   onChange={(e) => e.target.files[0] && uploadLogo(e.target.files[0])}
                   disabled={siteSettingsSaving}
                 />
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+                <div style={{ marginBottom: '0.5rem' }}>Placeholder content</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                  Generate one sample item for each content type — movie, series (2 episodes), short,
+                  vertical, and podcast — so you can see how every type actually looks across the
+                  homepage, browse pages, and cards without hand-creating test content. None of these
+                  have a real video or audio file behind them, so playback itself won't work — this is
+                  for checking layout and metadata display only. Every title is clearly marked
+                  &ldquo;[Placeholder]&rdquo; and briefly visible to real visitors while it exists, so
+                  remove it when you're done checking.
+                </p>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
+                  <button
+                    className="account-btn-secondary"
+                    style={{ width: 'auto' }}
+                    onClick={generatePlaceholders}
+                    disabled={placeholderBusy}
+                  >
+                    {placeholderBusy ? 'Working…' : 'Generate placeholder content'}
+                  </button>
+                  <button
+                    className="account-btn-secondary"
+                    style={{ width: 'auto', color: 'var(--danger)' }}
+                    onClick={removePlaceholders}
+                    disabled={placeholderBusy}
+                  >
+                    Remove all placeholders
+                  </button>
+                </div>
+                {placeholderResult && <p style={{ fontSize: '0.82rem', color: 'var(--brass)' }}>{placeholderResult}</p>}
+                {placeholderError && <p style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>{placeholderError}</p>}
               </div>
             </>
           )}
