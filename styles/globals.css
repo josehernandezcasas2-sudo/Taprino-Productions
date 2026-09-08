@@ -3720,7 +3720,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  grid-template-columns: 1.3fr 1.3fr 1fr 1fr 1fr;
   gap: 2rem;
   width: 100%;
   padding: 0 2.4rem;
@@ -5037,3 +5037,45 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 .back-button:hover { background: rgba(194,199,117,0.12); }
 .back-button svg { flex-shrink: 0; }
+
+/* ============================================================
+   Footer newsletter signup (components/NewsletterSignup.js)
+   ============================================================ */
+.newsletter-signup h4 {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin: 0 0 0.5rem;
+}
+.newsletter-blurb { font-size: 0.8rem; color: var(--ink-dim); margin: 0 0 0.7rem; line-height: 1.4; }
+.newsletter-form { display: flex; gap: 0.4rem; }
+.newsletter-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid rgba(234,231,221,0.15);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.82rem;
+}
+.newsletter-form button {
+  padding: 0.5rem 0.9rem;
+  border-radius: 6px;
+  border: none;
+  background: var(--brass);
+  color: #241a05;
+  font-weight: bold;
+  font-size: 0.78rem;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.newsletter-form button:disabled { opacity: 0.6; cursor: wait; }
+.newsletter-success { font-size: 0.85rem; color: var(--ok); }
+.newsletter-error { font-size: 0.78rem; color: var(--danger); margin-top: 0.5rem; }
+@media (max-width: 480px) {
+  .newsletter-form { flex-direction: column; }
+}

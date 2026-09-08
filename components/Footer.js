@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
+import NewsletterSignup from './NewsletterSignup';
 import { SITE } from '../lib/siteConfig';
 
 // Full-bleed, four-column footer — replaces the old single-line version
@@ -43,6 +44,10 @@ export default function Footer() {
             </span>
           </div>
           <p>An independent screening room for creators who&rsquo;d rather be backed than bought.</p>
+        </div>
+
+        <div className="footer-col footer-col-newsletter">
+          <NewsletterSignup />
         </div>
 
         <div className="footer-col">

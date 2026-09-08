@@ -338,6 +338,19 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
+  const [newsletterCount, setNewsletterCount] = useState(null);
+  const [newsletterEspConfigured, setNewsletterEspConfigured] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/admin/newsletter-signups')
+      .then((r) => r.json())
+      .then((data) => {
+        setNewsletterCount(data.count);
+        setNewsletterEspConfigured(data.signups.length > 0 ? data.signups.some((s) => s.synced_to_esp) : null);
+      })
+      .catch(() => setNewsletterCount(null));
+  }, []);
+
   const [pendingArtwork, setPendingArtwork] = useState(null);
   const [pendingEdits, setPendingEdits] = useState(null);
   const [editActionLoading, setEditActionLoading] = useState(null);
@@ -935,6 +948,19 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </div>
                 {placeholderResult && <p style={{ fontSize: '0.82rem', color: 'var(--brass)' }}>{placeholderResult}</p>}
                 {placeholderError && <p style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>{placeholderError}</p>}
+              </div>
+
+              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+                <div style={{ marginBottom: '0.5rem' }}>Newsletter signups</div>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                  {newsletterCount === null ? 'Loading…' : `${newsletterCount} signup${newsletterCount === 1 ? '' : 's'} collected via the footer form.`}
+                  {' '}Stored here regardless of whether an email-sending provider is connected yet — export
+                  anytime and bulk-import into whichever one you pick.
+                  {newsletterEspConfigured === false && ' None have synced to an ESP yet — set BREVO_API_KEY in Vercel once you\'ve created a Brevo account to start auto-syncing new signups.'}
+                </p>
+                <a href="/api/admin/newsletter-signups?format=csv" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block', textDecoration: 'none' }}>
+                  Download CSV
+                </a>
               </div>
             </>
           )}
