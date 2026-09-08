@@ -205,6 +205,13 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
       } else {
         router.push(`/series/${ep.id}`);
       }
+    } else if (ep.contentType === 'podcast' && ep.seriesId) {
+      // The episode page has no podcast-specific handling at all — no
+      // audio player for audio-only episodes, no show grouping. Podcasts
+      // play via the mini-player that lives on their show page, not a
+      // dedicated full-screen video view, so there's no "autoplay"
+      // variant to jump to the way there is for video content.
+      router.push(`/podcasts/${ep.seriesId}`);
     } else {
       // ?autoplay=1 tells the episode page to skip its landing view and
       // jump straight into playback — clicking Play should mean "start
@@ -222,7 +229,11 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
   // there's no autoplay/trailer query param, letting someone read the
   // description and decide before committing to watching.
   function goToEpisodeInfo(ep) {
-    router.push(`/episode/${ep.id}`);
+    if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
+    } else {
+      router.push(`/episode/${ep.id}`);
+    }
   }
   function goToTrailer(ep) {
     // Series has no "trailer landing page" of its own the way a movie
@@ -232,7 +243,13 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
     // (trailer plays ambiently in the background, same as the hero does),
     // where the actual Play button lives. More Info should inform, not
     // immediately commit to playing something.
-    router.push(ep.isSeries ? `/series/${ep.id}` : `/episode/${ep.id}`);
+    if (ep.isSeries) {
+      router.push(`/series/${ep.id}`);
+    } else if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
+    } else {
+      router.push(`/episode/${ep.id}`);
+    }
   }
 
   return (

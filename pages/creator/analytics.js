@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { episodeHref } from '../../lib/episodeLinks';
 import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -259,7 +260,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                       aria-pressed={selected}
                     >
                       <span role="cell" className="ca-title">
-                        <Link href={`/episode/${ep.id}`} onClick={(e) => e.stopPropagation()}>{ep.title}</Link>
+                        <Link href={episodeHref(ep)} onClick={(e) => e.stopPropagation()}>{ep.title}</Link>
                         {ep.seriesOrder ? <em> · Ep. {ep.seriesOrder}</em> : null}
                         {/* Shown as actual text now, not just a bar with nothing
                             to read — a screen reader (or anyone skimming past

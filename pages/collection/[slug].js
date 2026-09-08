@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
+import { episodeHref } from '../../lib/episodeLinks';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAccountContext } from '../../lib/accountContext';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
@@ -111,7 +112,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
                 {ep.contentType !== 'series' && (
                   <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
                 )}
-                <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                <Link href={episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                   <div className="poster-art">
                     {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
                     <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>

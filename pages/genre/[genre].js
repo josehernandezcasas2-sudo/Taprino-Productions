@@ -100,7 +100,10 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
   const router = useRouter();
 
   // Identical to the homepage's own handlers — same Play/More Info
-  // distinction, same series-vs-standalone branching.
+  // distinction, same series-vs-standalone branching. Podcast branch
+  // added here too — the episode page has no podcast-specific handling
+  // (no audio player, no show grouping), so podcast content needs to
+  // land on its show page instead, same fix as the homepage.
   function goToEpisode(ep) {
     if (ep.isSeries) {
       if (ep.firstEpisodeId) {
@@ -108,15 +111,27 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
       } else {
         router.push(`/series/${ep.id}`);
       }
+    } else if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
     } else {
       router.push(`/episode/${ep.id}?autoplay=1`);
     }
   }
   function goToEpisodeInfo(ep) {
-    router.push(`/episode/${ep.id}`);
+    if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
+    } else {
+      router.push(`/episode/${ep.id}`);
+    }
   }
   function goToTrailer(ep) {
-    router.push(ep.isSeries ? `/series/${ep.id}` : `/episode/${ep.id}`);
+    if (ep.isSeries) {
+      router.push(`/series/${ep.id}`);
+    } else if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
+    } else {
+      router.push(`/episode/${ep.id}`);
+    }
   }
 
   return (

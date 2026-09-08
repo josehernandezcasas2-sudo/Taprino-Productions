@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../components/BackButton';
+import { episodeHref } from '../lib/episodeLinks';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -131,7 +132,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                   >
                     ✕
                   </button>
-                  <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                  <Link href={episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                     <div className="poster-art">
                       <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                       ◈
@@ -162,7 +163,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                   >
                     ✕
                   </button>
-                  <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                  <Link href={episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                     <div className="poster-art">
                       <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                       ◈
@@ -208,7 +209,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
             {wishlistedEpisodes.map((ep) => (
               <div key={ep.id} className="card-wrap">
                 <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
-                <Link href={`/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                <Link href={episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                   <div className="poster-art">
                     <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                     ◈

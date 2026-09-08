@@ -100,7 +100,11 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
   const label = TYPE_LABELS[type];
 
   function goToInfo(ep) {
-    router.push(`/episode/${ep.id}`);
+    if (ep.contentType === 'podcast' && ep.seriesId) {
+      router.push(`/podcasts/${ep.seriesId}`);
+    } else {
+      router.push(`/episode/${ep.id}`);
+    }
   }
 
   return (
@@ -124,8 +128,8 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       {heroPool.length > 0 && (
         <HeroSpotlight
           pool={heroPool}
-          onPlay={(item) => { window.location.href = item.isSeries ? (item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`) : `/episode/${item.id}?autoplay=1`; }}
-          onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`; }}
+          onPlay={(item) => { window.location.href = item.isSeries ? (item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`) : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`; }}
+          onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}`; }}
           fullBleed
         />
       )}
