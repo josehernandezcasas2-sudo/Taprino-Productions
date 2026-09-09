@@ -39,7 +39,7 @@ export async function getServerSideProps({ req, res }) {
   if (!account.isCreator && !account.isAdmin) {
     return { redirect: { destination: '/', permanent: false } };
   }
-  const [allSeries, episodes] = await Promise.all([getAllSeries(), getPublicEpisodes()]);
+  const [allSeries, episodes] = await Promise.all([getAllSeries(account.userId), getPublicEpisodes()]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   return {
