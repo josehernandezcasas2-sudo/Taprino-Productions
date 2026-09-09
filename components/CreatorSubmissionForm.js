@@ -93,7 +93,7 @@ function draftHasContent(draft) {
 // option. All the video-upload/draft-autosave state and logic lives here
 // exactly once; the two call sites differ only in page chrome around it
 // and in what happens once a submission is kicked off (onSubmitted).
-export default function CreatorSubmissionForm({ allSeries, initialContentType, initialSeriesId, onSubmitted }) {
+export default function CreatorSubmissionForm({ allSeries, initialContentType, initialSeriesId, onSubmitted, lockContentType }) {
   const { activeUpload, startUpload, startUrlImport } = useUpload();
   const seriesList = allSeries;
   const [form, setForm] = useState(EMPTY_FORM);
@@ -402,10 +402,16 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
               </p>
             )}
 
-            <label>Content type</label>
-            <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
-              {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </select>
+            {lockContentType ? (
+              <input type="hidden" value={form.contentType} readOnly />
+            ) : (
+              <>
+                <label>Content type</label>
+                <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
+                  {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </>
+            )}
 
             {(form.contentType === 'series' || form.contentType === 'podcast') && (
               <>

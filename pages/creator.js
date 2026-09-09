@@ -1,6 +1,6 @@
+import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
 import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -9,6 +9,8 @@ import InstallButton from '../components/InstallButton';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 import CreatorSubmissionForm from '../components/CreatorSubmissionForm';
+import AddSeriesForm from '../components/AddSeriesForm';
+import SubmissionModal from '../components/SubmissionModal';
 
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
@@ -34,14 +36,45 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-// The actual form (title/description/video upload/draft-autosave/etc.)
-// lives in components/CreatorSubmissionForm.js — shared with the "Add
-// bonus content" popup on /creator/my-work, so there's exactly one copy
-// of that upload logic rather than two that can drift apart. This page is
-// just the surrounding chrome plus reading ?contentType=&seriesId= from
-// the URL for old deep links into this page.
+// Five type-specific buttons replace the old single generic form with a
+// content-type dropdown buried inside it — each opens a popup built for
+// just that type, so a podcast submission shows the show/season picker
+// and audio import right away, while a film submission never shows
+// series-related fields at all. "Add Series" is genuinely different from
+// the other four: it creates only a series shell (name/description/
+// artwork), no episode, pending admin review — episodes get added to it
+// afterward through the normal flow, whenever the creator's ready,
+// without waiting on that review.
+const TYPE_BUTTONS = [
+  { key: 'movie', icon: '\u{1F3AC}', label: 'Add Film' },
+  { key: 'series', icon: '\u{1F4FA}', label: 'Add Series' },
+  { key: 'podcast', icon: '\u{1F3A7}', label: 'Add Podcast' },
+  { key: 'short', icon: '\u26A1', label: 'Add Short' },
+  { key: 'vertical', icon: '\u{1F4F1}', label: 'Add Vertical' }
+];
+
+const TYPE_TITLES = {
+  movie: 'Add Film',
+  series: 'Add Series',
+  podcast: 'Add Podcast',
+  short: 'Add Short',
+  vertical: 'Add Vertical'
+};
+
 export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
-  const router = useRouter();
+  const [openModal, setOpenModal] = useState(null);
+  const [seriesCreated, setSeriesCreated] = useState(null);
+  // Distinct from openModal==='series' (which opens the "create a new
+  // series" form) — this instead opens the episode-submission form
+  // pre-targeted at a series that already exists, used by the "Add the
+  // first episode now" handoff right after a new series is created.
+  const [episodeForSeriesId, setEpisodeForSeriesId] = useState(null);
+
+  function closeModal() {
+    setOpenModal(null);
+    setEpisodeForSeriesId(null);
+    setSeriesCreated(null);
+  }
 
   return (
     <>
@@ -62,33 +95,74 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Creator Studio</div>
-        <p className="library-sub" style={{ marginBottom: '1rem' }}>Submit new episodes and track your review status.</p>
-        <Link
-          href="/creator/series"
-          className="account-btn-secondary"
-          style={{ display: 'inline-block', width: 'auto', textDecoration: 'none', marginBottom: '1.5rem' }}
-        >
+        <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Submit new episodes and track your review status.</p>
+
+        <div className="creator-type-grid">
+          {TYPE_BUTTONS.map((t) => (
+            <button key={t.key} type="button" className="creator-type-btn" onClick={() => setOpenModal(t.key)}>
+              <span className="creator-type-icon">{t.icon}</span>
+              <span>{t.label}</span>
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', margin: '0.6rem 0 1.4rem' }}>
+          Each opens a form built for that type only — no unrelated fields to skip past.
+        </p>
+
+        <Link href="/creator/series" className="account-btn-secondary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: '0.7rem' }}>
           ▤ Series management
         </Link>
-
-        <CreatorSubmissionForm
-          allSeries={allSeries}
-          initialContentType={router.isReady ? router.query.contentType : undefined}
-          initialSeriesId={router.isReady ? router.query.seriesId : undefined}
-        />
-
-        <div className="account-card" style={{ marginTop: '1.5rem' }}>
-          <div className="account-eyebrow">Your work</div>
-          <h3>See and manage what you've submitted</h3>
-          <p style={{ margin: '0.6rem 0 1rem', fontSize: '0.87rem', color: 'var(--ink-dim)' }}>
-            Pending review, already live, edit, add artwork, replace video, captions, or request deletion —
-            it's all on your <Link href="/creator/my-work" style={{ color: 'var(--signal-amber)' }}>Your Work</Link> page now.
-          </p>
-          <Link href="/creator/my-work" className="account-btn-primary" style={{ width: 'auto', display: 'inline-block', textDecoration: 'none' }}>
-            Go to Your Work →
-          </Link>
-        </div>
+        <Link href="/creator/my-work" className="account-btn-secondary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
+          📁 View your work
+        </Link>
       </main>
+
+      {openModal && openModal !== 'series' && (
+        <SubmissionModal title={TYPE_TITLES[openModal]} icon={TYPE_BUTTONS.find((t) => t.key === openModal).icon} onClose={closeModal}>
+          <CreatorSubmissionForm
+            allSeries={allSeries}
+            initialContentType={openModal}
+            lockContentType
+            onSubmitted={closeModal}
+          />
+        </SubmissionModal>
+      )}
+
+      {episodeForSeriesId && (
+        <SubmissionModal title={`Add Episode to ${seriesCreated ? seriesCreated.name : 'Series'}`} icon="📺" onClose={closeModal}>
+          <CreatorSubmissionForm
+            allSeries={allSeries.some((s) => s.id === episodeForSeriesId) ? allSeries : [...allSeries, { id: episodeForSeriesId, name: seriesCreated ? seriesCreated.name : 'Your new series' }]}
+            initialContentType="series"
+            initialSeriesId={episodeForSeriesId}
+            lockContentType
+            onSubmitted={closeModal}
+          />
+        </SubmissionModal>
+      )}
+
+      {openModal === 'series' && (
+        <SubmissionModal title="Add Series" icon="📺" onClose={closeModal}>
+          {seriesCreated ? (
+            <div>
+              <p style={{ color: 'var(--ok)', fontSize: '0.9rem' }}>
+                &ldquo;{seriesCreated.name}&rdquo; was created and is pending review. You can start adding
+                episodes to it right away — no need to wait.
+              </p>
+              <button
+                type="button"
+                className="account-btn-primary"
+                style={{ marginTop: '0.8rem' }}
+                onClick={() => { setOpenModal(null); setEpisodeForSeriesId(seriesCreated.id); }}
+              >
+                Add the first episode now →
+              </button>
+            </div>
+          ) : (
+            <AddSeriesForm onSubmitted={setSeriesCreated} />
+          )}
+        </SubmissionModal>
+      )}
+
       <Footer />
     </>
   );

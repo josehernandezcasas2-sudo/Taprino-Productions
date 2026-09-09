@@ -360,6 +360,39 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [ownershipSaving, setOwnershipSaving] = useState(null);
   const [ownershipError, setOwnershipError] = useState(null);
 
+  const [pendingSeries, setPendingSeries] = useState(null);
+  const [pendingSeriesBusy, setPendingSeriesBusy] = useState(null);
+  const [pendingSeriesError, setPendingSeriesError] = useState(null);
+
+  async function loadPendingSeries() {
+    try {
+      const res = await fetch('/api/admin/pending-series');
+      const data = await res.json();
+      if (res.ok) setPendingSeries(data.series);
+    } catch (err) {
+      setPendingSeries([]);
+    }
+  }
+
+  async function decidePendingSeries(seriesId, decision) {
+    setPendingSeriesBusy(seriesId);
+    setPendingSeriesError(null);
+    try {
+      const res = await fetch('/api/admin/pending-series', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seriesId, decision })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update this series.');
+      await loadPendingSeries();
+    } catch (err) {
+      setPendingSeriesError(err.message);
+    } finally {
+      setPendingSeriesBusy(null);
+    }
+  }
+
   async function loadSeriesOwnership() {
     try {
       const res = await fetch('/api/admin/series-ownership');
@@ -557,7 +590,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); loadSeriesOwnership(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); loadSeriesOwnership(); loadPendingSeries(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -1498,6 +1531,54 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             To grant or revoke access — including sub-admin roles and permission toggles —
             use <Link href="/admin/team">Team &amp; permissions →</Link>.
           </p>
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">New series awaiting review</div>
+          <h3>Series created via &ldquo;Add Series&rdquo;</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            Created through the Creator Studio&rsquo;s standalone &ldquo;Add Series&rdquo; button — no episode
+            yet, just the series shell itself (name, description, artwork). The creator can already be
+            submitting episodes to it while it sits here; this is about reviewing the series&rsquo; own
+            metadata, not gating episode work on it.
+          </p>
+          {pendingSeriesError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{pendingSeriesError}</p>}
+          {!pendingSeries ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
+          ) : pendingSeries.length === 0 ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {pendingSeries.map((s) => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{s.name}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+                      {s.submitted_by || 'unknown submitter'} — {new Date(s.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto', color: 'var(--danger)' }}
+                      onClick={() => decidePendingSeries(s.id, 'rejected')}
+                      disabled={pendingSeriesBusy === s.id}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      onClick={() => decidePendingSeries(s.id, 'approved')}
+                      disabled={pendingSeriesBusy === s.id}
+                    >
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>

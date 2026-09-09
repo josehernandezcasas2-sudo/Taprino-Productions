@@ -5098,3 +5098,31 @@ body:has(.mini-player) { padding-bottom: 72px; }
 @media (max-width: 480px) {
   .newsletter-form { flex-direction: column; }
 }
+
+/* ============================================================
+   Creator Studio type buttons (pages/creator.js)
+   ============================================================ */
+.creator-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.7rem;
+}
+@media (min-width: 640px) {
+  .creator-type-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.creator-type-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.9rem 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(217, 143, 62, 0.35);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-size: 0.92rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-align: left;
+}
+.creator-type-btn:hover { border-color: var(--brass); background: rgba(217,143,62,0.08); }
+.creator-type-icon { font-size: 1.2rem; flex-shrink: 0; }
