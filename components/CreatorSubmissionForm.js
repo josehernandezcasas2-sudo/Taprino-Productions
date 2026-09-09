@@ -127,6 +127,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
   const [audioUrl, setAudioUrl] = useState('');
   const [audioImporting, setAudioImporting] = useState(false);
   const [audioImportedUrl, setAudioImportedUrl] = useState(null);
+  const [audioBytes, setAudioBytes] = useState(null);
   const [audioError, setAudioError] = useState(null);
   const [skipVideo, setSkipVideo] = useState(false);
   const [posterFile, setPosterFile] = useState(null);
@@ -263,7 +264,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
       // Same idea for audio — already imported and verified server-side
       // by this point (see the Import button above), so this is just the
       // resulting URL riding along as metadata, not a new upload.
-      ...(audioImportedUrl ? { audioUrl: audioImportedUrl } : {})
+      ...(audioImportedUrl ? { audioUrl: audioImportedUrl, audioBytes } : {})
     };
 
     if (skipVideo) {
@@ -330,6 +331,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
     setSkipVideo(false);
     setAudioUrl('');
     setAudioImportedUrl(null);
+    setAudioBytes(null);
     setAudioError(null);
     setPosterFile(null);
     setThumbnailFile(null);
@@ -558,7 +560,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
                 {audioImportedUrl ? (
                   <p style={{ fontSize: '0.85rem', color: 'var(--ok)', marginBottom: '0.8rem' }}>
                     ✓ Audio file ready.{' '}
-                    <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                    <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioBytes(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                       Remove
                     </button>
                   </p>
@@ -590,6 +592,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
                             const data = await res.json();
                             if (!res.ok) throw new Error(data.error || 'Could not import that audio file.');
                             setAudioImportedUrl(data.audioUrl);
+                            setAudioBytes(data.audioBytes || null);
                           } catch (err) {
                             setAudioError(err.message);
                           } finally {

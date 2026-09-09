@@ -90,7 +90,8 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
     <>
       <Head>
         <title>{show.name} — Podcasts — {SITE.name}</title>
-        <meta name="description" content={show.description || `Listen to ${show.name} on ${SITE.name}.`} />
+        <meta name="description" content={show.desc || `Listen to ${show.name} on ${SITE.name}.`} />
+        <link rel="alternate" type="application/rss+xml" title={`${show.name} RSS Feed`} href={`/api/podcasts/${show.id}/rss.xml`} />
       </Head>
 
       <HeaderNav
@@ -115,7 +116,12 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="host">
               {host && `Hosted by ${host} · `}{episodes.length} episode{episodes.length === 1 ? '' : 's'}
             </div>
-            {show.description && <p>{show.description}</p>}
+            {show.desc && <p>{show.desc}</p>}
+            {episodes.some((ep) => ep.tier === 'free' && ep.audioUrl) && (
+              <a href={`/api/podcasts/${show.id}/rss.xml`} className="podcast-rss-link" target="_blank" rel="noopener noreferrer">
+                RSS Feed — for Apple Podcasts, Spotify, etc. →
+              </a>
+            )}
           </div>
         </div>
 

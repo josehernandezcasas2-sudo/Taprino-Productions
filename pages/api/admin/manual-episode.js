@@ -150,6 +150,7 @@ export default async function handler(req, res) {
     is_original: !!body.isOriginal,
     funding_url: normalizeUrl(body.fundingUrl),
     audio_url: body.audioUrl || null,
+    audio_bytes: body.audioBytes || null,
     ads_enabled: body.adsEnabled !== false,
     ad_break_seconds: Array.isArray(body.adBreakSeconds) && body.adBreakSeconds.length > 0 ? body.adBreakSeconds : [0],
     status,

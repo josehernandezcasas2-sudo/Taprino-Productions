@@ -163,6 +163,7 @@ export default async function handler(req, res) {
     video_type: 'html5',
     src,
     audio_url: body.audioUrl || null,
+    audio_bytes: body.audioBytes || null,
     trailer_src: trailerSrc,
     poster,
     thumbnail,

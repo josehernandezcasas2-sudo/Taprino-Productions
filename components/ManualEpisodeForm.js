@@ -61,6 +61,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
   const [audioUrl, setAudioUrl] = useState('');
   const [audioImporting, setAudioImporting] = useState(false);
   const [audioImportedUrl, setAudioImportedUrl] = useState(null);
+  const [audioBytes, setAudioBytes] = useState(null);
   const [audioError, setAudioError] = useState(null);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
@@ -108,7 +109,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           bonusParentType,
           bonusParentId,
           ...(skipVideo ? {} : { cloudflareVideoUid: videoUid.trim() }),
-          ...(audioImportedUrl ? { audioUrl: audioImportedUrl } : {}),
+          ...(audioImportedUrl ? { audioUrl: audioImportedUrl, audioBytes } : {}),
           ...(trailerUid.trim() ? { trailerCloudflareUid: trailerUid.trim() } : {}),
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {})
@@ -126,6 +127,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       setSkipVideo(false);
       setAudioUrl('');
       setAudioImportedUrl(null);
+      setAudioBytes(null);
       setAudioError(null);
       setPosterFile(null);
       setThumbnailFile(null);
@@ -207,7 +209,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
             {audioImportedUrl ? (
               <p style={{ fontSize: '0.85rem', color: 'var(--ok)', marginBottom: '0.8rem' }}>
                 ✓ Audio file ready.{' '}
-                <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
+                <button type="button" onClick={() => { setAudioImportedUrl(null); setAudioBytes(null); setAudioUrl(''); }} style={{ color: 'var(--ink-dim)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem' }}>
                   Remove
                 </button>
               </p>
@@ -242,6 +244,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
                         const data = await res.json();
                         if (!res.ok) throw new Error(data.error || 'Could not import that audio file.');
                         setAudioImportedUrl(data.audioUrl);
+                        setAudioBytes(data.audioBytes || null);
                       } catch (err) {
                         setAudioError(err.message);
                       } finally {

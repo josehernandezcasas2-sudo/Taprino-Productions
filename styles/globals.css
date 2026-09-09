@@ -4322,6 +4322,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .show-header-info h1 { margin: 0 0 0.4rem; color: var(--ink); }
 .show-header-info .host { color: var(--ink-dim); font-size: 0.9rem; margin-bottom: 0.8rem; }
 .show-header-info p { color: var(--ink); opacity: 0.85; font-size: 0.88rem; max-width: 60ch; margin-bottom: 1rem; }
+.podcast-rss-link {
+  display: inline-block;
+  font-size: 0.78rem;
+  color: var(--brass);
+  text-decoration: none;
+  font-family: var(--font-mono);
+}
+.podcast-rss-link:hover { text-decoration: underline; }
 
 .podcast-episode-row { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 0; border-bottom: 1px solid rgba(234,231,221,0.08); }
 .podcast-episode-row .ep-play-btn {
