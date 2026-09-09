@@ -4343,6 +4343,17 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border: 1px solid rgba(234,231,221,0.2); background: none; color: var(--ink-dim); cursor: pointer;
 }
 .podcast-watch-toggle button.on { background: var(--brass); color: #241a05; border-color: var(--brass); }
+.podcast-inline-watch-btn {
+  background: none;
+  border: none;
+  color: var(--brass);
+  font-size: 0.7rem;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.podcast-inline-watch-btn:hover { text-decoration: underline; }
+.podcast-inline-video { margin: -0.3rem 0 0.9rem; border-radius: 10px; overflow: hidden; }
 
 /* Your Work — grouped-by-project redesign, replacing the old flat card grid */
 .yourwork-toolbar { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 1.6rem; flex-wrap: wrap; }

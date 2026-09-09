@@ -1,6 +1,8 @@
+import { useState, Fragment } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
+import VideoPlayer from '../../components/VideoPlayer';
 import { getAccountContext } from '../../lib/accountContext';
 import { findSeries } from '../../lib/series';
 import { getPodcastShowEpisodes } from '../../lib/podcastShow';
@@ -53,9 +55,14 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
   const iconOverrides = usePlayerIconOverrides();
   const firstEpisode = episodes[0];
   const host = firstEpisode ? firstEpisode.artist : null;
+  const [expandedVideoId, setExpandedVideoId] = useState(null);
 
   function playAudio(ep) {
     if (!player || !ep.audioUrl) return;
+    // Stop any inline video before starting audio — otherwise clicking
+    // Play on a different episode's audio while a video is expanded would
+    // leave both playing at once, with two competing soundtracks.
+    setExpandedVideoId(null);
     player.playEpisode({
       id: ep.id,
       title: ep.title,
@@ -64,6 +71,17 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
       showArt: show.poster || show.thumbnail,
       audioUrl: ep.audioUrl
     });
+  }
+
+  // Stays on this page rather than navigating to /episode/[id] — the
+  // point of a podcast's video option is to watch it without losing the
+  // show context (other episodes, host info) the podcast page provides.
+  // Toggles closed if the same episode's video is already expanded.
+  function watchInline(ep) {
+    if (player && player.isPlaying) {
+      player.closePlayer();
+    }
+    setExpandedVideoId((current) => (current === ep.id ? null : ep.id));
   }
 
   const isCurrentlyPlaying = (ep) => player && player.currentEpisode && player.currentEpisode.id === ep.id && player.isPlaying;
@@ -108,7 +126,8 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
           const hasVideo = !!ep.src;
           const playing = isCurrentlyPlaying(ep);
           return (
-            <div key={ep.id} className="podcast-episode-row">
+            <Fragment key={ep.id}>
+            <div className="podcast-episode-row">
               {ep.locked ? (
                 <button className="ep-play-btn" disabled title={`${SITE.premiumTier} required`}><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
               ) : hasAudio ? (
@@ -116,7 +135,9 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
                   {playing ? <PauseIcon size={15} src={iconOverrides.pause} /> : <PlayIcon size={15} src={iconOverrides.play} />}
                 </button>
               ) : (
-                <Link href={`/episode/${ep.id}`} className="ep-play-btn" style={{ textDecoration: 'none' }} aria-label="Watch"><PlayIcon size={15} src={iconOverrides.play} /></Link>
+                <button className="ep-play-btn" onClick={() => watchInline(ep)} aria-label="Watch">
+                  <PlayIcon size={15} src={iconOverrides.play} />
+                </button>
               )}
               <div className="podcast-episode-row-info">
                 <h4>{ep.title}</h4>
@@ -126,12 +147,22 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
                 <span className="date">{formatDate(ep.createdAt)}</span>
                 <span className="dur">{ep.runtime}</span>
                 {hasVideo && !ep.locked && (
-                  <Link href={`/episode/${ep.id}`} style={{ fontSize: '0.7rem', color: 'var(--brass)' }}>
-                    {hasAudio ? 'Watch instead →' : 'Watch →'}
-                  </Link>
+                  <button className="podcast-inline-watch-btn" onClick={() => watchInline(ep)}>
+                    {expandedVideoId === ep.id ? 'Hide video ✕' : hasAudio ? 'Watch instead →' : 'Watch →'}
+                  </button>
                 )}
               </div>
             </div>
+            {expandedVideoId === ep.id && (
+              <div className="podcast-inline-video">
+                <VideoPlayer
+                  episode={ep}
+                  adsEnabled={!isSubscriber && !isAdmin && ep.tier === 'free' && ep.adsEnabled !== false}
+                  onEnded={() => setExpandedVideoId(null)}
+                />
+              </div>
+            )}
+            </Fragment>
           );
         })}
       </main>
