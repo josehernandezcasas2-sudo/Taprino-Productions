@@ -4,6 +4,15 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 
+// Default Next.js API body limit is 1MB — a base64-encoded image (roughly
+// 33% larger than the original file) plus the rest of the JSON payload
+// blows past that for any normally-sized upload, failing with a 413
+// before the handler below ever runs. Matches the limit already used by
+// every other image-upload endpoint in this app (e.g. add-artwork.js).
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } }
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');

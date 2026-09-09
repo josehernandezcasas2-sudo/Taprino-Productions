@@ -136,7 +136,21 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(profile)
       });
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch {
+        // Infrastructure-level failures (a request that's still too
+        // large even at the raised limit, a gateway timeout, etc.) come
+        // back as plain text or HTML, not JSON — trying to parse that as
+        // JSON is what actually produced the confusing "Unexpected
+        // token" error, masking the real, simpler problem underneath.
+        throw new Error(
+          res.status === 413
+            ? 'That image is too large — please use a smaller file.'
+            : `Something went wrong (server responded with status ${res.status}). Please try again.`
+        );
+      }
       if (!res.ok) throw new Error(data.error || 'Could not save.');
       setProfile((p) => ({
         ...p,

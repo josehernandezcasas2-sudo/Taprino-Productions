@@ -7,6 +7,15 @@ import { PITCH_TAGS } from '../../../lib/pitches';
 const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingRaised', 'fundingDeadline', 'team', 'photos'];
 const FIELD_TO_COLUMN = { projectUrl: 'project_url', fundingGoal: 'funding_goal', fundingRaised: 'funding_raised', fundingDeadline: 'funding_deadline' };
 
+// Default Next.js API body limit is 1MB — a base64-encoded image (roughly
+// 33% larger than the original file) plus the rest of the JSON payload
+// blows past that for any normally-sized upload, failing with a 413
+// before the handler below ever runs. Matches the limit already used by
+// every other image-upload endpoint in this app (e.g. add-artwork.js).
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } }
+};
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');

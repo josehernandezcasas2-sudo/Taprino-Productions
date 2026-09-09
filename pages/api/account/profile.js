@@ -5,6 +5,18 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 const MAX_SOCIAL_LINKS = 6;
 
+// Default Next.js API body limit is 1MB — a base64-encoded image (roughly
+// 33% larger than the original file) plus the rest of the JSON payload
+// blows past that for any normally-sized upload, failing with a 413
+// before the handler below ever runs. This is exactly what was breaking
+// avatar uploads: Vercel returns a plain-text 413 response body, and the
+// client's res.json() call then threw "Unexpected token" trying to parse
+// that plain text as JSON — which is what actually showed up as the
+// error, obscuring the real 413 status underneath it.
+export const config = {
+  api: { bodyParser: { sizeLimit: '10mb' } }
+};
+
 export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) {
