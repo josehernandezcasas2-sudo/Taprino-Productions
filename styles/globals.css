@@ -1160,7 +1160,7 @@ button { font-family: inherit; cursor: pointer; }
 .card-wrap:hover .ep-card { border-color: rgba(232, 163, 61, 0.5); box-shadow: 0 14px 30px rgba(0,0,0,0.5); }
 .ep-card.active { border-color: var(--signal-amber); }
 .ep-thumb {
-  aspect-ratio: 16 / 9;
+  aspect-ratio: 2 / 3;
   display: flex; align-items: center; justify-content: center;
   font-family: var(--font-mono);
   font-size: 0.6rem;
@@ -1263,10 +1263,30 @@ button { font-family: inherit; cursor: pointer; }
 .ep-card.free-ads .ep-badge { background: var(--olive-deep); color: var(--ink); }
 .ep-card.free-noads .ep-badge { background: var(--ok); color: #14261a; }
 .ep-card.premium .ep-badge { background: var(--brass); color: #241a05; }
-.ep-info { padding: 0.7rem 0.8rem 0.9rem; }
-.ep-info h4 { font-family: var(--font-display); font-size: 0.88rem; margin: 0 0 0.25rem; font-weight: 600; }
-.ep-info span { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
-.type-line { display: block; margin-top: 0.25rem; font-size: 0.6rem !important; }
+/* The scrim is a separate pseudo-element covering a fixed percentage of
+   .ep-thumb's height, rather than a background on .ep-info itself —
+   .ep-info's own height is driven by its text content (one vs. two-line
+   titles), so sizing the gradient to that would make the fade point
+   inconsistent from card to card. This keeps the fade always starting
+   at the same relative height up the poster regardless of title length. */
+.ep-thumb::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  height: 55%;
+  background: linear-gradient(to bottom, rgba(0,0,0,0) 0%, rgba(0,0,0,0.85) 100%);
+  pointer-events: none;
+  z-index: 1;
+}
+.ep-info {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  padding: 0.6rem 0.7rem 0.7rem;
+  z-index: 2;
+}
+.ep-info h4 { font-family: var(--font-display); font-size: 0.85rem; margin: 0 0 0.2rem; font-weight: 600; color: var(--ink); line-height: 1.25; }
+.ep-info span { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-dim); }
+.type-line { display: inline; font-size: 0.6rem !important; }
 .type-line.series { color: var(--brass) !important; }
 .type-line.movie { color: var(--mint) !important; }
 .type-line.short { color: var(--sky) !important; }
@@ -3655,6 +3675,11 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   right: 0;
   height: 4px;
   background: rgba(0, 0, 0, 0.5);
+  /* Above .ep-info (z-index 2) and its scrim — this needs to stay a
+     clear, unobstructed indicator at the very bottom edge of the poster
+     now that .ep-info's text overlay occupies the same corner, rather
+     than being a separate block below the thumbnail like before. */
+  z-index: 3;
 }
 .cw-progress-fill {
   height: 100%;

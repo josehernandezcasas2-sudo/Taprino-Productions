@@ -85,11 +85,10 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
                 {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.ep.tier, card.ep.adsEnabled).label}</span>
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
-              </div>
-              <div className="ep-info">
-                <h4>{card.ep.title}</h4>
-                <span>{card.ep.runtime}</span>
-                <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
+                <div className="ep-info">
+                  <h4>{card.ep.title}</h4>
+                  <span>{card.ep.runtime}</span> · <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
+                </div>
               </div>
             </button>
           </div>
@@ -104,11 +103,10 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
                 {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
                 {!card.info.thumbnail && '▤ series'}
-              </div>
-              <div className="ep-info">
-                <h4>{card.info.name}</h4>
-                <span>{card.count} episode{card.count === 1 ? '' : 's'}</span>
-                <span className="type-line series">▤ Series</span>
+                <div className="ep-info">
+                  <h4>{card.info.name}</h4>
+                  <span>{card.count} episode{card.count === 1 ? '' : 's'}</span> · <span className="type-line series">▤ Series</span>
+                </div>
               </div>
             </Link>
           </div>

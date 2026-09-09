@@ -342,17 +342,17 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                       <div className="ep-thumb">
                         <span className="ep-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                         {ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>}
-                      </div>
-                      <div className="ep-info">
-                        <h4>{ep.title}</h4>
-                        <span>{ep.runtime}</span>
-                        {ep.contentType === 'series' ? (
-                          <span className="type-line series">
-                            ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
-                          </span>
-                        ) : (
-                          <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
-                        )}
+                        <div className="ep-info">
+                          <h4>{ep.title}</h4>
+                          <span>{ep.runtime}</span>
+                          {ep.contentType === 'series' ? (
+                            <span className="type-line series">
+                              ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
+                            </span>
+                          ) : (
+                            <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   </div>

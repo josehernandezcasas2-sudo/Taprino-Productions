@@ -645,10 +645,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
                     <div className="ep-thumb">
                       {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
-                    </div>
-                    <div className="ep-info">
-                      <h4>{b.title}</h4>
-                      <span>{b.runtime}</span>
+                      <div className="ep-info">
+                        <h4>{b.title}</h4>
+                        <span>{b.runtime}</span>
+                      </div>
                     </div>
                   </Link>
                 </div>

@@ -40,15 +40,15 @@ export default function ContinueWatchingRow({ items, onSelect }) {
               >
                 <div className="ep-thumb">
                   {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
+                  <div className="ep-info">
+                    <h4>{ep.title}</h4>
+                    <span>{ep.artist}</span>
+                  </div>
                   {pct !== null && (
                     <div className="cw-progress-track" aria-hidden="true">
                       <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
                     </div>
                   )}
-                </div>
-                <div className="ep-info">
-                  <h4>{ep.title}</h4>
-                  <span>{ep.artist}</span>
                 </div>
               </div>
             </div>
