@@ -1193,6 +1193,21 @@ button { font-family: inherit; cursor: pointer; }
     transform: scale(1.07);
     z-index: 6;
   }
+  /* The first card in a horizontally-scrolling row sits flush against
+     the row's left edge. transform: scale grows a card equally in every
+     direction from its own center by default, so that leftward growth
+     was pushing past the row's left boundary and getting clipped by the
+     same overflow-x that makes the row scrollable in the first place.
+     Padding can't fix this without shifting every other card's spacing
+     too (not wanted) — changing just this card's growth to originate
+     from its left edge instead of center means it only grows right,
+     down, and up, never left, so nothing crosses that boundary at all.
+     Scoped to .cat-row-track specifically since grid/wrapping layouts
+     elsewhere (e.g. .shelf) don't have a row edge for this to clip
+     against in the first place. */
+  .cat-row-track > .card-wrap:first-child:hover {
+    transform-origin: left center;
+  }
 }
 .card-wrap > .ep-card, .card-wrap > .poster-card { display: block; width: 100%; }
 .wishlist-btn {
