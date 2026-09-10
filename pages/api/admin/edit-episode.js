@@ -33,7 +33,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, titleImageBase64, titleImageFileName, cloudflareVideoUid, ...fields } = req.body || {};
+  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, titleImageBase64, titleImageFileName, removeTitleImage, cloudflareVideoUid, ...fields } = req.body || {};
   if (!episodeId) {
     return res.status(400).json({ error: 'episodeId is required.' });
   }
@@ -131,6 +131,7 @@ export default async function handler(req, res) {
   if (poster) dbUpdates.poster = poster;
   if (thumbnail) dbUpdates.thumbnail = thumbnail;
   if (titleImageUrl) dbUpdates.title_image_url = titleImageUrl;
+  else if (removeTitleImage) dbUpdates.title_image_url = null;
   if (newSrc) dbUpdates.src = newSrc;
 
   if (poster && existing.poster) {
@@ -144,6 +145,10 @@ export default async function handler(req, res) {
   if (titleImageUrl && existing.title_image_url) {
     const oldPath = storagePathFromUrl(existing.title_image_url);
     if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'artwork replaced by admin (title image)', context: existing.title });
+  }
+  if (removeTitleImage && !titleImageUrl && existing.title_image_url) {
+    const oldPath = storagePathFromUrl(existing.title_image_url);
+    if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'title image removed by admin (reverted to text title)', context: existing.title });
   }
 
   if (Object.keys(dbUpdates).length === 0) {

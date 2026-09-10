@@ -71,6 +71,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [titleImageFile, setTitleImageFile] = useState(null);
+  const [removeTitleImage, setRemoveTitleImage] = useState(false);
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null); // null | 'checking' | { state, errorReasonText, readyToStream, ... } | { error }
   const [saving, setSaving] = useState(false);
@@ -159,6 +160,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
           ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
+          ...(removeTitleImage && !titleImageBase64 ? { removeTitleImage: true } : {}),
           ...(videoUid.trim() ? { cloudflareVideoUid: videoUid.trim() } : {})
         })
       });
@@ -430,9 +432,9 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
               </div>
             </div>
 
-            <div className={`admin-media-slot ${titleImageFile ? 'replacing' : episode.titleImageUrl ? 'has' : 'empty'}`}>
+            <div className={`admin-media-slot ${titleImageFile ? 'replacing' : removeTitleImage ? 'replacing' : episode.titleImageUrl ? 'has' : 'empty'}`}>
               <div className="admin-media-preview">
-                {episode.titleImageUrl ? (
+                {episode.titleImageUrl && !removeTitleImage ? (
                   <img src={episode.titleImageUrl} alt="" />
                 ) : (
                   <span className="admin-media-none">None</span>
@@ -440,26 +442,41 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
               </div>
               <div className="admin-media-body">
                 <div className="admin-media-label">
-                  <span className={`admin-connection-dot ${episode.titleImageUrl ? 'connected' : 'disconnected'}`} aria-hidden="true" />
+                  <span className={`admin-connection-dot ${episode.titleImageUrl && !removeTitleImage ? 'connected' : 'disconnected'}`} aria-hidden="true" />
                   Title image (PNG logo)
                 </div>
                 <div className="admin-media-state">
-                  {titleImageFile ? `Replacing with ${titleImageFile.name}` : episode.titleImageUrl ? 'In use' : 'Not set — hero shows plain text title'}
+                  {titleImageFile
+                    ? `Replacing with ${titleImageFile.name}`
+                    : removeTitleImage
+                    ? 'Will be removed — hero will show plain text title'
+                    : episode.titleImageUrl
+                    ? 'In use — hero shows this instead of the text title'
+                    : 'Not set — hero shows plain text title'}
                 </div>
                 <label className="admin-media-action">
                   {episode.titleImageUrl ? 'Replace…' : 'Upload…'}
-                  <input type="file" accept="image/png" onChange={(e) => setTitleImageFile(e.target.files[0] || null)} />
+                  <input type="file" accept="image/png" onChange={(e) => { setTitleImageFile(e.target.files[0] || null); setRemoveTitleImage(false); }} />
                 </label>
                 {titleImageFile && (
                   <button type="button" className="admin-media-undo" onClick={() => setTitleImageFile(null)}>
                     Keep existing
                   </button>
                 )}
+                {episode.titleImageUrl && !titleImageFile && (
+                  <button
+                    type="button"
+                    className="admin-media-undo"
+                    onClick={() => setRemoveTitleImage((r) => !r)}
+                  >
+                    {removeTitleImage ? 'Undo — keep title image' : 'Remove — use text title instead'}
+                  </button>
+                )}
               </div>
             </div>
           </div>
 
-          {(posterFile || thumbnailFile || titleImageFile) && (
+          {(posterFile || thumbnailFile || titleImageFile || removeTitleImage) && (
             <div className="admin-warning admin-warning-soft">
               <strong>Artwork will be replaced when you save.</strong> The current image is
               overwritten and isn&rsquo;t recoverable from here — make sure you still have the
