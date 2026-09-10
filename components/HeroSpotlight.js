@@ -145,6 +145,12 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
                 <span>{[ep.mainGenre, ep.releaseYear, formatRuntimeLong(ep.runtime) || ep.runtime].filter(Boolean).join(' \u00b7 ')}</span>
               </>
             )}
+            {ep.genre && (
+              <>
+                <span className="hero-meta-dot hero-sub-genre">&bull;</span>
+                <span className="hero-sub-genre">{ep.genre}</span>
+              </>
+            )}
             {ep.rating && (
               <>
                 <span className="hero-meta-dot">&bull;</span>

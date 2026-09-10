@@ -398,6 +398,12 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                     <span>{[episode.mainGenre, episode.releaseYear, formatRuntimeLong(episode.runtime) || episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
                   </>
                 )}
+                {episode.genre && (
+                  <>
+                    <span className="hero-meta-dot hero-sub-genre">&bull;</span>
+                    <span className="hero-sub-genre">{episode.genre}</span>
+                  </>
+                )}
                 {episode.rating && (
                   <>
                     <span className="hero-meta-dot">&bull;</span>

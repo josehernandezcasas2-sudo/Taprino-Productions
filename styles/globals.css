@@ -879,6 +879,16 @@ button { font-family: inherit; cursor: pointer; }
 }
 .hero-badge-tier.free-noads { background: var(--ok); color: #14261a; }
 .hero-meta-dot { opacity: 0.6; }
+/* Shown by default, right after the main genre/year/runtime group — but
+   this is the first thing to go once the hero's narrower on small
+   screens, rather than wrapping to a second line like the rest of
+   .hero-meta does. Reuses the same 640px cutoff already established for
+   .hero-content just above, so both scale down together at one
+   consistent width instead of introducing a second, unrelated
+   breakpoint for the same hero area. */
+@media (max-width: 640px) {
+  .hero-sub-genre { display: none; }
+}
 .hero-actions { display: flex; gap: 0.7rem; }
 .series-hero-meta {
   display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
