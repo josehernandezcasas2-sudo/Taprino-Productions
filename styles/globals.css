@@ -1088,7 +1088,17 @@ button { font-family: inherit; cursor: pointer; }
   }
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
-.genre-browse-track { display: flex; gap: 1.5rem; overflow-x: auto; padding-bottom: 0.5rem; }
+/* Small top padding added for the same reason .cat-row-track has
+   vertical padding: overflow-x:auto implicitly makes overflow-y
+   non-visible too, and .genre-browse-item:hover's translateY(-2px) had
+   no room to move into at the very top edge without this, clipping the
+   circle mid-hover. Setting overflow-x to visible instead (as tried in
+   DevTools) would remove this row's ability to scroll at all — with
+   ~10 genres at 90px each plus gaps, this row is wider than most phone
+   screens, so losing scroll here would hide genres entirely on mobile
+   rather than just letting you swipe to them. 6px comfortably covers
+   the 2px shift with room to spare. */
+.genre-browse-track { display: flex; gap: 1.5rem; overflow-x: auto; padding: 6px 0 0.5rem; }
 .genre-browse-item {
   display: flex;
   flex-direction: column;
