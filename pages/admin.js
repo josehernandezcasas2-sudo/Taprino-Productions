@@ -1281,6 +1281,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                     {s.pendingPoster && 'New poster staged. '}
                     {s.pendingThumbnail && 'New thumbnail staged. '}
                     {s.pendingHeroImage && 'New hero image staged. '}
+                    {s.pendingTitleImageUrl && 'New title image staged. '}
                     {s.pendingTrailerSrc && 'New trailer staged.'}
                   </p>
                   <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>

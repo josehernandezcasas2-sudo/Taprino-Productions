@@ -49,6 +49,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [heroImageFile, setHeroImageFile] = useState(null);
+  const [titleImageFile, setTitleImageFile] = useState(null);
   const [trailerFile, setTrailerFile] = useState(null);
   const [status, setStatus] = useState(null); // null | 'uploading-trailer' | 'saving' | 'done' | 'error'
   const [trailerProgress, setTrailerProgress] = useState(0);
@@ -71,14 +72,14 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
     // Only required in "existing" mode — a create with no artwork at all
     // is a completely normal flow (add art later from the same page), but
     // an "edit" with nothing attached would be a pointless no-op save.
-    if (mode === 'existing' && !posterFile && !thumbnailFile && !heroImageFile && !trailerFile) {
-      setError('Add at least a poster, thumbnail, hero image, or trailer.');
+    if (mode === 'existing' && !posterFile && !thumbnailFile && !heroImageFile && !titleImageFile && !trailerFile) {
+      setError('Add at least a poster, thumbnail, hero image, title image, or trailer.');
       return;
     }
 
     try {
       let targetSeriesId = seriesId;
-      const hasAnyArt = !!(posterFile || thumbnailFile || heroImageFile || trailerFile);
+      const hasAnyArt = !!(posterFile || thumbnailFile || heroImageFile || titleImageFile || trailerFile);
 
       if (mode === 'new') {
         setStatus('saving');
@@ -111,10 +112,11 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
       }
 
       setStatus('saving');
-      const [posterBase64, thumbnailBase64, heroImageBase64] = await Promise.all([
+      const [posterBase64, thumbnailBase64, heroImageBase64, titleImageBase64] = await Promise.all([
         readAsDataUrl(posterFile),
         readAsDataUrl(thumbnailFile),
-        readAsDataUrl(heroImageFile)
+        readAsDataUrl(heroImageFile),
+        readAsDataUrl(titleImageFile)
       ]);
       const res = await fetch('/api/creator/series-media', {
         method: 'POST',
@@ -124,6 +126,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
           ...(heroImageBase64 ? { heroImageBase64, heroImageFileName: heroImageFile.name } : {}),
+          ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
           ...(trailerUid ? { trailerUid } : {})
         })
       });
@@ -134,6 +137,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
       setPosterFile(null);
       setThumbnailFile(null);
       setHeroImageFile(null);
+      setTitleImageFile(null);
       setTrailerFile(null);
       setNewName('');
       setNewDescription('');
@@ -174,7 +178,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
             )}
             {selectedSeries && (
               <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: lockedSeriesId ? 0 : '-0.4rem' }}>
-                Currently has: {selectedSeries.poster ? 'poster ✓' : 'poster —'}, {selectedSeries.thumbnail ? 'thumbnail ✓' : 'thumbnail —'}, {selectedSeries.heroImage ? 'hero image ✓' : 'hero image —'}, {selectedSeries.trailerSrc ? 'trailer ✓' : 'trailer —'}
+                Currently has: {selectedSeries.poster ? 'poster ✓' : 'poster —'}, {selectedSeries.thumbnail ? 'thumbnail ✓' : 'thumbnail —'}, {selectedSeries.heroImage ? 'hero image ✓' : 'hero image —'}, {selectedSeries.titleImageUrl ? 'title image ✓' : 'title image —'}, {selectedSeries.trailerSrc ? 'trailer ✓' : 'trailer —'}
               </p>
             )}
           </>
@@ -195,6 +199,9 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
 
         <label>Series hero image <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— the background behind the title on this show's own page, optional</span></label>
         <input type="file" accept="image/*" onChange={(e) => setHeroImageFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
+
+        <label>Title image <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— a stylized PNG logo shown in the hero banner instead of the plain text title, optional</span></label>
+        <input type="file" accept="image/png" onChange={(e) => setTitleImageFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
         <label>Series trailer — plays in the homepage hero if a title from this series gets featured, optional</label>
         <input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />

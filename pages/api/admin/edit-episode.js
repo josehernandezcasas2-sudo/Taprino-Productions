@@ -33,13 +33,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, cloudflareVideoUid, ...fields } = req.body || {};
+  const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, titleImageBase64, titleImageFileName, cloudflareVideoUid, ...fields } = req.body || {};
   if (!episodeId) {
     return res.status(400).json({ error: 'episodeId is required.' });
   }
 
   const supabase = getSupabase();
-  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, src, status, submitted_by').eq('id', episodeId).maybeSingle();
+  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, title_image_url, src, status, submitted_by').eq('id', episodeId).maybeSingle();
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Episode not found.' });
   }
@@ -59,10 +59,12 @@ export default async function handler(req, res) {
 
   let poster;
   let thumbnail;
+  let titleImageUrl;
   try {
-    [poster, thumbnail] = await Promise.all([
+    [poster, thumbnail, titleImageUrl] = await Promise.all([
       uploadArtworkImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: `${episodeId}-poster` }),
-      uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `${episodeId}-thumbnail` })
+      uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `${episodeId}-thumbnail` }),
+      uploadArtworkImage({ base64: titleImageBase64, fileName: titleImageFileName, pathPrefix: `${episodeId}-title-image` })
     ]);
   } catch (err) {
     console.error('admin edit-episode artwork error:', err.message);
@@ -128,6 +130,7 @@ export default async function handler(req, res) {
   if (dbUpdates.status) dbUpdates.reviewed_at = new Date().toISOString();
   if (poster) dbUpdates.poster = poster;
   if (thumbnail) dbUpdates.thumbnail = thumbnail;
+  if (titleImageUrl) dbUpdates.title_image_url = titleImageUrl;
   if (newSrc) dbUpdates.src = newSrc;
 
   if (poster && existing.poster) {
@@ -137,6 +140,10 @@ export default async function handler(req, res) {
   if (thumbnail && existing.thumbnail) {
     const oldPath = storagePathFromUrl(existing.thumbnail);
     if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'artwork replaced by admin (thumbnail)', context: existing.title });
+  }
+  if (titleImageUrl && existing.title_image_url) {
+    const oldPath = storagePathFromUrl(existing.title_image_url);
+    if (oldPath) recordOrphan({ kind: 'storage_image', reference: oldPath, reason: 'artwork replaced by admin (title image)', context: existing.title });
   }
 
   if (Object.keys(dbUpdates).length === 0) {

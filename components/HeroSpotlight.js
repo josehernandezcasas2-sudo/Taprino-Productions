@@ -136,7 +136,9 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
 
         <div className="hero-content">
           <div className="hero-eyebrow">{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</div>
-          <h2>{ep.title}</h2>
+          <h2>
+            {ep.titleImageUrl ? <img src={ep.titleImageUrl} alt={ep.title} className="hero-title-image" /> : ep.title}
+          </h2>
           <div className="hero-meta">
             <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>
             {(ep.mainGenre || ep.releaseYear || ep.runtime) && (

@@ -389,7 +389,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
           <div className="hero-inner">
             <div className="hero-content">
               <div className="hero-eyebrow">{episode.contentType === 'movie' ? 'Movie' : 'Short'}</div>
-              <h2>{episode.title}</h2>
+              <h2>
+                {episode.titleImageUrl ? <img src={episode.titleImageUrl} alt={episode.title} className="hero-title-image" /> : episode.title}
+              </h2>
               <div className="hero-meta">
                 <span className={`hero-badge-tier ${tierBadge(episode.tier, episode.adsEnabled).key}`}>{tierBadge(episode.tier, episode.adsEnabled).label}</span>
                 {(episode.mainGenre || episode.releaseYear || episode.runtime) && (

@@ -848,6 +848,20 @@ button { font-family: inherit; cursor: pointer; }
   color: var(--ink);
   text-shadow: 0 2px 10px rgba(0,0,0,0.85);
 }
+/* A stylized PNG logo treatment of the title, shown instead of the plain
+   text above when set. Capped at roughly the same height the text title
+   reaches at its largest (clamp maxes out around 4.4rem/~70px, plus line
+   spacing), so an uploaded logo doesn't dominate the hero any more than
+   a long text title already could. drop-shadow instead of the text's
+   own text-shadow, since that property only applies to text glyphs. */
+.hero-title-image {
+  display: block;
+  max-width: 100%;
+  max-height: 110px;
+  width: auto;
+  height: auto;
+  filter: drop-shadow(0 2px 10px rgba(0,0,0,0.85));
+}
 .hero-content p {
   color: var(--ink);
   opacity: 0.9;

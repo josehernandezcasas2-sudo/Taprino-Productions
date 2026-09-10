@@ -70,6 +70,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
   });
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [titleImageFile, setTitleImageFile] = useState(null);
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null); // null | 'checking' | { state, errorReasonText, readyToStream, ... } | { error }
   const [saving, setSaving] = useState(false);
@@ -144,7 +145,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     setSaving(true);
     setError(null);
     try {
-      const [posterBase64, thumbnailBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile)]);
+      const [posterBase64, thumbnailBase64, titleImageBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile), readAsDataUrl(titleImageFile)]);
       const [bonusParentType, bonusParentId] = form.bonusParent ? form.bonusParent.split(':') : [null, null];
       const res = await fetch('/api/admin/edit-episode', {
         method: 'POST',
@@ -157,6 +158,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
           bonusParentId,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
+          ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
           ...(videoUid.trim() ? { cloudflareVideoUid: videoUid.trim() } : {})
         })
       });
@@ -427,9 +429,37 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
                 )}
               </div>
             </div>
+
+            <div className={`admin-media-slot ${titleImageFile ? 'replacing' : episode.titleImageUrl ? 'has' : 'empty'}`}>
+              <div className="admin-media-preview">
+                {episode.titleImageUrl ? (
+                  <img src={episode.titleImageUrl} alt="" />
+                ) : (
+                  <span className="admin-media-none">None</span>
+                )}
+              </div>
+              <div className="admin-media-body">
+                <div className="admin-media-label">
+                  <span className={`admin-connection-dot ${episode.titleImageUrl ? 'connected' : 'disconnected'}`} aria-hidden="true" />
+                  Title image (PNG logo)
+                </div>
+                <div className="admin-media-state">
+                  {titleImageFile ? `Replacing with ${titleImageFile.name}` : episode.titleImageUrl ? 'In use' : 'Not set — hero shows plain text title'}
+                </div>
+                <label className="admin-media-action">
+                  {episode.titleImageUrl ? 'Replace…' : 'Upload…'}
+                  <input type="file" accept="image/png" onChange={(e) => setTitleImageFile(e.target.files[0] || null)} />
+                </label>
+                {titleImageFile && (
+                  <button type="button" className="admin-media-undo" onClick={() => setTitleImageFile(null)}>
+                    Keep existing
+                  </button>
+                )}
+              </div>
+            </div>
           </div>
 
-          {(posterFile || thumbnailFile) && (
+          {(posterFile || thumbnailFile || titleImageFile) && (
             <div className="admin-warning admin-warning-soft">
               <strong>Artwork will be replaced when you save.</strong> The current image is
               overwritten and isn&rsquo;t recoverable from here — make sure you still have the

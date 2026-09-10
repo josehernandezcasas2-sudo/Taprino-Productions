@@ -24,12 +24,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, trailerUid } = req.body || {};
+  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, titleImageBase64, titleImageFileName, trailerUid } = req.body || {};
   if (!seriesId) {
     return res.status(400).json({ error: 'seriesId is required.' });
   }
-  if (!posterBase64 && !thumbnailBase64 && !heroImageBase64 && !trailerUid) {
-    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, hero image, or trailer.' });
+  if (!posterBase64 && !thumbnailBase64 && !heroImageBase64 && !titleImageBase64 && !trailerUid) {
+    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, hero image, title image, or trailer.' });
   }
 
   const supabase = getSupabase();
@@ -46,11 +46,13 @@ export default async function handler(req, res) {
   let poster;
   let thumbnail;
   let heroImage;
+  let titleImage;
   try {
-    [poster, thumbnail, heroImage] = await Promise.all([
+    [poster, thumbnail, heroImage, titleImage] = await Promise.all([
       uploadArtworkImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: `series-${seriesId}-poster` }),
       uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: `series-${seriesId}-thumbnail` }),
-      uploadArtworkImage({ base64: heroImageBase64, fileName: heroImageFileName, pathPrefix: `series-${seriesId}-hero` })
+      uploadArtworkImage({ base64: heroImageBase64, fileName: heroImageFileName, pathPrefix: `series-${seriesId}-hero` }),
+      uploadArtworkImage({ base64: titleImageBase64, fileName: titleImageFileName, pathPrefix: `series-${seriesId}-title-image` })
     ]);
   } catch (err) {
     console.error('series-media upload error:', err.message);
@@ -74,6 +76,7 @@ export default async function handler(req, res) {
   if (poster) dbUpdates.pending_poster = poster;
   if (thumbnail) dbUpdates.pending_thumbnail = thumbnail;
   if (heroImage) dbUpdates.pending_hero_image = heroImage;
+  if (titleImage) dbUpdates.pending_title_image_url = titleImage;
   if (trailerSrc) dbUpdates.pending_trailer_src = trailerSrc;
 
   const { error } = await supabase.from('series').update(dbUpdates).eq('id', seriesId);

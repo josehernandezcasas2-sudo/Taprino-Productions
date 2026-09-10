@@ -131,6 +131,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
 
       <SeriesHero
         title={seriesInfo.name}
+        titleImageUrl={seriesInfo.titleImageUrl}
         desc={seriesInfo.desc}
         videoSrc={heroSrc}
         imageSrc={heroImage}
