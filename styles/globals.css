@@ -1944,13 +1944,17 @@ button { font-family: inherit; cursor: pointer; }
 
 /* ---------------------------------------------------------------------
    Mobile tab bar
-   Desktop keeps the header nav it already has; below 900px the five main
-   destinations move to a fixed bottom bar. The body padding is what keeps
-   the footer and the last row of cards from sitting underneath it.
+   Desktop keeps the header nav it already has; at 1180px and below —
+   the same width where .nav-links collapses into .nav-hamburger — the
+   four main destinations move to a fixed bottom bar instead, covering
+   tablet widths too rather than leaving a gap where neither the full
+   nav nor the tab bar was the intended primary navigation. The body
+   padding is what keeps the footer and the last row of cards from
+   sitting underneath it.
    --------------------------------------------------------------------- */
 .tabbar { display: none; }
 
-@media (max-width: 900px) {
+@media (max-width: 1180px) {
   body {
     /* Pill height (~64px) + its 18px bottom offset + a little breathing
        room, so page content never sits directly under the floating bar. */
@@ -3984,9 +3988,10 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 
 /* Below this width there's no room for the full link row — collapse to
    logo + hamburger (which already carries every type link plus genres)
-   on the left, same search/pill/avatar cluster on the right. This mirrors
-   the mockup's mobile header, which relies on the bottom MobileTabBar for
-   primary navigation instead of a horizontal link row. */
+   on the left, same search/pill/avatar cluster on the right. The bottom
+   MobileTabBar takes over primary navigation at this exact same 1180px
+   breakpoint, so there's a clean handoff with no width range where
+   neither one is the intended nav. */
 @media (max-width: 1180px) {
   .nav-links { display: none; }
   .nav-hamburger { display: flex; }

@@ -13,8 +13,9 @@ import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, usePlayerIconOverrid
 // buttons that open a small drop-up menu above themselves — tapping one
 // that's already open closes it, tapping a different one switches to it,
 // and tapping anywhere else on the page (or navigating) closes whatever's
-// open. Hidden entirely above 900px, where the header nav is already
-// comfortable — unchanged from before.
+// open. Hidden entirely above 1180px, where the header nav's full link
+// row is already comfortable — matches the width where .nav-links
+// collapses into .nav-hamburger, so there's no gap between the two.
 const GROUPS = {
   discover: {
     label: 'Discover',
