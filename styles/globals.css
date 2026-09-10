@@ -1021,6 +1021,23 @@ button { font-family: inherit; cursor: pointer; }
      that the grown card and its shadow always fit entirely inside it.
   */
   padding: 2rem 0.3rem 3.6rem;
+  /* The first card sits flush against this row's left edge, so its
+     hover-grown left side (scale grows symmetrically from center by
+     default) had nowhere to go and was clipped by this same overflow-x.
+     A first attempt fixed that by making just the first card grow from
+     its left edge instead of center — but that made its hover motion
+     look visibly different from every other card's (growing off to one
+     side rather than expanding in place), which read as more wrong than
+     the clipping did. This is the standard fix instead: padding-left
+     creates real scrollable room before the first card for it to grow
+     into, and the matching negative margin-left cancels that shift back
+     out so nothing moves at rest — same symmetric center-grown hover as
+     every other card, just with somewhere for the left side to go.
+     30px covers both scale(1.07)'s own growth (~6-7px at this card
+     width) and the "0 14px 30px" hover shadow's blur radius, so neither
+     gets clipped even at full opacity. */
+  padding-left: calc(0.3rem + 30px);
+  margin-left: -30px;
   scroll-behavior: smooth;
 }
 /* Snap-to-card scrolling, touch devices only — matches Jose's request
@@ -1192,21 +1209,6 @@ button { font-family: inherit; cursor: pointer; }
   .card-wrap:hover {
     transform: scale(1.07);
     z-index: 6;
-  }
-  /* The first card in a horizontally-scrolling row sits flush against
-     the row's left edge. transform: scale grows a card equally in every
-     direction from its own center by default, so that leftward growth
-     was pushing past the row's left boundary and getting clipped by the
-     same overflow-x that makes the row scrollable in the first place.
-     Padding can't fix this without shifting every other card's spacing
-     too (not wanted) — changing just this card's growth to originate
-     from its left edge instead of center means it only grows right,
-     down, and up, never left, so nothing crosses that boundary at all.
-     Scoped to .cat-row-track specifically since grid/wrapping layouts
-     elsewhere (e.g. .shelf) don't have a row edge for this to clip
-     against in the first place. */
-  .cat-row-track > .card-wrap:first-child:hover {
-    transform-origin: left center;
   }
 }
 .card-wrap > .ep-card, .card-wrap > .poster-card { display: block; width: 100%; }
