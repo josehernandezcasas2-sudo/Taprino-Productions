@@ -485,7 +485,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               <p>{episode.desc}</p>
               <div className="credit-line">
                 {episode.artist && <span>Made by {episode.artist}</span>}
-                <span>{episode.runtime}</span>
+                <span>{formatRuntimeLong(episode.runtime) || episode.runtime}</span>
                 {episode.genre && <span>{episode.genre}</span>}
                 {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
                 {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
@@ -571,7 +571,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                   <Link href={`/episode/${nextEpisode.id}?autoplay=1`} className="side-ep-card">
                     <div className="side-ep-thumb" style={nextEpisode.thumbnail ? { backgroundImage: `url(${nextEpisode.thumbnail})` } : {}}>
                       <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
-                      {nextEpisode.runtime && <span className="dur-badge">{nextEpisode.runtime}</span>}
+                      {nextEpisode.runtime && <span className="dur-badge">{formatRuntimeLong(nextEpisode.runtime) || nextEpisode.runtime}</span>}
                     </div>
                     <div className="side-ep-info">
                       <h5>{nextEpisode.seriesOrder ? `S${nextEpisode.season || 1}E${nextEpisode.seriesOrder} — ` : ''}{nextEpisode.title}</h5>
@@ -591,11 +591,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                       ) : (
                         <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
                       )}
-                      {previousEpisode.runtime && <span className="dur-badge">{previousEpisode.runtime}</span>}
+                      {previousEpisode.runtime && <span className="dur-badge">{formatRuntimeLong(previousEpisode.runtime) || previousEpisode.runtime}</span>}
                     </div>
                     <div className="side-ep-info">
                       <h5>{previousEpisode.seriesOrder ? `S${previousEpisode.season || 1}E${previousEpisode.seriesOrder} — ` : ''}{previousEpisode.title}</h5>
-                      <span>{previousEpisodeWatched ? 'Watched' : previousEpisode.runtime}</span>
+                      <span>{previousEpisodeWatched ? 'Watched' : (formatRuntimeLong(previousEpisode.runtime) || previousEpisode.runtime)}</span>
                     </div>
                   </Link>
                 </>
@@ -623,7 +623,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                 <Link key={item.id} href={`/episode/${item.id}?autoplay=1`} className="side-ep-card">
                   <div className="side-ep-thumb" style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}}>
                     <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
-                    {item.runtime && <span className="dur-badge">{item.runtime}</span>}
+                    {item.runtime && <span className="dur-badge">{formatRuntimeLong(item.runtime) || item.runtime}</span>}
                   </div>
                   <div className="side-ep-info">
                     <h5>{item.title}</h5>
@@ -647,7 +647,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                       {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
                       <div className="ep-info">
                         <h4>{b.title}</h4>
-                        <span>{b.runtime}</span>
+                        <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
                       </div>
                     </div>
                   </Link>

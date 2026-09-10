@@ -16,6 +16,7 @@ import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
 import { tierBadge } from '../lib/tierBadge';
+import { formatRuntimeLong } from '../lib/videoMetadata';
 import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 
 import Footer from '../components/Footer';
@@ -139,7 +140,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                     </div>
                     <div className="poster-title-wrap">
                       <h4>{ep.title}</h4>
-                      <span>{ep.runtime}</span>
+                      <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                     </div>
                   </Link>
                 </div>
@@ -170,7 +171,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                     </div>
                     <div className="poster-title-wrap">
                       <h4>{ep.title}</h4>
-                      <span>{ep.runtime}</span>
+                      <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                     </div>
                   </Link>
                 </div>
@@ -216,7 +217,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                   </div>
                   <div className="poster-title-wrap">
                     <h4>{ep.title}</h4>
-                    <span>{ep.runtime}</span>
+                    <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                   </div>
                 </Link>
               </div>

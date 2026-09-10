@@ -14,6 +14,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { PlayIcon, PauseIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { formatRuntimeLong } from '../../lib/videoMetadata';
 
 export async function getServerSideProps({ req, res, params }) {
   const show = await findSeries(params.id);
@@ -151,7 +152,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
               </div>
               <div className="podcast-episode-row-meta">
                 <span className="date">{formatDate(ep.createdAt)}</span>
-                <span className="dur">{ep.runtime}</span>
+                <span className="dur">{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                 {hasVideo && !ep.locked && (
                   <button className="podcast-inline-watch-btn" onClick={() => watchInline(ep)}>
                     {expandedVideoId === ep.id ? 'Hide video ✕' : hasAudio ? 'Watch instead →' : 'Watch →'}

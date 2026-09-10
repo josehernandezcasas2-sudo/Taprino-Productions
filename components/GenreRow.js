@@ -4,6 +4,7 @@ import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { contentTypeTag } from '../lib/contentTypeTags';
 import { tierBadge } from '../lib/tierBadge';
 import { isRecentlyAdded } from '../lib/newBadge';
+import { formatRuntimeLong } from '../lib/videoMetadata';
 
 const MAX_CARDS = 15;
 
@@ -87,7 +88,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
                 <div className="ep-info">
                   <h4>{card.ep.title}</h4>
-                  <span>{card.ep.runtime}</span> · <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
+                  <span>{formatRuntimeLong(card.ep.runtime) || card.ep.runtime}</span> · <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
                 </div>
               </div>
             </button>

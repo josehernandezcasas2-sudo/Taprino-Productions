@@ -16,6 +16,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 import { tierBadge } from '../lib/tierBadge';
+import { formatRuntimeLong } from '../lib/videoMetadata';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -107,7 +108,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
                     </div>
                     <div className="poster-title-wrap">
                       <h4>{ep.title}</h4>
-                      <span>{ep.runtime}</span>
+                      <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                     </div>
                   </Link>
                 </div>

@@ -25,6 +25,7 @@ import Footer from '../components/Footer';
 import StudioTapaPromo from '../components/StudioTapaPromo';
 import { SITE } from '../lib/siteConfig';
 import { contentTypeTag } from '../lib/contentTypeTags';
+import { formatRuntimeLong } from '../lib/videoMetadata';
 import { tierBadge } from '../lib/tierBadge';
 
 export async function getServerSideProps({ req, res }) {
@@ -344,7 +345,7 @@ export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedI
                         {ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>}
                         <div className="ep-info">
                           <h4>{ep.title}</h4>
-                          <span>{ep.runtime}</span>
+                          <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                           {ep.contentType === 'series' ? (
                             <span className="type-line series">
                               ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}

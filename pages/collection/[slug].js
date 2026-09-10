@@ -13,6 +13,7 @@ import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
+import { formatRuntimeLong } from '../../lib/videoMetadata';
 import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
 
@@ -120,7 +121,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
                   </div>
                   <div className="poster-title-wrap">
                     <h4>{ep.title}</h4>
-                    <span>{ep.runtime}</span>
+                    <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
                     {ep.contentType === 'series' ? (
                       <span className="type-line series">
                         &#9636; {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}

@@ -14,6 +14,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
+import { formatRuntimeLong } from '../../lib/videoMetadata';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, res }) {
@@ -189,7 +190,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                         <h4>{ep.title}</h4>
                         <div className="episode-row-meta">
                           <span>{ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : `Season ${ep.season || 1}`}</span>
-                          {ep.runtime && <span>{ep.runtime}</span>}
+                          {ep.runtime && <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>}
                           {ep.rating && <span className="meta-pill">{ep.rating}</span>}
                           {ep.hasAudioDescription && <span className="meta-pill" title="Audio description available">AD</span>}
                           {ep.hasCaptions && <span className="meta-pill" title="Captions available">CC</span>}
@@ -212,7 +213,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                   {b.thumbnail && <img src={b.thumbnail} alt="" />}
                 </div>
                 <h6>{b.title}</h6>
-                <span>{b.runtime}</span>
+                <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
               </Link>
             ))}
           </div>
