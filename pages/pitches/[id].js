@@ -3,11 +3,13 @@ import Link from 'next/link';
 import BackButton from '../../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
+import { SignInButton } from '@clerk/nextjs';
 import { getAccountContext } from '../../lib/accountContext';
 import { HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import {
   getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
 } from '../../lib/pitches';
+import { getTotalRaisedForPitch } from '../../lib/pitchDonations';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
@@ -32,12 +34,13 @@ export async function getServerSideProps({ req, res, params }) {
 
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const { userId } = getAuth(req);
-  const [similar, updates, comments, episodes, saved] = await Promise.all([
+  const [similar, updates, comments, episodes, saved, totalRaisedCents] = await Promise.all([
     getSimilarPitches(pitch.tag, pitch.id),
     getPitchUpdates(pitch.id),
     getPitchComments(pitch.id),
     getPublicEpisodes(),
-    userId ? isPitchSaved(userId, pitch.id) : false
+    userId ? isPitchSaved(userId, pitch.id) : false,
+    pitch.funding_enabled ? getTotalRaisedForPitch(pitch.id) : Promise.resolve(null)
   ]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
@@ -54,12 +57,13 @@ export async function getServerSideProps({ req, res, params }) {
       similar,
       updates,
       comments,
-      initialSaved: saved
+      initialSaved: saved,
+      totalRaisedCents
     }
   };
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents }) {
   const iconOverrides = usePlayerIconOverrides();
   const [saved, setSaved] = useState(initialSaved);
   const [commentList, setCommentList] = useState(comments);
@@ -71,6 +75,11 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
   const [replyText, setReplyText] = useState('');
   const [postingReply, setPostingReply] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
+  const [donationAmount, setDonationAmount] = useState('');
+  const [donating, setDonating] = useState(false);
+  const [donationError, setDonationError] = useState(null);
+  const [donationSuccess, setDonationSuccess] = useState(false);
+  const [currentTotalRaisedCents, setCurrentTotalRaisedCents] = useState(totalRaisedCents);
 
   const pct = pitch.funding_goal ? Math.min(100, Math.round(((pitch.funding_raised || 0) / pitch.funding_goal) * 100)) : null;
 
@@ -95,6 +104,34 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pitchId: pitch.id })
     }).catch(() => {});
+  }
+
+  async function donate(e) {
+    e.preventDefault();
+    setDonationError(null);
+    const amount = Number(donationAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setDonationError('Enter an amount greater than $0.');
+      return;
+    }
+    setDonating(true);
+    try {
+      const res = await fetch('/api/pitches/donate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId: pitch.id, amountDollars: amount })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not process that donation.');
+      setCurrentTotalRaisedCents((prev) => (prev || 0) + data.donation.amountCents);
+      setDonationAmount('');
+      setDonationSuccess(true);
+      setTimeout(() => setDonationSuccess(false), 4000);
+    } catch (err) {
+      setDonationError(err.message);
+    } finally {
+      setDonating(false);
+    }
   }
 
   function share() {
@@ -212,14 +249,19 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="hero-eyebrow">{pitch.tag || 'Project'} &middot; Pitch Room</div>
             <h2>{pitch.title}</h2>
             <div className="hero-meta">
-              {pct !== null && <span className="hero-badge-tier">{pct}% funded</span>}
+              {!pitch.funding_enabled && pct !== null && <span className="hero-badge-tier">{pct}% funded</span>}
               {pitch.creator_name && (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
                   <span>By {pitch.creator_name}</span>
                 </>
               )}
-              {pitch.funding_goal && (
+              {pitch.funding_enabled ? (
+                <>
+                  <span className="hero-meta-dot">&bull;</span>
+                  <span>${((currentTotalRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} raised so far</span>
+                </>
+              ) : pitch.funding_goal && (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
                   <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
@@ -234,7 +276,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             </div>
             <p>{pitch.logline}</p>
             <div className="hero-actions">
-              {pitch.project_url && (
+              {!pitch.funding_enabled && pitch.project_url && (
                 <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
               )}
               <button className="wishlist-btn-large" onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'}>
@@ -244,6 +286,40 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 {shareCopied ? '✓' : '⇪'}
               </button>
             </div>
+            {pitch.funding_enabled && (
+              <div style={{ marginTop: 14 }}>
+                {isSignedIn ? (
+                  <form onSubmit={donate} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span style={{ opacity: 0.7 }}>$</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      placeholder="Amount"
+                      value={donationAmount}
+                      onChange={(e) => setDonationAmount(e.target.value)}
+                      style={{ width: '100px' }}
+                      disabled={donating}
+                    />
+                    <button type="submit" className="fund-btn" disabled={donating}>
+                      {donating ? 'Sending…' : '\u25C6 Support this project'}
+                    </button>
+                    {donationSuccess && <span style={{ color: 'var(--ok)', fontSize: 13 }}>Thank you for your support!</span>}
+                  </form>
+                ) : (
+                  <p style={{ fontSize: 13, opacity: 0.75 }}>
+                    <SignInButton mode="modal">
+                      <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>Sign in</span>
+                    </SignInButton>
+                    {' '}to support this project.
+                  </p>
+                )}
+                {donationError && <p style={{ color: 'var(--signal-red, #c55)', fontSize: 13, marginTop: 6 }}>{donationError}</p>}
+                <p style={{ fontSize: 12, opacity: 0.55, marginTop: 6 }}>
+                  Support is recorded now — real payment processing for this project is coming soon.
+                </p>
+              </div>
+            )}
           </div>
         </div>
       </div>
