@@ -24,12 +24,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, titleImageBase64, titleImageFileName, trailerUid } = req.body || {};
+  const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, titleImageBase64, titleImageFileName, removeTitleImage, trailerUid } = req.body || {};
   if (!seriesId) {
     return res.status(400).json({ error: 'seriesId is required.' });
   }
-  if (!posterBase64 && !thumbnailBase64 && !heroImageBase64 && !titleImageBase64 && !trailerUid) {
-    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, hero image, title image, or trailer.' });
+  if (!posterBase64 && !thumbnailBase64 && !heroImageBase64 && !titleImageBase64 && !removeTitleImage && !trailerUid) {
+    return res.status(400).json({ error: 'Provide at least a poster, thumbnail, hero image, title image, title image removal, or trailer.' });
   }
 
   const supabase = getSupabase();
@@ -77,6 +77,7 @@ export default async function handler(req, res) {
   if (thumbnail) dbUpdates.pending_thumbnail = thumbnail;
   if (heroImage) dbUpdates.pending_hero_image = heroImage;
   if (titleImage) dbUpdates.pending_title_image_url = titleImage;
+  else if (removeTitleImage) dbUpdates.pending_title_image_removal = true;
   if (trailerSrc) dbUpdates.pending_trailer_src = trailerSrc;
 
   const { error } = await supabase.from('series').update(dbUpdates).eq('id', seriesId);

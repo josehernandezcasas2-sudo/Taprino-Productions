@@ -50,6 +50,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [heroImageFile, setHeroImageFile] = useState(null);
   const [titleImageFile, setTitleImageFile] = useState(null);
+  const [removeTitleImage, setRemoveTitleImage] = useState(false);
   const [trailerFile, setTrailerFile] = useState(null);
   const [status, setStatus] = useState(null); // null | 'uploading-trailer' | 'saving' | 'done' | 'error'
   const [trailerProgress, setTrailerProgress] = useState(0);
@@ -72,14 +73,14 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
     // Only required in "existing" mode — a create with no artwork at all
     // is a completely normal flow (add art later from the same page), but
     // an "edit" with nothing attached would be a pointless no-op save.
-    if (mode === 'existing' && !posterFile && !thumbnailFile && !heroImageFile && !titleImageFile && !trailerFile) {
+    if (mode === 'existing' && !posterFile && !thumbnailFile && !heroImageFile && !titleImageFile && !removeTitleImage && !trailerFile) {
       setError('Add at least a poster, thumbnail, hero image, title image, or trailer.');
       return;
     }
 
     try {
       let targetSeriesId = seriesId;
-      const hasAnyArt = !!(posterFile || thumbnailFile || heroImageFile || titleImageFile || trailerFile);
+      const hasAnyArt = !!(posterFile || thumbnailFile || heroImageFile || titleImageFile || removeTitleImage || trailerFile);
 
       if (mode === 'new') {
         setStatus('saving');
@@ -127,6 +128,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
           ...(heroImageBase64 ? { heroImageBase64, heroImageFileName: heroImageFile.name } : {}),
           ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
+          ...(removeTitleImage && !titleImageBase64 ? { removeTitleImage: true } : {}),
           ...(trailerUid ? { trailerUid } : {})
         })
       });
@@ -138,6 +140,7 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
       setThumbnailFile(null);
       setHeroImageFile(null);
       setTitleImageFile(null);
+      setRemoveTitleImage(false);
       setTrailerFile(null);
       setNewName('');
       setNewDescription('');
@@ -201,7 +204,18 @@ export default function SeriesMediaForm({ allSeries, onSaved, initialMode, initi
         <input type="file" accept="image/*" onChange={(e) => setHeroImageFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
 
         <label>Title image <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— a stylized PNG logo shown in the hero banner instead of the plain text title, optional</span></label>
-        <input type="file" accept="image/png" onChange={(e) => setTitleImageFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />
+        <input
+          type="file"
+          accept="image/png"
+          onChange={(e) => { setTitleImageFile(e.target.files[0] || null); setRemoveTitleImage(false); }}
+          style={{ marginBottom: '0.8rem' }}
+        />
+        {mode === 'existing' && selectedSeries && selectedSeries.titleImageUrl && !titleImageFile && (
+          <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal', fontSize: '0.85rem', marginTop: '-0.5rem', marginBottom: '0.8rem' }}>
+            <input type="checkbox" checked={removeTitleImage} onChange={(e) => setRemoveTitleImage(e.target.checked)} />
+            Remove the current title image — use the text title instead
+          </label>
+        )}
 
         <label>Series trailer — plays in the homepage hero if a title from this series gets featured, optional</label>
         <input type="file" accept="video/*" onChange={(e) => setTrailerFile(e.target.files[0] || null)} style={{ marginBottom: '0.8rem' }} />

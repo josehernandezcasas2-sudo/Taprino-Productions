@@ -20,8 +20,8 @@ export default async function handler(req, res) {
       .or('pending_poster.not.is.null,pending_thumbnail.not.is.null'),
     supabase
       .from('series')
-      .select('id, name, poster, thumbnail, trailer_src, hero_image, title_image_url, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image, pending_title_image_url')
-      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null,pending_trailer_src.not.is.null,pending_hero_image.not.is.null,pending_title_image_url.not.is.null')
+      .select('id, name, poster, thumbnail, trailer_src, hero_image, title_image_url, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image, pending_title_image_url, pending_title_image_removal')
+      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null,pending_trailer_src.not.is.null,pending_hero_image.not.is.null,pending_title_image_url.not.is.null,pending_title_image_removal.eq.true')
   ]);
 
   if (episodesResult.error || seriesResult.error) {
@@ -50,7 +50,8 @@ export default async function handler(req, res) {
       pendingThumbnail: s.pending_thumbnail,
       pendingTrailerSrc: s.pending_trailer_src,
       pendingHeroImage: s.pending_hero_image,
-      pendingTitleImageUrl: s.pending_title_image_url
+      pendingTitleImageUrl: s.pending_title_image_url,
+      pendingTitleImageRemoval: s.pending_title_image_removal
     }))
   });
 }

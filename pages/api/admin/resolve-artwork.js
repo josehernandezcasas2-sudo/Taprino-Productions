@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   const nameCol = type === 'episode' ? 'title' : 'name';
   const selectCols = type === 'episode'
     ? `${nameCol}, poster, thumbnail, pending_poster, pending_thumbnail, submitted_by`
-    : `${nameCol}, poster, thumbnail, trailer_src, hero_image, title_image_url, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image, pending_title_image_url`;
+    : `${nameCol}, poster, thumbnail, trailer_src, hero_image, title_image_url, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image, pending_title_image_url, pending_title_image_removal`;
 
   const { data: row, error: fetchError } = await supabase.from(table).select(selectCols).eq('id', id).maybeSingle();
   if (fetchError || !row) {
@@ -40,7 +40,7 @@ export default async function handler(req, res) {
   }
 
   const context = row[nameCol];
-  const clearPending = { pending_poster: null, pending_thumbnail: null, ...(type === 'series' ? { pending_trailer_src: null, pending_hero_image: null, pending_title_image_url: null } : {}) };
+  const clearPending = { pending_poster: null, pending_thumbnail: null, ...(type === 'series' ? { pending_trailer_src: null, pending_hero_image: null, pending_title_image_url: null, pending_title_image_removal: false } : {}) };
 
   if (decision === 'deny') {
     // The staged upload exists in storage/Cloudflare but will never be
@@ -106,6 +106,10 @@ export default async function handler(req, res) {
     const path = storagePathFromUrl(row.title_image_url);
     if (path) orphanJobs.push(recordOrphan({ kind: 'storage_image', reference: path, reason: 'title image change approved (old title image)', context }));
   }
+  if (type === 'series' && row.pending_title_image_removal && !row.pending_title_image_url && row.title_image_url) {
+    const path = storagePathFromUrl(row.title_image_url);
+    if (path) orphanJobs.push(recordOrphan({ kind: 'storage_image', reference: path, reason: 'title image removal approved (reverted to text title)', context }));
+  }
   await Promise.all(orphanJobs);
 
   const applyUpdates = { ...clearPending };
@@ -114,6 +118,7 @@ export default async function handler(req, res) {
   if (type === 'series' && row.pending_trailer_src) applyUpdates.trailer_src = row.pending_trailer_src;
   if (type === 'series' && row.pending_hero_image) applyUpdates.hero_image = row.pending_hero_image;
   if (type === 'series' && row.pending_title_image_url) applyUpdates.title_image_url = row.pending_title_image_url;
+  else if (type === 'series' && row.pending_title_image_removal) applyUpdates.title_image_url = null;
 
   const { error } = await supabase.from(table).update(applyUpdates).eq('id', id);
   if (error) {
