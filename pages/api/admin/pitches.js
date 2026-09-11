@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getAllPitches, PITCH_TAGS } from '../../../lib/pitches';
+import { getTotalRaisedForPitch } from '../../../lib/pitchDonations';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
@@ -24,7 +25,17 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const pitches = await getAllPitches();
-    return res.status(200).json({ pitches });
+    // Only worth the extra query for pitches that actually use in-platform
+    // funding — everything else (the large majority, still using the
+    // original external-link model) has nothing to sum here at all.
+    const withTotals = await Promise.all(
+      pitches.map(async (p) => {
+        if (!p.funding_enabled) return p;
+        const totalRaisedCents = await getTotalRaisedForPitch(p.id);
+        return { ...p, total_raised_cents: totalRaisedCents };
+      })
+    );
+    return res.status(200).json({ pitches: withTotals });
   }
 
   if (req.method === 'POST') {
@@ -71,19 +82,62 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PATCH') {
-    const { pitchId, status } = req.body || {};
-    if (!pitchId || !['pending', 'approved', 'rejected'].includes(status)) {
-      return res.status(400).json({ error: 'pitchId and a valid status are required.' });
+    const { pitchId, status, cutPercent, disableFunding } = req.body || {};
+    if (!pitchId) {
+      return res.status(400).json({ error: 'pitchId is required.' });
     }
-    const { error } = await supabase
-      .from('pitches')
-      .update({ status, reviewed_by: email, reviewed_at: new Date().toISOString() })
-      .eq('id', pitchId);
-    if (error) {
-      console.error('pitches update error:', error.message);
-      return res.status(500).json({ error: `Could not update pitch: ${error.message}` });
+
+    // Funding enable/disable is a separate, optional action from a
+    // status change — admin typically enables funding on a pitch that's
+    // already approved, as its own follow-up step, not bundled into the
+    // same request that first approved it.
+    if (cutPercent != null || disableFunding) {
+      if (disableFunding) {
+        const { error } = await supabase.from('pitches').update({ funding_enabled: false }).eq('id', pitchId);
+        if (error) {
+          console.error('pitches disable-funding error:', error.message);
+          return res.status(500).json({ error: `Could not disable funding: ${error.message}` });
+        }
+        await recordAudit({ adminId: userId, adminEmail: email, action: 'pitch_funding_disabled', targetType: 'pitch', targetId: pitchId });
+      } else {
+        const numericCut = Number(cutPercent);
+        if (!Number.isFinite(numericCut) || numericCut < 0 || numericCut > 100) {
+          return res.status(400).json({ error: 'cutPercent must be a number between 0 and 100.' });
+        }
+        const { data: pitchRow, error: fetchError } = await supabase.from('pitches').select('status').eq('id', pitchId).maybeSingle();
+        if (fetchError || !pitchRow) {
+          return res.status(404).json({ error: 'Pitch not found.' });
+        }
+        if (pitchRow.status !== 'approved') {
+          return res.status(400).json({ error: 'Only an approved pitch can have funding enabled.' });
+        }
+        const { error } = await supabase
+          .from('pitches')
+          .update({ funding_enabled: true, platform_cut_percent: numericCut, reviewed_by: email, reviewed_at: new Date().toISOString() })
+          .eq('id', pitchId);
+        if (error) {
+          console.error('pitches enable-funding error:', error.message);
+          return res.status(500).json({ error: `Could not enable funding: ${error.message}` });
+        }
+        await recordAudit({ adminId: userId, adminEmail: email, action: 'pitch_funding_enabled', targetType: 'pitch', targetId: pitchId, details: `${numericCut}%` });
+      }
+      if (!status) return res.status(200).json({ ok: true });
     }
-    await recordAudit({ adminId: userId, adminEmail: email, action: `pitch_${status}`, targetType: 'pitch', targetId: pitchId });
+
+    if (status) {
+      if (!['pending', 'approved', 'rejected'].includes(status)) {
+        return res.status(400).json({ error: 'status must be pending, approved, or rejected.' });
+      }
+      const { error } = await supabase
+        .from('pitches')
+        .update({ status, reviewed_by: email, reviewed_at: new Date().toISOString() })
+        .eq('id', pitchId);
+      if (error) {
+        console.error('pitches update error:', error.message);
+        return res.status(500).json({ error: `Could not update pitch: ${error.message}` });
+      }
+      await recordAudit({ adminId: userId, adminEmail: email, action: `pitch_${status}`, targetType: 'pitch', targetId: pitchId });
+    }
     return res.status(200).json({ ok: true });
   }
 

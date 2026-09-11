@@ -188,6 +188,48 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
+  const [cutPercentInputs, setCutPercentInputs] = useState({});
+  const [fundingBusyId, setFundingBusyId] = useState(null);
+
+  async function enablePitchFunding(pitchId) {
+    const cutPercent = cutPercentInputs[pitchId];
+    if (cutPercent == null || cutPercent === '' || Number(cutPercent) < 0 || Number(cutPercent) > 100) {
+      setPitchError('Enter a cut percentage between 0 and 100.');
+      return;
+    }
+    setFundingBusyId(pitchId);
+    try {
+      const res = await fetch('/api/admin/pitches', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId, cutPercent })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not enable funding.');
+      await loadPitches();
+    } catch (err) {
+      setPitchError(err.message);
+    } finally {
+      setFundingBusyId(null);
+    }
+  }
+
+  async function disablePitchFunding(pitchId) {
+    setFundingBusyId(pitchId);
+    try {
+      await fetch('/api/admin/pitches', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId, disableFunding: true })
+      });
+      await loadPitches();
+    } catch (err) {
+      setPitchError('Could not disable funding.');
+    } finally {
+      setFundingBusyId(null);
+    }
+  }
+
   async function loadSiteSettings() {
     try {
       const res = await fetch('/api/admin/site-settings');
@@ -1092,6 +1134,49 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                   </div>
                 </div>
                 <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{p.logline}</div>
+                {p.status === 'approved' && (
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(234,231,221,0.1)' }}>
+                    {p.funding_enabled ? (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                        <span style={{ fontSize: 12, color: 'var(--ok)' }}>
+                          In-platform funding on — {p.platform_cut_percent}% platform cut
+                          {p.total_raised_cents != null && ` · $${(p.total_raised_cents / 100).toFixed(2)} raised`}
+                          {!p.creator_stripe_account_id && ' (no Stripe account connected yet — donations can\'t actually be charged)'}
+                        </span>
+                        <button
+                          className="account-btn-secondary"
+                          style={{ width: 'auto', fontSize: 12 }}
+                          onClick={() => disablePitchFunding(p.id)}
+                          disabled={fundingBusyId === p.id}
+                        >
+                          Disable funding
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <span style={{ fontSize: 12, opacity: 0.65 }}>In-platform funding off</span>
+                        <input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.5"
+                          placeholder="Cut %"
+                          value={cutPercentInputs[p.id] || ''}
+                          onChange={(e) => setCutPercentInputs((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                          style={{ width: '70px', fontSize: 12 }}
+                        />
+                        <button
+                          className="account-btn-secondary"
+                          style={{ width: 'auto', fontSize: 12 }}
+                          onClick={() => enablePitchFunding(p.id)}
+                          disabled={fundingBusyId === p.id}
+                        >
+                          {fundingBusyId === p.id ? 'Enabling…' : 'Enable funding'}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))
           )}
