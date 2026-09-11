@@ -8,6 +8,7 @@ import { getAllSeriesForCreator } from '../lib/series';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import AdminEditEpisodeModal from '../components/AdminEditEpisodeModal';
+import AdminReviewAdModal from '../components/AdminReviewAdModal';
 import ManualEpisodeForm from '../components/ManualEpisodeForm';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
@@ -364,6 +365,23 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [pendingSeriesBusy, setPendingSeriesBusy] = useState(null);
   const [pendingSeriesError, setPendingSeriesError] = useState(null);
 
+  const [pendingAds, setPendingAds] = useState(null);
+  const [reviewingAd, setReviewingAd] = useState(null);
+
+  async function loadPendingAds() {
+    try {
+      const res = await fetch('/api/admin/review-ad');
+      const data = await res.json();
+      if (res.ok) setPendingAds(data.ads);
+    } catch (err) {
+      setPendingAds([]);
+    }
+  }
+
+  function handleAdResolved(resolvedAd) {
+    setPendingAds((prev) => (prev || []).filter((a) => a.id !== resolvedAd.id));
+  }
+
   async function loadPendingSeries() {
     try {
       const res = await fetch('/api/admin/pending-series');
@@ -590,7 +608,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
-  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); loadSeriesOwnership(); loadPendingSeries(); }, []);
+  useEffect(() => { loadDeletions(); loadOrphans(); loadPendingArtwork(); loadPendingEdits(); loadAuditLog(); loadSiteSettings(); loadPitches(); loadReportedComments(); loadSeriesOwnership(); loadPendingSeries(); loadPendingAds(); }, []);
 
   async function resolveDeletion(type, id, decision) {
     setDeletionActionLoading(`${type}-${id}`);
@@ -1536,6 +1554,37 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         </div>
 
         <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Advertiser ads awaiting review</div>
+          <h3>Submitted via the advertiser dashboard</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            View the video, edit any field, and set the billing rate before approving — that rate
+            (not shown to the advertiser) is what their budget gets charged per impression.
+          </p>
+          {!pendingAds ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
+          ) : pendingAds.length === 0 ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {pendingAds.map((ad) => (
+                <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{ad.title}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+                      {ad.accountCompanyName || 'Unknown advertiser'}
+                      {ad.budgetTotalCents != null && ` — $${(ad.budgetTotalCents / 100).toFixed(2)} budget cap`}
+                    </div>
+                  </div>
+                  <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReviewingAd(ad)}>
+                    Review →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">New series awaiting review</div>
           <h3>Series created via &ldquo;Add Series&rdquo;</h3>
           <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
@@ -1667,6 +1716,14 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             loadSubmissions();
             loadOrphans();
           }}
+        />
+      )}
+
+      {reviewingAd && (
+        <AdminReviewAdModal
+          ad={reviewingAd}
+          onClose={() => setReviewingAd(null)}
+          onResolved={handleAdResolved}
         />
       )}
     </>
