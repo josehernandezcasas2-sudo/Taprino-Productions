@@ -77,6 +77,35 @@ export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, is
     setAds((prev) => [newAd, ...prev]);
   }
 
+  const [budgetInputs, setBudgetInputs] = useState({});
+  const [budgetBusyId, setBudgetBusyId] = useState(null);
+  const [budgetErrors, setBudgetErrors] = useState({});
+
+  async function handleIncreaseBudget(adId) {
+    const additionalDollars = budgetInputs[adId];
+    if (!additionalDollars || Number(additionalDollars) <= 0) {
+      setBudgetErrors((prev) => ({ ...prev, [adId]: 'Enter a positive amount.' }));
+      return;
+    }
+    setBudgetErrors((prev) => ({ ...prev, [adId]: null }));
+    setBudgetBusyId(adId);
+    try {
+      const res = await fetch('/api/ads/increase-budget', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adId, additionalDollars })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not increase the budget.');
+      setAds((prev) => prev.map((a) => (a.id === adId ? data.ad : a)));
+      setBudgetInputs((prev) => ({ ...prev, [adId]: '' }));
+    } catch (err) {
+      setBudgetErrors((prev) => ({ ...prev, [adId]: err.message }));
+    } finally {
+      setBudgetBusyId(null);
+    }
+  }
+
   return (
     <>
       <Head>
@@ -158,6 +187,31 @@ export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, is
                       </div>
                       {!ad.active && ad.reviewStatus === 'approved' && (
                         <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '0.2rem' }}>Paused</div>
+                      )}
+                      {ad.reviewStatus === 'approved' && (
+                        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', marginTop: '0.6rem' }}>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            placeholder="Add $"
+                            value={budgetInputs[ad.id] || ''}
+                            onChange={(e) => setBudgetInputs((prev) => ({ ...prev, [ad.id]: e.target.value }))}
+                            style={{ width: '90px', fontSize: '0.8rem' }}
+                          />
+                          <button
+                            type="button"
+                            className="account-btn-secondary"
+                            style={{ width: 'auto', padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
+                            onClick={() => handleIncreaseBudget(ad.id)}
+                            disabled={budgetBusyId === ad.id}
+                          >
+                            {budgetBusyId === ad.id ? 'Adding…' : 'Add to budget'}
+                          </button>
+                        </div>
+                      )}
+                      {budgetErrors[ad.id] && (
+                        <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '0.3rem' }}>{budgetErrors[ad.id]}</div>
                       )}
                     </div>
                   ))}
