@@ -3800,7 +3800,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 .footer-grid {
   display: grid;
-  grid-template-columns: 1.3fr 1.3fr 1fr 1fr 1fr;
+  grid-template-columns: 1.3fr 1.3fr 1fr 1fr 1fr 1fr;
   gap: 2rem;
   width: 100%;
   padding: 0 2.4rem;

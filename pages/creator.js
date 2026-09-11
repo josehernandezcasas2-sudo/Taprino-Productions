@@ -10,6 +10,7 @@ import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 import CreatorSubmissionForm from '../components/CreatorSubmissionForm';
 import AddSeriesForm from '../components/AddSeriesForm';
+import AddPitchForm from '../components/AddPitchForm';
 import SubmissionModal from '../components/SubmissionModal';
 
 // SECURITY: same enforcement pattern as /admin — a non-creator is
@@ -50,7 +51,8 @@ const TYPE_BUTTONS = [
   { key: 'series', icon: '\u{1F4FA}', label: 'Add Series' },
   { key: 'podcast', icon: '\u{1F3A7}', label: 'Add Podcast' },
   { key: 'short', icon: '\u26A1', label: 'Add Short' },
-  { key: 'vertical', icon: '\u{1F4F1}', label: 'Add Vertical' }
+  { key: 'vertical', icon: '\u{1F4F1}', label: 'Add Vertical' },
+  { key: 'pitch', icon: '\u{1F4E3}', label: 'Add Pitch' }
 ];
 
 const TYPE_TITLES = {
@@ -58,12 +60,14 @@ const TYPE_TITLES = {
   series: 'Add Series',
   podcast: 'Add Podcast',
   short: 'Add Short',
-  vertical: 'Add Vertical'
+  vertical: 'Add Vertical',
+  pitch: 'Add Pitch'
 };
 
 export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const [openModal, setOpenModal] = useState(null);
   const [seriesCreated, setSeriesCreated] = useState(null);
+  const [pitchSubmitted, setPitchSubmitted] = useState(null);
   // Distinct from openModal==='series' (which opens the "create a new
   // series" form) — this instead opens the episode-submission form
   // pre-targeted at a series that already exists, used by the "Add the
@@ -74,6 +78,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
     setOpenModal(null);
     setEpisodeForSeriesId(null);
     setSeriesCreated(null);
+    setPitchSubmitted(null);
   }
 
   return (
@@ -117,7 +122,7 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
         </Link>
       </main>
 
-      {openModal && openModal !== 'series' && (
+      {openModal && openModal !== 'series' && openModal !== 'pitch' && (
         <SubmissionModal title={TYPE_TITLES[openModal]} icon={TYPE_BUTTONS.find((t) => t.key === openModal).icon} onClose={closeModal}>
           <CreatorSubmissionForm
             allSeries={allSeries}
@@ -159,6 +164,24 @@ export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSub
             </div>
           ) : (
             <AddSeriesForm onSubmitted={setSeriesCreated} />
+          )}
+        </SubmissionModal>
+      )}
+
+      {openModal === 'pitch' && (
+        <SubmissionModal title="Add Pitch" icon="\u{1F4E3}" onClose={closeModal}>
+          {pitchSubmitted ? (
+            <div>
+              <p style={{ color: 'var(--ok)', fontSize: '0.9rem' }}>
+                &ldquo;{pitchSubmitted.title || 'Your project'}&rdquo; was submitted and is pending review.
+                You&rsquo;ll see its status on your Pitch Room dashboard.
+              </p>
+              <Link href="/creator/pitch/dashboard" className="account-btn-primary" style={{ display: 'inline-block', marginTop: '0.8rem', textDecoration: 'none' }}>
+                Go to your Pitch Room dashboard →
+              </Link>
+            </div>
+          ) : (
+            <AddPitchForm onSubmitted={setPitchSubmitted} />
           )}
         </SubmissionModal>
       )}
