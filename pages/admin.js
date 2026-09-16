@@ -46,6 +46,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const [submissions, setSubmissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [creatorEmail, setCreatorEmail] = useState('');
   const [creatorAction, setCreatorAction] = useState('grant');
   const [creatorStatus, setCreatorStatus] = useState(null);
@@ -718,6 +719,31 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
     }
   }
 
+  const needsReviewCount = (submissions?.length || 0) + (pendingSeries?.length || 0) + (pendingAds?.length || 0);
+  const libraryQueueCount = (pendingArtwork ? pendingArtwork.episodes.length + pendingArtwork.series.length : 0) +
+    (pendingEdits ? pendingEdits.episodes.length + pendingEdits.series.length : 0) +
+    (deletions ? deletions.episodes.length + deletions.series.length : 0) +
+    (orphans?.length || 0);
+  const pitchRoomCount = reportedComments?.length || 0;
+
+  const navSections = [
+    { id: 'dashboard', label: 'Dashboard', icon: '◈', count: 0 },
+    { id: 'needs-review', label: 'Needs Your Review', icon: '⏳', count: needsReviewCount },
+    { id: 'library', label: 'Content Library', icon: '▤', count: libraryQueueCount },
+    { id: 'site-settings', label: 'Site Settings', icon: '⚙', count: 0 },
+    { id: 'pitch-room', label: 'Pitch Room', icon: '✦', count: pitchRoomCount },
+    { id: 'series-ownership', label: 'Series Ownership', icon: '◫', count: 0 },
+    { id: 'access-history', label: 'Access & History', icon: '☰', count: 0 }
+  ];
+
+  function goToSection(id) {
+    setSidebarOpen(false);
+    if (typeof document !== 'undefined') {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
   return (
     <>
       <Head>
@@ -733,6 +759,28 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
+      <div className="admin-topbar">
+        <button className="admin-hamburger" onClick={() => setSidebarOpen(true)} aria-label="Open admin navigation">
+          ☰ <span>Sections</span>
+        </button>
+      </div>
+
+      <div className="admin-shell">
+        {sidebarOpen && <div className="admin-sidebar-scrim" onClick={() => setSidebarOpen(false)} />}
+        <aside className={`admin-sidebar${sidebarOpen ? ' admin-sidebar-open' : ''}`}>
+          <button className="admin-sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close admin navigation">✕</button>
+          <nav className="admin-sidebar-nav">
+            {navSections.map((s) => (
+              <button key={s.id} className="admin-sidebar-link" onClick={() => goToSection(s.id)} title={s.label}>
+                <span className="admin-sidebar-icon">{s.icon}</span>
+                <span className="admin-sidebar-label">{s.label}</span>
+                {s.count > 0 && <span className="admin-sidebar-badge">{s.count}</span>}
+              </button>
+            ))}
+          </nav>
+        </aside>
+
+        <div className="admin-shell-content">
       <div className="install-row"><InstallButton /></div>
       {siteConfigIncomplete() && (
         <div className="admin-config-warning">
@@ -762,7 +810,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       </div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '820px' }}>
-        <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Admin Portal</div>
+        <div id="dashboard" className="library-heading" style={{ marginBottom: '0.3rem' }}>Admin Portal</div>
         <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Review creator submissions and manage access.</p>
 
         {stats && (
@@ -775,6 +823,192 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <div className="dash-stat"><div className="dash-stat-value">{stats.totalViews}</div><div className="dash-stat-label">Total views</div></div>
           </div>
         )}
+
+        <div id="needs-review" className="admin-section-divider">
+          Needs Your Review{needsReviewCount > 0 ? ` (${needsReviewCount})` : ''}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Pending review</div>
+          <h3>Creator submissions</h3>
+
+          {loading ? (
+            <p>Loading…</p>
+          ) : submissions.length === 0 ? (
+            <p>Nothing waiting on review right now.</p>
+          ) : (
+            <>
+              {selectedIds.size > 0 && (
+                <div className="dash-nudge" style={{ borderColor: 'rgba(74,168,162,0.35)', background: 'rgba(74,168,162,0.08)' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                    <span>{selectedIds.size} selected</span>
+                    <button className="account-btn-primary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('approve')}>
+                      {bulkLoading ? 'Working…' : `✓ Approve ${selectedIds.size}`}
+                    </button>
+                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setBulkRejecting((v) => !v)}>
+                      ✕ Reject {selectedIds.size}
+                    </button>
+                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setSelectedIds(new Set())}>
+                      Clear selection
+                    </button>
+                  </div>
+                  {bulkRejecting && (
+                    <div style={{ marginTop: '0.6rem' }}>
+                      <input
+                        type="text"
+                        placeholder="Reason (shown to every creator in this batch)"
+                        value={bulkRejectionReason}
+                        onChange={(e) => setBulkRejectionReason(e.target.value)}
+                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
+                      />
+                      <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('reject')}>
+                        Confirm rejection of {selectedIds.size}
+                      </button>
+                    </div>
+                  )}
+                  {bulkError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{bulkError}</p>}
+                </div>
+              )}
+
+              {submissions.map((s) => (
+                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '1rem 0' }}>
+                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(s.id)}
+                      onChange={() => toggleSelected(s.id)}
+                      style={{ marginTop: '0.3rem' }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <h4 style={{ margin: '0 0 0.3rem' }}>{s.title}</h4>
+                      <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>{s.description}</p>
+                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                        {s.content_type} · {s.genre} · {s.runtime} · by {s.artist} · suggested tier: {s.tier}
+                      </div>
+                      <video src={s.src} controls style={{ width: '100%', maxWidth: '360px', borderRadius: '4px', marginBottom: '0.6rem' }} />
+                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                        <button
+                          className="account-btn-primary"
+                          style={{ width: 'auto' }}
+                          disabled={actionLoading === s.id}
+                          onClick={() => review(s.id, 'approve', { tierOverride: s.tier })}
+                        >
+                          {actionLoading === s.id ? 'Working…' : '✓ Approve'}
+                        </button>
+                        <button
+                          className="account-btn-secondary"
+                          style={{ width: 'auto' }}
+                          disabled={actionLoading === s.id}
+                          onClick={() => setRejectingId(rejectingId === s.id ? null : s.id)}
+                        >
+                          ✕ Reject
+                        </button>
+                      </div>
+                      {rejectingId === s.id && (
+                        <div style={{ marginTop: '0.6rem' }}>
+                          <input
+                            type="text"
+                            placeholder="Reason (shown to the creator)"
+                            value={rejectionReason}
+                            onChange={(e) => setRejectionReason(e.target.value)}
+                            style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
+                          />
+                          <button
+                            className="account-btn-secondary"
+                            style={{ width: 'auto' }}
+                            disabled={actionLoading === s.id}
+                            onClick={() => review(s.id, 'reject', { rejectionReason })}
+                          >
+                            Confirm rejection
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">Advertiser ads awaiting review</div>
+          <h3>Submitted via the advertiser dashboard</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            View the video, edit any field, and set the billing rate before approving — that rate
+            (not shown to the advertiser) is what their budget gets charged per impression.
+          </p>
+          {!pendingAds ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
+          ) : pendingAds.length === 0 ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {pendingAds.map((ad) => (
+                <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{ad.title}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+                      {ad.accountCompanyName || 'Unknown advertiser'}
+                      {ad.budgetTotalCents != null && ` — $${(ad.budgetTotalCents / 100).toFixed(2)} budget cap`}
+                    </div>
+                  </div>
+                  <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReviewingAd(ad)}>
+                    Review →
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="account-card" style={{ maxWidth: 'none' }}>
+          <div className="account-eyebrow">New series awaiting review</div>
+          <h3>Series created via &ldquo;Add Series&rdquo;</h3>
+          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
+            Created through the Creator Studio&rsquo;s standalone &ldquo;Add Series&rdquo; button — no episode
+            yet, just the series shell itself (name, description, artwork). The creator can already be
+            submitting episodes to it while it sits here; this is about reviewing the series&rsquo; own
+            metadata, not gating episode work on it.
+          </p>
+          {pendingSeriesError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{pendingSeriesError}</p>}
+          {!pendingSeries ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
+          ) : pendingSeries.length === 0 ? (
+            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+              {pendingSeries.map((s) => (
+                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
+                  <div>
+                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{s.name}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+                      {s.submitted_by || 'unknown submitter'} — {new Date(s.created_at).toLocaleDateString()}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      className="account-btn-secondary"
+                      style={{ width: 'auto', color: 'var(--danger)' }}
+                      onClick={() => decidePendingSeries(s.id, 'rejected')}
+                      disabled={pendingSeriesBusy === s.id}
+                    >
+                      Reject
+                    </button>
+                    <button
+                      className="account-btn-primary"
+                      style={{ width: 'auto' }}
+                      onClick={() => decidePendingSeries(s.id, 'approved')}
+                      disabled={pendingSeriesBusy === s.id}
+                    >
+                      Approve
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <div className="admin-section-divider">Overview &amp; Navigation</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
@@ -833,7 +1067,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </div>
         </div>
 
-        <div className="admin-section-divider">Site Configuration</div>
+        <div id="site-settings" className="admin-section-divider">Site Configuration</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Site settings</div>
           <h3>Header &amp; links</h3>
@@ -1059,6 +1293,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
+        <div id="pitch-room" className="admin-section-divider">Pitch Room</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pitch Room</div>
           <h3>Projects seeking funding</h3>
@@ -1188,110 +1423,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
         />
 
-        <div className="admin-section-divider">Content Review &amp; Library</div>
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">Pending review</div>
-          <h3>Creator submissions</h3>
-
-          {loading ? (
-            <p>Loading…</p>
-          ) : submissions.length === 0 ? (
-            <p>Nothing waiting on review right now.</p>
-          ) : (
-            <>
-              {selectedIds.size > 0 && (
-                <div className="dash-nudge" style={{ borderColor: 'rgba(74,168,162,0.35)', background: 'rgba(74,168,162,0.08)' }}>
-                  <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                    <span>{selectedIds.size} selected</span>
-                    <button className="account-btn-primary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('approve')}>
-                      {bulkLoading ? 'Working…' : `✓ Approve ${selectedIds.size}`}
-                    </button>
-                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setBulkRejecting((v) => !v)}>
-                      ✕ Reject {selectedIds.size}
-                    </button>
-                    <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => setSelectedIds(new Set())}>
-                      Clear selection
-                    </button>
-                  </div>
-                  {bulkRejecting && (
-                    <div style={{ marginTop: '0.6rem' }}>
-                      <input
-                        type="text"
-                        placeholder="Reason (shown to every creator in this batch)"
-                        value={bulkRejectionReason}
-                        onChange={(e) => setBulkRejectionReason(e.target.value)}
-                        style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
-                      />
-                      <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={bulkLoading} onClick={() => bulkReview('reject')}>
-                        Confirm rejection of {selectedIds.size}
-                      </button>
-                    </div>
-                  )}
-                  {bulkError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.5rem' }}>{bulkError}</p>}
-                </div>
-              )}
-
-              {submissions.map((s) => (
-                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '1rem 0' }}>
-                  <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(s.id)}
-                      onChange={() => toggleSelected(s.id)}
-                      style={{ marginTop: '0.3rem' }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <h4 style={{ margin: '0 0 0.3rem' }}>{s.title}</h4>
-                      <p style={{ margin: '0 0 0.5rem', fontSize: '0.85rem' }}>{s.description}</p>
-                      <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
-                        {s.content_type} · {s.genre} · {s.runtime} · by {s.artist} · suggested tier: {s.tier}
-                      </div>
-                      <video src={s.src} controls style={{ width: '100%', maxWidth: '360px', borderRadius: '4px', marginBottom: '0.6rem' }} />
-                      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
-                        <button
-                          className="account-btn-primary"
-                          style={{ width: 'auto' }}
-                          disabled={actionLoading === s.id}
-                          onClick={() => review(s.id, 'approve', { tierOverride: s.tier })}
-                        >
-                          {actionLoading === s.id ? 'Working…' : '✓ Approve'}
-                        </button>
-                        <button
-                          className="account-btn-secondary"
-                          style={{ width: 'auto' }}
-                          disabled={actionLoading === s.id}
-                          onClick={() => setRejectingId(rejectingId === s.id ? null : s.id)}
-                        >
-                          ✕ Reject
-                        </button>
-                      </div>
-                      {rejectingId === s.id && (
-                        <div style={{ marginTop: '0.6rem' }}>
-                          <input
-                            type="text"
-                            placeholder="Reason (shown to the creator)"
-                            value={rejectionReason}
-                            onChange={(e) => setRejectionReason(e.target.value)}
-                            style={{ width: '100%', boxSizing: 'border-box', marginBottom: '0.5rem' }}
-                          />
-                          <button
-                            className="account-btn-secondary"
-                            style={{ width: 'auto' }}
-                            disabled={actionLoading === s.id}
-                            onClick={() => review(s.id, 'reject', { rejectionReason })}
-                          >
-                            Confirm rejection
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </>
-          )}
-        </div>
-
+        <div id="library" className="admin-section-divider">Content Library</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Library</div>
           <h3>Every episode, any status</h3>
@@ -1606,7 +1738,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="admin-section-divider">Access &amp; History</div>
+        <div id="access-history" className="admin-section-divider">Access &amp; History</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Creator access</div>
           <h3>Roster</h3>
@@ -1638,85 +1770,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </p>
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">Advertiser ads awaiting review</div>
-          <h3>Submitted via the advertiser dashboard</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
-            View the video, edit any field, and set the billing rate before approving — that rate
-            (not shown to the advertiser) is what their budget gets charged per impression.
-          </p>
-          {!pendingAds ? (
-            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
-          ) : pendingAds.length === 0 ? (
-            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {pendingAds.map((ad) => (
-                <div key={ad.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
-                  <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{ad.title}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
-                      {ad.accountCompanyName || 'Unknown advertiser'}
-                      {ad.budgetTotalCents != null && ` — $${(ad.budgetTotalCents / 100).toFixed(2)} budget cap`}
-                    </div>
-                  </div>
-                  <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReviewingAd(ad)}>
-                    Review →
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">New series awaiting review</div>
-          <h3>Series created via &ldquo;Add Series&rdquo;</h3>
-          <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
-            Created through the Creator Studio&rsquo;s standalone &ldquo;Add Series&rdquo; button — no episode
-            yet, just the series shell itself (name, description, artwork). The creator can already be
-            submitting episodes to it while it sits here; this is about reviewing the series&rsquo; own
-            metadata, not gating episode work on it.
-          </p>
-          {pendingSeriesError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{pendingSeriesError}</p>}
-          {!pendingSeries ? (
-            <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
-          ) : pendingSeries.length === 0 ? (
-            <p style={{ color: 'var(--ink-dim)' }}>Nothing waiting on review right now.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-              {pendingSeries.map((s) => (
-                <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0.9rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
-                  <div>
-                    <div style={{ fontWeight: 'bold', fontSize: '0.92rem' }}>{s.name}</div>
-                    <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
-                      {s.submitted_by || 'unknown submitter'} — {new Date(s.created_at).toLocaleDateString()}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button
-                      className="account-btn-secondary"
-                      style={{ width: 'auto', color: 'var(--danger)' }}
-                      onClick={() => decidePendingSeries(s.id, 'rejected')}
-                      disabled={pendingSeriesBusy === s.id}
-                    >
-                      Reject
-                    </button>
-                    <button
-                      className="account-btn-primary"
-                      style={{ width: 'auto' }}
-                      onClick={() => decidePendingSeries(s.id, 'approved')}
-                      disabled={pendingSeriesBusy === s.id}
-                    >
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
+        <div id="series-ownership" className="admin-section-divider">Series Ownership</div>
         <div className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Series ownership</div>
           <h3>Who owns each show</h3>
@@ -1786,6 +1840,8 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
       </main>
+        </div>
+      </div>
       <Footer />
 
       {editingEpisode && (
