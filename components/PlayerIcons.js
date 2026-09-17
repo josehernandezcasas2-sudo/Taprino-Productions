@@ -163,6 +163,19 @@ export function TargetIcon({ src, size = 18 }) {
   );
 }
 
+// Two offset cards standing in for "a deck to swipe through" — used on the
+// Pitch Room's Discover button (pages/pitches.js), which previously used a
+// raw 🔀 emoji that rendered inconsistently across operating systems.
+export function SwipeDeckIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="6.5" y="2.5" width="12" height="16" rx="2" transform="rotate(-8 12.5 10.5)" opacity="0.55" />
+      <rect x="4.5" y="5.5" width="14" height="16" rx="2" />
+    </svg>
+  );
+}
+
 export function CardIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (

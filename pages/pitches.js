@@ -4,7 +4,7 @@ import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../lib/accountContext';
-import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { HeartIcon, SwipeDeckIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import { getApprovedPitches, getSavedPitchIds, PITCH_TAGS } from '../lib/pitches';
 import { getSupabase } from '../lib/supabase';
 import { getSiteSettings } from '../lib/siteSettings';
@@ -169,8 +169,9 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         </div>
 
         <div style={{ margin: '1rem 0 1.4rem' }}>
-          <Link href="/pitches/discover" className="account-btn-primary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
-            🔀 Discover — swipe through ideas
+          <Link href="/pitches/discover" className="account-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'auto', textDecoration: 'none' }}>
+            <SwipeDeckIcon size={18} src={iconOverrides.pitch_swipe} />
+            Discover — swipe through ideas
           </Link>
         </div>
 
