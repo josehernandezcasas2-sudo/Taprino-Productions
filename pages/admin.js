@@ -729,18 +729,52 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
   const navSections = [
     { id: 'dashboard', label: 'Dashboard', icon: '◈', count: 0 },
     { id: 'needs-review', label: 'Needs Your Review', icon: '⏳', count: needsReviewCount },
-    { id: 'library', label: 'Content Library', icon: '▤', count: libraryQueueCount },
-    { id: 'site-settings', label: 'Site Settings', icon: '⚙', count: 0 },
+    {
+      id: 'library', label: 'Content Library', icon: '▤', count: libraryQueueCount,
+      children: [
+        { id: 'library-all', label: 'All episodes' },
+        { id: 'library-artwork', label: 'Pending artwork' },
+        { id: 'library-edits', label: 'Pending edits' },
+        { id: 'library-deletions', label: 'Deletions' },
+        { id: 'library-orphans', label: 'Orphaned media' }
+      ]
+    },
+    {
+      id: 'site-settings', label: 'Site Settings', icon: '⚙', count: 0,
+      children: [
+        { id: 'site-settings', label: 'Nav & links' },
+        { id: 'settings-icons', label: 'Icons & branding' },
+        { id: 'settings-newsletter', label: 'Newsletter' }
+      ]
+    },
     { id: 'pitch-room', label: 'Pitch Room', icon: '✦', count: pitchRoomCount },
     { id: 'series-ownership', label: 'Series Ownership', icon: '◫', count: 0 },
     { id: 'access-history', label: 'Access & History', icon: '☰', count: 0 }
   ];
+
+  const sidebarQuickLinks = [
+    { href: '/creator', label: 'Submit work' },
+    { href: '/creator/my-work', label: 'Your work' },
+    { href: '/pitches', label: 'Pitch Room' },
+    { href: '/live', label: 'Live stream page' },
+    { href: '/account', label: 'Account' }
+  ];
+
+  const [expandedSection, setExpandedSection] = useState(null);
 
   function goToSection(id) {
     setSidebarOpen(false);
     if (typeof document !== 'undefined') {
       const el = document.getElementById(id);
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }
+
+  function handleSectionClick(s) {
+    if (s.children) {
+      setExpandedSection(expandedSection === s.id ? null : s.id);
+    } else {
+      goToSection(s.id);
     }
   }
 
@@ -771,13 +805,38 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           <button className="admin-sidebar-close" onClick={() => setSidebarOpen(false)} aria-label="Close admin navigation">✕</button>
           <nav className="admin-sidebar-nav">
             {navSections.map((s) => (
-              <button key={s.id} className="admin-sidebar-link" onClick={() => goToSection(s.id)} title={s.label}>
-                <span className="admin-sidebar-icon">{s.icon}</span>
-                <span className="admin-sidebar-label">{s.label}</span>
-                {s.count > 0 && <span className="admin-sidebar-badge">{s.count}</span>}
-              </button>
+              <div key={s.id} className="admin-sidebar-item">
+                <button
+                  className={`admin-sidebar-link${expandedSection === s.id ? ' admin-sidebar-link-expanded' : ''}`}
+                  onClick={() => handleSectionClick(s)}
+                  title={s.label}
+                >
+                  <span className="admin-sidebar-icon">{s.icon}</span>
+                  <span className="admin-sidebar-label">{s.label}</span>
+                  {s.count > 0 && <span className="admin-sidebar-badge">{s.count}</span>}
+                  {s.children && <span className="admin-sidebar-caret">{expandedSection === s.id ? '▾' : '▸'}</span>}
+                </button>
+                {s.children && expandedSection === s.id && (
+                  <div className="admin-sidebar-subnav">
+                    {s.children.map((c) => (
+                      <button key={c.id} className="admin-sidebar-sublink" onClick={() => goToSection(c.id)}>
+                        {c.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             ))}
           </nav>
+
+          <div className="admin-sidebar-quicklinks">
+            <div className="admin-sidebar-quicklinks-label">Quick links</div>
+            {sidebarQuickLinks.map((l) => (
+              <Link key={l.href} href={l.href} className="admin-sidebar-quicklink" onClick={() => setSidebarOpen(false)}>
+                {l.label}
+              </Link>
+            ))}
+          </div>
         </aside>
 
         <div className="admin-shell-content">
@@ -824,71 +883,12 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </div>
         )}
 
-        {needsReviewCount > 0 && (
-          <div className="review-queue-preview">
-            <div className="review-queue-head">
-              <h3 style={{ margin: 0 }}>Needs your review</h3>
-              <span className="review-queue-count">{needsReviewCount} waiting</span>
-            </div>
-
-            {(submissions || []).slice(0, 3).map((s) => (
-              <div key={`sub-${s.id}`} className="review-queue-row">
-                <span className="review-queue-type sub">Submission</span>
-                <span className="review-queue-title">{s.title}</span>
-                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => goToSection('needs-review')}>
-                  Review →
-                </button>
-              </div>
-            ))}
-
-            {(pendingSeries || []).slice(0, 3).map((s) => (
-              <div key={`ser-${s.id}`} className="review-queue-row">
-                <span className="review-queue-type ser">Series</span>
-                <span className="review-queue-title">{s.name}</span>
-                <div style={{ display: 'flex', gap: '0.4rem' }}>
-                  <button
-                    className="account-btn-secondary"
-                    style={{ width: 'auto', color: 'var(--danger)' }}
-                    onClick={() => decidePendingSeries(s.id, 'rejected')}
-                    disabled={pendingSeriesBusy === s.id}
-                  >
-                    Reject
-                  </button>
-                  <button
-                    className="account-btn-primary"
-                    style={{ width: 'auto' }}
-                    onClick={() => decidePendingSeries(s.id, 'approved')}
-                    disabled={pendingSeriesBusy === s.id}
-                  >
-                    Approve
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {(pendingAds || []).slice(0, 3).map((ad) => (
-              <div key={`ad-${ad.id}`} className="review-queue-row">
-                <span className="review-queue-type ad">Ad</span>
-                <span className="review-queue-title">{ad.title}</span>
-                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReviewingAd(ad)}>
-                  Review →
-                </button>
-              </div>
-            ))}
-
-            {needsReviewCount > 9 && (
-              <div className="review-queue-more">+{needsReviewCount - 9} more below</div>
-            )}
-          </div>
-        )}
-
         <div id="needs-review" className="admin-section-divider">
           Needs Your Review{needsReviewCount > 0 ? ` (${needsReviewCount})` : ''}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">Pending review</div>
-          <h3>Creator submissions</h3>
+        <div className="account-card review-consolidated" style={{ maxWidth: 'none' }}>
+          <div className="review-group-label">Creator submissions</div>
 
           {loading ? (
             <p>Loading…</p>
@@ -987,11 +987,10 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               ))}
             </>
           )}
-        </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">Advertiser ads awaiting review</div>
-          <h3>Submitted via the advertiser dashboard</h3>
+        <div className="review-group-divider"></div>
+        <div className="review-group-label">Advertiser ads</div>
+        <div>
           <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
             View the video, edit any field, and set the billing rate before approving — that rate
             (not shown to the advertiser) is what their budget gets charged per impression.
@@ -1020,15 +1019,16 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
-          <div className="account-eyebrow">New series awaiting review</div>
-          <h3>Series created via &ldquo;Add Series&rdquo;</h3>
+        <div className="review-group-divider"></div>
+        <div className="review-group-label">New series</div>
+        <div>
           <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
             Created through the Creator Studio&rsquo;s standalone &ldquo;Add Series&rdquo; button — no episode
             yet, just the series shell itself (name, description, artwork). The creator can already be
             submitting episodes to it while it sits here; this is about reviewing the series&rsquo; own
             metadata, not gating episode work on it.
           </p>
+
           {pendingSeriesError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{pendingSeriesError}</p>}
           {!pendingSeries ? (
             <p style={{ color: 'var(--ink-dim)' }}>Loading…</p>
@@ -1066,6 +1066,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               ))}
             </div>
           )}
+        </div>
         </div>
 
         <div className="admin-section-divider">Overview &amp; Navigation</div>
@@ -1249,7 +1250,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               </button>
               {siteSettingsSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div id="settings-icons" style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Search icon</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   Replace the default 🔍 emoji in the header with an uploaded image — same idea as genre icons.
@@ -1335,7 +1336,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 {placeholderError && <p style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>{placeholderError}</p>}
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div id="settings-newsletter" style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Newsletter signups</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   {newsletterCount === null ? 'Loading…' : `${newsletterCount} signup${newsletterCount === 1 ? '' : 's'} collected via the footer form.`}
@@ -1482,7 +1483,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         />
 
         <div id="library" className="admin-section-divider">Content Library</div>
-        <div className="account-card" style={{ maxWidth: 'none' }}>
+        <div id="library-all" className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Library</div>
           <h3>Every episode, any status</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1521,7 +1522,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
+        <div id="library-artwork" className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending artwork changes</div>
           <h3>Poster, thumbnail, and trailer changes awaiting approval</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1602,7 +1603,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
+        <div id="library-edits" className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending edits</div>
           <h3>Title &amp; description changes awaiting approval</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1689,7 +1690,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
+        <div id="library-deletions" className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Pending deletions</div>
           <h3>Episode and series removal requests</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1759,7 +1760,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           )}
         </div>
 
-        <div className="account-card" style={{ maxWidth: 'none' }}>
+        <div id="library-orphans" className="account-card" style={{ maxWidth: 'none' }}>
           <div className="account-eyebrow">Orphaned media</div>
           <h3>Files no longer referenced anywhere</h3>
           <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
