@@ -824,6 +824,64 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           </div>
         )}
 
+        {needsReviewCount > 0 && (
+          <div className="review-queue-preview">
+            <div className="review-queue-head">
+              <h3 style={{ margin: 0 }}>Needs your review</h3>
+              <span className="review-queue-count">{needsReviewCount} waiting</span>
+            </div>
+
+            {(submissions || []).slice(0, 3).map((s) => (
+              <div key={`sub-${s.id}`} className="review-queue-row">
+                <span className="review-queue-type sub">Submission</span>
+                <span className="review-queue-title">{s.title}</span>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => goToSection('needs-review')}>
+                  Review →
+                </button>
+              </div>
+            ))}
+
+            {(pendingSeries || []).slice(0, 3).map((s) => (
+              <div key={`ser-${s.id}`} className="review-queue-row">
+                <span className="review-queue-type ser">Series</span>
+                <span className="review-queue-title">{s.name}</span>
+                <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  <button
+                    className="account-btn-secondary"
+                    style={{ width: 'auto', color: 'var(--danger)' }}
+                    onClick={() => decidePendingSeries(s.id, 'rejected')}
+                    disabled={pendingSeriesBusy === s.id}
+                  >
+                    Reject
+                  </button>
+                  <button
+                    className="account-btn-primary"
+                    style={{ width: 'auto' }}
+                    onClick={() => decidePendingSeries(s.id, 'approved')}
+                    disabled={pendingSeriesBusy === s.id}
+                  >
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {(pendingAds || []).slice(0, 3).map((ad) => (
+              <div key={`ad-${ad.id}`} className="review-queue-row">
+                <span className="review-queue-type ad">Ad</span>
+                <span className="review-queue-title">{ad.title}</span>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReviewingAd(ad)}>
+                  Review →
+                </button>
+              </div>
+            ))}
+
+            {needsReviewCount > 9 && (
+              <div className="review-queue-more">+{needsReviewCount - 9} more below</div>
+            )}
+          </div>
+        )}
+
         <div id="needs-review" className="admin-section-divider">
           Needs Your Review{needsReviewCount > 0 ? ` (${needsReviewCount})` : ''}
         </div>
