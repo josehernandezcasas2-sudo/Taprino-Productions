@@ -1,407 +1,62 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/router';
 import Head from 'next/head';
-import { getPublicEpisodes } from '../lib/publicEpisodes';
-import { getAllSeries } from '../lib/series';
-import { getAccountContext } from '../lib/accountContext';
-import { getViewCounts, isRedisConfigured } from '../lib/redis';
-import { buildHeroCandidates } from '../lib/heroCandidates';
-import { useWishlist } from '../lib/useWishlist';
-import GenreRow from '../components/GenreRow';
-import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
-import ContinueWatchingRow from '../components/ContinueWatchingRow';
-import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../lib/contentLifecycle';
-import { getContinueWatching } from '../lib/continueWatching';
-import HeroSpotlight from '../components/HeroSpotlight';
-import SignalPanel from '../components/SignalPanel';
-import InstallButton from '../components/InstallButton';
 import Link from 'next/link';
+import { getAccountContext } from '../lib/accountContext';
+import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
-import { getCurrentLiveStream } from '../lib/liveStreams';
-import { getChannelState } from '../lib/channelSchedule';
-import WishlistButton from '../components/WishlistButton';
+import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
-import StudioTapaPromo from '../components/StudioTapaPromo';
 import { SITE } from '../lib/siteConfig';
-import { contentTypeTag } from '../lib/contentTypeTags';
-import { formatRuntimeLong } from '../lib/videoMetadata';
-import { tierBadge } from '../lib/tierBadge';
 
-export async function getServerSideProps({ req, res }) {
-  // CDN caching, but ONLY for signed-out visitors.
-  //
-  // This page returns per-user props (email, wishlist, isAdmin,
-  // isSubscriber). Caching it publicly for everyone would let Vercel's CDN
-  // serve one visitor's rendered HTML — including their email address and
-  // admin status — to the next person for the life of the cache. That is a
-  // real data leak, not a theoretical one.
-  //
-  // Signed-out visitors, though, all receive identical HTML, and they're
-  // the overwhelming majority of traffic including every crawler. Caching
-  // just that case captures most of the invocation saving with none of the
-  // exposure. The Vary header is what keeps the two populations in
-  // separate cache entries.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
-  if (hasSession) {
-    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  } else {
-    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.setHeader('Vary', 'Cookie');
-  }
-
-  // getAccountContext and getViewCounts are both independent of the four
-  // calls above — neither reads episodes, series, live, or channel data.
-  // Running them sequentially after the first batch means the function
-  // sits idle waiting on I/O it didn't need to wait on. Folding them into
-  // the same parallel batch overlaps that latency instead of stacking it,
-  // which shortens the function's actual running time — and Fluid
-  // compute bills for exactly that: how long the function is active,
-  // including time spent awaiting a response.
-  const needsViewCounts = isRedisConfigured();
-  const [episodesWithBonus, allSeries, liveStream, channelState, account, viewCountsResult, lifecycleSettings] = await Promise.all([
-    getPublicEpisodes(),
-    getAllSeries(),
-    getCurrentLiveStream(),
-    getChannelState(),
-    getAccountContext(req),
-    needsViewCounts ? getViewCounts() : Promise.resolve(null),
-    getLifecycleSettings()
-  ]);
-
-  // Bonus content (BTS, trailers, extras) only ever shows up attached
-  // under its parent series/episode's own page — never as its own
-  // browsable card in genre rows, New Releases, or anywhere else general.
-  // Filtering it out once here, right after the fetch, means every row
-  // and filter below gets the right set automatically instead of needing
-  // its own bonus-content exclusion.
-  const episodesWithBonusRemoved = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
-
-  // Age restriction is enforced at the point someone actually tries to
-  // watch (pages/episode/[id].js), not here. Hiding cards from browsing
-  // entirely made age-restricted titles invisible even to adults who just
-  // hadn't signed in yet, and gave no path to the "sign up, confirm your
-  // age" flow that's supposed to convert that visit into an account.
-  // Showing the card and gating the click is the better funnel.
-  const episodes = episodesWithBonusRemoved;
-
-  // Continue Watching needs `episodes` to already be resolved (it maps
-  // saved positions back to real episode data), so it can't join the
-  // batch above — but it can still run alongside anything that doesn't
-  // depend on episodes, rather than sitting fully sequential after it.
-  // Reusing `hasSession` (already computed above for the cache-control
-  // decision) instead of waiting on `account.isSignedIn` avoids an extra
-  // round of sequencing just to learn something this cookie check already
-  // tells us for free.
-  const continueWatching = hasSession ? await getContinueWatching(req, episodes) : [];
-
-  const newReleases = episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays));
-  const leavingSoon = episodes.filter((e) => isLeavingSoon(e.availableUntil, lifecycleSettings.leavingSoonDays));
-
-  // Signed-out visitors who dismissed/opted out of the newsletter get a
-  // plain cookie so the panel doesn't keep reappearing on this browser —
-  // this one's unrelated to login, so it's untouched by the Clerk switch.
-  let showNewsletterPanel = account.showNewsletterPanel;
-  if (!account.isSignedIn) {
-    const cookieHeader = req.headers.cookie || '';
-    if (/taprino_nl_dismiss=1/.test(cookieHeader)) {
-      showNewsletterPanel = false;
-    }
-  }
-
-  // Build the hero pool — standalone movies/shorts plus whole series
-  // (aggregated by total views across their episodes). With real view data,
-  // the top-viewed items overall win the slot, so a genuinely popular SHOW
-  // can out-rank a single episode and pull people into bingeing it. Without
-  // Redis configured, this falls back to whatever has `featured: true` set.
-  let heroPool;
-  const viewCounts = viewCountsResult || {};
-  if (isRedisConfigured()) {
-    const candidates = buildHeroCandidates(episodes, allSeries, viewCounts);
-    const ranked = candidates.filter((c) => c.views > 0).sort((a, b) => b.views - a.views);
-    heroPool = ranked.length > 0 ? ranked.slice(0, 5) : buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
-  } else {
-    heroPool = buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
-  }
-  if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
+// Placeholder root page — the real homepage (hero, continue watching, genre
+// rows, everything that used to live at "/") moved to pages/stream.js so
+// this route is free for a future, differently-designed landing page.
+// Deliberately minimal for now, per Jose: no design pass yet, just enough
+// to not be a dead end while that's decided. Every other page's own
+// internal "back to home"/nav-active logic already points at /stream, not
+// here — this page is not currently linked to from anywhere else in the
+// app on purpose, so nothing regresses while it sits undesigned.
+export async function getServerSideProps({ req }) {
+  const account = await getAccountContext(req);
+  const episodes = await getPublicEpisodes();
+  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   return {
     props: {
-      liveStream,
-      channelOnAir: channelState.onAir ? { title: channelState.program.title } : null,
-      isSubscriber: account.isSubscriber,
       isSignedIn: account.isSignedIn,
-      showNewsletterPanel,
-      heroPool,
-      wishlist: account.wishlist,
+      isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
-      episodes,
-      allSeries,
-      newReleases,
-      leavingSoon,
-      continueWatching,
-      viewCounts
+      mainGenres
     }
   };
 }
 
-export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching, viewCounts }) {
-  const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
-  const iconOverrides = usePlayerIconOverrides();
-  const router = useRouter();
-  const [query, setQuery] = useState('');
-  const [activeGenre, setActiveGenre] = useState('All');
-  const [activeType, setActiveType] = useState('All');
-
-  // Genre/type picks live in the URL (?genre=, ?type=) so a filtered
-  // view is shareable and survives a refresh, not just local component state.
-  useEffect(() => {
-    if (!router.isReady) return;
-    setActiveGenre(router.query.genre || 'All');
-    setActiveType(router.query.type || 'All');
-    if (typeof router.query.q === 'string') setQuery(router.query.q);
-  }, [router.isReady, router.query.genre, router.query.type, router.query.q]);
-
-  function handleGenreSelect(genre) {
-    setActiveGenre(genre);
-    const q = { ...router.query };
-    if (genre === 'All') delete q.genre; else q.genre = genre;
-    router.push({ pathname: '/', query: q }, undefined, { shallow: true });
-  }
-
-  function handleTypeSelect(t) {
-    setActiveType(t);
-    const q = { ...router.query };
-    if (t === 'All') delete q.type; else q.type = t;
-    router.push({ pathname: '/', query: q }, undefined, { shallow: true });
-  }
-
-  // Only ever includes genres that at least one episode actually has —
-  // this is what keeps an empty genre from ever showing up as its own row
-  // or browse option. No separate "hide if empty" check needed anywhere
-  // else; there's simply nothing to filter down to.
-  const mainGenres = useMemo(
-    () => [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-    [episodes]
-  );
-
-  const searchResults = useMemo(() => {
-    if (!query.trim()) return null;
-    const q = query.trim().toLowerCase();
-    return episodes.filter((e) =>
-      [e.title, e.desc, e.artist, e.genre].filter(Boolean).some((field) => field.toLowerCase().includes(q))
-    );
-  }, [query]);
-
-  function goToEpisode(ep) {
-    if (ep.isSeries) {
-      // Play should mean "start watching," same as it does for standalone
-      // content — jump straight to episode 1 rather than the series'
-      // overview page. Falls back to the overview only if a series
-      // somehow has no episodes at all (shouldn't happen in practice).
-      if (ep.firstEpisodeId) {
-        router.push(`/episode/${ep.firstEpisodeId}?autoplay=1`);
-      } else {
-        router.push(`/series/${ep.id}`);
-      }
-    } else if (ep.contentType === 'podcast' && ep.seriesId) {
-      // The episode page has no podcast-specific handling at all — no
-      // audio player for audio-only episodes, no show grouping. Podcasts
-      // play via the mini-player that lives on their show page, not a
-      // dedicated full-screen video view, so there's no "autoplay"
-      // variant to jump to the way there is for video content.
-      router.push(`/podcasts/${ep.seriesId}`);
-    } else {
-      // ?autoplay=1 tells the episode page to skip its landing view and
-      // jump straight into playback — clicking Play should mean "start
-      // watching now," not "show me the info page first."
-      router.push(`/episode/${ep.id}?autoplay=1`);
-    }
-  }
-
-  // Browsing a library row is a different action than pressing Play —
-  // clicking a card here means "tell me more about this," not "start
-  // playing it immediately." Series cards in GenreRow already link
-  // straight to /series/[id] on their own (no onSelect involved at all),
-  // so this only ever runs for standalone movies/shorts — landing on
-  // the same info page the episode route already shows by default when
-  // there's no autoplay/trailer query param, letting someone read the
-  // description and decide before committing to watching.
-  function goToEpisodeInfo(ep) {
-    if (ep.contentType === 'podcast' && ep.seriesId) {
-      router.push(`/podcasts/${ep.seriesId}`);
-    } else {
-      router.push(`/episode/${ep.id}`);
-    }
-  }
-  function goToTrailer(ep) {
-    // Series has no "trailer landing page" of its own the way a movie
-    // does — /series/[id] already IS the info page (seasons, episodes,
-    // description), so More Info on a series just goes straight there.
-    // No query param at all — this lands on the standalone landing view
-    // (trailer plays ambiently in the background, same as the hero does),
-    // where the actual Play button lives. More Info should inform, not
-    // immediately commit to playing something.
-    if (ep.isSeries) {
-      router.push(`/series/${ep.id}`);
-    } else if (ep.contentType === 'podcast' && ep.seriesId) {
-      router.push(`/podcasts/${ep.seriesId}`);
-    } else {
-      router.push(`/episode/${ep.id}`);
-    }
-  }
-
+export default function Home({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres }) {
   return (
     <>
       <Head>
         <title>{SITE.name}</title>
-        <meta name="description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a ${SITE.premiumTier} membership tier.`} />
-        <meta property="og:title" content={SITE.name} />
-        <meta property="og:description" content={`${SITE.studio}'s screening room — free episodes, ad-supported, with a ${SITE.premiumTier} membership tier.`} />
-        <meta property="og:image" content="/og-image.png" />
-        <meta property="og:type" content="website" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={SITE.name} />
-        <meta name="twitter:description" content={`${SITE.studio}'s screening room.`} />
-        <meta name="twitter:image" content="/og-image.png" />
+        <meta name="description" content={`${SITE.studio} — ${SITE.premiumTier} streaming, funded projects, and more.`} />
       </Head>
 
-      <HeaderNav
-        activeType={activeType}
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-        liveStream={liveStream}
-      />
-      <div className="install-row"><InstallButton /></div>
+      <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
-      {liveStream && (
-        <Link href="/live" className="live-now-banner">
-          <i className="live-dot" aria-hidden="true" />
-          <span><strong>Live now</strong> — {liveStream.title}</span>
-          <span className="live-now-arrow">Watch →</span>
+      <main className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem', paddingBottom: '4rem' }}>
+        <div className="install-row"><InstallButton /></div>
+        <h1>{SITE.name}</h1>
+        <p style={{ maxWidth: '48ch', margin: '0 auto 1.6rem', color: 'var(--ink-dim)' }}>
+          This page is a placeholder — the real homepage design hasn&rsquo;t been built yet.
+          Everything that used to live here is still fully working, just moved.
+        </p>
+        <Link href="/stream" className="account-btn-primary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
+          Go to the screening room →
         </Link>
-      )}
-
-      <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
-
-      <main id="main-content" className="stage stage-single stage-wide">
-        <div>
-          <ContinueWatchingRow items={continueWatching} onSelect={goToEpisode} />
-          <GenreRow
-            title="New Releases"
-            seeAllHref="/collection/new-releases"
-            episodes={newReleases}
-            allSeries={allSeries}
-            currentId={null}
-            onSelect={goToEpisodeInfo}
-            isWishlisted={isWishlisted}
-            onToggleWishlist={toggleWishlist}
-            viewCounts={viewCounts}
-          />
-          <GenreRow
-            title="Leaving Soon"
-            seeAllHref="/collection/leaving-soon"
-            episodes={leavingSoon}
-            allSeries={allSeries}
-            currentId={null}
-            onSelect={goToEpisodeInfo}
-            isWishlisted={isWishlisted}
-            onToggleWishlist={toggleWishlist}
-            viewCounts={viewCounts}
-          />
-          <StudioTapaPromo isSubscriber={isSubscriber} />
-          {searchResults ? (
-            <>
-              <div className="shelf-heading">
-                {searchResults.length} result{searchResults.length === 1 ? '' : 's'} for &ldquo;{query}&rdquo;
-                <button
-                  className="trailer-link"
-                  style={{ marginLeft: '0.8rem' }}
-                  onClick={() => {
-                    setQuery('');
-                    const q = { ...router.query };
-                    delete q.q;
-                    router.push({ pathname: '/', query: q }, undefined, { shallow: true });
-                  }}
-                >
-                  ✕ Clear search
-                </button>
-              </div>
-              <div className="shelf">
-                {searchResults.map((ep) => (
-                  <div key={ep.id} className="card-wrap">
-                    {ep.contentType !== 'series' && (
-                      <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggleWishlist(ep.id)} />
-                    )}
-                    <button className={`ep-card ${tierBadge(ep.tier, ep.adsEnabled).key}`} onClick={() => goToEpisode(ep)}>
-                      <div className="ep-thumb">
-                        <span className="ep-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-                        {ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>}
-                        <div className="ep-info">
-                          <h4>{ep.title}</h4>
-                          <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
-                          {ep.contentType === 'series' ? (
-                            <span className="type-line series">
-                              ▤ {(allSeries.find((s) => s.id === ep.seriesId) || {}).name || 'Series'}{ep.seriesOrder ? ` · Ep. ${ep.seriesOrder}` : ''}
-                            </span>
-                          ) : (
-                            <span className={`type-line ${contentTypeTag(ep.contentType).key}`}>{contentTypeTag(ep.contentType).label}</span>
-                          )}
-                        </div>
-                      </div>
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <>
-              {(() => {
-                const visibleCount = episodes.filter(
-                  (e) =>
-                    (activeGenre === 'All' || e.mainGenre === activeGenre) &&
-                    (activeType === 'All' || e.contentType === activeType)
-                ).length;
-                if (visibleCount === 0) {
-                  const label = [
-                    activeType !== 'All' ? ({ series: 'Series', movie: 'Movies', short: 'Shorts' }[activeType]) : null,
-                    activeGenre !== 'All' ? activeGenre : null
-                  ].filter(Boolean).join(' · ');
-                  return <div className="poster-empty">Nothing in {label || 'this filter'} yet — check back soon.</div>;
-                }
-                return null;
-              })()}
-              {mainGenres
-                .filter((g) => activeGenre === 'All' || g === activeGenre)
-                .map((g) => (
-                  <GenreRow
-                    key={g}
-                    title={g}
-                    seeAllHref={`/genre/${encodeURIComponent(g)}`}
-                    episodes={episodes.filter(
-                      (e) => e.mainGenre === g && (activeType === 'All' || e.contentType === activeType)
-                    )}
-                    allSeries={allSeries}
-                    currentId={null}
-                    onSelect={goToEpisodeInfo}
-                    isWishlisted={isWishlisted}
-                    onToggleWishlist={toggleWishlist}
-                    viewCounts={viewCounts}
-                  />
-                ))}
-            </>
-          )}
-        </div>
       </main>
 
-      <Footer />
       <MobileTabBar />
+      <Footer />
     </>
   );
 }

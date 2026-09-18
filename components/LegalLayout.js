@@ -26,7 +26,7 @@ export default function LegalLayout({ title, updated, summary, children, account
       />
 
       <main className="stage stage-single legal-page">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
 
         <div className="eyebrow">Legal</div>
         <h1>{title}</h1>

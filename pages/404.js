@@ -21,7 +21,7 @@ export default function NotFound() {
           plenty else to watch.
         </p>
         <div className="error-actions">
-          <Link href="/" className="account-btn-primary">Back to the screening room</Link>
+          <Link href="/stream" className="account-btn-primary">Back to the screening room</Link>
           <Link href="/channel" className="account-btn-secondary">See what&rsquo;s on the channel</Link>
         </div>
       </main>

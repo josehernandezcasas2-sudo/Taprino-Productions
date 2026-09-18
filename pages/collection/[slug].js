@@ -100,7 +100,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="library-heading">{label}</div>
         <div className="library-sub">{episodes.length} title{episodes.length === 1 ? '' : 's'}</div>
 

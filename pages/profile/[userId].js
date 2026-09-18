@@ -64,7 +64,7 @@ export default function PublicProfile({ profile, mainGenres, isSignedIn, isSubsc
       />
 
       <main id="main-content" className="stage stage-single" style={{ maxWidth: '480px' }}>
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="profile-header">
           <div
             className="profile-avatar"

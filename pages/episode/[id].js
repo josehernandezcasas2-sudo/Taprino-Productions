@@ -269,7 +269,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
               </>
             )}
             <div style={{ marginTop: '1rem' }}>
-              <BackButton fallbackHref="/" />
+              <BackButton fallbackHref="/stream" />
             </div>
           </div>
         </main>

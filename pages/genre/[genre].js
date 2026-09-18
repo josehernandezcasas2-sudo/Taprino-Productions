@@ -157,7 +157,7 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
 
       <main id="main-content" className="stage stage-single stage-wide">
         <div>
-          <BackButton fallbackHref="/" />
+          <BackButton fallbackHref="/stream" />
           {episodes.length === 0 ? (
             <div className="poster-empty">Nothing tagged {genre} yet — check back soon.</div>
           ) : (

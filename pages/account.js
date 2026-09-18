@@ -259,7 +259,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       />
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="account-card">
           {isSignedIn && (
             <div className="account-avatar-row">
@@ -347,7 +347,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       <li>Gated series only {SITE.premiumTier} members can watch</li>
                       <li>Back the creators you watch, directly</li>
                     </ul>
-                    <Link href="/" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
+                    <Link href="/stream" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
                       Join {SITE.premiumTier}
                     </Link>
                   </>

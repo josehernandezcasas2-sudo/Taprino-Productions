@@ -135,7 +135,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       )}
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <GenreBrowseRow genres={mainGenres} icons={genreIcons} />
 
         <div className="library-heading">{label}</div>

@@ -20,7 +20,7 @@ export async function getServerSideProps({ req, res }) {
   // Same gate as the existing loop scheduler (admin/channel.js) — a
   // sub-admin who can manage one can manage the other.
   if (!account.canAccessAdmin || !hasCapability(account, 'manage_schedule')) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const [episodes, schedule] = await Promise.all([getPublicEpisodes(), listWeeklySchedule()]);
   return {

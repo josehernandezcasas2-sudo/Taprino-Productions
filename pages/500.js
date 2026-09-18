@@ -20,7 +20,7 @@ export default function ServerError() {
           to know.
         </p>
         <div className="error-actions">
-          <Link href="/" className="account-btn-primary">Back to the screening room</Link>
+          <Link href="/stream" className="account-btn-primary">Back to the screening room</Link>
         </div>
       </main>
     </>

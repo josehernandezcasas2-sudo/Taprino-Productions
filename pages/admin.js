@@ -23,7 +23,7 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   if (!account.isAdmin) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
@@ -1109,7 +1109,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             disabled page looks without turning it on for everyone first.
           </p>
           <div className="admin-quicklinks-grid">
-            <Link href="/" className="account-quicklink">Home</Link>
+            <Link href="/stream" className="account-quicklink">Home</Link>
             <Link href="/type/series" className="account-quicklink">Series</Link>
             <Link href="/type/movie" className="account-quicklink">Films</Link>
             <Link href="/type/vertical" className="account-quicklink">Vertical</Link>

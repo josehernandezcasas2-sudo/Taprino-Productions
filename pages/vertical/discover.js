@@ -240,7 +240,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                 <Link href="/vertical/browse" className="reel-end-btn secondary">
                   Browse other vertical series
                 </Link>
-                <Link href="/" className="reel-end-home">or go back to Home</Link>
+                <Link href="/stream" className="reel-end-home">or go back to Home</Link>
               </div>
             )}
           </div>

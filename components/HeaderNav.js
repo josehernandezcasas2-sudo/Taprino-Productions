@@ -70,7 +70,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     e.preventDefault();
     const term = searchValue.trim();
     if (!term) return;
-    router.push({ pathname: '/', query: { q: term } });
+    router.push({ pathname: '/stream', query: { q: term } });
     setOpenMenu(null);
   }
 
@@ -102,7 +102,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   // Room all get their own real match now, straight from router.pathname.
   const currentPath = router.pathname;
   const currentTypeParam = currentPath === '/type/[type]' ? router.query.type : null;
-  const isHome = currentPath === '/' && (activeType === 'All' || !activeType);
+  const isHome = currentPath === '/stream' && (activeType === 'All' || !activeType);
   const isWishlistPage = currentPath === '/wishlist';
   const isRecsPage = currentPath === '/recs';
   const isChannelPage = currentPath === '/channel';
@@ -134,7 +134,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   return (
     <header className="channel-bar top-nav" ref={rootRef}>
       <div className="nav-left">
-        <Link href="/" className="brand-mark">
+        <Link href="/stream" className="brand-mark">
           {siteSettings && siteSettings.logoUrl ? (
             <img src={siteSettings.logoUrl} alt="" className="nav-logo-image" />
           ) : (

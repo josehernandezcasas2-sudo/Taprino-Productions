@@ -13,7 +13,7 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   if (!account.isCreator) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const { userId } = getAuth(req);
   const [episodes, pitches] = await Promise.all([getPublicEpisodes(), getPitchesForCreator(userId)]);

@@ -17,7 +17,7 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   if (!account.isCreator) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const [allSeries, episodes] = await Promise.all([getAllSeriesForCreator(), getPublicEpisodes()]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];

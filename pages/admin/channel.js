@@ -18,7 +18,7 @@ export async function getServerSideProps({ req, res }) {
   // manage_schedule permission bounces the same as a non-admin would,
   // exactly like the nav entry that leads here being hidden for them too.
   if (!account.canAccessAdmin || !hasCapability(account, 'manage_schedule')) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const episodes = await getPublicEpisodes();
   return {

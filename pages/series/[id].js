@@ -148,7 +148,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       />
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
 
         <div className="series-tabs">
           <button className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>

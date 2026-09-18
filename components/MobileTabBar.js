@@ -105,7 +105,7 @@ export default function MobileTabBar() {
     };
   }, [openMenu]);
 
-  const homeActive = path === '/';
+  const homeActive = path === '/stream';
   const openGroup = openMenu ? GROUPS[openMenu] : null;
   const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles) : openGroup.items) : [];
 
@@ -132,7 +132,7 @@ export default function MobileTabBar() {
         <span className="tabbar-label">Discover</span>
       </button>
 
-      <Link href="/" className={`tabbar-item ${homeActive ? 'active' : ''}`} aria-current={homeActive ? 'page' : undefined}>
+      <Link href="/stream" className={`tabbar-item ${homeActive ? 'active' : ''}`} aria-current={homeActive ? 'page' : undefined}>
         <span className="tabbar-glyph"><HouseIcon size={20} src={iconOverrides.tab_home} /></span>
         <span className="tabbar-label">Home</span>
       </Link>

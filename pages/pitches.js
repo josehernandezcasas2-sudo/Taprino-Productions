@@ -160,7 +160,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
       )}
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="library-heading">Pitch Room</div>
         <div className="library-sub">
           Projects looking for backing. Studio Tapa doesn&rsquo;t handle any of this funding directly —

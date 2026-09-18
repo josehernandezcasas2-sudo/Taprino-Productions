@@ -87,7 +87,7 @@ export default function Channel({ channelState, weeklySchedule, todaysDayOfWeek,
       <div className="install-row"><InstallButton /></div>
 
       <main className="stage stage-single stage-wide">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="player-card">
           <ChannelPlayer initialState={channelState} isSubscriber={isSubscriber} isAdmin={isAdmin} />
         </div>

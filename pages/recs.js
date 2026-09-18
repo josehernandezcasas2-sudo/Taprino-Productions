@@ -82,7 +82,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
         <div className="library-heading">My Recs</div>
 
         {!isSignedIn ? (

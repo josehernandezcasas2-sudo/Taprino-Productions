@@ -13,7 +13,7 @@ export async function getServerSideProps({ req }) {
   // Same gate as the video-episode submission page — pitch submission
   // requires the creator role, not just any signed-in account.
   if (!account.isCreator) {
-    return { redirect: { destination: '/', permanent: false } };
+    return { redirect: { destination: '/stream', permanent: false } };
   }
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];

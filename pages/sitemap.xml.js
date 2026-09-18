@@ -7,7 +7,8 @@ import { getAllSeries } from '../lib/series';
 // tooling, and the account page are excluded here and in robots.txt.
 function buildSitemap(origin, episodes, series, genres) {
   const staticPages = [
-    { path: '/', priority: '1.0', freq: 'daily' },
+    { path: '/', priority: '0.5', freq: 'monthly' },
+    { path: '/stream', priority: '1.0', freq: 'daily' },
     { path: '/about', priority: '0.6', freq: 'monthly' },
     { path: '/contact', priority: '0.6', freq: 'monthly' },
     { path: '/apply', priority: '0.7', freq: 'monthly' },

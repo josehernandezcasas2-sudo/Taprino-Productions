@@ -116,7 +116,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
       <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
-        <BackButton fallbackHref="/" />
+        <BackButton fallbackHref="/stream" />
 
         {continueList.length > 0 && (
           <>
