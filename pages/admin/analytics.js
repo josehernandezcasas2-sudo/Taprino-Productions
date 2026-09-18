@@ -112,7 +112,7 @@ export default function WatchAnalytics() {
                   <p style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>Nothing watched yet.</p>
                 ) : (
                   data.mostWatched.map((ep, i) => (
-                    <div key={ep.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0', borderTop: i > 0 ? '1px solid rgba(234,231,221,0.08)' : 'none' }}>
+                    <div key={ep.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0', borderTop: i > 0 ? '1px solid rgba(251,232,211,0.08)' : 'none' }}>
                       <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink-dim)', fontSize: '0.78rem', width: '1.2rem' }}>{i + 1}</span>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title}</div>
@@ -134,7 +134,7 @@ export default function WatchAnalytics() {
                   <p style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>Nothing published yet.</p>
                 ) : (
                   data.leastWatched.map((ep, i) => (
-                    <div key={ep.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0', borderTop: i > 0 ? '1px solid rgba(234,231,221,0.08)' : 'none' }}>
+                    <div key={ep.id} style={{ display: 'flex', alignItems: 'center', gap: '0.7rem', padding: '0.55rem 0', borderTop: i > 0 ? '1px solid rgba(251,232,211,0.08)' : 'none' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: '0.85rem', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ep.title}</div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--ink-dim)' }}>{TYPE_LABEL[ep.contentType] || ep.contentType}</div>

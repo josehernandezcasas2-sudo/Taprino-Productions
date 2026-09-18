@@ -201,7 +201,7 @@ export default function PromoCodesAdmin({ mainGenres, isSignedIn, isSubscriber, 
                     <code style={{ fontFamily: 'var(--font-mono)', fontSize: '0.95rem' }}>{c.code}</code>
                     <button
                       onClick={() => copyCode(c.code)}
-                      style={{ background: 'none', border: '1px solid rgba(234,231,221,0.25)', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.72rem', color: 'var(--ink-dim)', cursor: 'pointer' }}
+                      style={{ background: 'none', border: '1px solid rgba(251,232,211,0.25)', borderRadius: '4px', padding: '0.15rem 0.5rem', fontSize: '0.72rem', color: 'var(--ink-dim)', cursor: 'pointer' }}
                     >
                       {copiedCode === c.code ? 'Copied!' : 'Copy'}
                     </button>

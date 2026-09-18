@@ -511,11 +511,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                     separate .player-meta row below this one, which also
                     repeated the runtime a second time — everything about
                     this episode's status now lives in this one row. */}
-                <span className="trailer-link" style={{ borderColor: 'rgba(234,231,221,0.18)' }}>
+                <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
                   {episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
                 </span>
                 {describedActive && (
-                  <span className="trailer-link" style={{ borderColor: 'rgba(234,231,221,0.18)' }}>🔊 Audio described</span>
+                  <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>🔊 Audio described</span>
                 )}
                 <button
                   className="trailer-link"

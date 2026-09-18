@@ -137,7 +137,7 @@ export default function SiteIconsAdmin({ mainGenres, isSignedIn, isSubscriber, e
                 <div
                   style={{
                     width: '64px', height: '64px', borderRadius: '10px',
-                    background: 'var(--surface-1)', border: '1px solid rgba(234,231,221,0.14)',
+                    background: 'var(--surface-1)', border: '1px solid rgba(251,232,211,0.14)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, overflow: 'hidden'
                   }}
                 >

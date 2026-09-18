@@ -515,7 +515,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                     </div>
 
                     {ageWasChanged && (
-                      <div style={{ background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+                      <div style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
                         <p style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
                           <strong>Before you save this change:</strong> the age you provide here determines
                           which age-restricted titles are shown to you — content rated for adults won&rsquo;t

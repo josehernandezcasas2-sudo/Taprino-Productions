@@ -94,7 +94,7 @@ export default function AddPitchForm({ onSubmitted }) {
       </p>
 
       {existingDraft && !draftApplied && (
-        <div className="account-card" style={{ background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)', marginBottom: '1rem' }}>
+        <div className="account-card" style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 0.8rem' }}>You have an unsaved draft of a project pitch. Resume where you left off?</p>
           <button className="account-btn-primary" type="button" style={{ width: 'auto', marginRight: '0.6rem' }} onClick={resumeDraft}>Resume draft</button>
           <button className="account-btn-secondary" type="button" style={{ width: 'auto' }} onClick={dismissDraft}>Start fresh</button>

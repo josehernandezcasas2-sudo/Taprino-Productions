@@ -295,7 +295,7 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
                   </div>
                 )}
 
-                <div style={{ marginTop: '0.9rem', paddingTop: '0.7rem', borderTop: '1px solid rgba(234,231,221,0.08)' }}>
+                <div style={{ marginTop: '0.9rem', paddingTop: '0.7rem', borderTop: '1px solid rgba(251,232,211,0.08)' }}>
                   {s.deletionRequested ? (
                     <>
                       <p style={{ fontSize: '0.8rem', color: 'var(--signal-amber)', margin: '0 0 0.4rem' }}>

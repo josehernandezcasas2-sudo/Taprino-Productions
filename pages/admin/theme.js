@@ -126,7 +126,7 @@ export default function ThemeAdmin() {
                       type="text"
                       value={values[v.key]}
                       onChange={(e) => setColor(v.key, e.target.value)}
-                      style={{ width: 90, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', background: 'var(--surface-2)', border: '1px solid rgba(234,231,221,0.15)', borderRadius: 5, padding: '0.3rem 0.5rem', color: 'var(--ink)' }}
+                      style={{ width: 90, fontFamily: 'var(--font-mono)', fontSize: '0.8rem', background: 'var(--surface-2)', border: '1px solid rgba(251,232,211,0.15)', borderRadius: 5, padding: '0.3rem 0.5rem', color: 'var(--ink)' }}
                     />
                     {values[v.key].toLowerCase() !== v.default.toLowerCase() && (
                       <button
@@ -141,7 +141,7 @@ export default function ThemeAdmin() {
               </div>
             ))}
 
-            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid rgba(234,231,221,0.1)', paddingTop: '1.2rem' }}>
+            <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', marginTop: '1rem', borderTop: '1px solid rgba(251,232,211,0.1)', paddingTop: '1.2rem' }}>
               <button
                 onClick={saveAll}
                 disabled={saving}
@@ -151,7 +151,7 @@ export default function ThemeAdmin() {
               </button>
               <button
                 onClick={resetAllToDefault}
-                style={{ background: 'none', border: '1px solid rgba(234,231,221,0.2)', color: 'var(--ink)', borderRadius: 6, padding: '0.6rem 1.1rem', cursor: 'pointer', fontSize: '0.85rem' }}
+                style={{ background: 'none', border: '1px solid rgba(251,232,211,0.2)', color: 'var(--ink)', borderRadius: 6, padding: '0.6rem 1.1rem', cursor: 'pointer', fontSize: '0.85rem' }}
               >
                 Reset everything to default
               </button>

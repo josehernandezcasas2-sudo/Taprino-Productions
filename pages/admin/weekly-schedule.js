@@ -213,7 +213,7 @@ export default function WeeklyScheduleAdmin({ availableEpisodes, initialSchedule
             + Add slot to {DAY_LABELS_FULL[activeDay]}
           </button>
         ) : (
-          <form onSubmit={handleAddSlot} style={{ border: '1px solid rgba(234,231,221,0.15)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
+          <form onSubmit={handleAddSlot} style={{ border: '1px solid rgba(251,232,211,0.15)', borderRadius: '10px', padding: '1rem', marginBottom: '1rem' }}>
             <label>Slot type</label>
             <select value={slotType} onChange={(e) => setSlotType(e.target.value)}>
               <option value="episode">Episode</option>
@@ -255,7 +255,7 @@ export default function WeeklyScheduleAdmin({ availableEpisodes, initialSchedule
           </form>
         )}
 
-        <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', paddingTop: '1rem' }}>
+        <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', paddingTop: '1rem' }}>
           <label>Copy {DAY_LABELS_FULL[activeDay]}&rsquo;s lineup to another day</label>
           <div style={{ display: 'flex', gap: '0.5rem' }}>
             <select value={copyTarget} onChange={(e) => setCopyTarget(e.target.value)} style={{ flex: 1 }}>

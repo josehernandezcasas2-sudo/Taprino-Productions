@@ -165,9 +165,9 @@ export default function RssImportPanel({ allSeries, onImported }) {
           <label style={{ marginTop: '0.8rem', display: 'block' }}>
             Episodes ({selected.size} of {preview.episodes.length} selected)
           </label>
-          <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid rgba(234,231,221,0.15)', borderRadius: 6, padding: '0.5rem', marginBottom: '1rem' }}>
+          <div style={{ maxHeight: 320, overflowY: 'auto', border: '1px solid rgba(251,232,211,0.15)', borderRadius: 6, padding: '0.5rem', marginBottom: '1rem' }}>
             {preview.episodes.map((ep) => (
-              <label key={ep.guid} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.4rem 0', fontWeight: 'normal', borderBottom: '1px solid rgba(234,231,221,0.06)' }}>
+              <label key={ep.guid} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', padding: '0.4rem 0', fontWeight: 'normal', borderBottom: '1px solid rgba(251,232,211,0.06)' }}>
                 <input type="checkbox" checked={selected.has(ep.guid)} onChange={() => toggleEpisode(ep.guid)} style={{ marginTop: '0.2rem' }} />
                 <span>
                   <strong style={{ fontSize: '0.85rem' }}>{ep.title}</strong>

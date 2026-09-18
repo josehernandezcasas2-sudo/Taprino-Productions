@@ -930,7 +930,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               )}
 
               {submissions.map((s) => (
-                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '1rem 0' }}>
+                <div key={s.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '1rem 0' }}>
                   <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start' }}>
                     <input
                       type="checkbox"
@@ -1085,7 +1085,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <p>Nothing in the rotation right now.</p>
           ) : (
             library.filter((e) => e.featured).map((e) => (
-              <div key={e.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.7rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div key={e.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.7rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <div>
                   <h4 style={{ margin: '0 0 0.2rem' }}>{e.title}</h4>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-dim)' }}>
@@ -1144,7 +1144,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <>
               {siteSettingsError && <p style={{ color: 'var(--danger)' }}>{siteSettingsError}</p>}
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.6rem' }}>
                   <input
                     type="checkbox"
@@ -1174,7 +1174,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 )}
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
@@ -1185,7 +1185,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </label>
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
@@ -1196,7 +1196,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </label>
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
@@ -1207,7 +1207,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </label>
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
                     type="checkbox"
@@ -1218,7 +1218,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </label>
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'block', marginBottom: '0.4rem' }}>
                   My Recs — closeness ({siteSettings.recommendationCloseness}/10)
                 </label>
@@ -1251,7 +1251,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               </button>
               {siteSettingsSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
 
-              <div id="settings-icons" style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div id="settings-icons" style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Search icon</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   Replace the default 🔍 emoji in the header with an uploaded image — same idea as genre icons.
@@ -1277,7 +1277,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 />
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Site logo</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   Replace the plain "ST" text badge in the header with your actual logo. Square or wide
@@ -1304,7 +1304,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 />
               </div>
 
-              <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Placeholder content</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   Generate one sample item for each content type — movie, series (2 episodes), short,
@@ -1337,7 +1337,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 {placeholderError && <p style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>{placeholderError}</p>}
               </div>
 
-              <div id="settings-newsletter" style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
+              <div id="settings-newsletter" style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0 0', marginTop: '0.9rem' }}>
                 <div style={{ marginBottom: '0.5rem' }}>Newsletter signups</div>
                 <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
                   {newsletterCount === null ? 'Loading…' : `${newsletterCount} signup${newsletterCount === 1 ? '' : 's'} collected via the footer form.`}
@@ -1366,7 +1366,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           {pitchError && <p style={{ color: 'var(--danger)' }}>{pitchError}</p>}
 
           {reportedComments && reportedComments.length > 0 && (
-            <div style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0', marginBottom: '0.6rem' }}>
+            <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0', marginBottom: '0.6rem' }}>
               <strong style={{ color: 'var(--danger)' }}>Reported comments ({reportedComments.length})</strong>
               {reportedComments.map((c) => (
                 <div key={c.id} style={{ border: '1px solid #333', borderRadius: 8, padding: 10, marginTop: 8 }}>
@@ -1430,7 +1430,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </div>
                 <div style={{ fontSize: 13, opacity: 0.75, marginTop: 4 }}>{p.logline}</div>
                 {p.status === 'approved' && (
-                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(234,231,221,0.1)' }}>
+                  <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(251,232,211,0.1)' }}>
                     {p.funding_enabled ? (
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                         <span style={{ fontSize: 12, color: 'var(--ok)' }}>
@@ -1506,7 +1506,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <p>No episodes match.</p>
           ) : (
             library.map((e) => (
-              <div key={e.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div key={e.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <div>
                   <h4 style={{ margin: '0 0 0.2rem' }}>{e.title}</h4>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: 'var(--ink-dim)' }}>
@@ -1540,7 +1540,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           ) : (
             <>
               {pendingArtwork.episodes.map((e) => (
-                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--signal-amber)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Episode</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{e.title}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1569,7 +1569,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               ))}
 
               {pendingArtwork.series.map((s) => (
-                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
@@ -1621,7 +1621,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           ) : (
             <>
               {pendingEdits.episodes.map((e) => (
-                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--signal-amber)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Episode</div>
                   {e.pendingTitle && (
                     <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>
@@ -1655,7 +1655,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               ))}
 
               {pendingEdits.series.map((s) => (
-                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Show / series</div>
                   {s.pendingName && (
                     <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>
@@ -1707,7 +1707,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           ) : (
             <>
               {deletions.episodes.map((e) => (
-                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`episode-${e.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--signal-amber)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Episode</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{e.title}{e.artist ? ` — by ${e.artist}` : ''}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {e.reason}</p>
@@ -1733,7 +1733,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
               ))}
 
               {deletions.series.map((s) => (
-                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.9rem 0' }}>
+                <div key={`series-${s.id}`} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.65rem', color: 'var(--brass)', marginBottom: '0.2rem', textTransform: 'uppercase' }}>Series</div>
                   <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
                   <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {s.reason}</p>
@@ -1777,7 +1777,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <p>Nothing orphaned right now.</p>
           ) : (
             orphans.map((o) => (
-              <div key={o.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <div key={o.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.8rem 0', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: o.kind === 'cloudflare_video' ? 'var(--signal-amber)' : 'var(--brass)', textTransform: 'uppercase', marginBottom: '0.2rem' }}>
                     {o.kind === 'cloudflare_video' ? 'Cloudflare video' : 'Storage image'}
@@ -1809,7 +1809,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <p>No creators or admins yet.</p>
           ) : (
             roster.map((c) => (
-              <div key={c.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.7rem 0' }}>
+              <div key={c.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.7rem 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
                   <strong style={{ fontSize: '0.9rem' }}>{c.email || '(no email on file)'}</strong>
                   <span style={{ fontFamily: 'var(--font-mono)', fontSize: '0.68rem', color: c.role === 'admin' ? 'var(--brass)' : 'var(--signal-amber)' }}>
@@ -1847,7 +1847,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <>
               {ownershipError && <p style={{ color: 'var(--danger)' }}>{ownershipError}</p>}
               {seriesOwnership.map((s) => (
-                <div key={s.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+                <div key={s.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.8rem 0', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
                   <div style={{ flex: '1 1 200px' }}>
                     <div style={{ fontSize: '0.9rem' }}>{s.name}</div>
                     <div style={{ fontSize: '0.75rem', color: s.ownerEmail ? 'var(--ink-dim)' : 'var(--signal-amber)' }}>
@@ -1886,7 +1886,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
             <p>Nothing logged yet.</p>
           ) : (
             auditLog.map((entry) => (
-              <div key={entry.id} style={{ borderTop: '1px solid rgba(234,231,221,0.1)', padding: '0.6rem 0', fontSize: '0.8rem' }}>
+              <div key={entry.id} style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.6rem 0', fontSize: '0.8rem' }}>
                 <span style={{ color: 'var(--ink-dim)', fontFamily: 'var(--font-mono)', fontSize: '0.68rem' }}>
                   {new Date(entry.createdAt).toLocaleString()}
                 </span>

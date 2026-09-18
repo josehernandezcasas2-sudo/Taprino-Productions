@@ -186,7 +186,7 @@ export default function PlayerIconsAdmin({ mainGenres, isSignedIn, isSubscriber,
               Site Settings page. That old field still technically works, but this page now takes
               priority over it — upload here going forward rather than there.
             </p>
-            <div style={{ background: 'rgba(217,143,62,0.1)', border: '1px solid rgba(217,143,62,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+            <div style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
               <strong>Sizing recommendation:</strong> square images, at least 64×64px (128×128px or
               larger holds up better on high-density/retina screens). Transparent PNG or SVG works
               best — these render small (typically 18–32px), so simple, bold shapes read far more

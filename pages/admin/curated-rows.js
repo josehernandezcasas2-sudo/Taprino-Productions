@@ -274,7 +274,7 @@ export default function CuratedRowsAdmin({ mainGenres, episodes, isSignedIn, isS
                   key={g.id}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '0.7rem',
-                    padding: '0.7rem 0.9rem', border: '1px solid rgba(234,231,221,0.12)', borderRadius: '8px',
+                    padding: '0.7rem 0.9rem', border: '1px solid rgba(251,232,211,0.12)', borderRadius: '8px',
                     opacity: g.active ? 1 : 0.5
                   }}
                 >
