@@ -3,29 +3,52 @@ import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getActiveAnnouncements } from '../lib/announcements';
+import { getFeaturedCreators } from '../lib/userProfiles';
+import { getApprovedPitches } from '../lib/pitches';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 
-// Placeholder root page — the real homepage (hero, continue watching, genre
-// rows, everything that used to live at "/") moved to pages/stream.js so
-// this route is free for a future, differently-designed landing page.
-// Deliberately minimal for now, per Jose: no full design pass yet, just
-// enough to not be a dead end while that's decided. Every other page's
-// own internal "back to home"/nav-active logic already points at
-// /stream, not here — this page is not currently linked to from
-// anywhere else in the app on purpose, so nothing regresses while it
-// sits undesigned. The Announcements section below is the one real,
-// live piece built ahead of the rest of the homepage design.
+// The zine-style homepage — built from the approved mockup (Variant C:
+// collage layout, rotated stickers, polaroid people cards). Replaced the
+// earlier bare placeholder now that Jose picked a direction. Every
+// section here uses real data with one honest exception: Featured
+// People has no admin-curated "featured" flag yet (see
+// lib/userProfiles.js getFeaturedCreators), so it shows the most
+// recently active real creators instead — a reasonable stand-in until
+// that curation exists, not a design shortcut.
 export async function getServerSideProps({ req }) {
   const account = await getAccountContext(req);
-  const [episodes, announcements] = await Promise.all([
+  const [episodes, announcements, featuredCreators, pitchRows] = await Promise.all([
     getPublicEpisodes(),
-    getActiveAnnouncements()
+    getActiveAnnouncements(),
+    getFeaturedCreators(4),
+    getApprovedPitches()
   ]);
+
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const filmsAndShorts = episodes
+    .filter((e) => e.contentType === 'movie' || e.contentType === 'short')
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 8);
+  const podcasts = episodes
+    .filter((e) => e.contentType === 'podcast')
+    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    .slice(0, 6);
+  // Simple, honest hero pick for now: the most recent admin-flagged
+  // "featured" item, falling back to the most recent film/short of any
+  // kind so the hero is never empty just because nothing's been flagged.
+  const heroItem = episodes.find((e) => e.featured) || filmsAndShorts[0] || null;
+  const pitches = pitchRows.slice(0, 3).map((p) => ({
+    id: p.id,
+    title: p.title,
+    tag: p.tag,
+    logline: p.logline || p.description,
+    fundingRaised: p.funding_raised,
+    creatorName: p.creator_name || null
+  }));
 
   return {
     props: {
@@ -35,12 +58,26 @@ export async function getServerSideProps({ req }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       mainGenres,
-      announcements
+      announcements,
+      featuredCreators,
+      filmsAndShorts,
+      podcasts,
+      heroItem,
+      pitches
     }
   };
 }
 
-export default function Home({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, announcements }) {
+function isExternalUrl(url) {
+  return !!url && /^https?:\/\//i.test(url);
+}
+
+export default function Home({
+  isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres,
+  announcements, featuredCreators, filmsAndShorts, podcasts, heroItem, pitches
+}) {
+  const cassetteColors = ['mint', 'sky', 'rust', 'brass'];
+
   return (
     <>
       <Head>
@@ -50,53 +87,126 @@ export default function Home({ isSignedIn, isSubscriber, email, isAdmin, isCreat
 
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
-      <main className="stage stage-single">
-        <div className="install-row"><InstallButton /></div>
+      <main id="main-content">
+        <div className="install-row" style={{ padding: '0 1.6rem' }}><InstallButton /></div>
+
+        <div className="zine-masthead">
+          <div>
+            <span className="zine-masthead-title">{SITE.name}</span>
+            <span className="zine-masthead-tag">SCREENING ROOM EDITION</span>
+          </div>
+        </div>
+
+        {heroItem && (
+          <div className="zine-hero">
+            <div className="zine-hero-collage">
+              <div className="zine-hero-art-wrap">
+                <div
+                  className="zine-hero-art"
+                  style={heroItem.poster || heroItem.heroImage ? { backgroundImage: `url(${heroItem.poster || heroItem.heroImage})` } : undefined}
+                />
+                <div className="zine-hero-art-tag">NOW STREAMING</div>
+              </div>
+              <div className="zine-hero-text">
+                <h2>{heroItem.title}</h2>
+                {heroItem.desc && <p>{heroItem.desc}</p>}
+                <Link href={`/episode/${heroItem.id}`} className="zine-sticker brass">▶ WATCH</Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {announcements.length > 0 && (
-          <div style={{ margin: '1.6rem 0 2.2rem' }}>
-            <h3 style={{ margin: '0 0 0.8rem' }}>Announcements</h3>
-            <div style={{ display: 'flex', gap: '0.9rem', overflowX: 'auto', paddingBottom: '0.4rem' }}>
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker mint">ANNOUNCEMENTS</span></div>
+            <div className="zine-brief-row">
               {announcements.map((a) => {
-                const isExternal = a.linkUrl && /^https?:\/\//i.test(a.linkUrl);
-                const CardTag = a.linkUrl ? (isExternal ? 'a' : Link) : 'div';
-                const cardProps = a.linkUrl
-                  ? (isExternal ? { href: a.linkUrl, target: '_blank', rel: 'noopener noreferrer' } : { href: a.linkUrl })
-                  : {};
+                const external = isExternalUrl(a.linkUrl);
+                const Tag = a.linkUrl ? (external ? 'a' : Link) : 'div';
+                const tagProps = a.linkUrl ? (external ? { href: a.linkUrl, target: '_blank', rel: 'noopener noreferrer' } : { href: a.linkUrl }) : {};
                 return (
-                  <CardTag
-                    key={a.id}
-                    {...cardProps}
-                    className="account-card"
-                    style={{
-                      flex: '0 0 300px', maxWidth: 'none', padding: 0, overflow: 'hidden',
-                      textDecoration: 'none', color: 'inherit', display: 'block'
-                    }}
-                  >
-                    {a.imageUrl && (
-                      <img src={a.imageUrl} alt="" style={{ width: '100%', aspectRatio: '1200/630', objectFit: 'cover', display: 'block' }} />
-                    )}
-                    <div style={{ padding: '0.9rem 1rem' }}>
-                      <h4 style={{ margin: '0 0 0.4rem' }}>{a.title}</h4>
-                      {a.body && <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--ink-dim)', lineHeight: 1.5 }}>{a.body}</p>}
+                  <Tag key={a.id} {...tagProps} className="zine-brief-card">
+                    <div className="zine-brief-date">
+                      {new Date(a.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase()}
                     </div>
-                  </CardTag>
+                    <h4>{a.title}</h4>
+                    {a.body && <p>{a.body}</p>}
+                  </Tag>
                 );
               })}
             </div>
           </div>
         )}
 
-        <div style={{ textAlign: 'center', paddingTop: '2rem', paddingBottom: '4rem' }}>
-          <h1>{SITE.name}</h1>
-          <p style={{ maxWidth: '48ch', margin: '0 auto 1.6rem', color: 'var(--ink-dim)' }}>
-            This page is a placeholder — the rest of the homepage design hasn&rsquo;t been built yet.
-            Everything that used to live here is still fully working, just moved.
-          </p>
-          <Link href="/stream" className="account-btn-primary" style={{ display: 'inline-block', width: 'auto', textDecoration: 'none' }}>
-            Go to the screening room →
-          </Link>
-        </div>
+        {featuredCreators.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker sky">THE FACES BEHIND IT</span></div>
+            <div className="zine-people-row">
+              {featuredCreators.map((c) => (
+                <Link key={c.userId} href={`/profile/${c.userId}`} className="zine-polaroid">
+                  <div className="zine-polaroid-photo" style={c.avatarUrl ? { backgroundImage: `url(${c.avatarUrl})` } : undefined} />
+                  <h5>{c.displayName}</h5>
+                  <span className="zine-credit">{c.credits.slice(0, 2).join(', ')}</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {filmsAndShorts.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker rust">FILMS &amp; SHORTS</span></div>
+            <div className="zine-filmstrip">
+              {filmsAndShorts.map((e) => (
+                <Link key={e.id} href={`/episode/${e.id}`} className="zine-filmstrip-item">
+                  <div className="zine-filmstrip-poster" style={e.poster ? { backgroundImage: `url(${e.poster})` } : undefined} />
+                  <h5>{e.title}</h5>
+                  <span>{e.contentType === 'movie' ? 'FILM' : 'SHORT'}{e.runtime ? ` · ${e.runtime}` : ''}</span>
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/type/movie" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>See the full library →</Link>
+            </div>
+          </div>
+        )}
+
+        {podcasts.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker brass">ON AIR</span></div>
+            <div className="zine-cassette-row">
+              {podcasts.map((p, i) => (
+                <Link key={p.id} href={`/episode/${p.id}`} className={`zine-cassette ${cassetteColors[i % cassetteColors.length]}`}>
+                  <span className="zine-cassette-label">{p.title}</span>
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/podcasts" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>See all podcasts →</Link>
+            </div>
+          </div>
+        )}
+
+        {pitches.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker mint">PITCH ROOM</span></div>
+            <div className="zine-flyer-row">
+              {pitches.map((p) => (
+                <Link key={p.id} href={`/pitches/${p.id}`} className="zine-flyer">
+                  <h4>{p.title}</h4>
+                  {p.logline && <p>{p.logline}</p>}
+                  {p.creatorName && <div className="zine-flyer-by">by {p.creatorName}</div>}
+                  {p.fundingRaised != null && (
+                    <div className="zine-flyer-raised">${Number(p.fundingRaised).toLocaleString()} raised</div>
+                  )}
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/pitches" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>See all projects →</Link>
+            </div>
+          </div>
+        )}
       </main>
 
       <MobileTabBar />

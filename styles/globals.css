@@ -5496,3 +5496,196 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 .creator-type-btn:hover { border-color: var(--brass); background: rgba(217,143,62,0.08); }
 .creator-type-icon { font-size: 1.2rem; flex-shrink: 0; }
+
+/* ============================================================
+   Homepage (pages/index.js) — "zine" style: collage layout,
+   rotated stickers, polaroid people cards. Built from the
+   approved mockup (Variant C). Real brand tokens throughout
+   (--mint/--sky/--rust are sampled from the logo itself — see
+   the palette comment at the top of this file).
+   ============================================================ */
+.zine-masthead {
+  padding: 1.6rem 1.6rem 0.9rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+}
+.zine-masthead-title {
+  font-size: 2.2rem;
+  margin: 0;
+  transform: rotate(-2deg);
+  display: inline-block;
+}
+.zine-masthead-tag {
+  background: var(--brass);
+  color: #241a05;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 0.25rem 0.6rem;
+  transform: rotate(3deg);
+  display: inline-block;
+  margin-left: 0.7rem;
+  border-radius: 2px;
+}
+
+.zine-sticker {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  padding: 0.3rem 0.7rem;
+  border-radius: 20px;
+  transform: rotate(-2deg);
+  color: #241a05;
+}
+.zine-sticker.mint { background: var(--mint); }
+.zine-sticker.sky { background: var(--sky); }
+.zine-sticker.brass { background: var(--brass); }
+.zine-sticker.rust { background: var(--rust); color: var(--ink); }
+
+.zine-dept { padding: 1.6rem; }
+.zine-dept-label { margin-bottom: 1.1rem; }
+
+/* hero collage */
+.zine-hero { padding: 0.5rem 1.6rem 1.8rem; }
+.zine-hero-collage { display: flex; align-items: flex-end; gap: 0; flex-wrap: wrap; }
+.zine-hero-art-wrap { position: relative; margin-right: -1.5rem; z-index: 2; }
+.zine-hero-art {
+  width: 380px;
+  max-width: 100%;
+  height: 260px;
+  border: 6px solid var(--ink);
+  transform: rotate(-3deg);
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-2);
+}
+.zine-hero-art-tag {
+  position: absolute;
+  top: -0.8rem;
+  left: 1.1rem;
+  background: var(--rust);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  padding: 0.3rem 0.7rem;
+  transform: rotate(-6deg);
+  border-radius: 2px;
+}
+.zine-hero-text { flex: 1; min-width: 260px; padding: 0 0 1rem 3rem; }
+.zine-hero-text h2 { font-size: 2.4rem; margin: 0 0 0.6rem; transform: rotate(1deg); }
+.zine-hero-text p { font-size: 0.9rem; color: var(--ink-dim); max-width: 44ch; line-height: 1.6; margin: 0 0 0.9rem; }
+
+/* announcements — taped index cards */
+.zine-brief-row { display: flex; gap: 1.1rem; overflow-x: auto; padding-bottom: 0.3rem; }
+.zine-brief-card {
+  flex: 0 0 260px;
+  background: var(--ink);
+  color: #241a05;
+  padding: 0.9rem 1.1rem;
+  transform: rotate(-1deg);
+  text-decoration: none;
+  display: block;
+  border-radius: 2px;
+}
+.zine-brief-card:nth-child(2) { transform: rotate(1deg); }
+.zine-brief-card:nth-child(3n) { transform: rotate(-0.5deg); }
+.zine-brief-date { font-family: var(--font-mono); font-size: 0.6rem; color: var(--rust); margin-bottom: 0.35rem; }
+.zine-brief-card h4 { font-size: 0.92rem; margin: 0 0 0.35rem; }
+.zine-brief-card p { font-size: 0.72rem; line-height: 1.45; margin: 0; opacity: 0.75; }
+
+/* featured people — polaroids */
+.zine-people-row { display: flex; gap: 1.4rem; overflow-x: auto; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.zine-polaroid {
+  flex: 0 0 140px;
+  background: var(--ink);
+  padding: 0.6rem 0.6rem 1.4rem;
+  transform: rotate(2deg);
+  text-decoration: none;
+  display: block;
+}
+.zine-polaroid:nth-child(2n) { transform: rotate(-3deg); margin-top: 0.8rem; }
+.zine-polaroid:nth-child(3n) { transform: rotate(1.5deg); }
+.zine-polaroid:nth-child(4n) { transform: rotate(-1deg); margin-top: 0.5rem; }
+.zine-polaroid-photo {
+  width: 100%;
+  height: 110px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-2);
+  margin-bottom: 0.6rem;
+}
+.zine-polaroid h5 { color: #241a05; font-size: 0.82rem; margin: 0 0 0.15rem; font-family: var(--font-display, inherit); }
+.zine-polaroid .zine-credit { display: block; font-size: 0.62rem; color: #6b6248; margin-top: 0.25rem; font-style: italic; }
+
+/* films & shorts — filmstrip */
+.zine-filmstrip { display: flex; background: var(--surface-1); padding: 1rem; gap: 0.9rem; transform: rotate(-0.4deg); overflow-x: auto; }
+.zine-filmstrip-item { flex: 0 0 160px; text-decoration: none; display: block; color: inherit; }
+.zine-filmstrip-poster {
+  height: 200px;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--surface-2);
+  margin-bottom: 0.6rem;
+  border: 3px solid var(--surface-0);
+}
+.zine-filmstrip-item h5 { font-size: 0.85rem; margin: 0 0 0.15rem; color: var(--ink); }
+.zine-filmstrip-item span { font-size: 0.62rem; color: var(--ink-dim); font-family: var(--font-mono); }
+
+/* on air — cassette tiles */
+.zine-cassette-row { display: flex; gap: 1rem; overflow-x: auto; }
+.zine-cassette {
+  flex: 0 0 190px;
+  height: 90px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.zine-cassette.mint { background: var(--mint); }
+.zine-cassette.sky { background: var(--sky); }
+.zine-cassette.rust { background: var(--rust); }
+.zine-cassette.brass { background: var(--brass); }
+.zine-cassette-label {
+  background: var(--ink);
+  color: #241a05;
+  font-size: 0.78rem;
+  padding: 0.4rem 0.7rem;
+  transform: rotate(-2deg);
+  font-weight: bold;
+  border-radius: 2px;
+}
+
+/* pitch room — flyer cards */
+.zine-flyer-row { display: flex; gap: 1.2rem; overflow-x: auto; }
+.zine-flyer {
+  flex: 0 0 250px;
+  background: var(--ink);
+  color: #241a05;
+  padding: 1.1rem;
+  transform: rotate(1deg);
+  text-decoration: none;
+  display: block;
+  border-radius: 2px;
+}
+.zine-flyer:nth-child(2) { transform: rotate(-1.5deg); }
+.zine-flyer:nth-child(3n) { transform: rotate(0.5deg); }
+.zine-flyer h4 { font-size: 1.05rem; margin: 0 0 0.4rem; }
+.zine-flyer p { font-size: 0.72rem; line-height: 1.5; margin: 0 0 0.6rem; opacity: 0.75; }
+.zine-flyer-by { font-size: 0.66rem; font-style: italic; color: #6b6248; margin-bottom: 0.5rem; }
+.zine-flyer-raised { font-family: var(--font-mono); font-size: 0.7rem; color: var(--rust); font-weight: bold; }
+
+@media (max-width: 640px) {
+  .zine-masthead { padding: 1.2rem 1.1rem 0.7rem; flex-direction: column; align-items: flex-start; }
+  .zine-masthead-title { font-size: 1.7rem; }
+  .zine-dept { padding: 1.1rem; }
+  .zine-hero { padding: 0.3rem 1.1rem 1.2rem; }
+  .zine-hero-collage { flex-direction: column; align-items: flex-start; }
+  .zine-hero-art-wrap { margin-right: 0; }
+  .zine-hero-art { width: 100%; height: 200px; }
+  .zine-hero-text { padding: 1.4rem 0 0; }
+  .zine-hero-text h2 { font-size: 1.9rem; }
+}
