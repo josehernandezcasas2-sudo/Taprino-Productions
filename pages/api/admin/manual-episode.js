@@ -1,6 +1,7 @@
 import { getRoleContext, findUserByEmail } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
+import { bunnyPlaybackUrl, isValidBunnyHost, muxPlaybackUrl, isValidMuxPlaybackId } from '../../../lib/videoProviders';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
@@ -20,6 +21,7 @@ const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGe
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
+const VALID_VIDEO_PROVIDERS = ['cloudflare', 'bunny', 'mux'];
 
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
@@ -41,8 +43,21 @@ export default async function handler(req, res) {
   if (missing.length > 0) {
     return res.status(400).json({ error: `Missing required fields: ${missing.join(', ')}` });
   }
-  if (!body.cloudflareVideoUid && !body.audioUrl) {
-    return res.status(400).json({ error: 'Provide either a Cloudflare video ID or an imported audio file.' });
+  const videoProvider = body.videoProvider && VALID_VIDEO_PROVIDERS.includes(body.videoProvider) ? body.videoProvider : 'cloudflare';
+  if (body.videoProvider && !VALID_VIDEO_PROVIDERS.includes(body.videoProvider)) {
+    return res.status(400).json({ error: `videoProvider must be one of: ${VALID_VIDEO_PROVIDERS.join(', ')}` });
+  }
+  const hasCloudflareVideo = videoProvider === 'cloudflare' && !!body.cloudflareVideoUid;
+  const hasBunnyVideo = videoProvider === 'bunny' && !!body.bunnyPullZoneHost && !!body.bunnyVideoId;
+  const hasMuxVideo = videoProvider === 'mux' && !!body.muxPlaybackId;
+  if (!hasCloudflareVideo && !hasBunnyVideo && !hasMuxVideo && !body.audioUrl) {
+    return res.status(400).json({ error: 'Provide a video ID for the selected provider, or an imported audio file.' });
+  }
+  if (videoProvider === 'bunny' && body.bunnyPullZoneHost && !isValidBunnyHost(body.bunnyPullZoneHost)) {
+    return res.status(400).json({ error: 'That doesn\u2019t look like a Bunny.net pull zone hostname \u2014 it should end in .b-cdn.net.' });
+  }
+  if (videoProvider === 'mux' && body.muxPlaybackId && !isValidMuxPlaybackId(body.muxPlaybackId)) {
+    return res.status(400).json({ error: 'That doesn\u2019t look like a valid Mux playback ID \u2014 letters and numbers only, no slashes or spaces.' });
   }
   if (!VALID_TIERS.includes(body.tier)) {
     return res.status(400).json({ error: `tier must be one of: ${VALID_TIERS.join(', ')}` });
@@ -64,9 +79,14 @@ export default async function handler(req, res) {
   // silently become a published episode with a broken player. Skipped
   // entirely for an audio-only podcast episode, since there's no video to
   // check in that case at all.
+  //
+  // Bunny and Mux don't get this check — that requires each platform's
+  // own API key, which doesn't exist yet (see lib/videoProviders.js).
+  // Their src is computed directly from what's typed in and trusted, the
+  // same as pasting a raw URL would be.
   let videoStatus = null;
   let src = null;
-  if (body.cloudflareVideoUid) {
+  if (hasCloudflareVideo) {
     videoStatus = await getCloudflareVideoStatus(body.cloudflareVideoUid);
     if (!videoStatus) {
       return res.status(404).json({ error: 'No Cloudflare video found with that ID — check it was copied correctly.' });
@@ -75,6 +95,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: `Cloudflare could not process this video: ${videoStatus.errorReasonText || videoStatus.errorReasonCode}. Re-export and re-upload it before linking.` });
     }
     src = cloudflarePlaybackUrl(body.cloudflareVideoUid);
+  } else if (hasBunnyVideo) {
+    src = bunnyPlaybackUrl(body.bunnyPullZoneHost, body.bunnyVideoId);
+  } else if (hasMuxVideo) {
+    src = muxPlaybackUrl(body.muxPlaybackId);
   }
   let trailerSrc = null;
   if (body.trailerCloudflareUid) {
@@ -142,6 +166,7 @@ export default async function handler(req, res) {
     bonus_parent_type: body.contentType === 'bonus' ? body.bonusParentType : null,
     bonus_parent_id: body.contentType === 'bonus' ? body.bonusParentId : null,
     video_type: 'html5',
+    video_provider: videoProvider,
     src,
     trailer_src: trailerSrc,
     poster,
@@ -164,13 +189,20 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not create the episode.' });
   }
 
+  const videoDescription = hasCloudflareVideo
+    ? `manually-linked Cloudflare video ${body.cloudflareVideoUid}`
+    : hasBunnyVideo
+    ? `manually-linked Bunny.net video ${body.bunnyVideoId}`
+    : hasMuxVideo
+    ? `manually-linked Mux video ${body.muxPlaybackId}`
+    : 'imported audio file';
   await recordAudit({
     adminId: userId,
     adminEmail: email,
     action: 'manual_episode_created',
     targetType: 'episode',
     targetId: id,
-    details: `${body.title} — via ${body.cloudflareVideoUid ? `manually-linked Cloudflare video ${body.cloudflareVideoUid}` : 'imported audio file'}${body.creatorEmail ? `, attributed to ${body.creatorEmail}` : ''}`
+    details: `${body.title} — via ${videoDescription}${body.creatorEmail ? `, attributed to ${body.creatorEmail}` : ''}`
   });
 
   return res.status(200).json({ ok: true, episodeId: id, videoState: videoStatus ? videoStatus.state : null });

@@ -3,6 +3,7 @@ import { parseAdBreaksInput } from '../lib/adBreaks';
 import { useDraftAutosave } from '../lib/useDraftAutosave';
 import { SITE } from '../lib/siteConfig';
 import { CONTENT_RATINGS } from '../lib/contentRatings';
+import { VIDEO_PROVIDERS } from '../lib/videoProviders';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 const CONTENT_TYPES = [
@@ -56,6 +57,10 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
   }
   const [videoUid, setVideoUid] = useState('');
   const [videoCheck, setVideoCheck] = useState(null);
+  const [videoProvider, setVideoProvider] = useState('cloudflare');
+  const [bunnyPullZoneHost, setBunnyPullZoneHost] = useState('');
+  const [bunnyVideoId, setBunnyVideoId] = useState('');
+  const [muxPlaybackId, setMuxPlaybackId] = useState('');
   const [trailerUid, setTrailerUid] = useState('');
   const [skipVideo, setSkipVideo] = useState(false);
   const [audioUrl, setAudioUrl] = useState('');
@@ -92,9 +97,19 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       setError('Import an audio file first, or uncheck "Audio only" to link a video instead.');
       return;
     }
-    if (!skipVideo && !videoUid.trim()) {
-      setError('Paste the Cloudflare video ID first, or check "Audio only" above for an audio-only episode.');
-      return;
+    if (!skipVideo) {
+      if (videoProvider === 'cloudflare' && !videoUid.trim()) {
+        setError('Paste the Cloudflare video ID first, or check "Audio only" above for an audio-only episode.');
+        return;
+      }
+      if (videoProvider === 'bunny' && (!bunnyPullZoneHost.trim() || !bunnyVideoId.trim())) {
+        setError('Enter both the Bunny.net pull zone hostname and the video ID, or check "Audio only" above.');
+        return;
+      }
+      if (videoProvider === 'mux' && !muxPlaybackId.trim()) {
+        setError('Paste the Mux playback ID first, or check "Audio only" above for an audio-only episode.');
+        return;
+      }
     }
     setSaving(true);
     try {
@@ -108,7 +123,12 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
           adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
           bonusParentType,
           bonusParentId,
-          ...(skipVideo ? {} : { cloudflareVideoUid: videoUid.trim() }),
+          ...(skipVideo ? {} : {
+            videoProvider,
+            ...(videoProvider === 'cloudflare' ? { cloudflareVideoUid: videoUid.trim() } : {}),
+            ...(videoProvider === 'bunny' ? { bunnyPullZoneHost: bunnyPullZoneHost.trim(), bunnyVideoId: bunnyVideoId.trim() } : {}),
+            ...(videoProvider === 'mux' ? { muxPlaybackId: muxPlaybackId.trim() } : {})
+          }),
           ...(audioImportedUrl ? { audioUrl: audioImportedUrl, audioBytes } : {}),
           ...(trailerUid.trim() ? { trailerCloudflareUid: trailerUid.trim() } : {}),
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
@@ -123,6 +143,10 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       setForm(EMPTY_FORM);
       setVideoUid('');
       setVideoCheck(null);
+      setVideoProvider('cloudflare');
+      setBunnyPullZoneHost('');
+      setBunnyVideoId('');
+      setMuxPlaybackId('');
       setTrailerUid('');
       setSkipVideo(false);
       setAudioUrl('');
@@ -173,31 +197,88 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
 
         {!skipVideo && (
           <>
-            <label>Cloudflare video ID{form.contentType !== 'podcast' && ' — required'}</label>
-            <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
-              <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} required={form.contentType !== 'podcast'} />
-              <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
-                {videoCheck === 'checking' ? 'Checking…' : 'Check'}
-              </button>
-            </div>
-            {videoCheck && videoCheck !== 'checking' && (
-          videoCheck.error ? (
-            <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
-          ) : videoCheck.state === 'error' ? (
-            <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
-              Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
-            </p>
-          ) : videoCheck.state === 'ready' ? (
-            <p style={{ color: 'var(--ok)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream.</p>
-          ) : (
-            <p style={{ color: 'var(--signal-amber)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
-              Still processing ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can still create the episode, it just won&rsquo;t be watchable until this finishes.
-            </p>
-          )
-        )}
+            <label>Video provider</label>
+            <select value={videoProvider} onChange={(e) => setVideoProvider(e.target.value)} style={{ marginBottom: '0.6rem' }}>
+              {VIDEO_PROVIDERS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
 
-        <label>Trailer — Cloudflare video ID, optional</label>
-        <input type="text" value={trailerUid} onChange={(e) => setTrailerUid(e.target.value)} placeholder="Only if a trailer was also manually uploaded" style={{ marginBottom: '0.8rem' }} />
+            {videoProvider === 'cloudflare' && (
+              <>
+                <label>Cloudflare video ID{form.contentType !== 'podcast' && ' — required'}</label>
+                <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.4rem' }}>
+                  <input type="text" value={videoUid} onChange={(e) => { setVideoUid(e.target.value); setVideoCheck(null); }} placeholder="e.g. c792e0c49f72f77e00693d10c0ef02cd" style={{ flex: 1 }} required={form.contentType !== 'podcast'} />
+                  <button type="button" className="account-btn-secondary" onClick={checkVideo} disabled={!videoUid.trim() || videoCheck === 'checking'} style={{ width: 'auto' }}>
+                    {videoCheck === 'checking' ? 'Checking…' : 'Check'}
+                  </button>
+                </div>
+                {videoCheck && videoCheck !== 'checking' && (
+              videoCheck.error ? (
+                <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>{videoCheck.error}</p>
+              ) : videoCheck.state === 'error' ? (
+                <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
+                  Cloudflare could not process this file: {videoCheck.errorReasonText || videoCheck.errorReasonCode}. Re-export and re-upload before linking.
+                </p>
+              ) : videoCheck.state === 'ready' ? (
+                <p style={{ color: 'var(--ok)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>✓ Ready to stream.</p>
+              ) : (
+                <p style={{ color: 'var(--signal-amber)', fontSize: '0.8rem', marginTop: '-0.2rem' }}>
+                  Still processing ({videoCheck.state}{videoCheck.pctComplete ? `, ${videoCheck.pctComplete}%` : ''}) — you can still create the episode, it just won&rsquo;t be watchable until this finishes.
+                </p>
+              )
+            )}
+              </>
+            )}
+
+            {videoProvider === 'bunny' && (
+              <>
+                <label>Bunny.net pull zone hostname{form.contentType !== 'podcast' && ' — required'}</label>
+                <input
+                  type="text"
+                  value={bunnyPullZoneHost}
+                  onChange={(e) => setBunnyPullZoneHost(e.target.value)}
+                  placeholder="e.g. vz-abc123-456.b-cdn.net"
+                  required={form.contentType !== 'podcast'}
+                  style={{ marginBottom: '0.4rem' }}
+                />
+                <label>Bunny.net video ID{form.contentType !== 'podcast' && ' — required'}</label>
+                <input
+                  type="text"
+                  value={bunnyVideoId}
+                  onChange={(e) => setBunnyVideoId(e.target.value)}
+                  placeholder="the video GUID from your Bunny Stream library"
+                  required={form.contentType !== 'podcast'}
+                  style={{ marginBottom: '0.4rem' }}
+                />
+                <p className="video-source-help">
+                  Not wired up to Bunny&rsquo;s API yet, so this can&rsquo;t verify the video actually
+                  processed the way the Cloudflare field does — it just builds the playback URL from
+                  what&rsquo;s typed here. Both values are on the video&rsquo;s page in your Bunny Stream
+                  library.
+                </p>
+              </>
+            )}
+
+            {videoProvider === 'mux' && (
+              <>
+                <label>Mux playback ID{form.contentType !== 'podcast' && ' — required'}</label>
+                <input
+                  type="text"
+                  value={muxPlaybackId}
+                  onChange={(e) => setMuxPlaybackId(e.target.value)}
+                  placeholder="e.g. DS00Spx1CV902MCtPj5WknGlR102V5HFkDe"
+                  required={form.contentType !== 'podcast'}
+                  style={{ marginBottom: '0.4rem' }}
+                />
+                <p className="video-source-help">
+                  Not wired up to Mux&rsquo;s API yet, so this can&rsquo;t verify the video actually
+                  processed the way the Cloudflare field does — it just builds the playback URL from
+                  what&rsquo;s typed here. Found on the asset&rsquo;s page in your Mux dashboard.
+                </p>
+              </>
+            )}
+
+            <label>Trailer — Cloudflare video ID, optional</label>
+            <input type="text" value={trailerUid} onChange={(e) => setTrailerUid(e.target.value)} placeholder="Only if a trailer was also manually uploaded" style={{ marginBottom: '0.8rem' }} />
           </>
         )}
 
