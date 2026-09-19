@@ -61,6 +61,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     tier: episode.tier || 'free',
     status: episode.status || 'pending',
     featured: !!episode.featured,
+    discoverCurated: !!episode.discoverCurated,
     isOriginal: !!episode.isOriginal,
     fundingUrl: episode.fundingUrl || '',
     availableFrom: toDateInputValue(episode.availableFrom),
@@ -327,6 +328,13 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <input type="checkbox" checked={form.featured} onChange={(e) => update('featured', e.target.checked)} />
             Eligible for the homepage hero rotation
           </label>
+
+          {form.contentType === 'vertical' && (
+            <label className="admin-checkbox">
+              <input type="checkbox" checked={form.discoverCurated} onChange={(e) => update('discoverCurated', e.target.checked)} />
+              Curated pick for the Discover feed <span className="admin-optional">— shows up in the feed&rsquo;s dedicated curated slot (every 4th card) instead of only appearing through the random/personalized lanes</span>
+            </label>
+          )}
 
           <label className="admin-checkbox">
             <input type="checkbox" checked={form.adsEnabled} onChange={(e) => update('adsEnabled', e.target.checked)} />

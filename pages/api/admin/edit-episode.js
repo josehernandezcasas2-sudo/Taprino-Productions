@@ -19,8 +19,8 @@ export const config = {
 const VALID_TIERS = ['free', 'premium'];
 const VALID_STATUSES = ['pending', 'approved', 'rejected'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'fundingUrl', 'audioUrl', 'releaseYear'];
-const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', fundingUrl: 'funding_url', audioUrl: 'audio_url', releaseYear: 'release_year' };
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'discoverCurated', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'fundingUrl', 'audioUrl', 'releaseYear'];
+const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', fundingUrl: 'funding_url', audioUrl: 'audio_url', releaseYear: 'release_year', discoverCurated: 'discover_curated' };
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {

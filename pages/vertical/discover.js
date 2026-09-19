@@ -2,19 +2,24 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
+import { getAuth } from '@clerk/nextjs/server';
 import { useSmartBack } from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
+import { getWatchHistory } from '../../lib/watchHistory';
+import { getSiteSettings } from '../../lib/siteSettings';
+import { getRecommendations } from '../../lib/recommendations';
 import { useWishlist } from '../../lib/useWishlist';
-import { buildVerticalUnits, pickNextUnit, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
+import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
 import ReelPlayer from '../../components/ReelPlayer';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
+  const { userId } = getAuth(req);
+  const [episodes, allSeries, siteSettings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getSiteSettings()]);
 
   const entitled = account.isSubscriber || account.isAdmin;
   const verticalEpisodes = filterEntitledVertical(episodes, entitled);
@@ -22,17 +27,40 @@ export async function getServerSideProps({ req, res }) {
   const seriesNameById = {};
   for (const s of allSeries) seriesNameById[s.id] = s.name;
 
+  // Personal lane: same recommendation engine /recs already uses,
+  // scoped to vertical content only. A brand-new viewer or a
+  // signed-out one simply gets an empty personal pool — the picker
+  // (lib/verticalFeed.js) falls back to random for those slots rather
+  // than the feed breaking or the personal lane being forced on
+  // meaningless data.
+  let personalUnitKeys = [];
+  if (account.isSignedIn) {
+    const watchHistory = userId ? await getWatchHistory(userId, verticalEpisodes) : [];
+    const tasteIds = [...account.wishlist, ...watchHistory.map((e) => e.id)];
+    const recommended = getRecommendations({
+      episodes: verticalEpisodes,
+      tasteIds,
+      excludeIds: [],
+      closeness: siteSettings.recommendationCloseness,
+      count: verticalEpisodes.length
+    });
+    // Sets aren't JSON-serializable as a Next.js prop — sent as a plain
+    // array and rebuilt into a Set on the client (see below).
+    personalUnitKeys = [...buildPersonalUnitKeys(recommended)];
+  }
+
   return {
     props: {
       verticalEpisodes,
       seriesNameById,
       isSignedIn: account.isSignedIn,
-      wishlist: account.wishlist
+      wishlist: account.wishlist,
+      personalUnitKeys
     }
   };
 }
 
-export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist }) {
+export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist, personalUnitKeys }) {
   const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const [shareCopiedKey, setShareCopiedKey] = useState(null);
@@ -44,6 +72,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   const [srcByEpisodeId, setSrcByEpisodeId] = useState({});
   const seenSeriesIds = useRef(new Set());
   const unitsRef = useRef([]);
+  const pickerRef = useRef(null);
   // Smart-back for the "×" close button below — this feed has no room for
   // the standard pill button (it would obstruct the video), but should
   // still return to wherever the person actually came from rather than
@@ -52,17 +81,18 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
 
   // Build the unit pool once and seed the deck — either with the specific
   // series requested via ?series=id (from the browse-series picker), or a
-  // random pick for the plain nav entry point. Waits on router.isReady
-  // since router.query isn't reliably populated before that on first
-  // render.
+  // pick from the 3-random/1-curated/3-personal cycle for the plain nav
+  // entry point. Waits on router.isReady since router.query isn't
+  // reliably populated before that on first render.
   useEffect(() => {
     if (!router.isReady) return;
     unitsRef.current = buildVerticalUnits(verticalEpisodes);
+    pickerRef.current = createDiscoverPicker(unitsRef.current, new Set(personalUnitKeys));
     const requestedSeriesId = router.query.series;
     const requested = requestedSeriesId
       ? unitsRef.current.find((u) => u.type === 'series' && u.seriesId === requestedSeriesId)
       : null;
-    const first = requested || pickNextUnit(unitsRef.current, seenSeriesIds.current);
+    const first = requested || pickerRef.current.next(seenSeriesIds.current);
     if (!first) return;
     if (first.type === 'series') seenSeriesIds.current.add(first.seriesId);
     setDeck(expandUnitToSlides(first));
@@ -70,7 +100,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   }, [router.isReady]);
 
   const extendDeck = useCallback(() => {
-    const next = pickNextUnit(unitsRef.current, seenSeriesIds.current);
+    const next = pickerRef.current && pickerRef.current.next(seenSeriesIds.current);
     if (!next) return;
     if (next.type === 'series') seenSeriesIds.current.add(next.seriesId);
     setDeck((d) => [...d, ...expandUnitToSlides(next)]);
