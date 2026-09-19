@@ -5182,6 +5182,29 @@ body:has(.mini-player) { padding-bottom: 72px; }
   overflow: hidden;
 }
 
+/* On anything wider than a phone, a 9:16 video stretched with
+   object-fit:cover across the full viewport width gets massively
+   cropped/zoomed — only a thin vertical sliver of the actual frame ends
+   up visible. Above the phone breakpoint, each slide is capped to a
+   proper 9:16 box and centered; .reel-feed's own black background (see
+   above) becomes the letterbox bars on either side. Every child here
+   (.reel-close, .reel-action-rail, .reel-caption, .reel-end-card) is
+   positioned absolute/inset:0 relative to .reel-slide, so they all
+   reposition correctly onto the narrower box for free — no separate
+   rule needed per element. Scoped to .reel-* only, so this never
+   touches the regular horizontal player used for movies/series/podcasts.
+   480px keeps the box a believable phone width even on a very tall,
+   narrow desktop window, rather than letting the height-based formula
+   grow unchecked. */
+@media (min-width: 641px) {
+  .reel-slide {
+    width: calc(100vh * 9 / 16);
+    width: calc(100svh * 9 / 16);
+    max-width: 480px;
+    margin: 0 auto;
+  }
+}
+
 .reel-video-wrap { position: absolute; inset: 0; background: #000; }
 .reel-video, .reel-video-poster {
   position: absolute; inset: 0;
