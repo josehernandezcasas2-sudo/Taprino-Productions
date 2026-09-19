@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
 import { formatRuntimeLong } from '../lib/videoMetadata';
 import { PlayIcon, PauseIcon, VolumeIcon, InfoIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -107,7 +108,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   return (
     <div className={`hero-carousel ${fullBleed ? 'full-bleed' : ''}`}>
       {isImageMode ? (
-        <img key={ep.id} src={imageSrc} alt={ep.title} className="hero-video hero-image" />
+        <Image key={ep.id} src={imageSrc} alt={ep.title} fill priority sizes="100vw" className="hero-video hero-image" />
       ) : (
         <video
           key={ep.id}
@@ -137,7 +138,16 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
         <div className="hero-content">
           <div className="hero-eyebrow">{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</div>
           <h2>
-            {ep.titleImageUrl ? <img src={ep.titleImageUrl} alt={ep.title} className="hero-title-image" /> : ep.title}
+            {ep.titleImageUrl ? (
+              <Image
+                src={ep.titleImageUrl}
+                alt={ep.title}
+                width={400}
+                height={110}
+                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '110px' }}
+                className="hero-title-image"
+              />
+            ) : ep.title}
           </h2>
           <div className="hero-meta">
             <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>

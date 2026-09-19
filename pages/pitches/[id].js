@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
@@ -239,7 +240,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
 
       <div className="hero-carousel full-bleed">
         {pitch.hero_image || pitch.thumbnail ? (
-          <img src={pitch.hero_image || pitch.thumbnail} alt="" className="hero-video hero-image" />
+          <Image src={pitch.hero_image || pitch.thumbnail} alt="" fill priority sizes="100vw" className="hero-video hero-image" />
         ) : (
           <div className="hero-video" style={{ background: 'linear-gradient(120deg,#3a4a6a,#2a2a3a)' }} />
         )}

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Image from 'next/image';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -117,7 +118,7 @@ export default function RssImportPanel({ allSeries, onImported }) {
       {preview && (
         <>
           <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', marginBottom: '1rem' }}>
-            {preview.showImage && <img src={preview.showImage} alt="" style={{ width: 64, height: 64, borderRadius: 8 }} />}
+            {preview.showImage && <Image src={preview.showImage} alt="" width={64} height={64} style={{ borderRadius: 8 }} />}
             <div>
               <strong>{preview.showTitle}</strong>
               <div style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>{preview.episodes.length} episodes found</div>

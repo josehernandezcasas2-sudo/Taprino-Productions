@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 
 // Emoji and unicode symbols (🔊, ▶, ⚙, ⤢, etc.) render using each
 // device's own font/emoji set, which is exactly why the same character
@@ -33,7 +34,7 @@ export function usePlayerIconOverrides() {
 }
 
 function IconImage({ src, size }) {
-  return <img src={src} width={size} height={size} style={{ objectFit: 'contain', display: 'block' }} alt="" />;
+  return <Image src={src} width={size} height={size} style={{ objectFit: 'contain', display: 'block' }} alt="" unoptimized={size <= 32} />;
 }
 
 export function PlayIcon({ src, size = 18 }) {

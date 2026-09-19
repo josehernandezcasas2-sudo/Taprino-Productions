@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
@@ -136,7 +137,14 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       <div className="nav-left">
         <Link href="/stream" className="brand-mark">
           {siteSettings && siteSettings.logoUrl ? (
-            <img src={siteSettings.logoUrl} alt="" className="nav-logo-image" />
+            <Image
+              src={siteSettings.logoUrl}
+              alt=""
+              width={128}
+              height={32}
+              style={{ height: '2rem', width: 'auto', maxWidth: '8rem', objectFit: 'contain' }}
+              className="nav-logo-image"
+            />
           ) : (
             <span className="footer-logo-badge nav-logo-badge">ST</span>
           )}
@@ -231,10 +239,12 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
         >
           {iconOverrides.search || (siteSettings && siteSettings.searchIconUrl) ? (
-            <img
+            <Image
               src={iconOverrides.search || siteSettings.searchIconUrl}
               alt=""
-              style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover' }}
+              width={20}
+              height={20}
+              style={{ borderRadius: '50%', objectFit: 'cover' }}
             />
           ) : (
             <SearchIcon />

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -214,7 +215,9 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
             {schedule.map((row, i) => (
               <div key={row.id} className="house-ad-card">
                 {row.episode && row.episode.thumbnail ? (
-                  <img src={row.episode.thumbnail} alt="" className="house-ad-preview" />
+                  <div style={{ position: 'relative', width: '100%', aspectRatio: '16 / 9', borderRadius: '4px', overflow: 'hidden', background: '#000' }}>
+                    <Image src={row.episode.thumbnail} alt="" fill sizes="200px" style={{ objectFit: 'cover' }} />
+                  </div>
                 ) : (
                   <div className="house-ad-preview" />
                 )}

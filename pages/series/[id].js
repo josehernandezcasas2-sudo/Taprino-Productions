@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getBonusContentFor } from '../../lib/bonusContent';
@@ -183,7 +184,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                   <div key={ep.id} className="episode-row">
                     <Link href={`/episode/${ep.id}?autoplay=1`} className={`episode-row-link ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                       <div className="episode-row-thumb">
-                        {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
+                        {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                         <span className="episode-row-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                         {!ep.thumbnail && (ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
                       </div>
@@ -211,7 +212,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
             {bonusContent.map((b) => (
               <Link key={b.id} href={`/episode/${b.id}?autoplay=1`} className="series-bonus-card">
                 <div className="series-bonus-thumb">
-                  {b.thumbnail && <img src={b.thumbnail} alt="" />}
+                  {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="200px" />}
                 </div>
                 <h6>{b.title}</h6>
                 <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>

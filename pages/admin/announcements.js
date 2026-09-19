@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -310,7 +311,9 @@ export default function AnnouncementsAdmin({ mainGenres, isSignedIn, isSubscribe
               <div style={{ display: 'flex', gap: '1rem' }}>
                 <div style={{ flexShrink: 0, width: '160px' }}>
                   {a.imageUrl ? (
-                    <img src={a.imageUrl} alt="" style={{ width: '100%', aspectRatio: '1200/630', objectFit: 'cover', borderRadius: '8px' }} />
+                    <div style={{ position: 'relative', width: '100%', aspectRatio: '1200/630', borderRadius: '8px', overflow: 'hidden' }}>
+                      <Image src={a.imageUrl} alt="" fill sizes="160px" style={{ objectFit: 'cover' }} />
+                    </div>
                   ) : (
                     <div style={{ width: '100%', aspectRatio: '1200/630', borderRadius: '8px', background: 'var(--surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', color: 'var(--ink-dim)' }}>
                       No image

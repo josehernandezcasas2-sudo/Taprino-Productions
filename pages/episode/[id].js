@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { PlayIcon, HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
@@ -379,9 +380,12 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
           {episode.trailerSrc ? (
             <video className="hero-video" src={episode.trailerSrc} autoPlay muted loop playsInline onContextMenu={(e) => e.preventDefault()} />
           ) : (
-            <img
+            <Image
               src={episode.heroImage || episode.poster || episode.thumbnail}
               alt=""
+              fill
+              priority
+              sizes="100vw"
               className="hero-video hero-image"
             />
           )}
@@ -390,7 +394,16 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
             <div className="hero-content">
               <div className="hero-eyebrow">{episode.contentType === 'movie' ? 'Movie' : 'Short'}</div>
               <h2>
-                {episode.titleImageUrl ? <img src={episode.titleImageUrl} alt={episode.title} className="hero-title-image" /> : episode.title}
+                {episode.titleImageUrl ? (
+                  <Image
+                    src={episode.titleImageUrl}
+                    alt={episode.title}
+                    width={400}
+                    height={110}
+                    style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '110px' }}
+                    className="hero-title-image"
+                  />
+                ) : episode.title}
               </h2>
               <div className="hero-meta">
                 <span className={`hero-badge-tier ${tierBadge(episode.tier, episode.adsEnabled).key}`}>{tierBadge(episode.tier, episode.adsEnabled).label}</span>
@@ -652,7 +665,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                 <div key={b.id} className="card-wrap row-card">
                   <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
                     <div className="ep-thumb">
-                      {b.thumbnail && <img src={b.thumbnail} alt="" className="ep-thumb-img" />}
+                      {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                       <div className="ep-info">
                         <h4>{b.title}</h4>
                         <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>

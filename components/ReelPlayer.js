@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 
 // Deliberately not VideoPlayer.js — that component carries ads, captions,
 // quality settings, and watch-progress tracking that the immersive reel
@@ -76,7 +77,7 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
 
   return (
     <div className="reel-video-wrap" onClick={onToggleMute}>
-      {loading && thumbnail && <img src={thumbnail} alt="" className="reel-video-poster" />}
+      {loading && thumbnail && <Image src={thumbnail} alt="" fill sizes="480px" className="reel-video-poster" />}
       <video
         ref={videoRef}
         className="reel-video"

@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 
 // Default emoji icons. Admins can override any of these per-genre with an
 // uploaded image from /admin/genre-icons — see lib/genreIcons.js for how
@@ -29,7 +30,7 @@ export default function GenreBrowseRow({ genres, icons }) {
           return (
             <Link key={g} href={`/genre/${encodeURIComponent(g)}`} className="genre-browse-item">
               <div className="genre-browse-circle">
-                {custom ? <img src={custom} alt="" className="genre-browse-img" /> : (GENRE_ICONS[g] || '◆')}
+                {custom ? <Image src={custom} alt="" width={84} height={84} className="genre-browse-img" /> : (GENRE_ICONS[g] || '◆')}
               </div>
               <span>{g}</span>
             </Link>

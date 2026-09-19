@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import WishlistButton from './WishlistButton';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { contentTypeTag } from '../lib/contentTypeTags';
@@ -83,7 +84,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             >
               <div className="ep-thumb">
                 {card.hasNew && <span className="new-episode-banner">New episode</span>}
-                {card.ep.thumbnail && <img src={card.ep.thumbnail} alt="" className="ep-thumb-img" />}
+                {card.ep.thumbnail && <Image src={card.ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.ep.tier, card.ep.adsEnabled).label}</span>
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
                 <div className="ep-info">
@@ -101,7 +102,7 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             <Link href={`/series/${card.info.id}`} className={`ep-card ${tierBadge(card.tier, card.adsEnabled).key}`}>
               <div className="ep-thumb">
                 {card.hasNew && <span className="new-episode-banner">New episode</span>}
-                {card.info.thumbnail && <img src={card.info.thumbnail} alt="" className="ep-thumb-img" />}
+                {card.info.thumbnail && <Image src={card.info.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
                 {!card.info.thumbnail && '▤ series'}
                 <div className="ep-info">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -142,7 +143,7 @@ export default function GenreIconsAdmin({ mainGenres, isSignedIn, isSubscriber, 
             <div key={g} className="genre-icon-card">
               <div className="genre-icon-preview">
                 {icons[g] ? (
-                  <img src={icons[g]} alt="" />
+                  <Image src={icons[g]} alt="" width={64} height={64} />
                 ) : (
                   <span className="genre-icon-emoji">{DEFAULT_EMOJI[g]}</span>
                 )}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import Image from 'next/image';
 import { SITE } from '../lib/siteConfig';
 import { CONTENT_RATINGS } from '../lib/contentRatings';
 import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
@@ -387,7 +388,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <div className={`admin-media-slot ${posterFile ? 'replacing' : episode.poster ? 'has' : 'empty'}`}>
               <div className="admin-media-preview">
                 {episode.poster ? (
-                  <img src={episode.poster} alt="" />
+                  <Image src={episode.poster} alt="" width={56} height={84} />
                 ) : (
                   <span className="admin-media-none">None</span>
                 )}
@@ -415,7 +416,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <div className={`admin-media-slot ${thumbnailFile ? 'replacing' : episode.thumbnail ? 'has' : 'empty'}`}>
               <div className="admin-media-preview">
                 {episode.thumbnail ? (
-                  <img src={episode.thumbnail} alt="" />
+                  <Image src={episode.thumbnail} alt="" width={56} height={84} />
                 ) : (
                   <span className="admin-media-none">None</span>
                 )}
@@ -443,7 +444,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <div className={`admin-media-slot ${titleImageFile ? 'replacing' : removeTitleImage ? 'replacing' : episode.titleImageUrl ? 'has' : 'empty'}`}>
               <div className="admin-media-preview">
                 {episode.titleImageUrl && !removeTitleImage ? (
-                  <img src={episode.titleImageUrl} alt="" />
+                  <Image src={episode.titleImageUrl} alt="" width={56} height={84} />
                 ) : (
                   <span className="admin-media-none">None</span>
                 )}

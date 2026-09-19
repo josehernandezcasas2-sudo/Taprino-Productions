@@ -1,4 +1,5 @@
 import { parseRuntimeToSeconds } from '../lib/videoMetadata';
+import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
 
 const MAX_CARDS = 15;
@@ -39,7 +40,7 @@ export default function ContinueWatchingRow({ items, onSelect }) {
                 onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ep); }}
               >
                 <div className="ep-thumb">
-                  {ep.thumbnail && <img src={ep.thumbnail} alt="" className="ep-thumb-img" />}
+                  {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                   <div className="ep-info">
                     <h4>{ep.title}</h4>
                     <span>{ep.artist}</span>

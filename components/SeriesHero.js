@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import { PlayIcon, PauseIcon, VolumeIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
@@ -66,7 +67,7 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, image
   return (
     <div className="hero-carousel full-bleed">
       {isImageMode ? (
-        <img src={imageSrc} alt={title} className="hero-video hero-image" />
+        <Image src={imageSrc} alt={title} fill priority sizes="100vw" className="hero-video hero-image" />
       ) : hasMedia ? (
         <video
           ref={videoRef}
@@ -99,7 +100,16 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, image
         <div className="hero-content">
           <div className="hero-eyebrow">Series{isOriginal ? ' · Tapa Original' : ''}</div>
           <h2>
-            {titleImageUrl ? <img src={titleImageUrl} alt={title} className="hero-title-image" /> : title}
+            {titleImageUrl ? (
+              <Image
+                src={titleImageUrl}
+                alt={title}
+                width={400}
+                height={110}
+                style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '110px' }}
+                className="hero-title-image"
+              />
+            ) : title}
           </h2>
           <p>{desc}</p>
           <div className="series-hero-meta">

@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { episodeHref } from '../../lib/episodeLinks';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -115,7 +116,7 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
                 )}
                 <Link href={episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                   <div className="poster-art">
-                    {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
+                    {ep.poster && <Image src={ep.poster} alt="" fill sizes="(max-width: 640px) 45vw, 220px" className="poster-art-img" />}
                     <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                     {!ep.poster && '◈'}
                   </div>

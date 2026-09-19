@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import Image from 'next/image';
 import BackButton from '../components/BackButton';
 import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -103,7 +104,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
                   <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : `/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                     <div className="poster-art">
                       <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-                      {ep.poster && <img src={ep.poster} alt="" className="poster-art-img" />}
+                      {ep.poster && <Image src={ep.poster} alt="" fill sizes="(max-width: 640px) 45vw, 220px" className="poster-art-img" />}
                       {!ep.poster && '◈'}
                     </div>
                     <div className="poster-title-wrap">

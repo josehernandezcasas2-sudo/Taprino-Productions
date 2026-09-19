@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -203,7 +204,7 @@ export default function PlayerIconsAdmin({ mainGenres, isSignedIn, isSubscriber,
             <div key={key} className="genre-icon-card">
               <div className="genre-icon-preview" style={{ background: '#0f0f0a', color: '#eae7dd' }}>
                 {icons[key] ? (
-                  <img src={icons[key]} alt="" style={{ width: 32, height: 32, objectFit: 'contain' }} />
+                  <Image src={icons[key]} alt="" width={32} height={32} style={{ objectFit: 'contain' }} />
                 ) : (
                   <Default />
                 )}

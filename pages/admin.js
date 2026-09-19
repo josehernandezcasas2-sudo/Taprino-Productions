@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { getAccountContext } from '../lib/accountContext';
 import { SITE } from '../lib/siteConfig';
@@ -1258,7 +1259,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </p>
                 {siteSettings.searchIconUrl && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.6rem' }}>
-                    <img src={siteSettings.searchIconUrl} alt="" style={{ width: 28, height: 28, borderRadius: '50%' }} />
+                    <Image src={siteSettings.searchIconUrl} alt="" width={28} height={28} style={{ borderRadius: '50%' }} />
                     <button
                       className="account-btn-secondary"
                       style={{ width: 'auto' }}
@@ -1285,7 +1286,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </p>
                 {siteSettings.logoUrl && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: '0.6rem' }}>
-                    <img src={siteSettings.logoUrl} alt="" style={{ height: 32, maxWidth: 120 }} />
+                    <Image src={siteSettings.logoUrl} alt="" width={120} height={32} style={{ height: 32, width: 'auto', maxWidth: 120 }} />
                     <button
                       className="account-btn-secondary"
                       style={{ width: 'auto' }}

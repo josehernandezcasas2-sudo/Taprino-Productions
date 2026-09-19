@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import NewsletterSignup from './NewsletterSignup';
 import { SITE } from '../lib/siteConfig';
@@ -35,7 +36,14 @@ export default function Footer() {
         <div className="footer-brand">
           <div className="footer-brand-mark">
             {logoUrl ? (
-              <img src={logoUrl} alt="" className="footer-logo-image" />
+              <Image
+                src={logoUrl}
+                alt=""
+                width={128}
+                height={32}
+                style={{ height: '2rem', width: 'auto', maxWidth: '8rem', objectFit: 'contain' }}
+                className="footer-logo-image"
+              />
             ) : (
               <span className="footer-logo-badge">ST</span>
             )}
