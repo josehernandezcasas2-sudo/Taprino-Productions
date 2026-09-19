@@ -4,6 +4,7 @@ import { cloudflareUidFromUrl } from '../../../lib/cloudflareUpload';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
+import { invalidateCache } from '../../../lib/redis';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -107,6 +108,7 @@ export default async function handler(req, res) {
     console.error('resolve-deletion confirm error:', error.message);
     return res.status(500).json({ error: 'Could not delete this.' });
   }
+  await invalidateCache(type === 'episode' ? 'public_episodes_v1' : 'all_series_approved_v1');
 
   await recordAudit({ adminId: userId, adminEmail: email, action: `confirm_${type}_deletion`, targetType: type, targetId: id, details: row ? (type === 'episode' ? row.title : row.name) : undefined });
   if (type === 'episode' && row) {

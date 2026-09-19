@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
+import { invalidateCache } from '../../../lib/redis';
 
 // Same update shape as review-submission.js, just applied to a batch.
 // Bulk reject uses one shared reason for every item in the batch — if a
@@ -62,6 +63,7 @@ export default async function handler(req, res) {
     console.error('bulk-review error:', error.message);
     return res.status(500).json({ error: 'Could not update these submissions.' });
   }
+  await invalidateCache('public_episodes_v1');
 
   const updatedCount = (data || []).length;
 

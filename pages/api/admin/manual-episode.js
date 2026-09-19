@@ -5,6 +5,7 @@ import { bunnyPlaybackUrl, isValidBunnyHost, muxPlaybackUrl, isValidMuxPlaybackI
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
+import { invalidateCache } from '../../../lib/redis';
 
 // The manual fallback path: for when a creator's in-app upload keeps
 // getting blocked (ad blocker, firewall, flaky network — see
@@ -188,6 +189,7 @@ export default async function handler(req, res) {
     console.error('manual-episode insert error:', error.message);
     return res.status(500).json({ error: 'Could not create the episode.' });
   }
+  await invalidateCache('public_episodes_v1');
 
   const videoDescription = hasCloudflareVideo
     ? `manually-linked Cloudflare video ${body.cloudflareVideoUid}`

@@ -4,6 +4,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { recordAudit } from '../../../lib/auditLog';
+import { invalidateCache } from '../../../lib/redis';
 import { notifyCreator } from '../../../lib/notify';
 import { cloudflarePlaybackUrl, cloudflareUidFromUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 
@@ -160,6 +161,7 @@ export default async function handler(req, res) {
     console.error('admin edit-episode db error:', error.message);
     return res.status(500).json({ error: 'Could not save changes.' });
   }
+  await invalidateCache('public_episodes_v1');
 
   await recordAudit({
     adminId: userId,

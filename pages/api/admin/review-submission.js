@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
+import { invalidateCache } from '../../../lib/redis';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -45,6 +46,7 @@ export default async function handler(req, res) {
     console.error('review-submission error:', error.message);
     return res.status(500).json({ error: 'Could not update the submission.' });
   }
+  await invalidateCache('public_episodes_v1');
 
   await recordAudit({
     adminId: userId,

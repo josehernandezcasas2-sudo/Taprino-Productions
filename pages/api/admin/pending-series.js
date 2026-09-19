@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
+import { invalidateCache } from '../../../lib/redis';
 
 export default async function handler(req, res) {
   const { userId, email, isAdmin } = await getRoleContext(req);
@@ -30,6 +31,7 @@ export default async function handler(req, res) {
       .update({ status: decision, reviewed_by: email, reviewed_at: new Date().toISOString() })
       .eq('id', seriesId);
     if (error) return res.status(500).json({ error: error.message });
+    await invalidateCache('all_series_approved_v1');
 
     await recordAudit({
       adminId: userId,
