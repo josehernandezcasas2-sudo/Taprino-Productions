@@ -864,6 +864,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <Link href="/admin/player-icons"><SlidersIcon size={15} src={iconOverrides.sliders} /> Icons →</Link>
         <Link href="/admin/content-lifecycle"><CalendarIcon size={15} src={iconOverrides.calendar} /> Content lifecycle →</Link>
         <Link href="/admin/promo-codes"><TicketIcon size={15} src={iconOverrides.ticket} /> Promo codes →</Link>
+        <Link href="/admin/ad-credit-codes"><TicketIcon size={15} src={iconOverrides.ticket} /> Ad credit codes →</Link>
         <Link href="/admin/site-icons"><BrowserTabIcon size={15} src={iconOverrides.browser_tab} /> Site icons →</Link>
         <Link href="/admin/curated-rows"><RowsIcon size={15} /> Curated rows →</Link>
         <Link href="/admin/announcements"><BellIcon size={15} /> Announcements →</Link>

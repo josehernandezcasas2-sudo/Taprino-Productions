@@ -95,6 +95,10 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
   const [buyAmount, setBuyAmount] = useState('');
   const [buyBusy, setBuyBusy] = useState(false);
   const [buyError, setBuyError] = useState(null);
+  const [redeemCode, setRedeemCode] = useState('');
+  const [redeemBusy, setRedeemBusy] = useState(false);
+  const [redeemError, setRedeemError] = useState(null);
+  const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [checkoutNotice, setCheckoutNotice] = useState(null);
   const [editingAd, setEditingAd] = useState(null);
   const [adActionBusyId, setAdActionBusyId] = useState(null);
@@ -240,6 +244,33 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
     }
   }
 
+  async function handleRedeemCode(e) {
+    e.preventDefault();
+    setRedeemError(null);
+    setRedeemSuccess(null);
+    if (!redeemCode.trim()) {
+      setRedeemError('Enter a code first.');
+      return;
+    }
+    setRedeemBusy(true);
+    try {
+      const res = await fetch('/api/ads/redeem-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: redeemCode })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not redeem that code.');
+      setRedeemSuccess(`Added $${(data.amountCents / 100).toFixed(2)} in ad credits.`);
+      setRedeemCode('');
+      await refreshAccount();
+    } catch (err) {
+      setRedeemError(err.message);
+    } finally {
+      setRedeemBusy(false);
+    }
+  }
+
   const accountSuspended = adAccount.status !== 'active';
 
   return (
@@ -292,6 +323,21 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
             </button>
           </form>
           {buyError && <div className="house-ad-error">{buyError}</div>}
+
+          <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.6rem', alignItems: 'flex-start', marginTop: '0.9rem', paddingTop: '0.9rem', borderTop: '1px solid rgba(251,232,211,0.1)' }}>
+            <input
+              type="text"
+              placeholder="Have a code? Enter it here"
+              value={redeemCode}
+              onChange={(e) => setRedeemCode(e.target.value)}
+              style={{ maxWidth: '220px', fontFamily: 'var(--font-mono)' }}
+            />
+            <button className="account-btn-secondary" type="submit" disabled={redeemBusy} style={{ width: 'auto' }}>
+              {redeemBusy ? 'Redeeming…' : 'Redeem'}
+            </button>
+          </form>
+          {redeemError && <div className="house-ad-error">{redeemError}</div>}
+          {redeemSuccess && <div style={{ fontSize: '0.82rem', color: 'var(--ok)', marginTop: '0.4rem' }}>{redeemSuccess}</div>}
         </div>
 
         <div className="account-card ad-manager-account-card" style={{ maxWidth: 'none', marginBottom: '1.5rem' }}>
