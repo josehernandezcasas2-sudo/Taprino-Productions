@@ -1,4 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/router';
+import { useDraftAutosave } from '../lib/useDraftAutosave';
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -12,10 +14,61 @@ function readAsDataUrl(file) {
 const EMPTY = { title: '', clickUrl: '', durationSeconds: '', budgetDollars: '' };
 
 export default function AdvertiserAdForm({ onSubmitted }) {
+  const router = useRouter();
   const [form, setForm] = useState(EMPTY);
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  const { existingDraft, scheduleSave, clearDraft, dismissDraft } = useDraftAutosave('ad');
+  const [draftApplied, setDraftApplied] = useState(false);
+
+  // Same guard as the pitch/episode forms: don't let a fresh mount
+  // autosave over a draft the advertiser hasn't been offered a chance to
+  // resume or discard yet.
+  const readyToAutosave = existingDraft === null || draftApplied;
+  useEffect(() => {
+    if (readyToAutosave && form.title.trim()) {
+      scheduleSave(form);
+    }
+  }, [form, readyToAutosave, scheduleSave]);
+
+  function resumeDraft() {
+    if (existingDraft) setForm((f) => ({ ...f, ...existingDraft }));
+    setDraftApplied(true);
+  }
+
+  // The video file itself can't be part of the draft — it can't be
+  // serialized into the JSONB column the other fields are stored in the
+  // same way a title or URL can. Text fields survive a navigation away
+  // and back; the file selection does not, so resuming a draft still
+  // means re-choosing the video.
+  const hasUnsavedInput = Boolean(file || form.title.trim() || form.clickUrl.trim());
+
+  useEffect(() => {
+    function handleBeforeUnload(e) {
+      if (!hasUnsavedInput || busy) return;
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [hasUnsavedInput, busy]);
+
+  useEffect(() => {
+    function handleRouteChangeStart() {
+      if (!hasUnsavedInput || busy) return;
+      // eslint-disable-next-line no-alert
+      if (window.confirm('You have an ad in progress. Leave without submitting it?')) return;
+      router.events.emit('routeChangeError');
+      // Next's Pages Router has no built-in way to cancel a route change —
+      // this throw is the documented (if unusual-looking) workaround, and
+      // is safe in production; it only logs a harmless dev-mode warning.
+      // eslint-disable-next-line no-throw-literal
+      throw 'routeChange aborted (unsaved ad form) — safe to ignore, see https://github.com/vercel/next.js/discussions/32231';
+    }
+    router.events.on('routeChangeStart', handleRouteChangeStart);
+    return () => router.events.off('routeChangeStart', handleRouteChangeStart);
+  }, [hasUnsavedInput, busy, router]);
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -87,6 +140,7 @@ export default function AdvertiserAdForm({ onSubmitted }) {
       setForm(EMPTY);
       setFile(null);
       e.target.reset();
+      clearDraft();
       if (onSubmitted) onSubmitted(data.ad);
     } catch (err) {
       setError(err.message);
@@ -102,6 +156,18 @@ export default function AdvertiserAdForm({ onSubmitted }) {
         that happens. The rate your budget is billed at is set during review, so what you enter
         below is a spending cap, not a price.
       </p>
+
+      {existingDraft && !draftApplied && (
+        <div className="account-card" style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', marginBottom: '1rem' }}>
+          <p style={{ margin: '0 0 0.8rem' }}>You have an unfinished ad. Resume where you left off?</p>
+          <p style={{ margin: '0 0 0.8rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+            The video file itself couldn&rsquo;t be saved — you&rsquo;ll need to choose it again, but
+            everything else is here.
+          </p>
+          <button className="account-btn-primary" type="button" style={{ width: 'auto', marginRight: '0.6rem' }} onClick={resumeDraft}>Resume draft</button>
+          <button className="account-btn-secondary" type="button" style={{ width: 'auto' }} onClick={dismissDraft}>Start fresh</button>
+        </div>
+      )}
 
       <label>Ad title <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— for your own reference, not shown to viewers</span></label>
       <input value={form.title} onChange={(e) => update('title', e.target.value)} placeholder="Fall promo" required />

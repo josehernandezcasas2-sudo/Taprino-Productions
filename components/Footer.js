@@ -74,6 +74,7 @@ export default function Footer() {
         <div className="footer-col">
           <h4>Advertise</h4>
           <Link href="/advertise">Create an ad account</Link>
+          <Link href="/advertise/login">Ad Manager log in</Link>
         </div>
 
         <div className="footer-col">

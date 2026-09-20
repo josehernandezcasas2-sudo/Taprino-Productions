@@ -1,11 +1,14 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 
-// Only these three are valid draft types right now — episode drafts for
+// Only these are valid draft types right now — episode drafts for
 // creators, episode drafts for admin (kept separate from the creator one
 // since the two forms have different field shapes and neither should
-// accidentally load the other's draft), and pitch drafts for creators.
-const VALID_TYPES = ['episode', 'admin_episode', 'pitch'];
+// accidentally load the other's draft), pitch drafts for creators, and
+// ad drafts for advertisers (gated on just being signed in, not
+// isCreator/isAdmin — an ad account is deliberately not part of that
+// role system, see migration 056_ad_accounts.sql).
+const VALID_TYPES = ['episode', 'admin_episode', 'pitch', 'ad'];
 
 export default async function handler(req, res) {
   const { type } = req.query;
