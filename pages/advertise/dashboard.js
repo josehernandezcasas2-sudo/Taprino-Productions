@@ -6,6 +6,7 @@ import { getOwnAdAccount, getAdsForAccount } from '../../lib/adAccounts';
 import AdManagerNav from '../../components/AdManagerNav';
 import AdManagerFooter from '../../components/AdManagerFooter';
 import AdvertiserAdForm from '../../components/AdvertiserAdForm';
+import AdvertiserEditAdModal from '../../components/AdvertiserEditAdModal';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
@@ -34,7 +35,15 @@ export async function getServerSideProps({ req, res }) {
 const STATUS_LABEL = {
   pending: 'Pending review',
   approved: 'Approved',
-  rejected: 'Rejected'
+  rejected: 'Rejected',
+  withdrawn: 'Withdrawn'
+};
+
+const STATUS_COLOR = {
+  approved: 'var(--ok)',
+  rejected: 'var(--danger)',
+  pending: 'var(--brass)',
+  withdrawn: 'var(--ink-faint)'
 };
 
 function centsToDollars(cents) {
@@ -49,9 +58,60 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
   const [buyBusy, setBuyBusy] = useState(false);
   const [buyError, setBuyError] = useState(null);
   const [checkoutNotice, setCheckoutNotice] = useState(null);
+  const [editingAd, setEditingAd] = useState(null);
+  const [adActionBusyId, setAdActionBusyId] = useState(null);
+  const [adActionErrors, setAdActionErrors] = useState({});
 
   function handleAdSubmitted(newAd) {
     setAds((prev) => [newAd, ...prev]);
+  }
+
+  function handleAdEdited(updatedAd) {
+    setAds((prev) => prev.map((a) => (a.id === updatedAd.id ? updatedAd : a)));
+  }
+
+  function setAdError(adId, message) {
+    setAdActionErrors((prev) => ({ ...prev, [adId]: message }));
+  }
+
+  async function handleWithdraw(adId) {
+    // eslint-disable-next-line no-alert
+    if (!window.confirm('Withdraw this ad? This can\'t be undone — you\'d need to submit a new one.')) return;
+    setAdError(adId, null);
+    setAdActionBusyId(adId);
+    try {
+      const res = await fetch('/api/ads/withdraw-ad', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not withdraw this ad.');
+      setAds((prev) => prev.map((a) => (a.id === adId ? { ...a, reviewStatus: 'withdrawn' } : a)));
+    } catch (err) {
+      setAdError(adId, err.message);
+    } finally {
+      setAdActionBusyId(null);
+    }
+  }
+
+  async function handleTogglePause(adId, currentlyPaused) {
+    setAdError(adId, null);
+    setAdActionBusyId(adId);
+    try {
+      const res = await fetch('/api/ads/toggle-pause', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adId, paused: !currentlyPaused })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update this ad.');
+      setAds((prev) => prev.map((a) => (a.id === adId ? data.ad : a)));
+    } catch (err) {
+      setAdError(adId, err.message);
+    } finally {
+      setAdActionBusyId(null);
+    }
   }
 
   async function refreshAccount() {
@@ -120,6 +180,8 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
     }
   }
 
+  const accountSuspended = adAccount.status !== 'active';
+
   return (
     <>
       <Head>
@@ -129,6 +191,15 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Ad Manager</div>
+
+        {accountSuspended && (
+          <div className="account-card" style={{ maxWidth: 'none', marginBottom: '1rem', borderLeft: '3px solid var(--danger)' }}>
+            <p style={{ margin: 0, fontSize: '0.9rem', fontWeight: 'bold', color: 'var(--danger)' }}>Your ad account is suspended</p>
+            <p style={{ margin: '0.3rem 0 0', fontSize: '0.85rem', color: 'var(--ink-dim)' }}>
+              You can&rsquo;t submit new ads or buy credits while suspended. Contact support to resolve this.
+            </p>
+          </div>
+        )}
 
         {checkoutNotice && (
           <div className="account-card" style={{ maxWidth: 'none', marginBottom: '1rem', borderLeft: '3px solid var(--sky)' }}>
@@ -153,9 +224,10 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
               placeholder="25.00"
               value={buyAmount}
               onChange={(e) => setBuyAmount(e.target.value)}
+              disabled={accountSuspended}
               style={{ maxWidth: '140px' }}
             />
-            <button className="unlock-btn" type="submit" disabled={buyBusy} style={{ width: 'auto' }}>
+            <button className="unlock-btn" type="submit" disabled={buyBusy || accountSuspended} style={{ width: 'auto' }}>
               {buyBusy ? 'Redirecting…' : 'Add credits'}
             </button>
           </form>
@@ -164,7 +236,11 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
 
         <div className="account-card ad-manager-account-card" style={{ maxWidth: 'none', marginBottom: '1.5rem' }}>
           <h3>Submit a new ad</h3>
-          <AdvertiserAdForm onSubmitted={handleAdSubmitted} />
+          {accountSuspended ? (
+            <p style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>Submissions are disabled while your account is suspended.</p>
+          ) : (
+            <AdvertiserAdForm onSubmitted={handleAdSubmitted} />
+          )}
         </div>
 
         <div className="account-card ad-manager-account-card" style={{ maxWidth: 'none' }}>
@@ -177,16 +253,17 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
                 <div key={ad.id} style={{ padding: '0.8rem 1rem', borderRadius: '10px', background: 'var(--surface-2)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span style={{ fontWeight: 'bold' }}>{ad.title}</span>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold',
-                        color: ad.reviewStatus === 'approved' ? 'var(--ok)' : ad.reviewStatus === 'rejected' ? 'var(--danger)' : 'var(--brass)'
-                      }}
-                    >
+                    <span style={{ fontSize: '0.75rem', fontWeight: 'bold', color: STATUS_COLOR[ad.reviewStatus] || 'var(--ink-dim)' }}>
                       {STATUS_LABEL[ad.reviewStatus] || ad.reviewStatus}
                     </span>
                   </div>
+
+                  {ad.reviewStatus === 'rejected' && ad.rejectionReason && (
+                    <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.3rem', padding: '0.5rem 0.7rem', background: 'rgba(248,95,115,0.08)', borderRadius: '6px' }}>
+                      {ad.rejectionReason}
+                    </div>
+                  )}
+
                   <div style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '0.3rem' }}>
                     {ad.impressions} impressions · {ad.clicks} clicks
                     {' · '}
@@ -194,12 +271,57 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
                       ? <>{centsToDollars(ad.budgetSpentCents)} of {centsToDollars(ad.budgetTotalCents)} cap spent</>
                       : <>{centsToDollars(ad.budgetSpentCents)} spent, no per-ad cap</>}
                   </div>
+
                   {ad.reviewStatus === 'approved' && !ad.active && (
                     <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '0.2rem' }}>
-                      Paused — {ad.budgetTotalCents != null && ad.budgetSpentCents >= ad.budgetTotalCents
-                        ? 'this ad\u2019s own cap has been reached.'
-                        : 'add credits above to resume.'}
+                      {ad.pausedByAdvertiser
+                        ? 'Paused by you.'
+                        : ad.budgetTotalCents != null && ad.budgetSpentCents >= ad.budgetTotalCents
+                        ? 'Paused — this ad\u2019s own cap has been reached.'
+                        : 'Paused — add credits above to resume.'}
                     </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+                    {ad.reviewStatus === 'pending' && (
+                      <>
+                        <button
+                          type="button"
+                          className="account-btn-secondary"
+                          style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                          onClick={() => setEditingAd(ad)}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          className="account-btn-secondary"
+                          style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem', color: 'var(--danger)' }}
+                          onClick={() => handleWithdraw(ad.id)}
+                          disabled={adActionBusyId === ad.id}
+                        >
+                          {adActionBusyId === ad.id ? 'Withdrawing…' : 'Withdraw'}
+                        </button>
+                      </>
+                    )}
+                    {ad.reviewStatus === 'approved' && (
+                      <button
+                        type="button"
+                        className="account-btn-secondary"
+                        style={{ width: 'auto', padding: '0.35rem 0.75rem', fontSize: '0.8rem' }}
+                        onClick={() => handleTogglePause(ad.id, ad.pausedByAdvertiser)}
+                        disabled={adActionBusyId === ad.id}
+                      >
+                        {adActionBusyId === ad.id
+                          ? 'Updating…'
+                          : ad.pausedByAdvertiser
+                          ? 'Resume'
+                          : 'Pause'}
+                      </button>
+                    )}
+                  </div>
+                  {adActionErrors[ad.id] && (
+                    <div style={{ fontSize: '0.75rem', color: 'var(--danger)', marginTop: '0.3rem' }}>{adActionErrors[ad.id]}</div>
                   )}
                 </div>
               ))}
@@ -207,6 +329,14 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
           )}
         </div>
       </main>
+
+      {editingAd && (
+        <AdvertiserEditAdModal
+          ad={editingAd}
+          onClose={() => setEditingAd(null)}
+          onSaved={handleAdEdited}
+        />
+      )}
 
       <AdManagerFooter />
     </>

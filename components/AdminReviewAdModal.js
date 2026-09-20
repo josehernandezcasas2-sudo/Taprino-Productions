@@ -37,6 +37,7 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
   );
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState(ad.rejectionReason || '');
   const [busy, setBusy] = useState(null); // 'approved' | 'rejected' | null
   const [error, setError] = useState(null);
 
@@ -71,6 +72,10 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
       setError('Set a billing rate before approving — this is what the advertiser\'s budget gets charged per impression.');
       return;
     }
+    if (decision === 'rejected' && !rejectionReason.trim()) {
+      setError('Enter a reason before rejecting — the advertiser sees this, so they know what to fix.');
+      return;
+    }
     setBusy(decision);
     try {
       const videoBase64 = await readAsDataUrl(videoFile);
@@ -84,6 +89,7 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
           durationSeconds: Number(durationSeconds),
           clickUrl,
           costPerImpressionDollars: costPerImpressionDollars || null,
+          rejectionReason: decision === 'rejected' ? rejectionReason.trim() : undefined,
           ...(videoBase64 ? { videoBase64, videoFileName: videoFile.name } : {})
         })
       });
@@ -138,6 +144,14 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
             <> That works out to ${(Number(costPerImpressionDollars) * 1000).toFixed(2)} per 1,000 impressions.</>
           )}
         </small>
+
+        <label>Rejection reason <span style={{ fontWeight: 'normal', opacity: 0.65 }}>required only if you reject — the advertiser sees this</span></label>
+        <textarea
+          value={rejectionReason}
+          onChange={(e) => setRejectionReason(e.target.value)}
+          placeholder="e.g. Video quality too low, or click-through link doesn't work"
+          rows={2}
+        />
 
         {error && <div className="house-ad-error">{error}</div>}
 

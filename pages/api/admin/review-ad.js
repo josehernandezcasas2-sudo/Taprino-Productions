@@ -21,7 +21,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { adId, decision, title, videoBase64, videoFileName, durationSeconds, clickUrl, costPerImpressionDollars } = req.body || {};
+    const { adId, decision, title, videoBase64, videoFileName, durationSeconds, clickUrl, costPerImpressionDollars, rejectionReason } = req.body || {};
     try {
       // Dollars in from the admin UI, fractional cents to the db layer.
       // Deliberately NOT rounded to a whole cent — cost_per_impression_cents
@@ -43,7 +43,8 @@ export default async function handler(req, res) {
         videoFileName,
         durationSeconds: durationSeconds ? Number(durationSeconds) : null,
         clickUrl,
-        costPerImpressionCents
+        costPerImpressionCents,
+        rejectionReason
       });
 
       await recordAudit({
