@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { SITE } from '../../lib/siteConfig';
+import { addAdCredits } from '../../lib/adAccounts';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -39,9 +40,27 @@ export default async function handler(req, res) {
   // you'd hook in side effects: a welcome email, a Notion Artist Hub row,
   // a Discord ping, etc.
   switch (event.type) {
-    case 'checkout.session.completed':
-      console.log(`New ${SITE.premiumTier} member. Stripe customer:`, event.data.object.customer);
+    case 'checkout.session.completed': {
+      const session = event.data.object;
+      // Two entirely different kinds of checkout land here — the
+      // subscription join flow (no metadata.type) and an ad-credits
+      // top-up (metadata.type === 'ad_credits', set when the session
+      // was created in pages/api/ads/buy-credits.js). amount_total is
+      // Stripe's own confirmed charge amount, in cents — used here
+      // rather than trusting anything the client could have sent, since
+      // this is the one number that determines how many real dollars of
+      // credit an advertiser's account receives.
+      if (session.metadata?.type === 'ad_credits' && session.metadata?.adAccountId) {
+        try {
+          await addAdCredits({ adAccountId: session.metadata.adAccountId, additionalCents: session.amount_total });
+        } catch (err) {
+          console.error('addAdCredits from webhook failed:', err.message);
+        }
+      } else {
+        console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
+      }
       break;
+    }
     case 'customer.subscription.deleted':
       console.log(`${SITE.premiumTier} member cancelled. Stripe customer:`, event.data.object.customer);
       break;

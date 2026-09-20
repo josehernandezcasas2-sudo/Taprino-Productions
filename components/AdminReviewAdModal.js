@@ -14,11 +14,27 @@ function centsToDollarsInput(cents) {
   return cents != null ? (cents / 100).toFixed(2) : '';
 }
 
-export default function AdminReviewAdModal({ ad, onClose, onResolved }) {
+// A CPM of 600 cents ($6.00 per 1,000 impressions) works out to
+// $0.006 per single impression — this is the only place that
+// conversion happens, since every other rate in this file is already a
+// stored per-impression dollar figure.
+function cpmCentsToPerImpressionDollars(cpmCents) {
+  return (cpmCents / 100 / 1000).toFixed(4);
+}
+
+export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpmCents }) {
   const [title, setTitle] = useState(ad.title);
   const [durationSeconds, setDurationSeconds] = useState(String(ad.durationSeconds));
   const [clickUrl, setClickUrl] = useState(ad.clickUrl || '');
-  const [costPerImpressionDollars, setCostPerImpressionDollars] = useState(centsToDollarsInput(ad.costPerImpressionCents));
+  // Only fall back to the site-wide default when this particular ad has
+  // never had a rate set — an ad already carrying its own
+  // costPerImpressionCents (e.g. re-opening one already reviewed) keeps
+  // showing exactly that, never silently swapped for today's default.
+  const [costPerImpressionDollars, setCostPerImpressionDollars] = useState(
+    ad.costPerImpressionCents != null
+      ? centsToDollarsInput(ad.costPerImpressionCents)
+      : cpmCentsToPerImpressionDollars(defaultCpmCents || 600)
+  );
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [busy, setBusy] = useState(null); // 'approved' | 'rejected' | null
@@ -92,7 +108,9 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved }) {
 
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginBottom: '0.8rem' }}>
           Submitted by {ad.accountContactEmail || 'unknown'}
-          {ad.budgetTotalCents != null && ` · $${(ad.budgetTotalCents / 100).toFixed(2)} budget cap`}
+          {ad.budgetTotalCents != null
+            ? ` · optional cap on this ad: $${(ad.budgetTotalCents / 100).toFixed(2)}`
+            : ' · no per-ad cap set — draws from the advertiser\'s account credits until they run out'}
         </p>
 
         <video src={videoPreviewUrl || ad.videoUrl} controls style={{ width: '100%', borderRadius: '8px', marginBottom: '1rem', background: '#000' }} />
@@ -110,10 +128,15 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved }) {
         <input type="url" value={clickUrl} onChange={(e) => setClickUrl(e.target.value)} />
 
         <label>Billing rate — cost per impression (dollars) <span style={{ fontWeight: 'normal', opacity: 0.65 }}>required before approving</span></label>
-        <input type="number" min="0" step="0.0001" value={costPerImpressionDollars} onChange={(e) => setCostPerImpressionDollars(e.target.value)} placeholder="0.0050" />
+        <input type="number" min="0" step="0.0001" value={costPerImpressionDollars} onChange={(e) => setCostPerImpressionDollars(e.target.value)} placeholder="0.0060" />
         <small className="house-ad-hint">
-          This is the rate the advertiser&rsquo;s budget gets billed at per impression — they set only
-          their spending cap, never this rate.
+          This is the rate the advertiser&rsquo;s credits get billed at per impression — they never
+          see this number directly. Pre-filled from your site-wide CPM default
+          {defaultCpmCents != null && ad.costPerImpressionCents == null && ` ($${(defaultCpmCents / 100).toFixed(2)} per 1,000 impressions)`};
+          change it here to set a different rate just for this ad.
+          {costPerImpressionDollars && !Number.isNaN(Number(costPerImpressionDollars)) && (
+            <> That works out to ${(Number(costPerImpressionDollars) * 1000).toFixed(2)} per 1,000 impressions.</>
+          )}
         </small>
 
         {error && <div className="house-ad-error">{error}</div>}

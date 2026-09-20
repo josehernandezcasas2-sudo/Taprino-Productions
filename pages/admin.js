@@ -259,6 +259,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           podcastsEnabled: siteSettings.podcastsEnabled,
           recommendationCloseness: siteSettings.recommendationCloseness,
           elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
+          adCpmCents: siteSettings.adCpmCents,
           ...overrides
         })
       });
@@ -1242,6 +1243,23 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
                 </div>
               </div>
 
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'block', marginBottom: '0.4rem' }}>Ad billing rate — default CPM (dollars per 1,000 impressions)</label>
+                <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
+                  This is only the default an advertiser&rsquo;s ad starts with when you review it — you
+                  can still set a different rate for any individual ad in the review modal. Changing
+                  this never affects an ad already approved.
+                </p>
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={(siteSettings.adCpmCents / 100).toFixed(2)}
+                  onChange={(e) => setSiteSettings((s) => ({ ...s, adCpmCents: Math.round(Number(e.target.value) * 100) }))}
+                  style={{ maxWidth: '140px' }}
+                />
+              </div>
+
               <button
                 className="account-btn-primary"
                 style={{ width: 'auto', marginTop: '0.4rem' }}
@@ -1926,6 +1944,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
           ad={reviewingAd}
           onClose={() => setReviewingAd(null)}
           onResolved={handleAdResolved}
+          defaultCpmCents={siteSettings?.adCpmCents}
         />
       )}
     </>

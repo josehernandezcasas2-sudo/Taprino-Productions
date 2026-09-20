@@ -23,12 +23,15 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { adId, decision, title, videoBase64, videoFileName, durationSeconds, clickUrl, costPerImpressionDollars } = req.body || {};
     try {
-      // Dollars in from the admin UI, cents to the db layer — same
-      // convention as the advertiser's own budget field, for the same
-      // reason (typing "5.00" reads naturally; storing 500 avoids
-      // floating-point money bugs).
+      // Dollars in from the admin UI, fractional cents to the db layer.
+      // Deliberately NOT rounded to a whole cent — cost_per_impression_cents
+      // is a numeric column specifically because a realistic CPM (e.g. the
+      // site's $6.00 default) works out to a fraction of a cent per single
+      // impression (0.6, in that example). Rounding here would silently
+      // inflate that to 1 cent — an effective $10 CPM, a 67% overcharge —
+      // which is exactly the bug this replaced.
       const costPerImpressionCents = costPerImpressionDollars != null && costPerImpressionDollars !== ''
-        ? Math.round(Number(costPerImpressionDollars) * 100)
+        ? Number(costPerImpressionDollars) * 100
         : null;
 
       const ad = await reviewAdvertiserAd({

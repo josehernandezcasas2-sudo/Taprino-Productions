@@ -153,8 +153,9 @@ export default function AdvertiserAdForm({ onSubmitted }) {
     <form onSubmit={submit} className="house-ad-form">
       <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
         Submitted ads are reviewed before going live — you&rsquo;ll see the status change here once
-        that happens. The rate your budget is billed at is set during review, so what you enter
-        below is a spending cap, not a price.
+        that happens. Once approved, this ad runs off your account&rsquo;s ad credits (buy those from
+        your dashboard) — the cap below is optional, only needed if you want this specific ad to
+        stop at a set amount even while you still have credits available.
       </p>
 
       {existingDraft && !draftApplied && (
@@ -185,8 +186,8 @@ export default function AdvertiserAdForm({ onSubmitted }) {
       <label>Duration (seconds)</label>
       <input type="number" min="1" value={form.durationSeconds} onChange={(e) => update('durationSeconds', e.target.value)} required />
 
-      <label>Budget <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— your total spending cap for this ad, in dollars, optional</span></label>
-      <input type="number" min="0" step="0.01" value={form.budgetDollars} onChange={(e) => update('budgetDollars', e.target.value)} placeholder="50.00" />
+      <label>Optional cap for this ad <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— stop this specific ad at a set amount, even if you have more credits available</span></label>
+      <input type="number" min="0" step="0.01" value={form.budgetDollars} onChange={(e) => update('budgetDollars', e.target.value)} placeholder="Leave blank for no cap" />
 
       {error && <div className="house-ad-error">{error}</div>}
 

@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo } = req.body || {};
+  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo, adCpmCents } = req.body || {};
   if (shopEnabled && (!shopUrl || !shopUrl.trim())) {
     return res.status(400).json({ error: 'A Shop URL is required to enable the Shop link.' });
   }
@@ -101,6 +101,13 @@ export default async function handler(req, res) {
   if (podcastsEnabled !== undefined) updates.podcasts_enabled = !!podcastsEnabled;
   if (elevatorPitchEnabled !== undefined) updates.elevator_pitch_enabled = !!elevatorPitchEnabled;
   if (curatedRowsRandomOrder !== undefined) updates.curated_rows_random_order = !!curatedRowsRandomOrder;
+  if (adCpmCents !== undefined) {
+    const cpm = Math.round(Number(adCpmCents));
+    if (!Number.isFinite(cpm) || cpm < 0) {
+      return res.status(400).json({ error: 'Ad CPM must be a non-negative number of cents.' });
+    }
+    updates.ad_cpm_cents = cpm;
+  }
   if (recommendationCloseness !== undefined) {
     const closeness = Math.max(0, Math.min(10, Number(recommendationCloseness)));
     updates.recommendation_closeness = Number.isFinite(closeness) ? closeness : 6;
