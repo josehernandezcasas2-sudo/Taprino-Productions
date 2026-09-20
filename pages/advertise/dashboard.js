@@ -3,6 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount, getAdsForAccount } from '../../lib/adAccounts';
+import { getSiteSettings } from '../../lib/siteSettings';
 import AdManagerNav from '../../components/AdManagerNav';
 import AdManagerFooter from '../../components/AdManagerFooter';
 import AdvertiserAdForm from '../../components/AdvertiserAdForm';
@@ -29,7 +30,8 @@ export async function getServerSideProps({ req, res }) {
   }
 
   const ads = await getAdsForAccount(adAccount.id);
-  return { props: { adAccount, ads } };
+  const { adCpmCents } = await getSiteSettings();
+  return { props: { adAccount, ads, adCpmCents } };
 }
 
 const STATUS_LABEL = {
@@ -50,7 +52,43 @@ function centsToDollars(cents) {
   return `$${(cents / 100).toFixed(2)}`;
 }
 
-export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: initialAds }) {
+// A simple inline sparkline — no chart library needed for 14 points.
+// The `max(..., 1)` floor avoids a divide-by-zero for a brand-new ad
+// with no impressions yet — that series renders as a flat line along
+// the bottom, which reads correctly as "zero," not as a broken chart.
+function Sparkline({ series }) {
+  const width = 200;
+  const height = 32;
+  const values = series.map((d) => d.count);
+  const max = Math.max(...values, 1);
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * width;
+      const y = height - (v / max) * height;
+      return `${x},${y}`;
+    })
+    .join(' ');
+  return (
+    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
+      <polyline points={points} fill="none" stroke="var(--sky)" strokeWidth="2" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function TrendLabel({ last7, prior7 }) {
+  if (prior7 === 0 && last7 === 0) return <span style={{ color: 'var(--ink-faint)' }}>No impressions yet</span>;
+  if (prior7 === 0) return <span style={{ color: 'var(--ok)' }}>New this week</span>;
+  const pct = Math.round(((last7 - prior7) / prior7) * 100);
+  if (pct === 0) return <span style={{ color: 'var(--ink-dim)' }}>Flat vs. last week</span>;
+  const up = pct > 0;
+  return (
+    <span style={{ color: up ? 'var(--ok)' : 'var(--danger)' }}>
+      {up ? '↑' : '↓'} {Math.abs(pct)}% vs. last week
+    </span>
+  );
+}
+
+export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: initialAds, adCpmCents }) {
   const router = useRouter();
   const [adAccount, setAdAccount] = useState(initialAdAccount);
   const [ads, setAds] = useState(initialAds);
@@ -61,6 +99,28 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
   const [editingAd, setEditingAd] = useState(null);
   const [adActionBusyId, setAdActionBusyId] = useState(null);
   const [adActionErrors, setAdActionErrors] = useState({});
+  const [performanceByAd, setPerformanceByAd] = useState({});
+  const [performanceConfigured, setPerformanceConfigured] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/ads/performance')
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (data.configured === false) {
+          setPerformanceConfigured(false);
+        } else {
+          setPerformanceByAd(data.byAd || {});
+        }
+      })
+      .catch(() => {
+        // Silent — performance history is a nice-to-have on top of the
+        // lifetime impressions/clicks count already shown, not something
+        // the rest of the dashboard depends on.
+      });
+    return () => { cancelled = true; };
+  }, []);
 
   function handleAdSubmitted(newAd) {
     setAds((prev) => [newAd, ...prev]);
@@ -236,6 +296,10 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
 
         <div className="account-card ad-manager-account-card" style={{ maxWidth: 'none', marginBottom: '1.5rem' }}>
           <h3>Submit a new ad</h3>
+          <p style={{ fontSize: '0.82rem', color: 'var(--ink-dim)', marginBottom: '0.8rem' }}>
+            Current rate: <strong style={{ color: 'var(--ink)' }}>${(adCpmCents / 100).toFixed(2)} per 1,000 impressions</strong>
+            {' '}— confirmed for this specific ad once admin approves it.
+          </p>
           {accountSuspended ? (
             <p style={{ color: 'var(--ink-dim)', fontSize: '0.85rem' }}>Submissions are disabled while your account is suspended.</p>
           ) : (
@@ -271,6 +335,15 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
                       ? <>{centsToDollars(ad.budgetSpentCents)} of {centsToDollars(ad.budgetTotalCents)} cap spent</>
                       : <>{centsToDollars(ad.budgetSpentCents)} spent, no per-ad cap</>}
                   </div>
+
+                  {ad.reviewStatus === 'approved' && performanceConfigured && performanceByAd[ad.id] && (
+                    <div style={{ marginTop: '0.5rem' }}>
+                      <Sparkline series={performanceByAd[ad.id].series} />
+                      <div style={{ fontSize: '0.75rem', marginTop: '0.2rem' }}>
+                        <TrendLabel last7={performanceByAd[ad.id].last7} prior7={performanceByAd[ad.id].prior7} />
+                      </div>
+                    </div>
+                  )}
 
                   {ad.reviewStatus === 'approved' && !ad.active && (
                     <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginTop: '0.2rem' }}>

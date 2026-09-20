@@ -1,5 +1,6 @@
 import { getSupabase } from '../../../lib/supabase';
 import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
+import { recordDailyAdImpression } from '../../../lib/redis';
 
 // Fired by the IMA SDK as a plain GET the moment a house ad actually starts
 // playing — this is the <Impression> URL embedded in the VAST response
@@ -31,6 +32,7 @@ export default async function handler(req, res) {
     try {
       const supabase = getSupabase();
       await supabase.rpc('increment_house_ad_impression', { target_id: ad });
+      await recordDailyAdImpression(ad);
     } catch (err) {
       // A missed count is not worth breaking playback over — this must
       // never be the reason an ad (or the content after it) fails to load.

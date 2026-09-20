@@ -3,6 +3,7 @@ import Head from 'next/head';
 import { SignInButton } from '@clerk/nextjs';
 import { getAccountContext } from '../lib/accountContext';
 import { getOwnAdAccount } from '../lib/adAccounts';
+import { getSiteSettings } from '../lib/siteSettings';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import Footer from '../components/Footer';
@@ -22,18 +23,21 @@ export async function getServerSideProps({ req, res }) {
     }
   }
 
+  const { adCpmCents } = await getSiteSettings();
+
   return {
     props: {
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
-      isCreator: account.isCreator
+      isCreator: account.isCreator,
+      adCpmCents
     }
   };
 }
 
-export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, isCreator, adCpmCents }) {
   const [companyName, setCompanyName] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [signupBusy, setSignupBusy] = useState(false);
@@ -71,6 +75,11 @@ export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, is
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Advertise on {SITE.name}</div>
+        <p style={{ fontSize: '0.95rem', color: 'var(--ink-dim)', marginBottom: '1.2rem' }}>
+          Starting at <strong style={{ color: 'var(--ink)' }}>${(adCpmCents / 100).toFixed(2)} per 1,000 impressions</strong> — the
+          exact rate for your ad is confirmed when it&rsquo;s approved, but this is what to expect
+          going in.
+        </p>
 
         {!isSignedIn && (
           <div className="account-card" style={{ maxWidth: 'none' }}>
