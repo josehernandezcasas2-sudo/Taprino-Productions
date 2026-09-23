@@ -4333,6 +4333,17 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .account-identity-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
 .account-identity-name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .account-identity-name-row h3 { margin: 0; font-size: 1.25rem; }
+/* Both badges need to never wrap their OWN text — .account-identity-name-row
+   already wraps at the row level (flex-wrap:wrap above), which is the
+   right place for narrow screens to break: the whole pill drops to its
+   own line, rather than a pill getting squeezed narrower than its text
+   and breaking mid-word into a tall, mis-shaped two-line badge like
+   "TAPA +" / "MEMBER" was doing on mobile. */
+.account-identity-name-row .account-role-badge,
+.account-identity-name-row .account-tier-badge {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .account-tier-badge {
   background: var(--brass-deep);
   color: var(--ink);
