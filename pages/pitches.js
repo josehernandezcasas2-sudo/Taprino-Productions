@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../components/BackButton';
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../lib/accountContext';
 import { HeartIcon, SwipeDeckIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
@@ -53,7 +54,21 @@ export async function getServerSideProps({ req, res }) {
   for (const row of saveRows || []) {
     saveCountsByPitchId[row.pitch_id] = (saveCountsByPitchId[row.pitch_id] || 0) + 1;
   }
-  const pitchesWithSaveCounts = pitches.map((p) => ({ ...p, savedCount: saveCountsByPitchId[p.id] || 0 }));
+  // Same lightweight-aggregate pattern as saveCountsByPitchId above, for
+  // the same reason pages/pitches/[id].js switched to this: a
+  // funding_enabled pitch's real progress lives in pitch_donations, not
+  // the self-reported funding_raised column, which never gets updated
+  // once a project is on real in-platform funding.
+  const { data: donationRows } = await supabase.from('pitch_donations').select('pitch_id, amount_cents');
+  const raisedCentsByPitchId = {};
+  for (const row of donationRows || []) {
+    raisedCentsByPitchId[row.pitch_id] = (raisedCentsByPitchId[row.pitch_id] || 0) + row.amount_cents;
+  }
+  const pitchesWithSaveCounts = pitches.map((p) => ({
+    ...p,
+    savedCount: saveCountsByPitchId[p.id] || 0,
+    liveRaisedCents: p.funding_enabled ? (raisedCentsByPitchId[p.id] || 0) : null
+  }));
 
   return {
     props: {
@@ -72,6 +87,7 @@ export async function getServerSideProps({ req, res }) {
 
 export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, savedIds, bypassingDisabled }) {
   const iconOverrides = usePlayerIconOverrides();
+  const router = useRouter();
   const [saved, setSaved] = useState(new Set(savedIds));
   const [activeTag, setActiveTag] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,7 +109,8 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
 
   function fundingPct(p) {
     if (!p.funding_goal) return null;
-    return Math.min(100, Math.round(((p.funding_raised || 0) / p.funding_goal) * 100));
+    const raised = p.funding_enabled ? (p.liveRaisedCents || 0) / 100 : (p.funding_raised || 0);
+    return Math.min(100, Math.round((raised / p.funding_goal) * 100));
   }
 
   // Whole calendar days until the deadline date, comparing dates only
@@ -249,12 +266,38 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                   </div>
                   <div className="pitch-info">
                     <h4>{p.title}</h4>
-                    {p.creator_name && <div className="creator">{p.creator_name}</div>}
+                    {p.creator_name && (
+                      p.created_by ? (
+                        // A real <Link> here would nest an <a> inside the
+                        // card's own <Link> (invalid HTML — browsers
+                        // un-nest it, which can visibly relocate it out of
+                        // the card). A keyboard-operable span with the
+                        // same click-through-to-navigate behavior instead.
+                        <span
+                          className="creator creator-link"
+                          role="link"
+                          tabIndex={0}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/profile/${p.created_by}`); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault(); e.stopPropagation();
+                              router.push(`/profile/${p.created_by}`);
+                            }
+                          }}
+                        >
+                          {p.creator_name}
+                        </span>
+                      ) : (
+                        <div className="creator">{p.creator_name}</div>
+                      )
+                    )}
                     {pct !== null && (
                       <>
                         <div className="pitch-progress-track"><div className="pitch-progress-fill" style={{ width: `${pct}%` }} /></div>
                         <div className="pitch-progress-label">
-                          ${Number(p.funding_raised || 0).toLocaleString()} of ${Number(p.funding_goal).toLocaleString()} goal
+                          {p.funding_enabled
+                            ? `$${((p.liveRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of $${Number(p.funding_goal).toLocaleString()} goal`
+                            : `$${Number(p.funding_raised || 0).toLocaleString()} of $${Number(p.funding_goal).toLocaleString()} goal`}
                         </div>
                       </>
                     )}

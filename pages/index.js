@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getActiveAnnouncements } from '../lib/announcements';
@@ -54,7 +55,8 @@ export async function getServerSideProps({ req }) {
     tag: p.tag,
     logline: p.logline || p.description,
     fundingRaised: p.funding_raised,
-    creatorName: p.creator_name || null
+    creatorName: p.creator_name || null,
+    creatorUserId: p.created_by || null
   }));
 
   // Series row — same "consolidate episodes into one card per show"
@@ -131,6 +133,7 @@ export default function Home({
   seriesRows, trending, liveStream
 }) {
   const cassetteColors = ['mint', 'sky', 'rust', 'brass'];
+  const router = useRouter();
 
   return (
     <>
@@ -295,7 +298,26 @@ export default function Home({
                 <Link key={p.id} href={`/pitches/${p.id}`} className="zine-flyer">
                   <h4>{p.title}</h4>
                   {p.logline && <p>{p.logline}</p>}
-                  {p.creatorName && <div className="zine-flyer-by">by {p.creatorName}</div>}
+                  {p.creatorName && (
+                    p.creatorUserId ? (
+                      <span
+                        className="zine-flyer-by zine-flyer-by-link"
+                        role="link"
+                        tabIndex={0}
+                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/profile/${p.creatorUserId}`); }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault(); e.stopPropagation();
+                            router.push(`/profile/${p.creatorUserId}`);
+                          }
+                        }}
+                      >
+                        by {p.creatorName}
+                      </span>
+                    ) : (
+                      <div className="zine-flyer-by">by {p.creatorName}</div>
+                    )
+                  )}
                   {p.fundingRaised != null && (
                     <div className="zine-flyer-raised">${Number(p.fundingRaised).toLocaleString()} raised</div>
                   )}

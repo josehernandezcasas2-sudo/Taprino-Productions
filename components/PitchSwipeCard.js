@@ -113,7 +113,19 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
         {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
         <h2>{pitch.title}</h2>
         <p className="swipe-card-logline">{pitch.logline}</p>
-        {pitch.creator_name && <div className="swipe-card-creator">{pitch.creator_name}</div>}
+        {pitch.creator_name && (
+          pitch.created_by ? (
+            <Link
+              href={`/profile/${pitch.created_by}`}
+              className="swipe-card-creator swipe-card-creator-link"
+              onPointerDown={(e) => e.stopPropagation()}
+            >
+              {pitch.creator_name}
+            </Link>
+          ) : (
+            <div className="swipe-card-creator">{pitch.creator_name}</div>
+          )
+        )}
         <Link
           href={`/pitches/${pitch.id}`}
           className="swipe-card-learn-more"

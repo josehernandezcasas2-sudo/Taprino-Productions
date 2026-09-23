@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { useState } from 'react';
+import { useRouter } from 'next/router';
 import { getAuth } from '@clerk/nextjs/server';
 import { SignInButton } from '@clerk/nextjs';
 import { getAccountContext } from '../../lib/accountContext';
@@ -12,6 +13,7 @@ import {
   getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
 } from '../../lib/pitches';
 import { getDonationsForPitch } from '../../lib/pitchDonations';
+import { getPublicDisplayNames } from '../../lib/userProfiles';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
@@ -48,6 +50,21 @@ export async function getServerSideProps({ req, res, params }) {
   const totalRaisedCents = pitch.funding_enabled ? donations.reduce((sum, d) => sum + d.amountCents, 0) : null;
   const backerCount = pitch.funding_enabled ? new Set(donations.map((d) => d.donorUserId)).size : null;
 
+  // Most recent unique backers, most-recent-donation-first — donations
+  // already come back ordered newest-first (getDonationsForPitch), so
+  // the first time a donor id appears in that order is their latest
+  // donation. Capped at 8 so this stays a strip, not another grid.
+  const seenDonors = new Set();
+  const recentBackerIds = [];
+  for (const d of donations) {
+    if (seenDonors.has(d.donorUserId)) continue;
+    seenDonors.add(d.donorUserId);
+    recentBackerIds.push(d.donorUserId);
+    if (recentBackerIds.length >= 8) break;
+  }
+  const backerNames = recentBackerIds.length > 0 ? await getPublicDisplayNames(recentBackerIds) : {};
+  const recentBackers = recentBackerIds.map((id) => ({ userId: id, displayName: backerNames[id] }));
+
   return {
     props: {
       isSignedIn: account.isSignedIn,
@@ -63,13 +80,17 @@ export async function getServerSideProps({ req, res, params }) {
       comments,
       initialSaved: saved,
       totalRaisedCents,
-      backerCount
+      backerCount,
+      recentBackers
     }
   };
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount }) {
+const DONATION_PRESETS = [10, 25, 50];
+
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers }) {
   const iconOverrides = usePlayerIconOverrides();
+  const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
   const [commentList, setCommentList] = useState(comments);
   const [commentText, setCommentText] = useState('');
@@ -261,7 +282,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <h2>{pitch.title}</h2>
 
             {pct !== null && (
-              <div className="pitch-progress-bar">
+              <div className="pitch-progress-track pitch-progress-track-lg">
                 <div className="pitch-progress-fill" style={{ width: `${pct}%` }} />
               </div>
             )}
@@ -308,14 +329,32 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
               )}
               <WishlistButton isActive={saved} onToggle={toggleSave} className="wishlist-btn-large" />
-              <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
-                {shareCopied ? '✓' : '⇪'}
-              </button>
+              <div className="pitch-share-wrap">
+                <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
+                  {shareCopied ? '✓' : '⇪'}
+                </button>
+                {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
+              </div>
             </div>
             {pitch.funding_enabled && (
               <div style={{ marginTop: 14 }}>
                 {isSignedIn ? (
-                  <form onSubmit={donate} style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  <form onSubmit={donate}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                      {DONATION_PRESETS.map((amount) => (
+                        <button
+                          key={amount}
+                          type="button"
+                          className="pitch-preset-btn"
+                          aria-pressed={donationAmount === String(amount)}
+                          onClick={() => setDonationAmount(String(amount))}
+                          disabled={donating}
+                        >
+                          ${amount}
+                        </button>
+                      ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
                     <span style={{ opacity: 0.7 }}>$</span>
                     <input
                       type="number"
@@ -331,6 +370,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                       {donating ? 'Sending…' : '\u25C6 Support this project'}
                     </button>
                     {donationSuccess && <span style={{ color: 'var(--ok)', fontSize: 13 }}>Thank you for your support!</span>}
+                    </div>
                   </form>
                 ) : (
                   <p style={{ fontSize: 13, opacity: 0.75 }}>
@@ -400,6 +440,20 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
           </>
         )}
 
+        {recentBackers.length > 0 && (
+          <>
+            <div className="pitch-section-label">Backers{backerCount > recentBackers.length ? ` (${backerCount})` : ''}</div>
+            <div className="pitch-backer-row">
+              {recentBackers.map((b) => (
+                <Link key={b.userId} href={`/profile/${b.userId}`} className="pitch-backer">
+                  <div className="pitch-backer-avatar">{(b.displayName || '?')[0].toUpperCase()}</div>
+                  <span>{b.displayName}</span>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
         {similar.length > 0 && (
           <>
             <div className="pitch-section-label">Similar projects</div>
@@ -411,7 +465,26 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                   </div>
                   <div className="pitch-info">
                     <h4>{p.title}</h4>
-                    {p.creator_name && <div className="creator">{p.creator_name}</div>}
+                    {p.creator_name && (
+                      p.created_by ? (
+                        <span
+                          className="creator creator-link"
+                          role="link"
+                          tabIndex={0}
+                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); router.push(`/profile/${p.created_by}`); }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault(); e.stopPropagation();
+                              router.push(`/profile/${p.created_by}`);
+                            }
+                          }}
+                        >
+                          {p.creator_name}
+                        </span>
+                      ) : (
+                        <div className="creator">{p.creator_name}</div>
+                      )
+                    )}
                   </div>
                 </Link>
               ))}

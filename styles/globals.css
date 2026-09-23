@@ -4472,6 +4472,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .pitch-info { padding: 0.9rem 1rem 1.1rem; }
 .pitch-info h4 { margin: 0 0 0.25rem; font-size: 0.95rem; color: var(--ink); }
 .pitch-info .creator { color: var(--ink-dim); font-size: 0.78rem; margin-bottom: 0.5rem; }
+.pitch-info .creator-link { display: inline-block; cursor: pointer; }
+.pitch-info .creator-link:hover { color: var(--brass); text-decoration: underline; }
 .pitch-progress-track { height: 5px; background: rgba(255,255,255,0.12); border-radius: 3px; overflow: hidden; margin-bottom: 0.4rem; }
 .pitch-progress-fill { height: 100%; background: var(--brass); }
 .pitch-progress-label { font-size: 0.7rem; color: var(--ink-dim); }
@@ -4483,19 +4485,59 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   border-radius: 8px; font-family: var(--font-display); font-weight: 700;
   font-size: 0.95rem; text-decoration: none; display: inline-block; border: none; cursor: pointer;
 }
-.pitch-progress-bar {
+.pitch-preset-btn {
+  background: rgba(251, 232, 211, 0.08);
+  border: 1px solid rgba(251, 232, 211, 0.25);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem;
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.pitch-preset-btn:hover { border-color: var(--brass); }
+.pitch-preset-btn[aria-pressed="true"] { background: var(--brass); color: #241a05; border-color: var(--brass); }
+.pitch-preset-btn:disabled { opacity: 0.6; cursor: wait; }
+
+.pitch-share-wrap { position: relative; display: inline-flex; }
+.pitch-share-toast {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #1a1408;
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  animation: pitch-toast-in 0.15s ease;
+}
+.pitch-share-toast::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+@keyframes pitch-toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+/* Hero-sized variant of the same .pitch-progress-track/-fill pair used
+   on the Pitch Room grid (pages/pitches.js) — one shared bar style
+   instead of two near-duplicate systems, just taller and capped to a
+   sane max width for the hero's wide layout. */
+.pitch-progress-track-lg {
   height: 6px;
   border-radius: 999px;
-  background: rgba(251, 232, 211, 0.15);
-  overflow: hidden;
-  margin: 0.7rem 0 0.9rem;
   max-width: 420px;
-}
-.pitch-progress-fill {
-  height: 100%;
-  background: var(--brass);
-  border-radius: 999px;
-  transition: width 0.3s ease;
+  margin: 0.7rem 0 0.9rem;
 }
 .pitch-section-label {
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
@@ -4508,6 +4550,18 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   display: flex; align-items: center; justify-content: center; font-weight: 700;
   font-family: var(--font-mono); flex-shrink: 0;
 }
+.pitch-backer-row { display: flex; flex-wrap: wrap; gap: 0.7rem; }
+.pitch-backer {
+  display: flex; align-items: center; gap: 0.5rem; background: var(--surface-2);
+  border-radius: 999px; padding: 0.35rem 0.9rem 0.35rem 0.35rem; text-decoration: none; color: var(--ink);
+}
+.pitch-backer:hover { background: var(--surface-3); }
+.pitch-backer-avatar {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--brass); color: #241a05;
+  display: flex; align-items: center; justify-content: center; font-weight: 700;
+  font-family: var(--font-mono); font-size: 0.72rem; flex-shrink: 0;
+}
+.pitch-backer span { font-size: 0.8rem; }
 .pitch-photo-row { display: flex; flex-wrap: wrap; gap: 0.8rem; }
 .pitch-photo-item { width: 220px; height: 140px; border-radius: 0.7rem; background-size: cover; background-position: center; background-color: var(--surface-3); }
 .pitch-update-card { background: var(--surface-2); border-radius: 0.8rem; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
@@ -5238,6 +5292,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
   line-height: 1.4;
 }
 .swipe-card-creator { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.7rem; }
+.swipe-card-creator-link { display: block; text-decoration: none; width: fit-content; }
+.swipe-card-creator-link:hover { color: var(--brass); text-decoration: underline; }
 .swipe-card-learn-more {
   display: inline-block;
   font-family: var(--font-mono);
@@ -5903,6 +5959,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-flyer h4 { font-size: 1.05rem; margin: 0 0 0.4rem; }
 .zine-flyer p { font-size: 0.72rem; line-height: 1.5; margin: 0 0 0.6rem; opacity: 0.75; }
 .zine-flyer-by { font-size: 0.66rem; font-style: italic; color: #6b6248; margin-bottom: 0.5rem; }
+.zine-flyer-by-link { display: inline-block; cursor: pointer; }
+.zine-flyer-by-link:hover { text-decoration: underline; color: var(--rust); }
 .zine-flyer-raised { font-family: var(--font-mono); font-size: 0.7rem; color: var(--rust); font-weight: bold; }
 
 /* trending — rank badge pinned to the corner of the same poster card
