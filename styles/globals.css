@@ -5533,11 +5533,51 @@ body:has(.mini-player) { padding-bottom: 72px; }
    Pitch Room "Discover" swipe deck (pages/pitches/discover.js,
    components/PitchSwipeCard.js)
    ============================================================ */
-.discover-stage { max-width: 480px; margin: 0 auto; text-align: center; }
-.discover-stage .back-link { display: inline-block; margin-bottom: 1rem; }
-.discover-stage .library-heading, .discover-stage .library-sub { text-align: left; }
+/* Full-screen takeover, same idea as .reel-feed (vertical discover) —
+   no HeaderNav/Footer, just the swipe deck centered in the viewport with
+   the tab bar still visible at the bottom. A fixed "×" stands in for
+   HeaderNav's back link (same smart-back behavior, see useSmartBack). */
+.pitch-discover-stage {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.9rem;
+  padding: 1.2rem;
+  padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  background: var(--void);
+  text-align: center;
+}
+/* Below 1180px the tab bar is visible (see MobileTabBar/.tabbar's own
+   breakpoint) — reserve room for its floating pill so the card and swipe
+   buttons never sit underneath it. */
+@media (max-width: 1180px) {
+  .pitch-discover-stage { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+}
+.pitch-discover-close {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  left: 1rem;
+  z-index: 4;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(251, 232, 211, 0.08);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.pitch-discover-close:hover { background: rgba(251, 232, 211, 0.16); }
+.pitch-discover-banner { max-width: 420px; }
 
-.swipe-deck-wrap { display: flex; flex-direction: column; align-items: center; margin-top: 1rem; }
+.swipe-deck-wrap { display: flex; flex-direction: column; align-items: center; }
 
 .swipe-round-tag {
   font-family: var(--font-mono);

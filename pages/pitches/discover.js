@@ -1,15 +1,13 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import BackButton from '../../components/BackButton';
+import { useSmartBack } from '../../components/BackButton';
+import { CloseIcon } from '../../components/PlayerIcons';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches } from '../../lib/pitches';
 import { getSiteSettings } from '../../lib/siteSettings';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
 import PitchSwipeCard, { SwipeButtons } from '../../components/PitchSwipeCard';
 import { SITE } from '../../lib/siteConfig';
 import { readLocalProgress, saveLocalProgress, clearLocalProgress, reconstructFromIds } from '../../lib/swipeProgressStorage';
@@ -27,23 +25,18 @@ export async function getServerSideProps({ req, res }) {
   }
 
   // private, not public: this response embeds personalized account data
-  // (email, admin/creator status via HeaderNav's props) — a public,
-  // shared cache could serve one signed-in user's personalized page to a
-  // completely different visitor within the cache window.
+  // (whether this viewer is bypassing a disabled Pitch Room as an admin,
+  // their own swipe progress) — a public, shared cache could serve one
+  // signed-in user's personalized page to a completely different visitor
+  // within the cache window.
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
 
   const { userId } = getAuth(req);
-  const [pitches, episodes] = await Promise.all([getApprovedPitches(), getPublicEpisodes()]);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const pitches = await getApprovedPitches();
 
   return {
     props: {
       isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator,
-      mainGenres,
       pitches,
       bypassingDisabled,
       requireSignIn: !userId
@@ -55,7 +48,13 @@ function shuffled(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
 }
 
-export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, bypassingDisabled, requireSignIn }) {
+export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, requireSignIn }) {
+  // Full-screen takeover, same idea as /vertical/discover — no HeaderNav
+  // (this smart-back close button replaces it), just the tab bar staying
+  // put at the bottom. goBack matches the header/nav pill's own "true
+  // back if you navigated here in-site, otherwise /pitches" behavior.
+  const goBack = useSmartBack('/pitches');
+
   // Starts empty/loading rather than synchronously shuffling — whether to
   // resume a saved deck or start fresh can't be known until the mount
   // effect below checks (an API call for signed-in users, localStorage
@@ -237,35 +236,20 @@ export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin
         <meta name="description" content={`Swipe through project ideas looking for backing on ${SITE.name}.`} />
       </Head>
 
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
+      <div className="pitch-discover-stage">
+        <button className="pitch-discover-close" onClick={goBack} aria-label="Close">
+          <CloseIcon size={16} />
+        </button>
 
-      {bypassingDisabled && (
-        <div className="admin-preview-banner">
-          ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
-          <Link href="/admin">Go turn it back on</Link>
-        </div>
-      )}
-
-      <main className="library-stage discover-stage">
-        <BackButton fallbackHref="/pitches" />
-        <div className="library-heading">Discover</div>
-        <div className="library-sub">
-          Swipe right to like and follow a project, left if it's not for you, or down to skip it for
-          now — anything you skip comes back around for a second look before you're done.
-        </div>
-
-        {saveError && <div className="admin-preview-banner" style={{ marginTop: '1rem' }}>{saveError}</div>}
-
+        {bypassingDisabled && (
+          <div className="admin-preview-banner pitch-discover-banner">
+            ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
+            <Link href="/admin">Go turn it back on</Link>
+          </div>
+        )}
+        {saveError && <div className="admin-preview-banner pitch-discover-banner">{saveError}</div>}
         {requireSignIn && (
-          <div className="poster-empty" style={{ marginTop: '1.4rem' }}>
+          <div className="poster-empty pitch-discover-banner">
             Sign in to like and follow projects — you can still browse without an account, but likes
             won&rsquo;t be saved anywhere.
           </div>
@@ -325,8 +309,7 @@ export default function PitchDiscover({ isSignedIn, isSubscriber, email, isAdmin
             </>
           )}
         </div>
-      </main>
-      <Footer />
+      </div>
       <MobileTabBar />
     </>
   );
