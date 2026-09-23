@@ -1,12 +1,23 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { HeartIcon, CloseIcon } from './PlayerIcons';
+import { HeartIcon, CloseIcon, InfoIcon } from './PlayerIcons';
 
 const THRESHOLD_X = 100; // px horizontal drag to commit like/dislike
 const THRESHOLD_Y = 120; // px vertical drag to commit skip — taller than
 // THRESHOLD_X since a downward drag is easier to do accidentally while
 // scrolling on a touch device than a deliberate sideways swipe is.
+const TAP_THRESHOLD = 6; // px — below this, a released pointer counts as a
+// tap (flips the card) rather than an aborted drag (snaps back to center).
 const EXIT_MS = 280;
+
+function formatDeadline(dateStr) {
+  if (!dateStr) return null;
+  try {
+    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch {
+    return null;
+  }
+}
 
 // Renders exactly one card and handles its own drag gesture — the parent
 // only ever finds out "this card was swiped left/right/down" via onSwipe.
@@ -16,6 +27,10 @@ const EXIT_MS = 280;
 export default function PitchSwipeCard({ pitch, onSwipe }) {
   const [drag, setDrag] = useState({ dx: 0, dy: 0, dragging: false });
   const [exiting, setExiting] = useState(null); // null | 'left' | 'right' | 'down'
+  // Resets on its own each time a new pitch comes up — this component is
+  // rendered with key={pitch.id} in pages/pitches/discover.js, so React
+  // fully remounts it per card rather than reusing this state.
+  const [flipped, setFlipped] = useState(false);
   const startRef = useRef({ x: 0, y: 0 });
   const pointerIdRef = useRef(null);
 
@@ -55,10 +70,15 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
       commit('left');
     } else if (absY > absX && dy > THRESHOLD_Y) {
       commit('down');
+    } else if (absX < TAP_THRESHOLD && absY < TAP_THRESHOLD) {
+      // Barely moved at all — a tap/click, not an aborted drag. Flips the
+      // card instead of snapping back (there's nothing to snap back from).
+      setDrag({ dx: 0, dy: 0, dragging: false });
+      setFlipped((f) => !f);
     } else {
-      // Below threshold — snap back to center. The transition CSS only
-      // applies once dragging stops (see style below), so this animates
-      // smoothly instead of jumping.
+      // Below threshold but moved more than a tap — snap back to center.
+      // The transition CSS only applies once dragging stops (see style
+      // below), so this animates smoothly instead of jumping.
       setDrag({ dx: 0, dy: 0, dragging: false });
     }
   }
@@ -90,6 +110,9 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
   // this eases it the rest of the way.
   const transition = drag.dragging ? 'none' : `transform ${EXIT_MS}ms ease, opacity ${EXIT_MS}ms ease`;
 
+  const pct = pitch.funding_goal ? Math.min(100, Math.round(((pitch.funding_raised || 0) / pitch.funding_goal) * 100)) : null;
+  const deadline = formatDeadline(pitch.funding_deadline);
+
   return (
     <div
       className="swipe-card"
@@ -97,46 +120,83 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
-      style={{
-        transform,
-        transition,
-        opacity: exiting ? 0 : 1,
-        backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined
-      }}
+      style={{ transform, transition, opacity: exiting ? 0 : 1 }}
     >
       <div className={`swipe-badge swipe-badge-like ${likeOpacity > 0.15 ? 'visible' : ''}`} style={{ opacity: likeOpacity }}>LIKE</div>
       <div className={`swipe-badge swipe-badge-nope ${nopeOpacity > 0.15 ? 'visible' : ''}`} style={{ opacity: nopeOpacity }}>PASS</div>
       <div className={`swipe-badge swipe-badge-skip ${skipOpacity > 0.15 ? 'visible' : ''}`} style={{ opacity: skipOpacity }}>SKIP</div>
 
-      <div className="swipe-card-scrim" />
-      <div className="swipe-card-body">
-        {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
-        <h2>{pitch.title}</h2>
-        <p className="swipe-card-logline">{pitch.logline}</p>
-        {pitch.creator_name && (
-          pitch.created_by ? (
+      {/* A tap flips this (see the TAP_THRESHOLD branch in
+          handlePointerUp) — a plain CSS 3D rotate on this inner wrapper,
+          independent of the outer .swipe-card's own drag transform, so
+          swiping still works identically whichever face is showing. */}
+      <div className={`swipe-card-flip-inner ${flipped ? 'flipped' : ''}`}>
+        <div className="swipe-card-face swipe-card-front" style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}>
+          <div className="swipe-card-scrim" />
+          <div className="swipe-card-flip-hint"><InfoIcon size={13} /> Tap for more</div>
+          <div className="swipe-card-body">
+            {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
+            <h2>{pitch.title}</h2>
+            <p className="swipe-card-logline">{pitch.logline}</p>
+            {pitch.creator_name && (
+              pitch.created_by ? (
+                <Link
+                  href={`/profile/${pitch.created_by}`}
+                  className="swipe-card-creator swipe-card-creator-link"
+                  onPointerDown={(e) => e.stopPropagation()}
+                >
+                  {pitch.creator_name}
+                </Link>
+              ) : (
+                <div className="swipe-card-creator">{pitch.creator_name}</div>
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="swipe-card-face swipe-card-back">
+          <div className="swipe-card-body swipe-card-back-body">
+            {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
+            <h2>{pitch.title}</h2>
+
+            {(pitch.description || pitch.logline) && (
+              <p className="swipe-card-description">{pitch.description || pitch.logline}</p>
+            )}
+
+            {pct != null && (
+              <div className="swipe-card-funding">
+                <div className="pitch-progress-track">
+                  <div className="pitch-progress-fill" style={{ width: `${pct}%` }} />
+                </div>
+                <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
+              </div>
+            )}
+            {deadline && <div className="swipe-card-deadline">Funding closes {deadline}</div>}
+
+            {Array.isArray(pitch.team) && pitch.team.length > 0 && (
+              <div className="swipe-card-team">
+                {pitch.team.map((m, i) => (
+                  <span key={i} className="swipe-card-team-member">
+                    {m.name}{m.role ? ` — ${m.role}` : ''}
+                  </span>
+                ))}
+              </div>
+            )}
+
             <Link
-              href={`/profile/${pitch.created_by}`}
-              className="swipe-card-creator swipe-card-creator-link"
+              href={`/pitches/${pitch.id}`}
+              className="swipe-card-learn-more"
+              target="_blank"
+              rel="noopener noreferrer"
+              // A tap here is "show me the full page," not a swipe/flip —
+              // it must never register as a drag or tap on the card
+              // underneath it.
               onPointerDown={(e) => e.stopPropagation()}
             >
-              {pitch.creator_name}
+              View full pitch &rarr;
             </Link>
-          ) : (
-            <div className="swipe-card-creator">{pitch.creator_name}</div>
-          )
-        )}
-        <Link
-          href={`/pitches/${pitch.id}`}
-          className="swipe-card-learn-more"
-          target="_blank"
-          rel="noopener noreferrer"
-          // A tap here is "show me the full page," not a swipe — it must
-          // never register as a drag start on the card underneath it.
-          onPointerDown={(e) => e.stopPropagation()}
-        >
-          View full pitch &rarr;
-        </Link>
+          </div>
+        </div>
       </div>
     </div>
   );
