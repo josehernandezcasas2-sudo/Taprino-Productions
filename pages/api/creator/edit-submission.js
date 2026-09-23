@@ -6,7 +6,7 @@ import { getSupabase } from '../../../lib/supabase';
 // is a separate feature, not this one) plus the series-specific fields.
 const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'releaseYear'];
 const VALID_TIERS = ['free', 'premium'];
-const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
+const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -78,9 +78,17 @@ export default async function handler(req, res) {
     dbUpdates.release_year = Number.isInteger(year) ? year : null;
   }
   if (updates.contentType !== undefined) dbUpdates.content_type = updates.contentType;
-  if (updates.seriesId !== undefined) dbUpdates.series_id = effectiveContentType === 'series' && !isNewSeries ? updates.seriesId : null;
-  if (updates.season !== undefined) dbUpdates.season = effectiveContentType === 'series' ? Number(updates.season) || 1 : null;
-  if (updates.seriesOrder !== undefined) dbUpdates.series_order = effectiveContentType === 'series' ? Number(updates.seriesOrder) : null;
+  // Podcasts group into a "show" the same way series episodes group into a
+  // series — CreatorSubmissionForm/ManualEpisodeForm both treat 'podcast'
+  // and 'series' identically for this exact field set (see their shared
+  // `contentType === 'series' || contentType === 'podcast'` checks). This
+  // used to only recognize 'series' here, which meant editing ANY field on
+  // a pending podcast episode silently nulled out its show/season/episode
+  // number — a real data-loss bug, not just a missed edge case.
+  const usesShowGrouping = effectiveContentType === 'series' || effectiveContentType === 'podcast';
+  if (updates.seriesId !== undefined) dbUpdates.series_id = usesShowGrouping && !isNewSeries ? updates.seriesId : null;
+  if (updates.season !== undefined) dbUpdates.season = usesShowGrouping ? Number(updates.season) || 1 : null;
+  if (updates.seriesOrder !== undefined) dbUpdates.series_order = usesShowGrouping ? Number(updates.seriesOrder) : null;
 
   if (Object.keys(dbUpdates).length === 0) {
     return res.status(400).json({ error: 'Nothing to update.' });

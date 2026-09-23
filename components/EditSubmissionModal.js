@@ -8,7 +8,8 @@ const CONTENT_TYPES = [
   { value: 'movie', label: 'Movie' },
   { value: 'series', label: 'Series episode' },
   { value: 'vertical', label: 'Vertical' },
-  { value: 'podcast', label: 'Podcast' }
+  { value: 'podcast', label: 'Podcast' },
+  { value: 'bonus', label: 'Bonus content' }
 ];
 
 // Only rendered for a submission whose status is still 'pending' — the API
@@ -101,13 +102,20 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
             {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
           </select>
 
-          {form.contentType === 'series' && (
+          {/* Podcasts group into a "show" exactly the way series episodes
+              group into a series (same series_id/season/series_order
+              columns) — CreatorSubmissionForm treats the two identically
+              for this reason. This used to only render for 'series', which
+              meant a podcast episode's show/season/episode-number were
+              being silently cleared on every edit with no field here to
+              even show it was happening. */}
+          {(form.contentType === 'series' || form.contentType === 'podcast') && (
             <>
-              <label>Series</label>
+              <label>{form.contentType === 'podcast' ? 'Show' : 'Series'}</label>
               <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
-                <option value="">Choose a series…</option>
+                <option value="">Choose a {form.contentType === 'podcast' ? 'show' : 'series'}…</option>
                 {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                <option value="__new__">A new series not listed here</option>
+                <option value="__new__">A new {form.contentType === 'podcast' ? 'show' : 'series'} not listed here</option>
               </select>
               <label>Season</label>
               <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />

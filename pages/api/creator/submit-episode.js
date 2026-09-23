@@ -11,7 +11,7 @@ import { normalizeUrl } from '../../../lib/normalizeUrl';
 // this check can't be.
 const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier'];
 const VALID_TIERS = ['free', 'premium'];
-const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast'];
+const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
 
 // Poster/thumbnail arrive as base64 data URLs in the JSON body (see
 // pages/creator.js) rather than a real multipart upload — simplest thing
