@@ -4567,31 +4567,54 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .pitch-update-card { background: var(--surface-2); border-radius: 0.8rem; padding: 1.1rem 1.2rem; margin-bottom: 1rem; }
 .pitch-update-date { font-family: var(--font-mono); font-size: 0.68rem; color: var(--brass); letter-spacing: 0.04em; margin-bottom: 0.4rem; }
 .pitch-comment-card { background: var(--surface-2); border-radius: 0.7rem; padding: 1rem 1.1rem; margin-bottom: 0.8rem; }
-.pitch-comment-meta { display: flex; justify-content: space-between; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.5rem; }
-.pitch-comment-meta span:first-child { font-weight: 700; color: var(--ink); }
-.pitch-comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.5; margin-bottom: 0.6rem; }
-.pitch-comment-actions { display: flex; align-items: center; gap: 1rem; }
+.pitch-comment-meta { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.5rem; flex-wrap: wrap; }
+.pitch-comment-who { display: flex; align-items: center; gap: 0.5rem; }
+.pitch-comment-avatar {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--brass); color: #241a05;
+  display: flex; align-items: center; justify-content: center; font-size: 0.62rem; font-weight: 700;
+  font-family: var(--font-mono); text-decoration: none; flex-shrink: 0;
+}
+.pitch-comment-name { font-weight: 700; color: var(--ink); text-decoration: none; }
+.pitch-comment-name:hover { color: var(--brass); text-decoration: underline; }
+.pitch-comment-badge {
+  background: var(--brass); color: #241a05; font-family: var(--font-mono); font-size: 0.58rem;
+  font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; padding: 0.12rem 0.45rem; border-radius: 999px;
+}
+.pitch-comment-date { white-space: nowrap; }
+.pitch-comment-body { font-size: 0.9rem; color: var(--ink); line-height: 1.5; margin-bottom: 0.6rem; white-space: pre-wrap; }
+.pitch-comment-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 1rem; }
 .pitch-comment-report, .pitch-comment-reply-btn {
   background: none; border: none; color: var(--ink-dim); font-size: 0.75rem;
   cursor: pointer; text-decoration: underline; padding: 0;
 }
 .pitch-comment-report:hover, .pitch-comment-reply-btn:hover { color: var(--brass); }
+.pitch-comment-report:disabled { opacity: 0.6; cursor: wait; }
+.pitch-report-picker { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.pitch-report-reason-btn {
+  background: none; border: 1px solid rgba(251, 232, 211, 0.2); color: var(--ink-dim);
+  font-size: 0.7rem; padding: 0.2rem 0.55rem; border-radius: 999px; cursor: pointer;
+}
+.pitch-report-reason-btn:hover { border-color: var(--danger); color: var(--danger); }
 
-/* Comment/reply form fields — the pitch page isn't wrapped in
+/* Comment/reply/edit form fields — the pitch page isn't wrapped in
    .account-card like most forms elsewhere, so without these the comment
    and reply textareas were rendering with zero styling at all (raw
    browser defaults) — the single biggest reason the page read as
    unfinished. */
 .pitch-comment-form textarea,
-.pitch-reply-form textarea {
+.pitch-reply-form textarea,
+.pitch-edit-form textarea {
   width: 100%; box-sizing: border-box; padding: 0.7rem 0.9rem;
   border: 1px solid rgba(251, 232, 211, 0.18); border-radius: 8px;
   background: var(--void); font-family: var(--font-body); font-size: 0.9rem;
-  color: var(--ink); resize: vertical; margin-bottom: 0.6rem;
+  color: var(--ink); resize: vertical; margin-bottom: 0.3rem;
 }
 .pitch-comment-form textarea:focus,
-.pitch-reply-form textarea:focus { outline: none; border-color: var(--brass); }
+.pitch-reply-form textarea:focus,
+.pitch-edit-form textarea:focus { outline: none; border-color: var(--brass); }
+.pitch-char-count { font-size: 0.68rem; color: var(--ink-dim); text-align: right; margin-bottom: 0.6rem; }
 .pitch-reply-form { margin: 0.8rem 0 0.4rem; padding-top: 0.8rem; border-top: 1px solid rgba(251,232,211,0.08); }
+.pitch-edit-form { margin-bottom: 0.6rem; }
 .pitch-reply-list { margin: 0.9rem 0 0 1.6rem; padding-left: 1rem; border-left: 2px solid rgba(251,232,211,0.1); }
 .pitch-reply-card { background: var(--surface-3); margin-bottom: 0.6rem; }
 .pitch-discussion-empty { color: var(--ink-dim); font-size: 0.85rem; padding: 1.5rem; text-align: center; background: var(--surface-2); border-radius: 0.7rem; }

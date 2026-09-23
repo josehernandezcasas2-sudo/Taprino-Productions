@@ -73,6 +73,7 @@ export async function getServerSideProps({ req, res, params }) {
       isAdmin: account.isAdmin,
       bypassingDisabled,
       isCreator: account.isCreator,
+      userId: userId || null,
       mainGenres,
       pitch,
       similar,
@@ -88,7 +89,31 @@ export async function getServerSideProps({ req, res, params }) {
 
 const DONATION_PRESETS = [10, 25, 50];
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers }) {
+const REPORT_REASONS = ['Spam', 'Harassment', 'Off-topic', 'Other'];
+
+// Comments today, tomorrow, and yesterday get a short relative-feeling
+// label; anything older falls back to a plain date — the same "recent
+// stuff reads as recent, old stuff reads as a date" split most comment
+// sections use, without pulling in a whole relative-time library for it.
+function formatCommentDate(iso) {
+  const d = new Date(iso);
+  const now = new Date();
+  const diffMs = now - d;
+  const diffMins = Math.floor(diffMs / 60000);
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  const diffHours = Math.floor(diffMins / 60);
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function countComments(list) {
+  return list.reduce((sum, c) => sum + 1 + (c.replies ? c.replies.length : 0), 0);
+}
+
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
@@ -97,9 +122,15 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
   const [posting, setPosting] = useState(false);
   const [commentError, setCommentError] = useState(null);
   const [reportedIds, setReportedIds] = useState(new Set());
+  const [reportingId, setReportingId] = useState(null);
   const [replyingTo, setReplyingTo] = useState(null);
   const [replyText, setReplyText] = useState('');
   const [postingReply, setPostingReply] = useState(false);
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
   const [shareCopied, setShareCopied] = useState(false);
   const [donationAmount, setDonationAmount] = useState('');
   const [donating, setDonating] = useState(false);
@@ -236,13 +267,163 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
     }
   }
 
-  async function reportComment(commentId) {
+  async function reportComment(commentId, reason) {
+    setReportingId(null);
     setReportedIds((prev) => new Set(prev).add(commentId));
     await fetch('/api/pitch-comment-report', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ commentId })
+      body: JSON.stringify({ commentId, reason })
     }).catch(() => {});
+  }
+
+  function startEdit(c) {
+    setEditingId(c.id);
+    setEditText(c.body);
+    setEditError(null);
+  }
+
+  function cancelEdit() {
+    setEditingId(null);
+    setEditText('');
+    setEditError(null);
+  }
+
+  async function saveEdit(commentId) {
+    if (!editText.trim()) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch('/api/pitch-comment', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId, body: editText })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not save your edit.');
+      setEditingId(null);
+      setEditText('');
+      await refreshComments();
+    } catch (err) {
+      setEditError(err.message);
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  async function deleteComment(commentId) {
+    if (!window.confirm('Delete this comment? This can’t be undone.')) return;
+    setDeletingId(commentId);
+    try {
+      const res = await fetch('/api/pitch-comment', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ commentId })
+      });
+      if (!res.ok) throw new Error();
+      await refreshComments();
+    } catch (err) {
+      alert('Could not delete that comment — try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  // Shared between top-level comments and their (one-level-deep) replies —
+  // avatar/name/badge, edit-in-place, delete, report, and (top-level
+  // only) the reply thread beneath it. Recreated each render like any
+  // other closure-capturing helper here; the list is small enough that
+  // this costs nothing worth avoiding.
+  function renderComment(c, { isReply } = {}) {
+    const isOwn = Boolean(userId) && c.user_id === userId;
+    const isCreatorComment = Boolean(pitch.created_by) && c.user_id === pitch.created_by;
+    const isEditing = editingId === c.id;
+
+    return (
+      <div key={c.id} className={`pitch-comment-card${isReply ? ' pitch-reply-card' : ''}`}>
+        <div className="pitch-comment-meta">
+          <div className="pitch-comment-who">
+            <Link href={`/profile/${c.user_id}`} className="pitch-comment-avatar">{(c.displayName || '?')[0].toUpperCase()}</Link>
+            <Link href={`/profile/${c.user_id}`} className="pitch-comment-name">{c.displayName}</Link>
+            {isCreatorComment && <span className="pitch-comment-badge">Creator</span>}
+          </div>
+          <span className="pitch-comment-date">{formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</span>
+        </div>
+
+        {isEditing ? (
+          <div className="pitch-edit-form">
+            {editError && <p style={{ color: 'var(--danger)', fontSize: '0.8rem' }}>{editError}</p>}
+            <textarea value={editText} onChange={(e) => setEditText(e.target.value)} rows={2} maxLength={1000} />
+            <div className="pitch-char-count">{editText.length}/1000</div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="account-btn-primary" style={{ width: 'auto' }} disabled={editSaving} onClick={() => saveEdit(c.id)}>
+                {editSaving ? 'Saving…' : 'Save'}
+              </button>
+              <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={cancelEdit}>Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <div className="pitch-comment-body">{c.body}</div>
+        )}
+
+        {!isEditing && (
+          <div className="pitch-comment-actions">
+            {isSignedIn && !isReply && (
+              <button className="pitch-comment-reply-btn" onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyText(''); }}>
+                ↩ Reply
+              </button>
+            )}
+            {isOwn && (
+              <>
+                <button className="pitch-comment-reply-btn" onClick={() => startEdit(c)}>Edit</button>
+                <button className="pitch-comment-report" onClick={() => deleteComment(c.id)} disabled={deletingId === c.id}>
+                  {deletingId === c.id ? 'Deleting…' : 'Delete'}
+                </button>
+              </>
+            )}
+            {isSignedIn && !isOwn && (
+              reportedIds.has(c.id) ? (
+                <span style={{ fontSize: '0.7rem', color: 'var(--ink-dim)' }}>Reported — thank you.</span>
+              ) : reportingId === c.id ? (
+                <div className="pitch-report-picker">
+                  {REPORT_REASONS.map((r) => (
+                    <button key={r} type="button" className="pitch-report-reason-btn" onClick={() => reportComment(c.id, r)}>{r}</button>
+                  ))}
+                  <button type="button" className="pitch-report-reason-btn" onClick={() => setReportingId(null)}>Cancel</button>
+                </div>
+              ) : (
+                <button className="pitch-comment-report" onClick={() => setReportingId(c.id)}>Report</button>
+              )
+            )}
+          </div>
+        )}
+
+        {!isReply && replyingTo === c.id && (
+          <div className="pitch-reply-form">
+            <textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder={`Reply to ${c.displayName}…`}
+              rows={2}
+              maxLength={1000}
+            />
+            <div className="pitch-char-count">{replyText.length}/1000</div>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button className="account-btn-primary" style={{ width: 'auto' }} disabled={postingReply} onClick={() => postReply(c.id)}>
+                {postingReply ? 'Posting…' : 'Post reply'}
+              </button>
+              <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReplyingTo(null)}>Cancel</button>
+            </div>
+          </div>
+        )}
+
+        {!isReply && c.replies && c.replies.length > 0 && (
+          <div className="pitch-reply-list">
+            {c.replies.map((r) => renderComment(r, { isReply: true }))}
+          </div>
+        )}
+      </div>
+    );
   }
 
   return (
@@ -492,7 +673,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
           </>
         )}
 
-        <div className="pitch-section-label">Discussion</div>
+        <div className="pitch-section-label">Discussion{commentList.length > 0 ? ` (${countComments(commentList)})` : ''}</div>
         {isSignedIn ? (
           <form className="pitch-comment-form" onSubmit={postComment} style={{ marginBottom: '1.2rem' }}>
             {commentError && <p style={{ color: 'var(--danger)' }}>{commentError}</p>}
@@ -503,6 +684,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               rows={2}
               maxLength={1000}
             />
+            <div className="pitch-char-count">{commentText.length}/1000</div>
             <button className="account-btn-primary" type="submit" disabled={posting} style={{ width: 'auto' }}>
               {posting ? 'Posting…' : 'Post comment'}
             </button>
@@ -514,65 +696,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
         {commentList.length === 0 ? (
           <div className="pitch-discussion-empty">No comments yet — be the first to say something.</div>
         ) : (
-          commentList.map((c) => (
-            <div key={c.id} className="pitch-comment-card">
-              <div className="pitch-comment-meta">
-                <span>{c.displayName}</span>
-                <span>{new Date(c.created_at).toLocaleDateString()}</span>
-              </div>
-              <div className="pitch-comment-body">{c.body}</div>
-              <div className="pitch-comment-actions">
-                {isSignedIn && (
-                  <button className="pitch-comment-reply-btn" onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyText(''); }}>
-                    ↩ Reply
-                  </button>
-                )}
-                {isSignedIn && (
-                  reportedIds.has(c.id) ? (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--ink-dim)' }}>Reported — thank you.</span>
-                  ) : (
-                    <button className="pitch-comment-report" onClick={() => reportComment(c.id)}>Report</button>
-                  )
-                )}
-              </div>
-
-              {replyingTo === c.id && (
-                <div className="pitch-reply-form">
-                  <textarea
-                    value={replyText}
-                    onChange={(e) => setReplyText(e.target.value)}
-                    placeholder={`Reply to ${c.displayName}…`}
-                    rows={2}
-                    maxLength={1000}
-                  />
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="account-btn-primary" style={{ width: 'auto' }} disabled={postingReply} onClick={() => postReply(c.id)}>
-                      {postingReply ? 'Posting…' : 'Post reply'}
-                    </button>
-                    <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setReplyingTo(null)}>Cancel</button>
-                  </div>
-                </div>
-              )}
-
-              {c.replies && c.replies.length > 0 && (
-                <div className="pitch-reply-list">
-                  {c.replies.map((r) => (
-                    <div key={r.id} className="pitch-comment-card pitch-reply-card">
-                      <div className="pitch-comment-meta">
-                        <span>{r.displayName}</span>
-                        <span>{new Date(r.created_at).toLocaleDateString()}</span>
-                      </div>
-                      <div className="pitch-comment-body">{r.body}</div>
-                      {isSignedIn && !reportedIds.has(r.id) && (
-                        <button className="pitch-comment-report" onClick={() => reportComment(r.id)}>Report</button>
-                      )}
-                      {reportedIds.has(r.id) && <span style={{ fontSize: '0.7rem', color: 'var(--ink-dim)' }}>Reported — thank you.</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))
+          commentList.map((c) => renderComment(c))
         )}
       </main>
       <Footer />
