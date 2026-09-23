@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -70,6 +70,8 @@ export default function MobileTabBar() {
   const [roles, setRoles] = useState({ isSignedIn: false, isCreator: false, isAdmin: false });
   const [showCreateModal, setShowCreateModal] = useState(false);
   const barRef = useRef(null);
+  const dropdownRef = useRef(null);
+  const triggerRefs = useRef({});
 
   // Self-fetched rather than threaded down as a prop — MobileTabBar is
   // rendered bare on every single page, and adding a new required prop
@@ -111,10 +113,33 @@ export default function MobileTabBar() {
   const openGroup = openMenu ? GROUPS[openMenu] : null;
   const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles) : openGroup.items) : [];
 
+  // Centers the dropdown over whichever button actually opened it, rather
+  // than the old fixed left:4px / right:4px / left:50%+translateX(-42%)
+  // per-menu offsets — those were hand-tuned for one specific bar width
+  // (a narrow phone) and broke as soon as the same bar rendered wider (a
+  // tablet, or after the "+" button shifted Watch's position): the drop-up
+  // would pop up nowhere near the button that opened it. Measuring the
+  // real button and bar at open time keeps this correct at any width.
+  // useLayoutEffect (not useEffect) so this is set before the browser
+  // paints — no visible jump from a wrong position to the right one.
+  useLayoutEffect(() => {
+    if (!openMenu || !dropdownRef.current || !barRef.current) return;
+    const btn = triggerRefs.current[openMenu];
+    if (!btn) return;
+    const barRect = barRef.current.getBoundingClientRect();
+    const btnRect = btn.getBoundingClientRect();
+    const dropdownWidth = dropdownRef.current.offsetWidth;
+    const margin = 6;
+    const btnCenter = btnRect.left + btnRect.width / 2 - barRect.left;
+    let left = btnCenter - dropdownWidth / 2;
+    left = Math.max(margin, Math.min(left, barRect.width - dropdownWidth - margin));
+    dropdownRef.current.style.left = `${left}px`;
+  }, [openMenu]);
+
   return (
     <nav className="tabbar" aria-label="Primary" ref={barRef}>
       {openGroup && (
-        <div className={`tabbar-dropup tabbar-dropup-${openMenu}`} role="menu">
+        <div ref={dropdownRef} className="tabbar-dropup" role="menu">
           {openItems.map((item) => (
             <Link key={item.href} href={item.href} className="tabbar-dropup-item" role="menuitem">
               {item.label}
@@ -124,6 +149,7 @@ export default function MobileTabBar() {
       )}
 
       <button
+        ref={(el) => { triggerRefs.current.discover = el; }}
         type="button"
         className={`tabbar-item tabbar-discover ${GROUPS.discover.match(path) ? 'active' : ''} ${openMenu === 'discover' ? 'open' : ''}`}
         onClick={() => setOpenMenu((m) => (m === 'discover' ? null : 'discover'))}
@@ -152,6 +178,7 @@ export default function MobileTabBar() {
       )}
 
       <button
+        ref={(el) => { triggerRefs.current.watch = el; }}
         type="button"
         className={`tabbar-item ${GROUPS.watch.match(path, query) ? 'active' : ''} ${openMenu === 'watch' ? 'open' : ''}`}
         onClick={() => setOpenMenu((m) => (m === 'watch' ? null : 'watch'))}
@@ -163,6 +190,7 @@ export default function MobileTabBar() {
       </button>
 
       <button
+        ref={(el) => { triggerRefs.current.account = el; }}
         type="button"
         className={`tabbar-item ${GROUPS.account.match(path) ? 'active' : ''} ${openMenu === 'account' ? 'open' : ''}`}
         onClick={() => setOpenMenu((m) => (m === 'account' ? null : 'account'))}
