@@ -4,7 +4,7 @@ import { tierBadge } from '../lib/tierBadge';
 import { formatRuntimeLong } from '../lib/videoMetadata';
 import { SITE } from '../lib/siteConfig';
 
-const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast';
+const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
 
 function formatClock(seconds) {

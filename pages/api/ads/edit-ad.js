@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Create an ad account first.' });
   }
 
-  const { adId, title, videoBase64, videoFileName, durationSeconds, clickUrl, budgetTotalCents } = req.body || {};
+  const { adId, title, videoBase64, videoFileName, durationSeconds, clickUrl, budgetTotalCents, placements } = req.body || {};
   try {
     const ad = await editPendingAd({
       adId,
@@ -33,7 +33,8 @@ export default async function handler(req, res) {
       videoFileName,
       durationSeconds: durationSeconds ? Number(durationSeconds) : undefined,
       clickUrl,
-      budgetTotalCents: budgetTotalCents !== undefined ? (budgetTotalCents ? Math.round(Number(budgetTotalCents)) : null) : undefined
+      budgetTotalCents: budgetTotalCents !== undefined ? (budgetTotalCents ? Math.round(Number(budgetTotalCents)) : null) : undefined,
+      placements
     });
     return res.status(200).json({ ad });
   } catch (err) {

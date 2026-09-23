@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useDraftAutosave } from '../lib/useDraftAutosave';
+import { AD_PLACEMENTS } from '../lib/adPlacements';
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -11,7 +12,11 @@ function readAsDataUrl(file) {
   });
 }
 
-const EMPTY = { title: '', clickUrl: '', durationSeconds: '', budgetDollars: '' };
+const EMPTY = { title: '', clickUrl: '', durationSeconds: '', budgetDollars: '', placements: [] };
+
+function togglePlacement(current, value) {
+  return current.includes(value) ? current.filter((p) => p !== value) : [...current, value];
+}
 
 export default function AdvertiserAdForm({ onSubmitted }) {
   const router = useRouter();
@@ -126,7 +131,8 @@ export default function AdvertiserAdForm({ onSubmitted }) {
           videoFileName: file.name,
           durationSeconds: Number(form.durationSeconds),
           clickUrl: form.clickUrl || undefined,
-          budgetTotalCents
+          budgetTotalCents,
+          placements: form.placements && form.placements.length > 0 ? form.placements : undefined
         })
       });
       let data;
@@ -188,6 +194,21 @@ export default function AdvertiserAdForm({ onSubmitted }) {
 
       <label>Optional cap for this ad <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— stop this specific ad at a set amount, even if you have more credits available</span></label>
       <input type="number" min="0" step="0.01" value={form.budgetDollars} onChange={(e) => update('budgetDollars', e.target.value)} placeholder="Leave blank for no cap" />
+
+      <label>Where should this run? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>leave everything unchecked to run everywhere</span></label>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.6rem' }}>
+        {AD_PLACEMENTS.map((p) => (
+          <label key={p.value} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'normal', fontSize: '0.88rem' }}>
+            <input
+              type="checkbox"
+              checked={form.placements.includes(p.value)}
+              onChange={() => update('placements', togglePlacement(form.placements, p.value))}
+              style={{ width: 'auto' }}
+            />
+            {p.label}
+          </label>
+        ))}
+      </div>
 
       {error && <div className="house-ad-error">{error}</div>}
 

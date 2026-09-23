@@ -5884,3 +5884,30 @@ body:has(.mini-player) { padding-bottom: 72px; }
   text-align: center;
 }
 .ad-manager-login-card a { color: var(--sky); }
+
+/* Vertical Discover's ad cards — a clear "Ad" disclosure badge (top-left,
+   away from the existing action rail on the right) and a CTA link styled
+   consistently with the feed's own caption area. */
+.reel-ad-badge {
+  position: absolute;
+  top: calc(1rem + env(safe-area-inset-top, 0px));
+  left: 1rem;
+  z-index: 5;
+  background: rgba(0, 0, 0, 0.6);
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.25rem 0.6rem;
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+}
+.reel-ad-cta {
+  display: inline-block;
+  margin-top: 0.5rem;
+  color: var(--sky);
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-decoration: none;
+}

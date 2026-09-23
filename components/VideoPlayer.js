@@ -15,9 +15,9 @@ import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlaye
 //      the default specifically so a fresh checkout of this app has a
 //      functioning ad path on day one, not a hardcoded pointer to Google's
 //      public IMA sample forever.
-function getAdTagUrl() {
+function getAdTagUrl(placement) {
   if (process.env.NEXT_PUBLIC_AD_TAG_URL) return process.env.NEXT_PUBLIC_AD_TAG_URL;
-  if (typeof window !== 'undefined') return `${window.location.origin}/api/house-ads/vast`;
+  if (typeof window !== 'undefined') return `${window.location.origin}/api/house-ads/vast?placement=${placement}`;
   return null;
 }
 
@@ -442,7 +442,7 @@ export default function VideoPlayer({
       );
 
       const adsRequest = new google.ima.AdsRequest();
-      const adTagUrl = getAdTagUrl();
+      const adTagUrl = getAdTagUrl('main_player');
       if (!adTagUrl) return false;
       adsRequest.adTagUrl = adTagUrl;
       adsRequest.linearAdSlotWidth = v.clientWidth || 640;

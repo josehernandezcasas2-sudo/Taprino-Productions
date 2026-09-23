@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
+const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
+
 // A separate component from components/VideoPlayer.js on purpose, rather
 // than one player branching heavily on a `live` prop. Live has no
 // duration, no seek, no resume position, and a fundamentally different ad

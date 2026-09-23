@@ -1,4 +1,9 @@
 import { useState } from 'react';
+import { AD_PLACEMENTS } from '../lib/adPlacements';
+
+function togglePlacement(current, value) {
+  return current.includes(value) ? current.filter((p) => p !== value) : [...current, value];
+}
 
 function readAsDataUrl(file) {
   if (!file) return Promise.resolve(null);
@@ -19,6 +24,7 @@ export default function AdvertiserEditAdModal({ ad, onClose, onSaved }) {
   const [durationSeconds, setDurationSeconds] = useState(String(ad.durationSeconds));
   const [clickUrl, setClickUrl] = useState(ad.clickUrl || '');
   const [budgetDollars, setBudgetDollars] = useState(centsToDollarsInput(ad.budgetTotalCents));
+  const [placements, setPlacements] = useState(ad.placements || []);
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -61,6 +67,7 @@ export default function AdvertiserEditAdModal({ ad, onClose, onSaved }) {
           durationSeconds: Number(durationSeconds),
           clickUrl,
           budgetTotalCents: budgetDollars ? Math.round(Number(budgetDollars) * 100) : null,
+          placements: placements.length > 0 ? placements : null,
           ...(videoBase64 ? { videoBase64, videoFileName: videoFile.name } : {})
         })
       });
@@ -104,6 +111,21 @@ export default function AdvertiserEditAdModal({ ad, onClose, onSaved }) {
 
         <label>Optional cap for this ad <span style={{ fontWeight: 'normal', opacity: 0.65 }}>— leave blank for no cap</span></label>
         <input type="number" min="0" step="0.01" value={budgetDollars} onChange={(e) => setBudgetDollars(e.target.value)} placeholder="Leave blank for no cap" />
+
+        <label>Where should this run? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>leave everything unchecked to run everywhere</span></label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.6rem' }}>
+          {AD_PLACEMENTS.map((p) => (
+            <label key={p.value} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'normal', fontSize: '0.88rem' }}>
+              <input
+                type="checkbox"
+                checked={placements.includes(p.value)}
+                onChange={() => setPlacements((prev) => togglePlacement(prev, p.value))}
+                style={{ width: 'auto' }}
+              />
+              {p.label}
+            </label>
+          ))}
+        </div>
 
         {error && <div className="house-ad-error">{error}</div>}
 

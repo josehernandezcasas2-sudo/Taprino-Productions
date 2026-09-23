@@ -31,7 +31,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { title, videoBase64, videoFileName, durationSeconds, clickUrl, budgetTotalCents, targeting } = req.body || {};
+    const { title, videoBase64, videoFileName, durationSeconds, clickUrl, budgetTotalCents, targeting, placements } = req.body || {};
     try {
       const ad = await submitAdvertiserAd({
         adAccountId: account.id,
@@ -41,7 +41,8 @@ export default async function handler(req, res) {
         durationSeconds: durationSeconds ? Number(durationSeconds) : null,
         clickUrl,
         budgetTotalCents: budgetTotalCents ? Math.round(Number(budgetTotalCents)) : null,
-        targeting
+        targeting,
+        placements
       });
       return res.status(200).json({ ad });
     } catch (err) {

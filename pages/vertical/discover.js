@@ -12,6 +12,7 @@ import { getSiteSettings } from '../../lib/siteSettings';
 import { getRecommendations } from '../../lib/recommendations';
 import { useWishlist } from '../../lib/useWishlist';
 import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
+import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
 import { SITE } from '../../lib/siteConfig';
 
@@ -60,6 +61,22 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+// One ad card per this many real content slides — a rough middle ground
+// between "never" and "so often it stops feeling like a content feed."
+// Easy to retune later; this is the only place the number lives.
+const AD_FREQUENCY = 6;
+
+async function fetchAdSlide() {
+  try {
+    const res = await fetch('/api/house-ads/pick?placement=vertical_discover');
+    const data = await res.json();
+    if (!data.ad) return null;
+    return { kind: 'ad', key: `ad-${data.ad.id}-${Date.now()}`, ad: data.ad };
+  } catch {
+    return null;
+  }
+}
+
 export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist, personalUnitKeys }) {
   const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -73,6 +90,11 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   const seenSeriesIds = useRef(new Set());
   const unitsRef = useRef([]);
   const pickerRef = useRef(null);
+  // Every AD_FREQUENCY real content slides (episodes — end-cards and ad
+  // cards themselves don't count), one ad card gets inserted. Kept as a
+  // ref rather than state since it's pure bookkeeping that never needs
+  // to trigger a re-render on its own.
+  const contentSlideCountRef = useRef(0);
   // Smart-back for the "×" close button below — this feed has no room for
   // the standard pill button (it would obstruct the video), but should
   // still return to wherever the person actually came from rather than
@@ -95,7 +117,15 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     const first = requested || pickerRef.current.next(seenSeriesIds.current);
     if (!first) return;
     if (first.type === 'series') seenSeriesIds.current.add(first.seriesId);
-    setDeck(expandUnitToSlides(first));
+    const firstSlides = expandUnitToSlides(first);
+    setDeck(firstSlides);
+    contentSlideCountRef.current += firstSlides.filter((s) => s.kind === 'episode').length;
+    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+      contentSlideCountRef.current = 0;
+      fetchAdSlide().then((adSlide) => {
+        if (adSlide) setDeck((d) => [...d, adSlide]);
+      });
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router.isReady]);
 
@@ -103,7 +133,15 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     const next = pickerRef.current && pickerRef.current.next(seenSeriesIds.current);
     if (!next) return;
     if (next.type === 'series') seenSeriesIds.current.add(next.seriesId);
-    setDeck((d) => [...d, ...expandUnitToSlides(next)]);
+    const nextSlides = expandUnitToSlides(next);
+    setDeck((d) => [...d, ...nextSlides]);
+    contentSlideCountRef.current += nextSlides.filter((s) => s.kind === 'episode').length;
+    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+      contentSlideCountRef.current = 0;
+      fetchAdSlide().then((adSlide) => {
+        if (adSlide) setDeck((d) => [...d, adSlide]);
+      });
+    }
   }, []);
 
   // Auto-extend as the viewer approaches the end — but never past an
@@ -253,6 +291,13 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                   )}
                 </div>
               </>
+            ) : slide.kind === 'ad' ? (
+              <ReelAdCard
+                ad={slide.ad}
+                active={i === activeIndex}
+                muted={muted}
+                onToggleMute={() => setMuted((m) => !m)}
+              />
             ) : (
               <div className="reel-end-card">
                 <button className="reel-close" onClick={goBack}>&times;</button>

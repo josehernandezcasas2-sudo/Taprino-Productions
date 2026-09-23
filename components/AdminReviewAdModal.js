@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { AD_PLACEMENTS } from '../lib/adPlacements';
 
 function readAsDataUrl(file) {
   if (!file) return Promise.resolve(null);
@@ -12,6 +13,10 @@ function readAsDataUrl(file) {
 
 function centsToDollarsInput(cents) {
   return cents != null ? (cents / 100).toFixed(2) : '';
+}
+
+function togglePlacement(current, value) {
+  return current.includes(value) ? current.filter((p) => p !== value) : [...current, value];
 }
 
 // A CPM of 600 cents ($6.00 per 1,000 impressions) works out to
@@ -38,6 +43,7 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
   const [videoFile, setVideoFile] = useState(null);
   const [videoPreviewUrl, setVideoPreviewUrl] = useState(null);
   const [rejectionReason, setRejectionReason] = useState(ad.rejectionReason || '');
+  const [placements, setPlacements] = useState(ad.placements || []);
   const [busy, setBusy] = useState(null); // 'approved' | 'rejected' | null
   const [error, setError] = useState(null);
 
@@ -90,6 +96,7 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
           clickUrl,
           costPerImpressionDollars: costPerImpressionDollars || null,
           rejectionReason: decision === 'rejected' ? rejectionReason.trim() : undefined,
+          placements: placements.length > 0 ? placements : null,
           ...(videoBase64 ? { videoBase64, videoFileName: videoFile.name } : {})
         })
       });
@@ -118,6 +125,21 @@ export default function AdminReviewAdModal({ ad, onClose, onResolved, defaultCpm
             ? ` · optional cap on this ad: $${(ad.budgetTotalCents / 100).toFixed(2)}`
             : ' · no per-ad cap set — draws from the advertiser\'s account credits until they run out'}
         </p>
+
+        <label>Where should this run? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>as requested by the advertiser — adjust if needed. Leave everything unchecked to run everywhere</span></label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.6rem' }}>
+          {AD_PLACEMENTS.map((p) => (
+            <label key={p.value} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 'normal', fontSize: '0.88rem' }}>
+              <input
+                type="checkbox"
+                checked={placements.includes(p.value)}
+                onChange={() => setPlacements((prev) => togglePlacement(prev, p.value))}
+                style={{ width: 'auto' }}
+              />
+              {p.label}
+            </label>
+          ))}
+        </div>
 
         <video src={videoPreviewUrl || ad.videoUrl} controls style={{ width: '100%', borderRadius: '8px', marginBottom: '1rem', background: '#000' }} />
 

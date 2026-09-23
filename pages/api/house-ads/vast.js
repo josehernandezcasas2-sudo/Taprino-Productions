@@ -40,7 +40,8 @@ export default async function handler(req, res) {
   }
 
   try {
-    const ad = await pickActiveHouseAd();
+    const { placement } = req.query;
+    const ad = await pickActiveHouseAd(typeof placement === 'string' ? placement : undefined);
     if (!ad) {
       return res.status(200).send(emptyVast());
     }
