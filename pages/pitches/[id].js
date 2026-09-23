@@ -6,11 +6,12 @@ import { useState } from 'react';
 import { getAuth } from '@clerk/nextjs/server';
 import { SignInButton } from '@clerk/nextjs';
 import { getAccountContext } from '../../lib/accountContext';
-import { HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { usePlayerIconOverrides } from '../../components/PlayerIcons';
+import WishlistButton from '../../components/WishlistButton';
 import {
   getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
 } from '../../lib/pitches';
-import { getTotalRaisedForPitch } from '../../lib/pitchDonations';
+import { getDonationsForPitch } from '../../lib/pitchDonations';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
@@ -35,15 +36,17 @@ export async function getServerSideProps({ req, res, params }) {
 
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const { userId } = getAuth(req);
-  const [similar, updates, comments, episodes, saved, totalRaisedCents] = await Promise.all([
+  const [similar, updates, comments, episodes, saved, donations] = await Promise.all([
     getSimilarPitches(pitch.tag, pitch.id),
     getPitchUpdates(pitch.id),
     getPitchComments(pitch.id),
     getPublicEpisodes(),
     userId ? isPitchSaved(userId, pitch.id) : false,
-    pitch.funding_enabled ? getTotalRaisedForPitch(pitch.id) : Promise.resolve(null)
+    pitch.funding_enabled ? getDonationsForPitch(pitch.id) : Promise.resolve([])
   ]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const totalRaisedCents = pitch.funding_enabled ? donations.reduce((sum, d) => sum + d.amountCents, 0) : null;
+  const backerCount = pitch.funding_enabled ? new Set(donations.map((d) => d.donorUserId)).size : null;
 
   return {
     props: {
@@ -59,12 +62,13 @@ export async function getServerSideProps({ req, res, params }) {
       updates,
       comments,
       initialSaved: saved,
-      totalRaisedCents
+      totalRaisedCents,
+      backerCount
     }
   };
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount }) {
   const iconOverrides = usePlayerIconOverrides();
   const [saved, setSaved] = useState(initialSaved);
   const [commentList, setCommentList] = useState(comments);
@@ -82,7 +86,13 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
   const [donationSuccess, setDonationSuccess] = useState(false);
   const [currentTotalRaisedCents, setCurrentTotalRaisedCents] = useState(totalRaisedCents);
 
-  const pct = pitch.funding_goal ? Math.min(100, Math.round(((pitch.funding_raised || 0) / pitch.funding_goal) * 100)) : null;
+  // funding_enabled pitches are tracked for real via pitch_donations
+  // (currentTotalRaisedCents), so the bar/percentage should reflect that
+  // live number — pitch.funding_raised is the older self-reported field,
+  // only meaningful for the external-link campaigns that never turned
+  // funding_enabled on.
+  const raisedForPct = pitch.funding_enabled ? (currentTotalRaisedCents || 0) / 100 : (pitch.funding_raised || 0);
+  const pct = pitch.funding_goal ? Math.min(100, Math.round((raisedForPct / pitch.funding_goal) * 100)) : null;
 
   // Same calendar-date-only logic as pages/pitches.js — see that file's
   // comment for why "tomorrow" reads as 1 day left rather than 2, why
@@ -249,18 +259,35 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
           <div className="hero-content">
             <div className="hero-eyebrow">{pitch.tag || 'Project'} &middot; Pitch Room</div>
             <h2>{pitch.title}</h2>
+
+            {pct !== null && (
+              <div className="pitch-progress-bar">
+                <div className="pitch-progress-fill" style={{ width: `${pct}%` }} />
+              </div>
+            )}
+
             <div className="hero-meta">
-              {!pitch.funding_enabled && pct !== null && <span className="hero-badge-tier">{pct}% funded</span>}
+              {pct !== null && <span className="hero-badge-tier">{pct}% funded</span>}
               {pitch.creator_name && (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
-                  <span>By {pitch.creator_name}</span>
+                  {pitch.created_by ? (
+                    <Link href={`/profile/${pitch.created_by}`} style={{ color: 'inherit' }}>By {pitch.creator_name}</Link>
+                  ) : (
+                    <span>By {pitch.creator_name}</span>
+                  )}
                 </>
               )}
               {pitch.funding_enabled ? (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
                   <span>${((currentTotalRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} raised so far</span>
+                  {backerCount > 0 && (
+                    <>
+                      <span className="hero-meta-dot">&bull;</span>
+                      <span>{backerCount} backer{backerCount === 1 ? '' : 's'}</span>
+                    </>
+                  )}
                 </>
               ) : pitch.funding_goal && (
                 <>
@@ -280,10 +307,8 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               {!pitch.funding_enabled && pitch.project_url && (
                 <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
               )}
-              <button className="wishlist-btn-large" onClick={toggleSave} aria-label={saved ? 'Unsave' : 'Save'}>
-                {<HeartIcon active={saved} src={saved ? iconOverrides.heart_active : iconOverrides.heart_inactive} />}
-              </button>
-              <button className="wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
+              <WishlistButton isActive={saved} onToggle={toggleSave} className="wishlist-btn-large" />
+              <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
                 {shareCopied ? '✓' : '⇪'}
               </button>
             </div>

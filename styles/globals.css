@@ -4483,6 +4483,20 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   border-radius: 8px; font-family: var(--font-display); font-weight: 700;
   font-size: 0.95rem; text-decoration: none; display: inline-block; border: none; cursor: pointer;
 }
+.pitch-progress-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(251, 232, 211, 0.15);
+  overflow: hidden;
+  margin: 0.7rem 0 0.9rem;
+  max-width: 420px;
+}
+.pitch-progress-fill {
+  height: 100%;
+  background: var(--brass);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
 .pitch-section-label {
   font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.12em;
   text-transform: uppercase; color: var(--ink-dim); margin: 2.2rem 0 1rem;
