@@ -85,6 +85,29 @@ export default function MobileTabBar() {
       .catch(() => {});
   }, []);
 
+  // Keeps the floating tab bar hugging the actual bottom of the screen on
+  // mobile Chrome/Safari, where the address bar slides in and out as you
+  // scroll. That chrome shrinks the VISUAL viewport without changing the
+  // LAYOUT viewport `position: fixed` anchors to, so without this the bar
+  // sits too high the moment the chrome is showing — a strip of real page
+  // content ends up visible below it instead of the bar tracking the true
+  // edge. See the --vv-bottom-gap consumer on .tabbar in globals.css.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return undefined;
+    function updateBottomGap() {
+      const gap = window.innerHeight - (vv.height + vv.offsetTop);
+      document.documentElement.style.setProperty('--vv-bottom-gap', `${Math.max(0, Math.round(gap))}px`);
+    }
+    updateBottomGap();
+    vv.addEventListener('resize', updateBottomGap);
+    vv.addEventListener('scroll', updateBottomGap);
+    return () => {
+      vv.removeEventListener('resize', updateBottomGap);
+      vv.removeEventListener('scroll', updateBottomGap);
+    };
+  }, []);
+
   // The bar doesn't remount between pages (it's mounted once, in
   // _app.js), so an open menu needs to be explicitly closed on
   // navigation — otherwise tapping one of its own links would leave it

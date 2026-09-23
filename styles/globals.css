@@ -2091,7 +2091,16 @@ button { font-family: inherit; cursor: pointer; }
     position: fixed;
     left: calc(16px + env(safe-area-inset-left, 0px));
     right: calc(16px + env(safe-area-inset-right, 0px));
-    bottom: calc(18px + env(safe-area-inset-bottom, 0px));
+    /* --vv-bottom-gap (set by MobileTabBar.js via the visualViewport API)
+       is normally 0. Mobile Chrome/Safari's own address bar slides in
+       and out as you scroll, shrinking the VISUAL viewport without
+       changing the LAYOUT viewport that `position: fixed` actually
+       anchors to — so without this, the bar sits too high the moment
+       that chrome is showing, leaving a strip of real page content
+       visible below it instead of the bar hugging the true bottom edge.
+       This is what Jose reported ("doesn't stay at the correct spot")
+       while scrolling the stream library on a phone. */
+    bottom: calc(18px + env(safe-area-inset-bottom, 0px) + var(--vv-bottom-gap, 0px));
     z-index: 60;
     display: flex;
     background: rgba(41, 39, 25, 0.94);
