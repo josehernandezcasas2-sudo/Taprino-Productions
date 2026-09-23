@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
 import { PlusIcon, VideoCameraIcon, ImageIcon } from './PlayerIcons';
@@ -117,7 +118,17 @@ export default function CreatePostModal({ onClose, onPosted }) {
     onClose();
   }
 
-  return (
+  // Rendered into document.body via a portal rather than in place —
+  // MobileTabBar mounts this modal as a child of <nav className="tabbar">,
+  // and .tabbar has backdrop-filter: blur(10px). That CSS property makes
+  // .tabbar the containing block for any position:fixed descendant
+  // (same rule as transform/filter/perspective), so .modal-backdrop's
+  // fixed positioning would otherwise be confined to the tab bar's own
+  // tiny box instead of covering the viewport — the modal existed in the
+  // DOM but was invisible, squeezed inside the pill. The portal escapes
+  // that entirely.
+  if (typeof document === 'undefined') return null;
+  return createPortal((
     <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
@@ -202,5 +213,5 @@ export default function CreatePostModal({ onClose, onPosted }) {
         )}
       </div>
     </div>
-  );
+  ), document.body);
 }
