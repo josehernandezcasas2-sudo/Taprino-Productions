@@ -10,6 +10,8 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getWatchHistory } from '../../lib/watchHistory';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getRecommendations } from '../../lib/recommendations';
+import { getRecentVideoPosts } from '../../lib/posts';
+import { getPublicDisplayNames } from '../../lib/userProfiles';
 import { useWishlist } from '../../lib/useWishlist';
 import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
@@ -21,10 +23,33 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
   const { userId } = getAuth(req);
-  const [episodes, allSeries, siteSettings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getSiteSettings()]);
+  const [episodes, allSeries, siteSettings, videoPosts] = await Promise.all([
+    getPublicEpisodes(),
+    getAllSeries(),
+    getSiteSettings(),
+    getRecentVideoPosts()
+  ]);
 
   const entitled = account.isSubscriber || account.isAdmin;
-  const verticalEpisodes = filterEntitledVertical(episodes, entitled);
+  const catalogVertical = filterEntitledVertical(episodes, entitled);
+
+  // User-posted videos (lib/posts.js) — admin test feature — are woven
+  // into the same deck as curated episodes, normalized to the same
+  // episode-shape buildVerticalUnits/expandUnitToSlides already expect.
+  // Always free/standalone (no seriesId): the posts table has no
+  // tier/entitlement concept of its own yet.
+  const authorNames = await getPublicDisplayNames(videoPosts.map((p) => p.userId));
+  const postUnits = videoPosts.map((p) => ({
+    id: `post:${p.id}`,
+    title: p.caption || '',
+    thumbnail: p.thumbnailUrl,
+    contentType: 'vertical',
+    tier: 'free',
+    seriesId: null,
+    isUserPost: true,
+    authorName: authorNames[p.userId] || 'A viewer'
+  }));
+  const verticalEpisodes = [...catalogVertical, ...postUnits];
 
   const seriesNameById = {};
   for (const s of allSeries) seriesNameById[s.id] = s.name;
@@ -208,10 +233,14 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     // itself, so this is honest about what it actually does rather than
     // implying it jumps to this exact clip. Standalone clips: the regular
     // episode page, since the discover feed has no "start on this one
-    // specific standalone clip" mode to link into.
+    // specific standalone clip" mode to link into. A user post has neither
+    // — no episode page, no per-post deep link yet — so it just shares the
+    // feed itself.
     const url = slide.seriesId
       ? `${window.location.origin}/vertical/discover?series=${slide.seriesId}`
-      : `${window.location.origin}/episode/${slide.episode.id}`;
+      : slide.episode.isUserPost
+        ? `${window.location.origin}/vertical/discover`
+        : `${window.location.origin}/episode/${slide.episode.id}`;
     if (navigator.share) {
       navigator.share({ title: slide.episode.title, url }).catch(() => {});
     } else {
@@ -268,6 +297,10 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                 />
                 <button className="reel-close" onClick={goBack}>&times;</button>
                 <div className="reel-action-rail">
+                  {/* User posts aren't real episodes (see lib/posts.js) — no
+                      wishlist row for them to attach to, so this action
+                      simply doesn't exist for that slide kind. */}
+                  {!slide.episode.isUserPost && (
                   <button
                     className={`reel-action-btn ${isWishlisted(slide.episode.id) ? 'active' : ''}`}
                     onClick={() => toggleWishlist(slide.episode.id)}
@@ -279,6 +312,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                       size={22}
                     />
                   </button>
+                  )}
                   <button
                     className="reel-action-btn"
                     onClick={() => share(slide)}
@@ -293,7 +327,10 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                   {slide.seriesId && (
                     <div className="reel-caption-series">{(seriesNameById[slide.seriesId] || '').toUpperCase()}</div>
                   )}
-                  <div className="reel-caption-title">{slide.episode.title}</div>
+                  {slide.episode.isUserPost && (
+                    <div className="reel-caption-series reel-caption-post-author">{slide.episode.authorName}</div>
+                  )}
+                  {slide.episode.title && <div className="reel-caption-title">{slide.episode.title}</div>}
                   {slide.positionInSeries && (
                     <div className="reel-caption-progress">Episode {slide.positionInSeries} of {slide.seriesLength}</div>
                   )}

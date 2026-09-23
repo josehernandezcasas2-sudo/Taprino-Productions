@@ -35,12 +35,12 @@ export function UploadProvider({ children }) {
     uploadStatusRef.current = activeUpload;
   }, [activeUpload]);
 
-  async function startUpload(file, formData, trailerFile, uploadMethod = 'tus', submitEndpoint = '/api/creator/submit-episode') {
+  async function startUpload(file, formData, trailerFile, uploadMethod = 'tus', submitEndpoint = '/api/creator/submit-episode', doneMessages) {
     if (activeUpload && activeUpload.status === 'uploading') {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
 
-    lastAttemptRef.current = { file, formData, trailerFile, submitEndpoint };
+    lastAttemptRef.current = { file, formData, trailerFile, submitEndpoint, doneMessages };
 
     setActiveUpload({
       phase: 'main',
@@ -50,6 +50,7 @@ export function UploadProvider({ children }) {
       startedAt: Date.now(),
       status: 'requesting-url',
       uploadMethod,
+      doneMessages,
       errorTitle: null,
       errorMessage: null,
       likelyBlocked: false
@@ -287,7 +288,7 @@ export function UploadProvider({ children }) {
       startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData);
       return;
     }
-    startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus', attempt.submitEndpoint);
+    startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus', attempt.submitEndpoint, attempt.doneMessages);
   }
 
   function dismissUpload() {

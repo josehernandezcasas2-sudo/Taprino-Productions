@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, usePlayerIconOverrides } from './PlayerIcons';
+import CreatePostModal from './CreatePostModal';
 
 // Four tabs, down from the previous five: Series and Films folded into one
 // "Watch" tab, My List moved into the Account menu alongside My Work, and
@@ -67,6 +68,7 @@ export default function MobileTabBar() {
   const iconOverrides = usePlayerIconOverrides();
   const [openMenu, setOpenMenu] = useState(null);
   const [roles, setRoles] = useState({ isSignedIn: false, isCreator: false, isAdmin: false });
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const barRef = useRef(null);
 
   // Self-fetched rather than threaded down as a prop — MobileTabBar is
@@ -137,6 +139,18 @@ export default function MobileTabBar() {
         <span className="tabbar-label">Home</span>
       </Link>
 
+      {roles.isAdmin && (
+        <button
+          type="button"
+          className="tabbar-item tabbar-add"
+          onClick={() => { setOpenMenu(null); setShowCreateModal(true); }}
+          aria-label="New post"
+          title="New post (admin test feature)"
+        >
+          <span className="tabbar-add-glyph"><PlusIcon size={20} /></span>
+        </button>
+      )}
+
       <button
         type="button"
         className={`tabbar-item ${GROUPS.watch.match(path, query) ? 'active' : ''} ${openMenu === 'watch' ? 'open' : ''}`}
@@ -158,6 +172,8 @@ export default function MobileTabBar() {
         <span className="tabbar-glyph"><AccountIcon size={20} src={iconOverrides.tab_account} /></span>
         <span className="tabbar-label">Account <span className="tabbar-caret" aria-hidden="true">▲</span></span>
       </button>
+
+      {showCreateModal && <CreatePostModal onClose={() => setShowCreateModal(false)} />}
     </nav>
   );
 }

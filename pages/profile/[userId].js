@@ -2,12 +2,14 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
 import BackButton from '../../components/BackButton';
-import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ShareIcon, CheckIcon, VideoCameraIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
 import { getPitchesForCreator } from '../../lib/pitches';
 import { getBackedPitches } from '../../lib/pitchDonations';
+import { getPostsForUser } from '../../lib/posts';
+import { formatRuntime } from '../../lib/videoMetadata';
 import { getUserRole } from '../../lib/roles';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import HeaderNav from '../../components/HeaderNav';
@@ -36,12 +38,13 @@ export async function getServerSideProps({ req, res, params }) {
   // the Promise.all above — no point fetching a stranger's credited work
   // for a userId that turns out to have no profile at all.
   const needsViewCounts = isRedisConfigured();
-  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts] = await Promise.all([
+  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts, posts] = await Promise.all([
     getCreditedWork(profile.userId),
     getPitchesForCreator(profile.userId),
     getBackedPitches(profile.userId),
     getUserRole(profile.userId),
-    needsViewCounts ? getViewCounts() : Promise.resolve({})
+    needsViewCounts ? getViewCounts() : Promise.resolve({}),
+    getPostsForUser(profile.userId)
   ]);
   // Public profile — only ever show approved, public pitches, never a
   // pending or rejected submission's review status.
@@ -78,6 +81,7 @@ export async function getServerSideProps({ req, res, params }) {
       creditedWork,
       pitches,
       backedPitches: backedPitchRows,
+      posts,
       totalViews,
       knownForGenres,
       // Same priority-order rule as account.js's own role badge — an
@@ -119,7 +123,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
@@ -209,6 +213,31 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
             {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
           </div>
         </div>
+
+        {posts.length > 0 && (
+          <>
+            <div className="profile-section-divider" />
+            <div className="profile-section-label">Posts</div>
+            <div className="profile-posts-grid">
+              {posts.map((post) => (
+                post.kind === 'video' ? (
+                  <Link key={post.id} href="/vertical/discover" className="profile-post-tile" style={post.thumbnailUrl ? { backgroundImage: `url(${post.thumbnailUrl})` } : undefined}>
+                    <span className="profile-post-tile-video-badge"><VideoCameraIcon size={16} /></span>
+                    {post.durationSeconds != null && (
+                      <span className="profile-post-tile-duration">{formatRuntime(post.durationSeconds)}</span>
+                    )}
+                  </Link>
+                ) : post.imageUrl ? (
+                  <a key={post.id} href={post.imageUrl} target="_blank" rel="noopener noreferrer" className="profile-post-tile" style={{ backgroundImage: `url(${post.imageUrl})` }} />
+                ) : (
+                  <div key={post.id} className="profile-post-tile">
+                    <span className="profile-post-tile-caption">{post.caption}</span>
+                  </div>
+                )
+              ))}
+            </div>
+          </>
+        )}
 
         <div className="profile-section-divider" />
         <div className="profile-section-label">Tagged in</div>

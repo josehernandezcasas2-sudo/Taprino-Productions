@@ -36,12 +36,14 @@ export default function UploadStatusWidget() {
 
   const isUrlImport = activeUpload.uploadMethod === 'url-import';
 
+  const doneMessages = activeUpload.doneMessages || {};
+
   const label = {
     'requesting-url': isUrlImport ? 'Asking Cloudflare to fetch your link…' : 'Preparing upload…',
     uploading: activeUpload.phase === 'trailer' ? 'Uploading trailer (2 of 2)…' : 'Uploading…',
     importing: 'Importing from your link…',
     saving: 'Saving submission…',
-    done: 'Submitted for review',
+    done: doneMessages.label || 'Submitted for review',
     error: isUrlImport ? 'Import failed' : 'Upload failed'
   }[activeUpload.status];
 
@@ -94,7 +96,7 @@ export default function UploadStatusWidget() {
         <div className="upload-widget-meta">Almost done — saving your submission details…</div>
       )}
       {activeUpload.status === 'done' && (
-        <div className="upload-widget-meta">It now sits with the admin for review.</div>
+        <div className="upload-widget-meta">{doneMessages.meta || 'It now sits with the admin for review.'}</div>
       )}
       {activeUpload.status === 'error' && (
         <>

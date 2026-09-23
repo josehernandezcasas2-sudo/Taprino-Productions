@@ -1,4 +1,5 @@
 import { findEpisode } from '../../../lib/episodes';
+import { findPost } from '../../../lib/posts';
 import { getAccountContext } from '../../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../../lib/cloudflareUpload';
 
@@ -17,6 +18,16 @@ export default async function handler(req, res) {
 
   const { episodeId } = req.query;
   if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
+
+  // User-posted videos (lib/posts.js) are woven into the same deck as real
+  // episodes (see pages/vertical/discover.js), prefixed "post:" so this
+  // endpoint can tell them apart — they live in a separate table with no
+  // tier/entitlement concept, always free.
+  if (episodeId.startsWith('post:')) {
+    const post = await findPost(episodeId.slice(5));
+    if (!post || post.kind !== 'video') return res.status(404).json({ error: 'Not found.' });
+    return res.status(200).json({ src: post.videoSrc });
+  }
 
   const episode = await findEpisode(episodeId);
   if (!episode) return res.status(404).json({ error: 'Not found.' });

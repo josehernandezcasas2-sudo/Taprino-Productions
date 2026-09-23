@@ -631,6 +631,28 @@ export function RowsIcon({ src, size = 18 }) {
   );
 }
 
+// The tab bar's admin-only "add" button (post/video composer) and its
+// two in-modal choices.
+export function PlusIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function VideoCameraIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="6.5" width="13" height="11" rx="1.8" />
+      <path d="M15.5 10.5l6-3.3v9.6l-6-3.3z" />
+    </svg>
+  );
+}
+
 // The site-wide "Back" button icon — a circled chevron, real SVG shapes
 // rather than a text arrow character, matching every other icon here.
 export function BackArrowIcon({ src, size = 16 }) {

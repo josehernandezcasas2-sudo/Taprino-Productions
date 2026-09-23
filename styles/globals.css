@@ -2130,6 +2130,23 @@ button { font-family: inherit; cursor: pointer; }
      active-state indicator like the other three. */
   .tabbar-item.tabbar-discover { color: var(--sky); }
   .tabbar-item.tabbar-discover.active { color: #241a05; background: var(--brass); }
+  /* Admin-only test button — raised above the bar's own line like the
+     familiar Instagram/TikTok "add" button, so it reads as a distinct
+     action rather than just another destination tab. */
+  .tabbar-item.tabbar-add {
+    flex: 0 0 auto;
+    width: 46px;
+    height: 46px;
+    margin: 0 0.3rem;
+    margin-top: -18px;
+    border-radius: 50%;
+    background: var(--brass);
+    color: #241a05;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+    border: 3px solid rgba(41, 39, 25, 0.94);
+  }
+  .tabbar-item.tabbar-add:active { transform: scale(0.94); }
+  .tabbar-add-glyph { display: flex; align-items: center; justify-content: center; }
   .tabbar-caret {
     display: inline-block;
     font-size: 0.55em;
@@ -2208,6 +2225,96 @@ button { font-family: inherit; cursor: pointer; }
   .tabbar-dropup { animation: none; }
   .tabbar-dropup-watch { animation: none; transform: translateX(-42%); }
 }
+
+/* ---------------------------------------------------------------------
+   Post composer (admin test feature) — CreatePostModal.js
+   --------------------------------------------------------------------- */
+.create-post-choices {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.6rem;
+}
+.create-post-choice {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 1.4rem 1rem;
+  background: var(--void-1);
+  border: 1px solid rgba(251, 232, 211, 0.12);
+  border-radius: 8px;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: center;
+}
+.create-post-choice:hover { border-color: var(--brass); }
+.create-post-choice span:nth-child(2) { font-weight: 600; }
+.create-post-choice-sub { font-size: 0.72rem; color: var(--ink-dim); line-height: 1.3; }
+.create-post-image-preview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  max-width: 220px;
+  background-size: cover;
+  background-position: center;
+  border-radius: 6px;
+  margin-bottom: 0.8rem;
+}
+
+/* ---------------------------------------------------------------------
+   Public profile — user posts grid (photo/video posts, separate from
+   the credited-work poster grid above it)
+   --------------------------------------------------------------------- */
+.profile-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+}
+.profile-post-tile {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background-size: cover;
+  background-position: center;
+  background-color: var(--void-1);
+  display: block;
+  overflow: hidden;
+}
+.profile-post-tile-caption {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--ink);
+  background: linear-gradient(160deg, rgba(41,39,25,0.55), rgba(41,39,25,0.85));
+}
+.profile-post-tile-video-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  color: #fff;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
+}
+.profile-post-tile-duration {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: #fff;
+  background: rgba(0,0,0,0.55);
+  padding: 0.1rem 0.35rem;
+  border-radius: 4px;
+}
+
+/* Vertical discover feed — caption line identifying a user post as such,
+   reusing the same slot/style series names already occupy above the
+   title (see .reel-caption-series in pages/vertical/discover.js). */
+.reel-caption-post-author { text-transform: uppercase; }
 
 /* ---------------------------------------------------------------------
    Custom video player
