@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
-import { PlusIcon, VideoCameraIcon, ImageIcon } from './PlayerIcons';
+import { PlusIcon, VideoCameraIcon, ImageIcon, CloseIcon } from './PlayerIcons';
 
 const MAX_VIDEO_SECONDS = 5 * 60;
 const MAX_CAPTION_LENGTH = 2200;
@@ -23,11 +23,18 @@ function readAsDataUrl(f) {
 // immediately, no review step — this doesn't go through the creator
 // submission pipeline in lib/episodes.js at all, it writes to the
 // separate `posts` table (lib/posts.js).
+//
+// The media comes first, caption second — the same order Instagram/
+// Twitter use, and the one Jose asked for: pick the photo/video, see it,
+// THEN write about it underneath, rather than typing into a form field
+// before there's anything to react to.
 export default function CreatePostModal({ onClose, onPosted }) {
   const { startUpload } = useUpload();
   const [step, setStep] = useState('choose');
+  const imageInputRef = useRef(null);
+  const videoInputRef = useRef(null);
 
-  // Post (caption + optional photo)
+  // Post (photo + caption)
   const [caption, setCaption] = useState('');
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
@@ -36,15 +43,24 @@ export default function CreatePostModal({ onClose, onPosted }) {
 
   // Video
   const [videoFile, setVideoFile] = useState(null);
+  const [videoPreview, setVideoPreview] = useState(null);
   const [videoDuration, setVideoDuration] = useState(null);
   const [videoCaption, setVideoCaption] = useState('');
   const [checkingVideo, setCheckingVideo] = useState(false);
   const [videoError, setVideoError] = useState(null);
 
-  function handleImagePick(e) {
+  function pickImage(e) {
     const f = e.target.files[0] || null;
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
     setImageFile(f);
     setImagePreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  function clearImage() {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+    setImageFile(null);
+    setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = '';
   }
 
   async function handlePostSubmit(e) {
@@ -76,26 +92,41 @@ export default function CreatePostModal({ onClose, onPosted }) {
     }
   }
 
-  async function handleVideoPick(e) {
+  function clearVideo() {
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoFile(null);
+    setVideoPreview(null);
+    setVideoDuration(null);
+    setVideoError(null);
+    if (videoInputRef.current) videoInputRef.current.value = '';
+  }
+
+  async function pickVideo(e) {
     const f = e.target.files[0] || null;
-    setVideoFile(f);
+    if (videoPreview) URL.revokeObjectURL(videoPreview);
+    setVideoFile(null);
+    setVideoPreview(null);
     setVideoDuration(null);
     setVideoError(null);
     if (!f) return;
+
     setCheckingVideo(true);
     try {
       const duration = await readVideoDuration(f);
       if (duration > MAX_VIDEO_SECONDS) {
         setVideoError(`That video is ${formatRuntime(duration)} — videos are limited to 5 minutes.`);
-        setVideoFile(null);
+        if (videoInputRef.current) videoInputRef.current.value = '';
       } else {
+        setVideoFile(f);
+        setVideoPreview(URL.createObjectURL(f));
         setVideoDuration(duration);
       }
     } catch (err) {
       // Can't read duration client-side (unusual codec/container) — let it
       // through; the server re-checks against Cloudflare's own number once
       // it's processed (see pages/api/posts/create.js).
-      setVideoDuration(null);
+      setVideoFile(f);
+      setVideoPreview(URL.createObjectURL(f));
     } finally {
       setCheckingVideo(false);
     }
@@ -118,6 +149,15 @@ export default function CreatePostModal({ onClose, onPosted }) {
     onClose();
   }
 
+  function backToChoose() {
+    clearImage();
+    setCaption('');
+    setError(null);
+    clearVideo();
+    setVideoCaption('');
+    setStep('choose');
+  }
+
   // Rendered into document.body via a portal rather than in place —
   // MobileTabBar mounts this modal as a child of <nav className="tabbar">,
   // and .tabbar has backdrop-filter: blur(10px). That CSS property makes
@@ -130,7 +170,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
   if (typeof document === 'undefined') return null;
   return createPortal((
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-card create-post-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
             {step === 'choose' ? 'New post' : step === 'post' ? 'New post' : 'New video'}
@@ -143,7 +183,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
             <button type="button" className="create-post-choice" onClick={() => setStep('post')}>
               <ImageIcon size={26} />
               <span>Post</span>
-              <span className="create-post-choice-sub">Caption + an optional photo</span>
+              <span className="create-post-choice-sub">Photo + a caption</span>
             </button>
             <button type="button" className="create-post-choice" onClick={() => setStep('video')}>
               <VideoCameraIcon size={26} />
@@ -154,28 +194,47 @@ export default function CreatePostModal({ onClose, onPosted }) {
         )}
 
         {step === 'post' && (
-          <form onSubmit={handlePostSubmit}>
-            <label>Caption</label>
+          <form className="create-post-form" onSubmit={handlePostSubmit}>
+            <div
+              className="create-post-dropzone create-post-dropzone-photo"
+              onClick={() => imageInputRef.current && imageInputRef.current.click()}
+              style={imagePreview ? { backgroundImage: `url(${imagePreview})` } : undefined}
+            >
+              {!imagePreview ? (
+                <div className="create-post-dropzone-empty">
+                  <ImageIcon size={28} />
+                  <span>Tap to add a photo</span>
+                  <span className="create-post-dropzone-hint">Optional — a caption alone works too</span>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  className="create-post-dropzone-remove"
+                  onClick={(e) => { e.stopPropagation(); clearImage(); }}
+                  aria-label="Remove photo"
+                >
+                  <CloseIcon size={14} />
+                </button>
+              )}
+            </div>
+            <input ref={imageInputRef} type="file" accept="image/*" onChange={pickImage} hidden />
+
             <textarea
+              className="create-post-caption"
               value={caption}
               onChange={(e) => setCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
-              rows={4}
-              placeholder="What's up?"
-              style={{ marginBottom: '0.8rem' }}
+              rows={3}
+              placeholder="Write a caption…"
             />
-            <label>Photo — optional</label>
-            <input type="file" accept="image/*" onChange={handleImagePick} style={{ marginBottom: '0.8rem' }} />
-            {imagePreview && (
-              <div className="create-post-image-preview" style={{ backgroundImage: `url(${imagePreview})` }} />
-            )}
+            <div className="create-post-char-count">{caption.length}/{MAX_CAPTION_LENGTH}</div>
 
-            {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
+            {error && <p className="create-post-error">{error}</p>}
 
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
+            <div className="create-post-form-actions">
               <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>
                 {saving ? 'Posting…' : 'Post'}
               </button>
-              <button className="account-btn-secondary" type="button" onClick={() => setStep('choose')} disabled={saving} style={{ width: 'auto' }}>
+              <button className="account-btn-secondary" type="button" onClick={backToChoose} disabled={saving} style={{ width: 'auto' }}>
                 Back
               </button>
             </div>
@@ -183,29 +242,53 @@ export default function CreatePostModal({ onClose, onPosted }) {
         )}
 
         {step === 'video' && (
-          <form onSubmit={handleVideoSubmit}>
-            <label>Video — vertical, up to 5 minutes</label>
-            <input type="file" accept="video/*" onChange={handleVideoPick} style={{ marginBottom: '0.4rem' }} />
-            {checkingVideo && <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Checking length…</p>}
-            {videoDuration != null && (
-              <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Length: {formatRuntime(videoDuration)}</p>
-            )}
-            <label style={{ marginTop: '0.6rem' }}>Caption — optional</label>
+          <form className="create-post-form" onSubmit={handleVideoSubmit}>
+            <div
+              className="create-post-dropzone create-post-dropzone-video"
+              onClick={() => !videoPreview && videoInputRef.current && videoInputRef.current.click()}
+            >
+              {!videoPreview ? (
+                <div className="create-post-dropzone-empty">
+                  <VideoCameraIcon size={28} />
+                  <span>Tap to choose a video</span>
+                  <span className="create-post-dropzone-hint">Vertical, up to 5 minutes</span>
+                </div>
+              ) : (
+                <>
+                  <video className="create-post-video-preview" src={videoPreview} muted playsInline loop autoPlay />
+                  {videoDuration != null && (
+                    <span className="create-post-duration-badge">{formatRuntime(videoDuration)}</span>
+                  )}
+                  <button
+                    type="button"
+                    className="create-post-dropzone-remove"
+                    onClick={(e) => { e.stopPropagation(); clearVideo(); }}
+                    aria-label="Remove video"
+                  >
+                    <CloseIcon size={14} />
+                  </button>
+                </>
+              )}
+              {checkingVideo && <div className="create-post-dropzone-checking">Checking length…</div>}
+            </div>
+            <input ref={videoInputRef} type="file" accept="video/*" onChange={pickVideo} hidden />
+
+            {videoError && <p className="create-post-error">{videoError}</p>}
+
             <textarea
+              className="create-post-caption"
               value={videoCaption}
               onChange={(e) => setVideoCaption(e.target.value.slice(0, MAX_CAPTION_LENGTH))}
               rows={3}
               placeholder="What's this clip about?"
-              style={{ marginBottom: '0.8rem' }}
             />
+            <div className="create-post-char-count">{videoCaption.length}/{MAX_CAPTION_LENGTH}</div>
 
-            {videoError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{videoError}</p>}
-
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.4rem' }}>
+            <div className="create-post-form-actions">
               <button className="account-btn-primary" type="submit" disabled={!videoFile || checkingVideo} style={{ width: 'auto' }}>
                 <PlusIcon size={14} /> Post video
               </button>
-              <button className="account-btn-secondary" type="button" onClick={() => setStep('choose')} style={{ width: 'auto' }}>
+              <button className="account-btn-secondary" type="button" onClick={backToChoose} style={{ width: 'auto' }}>
                 Back
               </button>
             </div>
