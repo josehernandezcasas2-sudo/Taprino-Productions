@@ -5868,7 +5868,17 @@ body:has(.mini-player) { padding-bottom: 72px; }
 /* hero collage */
 .zine-hero { padding: 0.5rem 1.6rem 1.8rem; }
 .zine-hero-collage { display: flex; align-items: flex-end; gap: 0; flex-wrap: wrap; }
-.zine-hero-art-wrap { position: relative; margin-right: -1.5rem; z-index: 2; }
+/* flex-shrink:0 is the actual fix here — .zine-hero-text uses flex:1
+   (flex-basis:0%), so once the viewport is too narrow to fit a 380px
+   image AND the text's own 260px min-width side by side (roughly
+   640-900px, above the mobile breakpoint that stacks them but below
+   where they naturally fit), the art-wrap had no shrink protection and
+   was getting squeezed down to a sliver — just its own left border
+   rendering as a thin vertical line, with the actual poster image
+   invisible. .zine-hero-collage already has flex-wrap:wrap for exactly
+   this case; without flex-shrink:0 that wrap never triggered, because
+   shrinking the image was flexbox's first resort instead. */
+.zine-hero-art-wrap { position: relative; margin-right: -1.5rem; z-index: 2; flex-shrink: 0; }
 .zine-hero-art {
   width: 380px;
   max-width: 100%;
