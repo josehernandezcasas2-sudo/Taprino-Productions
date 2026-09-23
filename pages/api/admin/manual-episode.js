@@ -7,13 +7,14 @@ import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
 import { invalidateCache } from '../../../lib/redis';
 
-// The manual fallback path: for when a creator's in-app upload keeps
-// getting blocked (ad blocker, firewall, flaky network — see
-// lib/uploadErrors.js), the actual workaround is uploading the file
-// directly through Cloudflare's own dashboard (admin-only, since that
-// requires the Cloudflare account itself, not just this app) and then
-// creating the episode here from the resulting video ID — completely
-// bypassing this app's own upload pipeline for that one file.
+// Admin's direct add-an-episode path — components/ManualEpisodeForm.js.
+// Accepts a video the exact same three ways the creator-facing
+// submit-episode.js does (an in-app upload or link import, both via
+// contexts/UploadContext.js and arriving here as `videoUid`/`trailerUid`;
+// or a video already sitting in Cloudflare/Bunny/Mux, pasted as an ID —
+// `cloudflareVideoUid`/`trailerCloudflareUid` — for when the in-app
+// upload itself is what's broken: ad blocker, firewall, flaky network,
+// see lib/uploadErrors.js).
 //
 // This is admin-only, not creator-facing, for a concrete reason: it
 // requires values (attributing submitted_by, setting status/tier
@@ -48,7 +49,13 @@ export default async function handler(req, res) {
   if (body.videoProvider && !VALID_VIDEO_PROVIDERS.includes(body.videoProvider)) {
     return res.status(400).json({ error: `videoProvider must be one of: ${VALID_VIDEO_PROVIDERS.join(', ')}` });
   }
-  const hasCloudflareVideo = videoProvider === 'cloudflare' && !!body.cloudflareVideoUid;
+  // videoUid arrives from ManualEpisodeForm's own in-app upload/link-import
+  // (the same UploadContext flow the creator form uses) — cloudflareVideoUid
+  // is the older "paste an ID from a video already uploaded via Cloudflare's
+  // own dashboard" path. Both name the same thing once they get here.
+  const cloudflareVideoUid = body.cloudflareVideoUid || body.videoUid;
+  const trailerCloudflareUid = body.trailerCloudflareUid || body.trailerUid;
+  const hasCloudflareVideo = videoProvider === 'cloudflare' && !!cloudflareVideoUid;
   const hasBunnyVideo = videoProvider === 'bunny' && !!body.bunnyPullZoneHost && !!body.bunnyVideoId;
   const hasMuxVideo = videoProvider === 'mux' && !!body.muxPlaybackId;
   if (!hasCloudflareVideo && !hasBunnyVideo && !hasMuxVideo && !body.audioUrl) {
@@ -97,22 +104,22 @@ export default async function handler(req, res) {
   let videoStatus = null;
   let src = null;
   if (hasCloudflareVideo) {
-    videoStatus = await getCloudflareVideoStatus(body.cloudflareVideoUid);
+    videoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
     if (!videoStatus) {
       return res.status(404).json({ error: 'No Cloudflare video found with that ID — check it was copied correctly.' });
     }
     if (videoStatus.state === 'error') {
       return res.status(400).json({ error: `Cloudflare could not process this video: ${videoStatus.errorReasonText || videoStatus.errorReasonCode}. Re-export and re-upload it before linking.` });
     }
-    src = cloudflarePlaybackUrl(body.cloudflareVideoUid);
+    src = cloudflarePlaybackUrl(cloudflareVideoUid);
   } else if (hasBunnyVideo) {
     src = bunnyPlaybackUrl(body.bunnyPullZoneHost, body.bunnyVideoId);
   } else if (hasMuxVideo) {
     src = muxPlaybackUrl(body.muxPlaybackId);
   }
   let trailerSrc = null;
-  if (body.trailerCloudflareUid) {
-    trailerSrc = cloudflarePlaybackUrl(body.trailerCloudflareUid);
+  if (trailerCloudflareUid) {
+    trailerSrc = cloudflarePlaybackUrl(trailerCloudflareUid);
   }
 
   // Attributing this to a specific creator is optional — if provided, it
@@ -201,7 +208,7 @@ export default async function handler(req, res) {
   await invalidateCache('public_episodes_v1');
 
   const videoDescription = hasCloudflareVideo
-    ? `manually-linked Cloudflare video ${body.cloudflareVideoUid}`
+    ? `${body.videoUid ? 'uploaded' : 'manually-linked'} Cloudflare video ${cloudflareVideoUid}`
     : hasBunnyVideo
     ? `manually-linked Bunny.net video ${body.bunnyVideoId}`
     : hasMuxVideo

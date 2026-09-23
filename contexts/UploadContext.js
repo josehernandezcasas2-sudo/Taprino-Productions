@@ -196,12 +196,12 @@ export function UploadProvider({ children }) {
   // and keeping them apart means this can't accidentally destabilize the
   // TUS/basic-upload state machine above, which already has to handle a lot
   // of real-world flakiness on its own.
-  async function startUrlImport(videoUrl, fileName, formData) {
+  async function startUrlImport(videoUrl, fileName, formData, submitEndpoint = '/api/creator/submit-episode', doneMessages) {
     if (activeUpload && activeUpload.status === 'uploading') {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
 
-    lastAttemptRef.current = { videoUrl, fileName, formData, submitEndpoint: '/api/creator/submit-episode', isUrlImport: true };
+    lastAttemptRef.current = { videoUrl, fileName, formData, submitEndpoint, doneMessages, isUrlImport: true };
 
     setActiveUpload({
       phase: 'main',
@@ -212,6 +212,7 @@ export function UploadProvider({ children }) {
       status: 'requesting-url',
       uploadMethod: 'url-import',
       importPct: null,
+      doneMessages,
       errorTitle: null,
       errorMessage: null,
       likelyBlocked: false
@@ -258,7 +259,7 @@ export function UploadProvider({ children }) {
 
       setActiveUpload((u) => (u ? { ...u, phase: 'saving', status: 'saving' } : u));
 
-      const submitRes = await fetch('/api/creator/submit-episode', {
+      const submitRes = await fetch(submitEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...formData, videoUid })
@@ -285,7 +286,7 @@ export function UploadProvider({ children }) {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
     if (attempt.isUrlImport) {
-      startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData);
+      startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData, attempt.submitEndpoint, attempt.doneMessages);
       return;
     }
     startUpload(attempt.file, attempt.formData, attempt.trailerFile, useMethod || activeUpload?.uploadMethod || 'tus', attempt.submitEndpoint, attempt.doneMessages);
