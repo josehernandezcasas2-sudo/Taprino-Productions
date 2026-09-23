@@ -121,7 +121,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
     fetch('/api/account/profile')
       .then((r) => r.json())
       .then((data) => { setProfile(data); setOriginalAge(data.age ?? null); })
-      .catch(() => setProfile({ displayName: '', gender: '', age: '', bio: '', avatarUrl: null, socialLinks: [] }));
+      .catch(() => setProfile({ displayName: '', gender: '', age: '', bio: '', avatarUrl: null, socialLinks: [], stayInStream: false }));
   }, []);
 
   const ageWasChanged = originalAge !== null && String(profile.age || '') !== String(originalAge || '') && profile.age !== '';
@@ -238,6 +238,22 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       setDeleteError(err.message);
     } finally {
       setDeleteRequesting(false);
+    }
+  }
+
+  async function toggleStayInStream() {
+    const next = !(profile && profile.stayInStream);
+    setProfile((p) => ({ ...p, stayInStream: next }));
+    try {
+      const res = await fetch('/api/account/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stayInStream: next })
+      });
+      if (!res.ok) throw new Error();
+    } catch (err) {
+      // Revert on failure — same best-effort pattern as toggleNewsletter below.
+      setProfile((p) => ({ ...p, stayInStream: !next }));
     }
   }
 
@@ -497,6 +513,21 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                     </button>
                   )}
                 </div>
+                {profile && (
+                  <div className="account-row">
+                    <div>
+                      <div className="account-row-label">Here only for the stream?</div>
+                      <div className="account-row-detail">
+                        {profile.stayInStream
+                          ? `On — the logo takes you straight to /stream, skipping the ${SITE.name} homepage.`
+                          : `Off — the logo takes you to the ${SITE.name} homepage by default.`}
+                      </div>
+                    </div>
+                    <button className="account-btn-secondary" onClick={toggleStayInStream}>
+                      {profile.stayInStream ? 'Turn off' : 'Click to stay within the stream platform'}
+                    </button>
+                  </div>
+                )}
                 <div className="account-quicklinks" style={{ marginTop: '0.6rem' }}>
                   <Link href="/wishlist" className="account-quicklink"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                   <Link href="/recs" className="account-quicklink"><SparkleIcon size={14} src={iconOverrides.sparkle} /> My Recs</Link>

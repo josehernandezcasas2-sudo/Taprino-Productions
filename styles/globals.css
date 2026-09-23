@@ -230,6 +230,14 @@ button { font-family: inherit; cursor: pointer; }
   gap: 0.7rem;
   padding: 0.5rem 0.4rem 0.6rem;
 }
+.account-dropdown-header-link {
+  text-decoration: none;
+  color: inherit;
+  border-radius: 6px;
+  margin: -0.2rem -0.2rem 0.4rem;
+  transition: background 0.15s ease;
+}
+.account-dropdown-header-link:hover { background: rgba(251, 232, 211, 0.06); }
 .account-dropdown-avatar {
   flex: 0 0 auto;
   width: 38px;

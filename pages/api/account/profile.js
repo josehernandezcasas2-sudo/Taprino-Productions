@@ -26,17 +26,19 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const profile = await getOwnProfile(userId);
     return res.status(200).json({
+      userId,
       displayName: profile ? profile.display_name : null,
       gender: profile ? profile.gender : null,
       age: profile ? profile.age : null,
       bio: profile ? profile.bio : null,
       avatarUrl: profile ? profile.avatar_url : null,
-      socialLinks: profile && Array.isArray(profile.social_links) ? profile.social_links : []
+      socialLinks: profile && Array.isArray(profile.social_links) ? profile.social_links : [],
+      stayInStream: profile ? Boolean(profile.stay_in_stream) : false
     });
   }
 
   if (req.method === 'POST') {
-    const { displayName, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar } = req.body || {};
+    const { displayName, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, stayInStream } = req.body || {};
     if (displayName !== undefined && displayName !== null && String(displayName).trim().length > 60) {
       return res.status(400).json({ error: 'Display name is limited to 60 characters.' });
     }
@@ -83,7 +85,7 @@ export default async function handler(req, res) {
       const cleanedLinks = socialLinks !== undefined
         ? socialLinks.map((l) => ({ platform: (l.platform || '').trim().slice(0, 30), url: l.url.trim() }))
         : undefined;
-      await upsertOwnProfile(userId, { displayName, gender, age, bio, socialLinks: cleanedLinks, avatarUrl });
+      await upsertOwnProfile(userId, { displayName, gender, age, bio, socialLinks: cleanedLinks, avatarUrl, stayInStream });
       return res.status(200).json({ ok: true, avatarUrl });
     } catch (err) {
       return res.status(500).json({ error: err.message });

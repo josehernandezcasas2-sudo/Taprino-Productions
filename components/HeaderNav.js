@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, AccountIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -27,6 +27,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
   const [siteSettings, setShopSettings] = useState(null);
+  const [ownProfile, setOwnProfile] = useState(null);
   const rootRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -50,6 +51,18 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       .then((data) => setShopSettings(data))
       .catch(() => setShopSettings({ shopEnabled: false, shopUrl: null }));
   }, [isAdmin]);
+
+  // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
+  // every page, so this is cheaper than threading userId/avatarUrl/
+  // stayInStream through every single page's getServerSideProps just for
+  // the header. Gated on isSignedIn since the endpoint 401s otherwise.
+  useEffect(() => {
+    if (!isSignedIn) { setOwnProfile(null); return; }
+    fetch('/api/account/profile')
+      .then((r) => r.json())
+      .then(setOwnProfile)
+      .catch(() => {});
+  }, [isSignedIn]);
 
   useEffect(() => {
     function handleOutside(e) {
@@ -94,6 +107,8 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   }
 
   const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
+  const ownAvatarUrl = isSignedIn && ownProfile ? ownProfile.avatarUrl : null;
+  const ownProfileHref = isSignedIn && ownProfile && ownProfile.userId ? `/profile/${ownProfile.userId}` : null;
 
   // Deriving "what's active" from the real URL rather than trusting each
   // page to pass the right activeType prop — every page that wasn't one
@@ -135,7 +150,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   return (
     <header className="channel-bar top-nav" ref={rootRef}>
       <div className="nav-left">
-        <Link href="/stream" className="brand-mark">
+        <Link href={ownProfile && ownProfile.stayInStream ? '/stream' : '/'} className="brand-mark">
           {siteSettings && siteSettings.logoUrl ? (
             <Image
               src={siteSettings.logoUrl}
@@ -317,23 +332,39 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
           aria-label="Account menu"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
+          style={ownAvatarUrl ? { backgroundImage: `url(${ownAvatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
         >
-          {isSignedIn ? avatarLetter : '☺'}
+          {!ownAvatarUrl && (isSignedIn ? avatarLetter : '☺')}
         </button>
 
         {openMenu === 'account' && (
           <div className="dropdown dropdown-right open account-dropdown">
             {isSignedIn ? (
               <>
-                <div className="account-dropdown-header">
-                  <div className="account-dropdown-avatar">{avatarLetter || '☺'}</div>
-                  <div>
-                    <div className="account-dropdown-email">{email || 'Your account'}</div>
-                    <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
+                {ownProfileHref ? (
+                  <Link href={ownProfileHref} className="account-dropdown-header account-dropdown-header-link" onClick={() => setOpenMenu(null)}>
+                    <div className="account-dropdown-avatar" style={ownAvatarUrl ? { backgroundImage: `url(${ownAvatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
+                      {!ownAvatarUrl && (avatarLetter || '☺')}
+                    </div>
+                    <div>
+                      <div className="account-dropdown-email">{email || 'Your account'}</div>
+                      <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
+                    </div>
+                  </Link>
+                ) : (
+                  <div className="account-dropdown-header">
+                    <div className="account-dropdown-avatar">{avatarLetter || '☺'}</div>
+                    <div>
+                      <div className="account-dropdown-email">{email || 'Your account'}</div>
+                      <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
+                    </div>
                   </div>
-                </div>
+                )}
                 <div className="dropdown-divider" />
                 <Link href="/account" className="dropdown-item"><SettingsIcon size={15} src={iconOverrides.settings} /> Account Settings</Link>
+                {ownProfileHref && (
+                  <Link href={ownProfileHref} className="dropdown-item"><AccountIcon size={15} /> View public profile</Link>
+                )}
                 {isAdmin && <Link href="/admin" className="dropdown-item"><LockIcon size={15} src={iconOverrides.admin_lock} /> Admin Portal</Link>}
                 <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
