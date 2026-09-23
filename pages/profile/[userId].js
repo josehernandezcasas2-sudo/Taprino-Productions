@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
 import BackButton from '../../components/BackButton';
+import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
@@ -119,6 +120,7 @@ function formatViews(n) {
 }
 
 export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
@@ -202,7 +204,7 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
 
           <div className="pitch-share-wrap" style={{ marginTop: '1rem' }}>
             <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
-              {shareCopied ? '✓' : '⇪'}
+              {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}
             </button>
             {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
           </div>

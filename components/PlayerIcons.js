@@ -529,6 +529,35 @@ export function LinkIcon({ src, size = 18 }) {
   );
 }
 
+// The classic "share" glyph (arrow up into a tray) — used everywhere a
+// share button copies/shares the current page's link (vertical discover,
+// the pitch page, public profiles). Was previously a raw "↗" unicode
+// character in each of those, which — like every emoji/unicode glyph
+// noted at the top of this file — renders using each device's own font,
+// so it looked different per platform instead of matching the rest of
+// this icon set.
+export function ShareIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 15V4" />
+      <path d="M8 8l4-4 4 4" />
+      <path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6" />
+    </svg>
+  );
+}
+
+// Share buttons' "copied!" confirmation state — same reasoning as
+// ShareIcon above, replacing a raw "✓" checkmark character.
+export function CheckIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
 export function TicketIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (

@@ -14,6 +14,7 @@ import { useWishlist } from '../../lib/useWishlist';
 import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
+import { HeartIcon, ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
@@ -79,6 +80,7 @@ async function fetchAdSlide() {
 
 export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist, personalUnitKeys }) {
   const router = useRouter();
+  const iconOverrides = usePlayerIconOverrides();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const [shareCopiedKey, setShareCopiedKey] = useState(null);
   const containerRef = useRef(null);
@@ -271,14 +273,20 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                     onClick={() => toggleWishlist(slide.episode.id)}
                     aria-label={isWishlisted(slide.episode.id) ? 'Remove from My List' : 'Add to My List'}
                   >
-                    {isWishlisted(slide.episode.id) ? '\u2665' : '\u2661'}
+                    <HeartIcon
+                      active={isWishlisted(slide.episode.id)}
+                      src={isWishlisted(slide.episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive}
+                      size={22}
+                    />
                   </button>
                   <button
                     className="reel-action-btn"
                     onClick={() => share(slide)}
                     aria-label="Share"
                   >
-                    {shareCopiedKey === slide.key ? '\u2713' : '\u2197'}
+                    {shareCopiedKey === slide.key
+                      ? <CheckIcon size={22} />
+                      : <ShareIcon src={iconOverrides.share} size={22} />}
                   </button>
                 </div>
                 <div className="reel-caption">

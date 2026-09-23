@@ -7,7 +7,7 @@ import { useRouter } from 'next/router';
 import { getAuth } from '@clerk/nextjs/server';
 import { SignInButton } from '@clerk/nextjs';
 import { getAccountContext } from '../../lib/accountContext';
-import { usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import WishlistButton from '../../components/WishlistButton';
 import {
   getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
@@ -512,7 +512,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               <WishlistButton isActive={saved} onToggle={toggleSave} className="wishlist-btn-large" />
               <div className="pitch-share-wrap">
                 <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share" title="Share">
-                  {shareCopied ? '✓' : '⇪'}
+                  {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}
                 </button>
                 {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
               </div>
