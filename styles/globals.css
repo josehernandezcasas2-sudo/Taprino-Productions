@@ -5745,8 +5745,32 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-hero-text h2 { font-size: 2.4rem; margin: 0 0 0.6rem; transform: rotate(1deg); }
 .zine-hero-text p { font-size: 0.9rem; color: var(--ink-dim); max-width: 44ch; line-height: 1.6; margin: 0 0 0.9rem; }
 
+/* Shared by every horizontally-scrolling zine row below: native
+   scrollbar hidden (still scrollable by drag/trackpad/shift+wheel,
+   same treatment as .cat-row-track on /stream) plus a right-edge fade
+   so whichever card lands at the boundary dissolves out instead of
+   being hard-sliced. */
+.zine-brief-row, .zine-people-row, .zine-filmstrip, .zine-cassette-row, .zine-flyer-row {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 50px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 50px), transparent 100%);
+}
+.zine-brief-row::-webkit-scrollbar, .zine-people-row::-webkit-scrollbar,
+.zine-filmstrip::-webkit-scrollbar, .zine-cassette-row::-webkit-scrollbar,
+.zine-flyer-row::-webkit-scrollbar { display: none; }
+
 /* announcements — taped index cards */
-.zine-brief-row { display: flex; gap: 1.1rem; overflow-x: auto; padding-bottom: 0.3rem; }
+.zine-brief-row {
+  display: flex;
+  gap: 1.1rem;
+  overflow-x: auto;
+  /* overflow-x:auto implicitly clips overflow-y too (see .cat-row-track's
+     own comment on this same CSS quirk) — these cards are rotated up to
+     1deg, so their corners poke past their own layout box and were
+     getting clipped top/bottom with no padding to give them room. */
+  padding: 0.5rem 0.2rem 0.6rem;
+}
 .zine-brief-card {
   flex: 0 0 260px;
   background: var(--ink);
@@ -5764,7 +5788,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-brief-card p { font-size: 0.72rem; line-height: 1.45; margin: 0; opacity: 0.75; }
 
 /* featured people — polaroids */
-.zine-people-row { display: flex; gap: 1.4rem; overflow-x: auto; padding-top: 0.3rem; padding-bottom: 0.3rem; }
+.zine-people-row { display: flex; gap: 1.4rem; overflow-x: auto; padding: 0.6rem 0.2rem 0.7rem; }
 .zine-polaroid {
   flex: 0 0 140px;
   background: var(--ink);
@@ -5789,9 +5813,15 @@ body:has(.mini-player) { padding-bottom: 72px; }
 
 /* films & shorts — filmstrip */
 .zine-filmstrip { display: flex; background: var(--surface-1); padding: 1rem; gap: 0.9rem; transform: rotate(-0.4deg); overflow-x: auto; }
-.zine-filmstrip-item { flex: 0 0 160px; text-decoration: none; display: block; color: inherit; }
+.zine-filmstrip-item { flex: 0 0 150px; text-decoration: none; display: block; color: inherit; }
 .zine-filmstrip-poster {
-  height: 200px;
+  position: relative;
+  /* Real movie-poster ratio, matching .ep-thumb everywhere else on the
+     site — this was a fixed 200px height with no width set, so it just
+     stretched to fill the 160px item width (a squarish ~4:5 box) instead
+     of looking like an actual poster. */
+  width: 100%;
+  aspect-ratio: 2 / 3;
   background-size: cover;
   background-position: center;
   background-color: var(--surface-2);
@@ -5802,7 +5832,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-filmstrip-item span { font-size: 0.62rem; color: var(--ink-dim); font-family: var(--font-mono); }
 
 /* on air — cassette tiles */
-.zine-cassette-row { display: flex; gap: 1rem; overflow-x: auto; }
+.zine-cassette-row { display: flex; gap: 1rem; overflow-x: auto; padding: 0.3rem 0.2rem 0.4rem; }
 .zine-cassette {
   flex: 0 0 190px;
   height: 90px;
@@ -5827,7 +5857,15 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 
 /* pitch room — flyer cards */
-.zine-flyer-row { display: flex; gap: 1.2rem; overflow-x: auto; }
+.zine-flyer-row {
+  display: flex;
+  gap: 1.2rem;
+  overflow-x: auto;
+  /* No padding at all here previously — these cards rotate up to
+     1.5deg with nothing to stop overflow-x:auto's implicit overflow-y
+     clipping from cutting their corners off. */
+  padding: 0.5rem 0.2rem 0.6rem;
+}
 .zine-flyer {
   flex: 0 0 250px;
   background: var(--ink);
@@ -5844,6 +5882,80 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-flyer p { font-size: 0.72rem; line-height: 1.5; margin: 0 0 0.6rem; opacity: 0.75; }
 .zine-flyer-by { font-size: 0.66rem; font-style: italic; color: #6b6248; margin-bottom: 0.5rem; }
 .zine-flyer-raised { font-family: var(--font-mono); font-size: 0.7rem; color: var(--rust); font-weight: bold; }
+
+/* trending — rank badge pinned to the corner of the same poster card
+   Films & Shorts/Series use, rather than a whole separate card style
+   for what is visually the same "poster shelf" pattern with different
+   data behind it. */
+.zine-trending-rank {
+  position: absolute;
+  top: 0.4rem;
+  left: 0.4rem;
+  background: var(--brass);
+  color: #241a05;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.7rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 3px;
+  z-index: 1;
+}
+
+/* live bulletin — a bold "stop the presses" flash rather than the
+   plain .live-now-banner used on /stream, to match this page's
+   torn-paper/sticker language instead of looking like an unrelated
+   component dropped in. */
+.zine-live-flash {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem 0.9rem;
+  background: var(--rust);
+  color: var(--ink);
+  text-decoration: none;
+  padding: 0.9rem 1.2rem;
+  border-radius: 3px;
+  transform: rotate(-0.6deg);
+  box-shadow: 0 6px 14px rgba(0,0,0,0.35);
+}
+.zine-live-flash .live-dot { background: var(--ink); }
+.zine-live-flash-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+.zine-live-flash-title { font-weight: 700; flex: 1; min-width: 120px; }
+.zine-live-flash-cta { font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap; }
+
+/* membership classified — styled like a newspaper classifieds box
+   (dashed rule, small-ad proportions) instead of reusing the gradient
+   .promo-banner from /stream, so the upsell doesn't look like a
+   foreign component pasted into the collage. */
+.zine-classified {
+  display: block;
+  max-width: 420px;
+  background: var(--ink);
+  color: #241a05;
+  text-decoration: none;
+  padding: 1.1rem 1.3rem;
+  border: 1px dashed rgba(36, 26, 5, 0.35);
+  border-radius: 2px;
+  transform: rotate(0.7deg);
+}
+.zine-classified-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rust);
+  margin-bottom: 0.5rem;
+}
+.zine-classified h4 { font-size: 1rem; margin: 0 0 0.5rem; line-height: 1.3; }
+.zine-classified p { font-size: 0.78rem; line-height: 1.5; margin: 0 0 0.7rem; opacity: 0.8; }
+.zine-classified-cta { font-family: var(--font-mono); font-weight: 700; font-size: 0.76rem; }
 
 @media (max-width: 640px) {
   .zine-masthead { padding: 1.2rem 1.1rem 0.7rem; flex-direction: column; align-items: flex-start; }
