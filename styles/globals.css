@@ -1094,7 +1094,21 @@ button { font-family: inherit; cursor: pointer; }
   padding-left: calc(0.3rem + 30px);
   margin-left: -30px;
   scroll-behavior: smooth;
+  /* Two things fixed together here: (1) overflow-x:auto shows a
+     persistent native scrollbar under the row on any mouse-driven
+     browser (desktop Chrome/Edge/Firefox don't auto-hide it the way
+     touch OSes do) — hidden here since the row is already scrollable by
+     drag, trackpad, shift+wheel, or arrow keys without it. (2) whatever
+     card lands at the row's right edge was getting hard-sliced in half,
+     which reads as broken rather than "more to scroll to" — a fade mask
+     turns that same cutoff into an intentional continuation cue, same
+     trick Netflix/Hulu-style rows use instead of a hard clip. */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-mask-image: linear-gradient(to right, black calc(100% - 70px), transparent 100%);
+  mask-image: linear-gradient(to right, black calc(100% - 70px), transparent 100%);
 }
+.cat-row-track::-webkit-scrollbar { display: none; }
 /* Snap-to-card scrolling, touch devices only — matches Jose's request
    that "computer people can [just] scroll" while tablet/phone gets a
    more deliberate slide. hover:none + pointer:coarse is genuine touch
