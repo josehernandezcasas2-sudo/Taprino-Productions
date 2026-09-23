@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useState } from 'react';
 import BackButton from '../components/BackButton';
 import { getAuth } from '@clerk/nextjs/server';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -61,8 +62,26 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+// Deliberately kept local to this page rather than added to
+// lib/contentTypeTags.js — that map is specifically "how a card badge
+// labels a contentType" (and 'series' is excluded from it on purpose,
+// since series episodes aren't badged that way on cards). A recs filter
+// needs "series" as its own option, so it gets its own small list here.
+const TYPE_FILTERS = [
+  { value: 'all', label: 'All' },
+  { value: 'series', label: 'Series' },
+  { value: 'movie', label: 'Films' },
+  { value: 'short', label: 'Shorts' },
+  { value: 'vertical', label: 'Vertical' },
+  { value: 'podcast', label: 'Podcasts' }
+];
+
 export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres, email, isAdmin, isCreator, recommendations }) {
   const { isWishlisted, toggle } = useWishlist(isSignedIn, wishlist);
+  const [activeType, setActiveType] = useState('all');
+
+  const usedTypeFilters = TYPE_FILTERS.filter((t) => t.value === 'all' || recommendations.some((r) => r.contentType === t.value));
+  const visibleRecs = activeType === 'all' ? recommendations : recommendations.filter((r) => r.contentType === activeType);
 
   return (
     <>
@@ -97,8 +116,33 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
         ) : (
           <>
             <div className="library-sub">Based on what you've liked and watched — with a bit of room to explore.</div>
+
+            {usedTypeFilters.length > 2 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0 0 1.2rem' }}>
+                {usedTypeFilters.map((t) => (
+                  <button
+                    key={t.value}
+                    onClick={() => setActiveType(t.value)}
+                    className="account-btn-secondary"
+                    style={{
+                      width: 'auto',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.78rem',
+                      background: activeType === t.value ? 'var(--brass)' : undefined,
+                      color: activeType === t.value ? '#241a05' : undefined
+                    }}
+                  >
+                    {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {visibleRecs.length === 0 ? (
+              <div className="poster-empty">Nothing recommended in that category right now — try another filter.</div>
+            ) : (
             <div className="poster-grid">
-              {recommendations.map((ep) => (
+              {visibleRecs.map((ep) => (
                 <div key={ep.id} className="card-wrap">
                   <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
                   <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : `/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
@@ -115,6 +159,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
                 </div>
               ))}
             </div>
+            )}
           </>
         )}
       </main>
