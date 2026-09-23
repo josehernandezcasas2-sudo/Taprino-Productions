@@ -961,6 +961,20 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 0.95rem;
 }
 .hero-trailer:hover { border-color: var(--ink); background: rgba(20,21,28,0.6); }
+/* Same 640px cutover as .hero-content/.hero-sub-genre above. At full
+   size (0.95rem font + 1.7rem horizontal padding on .hero-play) the two
+   buttons together overflow a narrow phone's content width — the fixed
+   padding didn't shrink with the viewport, so "Play first episode"
+   wrapped mid-word inside its own button instead of the button just
+   being narrower. */
+@media (max-width: 640px) {
+  .hero-play, .hero-trailer {
+    padding: 0.75rem 1.1rem;
+    font-size: 0.85rem;
+    white-space: nowrap;
+  }
+  .hero-actions { gap: 0.5rem; }
+}
 
 .hero-arrow {
   position: absolute;
@@ -4264,6 +4278,105 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   font-size: 0.85rem;
   color: var(--ink-dim);
 }
+
+/* Account page restructure — identity header + main column / right rail
+   shell. Cards inside both columns keep using .account-card as-is so
+   inputs/buttons/subheadings stay visually consistent with the rest of
+   the account form styling above. */
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 1.4rem 1.5rem;
+  background: linear-gradient(135deg, var(--surface-2), var(--void-2));
+  border: 1px solid var(--ocean-ink);
+  border-radius: 4px;
+  margin-bottom: 1.4rem;
+}
+.account-identity .account-avatar { width: 64px; height: 64px; font-size: 1.5rem; }
+.account-identity-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.account-identity-name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.account-identity-name-row h3 { margin: 0; font-size: 1.25rem; }
+.account-tier-badge {
+  background: var(--brass-deep);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.6rem;
+  border-radius: 999px;
+}
+.account-identity-sub { font-size: 0.82rem; color: var(--ink-dim); }
+
+.account-shell { display: flex; align-items: flex-start; gap: 1.6rem; }
+.account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1.2rem; }
+.account-rail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 1.2rem; }
+@media (max-width: 900px) {
+  .account-shell { flex-direction: column; }
+  .account-rail { width: 100%; }
+}
+
+/* A card section's header row — title plus a small "who can see this"
+   indicator, used to keep Public Profile visually distinct from Privacy
+   instead of the two running together in one long form. */
+.account-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1.1rem;
+}
+.account-card-head h3 { margin: 0; }
+.account-visibility {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  letter-spacing: 0.03em;
+}
+.account-visibility::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  flex: none;
+}
+.account-visibility.public { color: var(--ok); }
+.account-visibility.private { color: var(--warn); }
+
+/* Label + action row, used throughout Security and Danger zone. */
+.account-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.85rem 0;
+}
+.account-row + .account-row { border-top: 1px solid rgba(251, 232, 211, 0.08); }
+.account-row-label { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+.account-row-detail { font-size: 0.8rem; color: var(--ink-dim); margin-top: 0.15rem; }
+.account-row .account-btn-secondary { width: auto; margin-bottom: 0; padding: 0.55rem 1rem; font-size: 0.78rem; }
+
+.account-card-danger {
+  border-color: var(--danger-deep);
+}
+.account-card-danger .account-subheading { color: var(--danger); }
+.account-card-danger .account-row-label.danger { color: var(--danger); }
+.account-btn-danger {
+  width: auto;
+  background: transparent;
+  border: 1px solid var(--danger-deep);
+  color: var(--danger);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  font-family: var(--font-display);
+  font-size: 0.78rem;
+}
+.account-btn-danger:hover { background: var(--danger-deep); color: var(--ink); }
+.account-btn-danger:disabled { opacity: 0.6; cursor: wait; }
 
 /* Content rating tag in the hero meta line (components/HeroSpotlight.js) */
 .hero-rating-tag {
