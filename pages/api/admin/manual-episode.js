@@ -70,6 +70,15 @@ export default async function handler(req, res) {
   if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || body.seriesId === '__new__') && !body.newSeriesName) {
     return res.status(400).json({ error: `Choose a ${body.contentType === 'podcast' ? 'show' : 'series'}, or provide newSeriesName to create one.` });
   }
+  // Same rule the creator-facing form already enforces (submit-episode.js)
+  // — without this, this endpoint let a series/podcast episode through
+  // with a null series_order, which the series page's own sort
+  // (`(a.seriesOrder || 0) - (b.seriesOrder || 0)`) then puts FIRST in the
+  // list ahead of episode 1, and renders as a bare "Season 1" badge
+  // instead of "S1 E<n>" since there's no number to show.
+  if ((body.contentType === 'series' || body.contentType === 'podcast') && !body.seriesOrder) {
+    return res.status(400).json({ error: `${body.contentType === 'podcast' ? 'Podcast' : 'Series'} episodes need an episode number.` });
+  }
   if (body.contentType === 'bonus' && (!body.bonusParentType || !body.bonusParentId)) {
     return res.status(400).json({ error: 'Choose which series or movie/short this bonus content belongs under.' });
   }

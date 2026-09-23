@@ -42,8 +42,15 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminPortal({ mainGenres, allSeries: initialAllSeries, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
+  // A real client-side refetchable piece of state, not just the server
+  // prop — ManualEpisodeForm below can create a brand-new series inline
+  // (the "or create a new series" field), and without this, that new
+  // series wouldn't show up in either its own dropdown or
+  // AdminEditEpisodeModal's for the rest of the session, only after a
+  // full page reload.
+  const [allSeries, setAllSeries] = useState(initialAllSeries);
   const [submissions, setSubmissions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
@@ -632,6 +639,21 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
       setLibrary([]);
     }
     setLibraryLoading(false);
+  }
+
+  // Same endpoint the creator-facing series pickers already use — refetches
+  // after ManualEpisodeForm creates a series inline, so it shows up right
+  // away in that form's own dropdown and AdminEditEpisodeModal's, instead
+  // of only after a full page reload.
+  async function loadAllSeries() {
+    try {
+      const res = await fetch('/api/creator/list-series');
+      const data = await res.json();
+      if (res.ok) setAllSeries(data.series || []);
+    } catch (err) {
+      // Leave the existing list in place — a failed refresh here shouldn't
+      // wipe out a dropdown that was working fine a moment ago.
+    }
   }
 
   useEffect(() => { loadStats(); loadRoster(); loadLibrary(''); }, []);
@@ -1501,7 +1523,7 @@ export default function AdminPortal({ mainGenres, allSeries, isSignedIn, isSubsc
         <ManualEpisodeForm
           allSeries={allSeries}
           standaloneEpisodes={(library || []).filter((e) => ['movie', 'short'].includes(e.contentType))}
-          onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); }}
+          onCreated={() => { loadSubmissions(); loadLibrary(librarySearch); loadStats(); loadAllSeries(); }}
         />
 
         <div id="library" className="admin-section-divider">Content Library</div>

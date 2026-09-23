@@ -380,7 +380,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
             <label>Season</label>
             <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />
             <label>Episode number within season</label>
-            <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} />
+            <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} required />
           </>
         )}
 
