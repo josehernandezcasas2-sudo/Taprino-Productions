@@ -5585,7 +5585,10 @@ body:has(.mini-player) { padding-bottom: 72px; }
   font-weight: 700;
   margin: 0 auto 1rem;
 }
+.profile-name-row { display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
 .profile-name { font-family: var(--font-display); font-size: 1.4rem; margin: 0 0 0.3rem; }
+.profile-name-row .profile-name { margin-bottom: 0; }
+.profile-joined { font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); margin: 0.4rem 0 0.8rem; }
 .profile-bio { font-size: 0.85rem; color: var(--ink-dim); max-width: 340px; margin: 0 auto 1rem; line-height: 1.5; }
 .profile-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
 .profile-link-pill {
@@ -5600,6 +5603,30 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .profile-link-pill:hover { border-color: var(--signal-amber); color: var(--signal-amber); }
 .profile-section-divider { height: 1px; background: rgba(251,232,211,0.1); margin: 0.6rem 0 1.4rem; }
 .profile-section-label { font-family: var(--font-mono); font-size: 0.8rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink); margin-bottom: 0.9rem; }
+
+/* "Tagged in" — real credited-work poster grid (pages/profile/[userId].js).
+   Same 2:3 poster convention as .ep-thumb elsewhere, in a wrapping grid
+   rather than a horizontal row since this is a fixed section on its own
+   page, not a scrollable homepage shelf. */
+.profile-work-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 1.2rem;
+}
+.profile-work-item { text-decoration: none; color: inherit; display: block; }
+.profile-work-poster {
+  aspect-ratio: 2 / 3;
+  border-radius: 8px;
+  background-color: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+  margin-bottom: 0.5rem;
+  border: 1px solid rgba(251, 232, 211, 0.1);
+  transition: border-color 0.15s ease;
+}
+.profile-work-item:hover .profile-work-poster { border-color: var(--brass); }
+.profile-work-title { font-size: 0.82rem; color: var(--ink); font-weight: 600; line-height: 1.3; }
+.profile-work-type { font-family: var(--font-mono); font-size: 0.64rem; color: var(--ink-dim); text-transform: uppercase; margin-top: 0.15rem; }
 
 /* ============================================================
    Channel weekly schedule (components/ChannelSchedule.js)
