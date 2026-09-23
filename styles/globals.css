@@ -2169,14 +2169,26 @@ button { font-family: inherit; cursor: pointer; }
     min-width: 180px;
     display: flex;
     flex-direction: column;
-    animation: tabbar-dropup-in 0.14s ease;
+    animation: tabbar-dropup-in 0.14s ease forwards;
   }
   @keyframes tabbar-dropup-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .tabbar-dropup-discover { left: 4px; }
-  .tabbar-dropup-watch { left: 50%; transform: translateX(-42%); }
+  /* Its own keyframes rather than the shared tabbar-dropup-in — that
+     animation drives `transform` for the slide-up, which completely
+     overrides (not composes with) this menu's separate static
+     translateX(-42%) centering for the whole animation, then snaps back
+     to it the instant the animation ends. This was the actual "bounce":
+     the Watch menu opened shifted off-center for 140ms, then jumped
+     sideways into its correct centered position. Baking the same
+     translateX into both keyframe ends keeps it centered throughout. */
+  .tabbar-dropup-watch { left: 50%; animation: tabbar-dropup-in-watch 0.14s ease forwards; }
+  @keyframes tabbar-dropup-in-watch {
+    from { opacity: 0; transform: translateX(-42%) translateY(6px); }
+    to { opacity: 1; transform: translateX(-42%) translateY(0); }
+  }
   .tabbar-dropup-account { right: 4px; }
   .tabbar-dropup-item {
     padding: 0.7rem 1.1rem;
@@ -2193,6 +2205,8 @@ button { font-family: inherit; cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .tabbar-item, .tabbar-glyph { transition: none; }
   .tabbar-item:active .tabbar-glyph { transform: none; }
+  .tabbar-dropup { animation: none; }
+  .tabbar-dropup-watch { animation: none; transform: translateX(-42%); }
 }
 
 /* ---------------------------------------------------------------------
