@@ -5589,6 +5589,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .profile-name { font-family: var(--font-display); font-size: 1.4rem; margin: 0 0 0.3rem; }
 .profile-name-row .profile-name { margin-bottom: 0; }
 .profile-joined { font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); margin: 0.4rem 0 0.8rem; }
+.profile-stats { font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink); margin-bottom: 0.7rem; }
+.profile-stats-dot { color: var(--ink-dim); margin: 0 0.4rem; }
+.profile-genre-tags { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem; margin-bottom: 0.9rem; }
+.profile-genre-tags-label { font-family: var(--font-mono); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-dim); margin-right: 0.2rem; }
+.profile-genre-tag {
+  background: var(--surface-2); color: var(--ink-dim); font-size: 0.72rem;
+  padding: 0.2rem 0.6rem; border-radius: 999px; border: 1px solid rgba(251, 232, 211, 0.1);
+}
 .profile-bio { font-size: 0.85rem; color: var(--ink-dim); max-width: 340px; margin: 0 auto 1rem; line-height: 1.5; }
 .profile-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.6rem; }
 .profile-link-pill {

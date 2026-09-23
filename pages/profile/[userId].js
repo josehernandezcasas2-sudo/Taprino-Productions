@@ -1,15 +1,20 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useState } from 'react';
 import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
 import { getPitchesForCreator } from '../../lib/pitches';
+import { getBackedPitches } from '../../lib/pitchDonations';
 import { getUserRole } from '../../lib/roles';
+import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
+
+const MAX_GENRE_TAGS = 4;
 
 export async function getServerSideProps({ req, res, params }) {
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
@@ -29,20 +34,51 @@ export async function getServerSideProps({ req, res, params }) {
   // exists, so it runs after the notFound check rather than racing it in
   // the Promise.all above — no point fetching a stranger's credited work
   // for a userId that turns out to have no profile at all.
-  const [creditedWork, pitchRows, role] = await Promise.all([
+  const needsViewCounts = isRedisConfigured();
+  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts] = await Promise.all([
     getCreditedWork(profile.userId),
     getPitchesForCreator(profile.userId),
-    getUserRole(profile.userId)
+    getBackedPitches(profile.userId),
+    getUserRole(profile.userId),
+    needsViewCounts ? getViewCounts() : Promise.resolve({})
   ]);
   // Public profile — only ever show approved, public pitches, never a
   // pending or rejected submission's review status.
   const pitches = pitchRows.filter((p) => p.status === 'approved');
+
+  // Total views across their credited work — a standalone item's views
+  // come straight from viewCounts by its own id, but a series has no
+  // view count of its own (only its individual episodes do), so that
+  // half sums every episode in `episodes` (already fetched above) that
+  // belongs to the series. Same aggregation GenreRow/pages/index.js
+  // already do for their own series rankings.
+  const totalViews = creditedWork.reduce((sum, item) => {
+    if (item.type === 'episode') return sum + (viewCounts[item.id] || 0);
+    const seriesViews = episodes
+      .filter((e) => e.seriesId === item.id)
+      .reduce((s, e) => s + (viewCounts[e.id] || 0), 0);
+    return sum + seriesViews;
+  }, 0);
+
+  // "Known for" — the genres their own credited episodes actually carry
+  // (series rows don't have a genre of their own), most-common first,
+  // capped so this stays a short tag row rather than a genre dump.
+  const genreCounts = {};
+  for (const item of creditedWork) {
+    if (item.mainGenre) genreCounts[item.mainGenre] = (genreCounts[item.mainGenre] || 0) + 1;
+  }
+  const knownForGenres = Object.keys(genreCounts)
+    .sort((a, b) => genreCounts[b] - genreCounts[a])
+    .slice(0, MAX_GENRE_TAGS);
 
   return {
     props: {
       profile,
       creditedWork,
       pitches,
+      backedPitches: backedPitchRows,
+      totalViews,
+      knownForGenres,
       // Same priority-order rule as account.js's own role badge — an
       // admin is also technically a creator, but only the single
       // highest-privilege badge should ever show.
@@ -76,11 +112,30 @@ function workHref(item) {
   return item.type === 'series' ? `/series/${item.id}` : `/episode/${item.id}`;
 }
 
-export default function PublicProfile({ profile, creditedWork, pitches, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+function formatViews(n) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(n % 1000000 >= 100000 ? 1 : 0)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}K`;
+  return String(n);
+}
+
+export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+  const [shareCopied, setShareCopied] = useState(false);
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+
+  function share() {
+    const url = typeof window !== 'undefined' ? window.location.href : '';
+    if (navigator.share) {
+      navigator.share({ title: profile.displayName, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      });
+    }
+  }
 
   return (
     <>
@@ -113,6 +168,26 @@ export default function PublicProfile({ profile, creditedWork, pitches, roleBadg
             {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
           </div>
           {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
+
+          {(creditedWork.length > 0 || totalViews > 0) && (
+            <div className="profile-stats">
+              <span>{creditedWork.length} title{creditedWork.length === 1 ? '' : 's'}</span>
+              {totalViews > 0 && (
+                <>
+                  <span className="profile-stats-dot">&bull;</span>
+                  <span>{formatViews(totalViews)} views</span>
+                </>
+              )}
+            </div>
+          )}
+
+          {knownForGenres.length > 0 && (
+            <div className="profile-genre-tags">
+              <span className="profile-genre-tags-label">Known for</span>
+              {knownForGenres.map((g) => <span key={g} className="profile-genre-tag">{g}</span>)}
+            </div>
+          )}
+
           {profile.bio && <p className="profile-bio">{profile.bio}</p>}
 
           {profile.socialLinks.length > 0 && (
@@ -124,6 +199,13 @@ export default function PublicProfile({ profile, creditedWork, pitches, roleBadg
               ))}
             </div>
           )}
+
+          <div className="pitch-share-wrap" style={{ marginTop: '1rem' }}>
+            <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
+              {shareCopied ? '✓' : '⇪'}
+            </button>
+            {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
+          </div>
         </div>
 
         <div className="profile-section-divider" />
@@ -150,6 +232,25 @@ export default function PublicProfile({ profile, creditedWork, pitches, roleBadg
             <div className="profile-section-label">Pitch Room projects</div>
             <div className="pitch-grid">
               {pitches.map((p) => (
+                <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
+                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                    {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                  </div>
+                  <div className="pitch-info">
+                    <h4>{p.title}</h4>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </>
+        )}
+
+        {backedPitches.length > 0 && (
+          <>
+            <div className="profile-section-divider" />
+            <div className="profile-section-label">Projects backed</div>
+            <div className="pitch-grid">
+              {backedPitches.map((p) => (
                 <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
                   <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
                     {p.tag && <span className="pitch-tag">{p.tag}</span>}
