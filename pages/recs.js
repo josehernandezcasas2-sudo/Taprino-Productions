@@ -79,9 +79,17 @@ const TYPE_FILTERS = [
 export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres, email, isAdmin, isCreator, recommendations }) {
   const { isWishlisted, toggle } = useWishlist(isSignedIn, wishlist);
   const [activeType, setActiveType] = useState('all');
+  const [activeGenre, setActiveGenre] = useState('all');
 
   const usedTypeFilters = TYPE_FILTERS.filter((t) => t.value === 'all' || recommendations.some((r) => r.contentType === t.value));
-  const visibleRecs = activeType === 'all' ? recommendations : recommendations.filter((r) => r.contentType === activeType);
+  // Genres actually present in the recs themselves, not the site-wide
+  // mainGenres prop — same "don't offer a filter that would just empty
+  // the grid" rule the type pills follow above.
+  const usedGenres = [...new Set(recommendations.map((r) => r.mainGenre).filter(Boolean))].sort();
+  const visibleRecs = recommendations.filter((r) =>
+    (activeType === 'all' || r.contentType === activeType) &&
+    (activeGenre === 'all' || r.mainGenre === activeGenre)
+  );
 
   return (
     <>
@@ -133,6 +141,40 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
                     }}
                   >
                     {t.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {usedGenres.length > 1 && (
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', margin: '0 0 1.2rem' }}>
+                <button
+                  onClick={() => setActiveGenre('all')}
+                  className="account-btn-secondary"
+                  style={{
+                    width: 'auto',
+                    padding: '0.35rem 0.85rem',
+                    fontSize: '0.78rem',
+                    background: activeGenre === 'all' ? 'var(--brass)' : undefined,
+                    color: activeGenre === 'all' ? '#241a05' : undefined
+                  }}
+                >
+                  All genres
+                </button>
+                {usedGenres.map((g) => (
+                  <button
+                    key={g}
+                    onClick={() => setActiveGenre(g)}
+                    className="account-btn-secondary"
+                    style={{
+                      width: 'auto',
+                      padding: '0.35rem 0.85rem',
+                      fontSize: '0.78rem',
+                      background: activeGenre === g ? 'var(--brass)' : undefined,
+                      color: activeGenre === g ? '#241a05' : undefined
+                    }}
+                  >
+                    {g}
                   </button>
                 ))}
               </div>
