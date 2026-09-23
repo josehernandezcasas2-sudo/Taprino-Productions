@@ -1,8 +1,10 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { useState } from 'react';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import PostMenu from '../../components/PostMenu';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
@@ -90,6 +92,7 @@ export async function getServerSideProps({ req, res, params }) {
       roleBadge: role === 'admin' ? 'Admin' : role === 'sub_admin' ? 'Sub-admin' : role === 'creator' ? 'Creator' : null,
       mainGenres,
       isSignedIn: account.isSignedIn,
+      viewerId: account.userId,
       isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
@@ -123,13 +126,41 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts: initialPosts, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+  const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
+  const [posts, setPosts] = useState(initialPosts);
+  const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+
+  async function deleteOwnPost(postId) {
+    const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Could not delete that post.');
+    setPosts((p) => p.filter((post) => post.id !== postId));
+  }
+
+  async function editOwnPostCaption(postId, newCaption) {
+    const res = await fetch(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caption: newCaption })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save that edit.');
+    setPosts((p) => p.map((post) => (post.id === postId ? { ...post, caption: newCaption } : post)));
+  }
+
+  async function reportPost(postId, reason) {
+    await fetch('/api/posts/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId, reason })
+    }).catch(() => {});
+  }
 
   function share() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
@@ -219,22 +250,52 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
             <div className="profile-section-divider" />
             <div className="profile-section-label">Posts</div>
             <div className="profile-posts-grid">
-              {posts.map((post) => (
-                post.kind === 'video' ? (
-                  <Link key={post.id} href="/vertical/discover" className="profile-post-tile" style={post.thumbnailUrl ? { backgroundImage: `url(${post.thumbnailUrl})` } : undefined}>
-                    <span className="profile-post-tile-video-badge"><VideoCameraIcon size={16} /></span>
-                    {post.durationSeconds != null && (
-                      <span className="profile-post-tile-duration">{formatRuntime(post.durationSeconds)}</span>
+              {posts.map((post) => {
+                // Plain clickable <div>s, not <Link>/<a> — PostMenu's own
+                // trigger button sits inside this tile, and a button
+                // nested in a real anchor still triggers the anchor's
+                // native navigation on click even with stopPropagation()
+                // (that stops JS bubbling, not the browser's built-in
+                // anchor behavior). Same workaround already used for
+                // "Similar projects" cards in pages/pitches/[id].js.
+                const openTile = () => {
+                  if (post.kind === 'video') router.push('/vertical/discover');
+                  else if (post.imageUrl) window.open(post.imageUrl, '_blank', 'noopener,noreferrer');
+                };
+                return (
+                  <div
+                    key={post.id}
+                    className="profile-post-tile"
+                    role="link"
+                    tabIndex={0}
+                    onClick={openTile}
+                    onKeyDown={(e) => { if (e.key === 'Enter') openTile(); }}
+                    style={post.kind === 'video' && post.thumbnailUrl ? { backgroundImage: `url(${post.thumbnailUrl})` } : post.kind === 'post' && post.imageUrl ? { backgroundImage: `url(${post.imageUrl})` } : undefined}
+                  >
+                    {post.kind === 'video' && (
+                      <>
+                        <span className="profile-post-tile-video-badge"><VideoCameraIcon size={16} /></span>
+                        {post.durationSeconds != null && (
+                          <span className="profile-post-tile-duration">{formatRuntime(post.durationSeconds)}</span>
+                        )}
+                      </>
                     )}
-                  </Link>
-                ) : post.imageUrl ? (
-                  <a key={post.id} href={post.imageUrl} target="_blank" rel="noopener noreferrer" className="profile-post-tile" style={{ backgroundImage: `url(${post.imageUrl})` }} />
-                ) : (
-                  <div key={post.id} className="profile-post-tile">
-                    <span className="profile-post-tile-caption">{post.caption}</span>
+                    {post.kind === 'post' && !post.imageUrl && (
+                      <span className="profile-post-tile-caption">{post.caption}</span>
+                    )}
+                    <div className="profile-post-tile-menu">
+                      <PostMenu
+                        isOwner={isOwnProfile}
+                        isSignedIn={isSignedIn}
+                        caption={post.caption}
+                        onDelete={() => deleteOwnPost(post.id)}
+                        onSaveCaption={(text) => editOwnPostCaption(post.id, text)}
+                        onReport={(reason) => reportPost(post.id, reason)}
+                      />
+                    </div>
                   </div>
-                )
-              ))}
+                );
+              })}
             </div>
           </>
         )}

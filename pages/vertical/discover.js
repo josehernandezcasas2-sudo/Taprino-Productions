@@ -16,6 +16,7 @@ import { useWishlist } from '../../lib/useWishlist';
 import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
+import PostMenu from '../../components/PostMenu';
 import { HeartIcon, ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -41,6 +42,8 @@ export async function getServerSideProps({ req, res }) {
   const authorNames = await getPublicDisplayNames(videoPosts.map((p) => p.userId));
   const postUnits = videoPosts.map((p) => ({
     id: `post:${p.id}`,
+    postId: p.id,
+    ownerId: p.userId,
     title: p.caption || '',
     thumbnail: p.thumbnailUrl,
     contentType: 'vertical',
@@ -81,6 +84,7 @@ export async function getServerSideProps({ req, res }) {
       verticalEpisodes,
       seriesNameById,
       isSignedIn: account.isSignedIn,
+      viewerId: account.userId,
       wishlist: account.wishlist,
       personalUnitKeys
     }
@@ -103,7 +107,7 @@ async function fetchAdSlide() {
   }
 }
 
-export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, wishlist, personalUnitKeys }) {
+export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, viewerId, wishlist, personalUnitKeys }) {
   const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -251,6 +255,39 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     }
   }
 
+  async function deletePostSlide(postId) {
+    const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Could not delete that post.');
+    // Removes it from the live deck immediately rather than waiting for a
+    // reload — there's only ever one slide per post (posts have no
+    // seriesId, so buildVerticalUnits never groups them into a multi-clip
+    // unit the way a series is).
+    setDeck((d) => d.filter((s) => !(s.kind === 'episode' && s.episode.postId === postId)));
+  }
+
+  async function editPostCaption(postId, newCaption) {
+    const res = await fetch(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caption: newCaption })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save that edit.');
+    setDeck((d) => d.map((s) => (
+      s.kind === 'episode' && s.episode.postId === postId
+        ? { ...s, episode: { ...s.episode, title: newCaption } }
+        : s
+    )));
+  }
+
+  async function reportPostSlide(postId, reason) {
+    await fetch('/api/posts/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId, reason })
+    }).catch(() => {});
+  }
+
   function handleDiscoverFromEndCard() {
     extendDeck();
   }
@@ -296,6 +333,18 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                   }}
                 />
                 <button className="reel-close" onClick={goBack}>&times;</button>
+                {slide.episode.isUserPost && (
+                  <div className="reel-post-menu">
+                    <PostMenu
+                      isOwner={Boolean(viewerId) && viewerId === slide.episode.ownerId}
+                      isSignedIn={isSignedIn}
+                      caption={slide.episode.title}
+                      onDelete={() => deletePostSlide(slide.episode.postId)}
+                      onSaveCaption={(text) => editPostCaption(slide.episode.postId, text)}
+                      onReport={(reason) => reportPostSlide(slide.episode.postId, reason)}
+                    />
+                  </div>
+                )}
                 <div className="reel-action-rail">
                   {/* User posts aren't real episodes (see lib/posts.js) — no
                       wishlist row for them to attach to, so this action

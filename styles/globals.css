@@ -2295,7 +2295,7 @@ button { font-family: inherit; cursor: pointer; }
 .profile-post-tile-video-badge {
   position: absolute;
   top: 6px;
-  right: 6px;
+  left: 6px;
   color: #fff;
   filter: drop-shadow(0 1px 3px rgba(0,0,0,0.7));
 }
@@ -2310,11 +2310,84 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0.1rem 0.35rem;
   border-radius: 4px;
 }
+.profile-post-tile-menu {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  z-index: 2;
+}
 
 /* Vertical discover feed — caption line identifying a user post as such,
    reusing the same slot/style series names already occupy above the
    title (see .reel-caption-series in pages/vertical/discover.js). */
 .reel-caption-post-author { text-transform: uppercase; }
+
+/* Post options menu (edit/delete for the owner, report for anyone else)
+   — components/PostMenu.js. Dropped into the vertical discover feed
+   (.reel-post-menu wrapper, mirroring .reel-close on the opposite top
+   corner) and the profile posts grid (.profile-post-tile-menu wrapper). */
+.reel-post-menu {
+  position: absolute;
+  top: max(1rem, env(safe-area-inset-top));
+  right: 1rem;
+  z-index: 4;
+}
+.post-menu { position: relative; }
+.post-menu-trigger {
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.35);
+  color: var(--ink);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.profile-post-tile-menu .post-menu-trigger {
+  width: 26px; height: 26px;
+  background: rgba(0,0,0,0.5);
+}
+.post-menu-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  min-width: 150px;
+  background: rgba(20, 19, 12, 0.97);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(251, 232, 211, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+.post-menu-item {
+  background: none;
+  border: none;
+  color: var(--ink);
+  text-align: left;
+  font-size: 0.82rem;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.post-menu-item:hover { background: rgba(251, 232, 211, 0.08); }
+.post-menu-item-danger { color: var(--danger); }
+.post-menu-note {
+  padding: 0.5rem 0.6rem;
+  font-size: 0.78rem;
+  color: var(--ink-dim);
+}
+.post-menu-edit { padding: 0.35rem; display: flex; flex-direction: column; gap: 0.4rem; }
+.post-menu-edit textarea {
+  width: 220px;
+  max-width: 60vw;
+  resize: vertical;
+  font: inherit;
+  font-size: 0.82rem;
+}
+.post-menu-edit-error { color: var(--danger); font-size: 0.75rem; margin: 0; }
+.post-menu-edit-actions { display: flex; gap: 0.4rem; }
 
 /* ---------------------------------------------------------------------
    Custom video player

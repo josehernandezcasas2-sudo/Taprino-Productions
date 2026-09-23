@@ -643,6 +643,19 @@ export function PlusIcon({ src, size = 18 }) {
   );
 }
 
+// The post/video options menu's trigger — literal three horizontal bars,
+// as opposed to the vertical "⋮" kebab some apps use for the same job.
+export function HamburgerMenuIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 7h16" />
+      <path d="M4 12h16" />
+      <path d="M4 17h16" />
+    </svg>
+  );
+}
+
 export function VideoCameraIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (
