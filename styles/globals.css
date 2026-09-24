@@ -3123,15 +3123,20 @@ button { font-family: inherit; cursor: pointer; }
 /* touch-action: none stops a drag here from scrolling/panning the page,
    but doesn't stop the browser's native text/element selection highlight
    from painting over the chart as a finger (or a mouse) drags across
-   it — that needs user-select separately. -webkit-touch-callout also
+   it — that needs user-select separately. -webkit-touch-callout
    suppresses iOS's own long-press callout (copy/lookup menu) over the
-   SVG, which the same drag gesture would otherwise trigger. */
+   SVG. -webkit-tap-highlight-color is a fourth, distinct mechanism —
+   WebKit's default gray/blue flash-and-hold box on anything tappable,
+   which is what was still showing on tablet (a solid rectangle over
+   the whole chart) even after the other three were already in place;
+   none of them touch this one, it needs its own property. */
 .ca-chart-svg {
   cursor: crosshair;
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
 }
 .ca-chart-svg:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 3px; }
 .ca-chart-tooltip {
