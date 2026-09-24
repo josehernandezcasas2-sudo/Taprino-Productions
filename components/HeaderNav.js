@@ -53,10 +53,9 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   }, [isAdmin]);
 
   // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
-  // every page, so this is cheaper than threading userId/avatarUrl
-  // through every single page's getServerSideProps just for the header
-  // (the avatar and "view public profile" link in the account dropdown).
-  // Gated on isSignedIn since the endpoint 401s otherwise.
+  // every page, so this is cheaper than threading userId/avatarUrl/
+  // stayInStream through every single page's getServerSideProps just for
+  // the header. Gated on isSignedIn since the endpoint 401s otherwise.
   useEffect(() => {
     if (!isSignedIn) { setOwnProfile(null); return; }
     fetch('/api/account/profile')
@@ -156,15 +155,13 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   return (
     <header className="channel-bar top-nav" ref={rootRef}>
       <div className="nav-left">
-        {/* Always goes home now — it used to follow the stayInStream
-            account preference (jump straight to /stream instead), but
-            that preference is for a person's OWN sense of "which half of
-            the site am I in," not for what happens when they tap the
-            logo. The two-line wordmark+kicker lockup below is the logo
-            now — no separate "ST" badge — and it resizes as one unit
-            down to mobile instead of the kicker surviving alone once the
+        {/* Follows the account's stayInStream preference — /stream
+            straight away for someone who's set that, / otherwise. The
+            two-line wordmark+kicker lockup below is the logo now — no
+            separate "ST" badge — and it resizes as one unit down to
+            mobile instead of the kicker surviving alone once the
             wordmark used to just disappear. */}
-        <Link href="/" className="brand-mark">
+        <Link href={ownProfile && ownProfile.stayInStream ? '/stream' : '/'} className="brand-mark">
           {siteSettings && siteSettings.logoUrl && (
             <Image
               src={siteSettings.logoUrl}
