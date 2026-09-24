@@ -119,7 +119,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   // Room all get their own real match now, straight from router.pathname.
   const currentPath = router.pathname;
   const currentTypeParam = currentPath === '/type/[type]' ? router.query.type : null;
-  const isHome = currentPath === '/stream' && (activeType === 'All' || !activeType);
   const isWishlistPage = currentPath === '/wishlist';
   const isRecsPage = currentPath === '/recs';
   const isChannelPage = currentPath === '/channel';
@@ -137,28 +136,44 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     ? (siteSettings && siteSettings.streamLabel) || 'Stream'
     : (siteSettings && siteSettings.connectLabel) || 'Connect';
 
-  const typeLinks = [
-    { href: '/', label: 'Home', match: isHome },
-    { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
-    { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
-    // Fail CLOSED while settings are still loading (siteSettings === null),
-    // matching Shop and Pitch Room below. This used to fail OPEN (show by
-    // default), which meant an admin-disabled link would flash visible on
-    // every single page load until the client-side fetch resolved, then
-    // vanish — looking exactly like a bug that "keeps randomly popping
-    // up." Failing closed means the opposite, much less confusing
-    // direction instead: a legitimate enabled link can be briefly absent
-    // for a moment, then appears — never the other way around.
-    ...(siteSettings && siteSettings.verticalEnabled !== false
-      ? [
-          { href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' },
-          { href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }
-        ]
-      : []),
-    ...(siteSettings && siteSettings.podcastsEnabled !== false
-      ? [{ href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' }]
-      : [])
-  ];
+  // Used to be one fixed list on every page — Series/Films/Vertical/
+  // Podcasts sitting right next to Pitch Discover, on the Connect
+  // homepage, made no more sense than Pitch Discover showing up while
+  // watching an episode. Now it mirrors the same Connect/Stream split
+  // MobileTabBar already makes between its Discover tab (Pitch Discover,
+  // Vertical Discover) and its Watch tab (Series, Movies, Podcasts,
+  // Vertical) — same two groups, same two sides.
+  //
+  // Fail CLOSED while settings are still loading (siteSettings === null),
+  // matching Shop below. This used to fail OPEN (show by default), which
+  // meant an admin-disabled link would flash visible on every single page
+  // load until the client-side fetch resolved, then vanish — looking
+  // exactly like a bug that "keeps randomly popping up." Failing closed
+  // means the opposite, much less confusing direction instead: a
+  // legitimate enabled link can be briefly absent for a moment, then
+  // appears — never the other way around.
+  const typeLinks = inStreamSection
+    ? [
+        { href: '/stream', label: 'Home', match: currentPath === '/stream' },
+        { href: '/type/series', label: 'Series', match: currentTypeParam === 'series' },
+        { href: '/type/movie', label: 'Films', match: currentTypeParam === 'movie' },
+        ...(siteSettings && siteSettings.verticalEnabled !== false
+          ? [{ href: '/type/vertical', label: 'Vertical', match: currentTypeParam === 'vertical' }]
+          : []),
+        ...(siteSettings && siteSettings.podcastsEnabled !== false
+          ? [{ href: '/podcasts', label: 'Podcasts', match: currentTypeParam === 'podcast' || currentPath === '/podcasts' || currentPath === '/podcasts/[id]' }]
+          : [])
+      ]
+    : [
+        { href: '/', label: 'Home', match: currentPath === '/' },
+        { href: '/pitches/discover', label: 'Pitch Discover', match: currentPath === '/pitches/discover' },
+        ...(siteSettings && siteSettings.verticalEnabled !== false
+          ? [{ href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }]
+          : []),
+        ...(siteSettings && siteSettings.elevatorPitchEnabled
+          ? [{ href: '/pitches', label: 'Pitch Room', match: isPitchesPage }]
+          : [])
+      ];
 
   return (
     <header className="channel-bar top-nav" ref={rootRef}>
@@ -194,11 +209,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           ))}
           <Link href="/wishlist" className={`nav-link ${isWishlistPage ? 'active' : ''}`}>My List</Link>
           {isSignedIn && <Link href="/recs" className={`nav-link ${isRecsPage ? 'active' : ''}`}>My Recs</Link>}
-          {siteSettings && siteSettings.elevatorPitchEnabled && (
-            <Link href="/pitches" className={`nav-link ${isPitchesPage ? 'active' : ''}`}>Pitch Room</Link>
-          )}
-          {/* Fails closed like everything else here now — same fix as
-              Vertical/Podcasts above, see that comment for why. */}
+          {/* Pitch Room moved into typeLinks above — Connect-side only now,
+              same reasoning as the comment there. Fails closed like
+              everything else here now — same fix as Vertical/Podcasts
+              above, see that comment for why. */}
           {siteSettings && siteSettings.liveTvEnabled !== false && (
             <Link href="/channel" className={`nav-link nav-link-live ${isChannelPage ? 'active' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
@@ -231,9 +245,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             ))}
             <Link href="/wishlist" className="dropdown-item" onClick={() => setOpenMenu(null)}>My List</Link>
             {isSignedIn && <Link href="/recs" className="dropdown-item" onClick={() => setOpenMenu(null)}>My Recs</Link>}
-            {siteSettings && siteSettings.elevatorPitchEnabled && (
-              <Link href="/pitches" className="dropdown-item" onClick={() => setOpenMenu(null)}>Pitch Room</Link>
-            )}
+            {/* Pitch Room moved into typeLinks above — Connect-side only now. */}
             {siteSettings && siteSettings.liveTvEnabled !== false && (
               <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
             )}
