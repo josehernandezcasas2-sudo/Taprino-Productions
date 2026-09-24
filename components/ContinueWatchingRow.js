@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { parseRuntimeToSeconds } from '../lib/videoMetadata';
 import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
+import { PlayIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const MAX_CARDS = 15;
 
@@ -16,6 +18,7 @@ const MAX_CARDS = 15;
 // wasn't working reliably, so it's been removed; touch, trackpad, and a
 // normal scrollbar all already work here without it.
 export default function ContinueWatchingRow({ items, onSelect }) {
+  const iconOverrides = usePlayerIconOverrides();
   if (!items || items.length === 0) return null;
 
   // Most recently watched first, capped the same as every other row —
@@ -31,30 +34,63 @@ export default function ContinueWatchingRow({ items, onSelect }) {
           const totalSeconds = parseRuntimeToSeconds(ep.runtime);
           const pct = totalSeconds ? Math.min(100, Math.round((ep.resumeSeconds / totalSeconds) * 100)) : null;
           return (
-            <div key={ep.id} className="card-wrap row-card">
-              <div
-                className={`ep-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}
-                onClick={() => onSelect(ep)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ep); }}
-              >
-                <div className="ep-thumb">
-                  {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
-                  <div className="ep-info">
-                    <h4>{ep.title}</h4>
-                    <span>{ep.artist}</span>
-                  </div>
-                  {pct !== null && (
-                    <div className="cw-progress-track" aria-hidden="true">
-                      <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ContinueWatchingCard
+              key={ep.id}
+              ep={ep}
+              pct={pct}
+              onSelect={onSelect}
+              iconOverrides={iconOverrides}
+            />
           );
         })}
+      </div>
+    </div>
+  );
+}
+
+// A title already in progress is already unlocked for this viewer, so the
+// no-thumbnail/broken-thumbnail fallback here is always a plain "Resume"
+// treatment — unlike GenreRow's browsing cards, there's no tier/lock
+// distinction left to make. `imgError` catches a thumbnail URL that's
+// present but broken (a corrupted or partially-uploaded file rendering as
+// garbled blocks of color) and swaps to the same clean fallback rather
+// than letting the browser show whatever it managed to decode.
+function ContinueWatchingCard({ ep, pct, onSelect, iconOverrides }) {
+  const [imgError, setImgError] = useState(false);
+  const showThumb = ep.thumbnail && !imgError;
+  return (
+    <div className="card-wrap row-card">
+      <div
+        className={`ep-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}
+        onClick={() => onSelect(ep)}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter') onSelect(ep); }}
+      >
+        <div className="ep-thumb">
+          {showThumb && (
+            <Image
+              src={ep.thumbnail}
+              alt=""
+              fill
+              sizes="(max-width: 640px) 40vw, 200px"
+              className="ep-thumb-img"
+              onError={() => setImgError(true)}
+            />
+          )}
+          {!showThumb && (
+            <span className="ep-thumb-fallback"><PlayIcon size={13} src={iconOverrides.play} /> Resume</span>
+          )}
+          <div className="ep-info">
+            <h4>{ep.title}</h4>
+            <span>{ep.artist}</span>
+          </div>
+          {pct !== null && (
+            <div className="cw-progress-track" aria-hidden="true">
+              <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

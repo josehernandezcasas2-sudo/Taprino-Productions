@@ -1279,6 +1279,17 @@ button { font-family: inherit; cursor: pointer; }
   width: 100%; height: 100%;
   object-fit: cover;
 }
+/* Shown instead of .ep-thumb-img when there's no thumbnail, or the
+   thumbnail failed to load. Positioned above the bottom scrim (z-index 1)
+   rather than left as plain in-flow text, so it can't get washed out by
+   it near the vertical center where the two overlap. */
+.ep-thumb-fallback {
+  position: relative;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
 .card-wrap {
   position: relative;
   transition: transform 0.18s ease, z-index 0s;
