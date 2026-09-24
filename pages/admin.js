@@ -267,6 +267,8 @@ export default function AdminPortal({ mainGenres, allSeries: initialAllSeries, i
           recommendationCloseness: siteSettings.recommendationCloseness,
           elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
           adCpmCents: siteSettings.adCpmCents,
+          connectLabel: siteSettings.connectLabel,
+          streamLabel: siteSettings.streamLabel,
           ...overrides
         })
       });
@@ -1169,6 +1171,42 @@ export default function AdminPortal({ mainGenres, allSeries: initialAllSeries, i
           ) : (
             <>
               {siteSettingsError && <p style={{ color: 'var(--danger)' }}>{siteSettingsError}</p>}
+
+              <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
+                <label style={{ display: 'block', marginBottom: '0.4rem' }}>Connect / Stream kicker</label>
+                <p style={{ fontSize: '0.72rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
+                  The small label under the logo that tells the two halves of the site apart. Shows
+                  &ldquo;{siteSettings.connectLabel || 'Connect'}&rdquo; on the community/discovery side and
+                  &ldquo;{siteSettings.streamLabel || 'Stream'}&rdquo; on the watch library and everything you&rsquo;d
+                  actually watch from (series/movie browse, podcasts, vertical, and episode/series/podcast pages) — one
+                  change here updates it everywhere it appears, on both sides.
+                </p>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '1 1 160px' }}>
+                    <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.2rem' }}>Connect-side label</label>
+                    <input
+                      type="text"
+                      placeholder="Connect"
+                      value={siteSettings.connectLabel || ''}
+                      onChange={(e) => setSiteSettings((s) => ({ ...s, connectLabel: e.target.value }))}
+                    />
+                  </div>
+                  <div style={{ flex: '1 1 160px' }}>
+                    <label style={{ display: 'block', fontSize: '0.7rem', color: 'var(--ink-dim)', marginBottom: '0.2rem' }}>Stream-side label</label>
+                    <input
+                      type="text"
+                      placeholder="Stream"
+                      value={siteSettings.streamLabel || ''}
+                      onChange={(e) => setSiteSettings((s) => ({ ...s, streamLabel: e.target.value }))}
+                    />
+                  </div>
+                </div>
+                {confirmedSiteSettings && (siteSettings.connectLabel !== confirmedSiteSettings.connectLabel || siteSettings.streamLabel !== confirmedSiteSettings.streamLabel) && (
+                  <div style={{ fontSize: '0.72rem', color: 'var(--signal-amber)', marginTop: '0.4rem' }}>
+                    Unsaved changes — click Save below to apply.
+                  </div>
+                )}
+              </div>
 
               <div style={{ borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' }}>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '0.6rem' }}>

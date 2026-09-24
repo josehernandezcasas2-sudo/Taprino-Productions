@@ -5,6 +5,7 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
+import { isStreamPath } from '../lib/streamSection';
 import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, AccountIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
@@ -125,9 +126,16 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const isPitchesPage = currentPath === '/pitches' || currentPath === '/pitches/[id]';
   // Distinguishes the zine-style homepage (/, community/discovery — pitches,
   // profiles, creator tools, everything that isn't the watch library) from
-  // the streaming library itself. Everything that isn't literally /stream
-  // reads as "Connect".
-  const kickerLabel = currentPath === '/stream' ? 'Stream' : 'Connect';
+  // the streaming library itself — every page you'd actually watch
+  // something from (the library home, series/movie browse, podcasts,
+  // vertical, and the episode/series/podcast pages themselves), not just
+  // /stream. The label text itself comes from site_settings (admin-
+  // editable on the Site Settings page) rather than being hardcoded here,
+  // so changing it in one place changes it on every page that shows it.
+  const inStreamSection = isStreamPath(currentPath, router.query);
+  const kickerLabel = inStreamSection
+    ? (siteSettings && siteSettings.streamLabel) || 'Stream'
+    : (siteSettings && siteSettings.connectLabel) || 'Connect';
 
   const typeLinks = [
     { href: '/', label: 'Home', match: isHome },
@@ -174,7 +182,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           )}
           <span className="brand-text">
             <span className="brand-word">Studio <strong>Tapa</strong></span>
-            <span className={`brand-kicker ${kickerLabel === 'Stream' ? 'brand-kicker-stream' : ''}`}>{kickerLabel}</span>
+            <span className={`brand-kicker ${inStreamSection ? 'brand-kicker-stream' : ''}`}>{kickerLabel}</span>
           </span>
         </Link>
 

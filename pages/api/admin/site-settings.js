@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo, adCpmCents } = req.body || {};
+  const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo, adCpmCents, connectLabel, streamLabel } = req.body || {};
   if (shopEnabled && (!shopUrl || !shopUrl.trim())) {
     return res.status(400).json({ error: 'A Shop URL is required to enable the Shop link.' });
   }
@@ -118,6 +118,11 @@ export default async function handler(req, res) {
   // far more often than icon changes.
   if (searchIconUrl !== undefined) updates.search_icon_url = searchIconUrl;
   if (logoUrl !== undefined) updates.site_logo_url = logoUrl;
+  // Blank clears back to the default rather than saving an empty kicker —
+  // an admin clearing the field is almost certainly "put it back," not
+  // "show nothing in the nav."
+  if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';
+  if (streamLabel !== undefined) updates.stream_label = streamLabel && streamLabel.trim() ? streamLabel.trim() : 'Stream';
 
   const { error } = await supabase.from('site_settings').update(updates).eq('id', 1);
 
