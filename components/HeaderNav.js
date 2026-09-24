@@ -253,7 +253,11 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>
             )}
 
-            {mainGenres && mainGenres.length > 0 && (
+            {/* Genres are a Stream-library browsing concept (/genre/X pages
+                live under the watch catalogue) — showing them on Connect
+                pages, where there's nothing genre-tagged to browse into,
+                was the same mismatch typeLinks used to have. */}
+            {inStreamSection && mainGenres && mainGenres.length > 0 && (
               <>
                 <div className="dropdown-divider" />
                 <div className="dropdown-label">Browse by genre</div>
