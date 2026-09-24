@@ -752,6 +752,14 @@ export default function VideoPlayer({
       <video
         ref={videoRef}
         className="tp-video"
+        // Without this, the element shows nothing until hls.js/the
+        // browser has actually buffered and decoded a real frame — on a
+        // slow connection or right as playback starts, that can be a
+        // partially-decoded or corrupted-looking frame instead of a
+        // clean black box, which is what was behind the big play button
+        // before this. A real poster shows immediately and never has
+        // that failure mode.
+        poster={episode.poster || episode.thumbnail || undefined}
         playsInline
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
