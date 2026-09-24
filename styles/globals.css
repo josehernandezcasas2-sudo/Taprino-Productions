@@ -1101,6 +1101,13 @@ button { font-family: inherit; cursor: pointer; }
      gets clipped even at full opacity. */
   padding-left: calc(0.3rem + 30px);
   margin-left: -30px;
+  /* Mirrors padding-left/margin-left exactly, for the same two reasons:
+     room for the last card's hover-grow, and — combined with
+     scroll-padding-right below — somewhere for a card to bleed into as
+     it scrolls past the right edge instead of being hard-sliced by
+     overflow-x the instant it crosses the gutter. */
+  padding-right: calc(0.3rem + 30px);
+  margin-right: -30px;
   /* Without this, mandatory scroll-snap below (touch devices) silently
      cancels the gutter above: a snap-align:start card is defined as
      "snapped" once its own edge reaches the scrollport's edge, which
@@ -1109,22 +1116,30 @@ button { font-family: inherit; cursor: pointer; }
      the true screen edge and clipping it, rather than resting at the
      intended gutter. scroll-padding tells the snap engine where the
      scroller's edge actually is for alignment purposes, matching this
-     rule's own padding-left exactly so scrollLeft:0 is itself already a
-     valid, respected snap position. */
+     rule's own padding-left/-right exactly so both resting positions are
+     themselves valid, respected snap positions. */
   scroll-padding-left: calc(0.3rem + 30px);
+  scroll-padding-right: calc(0.3rem + 30px);
   scroll-behavior: smooth;
   /* overflow-x:auto shows a persistent native scrollbar under the row on
      any mouse-driven browser (desktop Chrome/Edge/Firefox don't
      auto-hide it the way touch OSes do) — hidden here since the row is
      already scrollable by drag, trackpad, shift+wheel, or arrow keys
-     without it. There used to be a right-edge fade mask here too (to
-     soften a card getting cut off mid-scroll), but it only existed on
-     the right — the left edge was always a plain hard cut — so the two
-     sides never matched: one edge blended into the page background,
-     the other didn't. Removed rather than mirrored, so both edges are
-     the same plain clip. */
+     without it. */
   scrollbar-width: none;
   -ms-overflow-style: none;
+  /* A card mid-scroll, approaching either edge, would otherwise get
+     hard-sliced by overflow-x the instant it crosses the padding above —
+     a jarring, accidental-looking cut, especially on a phone where every
+     row is normally mid-scroll from a swipe. This fades it out instead,
+     same trick Netflix/Hulu-style rows use. It's symmetric on purpose —
+     an earlier version of this only faded the right edge, which is what
+     read as "not matching the left." The fade's own width matches this
+     rule's padding exactly, so it's confined to the gutter each card
+     bleeds into and never touches a card that's still fully seated at
+     rest (first card at scroll start, last at scroll end). */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, black calc(0.3rem + 30px), black calc(100% - (0.3rem + 30px)), transparent 100%);
+  mask-image: linear-gradient(to right, transparent 0, black calc(0.3rem + 30px), black calc(100% - (0.3rem + 30px)), transparent 100%);
 }
 .cat-row-track::-webkit-scrollbar { display: none; }
 /* Snap-to-card scrolling, touch devices only — matches Jose's request
