@@ -1113,19 +1113,18 @@ button { font-family: inherit; cursor: pointer; }
      valid, respected snap position. */
   scroll-padding-left: calc(0.3rem + 30px);
   scroll-behavior: smooth;
-  /* Two things fixed together here: (1) overflow-x:auto shows a
-     persistent native scrollbar under the row on any mouse-driven
-     browser (desktop Chrome/Edge/Firefox don't auto-hide it the way
-     touch OSes do) — hidden here since the row is already scrollable by
-     drag, trackpad, shift+wheel, or arrow keys without it. (2) whatever
-     card lands at the row's right edge was getting hard-sliced in half,
-     which reads as broken rather than "more to scroll to" — a fade mask
-     turns that same cutoff into an intentional continuation cue, same
-     trick Netflix/Hulu-style rows use instead of a hard clip. */
+  /* overflow-x:auto shows a persistent native scrollbar under the row on
+     any mouse-driven browser (desktop Chrome/Edge/Firefox don't
+     auto-hide it the way touch OSes do) — hidden here since the row is
+     already scrollable by drag, trackpad, shift+wheel, or arrow keys
+     without it. There used to be a right-edge fade mask here too (to
+     soften a card getting cut off mid-scroll), but it only existed on
+     the right — the left edge was always a plain hard cut — so the two
+     sides never matched: one edge blended into the page background,
+     the other didn't. Removed rather than mirrored, so both edges are
+     the same plain clip. */
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 70px), transparent 100%);
-  mask-image: linear-gradient(to right, black calc(100% - 70px), transparent 100%);
 }
 .cat-row-track::-webkit-scrollbar { display: none; }
 /* Snap-to-card scrolling, touch devices only — matches Jose's request
@@ -1146,37 +1145,9 @@ button { font-family: inherit; cursor: pointer; }
        the OS's own momentum scrolling, regardless of this property.
        This is very likely why snap wasn't visibly engaging on iPhone. */
     scroll-behavior: auto;
-    /* Full-bleed to the true screen edge instead of stopping at
-       .stage-wide's own right padding (2.4rem at this width). Without
-       this, the row's own container was the thing doing the cropping —
-       a card would visibly stop short of the actual edge of the phone,
-       which read as an accidental cutoff rather than a deliberate
-       "more to slide to" bleed. The negative margin pulls the
-       scrollable box itself out to the edge; the matching padding
-       after it means the crop still lands with a little breathing
-       room rather than slicing a card exactly at the boundary. Left
-       edge is untouched on purpose — the first card should stay
-       aligned with the row's own heading text, only the right side is
-       meant to bleed. */
-    margin-right: -2.4rem;
-    padding-right: 2.4rem;
-    /* Same fix as scroll-padding-left above, mirrored for the right
-       edge's own bleed amount at this breakpoint. */
-    scroll-padding-right: 2.4rem;
   }
   .row-card {
     scroll-snap-align: start;
-  }
-}
-/* .stage-wide halves its side padding at this width (2.4rem down to
-   1.2rem) — this mirrors that exact change for the bleed amount above,
-   so the two stay in sync instead of the bleed becoming a rem too wide
-   once the page's own padding shrinks. */
-@media (hover: none) and (pointer: coarse) and (max-width: 640px) {
-  .cat-row-track {
-    margin-right: -1.2rem;
-    padding-right: 1.2rem;
-    scroll-padding-right: 1.2rem;
   }
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
