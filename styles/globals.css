@@ -4390,7 +4390,6 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   color: var(--ink);
   flex-shrink: 0;
 }
-.nav-logo-badge { width: 2rem; height: 2rem; font-size: 0.68rem; }
 .nav-logo-image { height: 2rem; width: auto; max-width: 8rem; object-fit: contain; flex-shrink: 0; }
 .brand-text { display: flex; flex-direction: column; gap: 0.1rem; line-height: 1; }
 .brand-word { font-family: var(--font-display); font-size: 1.05rem; white-space: nowrap; }
@@ -4470,10 +4469,12 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 @media (max-width: 480px) {
   .tapa-plus-pill { padding: 0.45rem 0.85rem; font-size: 0.74rem; }
-  /* The kicker deliberately stays visible here — it's short enough on
-     its own (just "Connect"/"Stream") to still fit next to the badge,
-     search icon, pill, and avatar even with the full wordmark gone. */
-  .brand-word { display: none; }
+  /* The wordmark+kicker lockup is the whole logo now (no separate "ST"
+     badge) — it shrinks further here instead of the wordmark
+     disappearing, so the logo itself stays visible and readable at any
+     width rather than collapsing to just the kicker alone. */
+  .brand-word { font-size: 0.8rem; }
+  .brand-kicker { font-size: 0.48rem; letter-spacing: 0.13em; }
 }
 
 /* Live badge in the header nav (components/HeaderNav.js). Only rendered

@@ -53,9 +53,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   }, [isAdmin]);
 
   // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
-  // every page, so this is cheaper than threading userId/avatarUrl/
-  // stayInStream through every single page's getServerSideProps just for
-  // the header. Gated on isSignedIn since the endpoint 401s otherwise.
+  // every page, so this is cheaper than threading userId/avatarUrl
+  // through every single page's getServerSideProps just for the header
+  // (the avatar and "view public profile" link in the account dropdown).
+  // Gated on isSignedIn since the endpoint 401s otherwise.
   useEffect(() => {
     if (!isSignedIn) { setOwnProfile(null); return; }
     fetch('/api/account/profile')
@@ -126,9 +127,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   // Distinguishes the zine-style homepage (/, community/discovery — pitches,
   // profiles, creator tools, everything that isn't the watch library) from
   // the streaming library itself. Everything that isn't literally /stream
-  // reads as "Connect" — matches the same two-mode split the logo's own
-  // conditional link (stayInStream, below) already treats as the site's
-  // two halves.
+  // reads as "Connect".
   const kickerLabel = currentPath === '/stream' ? 'Stream' : 'Connect';
 
   const typeLinks = [
@@ -157,8 +156,16 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   return (
     <header className="channel-bar top-nav" ref={rootRef}>
       <div className="nav-left">
-        <Link href={ownProfile && ownProfile.stayInStream ? '/stream' : '/'} className="brand-mark">
-          {siteSettings && siteSettings.logoUrl ? (
+        {/* Always goes home now — it used to follow the stayInStream
+            account preference (jump straight to /stream instead), but
+            that preference is for a person's OWN sense of "which half of
+            the site am I in," not for what happens when they tap the
+            logo. The two-line wordmark+kicker lockup below is the logo
+            now — no separate "ST" badge — and it resizes as one unit
+            down to mobile instead of the kicker surviving alone once the
+            wordmark used to just disappear. */}
+        <Link href="/" className="brand-mark">
+          {siteSettings && siteSettings.logoUrl && (
             <Image
               src={siteSettings.logoUrl}
               alt=""
@@ -167,14 +174,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               style={{ height: '2rem', width: 'auto', maxWidth: '8rem', objectFit: 'contain' }}
               className="nav-logo-image"
             />
-          ) : (
-            <span className="footer-logo-badge nav-logo-badge">ST</span>
           )}
-          {/* Stacked under the wordmark rather than beside it — stays
-              readable at any width. brand-word itself still hides below
-              480px (no room for it next to the badge, search, and avatar),
-              but the kicker alone is short enough to keep showing there —
-              see .brand-mark's mobile rules. */}
           <span className="brand-text">
             <span className="brand-word">Studio <strong>Tapa</strong></span>
             <span className={`brand-kicker ${kickerLabel === 'Stream' ? 'brand-kicker-stream' : ''}`}>{kickerLabel}</span>
