@@ -41,25 +41,89 @@ function formatDate(iso) {
 // A plain inline SVG rather than a charting library — one dependency-free
 // path is lighter than pulling in recharts for a single sparkline, and it
 // renders identically on the server and the client.
+//
+// Interactive: hovering (mouse), dragging a finger, or tapping anywhere
+// over the line finds the nearest day and shows its exact view count —
+// the peak/first/last labels below the chart are useful summaries, but
+// don't answer "how many on THIS day," which is what this adds. Arrow
+// keys work too once the chart has focus, for anyone not using a mouse
+// or touchscreen.
 function Sparkline({ trend }) {
-  const { path, area, peak, peakDate } = useMemo(() => {
+  const svgRef = useRef(null);
+  const [hoverIndex, setHoverIndex] = useState(null);
+  const w = 640;
+  const h = 120;
+
+  const { path, area, peak, peakDate, points, step } = useMemo(() => {
     if (!trend.length) return {};
-    const w = 640;
-    const h = 120;
     const max = Math.max(...trend.map((d) => d.views), 1);
     const step = trend.length > 1 ? w / (trend.length - 1) : w;
     const points = trend.map((d, i) => [i * step, h - (d.views / max) * (h - 10) - 5]);
     const line = points.map(([x, y], i) => `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
     const filled = `${line} L${w},${h} L0,${h} Z`;
     const peakIdx = trend.reduce((best, d, i) => (d.views > trend[best].views ? i : best), 0);
-    return { path: line, area: filled, peak: max, peakDate: trend[peakIdx].date };
+    return { path: line, area: filled, peak: max, peakDate: trend[peakIdx].date, points, step };
   }, [trend]);
 
   if (!trend.length) return null;
 
+  // Only the X axis is stretched by preserveAspectRatio="none" (the CSS
+  // fixes the SVG's rendered height at 120px, matching the viewBox 1:1 —
+  // see .ca-chart svg) — so mapping a pointer's clientX back to a data
+  // index only ever needs the element's rendered width, not its height.
+  function indexFromClientX(clientX) {
+    const svg = svgRef.current;
+    if (!svg) return null;
+    const rect = svg.getBoundingClientRect();
+    if (rect.width === 0) return null;
+    const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const idx = Math.round((ratio * w) / step);
+    return Math.min(trend.length - 1, Math.max(0, idx));
+  }
+
+  function handlePointerMove(e) {
+    const idx = indexFromClientX(e.clientX);
+    if (idx !== null) setHoverIndex(idx);
+  }
+
+  function handlePointerLeave(e) {
+    // Touch has no real "hover" — pointerleave fires the instant a finger
+    // lifts, which would make the value vanish before anyone could read
+    // it. Only a mouse actually leaving the chart should clear it.
+    if (e.pointerType === 'mouse') setHoverIndex(null);
+  }
+
+  function handleKeyDown(e) {
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      setHoverIndex((i) => Math.max(0, (i ?? trend.length) - 1));
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      setHoverIndex((i) => Math.min(trend.length - 1, (i ?? -1) + 1));
+    } else if (e.key === 'Escape') {
+      setHoverIndex(null);
+    }
+  }
+
+  const hovered = hoverIndex != null ? trend[hoverIndex] : null;
+  const hoverPoint = hoverIndex != null ? points[hoverIndex] : null;
+  const tooltipLeftPct = hoverPoint ? Math.min(94, Math.max(6, (hoverPoint[0] / w) * 100)) : 0;
+
   return (
     <div className="ca-chart">
-      <svg viewBox="0 0 640 120" preserveAspectRatio="none" role="img" aria-label={`Views over the last ${trend.length} days. Peak of ${peak} views on ${peakDate}.`}>
+      <svg
+        ref={svgRef}
+        viewBox={`0 0 ${w} ${h}`}
+        preserveAspectRatio="none"
+        role="img"
+        tabIndex={0}
+        aria-label={`Views over the last ${trend.length} days. Peak of ${peak} views on ${peakDate}. Use the arrow keys to read each day's count.`}
+        className="ca-chart-svg"
+        onPointerMove={handlePointerMove}
+        onPointerDown={handlePointerMove}
+        onPointerLeave={handlePointerLeave}
+        onKeyDown={handleKeyDown}
+      >
         <defs>
           <linearGradient id="caFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="var(--signal-amber)" stopOpacity="0.28" />
@@ -68,7 +132,20 @@ function Sparkline({ trend }) {
         </defs>
         <path d={area} fill="url(#caFill)" />
         <path d={path} fill="none" stroke="var(--signal-amber)" strokeWidth="2" vectorEffect="non-scaling-stroke" />
+        {hoverPoint && (
+          <>
+            <line x1={hoverPoint[0]} y1="0" x2={hoverPoint[0]} y2={h} stroke="var(--signal-amber)" strokeWidth="1" strokeOpacity="0.35" vectorEffect="non-scaling-stroke" />
+            <circle cx={hoverPoint[0]} cy={hoverPoint[1]} r="4" fill="var(--signal-amber)" stroke="var(--void-2)" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+          </>
+        )}
       </svg>
+      {hovered && (
+        <div className="ca-chart-tooltip" style={{ left: `${tooltipLeftPct}%` }}>
+          <strong>{hovered.views.toLocaleString()}</strong>{' '}
+          view{hovered.views === 1 ? '' : 's'}
+          <span>{formatDate(hovered.date)}</span>
+        </div>
+      )}
       <div className="ca-chart-axis">
         <span>{formatDate(trend[0].date)}</span>
         <span>peak {peak}/day</span>

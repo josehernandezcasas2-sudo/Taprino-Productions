@@ -3118,8 +3118,28 @@ button { font-family: inherit; cursor: pointer; }
 .ca-change.up { color: var(--ok); }
 .ca-change.down { color: var(--danger); }
 
-.ca-chart { margin: 1.4rem 0 0.4rem; }
+.ca-chart { margin: 1.4rem 0 0.4rem; position: relative; }
 .ca-chart svg { width: 100%; height: 120px; display: block; }
+.ca-chart-svg { cursor: crosshair; touch-action: none; }
+.ca-chart-svg:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 3px; }
+.ca-chart-tooltip {
+  position: absolute;
+  top: -6px;
+  transform: translate(-50%, -100%);
+  background: var(--void-2);
+  border: 1px solid rgba(251, 232, 211, 0.16);
+  border-radius: 6px;
+  padding: 0.35rem 0.6rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--ink);
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+.ca-chart-tooltip strong { color: var(--signal-amber); font-size: 0.85rem; margin-right: 0.3rem; }
+.ca-chart-tooltip span { display: block; color: var(--static-grey); margin-top: 0.15rem; }
 .ca-chart-axis {
   display: flex;
   justify-content: space-between;
