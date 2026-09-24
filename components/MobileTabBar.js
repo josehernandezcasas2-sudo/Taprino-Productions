@@ -6,18 +6,36 @@ import CreatePostModal from './CreatePostModal';
 
 // Four tabs, down from the previous five: Series and Films folded into one
 // "Watch" tab, My List moved into the Account menu alongside My Work, and
-// a new Discover tab surfaces the two swipe/reel discovery experiences
+// a Discover tab surfaces the two swipe/reel discovery experiences
 // (Pitch Discover, Vertical Discover) that previously had no dedicated
 // spot in mobile navigation at all.
 //
-// Home stays a direct link, same as before. The other three are toggle
-// buttons that open a small drop-up menu above themselves — tapping one
-// that's already open closes it, tapping a different one switches to it,
-// and tapping anywhere else on the page (or navigating) closes whatever's
-// open. Hidden entirely above 1180px, where the header nav's full link
-// row is already comfortable — matches the width where .nav-links
-// collapses into .nav-hamburger, so there's no gap between the two.
+// Every tab is a toggle button that opens a small drop-up menu above
+// itself — tapping one that's already open closes it, tapping a
+// different one switches to it, and tapping anywhere else on the page
+// (or navigating) closes whatever's open. Home used to be a plain link
+// straight to /stream; it's a menu now too, offering Connect vs Stream
+// explicitly rather than picking one automatically, same split as the
+// header logo's stayInStream preference. Hidden entirely above 1180px,
+// where the header nav's full link row is already comfortable — matches
+// the width where .nav-links collapses into .nav-hamburger, so there's
+// no gap between the two.
 const GROUPS = {
+  home: {
+    label: 'Home',
+    Icon: HouseIcon,
+    iconKey: 'tab_home',
+    // Same Connect/Stream split as the header logo's stayInStream
+    // preference, but offered as an explicit choice here rather than
+    // picked automatically — this is the one link in the bar people are
+    // most likely to want to jump straight past into whichever half of
+    // the site they weren't just in.
+    items: [
+      { href: '/', label: 'Connect' },
+      { href: '/stream', label: 'Stream' }
+    ],
+    match: (p) => p === '/' || p === '/stream'
+  },
   discover: {
     label: 'Discover',
     Icon: CompassIcon,
@@ -132,7 +150,6 @@ export default function MobileTabBar() {
     };
   }, [openMenu]);
 
-  const homeActive = path === '/stream';
   const openGroup = openMenu ? GROUPS[openMenu] : null;
   const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles) : openGroup.items) : [];
 
@@ -172,6 +189,18 @@ export default function MobileTabBar() {
       )}
 
       <button
+        ref={(el) => { triggerRefs.current.home = el; }}
+        type="button"
+        className={`tabbar-item ${GROUPS.home.match(path) ? 'active' : ''} ${openMenu === 'home' ? 'open' : ''}`}
+        onClick={() => setOpenMenu((m) => (m === 'home' ? null : 'home'))}
+        aria-expanded={openMenu === 'home'}
+        aria-haspopup="menu"
+      >
+        <span className="tabbar-glyph"><HouseIcon size={20} src={iconOverrides.tab_home} /></span>
+        <span className="tabbar-label">Home <span className="tabbar-caret" aria-hidden="true">▲</span></span>
+      </button>
+
+      <button
         ref={(el) => { triggerRefs.current.discover = el; }}
         type="button"
         className={`tabbar-item tabbar-discover ${GROUPS.discover.match(path) ? 'active' : ''} ${openMenu === 'discover' ? 'open' : ''}`}
@@ -182,11 +211,6 @@ export default function MobileTabBar() {
         <span className="tabbar-glyph"><CompassIcon size={20} src={iconOverrides.tab_discover} /></span>
         <span className="tabbar-label">Discover</span>
       </button>
-
-      <Link href="/stream" className={`tabbar-item ${homeActive ? 'active' : ''}`} aria-current={homeActive ? 'page' : undefined}>
-        <span className="tabbar-glyph"><HouseIcon size={20} src={iconOverrides.tab_home} /></span>
-        <span className="tabbar-label">Home</span>
-      </Link>
 
       {roles.isAdmin && (
         <button
