@@ -223,6 +223,20 @@ button { font-family: inherit; cursor: pointer; }
 .dropdown-item svg, .dropdown-item img { vertical-align: -3px; margin-right: 0.5rem; }
 
 .account-dropdown { min-width: 240px; }
+@media (max-width: 640px) {
+  /* The shared .dropdown-right rule shifts every right-anchored dropdown
+     right: -1rem at this same breakpoint (tuned to stay flush with
+     .channel-bar's own reduced side padding here — see that rule's own
+     comment). That's fine for the smaller dropdowns it was tuned for,
+     but on the account dropdown — the widest one, at up to 300px — it
+     pushes the right edge to within a hair of the true screen edge
+     instead of leaving it any breathing room, which is what read as
+     "piping out." Compound selector so this wins over the shared rule
+     regardless of source order. */
+  .account-dropdown.dropdown-right {
+    right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+}
 @media (max-width: 480px) {
   .account-dropdown {
     /* min-width: 240px could exceed available space to the left of a
