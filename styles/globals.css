@@ -1101,6 +1101,17 @@ button { font-family: inherit; cursor: pointer; }
      gets clipped even at full opacity. */
   padding-left: calc(0.3rem + 30px);
   margin-left: -30px;
+  /* Without this, mandatory scroll-snap below (touch devices) silently
+     cancels the gutter above: a snap-align:start card is defined as
+     "snapped" once its own edge reaches the scrollport's edge, which
+     ignores padding entirely — so on load, the browser was scrolling the
+     row ~35px to the right on its own, sliding the first card left past
+     the true screen edge and clipping it, rather than resting at the
+     intended gutter. scroll-padding tells the snap engine where the
+     scroller's edge actually is for alignment purposes, matching this
+     rule's own padding-left exactly so scrollLeft:0 is itself already a
+     valid, respected snap position. */
+  scroll-padding-left: calc(0.3rem + 30px);
   scroll-behavior: smooth;
   /* Two things fixed together here: (1) overflow-x:auto shows a
      persistent native scrollbar under the row on any mouse-driven
@@ -1149,6 +1160,9 @@ button { font-family: inherit; cursor: pointer; }
        meant to bleed. */
     margin-right: -2.4rem;
     padding-right: 2.4rem;
+    /* Same fix as scroll-padding-left above, mirrored for the right
+       edge's own bleed amount at this breakpoint. */
+    scroll-padding-right: 2.4rem;
   }
   .row-card {
     scroll-snap-align: start;
@@ -1162,6 +1176,7 @@ button { font-family: inherit; cursor: pointer; }
   .cat-row-track {
     margin-right: -1.2rem;
     padding-right: 1.2rem;
+    scroll-padding-right: 1.2rem;
   }
 }
 .row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
