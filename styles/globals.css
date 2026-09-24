@@ -3120,7 +3120,19 @@ button { font-family: inherit; cursor: pointer; }
 
 .ca-chart { margin: 1.4rem 0 0.4rem; position: relative; }
 .ca-chart svg { width: 100%; height: 120px; display: block; }
-.ca-chart-svg { cursor: crosshair; touch-action: none; }
+/* touch-action: none stops a drag here from scrolling/panning the page,
+   but doesn't stop the browser's native text/element selection highlight
+   from painting over the chart as a finger (or a mouse) drags across
+   it — that needs user-select separately. -webkit-touch-callout also
+   suppresses iOS's own long-press callout (copy/lookup menu) over the
+   SVG, which the same drag gesture would otherwise trigger. */
+.ca-chart-svg {
+  cursor: crosshair;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
 .ca-chart-svg:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 3px; }
 .ca-chart-tooltip {
   position: absolute;
