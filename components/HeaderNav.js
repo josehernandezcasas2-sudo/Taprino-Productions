@@ -6,7 +6,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
 import { isStreamPath } from '../lib/streamSection';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, AccountIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -232,7 +232,14 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           aria-label="Browse by type and genre"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
         >
-          ☰
+          {/* Was a plain "☰" character — .icon-btn's font-family stack is
+              literally aimed at emoji fonts (Apple Color Emoji etc.),
+              which don't all draw a glyph centered in its own em-box, so
+              flexbox centering the button itself wasn't enough to center
+              what actually got painted inside it. Same fix as Search and
+              Notifications right below, which already use a drawn SVG
+              instead of a character for exactly this reason. */}
+          <HamburgerMenuIcon src={iconOverrides.hamburger} />
         </button>
 
         {openMenu === 'ham' && (
