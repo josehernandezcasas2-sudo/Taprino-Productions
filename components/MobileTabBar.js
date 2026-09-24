@@ -32,9 +32,10 @@ const GROUPS = {
     // the site they weren't just in.
     items: [
       { href: '/', label: 'Connect' },
-      { href: '/stream', label: 'Stream' }
+      { href: '/stream', label: 'Stream' },
+      { href: '/about', label: 'About' }
     ],
-    match: (p) => p === '/' || p === '/stream'
+    match: (p) => p === '/' || p === '/stream' || p === '/about'
   },
   discover: {
     label: 'Discover',
