@@ -94,6 +94,17 @@ body {
   font-family: var(--font-body);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  /* The zine homepage has several slightly-rotated full-width elements
+     (.zine-filmstrip, hero art, tags) — a rotated box's bounding width is
+     always a hair wider than its own width, and now that the zine rows'
+     horizontal padding was moved off their .zine-dept parent onto the
+     rows themselves (so they can reach the true screen edge), that sliver
+     of overshoot had nothing left stopping it from becoming a real,
+     page-wide horizontal scrollbar. Nothing on this site scrolls
+     horizontally at the document level — every row scrolls in its own
+     inner overflow-x:auto container — so clipping it here is a safe
+     backstop, not a loss of any real scroll behavior. */
+  overflow-x: hidden;
 }
 
 a { color: inherit; }
@@ -6334,8 +6345,17 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-sticker.brass { background: var(--brass); }
 .zine-sticker.rust { background: var(--rust); color: var(--ink); }
 
-.zine-dept { padding: 1.6rem; }
-.zine-dept-label { margin-bottom: 1.1rem; }
+/* Vertical padding only — a row's own horizontal padding (below) used to
+   live here instead, on the .zine-dept wrapper, which meant every row's
+   scrollable box stopped short of the actual screen edge even while
+   scrolling, with a permanent empty margin down both sides no matter
+   how far you scrolled. Moving it onto .zine-dept-label and each row
+   individually keeps the resting-card alignment with the label exactly
+   as it was, but lets the row's own box (and, for .zine-filmstrip, its
+   colored background panel) reach the true edge — same idea as
+   .cat-row-track's padding-left on /stream. */
+.zine-dept { padding: 1.6rem 0; }
+.zine-dept-label { margin-bottom: 1.1rem; padding: 0 1.6rem; }
 
 /* hero collage */
 .zine-hero { padding: 0.5rem 1.6rem 1.8rem; }
@@ -6399,8 +6419,11 @@ body:has(.mini-player) { padding-bottom: 72px; }
   /* overflow-x:auto implicitly clips overflow-y too (see .cat-row-track's
      own comment on this same CSS quirk) — these cards are rotated up to
      1deg, so their corners poke past their own layout box and were
-     getting clipped top/bottom with no padding to give them room. */
-  padding: 0.5rem 0.2rem 0.6rem;
+     getting clipped top/bottom with no padding to give them room. The
+     1.6rem left/right matches .zine-dept-label so the first card still
+     lines up with the "ANNOUNCEMENTS" sticker above it now that
+     .zine-dept itself no longer supplies that gutter. */
+  padding: 0.5rem 1.6rem 0.6rem;
 }
 .zine-brief-card {
   flex: 0 0 260px;
@@ -6419,7 +6442,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-brief-card p { font-size: 0.72rem; line-height: 1.45; margin: 0; opacity: 0.75; }
 
 /* featured people — polaroids */
-.zine-people-row { display: flex; gap: 1.4rem; overflow-x: auto; padding: 0.6rem 0.2rem 0.7rem; }
+.zine-people-row { display: flex; gap: 1.4rem; overflow-x: auto; padding: 0.6rem 1.6rem 0.7rem; }
 .zine-polaroid {
   flex: 0 0 140px;
   background: var(--ink);
@@ -6463,7 +6486,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-filmstrip-item span { font-size: 0.62rem; color: var(--ink-dim); font-family: var(--font-mono); }
 
 /* on air — cassette tiles */
-.zine-cassette-row { display: flex; gap: 1rem; overflow-x: auto; padding: 0.3rem 0.2rem 0.4rem; }
+.zine-cassette-row { display: flex; gap: 1rem; overflow-x: auto; padding: 0.3rem 1.6rem 0.4rem; }
 .zine-cassette {
   flex: 0 0 190px;
   height: 90px;
@@ -6494,8 +6517,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
   overflow-x: auto;
   /* No padding at all here previously — these cards rotate up to
      1.5deg with nothing to stop overflow-x:auto's implicit overflow-y
-     clipping from cutting their corners off. */
-  padding: 0.5rem 0.2rem 0.6rem;
+     clipping from cutting their corners off. Left/right matches
+     .zine-dept-label, same reasoning as .zine-brief-row above. */
+  padding: 0.5rem 1.6rem 0.6rem;
 }
 .zine-flyer {
   flex: 0 0 250px;
@@ -6593,7 +6617,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
 @media (max-width: 640px) {
   .zine-masthead { padding: 1.2rem 1.1rem 0.7rem; flex-direction: column; align-items: flex-start; }
   .zine-masthead-title { font-size: 1.7rem; }
-  .zine-dept { padding: 1.1rem; }
+  .zine-dept { padding: 1.1rem 0; }
+  .zine-dept-label { padding: 0 1.1rem; }
+  .zine-brief-row, .zine-people-row, .zine-cassette-row, .zine-flyer-row { padding-left: 1.1rem; padding-right: 1.1rem; }
   .zine-hero { padding: 0.3rem 1.1rem 1.2rem; }
   .zine-hero-collage { flex-direction: column; align-items: flex-start; }
   .zine-hero-art-wrap { margin-right: 0; }
