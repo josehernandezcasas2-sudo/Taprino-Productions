@@ -233,6 +233,15 @@ button { font-family: inherit; cursor: pointer; }
        cap instead of an unconditional fixed minimum. */
     min-width: 0;
     width: min(78vw, 300px);
+    /* This menu has grown to ~11 items for a signed-in admin (Account
+       Settings through Sign Out) — the base .dropdown rule has no
+       max-height, so on a phone it was running almost the full screen
+       height below the avatar with nothing to scroll it, same bug the
+       hamburger menu's comment above describes and was already fixed
+       for. Same fix here: cap it and let it scroll instead of just
+       growing indefinitely. */
+    max-height: calc(100vh - 140px);
+    overflow-y: auto;
   }
 }
 .account-dropdown-header {
