@@ -4693,18 +4693,43 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    shell. Cards inside both columns keep using .account-card as-is so
    inputs/buttons/subheadings stay visually consistent with the rest of
    the account form styling above. */
+/* .account-identity used to lay the avatar, name/badges, and the "View
+   public profile" link out as three siblings in one flex row with no
+   wrap — on a narrow phone, once the name row's own badges wrapped to a
+   second line (see the comment below on .account-identity-name-row),
+   the link stayed vertically centered against the now-taller block next
+   to it and visually overlapped the wrapped badge. Grouping avatar+meta
+   into their own .account-identity-top row, with only that row and the
+   link as this element's two flex children, means flex-wrap here only
+   ever has ONE thing to decide: whether the link fits on the same line
+   as everything else, or drops to its own line below — never a
+   mid-block overlap. */
 .account-identity {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 1.2rem;
+  gap: 1rem 1.2rem;
   padding: 1.4rem 1.5rem;
   background: linear-gradient(135deg, var(--surface-2), var(--void-2));
   border: 1px solid var(--ocean-ink);
   border-radius: 4px;
   margin-bottom: 1.4rem;
 }
-.account-identity .account-avatar { width: 64px; height: 64px; font-size: 1.5rem; }
+.account-identity-top { display: flex; align-items: center; gap: 1.2rem; flex: 1 1 240px; min-width: 0; }
+.account-identity .account-avatar { width: 64px; height: 64px; font-size: 1.5rem; flex-shrink: 0; }
 .account-identity-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+/* width:auto overrides .account-btn-secondary's own width:100% — this
+   used to be an inline style on the element instead of a class, which
+   is exactly why it couldn't be adjusted per breakpoint below. */
+.account-identity-link { flex-shrink: 0; width: auto; }
+@media (max-width: 480px) {
+  /* Below the width an avatar + name + both badges can share a line
+     with a compact button (see .account-identity's own comment), the
+     button wraps onto its own row — full width there reads as a
+     deliberate stacked CTA instead of a stray auto-width button sitting
+     flush against the card's left edge. */
+  .account-identity-link { width: 100%; }
+}
 .account-identity-name-row { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
 .account-identity-name-row h3 { margin: 0; font-size: 1.25rem; }
 /* Both badges need to never wrap their OWN text — .account-identity-name-row

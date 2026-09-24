@@ -302,19 +302,21 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
           <BackButton fallbackHref="/stream" />
 
           <div className="account-identity">
-            <div className="account-avatar" style={{ backgroundImage: profile && profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-              {!(profile && profile.avatarUrl) && avatarLetter}
-            </div>
-            <div className="account-identity-meta">
-              <div className="account-identity-name-row">
-                <h3>{profile && profile.displayName ? profile.displayName : (email || 'Your account')}</h3>
-                {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
-                {isSubscriber && <span className="account-tier-badge">{SITE.premiumTier} member</span>}
+            <div className="account-identity-top">
+              <div className="account-avatar" style={{ backgroundImage: profile && profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                {!(profile && profile.avatarUrl) && avatarLetter}
               </div>
-              <div className="account-identity-sub">{email ? <>Signed in as {email}</> : 'Signed in'}</div>
+              <div className="account-identity-meta">
+                <div className="account-identity-name-row">
+                  <h3>{profile && profile.displayName ? profile.displayName : (email || 'Your account')}</h3>
+                  {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+                  {isSubscriber && <span className="account-tier-badge">{SITE.premiumTier} member</span>}
+                </div>
+                <div className="account-identity-sub">{email ? <>Signed in as {email}</> : 'Signed in'}</div>
+              </div>
             </div>
             {userId && (
-              <Link href={`/profile/${userId}`} className="account-btn-secondary" style={{ width: 'auto' }}>
+              <Link href={`/profile/${userId}`} className="account-btn-secondary account-identity-link">
                 View public profile →
               </Link>
             )}
