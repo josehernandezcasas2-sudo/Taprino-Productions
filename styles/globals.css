@@ -1128,18 +1128,12 @@ button { font-family: inherit; cursor: pointer; }
      without it. */
   scrollbar-width: none;
   -ms-overflow-style: none;
-  /* A card mid-scroll, approaching either edge, would otherwise get
-     hard-sliced by overflow-x the instant it crosses the padding above —
-     a jarring, accidental-looking cut, especially on a phone where every
-     row is normally mid-scroll from a swipe. This fades it out instead,
-     same trick Netflix/Hulu-style rows use. It's symmetric on purpose —
-     an earlier version of this only faded the right edge, which is what
-     read as "not matching the left." The fade's own width matches this
-     rule's padding exactly, so it's confined to the gutter each card
-     bleeds into and never touches a card that's still fully seated at
-     rest (first card at scroll start, last at scroll end). */
-  -webkit-mask-image: linear-gradient(to right, transparent 0, black calc(0.3rem + 30px), black calc(100% - (0.3rem + 30px)), transparent 100%);
-  mask-image: linear-gradient(to right, transparent 0, black calc(0.3rem + 30px), black calc(100% - (0.3rem + 30px)), transparent 100%);
+  /* Tried a fade mask here at both edges (to soften a card getting
+     hard-sliced by overflow-x mid-scroll) — decided against it: the site
+     reads better with the row's own edge left alone, section unclipped,
+     than with a gradient bar sitting over it. Padding/margin above still
+     do their job (a clean, consistent gutter plus hover-grow room), just
+     with nothing painted over the result. */
 }
 .cat-row-track::-webkit-scrollbar { display: none; }
 /* Snap-to-card scrolling, touch devices only — matches Jose's request
