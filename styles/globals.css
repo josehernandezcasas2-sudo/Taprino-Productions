@@ -6378,15 +6378,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-hero-text p { font-size: 0.9rem; color: var(--ink-dim); max-width: 44ch; line-height: 1.6; margin: 0 0 0.9rem; }
 
 /* Shared by every horizontally-scrolling zine row below: native
-   scrollbar hidden (still scrollable by drag/trackpad/shift+wheel,
-   same treatment as .cat-row-track on /stream) plus a right-edge fade
-   so whichever card lands at the boundary dissolves out instead of
-   being hard-sliced. */
+   scrollbar hidden (still scrollable by drag/trackpad/shift+wheel).
+   Used to also carry a right-edge fade mask here, same as
+   .cat-row-track on /stream — removed for the same reason it was
+   removed there: the row's own edge left alone, unclipped, reads
+   better than a gradient bar painted over it. */
 .zine-brief-row, .zine-people-row, .zine-filmstrip, .zine-cassette-row, .zine-flyer-row {
   scrollbar-width: none;
   -ms-overflow-style: none;
-  -webkit-mask-image: linear-gradient(to right, black calc(100% - 50px), transparent 100%);
-  mask-image: linear-gradient(to right, black calc(100% - 50px), transparent 100%);
 }
 .zine-brief-row::-webkit-scrollbar, .zine-people-row::-webkit-scrollbar,
 .zine-filmstrip::-webkit-scrollbar, .zine-cassette-row::-webkit-scrollbar,
