@@ -29,13 +29,18 @@ const GROUPS = {
     // preference, but offered as an explicit choice here rather than
     // picked automatically — this is the one link in the bar people are
     // most likely to want to jump straight past into whichever half of
-    // the site they weren't just in.
-    items: [
+    // the site they weren't just in. Pitch Room is a function (not a
+    // plain array) for the same reason Account's is below — it only
+    // shows once admin has actually turned the feature on, same
+    // siteSettings.elevatorPitchEnabled gate the desktop header nav
+    // already checks in three places before showing this same link.
+    items: (roles, settings) => [
       { href: '/', label: 'Connect' },
       { href: '/stream', label: 'Stream' },
+      ...(settings && settings.elevatorPitchEnabled ? [{ href: '/pitches', label: 'Pitch Room' }] : []),
       { href: '/about', label: 'About' }
     ],
-    match: (p) => p === '/' || p === '/stream' || p === '/about'
+    match: (p) => p === '/' || p === '/stream' || p === '/about' || p === '/pitches' || p === '/pitches/[id]'
   },
   discover: {
     label: 'Discover',
@@ -87,6 +92,7 @@ export default function MobileTabBar() {
   const iconOverrides = usePlayerIconOverrides();
   const [openMenu, setOpenMenu] = useState(null);
   const [roles, setRoles] = useState({ isSignedIn: false, isCreator: false, isAdmin: false });
+  const [siteSettings, setSiteSettings] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const barRef = useRef(null);
   const dropdownRef = useRef(null);
@@ -101,6 +107,16 @@ export default function MobileTabBar() {
     fetch('/api/my-role')
       .then((r) => r.json())
       .then(setRoles)
+      .catch(() => {});
+  }, []);
+
+  // Same self-fetch reasoning as above, for Pitch Room's on/off toggle —
+  // public and cached, so this costs nothing extra beyond what HeaderNav
+  // already fetches on the same page.
+  useEffect(() => {
+    fetch('/api/site-settings')
+      .then((r) => r.json())
+      .then(setSiteSettings)
       .catch(() => {});
   }, []);
 
@@ -152,7 +168,7 @@ export default function MobileTabBar() {
   }, [openMenu]);
 
   const openGroup = openMenu ? GROUPS[openMenu] : null;
-  const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles) : openGroup.items) : [];
+  const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles, siteSettings) : openGroup.items) : [];
 
   // Centers the dropdown over whichever button actually opened it, rather
   // than the old fixed left:4px / right:4px / left:50%+translateX(-42%)
