@@ -1,7 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
 import CreatePostModal from './CreatePostModal';
 
 // Four tabs, down from the previous five: Series and Films folded into one
@@ -198,7 +198,7 @@ export default function MobileTabBar() {
         aria-haspopup="menu"
       >
         <span className="tabbar-glyph"><HouseIcon size={20} src={iconOverrides.tab_home} /></span>
-        <span className="tabbar-label">Home <span className="tabbar-caret" aria-hidden="true">▲</span></span>
+        <span className="tabbar-label">Home <span className="tabbar-caret" aria-hidden="true"><CaretUpIcon size={7} src={iconOverrides.tab_caret} /></span></span>
       </button>
 
       <button
@@ -234,7 +234,7 @@ export default function MobileTabBar() {
         aria-haspopup="menu"
       >
         <span className="tabbar-glyph"><WatchTabIcon size={20} src={iconOverrides.tab_watch} /></span>
-        <span className="tabbar-label">Watch <span className="tabbar-caret" aria-hidden="true">▲</span></span>
+        <span className="tabbar-label">Watch <span className="tabbar-caret" aria-hidden="true"><CaretUpIcon size={7} src={iconOverrides.tab_caret} /></span></span>
       </button>
 
       <button
@@ -246,7 +246,7 @@ export default function MobileTabBar() {
         aria-haspopup="menu"
       >
         <span className="tabbar-glyph"><AccountIcon size={20} src={iconOverrides.tab_account} /></span>
-        <span className="tabbar-label">Account <span className="tabbar-caret" aria-hidden="true">▲</span></span>
+        <span className="tabbar-label">Account <span className="tabbar-caret" aria-hidden="true"><CaretUpIcon size={7} src={iconOverrides.tab_caret} /></span></span>
       </button>
 
       {showCreateModal && <CreatePostModal onClose={() => setShowCreateModal(false)} />}

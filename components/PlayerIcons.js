@@ -620,6 +620,21 @@ export function CompassIcon({ src, size = 18 }) {
   );
 }
 
+// The mobile tab bar's drop-up indicator (Home/Watch/Account) — was a
+// plain "▲" character, which is exactly the emoji/unicode problem
+// described at the top of this file: each OS renders that glyph's
+// bounding box differently relative to the surrounding text's baseline,
+// which is why it never looked centered next to the label no matter how
+// the CSS around it was tuned. A drawn SVG has no such ambiguity.
+export function CaretUpIcon({ src, size = 8 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style={{ display: 'block' }}>
+      <path d="M12 6l9 12H3z" />
+    </svg>
+  );
+}
+
 export function RowsIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (

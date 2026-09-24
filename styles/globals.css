@@ -2173,10 +2173,16 @@ button { font-family: inherit; cursor: pointer; }
   }
   .tabbar-item.tabbar-add:active { transform: scale(0.94); }
   .tabbar-add-glyph { display: flex; align-items: center; justify-content: center; }
+  /* Was a plain "▲" character sized with font-size/em, which never sat
+     centered against the label text — a text glyph's bounding box isn't
+     vertically centered on its own baseline the way an SVG can be. Now
+     an inline SVG (see CaretUpIcon) sized in real px, and both this and
+     .tabbar-label below are flex containers so the icon centers against
+     the text's line box directly instead of relying on glyph metrics. */
   .tabbar-caret {
-    display: inline-block;
-    font-size: 0.55em;
-    margin-left: 2px;
+    display: inline-flex;
+    align-items: center;
+    margin-left: 3px;
     transition: transform 0.15s ease;
   }
   .tabbar-item.open .tabbar-caret { transform: rotate(180deg); }
@@ -2195,6 +2201,8 @@ button { font-family: inherit; cursor: pointer; }
     letter-spacing: 0.1em;
     text-transform: uppercase;
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
   }
   /* Drop-up menus — positioned above the bar itself (bottom: 100% of the
      fixed-positioned .tabbar). Horizontal position is NOT set here — the
