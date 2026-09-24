@@ -123,6 +123,13 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const isRecsPage = currentPath === '/recs';
   const isChannelPage = currentPath === '/channel';
   const isPitchesPage = currentPath === '/pitches' || currentPath === '/pitches/[id]';
+  // Distinguishes the zine-style homepage (/, community/discovery — pitches,
+  // profiles, creator tools, everything that isn't the watch library) from
+  // the streaming library itself. Everything that isn't literally /stream
+  // reads as "Connect" — matches the same two-mode split the logo's own
+  // conditional link (stayInStream, below) already treats as the site's
+  // two halves.
+  const kickerLabel = currentPath === '/stream' ? 'Stream' : 'Connect';
 
   const typeLinks = [
     { href: '/', label: 'Home', match: isHome },
@@ -163,7 +170,15 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           ) : (
             <span className="footer-logo-badge nav-logo-badge">ST</span>
           )}
-          <span className="brand-word">Studio <strong>Tapa</strong></span>
+          {/* Stacked under the wordmark rather than beside it — stays
+              readable at any width. brand-word itself still hides below
+              480px (no room for it next to the badge, search, and avatar),
+              but the kicker alone is short enough to keep showing there —
+              see .brand-mark's mobile rules. */}
+          <span className="brand-text">
+            <span className="brand-word">Studio <strong>Tapa</strong></span>
+            <span className={`brand-kicker ${kickerLabel === 'Stream' ? 'brand-kicker-stream' : ''}`}>{kickerLabel}</span>
+          </span>
         </Link>
 
         <nav className="nav-links" aria-label="Primary">
