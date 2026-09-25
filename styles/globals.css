@@ -2323,6 +2323,25 @@ button { font-family: inherit; cursor: pointer; }
 }
 .create-post-dropzone:hover { border-color: var(--brass); }
 .create-post-dropzone-photo { aspect-ratio: 1 / 1; max-width: 280px; margin-left: auto; margin-right: auto; }
+/* Smaller and left-aligned rather than the centered/prominent treatment
+   the main video dropzone gets above it — this is a secondary, optional
+   field, and shouldn't visually compete with the actual video. */
+.create-post-thumbnail-field { margin-bottom: 0.9rem; }
+.create-post-thumbnail-label {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 0.5rem;
+}
+.create-post-thumbnail-label .create-post-dropzone-hint { font-weight: 400; margin-left: 0.3rem; }
+.create-post-dropzone-thumbnail {
+  aspect-ratio: 9 / 16;
+  width: 92px;
+  margin-bottom: 0;
+}
+.create-post-dropzone-thumbnail .create-post-dropzone-empty { padding: 0.5rem; gap: 0.3rem; }
+.create-post-dropzone-thumbnail .create-post-dropzone-empty span:nth-child(2) { font-size: 0.68rem; }
 .create-post-dropzone-video {
   aspect-ratio: 9 / 16;
   max-width: 200px;

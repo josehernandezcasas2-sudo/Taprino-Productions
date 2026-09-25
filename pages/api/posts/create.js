@@ -62,6 +62,22 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
   }
 
+  // Optional — without one, lib/posts.js falls back to whichever frame
+  // Cloudflare happened to grab from the video itself, same as before
+  // this existed.
+  let thumbnailUrl = null;
+  if (body.thumbnailBase64) {
+    try {
+      thumbnailUrl = await uploadArtworkImage({
+        base64: body.thumbnailBase64,
+        fileName: body.thumbnailFileName,
+        pathPrefix: `post-thumb-${userId}-${Date.now().toString(36)}`
+      });
+    } catch (err) {
+      return res.status(400).json({ error: err.message });
+    }
+  }
+
   // The client already measured duration before starting the upload (see
   // CreatePostModal), but that's a value from the browser, not proof. When
   // Cloudflare has already finished processing enough to report its own
@@ -81,6 +97,7 @@ export default async function handler(req, res) {
     caption,
     videoUid: body.videoUid,
     videoSrc: src,
+    thumbnailUrl,
     durationSeconds
   });
   return res.status(200).json({ ok: true, id, kind: 'video' });

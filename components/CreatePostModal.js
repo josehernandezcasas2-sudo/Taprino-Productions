@@ -48,6 +48,13 @@ export default function CreatePostModal({ onClose, onPosted }) {
   const [videoCaption, setVideoCaption] = useState('');
   const [checkingVideo, setCheckingVideo] = useState(false);
   const [videoError, setVideoError] = useState(null);
+  // Optional custom cover — without one, the post falls back to whichever
+  // frame Cloudflare happens to grab from the video itself once it's
+  // processed, same as every video posted before this existed. A photo
+  // post has no equivalent field; the photo already is its own thumbnail.
+  const [thumbnailFile, setThumbnailFile] = useState(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState(null);
+  const thumbnailInputRef = useRef(null);
 
   function pickImage(e) {
     const f = e.target.files[0] || null;
@@ -99,6 +106,21 @@ export default function CreatePostModal({ onClose, onPosted }) {
     setVideoDuration(null);
     setVideoError(null);
     if (videoInputRef.current) videoInputRef.current.value = '';
+    clearThumbnail();
+  }
+
+  function pickThumbnail(e) {
+    const f = e.target.files[0] || null;
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailFile(f);
+    setThumbnailPreview(f ? URL.createObjectURL(f) : null);
+  }
+
+  function clearThumbnail() {
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailFile(null);
+    setThumbnailPreview(null);
+    if (thumbnailInputRef.current) thumbnailInputRef.current.value = '';
   }
 
   async function pickVideo(e) {
@@ -132,15 +154,25 @@ export default function CreatePostModal({ onClose, onPosted }) {
     }
   }
 
-  function handleVideoSubmit(e) {
+  async function handleVideoSubmit(e) {
     e.preventDefault();
     if (!videoFile) {
       setVideoError('Choose a video first.');
       return;
     }
+    // Read before the upload starts (not in parallel with it) — this
+    // modal closes as soon as startUpload kicks off, handing off to the
+    // global upload widget, so the thumbnail needs to already be part of
+    // the payload startUpload carries rather than something added later.
+    const thumbnailBase64 = await readAsDataUrl(thumbnailFile);
     startUpload(
       videoFile,
-      { kind: 'video', caption: videoCaption.trim(), durationSeconds: videoDuration },
+      {
+        kind: 'video',
+        caption: videoCaption.trim(),
+        durationSeconds: videoDuration,
+        ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {})
+      },
       null,
       'tus',
       '/api/posts/create',
@@ -157,6 +189,8 @@ export default function CreatePostModal({ onClose, onPosted }) {
     setVideoCaption('');
     setStep('choose');
   }
+  // Note: clearVideo() above already resets the thumbnail (see its own
+  // definition) since a thumbnail without its video makes no sense.
 
   // Rendered into document.body via a portal rather than in place —
   // MobileTabBar mounts this modal as a child of <nav className="tabbar">,
@@ -274,6 +308,41 @@ export default function CreatePostModal({ onClose, onPosted }) {
             <input ref={videoInputRef} type="file" accept="video/*" onChange={pickVideo} hidden />
 
             {videoError && <p className="create-post-error">{videoError}</p>}
+
+            {/* Only once there's a video to be a thumbnail FOR — picking a
+                cover before that has nothing to attach to. Optional:
+                leaving it blank falls back to whichever frame Cloudflare
+                grabs from the video itself once it's processed, same as
+                every video posted before this field existed. */}
+            {videoFile && (
+              <div className="create-post-thumbnail-field">
+                <span className="create-post-thumbnail-label">
+                  Cover thumbnail <span className="create-post-dropzone-hint">optional — replaces the auto-generated frame</span>
+                </span>
+                <div
+                  className="create-post-dropzone create-post-dropzone-thumbnail"
+                  onClick={() => thumbnailInputRef.current && thumbnailInputRef.current.click()}
+                  style={thumbnailPreview ? { backgroundImage: `url(${thumbnailPreview})` } : undefined}
+                >
+                  {!thumbnailPreview ? (
+                    <div className="create-post-dropzone-empty">
+                      <ImageIcon size={18} />
+                      <span>Add cover</span>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      className="create-post-dropzone-remove"
+                      onClick={(e) => { e.stopPropagation(); clearThumbnail(); }}
+                      aria-label="Remove custom thumbnail"
+                    >
+                      <CloseIcon size={14} />
+                    </button>
+                  )}
+                </div>
+                <input ref={thumbnailInputRef} type="file" accept="image/*" onChange={pickThumbnail} hidden />
+              </div>
+            )}
 
             <textarea
               className="create-post-caption"
