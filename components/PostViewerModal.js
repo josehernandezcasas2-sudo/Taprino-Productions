@@ -99,6 +99,7 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
               muted={muted}
               onToggleMute={() => setMuted((m) => !m)}
               thumbnail={post.thumbnailUrl}
+              showControls
             />
           ) : post.imageUrl ? (
             <>
