@@ -6001,9 +6001,6 @@ body:has(.mini-player) { padding-bottom: 72px; }
   box-shadow: 0 18px 40px rgba(0,0,0,0.45);
   cursor: grab;
   user-select: none;
-  /* Lets .swipe-card-flip-inner's rotateY read as an actual 3D flip
-     instead of a flat horizontal squash. */
-  perspective: 1400px;
   /* Without this, a touch device tries to scroll/pan the page as soon as
      a finger moves — fighting the pointermove-based drag tracking below
      instead of letting this element own the gesture entirely. */
@@ -6011,6 +6008,23 @@ body:has(.mini-player) { padding-bottom: 72px; }
   will-change: transform;
 }
 .swipe-card:active { cursor: grabbing; }
+/* perspective used to live on .swipe-card itself, but that's also the
+   element carrying the drag gesture's own constantly-changing inline
+   transform (translate/rotate) plus will-change:transform — on Safari,
+   an element that establishes a 3D perspective context AND has its own
+   animated transform + will-change can get promoted to a compositing
+   layer in a way that breaks backface-visibility for everything inside
+   it, which is almost certainly why .swipe-card-face's own backface-
+   visibility fix alone wasn't enough: correctly hiding the rotated-away
+   face requires the perspective context itself to be stable, not just
+   the thing being hidden. Perspective now lives on this separate,
+   never-transformed wrapper instead. */
+.swipe-card-perspective {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+  -webkit-perspective: 1400px;
+}
 .swipe-card-behind {
   position: absolute;
   inset: 0.6rem 0.9rem;
@@ -6032,6 +6046,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
   position: absolute;
   inset: 0;
   transform-style: preserve-3d;
+  -webkit-transform-style: preserve-3d;
   transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1);
 }
 .swipe-card-flip-inner.flipped { transform: rotateY(180deg); }
@@ -6068,6 +6083,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border-radius: 18px;
   overflow: hidden;
   background-color: var(--surface-2, #221c11);
+  /* Belt-and-suspenders alongside .swipe-card-face's own — a rotated-
+     away face bleeding through was reproducible even with .swipe-card-
+     face's backface-visibility correctly separated from overflow/
+     radius, which turned out to trace back to .swipe-card-perspective
+     (see its own comment) rather than this element specifically. Costs
+     nothing to also set it here. */
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
 }
 .swipe-card-front-surface {
   background-size: cover;

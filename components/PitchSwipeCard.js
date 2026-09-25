@@ -135,6 +135,12 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
       <div className={`swipe-badge swipe-badge-nope ${nopeOpacity > 0.15 ? 'visible' : ''}`} style={{ opacity: nopeOpacity }}>PASS</div>
       <div className={`swipe-badge swipe-badge-skip ${skipOpacity > 0.15 ? 'visible' : ''}`} style={{ opacity: skipOpacity }}>SKIP</div>
 
+      {/* .swipe-card-perspective exists so the 3D perspective context
+          isn't established by .swipe-card itself, which also carries
+          the drag gesture's own constantly-changing transform — see
+          its own CSS comment for why that combination broke backface-
+          visibility on Safari. */}
+      <div className="swipe-card-perspective">
       {/* A tap flips this (see the TAP_THRESHOLD branch in
           handlePointerUp) — a plain CSS 3D rotate on this inner wrapper,
           independent of the outer .swipe-card's own drag transform, so
@@ -235,6 +241,7 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );
