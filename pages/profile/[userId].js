@@ -1,11 +1,10 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useRouter } from 'next/router';
 import { useState } from 'react';
-import { createPortal } from 'react-dom';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
+import PostViewerModal from '../../components/PostViewerModal';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
@@ -138,11 +137,10 @@ function formatViews(n) {
 }
 
 export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts: initialPosts, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
-  const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [posts, setPosts] = useState(initialPosts);
-  const [lightboxPost, setLightboxPost] = useState(null);
+  const [viewerIndex, setViewerIndex] = useState(null);
   const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
@@ -262,7 +260,7 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
             <div className="profile-section-divider" />
             <div className="profile-section-label">Posts</div>
             <div className="profile-posts-grid">
-              {posts.map((post) => {
+              {posts.map((post, i) => {
                 // Plain clickable <div>s, not <Link>/<a> — PostMenu's own
                 // trigger button sits inside this tile, and a button
                 // nested in a real anchor still triggers the anchor's
@@ -270,10 +268,11 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
                 // (that stops JS bubbling, not the browser's built-in
                 // anchor behavior). Same workaround already used for
                 // "Similar projects" cards in pages/pitches/[id].js.
-                const openTile = () => {
-                  if (post.kind === 'video') router.push(`/snippets/discover?post=${post.id}`);
-                  else if (post.imageUrl) setLightboxPost(post);
-                };
+                // Opens the Instagram-style viewer in place (see
+                // PostViewerModal below) rather than navigating anywhere —
+                // this used to push video posts to /snippets/discover and
+                // window.open() a photo's raw storage URL.
+                const openTile = () => setViewerIndex(i);
                 // Every tile is the same 9:16 shape now (see .profile-post-tile),
                 // matching the "+" composer's own video/thumbnail preview
                 // exactly — a video always fills it natively. A photo could be
@@ -397,17 +396,18 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
       <Footer />
       <MobileTabBar />
 
-      {lightboxPost && typeof document !== 'undefined' && createPortal((
-        <div className="post-lightbox-backdrop" onClick={() => setLightboxPost(null)}>
-          <div className="post-lightbox-card" onClick={(e) => e.stopPropagation()}>
-            <button className="post-lightbox-close" onClick={() => setLightboxPost(null)} aria-label="Close">✕</button>
-            <img className="post-lightbox-img" src={lightboxPost.imageUrl} alt="" />
-            {lightboxPost.caption && (
-              <div className="post-lightbox-caption">&ldquo;{lightboxPost.caption}&rdquo;</div>
-            )}
-          </div>
-        </div>
-      ), document.body)}
+      {viewerIndex !== null && (
+        <PostViewerModal
+          posts={posts}
+          startIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+          isOwnProfile={isOwnProfile}
+          isSignedIn={isSignedIn}
+          onDelete={deleteOwnPost}
+          onSaveCaption={editOwnPostCaption}
+          onReport={reportPost}
+        />
+      )}
     </>
   );
 }

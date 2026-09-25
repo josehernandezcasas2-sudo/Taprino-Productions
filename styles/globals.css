@@ -2512,42 +2512,102 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 2;
 }
 
-/* Tapping a photo/caption post tile used to window.open() the raw
-   storage URL — an off-site navigation with nothing else on the page.
-   This shows it full-size in place instead. */
-.post-lightbox-backdrop {
+/* Instagram-style post viewer (components/PostViewerModal.js) — clicking
+   any profile grid tile (photo or snippet alike) used to navigate away
+   entirely (window.open() to the raw storage URL, or a full-page push
+   into /snippets/discover); this opens in place instead, with prev/next
+   to step through every post without closing and reopening. */
+.post-viewer-backdrop {
   position: fixed; inset: 0;
-  background: rgba(10, 10, 14, 0.9);
+  background: rgba(10, 10, 14, 0.92);
   display: flex; align-items: center; justify-content: center;
   padding: 1.2rem;
   z-index: 300;
 }
-.post-lightbox-card {
-  position: relative;
-  max-width: min(92vw, 520px);
+.post-viewer-card {
   display: flex; flex-direction: column; align-items: center;
+  width: min(92vw, 420px);
 }
-.post-lightbox-img {
-  max-width: 100%;
-  max-height: 72vh;
-  object-fit: contain;
-  border-radius: 10px;
+/* Every post — photo, snippet, or caption-only — renders inside the
+   same fixed 9:16 box (matching the grid tile and the composer's own
+   preview), so stepping between posts doesn't jump around in size.
+   A photo is letterboxed within it exactly like the grid tile
+   (background blur behind, object-fit:contain on top) rather than
+   cropped; a snippet reuses ReelPlayer as-is, same as the reel feeds. */
+.post-viewer-media {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 78vh;
+  border-radius: 12px;
+  overflow: hidden;
   background: var(--void-1);
 }
-.post-lightbox-caption {
-  margin-top: 0.9rem;
-  color: var(--ink-dim);
+.post-viewer-media-backdrop {
+  position: absolute; inset: 0;
+  background-size: cover;
+  background-position: center;
+  filter: blur(18px) brightness(0.5);
+  transform: scale(1.15);
+}
+.post-viewer-media-img {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  object-fit: contain;
+}
+.post-viewer-caption-only {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.6rem; text-align: center;
   font-family: var(--font-body);
   font-style: italic;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  background: linear-gradient(160deg, var(--void-2), var(--void-1));
+}
+.post-viewer-caption {
+  margin-top: 0.9rem;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
   text-align: center;
 }
-.post-lightbox-close {
+.post-viewer-close {
   position: absolute;
-  top: -2.6rem; right: 0;
-  background: none; border: none; color: var(--ink);
-  font-size: 1.7rem; line-height: 1; cursor: pointer;
+  top: 0.7rem; left: 0.7rem;
+  z-index: 3;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.45);
+  color: var(--ink);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
 }
+.post-viewer-menu {
+  position: absolute;
+  top: 0.7rem; right: 0.7rem;
+  z-index: 3;
+}
+.post-viewer-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 3;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0,0,0,0.45);
+  color: var(--ink);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.post-viewer-nav-prev { left: 0.6rem; }
+.post-viewer-nav-next { right: 0.6rem; }
 
 /* Vertical discover feed — caption line identifying a user post as such,
    reusing the same slot/style series names already occupy above the
@@ -2598,7 +2658,18 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
-  z-index: 200;
+  /* Portaled to document.body just like .post-viewer-backdrop (z-index
+     300) — both are direct children of body with no shared stacking
+     context to nest inside, so this has to outrank every overlay PostMenu
+     can be opened from, not just beat its own local siblings. Without
+     this, opening PostMenu from inside the post viewer modal put this
+     dropdown BEHIND the modal's backdrop: it still existed and still
+     received the click's mousedown for handleOutside's "was this inside
+     the dropdown" check, but the click itself visually landed on the
+     higher-stacked backdrop instead of the dropdown's own buttons — Edit/
+     Delete/Report looked like they did nothing but silently closed the
+     menu every time. */
+  z-index: 400;
 }
 .post-menu-item {
   background: none;
