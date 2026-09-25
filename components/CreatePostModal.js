@@ -136,7 +136,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
     try {
       const duration = await readVideoDuration(f);
       if (duration > MAX_VIDEO_SECONDS) {
-        setVideoError(`That video is ${formatRuntime(duration)} — videos are limited to 5 minutes.`);
+        setVideoError(`That snippet is ${formatRuntime(duration)} — snippets are limited to 5 minutes.`);
         if (videoInputRef.current) videoInputRef.current.value = '';
       } else {
         setVideoFile(f);
@@ -157,7 +157,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
   async function handleVideoSubmit(e) {
     e.preventDefault();
     if (!videoFile) {
-      setVideoError('Choose a video first.');
+      setVideoError('Choose a snippet first.');
       return;
     }
     // Read before the upload starts (not in parallel with it) — this
@@ -176,7 +176,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
       null,
       'tus',
       '/api/posts/create',
-      { label: 'Posted!', meta: 'Your video is live in Discover.' }
+      { label: 'Posted!', meta: 'Your snippet is live in Discover.' }
     );
     onClose();
   }
@@ -207,7 +207,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
       <div className="modal-card create-post-card" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>
-            {step === 'choose' ? 'New post' : step === 'post' ? 'New post' : 'New video'}
+            {step === 'choose' ? 'New post' : step === 'post' ? 'New post' : 'New snippet'}
           </h3>
           <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
@@ -221,7 +221,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
             </button>
             <button type="button" className="create-post-choice" onClick={() => setStep('video')}>
               <VideoCameraIcon size={26} />
-              <span>Video</span>
+              <span>Snippet</span>
               <span className="create-post-choice-sub">Vertical clip, up to 5 minutes</span>
             </button>
           </div>
@@ -284,7 +284,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
               {!videoPreview ? (
                 <div className="create-post-dropzone-empty">
                   <VideoCameraIcon size={28} />
-                  <span>Tap to choose a video</span>
+                  <span>Tap to choose a snippet</span>
                   <span className="create-post-dropzone-hint">Vertical, up to 5 minutes</span>
                 </div>
               ) : (
@@ -297,7 +297,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
                     type="button"
                     className="create-post-dropzone-remove"
                     onClick={(e) => { e.stopPropagation(); clearVideo(); }}
-                    aria-label="Remove video"
+                    aria-label="Remove snippet"
                   >
                     <CloseIcon size={14} />
                   </button>
@@ -355,7 +355,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
 
             <div className="create-post-form-actions">
               <button className="account-btn-primary" type="submit" disabled={!videoFile || checkingVideo} style={{ width: 'auto' }}>
-                <PlusIcon size={14} /> Post video
+                <PlusIcon size={14} /> Post snippet
               </button>
               <button className="account-btn-secondary" type="button" onClick={backToChoose} style={{ width: 'auto' }}>
                 Back
