@@ -37,12 +37,29 @@ export default function PostMenu({ isOwner, isSignedIn, caption, onDelete, onRep
       const insideTrigger = wrapRef.current && wrapRef.current.contains(e.target);
       const insideDropdown = dropdownRef.current && dropdownRef.current.contains(e.target);
       if (!insideTrigger && !insideDropdown) {
+        // Blur the edit textarea ourselves, right here, rather than
+        // leaving it to happen implicitly once React unmounts it a tick
+        // later — an explicit .blur() is the one thing that tells iOS
+        // "dismiss the keyboard now" immediately on first touch. Without
+        // it, tapping outside to scroll away from an open caption editor
+        // left the keyboard (and the visual-viewport resize that comes
+        // with closing it) to resolve on its own timeline, which is what
+        // read as the popup — and the scroll itself — only settling once
+        // the finger lifted rather than the instant it touched down.
+        if (document.activeElement && dropdownRef.current && dropdownRef.current.contains(document.activeElement)) {
+          document.activeElement.blur();
+        }
         setOpen(false);
         setMode('menu');
       }
     }
+    // Passive: this listener never calls preventDefault, so marking it
+    // passive lets the browser start the scroll/pan gesture immediately
+    // on touchstart instead of waiting to confirm we won't block it —
+    // one less thing standing between "finger touches the screen" and
+    // "menu closes and scrolling begins."
     document.addEventListener('mousedown', handleOutside);
-    document.addEventListener('touchstart', handleOutside);
+    document.addEventListener('touchstart', handleOutside, { passive: true });
     return () => {
       document.removeEventListener('mousedown', handleOutside);
       document.removeEventListener('touchstart', handleOutside);
