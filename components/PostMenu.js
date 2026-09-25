@@ -63,25 +63,49 @@ export default function PostMenu({ isOwner, isSignedIn, caption, onDelete, onRep
   // so this is set before the browser paints — no visible jump.
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return undefined;
+    // Bounds come from visualViewport, not window.innerWidth/innerHeight,
+    // whenever it's available — this is the edit textarea's own on-screen
+    // keyboard case. iOS Safari doesn't shrink window.innerHeight when the
+    // keyboard opens, only visualViewport.height; a fixed-position element
+    // placed against the stale full-page height reads as sitting behind
+    // the keyboard (effectively off-screen) or jumping the moment the
+    // keyboard's height animates in. Same root cause, and same fix, as
+    // the tab bar's own --vv-bottom-gap a few files over: measure the
+    // visual viewport, not the layout one.
     function place() {
       const t = triggerRef.current.getBoundingClientRect();
       const dd = dropdownRef.current;
       const dropdownWidth = dd ? dd.offsetWidth : 180;
       const dropdownHeight = dd ? dd.offsetHeight : 0;
       const margin = 8;
+      const vv = window.visualViewport;
+      const viewportLeft = vv ? vv.offsetLeft : 0;
+      const viewportTop = vv ? vv.offsetTop : 0;
+      const viewportRight = vv ? vv.offsetLeft + vv.width : window.innerWidth;
+      const viewportBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
       let left = t.right - dropdownWidth;
-      left = Math.max(margin, Math.min(left, window.innerWidth - dropdownWidth - margin));
-      const spaceBelow = window.innerHeight - t.bottom;
+      left = Math.max(viewportLeft + margin, Math.min(left, viewportRight - dropdownWidth - margin));
+      const spaceBelow = viewportBottom - t.bottom;
       const openUpward = dropdownHeight > 0 && spaceBelow < dropdownHeight + margin && t.top > dropdownHeight + margin;
-      const top = openUpward ? t.top - dropdownHeight - 6 : t.bottom + 6;
+      let top = openUpward ? t.top - dropdownHeight - 6 : t.bottom + 6;
+      top = Math.max(viewportTop + margin, Math.min(top, viewportBottom - dropdownHeight - margin));
       setPosition({ top, left });
     }
     place();
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
+    const vv = window.visualViewport;
+    if (vv) {
+      vv.addEventListener('resize', place);
+      vv.addEventListener('scroll', place);
+    }
     return () => {
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
+      if (vv) {
+        vv.removeEventListener('resize', place);
+        vv.removeEventListener('scroll', place);
+      }
     };
   }, [open, mode]);
 
