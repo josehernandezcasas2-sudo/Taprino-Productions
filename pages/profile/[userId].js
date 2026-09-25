@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import BackButton from '../../components/BackButton';
-import { ShareIcon, CheckIcon, VideoCameraIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -262,6 +262,17 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
                   if (post.kind === 'video') router.push('/vertical/discover');
                   else if (post.imageUrl) window.open(post.imageUrl, '_blank', 'noopener,noreferrer');
                 };
+                // Every tile is the same 9:16 shape now (see .profile-post-tile),
+                // matching the "+" composer's own video/thumbnail preview
+                // exactly — a video always fills it natively. A photo could be
+                // any shape someone happens to upload, so instead of cropping
+                // it to fit (the old aspect-ratio:1/1 + background-size:cover
+                // combination — reliably wrong for anything that wasn't
+                // already square), it's shown in full via object-fit:contain,
+                // over a blurred/darkened cover-fill of the same image so the
+                // letterboxed edges aren't just bare color. Nothing ever gets
+                // unexpectedly cut off, regardless of what gets uploaded.
+                const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
                 return (
                   <div
                     key={post.id}
@@ -270,19 +281,33 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
                     tabIndex={0}
                     onClick={openTile}
                     onKeyDown={(e) => { if (e.key === 'Enter') openTile(); }}
-                    style={post.kind === 'video' && post.thumbnailUrl ? { backgroundImage: `url(${post.thumbnailUrl})` } : post.kind === 'post' && post.imageUrl ? { backgroundImage: `url(${post.imageUrl})` } : undefined}
                   >
-                    {post.kind === 'video' && (
+                    {imageSrc ? (
                       <>
-                        <span className="profile-post-tile-video-badge"><VideoCameraIcon size={16} /></span>
-                        {post.durationSeconds != null && (
-                          <span className="profile-post-tile-duration">{formatRuntime(post.durationSeconds)}</span>
-                        )}
+                        <div className="profile-post-tile-backdrop" style={{ backgroundImage: `url(${imageSrc})` }} />
+                        <div className="profile-post-tile-fg" style={{ backgroundImage: `url(${imageSrc})` }} />
                       </>
+                    ) : (
+                      <span className="profile-post-tile-caption">&ldquo;{post.caption}&rdquo;</span>
                     )}
-                    {post.kind === 'post' && !post.imageUrl && (
-                      <span className="profile-post-tile-caption">{post.caption}</span>
-                    )}
+
+                    {/* One combined badge instead of two separately-positioned
+                        pieces (a bare camera icon top-left, duration text
+                        bottom-right) — video gets icon+duration together,
+                        a photo/caption post gets its own icon so the two
+                        kinds still read apart now that their tiles are the
+                        same shape. */}
+                    <span className={`profile-post-tile-type-badge ${post.kind !== 'video' ? 'profile-post-tile-type-badge-icon-only' : ''}`}>
+                      {post.kind === 'video' ? (
+                        <>
+                          <VideoCameraIcon size={12} />
+                          {post.durationSeconds != null && formatRuntime(post.durationSeconds)}
+                        </>
+                      ) : (
+                        <ImageIcon size={12} />
+                      )}
+                    </span>
+
                     <div className="profile-post-tile-menu">
                       <PostMenu
                         isOwner={isOwnProfile}
