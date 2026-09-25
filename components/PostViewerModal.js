@@ -14,7 +14,12 @@ const REPORT_REASONS = ['Spam', 'Harassment', 'Off-topic', 'Other'];
 // parent's own state, so an edit/delete/like made from inside here (same
 // PostMenu the grid tiles already use, plus the action rail below) shows
 // up immediately — no separate copy of the post to keep in sync.
-export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfile, isSignedIn, onDelete, onSaveCaption, onReport, onToggleLike }) {
+//
+// Ownership is per-post (post.userId === viewerId), not a single blanket
+// flag — the "Posts" grid only ever shows the profile owner's own posts
+// so that used to be the same thing either way, but "Saved Snippets"
+// (posts *this viewer* liked) can belong to anyone.
+export default function PostViewerModal({ posts, startIndex, onClose, viewerId, isSignedIn, onDelete, onSaveCaption, onReport, onToggleLike }) {
   const iconOverrides = usePlayerIconOverrides();
   const [index, setIndex] = useState(startIndex);
   const [muted, setMuted] = useState(true);
@@ -97,7 +102,8 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
   }
 
   const hasMedia = post.kind === 'video' || Boolean(post.imageUrl);
-  const canReport = isSignedIn && !isOwnProfile;
+  const isOwner = Boolean(viewerId) && post.userId === viewerId;
+  const canReport = isSignedIn && !isOwner;
 
   if (typeof document === 'undefined') return null;
   return createPortal((
@@ -112,7 +118,7 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
           <button className="post-viewer-close" onClick={onClose} aria-label="Close">&times;</button>
           <div className="post-viewer-menu">
             <PostMenu
-              isOwner={isOwnProfile}
+              isOwner={isOwner}
               isSignedIn={isSignedIn}
               caption={post.caption}
               onDelete={() => onDelete(post.id)}

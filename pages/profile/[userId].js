@@ -10,7 +10,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
 import { getPitchesForCreator } from '../../lib/pitches';
 import { getBackedPitches } from '../../lib/pitchDonations';
-import { getPostsForUser } from '../../lib/posts';
+import { getPostsForUser, getLikedVideoPosts } from '../../lib/posts';
 import { formatRuntime } from '../../lib/videoMetadata';
 import { getUserRole } from '../../lib/roles';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
@@ -49,14 +49,19 @@ export async function getServerSideProps({ req, res, params }) {
   // exists, so it runs after the notFound check rather than racing it in
   // the Promise.all above — no point fetching a stranger's credited work
   // for a userId that turns out to have no profile at all.
+  const isOwnProfile = Boolean(account.userId) && account.userId === profile.userId;
   const needsViewCounts = isRedisConfigured();
-  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts, posts] = await Promise.all([
+  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts, posts, savedSnippets] = await Promise.all([
     getCreditedWork(profile.userId),
     getPitchesForCreator(profile.userId),
     getBackedPitches(profile.userId),
     getUserRole(profile.userId),
     needsViewCounts ? getViewCounts() : Promise.resolve({}),
-    getPostsForUser(profile.userId, account.userId)
+    getPostsForUser(profile.userId, account.userId),
+    // Saved Snippets — everything the VIEWER has liked, not anything
+    // about the profile owner — so there's no point fetching it for
+    // anyone but the viewer looking at their own profile.
+    isOwnProfile ? getLikedVideoPosts(account.userId) : Promise.resolve([])
   ]);
   // Public profile — only ever show approved, public pitches, never a
   // pending or rejected submission's review status.
@@ -94,6 +99,7 @@ export async function getServerSideProps({ req, res, params }) {
       pitches,
       backedPitches: backedPitchRows,
       posts,
+      savedSnippets,
       totalViews,
       knownForGenres,
       // Same priority-order rule as account.js's own role badge — an
@@ -136,11 +142,15 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts: initialPosts, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [posts, setPosts] = useState(initialPosts);
-  const [viewerIndex, setViewerIndex] = useState(null);
+  const [savedSnippets, setSavedSnippets] = useState(initialSavedSnippets);
+  // Which grid opened the viewer — 'posts' or 'saved' — plus the index
+  // into that specific array. PostViewerModal reads posts/handlers for
+  // whichever one this points at (see its render below).
+  const [viewer, setViewer] = useState(null);
   const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
@@ -187,6 +197,53 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
     setPosts((p) => p.map((post) => (post.id === postId ? { ...post, likesCount: data.likesCount, likedByViewer: data.liked } : post)));
   }
 
+  // Saved Snippets is built entirely from likes — whatever the viewer
+  // has liked (lib/posts.js's getLikedVideoPosts) is what's "saved," so
+  // unliking one from in here is what removes it, same as Instagram's
+  // own unsave. These are separate posts/handlers from the ones above:
+  // this list can include other people's posts, so it needs its own
+  // owner-or-not per post (see PostViewerModal's own viewerId prop)
+  // rather than assuming everything here belongs to isOwnProfile.
+  async function deleteSavedPost(postId) {
+    const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Could not delete that post.');
+    setSavedSnippets((p) => p.filter((post) => post.id !== postId));
+  }
+
+  async function editSavedPostCaption(postId, newCaption) {
+    const res = await fetch(`/api/posts/${postId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ caption: newCaption })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save that edit.');
+    setSavedSnippets((p) => p.map((post) => (post.id === postId ? { ...post, caption: newCaption } : post)));
+  }
+
+  async function reportSavedPost(postId, reason) {
+    await fetch('/api/posts/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId, reason })
+    }).catch(() => {});
+  }
+
+  async function toggleSavedLike(postId) {
+    const res = await fetch('/api/posts/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not update that like.');
+    if (!data.liked) {
+      setSavedSnippets((p) => p.filter((post) => post.id !== postId));
+    } else {
+      setSavedSnippets((p) => p.map((post) => (post.id === postId ? { ...post, likesCount: data.likesCount, likedByViewer: true } : post)));
+    }
+  }
+
   function share() {
     const url = typeof window !== 'undefined' ? window.location.href : '';
     if (navigator.share) {
@@ -197,6 +254,85 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
         setTimeout(() => setShareCopied(false), 2000);
       });
     }
+  }
+
+  // Shared between "Posts" (always the profile owner's own) and "Saved
+  // Snippets" (whatever the viewer liked, could belong to anyone) — the
+  // tile itself doesn't care which grid it's in, just which handlers and
+  // ownership check apply, which `source` picks.
+  function renderPostTile(post, i, source) {
+    // Plain clickable <div>s, not <Link>/<a> — PostMenu's own trigger
+    // button sits inside this tile, and a button nested in a real anchor
+    // still triggers the anchor's native navigation on click even with
+    // stopPropagation() (that stops JS bubbling, not the browser's
+    // built-in anchor behavior). Same workaround already used for
+    // "Similar projects" cards in pages/pitches/[id].js.
+    // Opens the Instagram-style viewer in place (see PostViewerModal
+    // below) rather than navigating anywhere — this used to push video
+    // posts to /snippets/discover and window.open() a photo's raw
+    // storage URL.
+    const openTile = () => setViewer({ source, index: i });
+    // Every tile is the same 9:16 shape now (see .profile-post-tile),
+    // matching the "+" composer's own video/thumbnail preview exactly —
+    // a video always fills it natively. A photo could be any shape
+    // someone happens to upload, so instead of cropping it to fit (the
+    // old aspect-ratio:1/1 + background-size:cover combination —
+    // reliably wrong for anything that wasn't already square), it's
+    // shown in full via object-fit:contain, over a blurred/darkened
+    // cover-fill of the same image so the letterboxed edges aren't just
+    // bare color. Nothing ever gets unexpectedly cut off, regardless of
+    // what gets uploaded.
+    const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
+    const isOwner = Boolean(viewerId) && post.userId === viewerId;
+    const onDeleteFn = source === 'saved' ? deleteSavedPost : deleteOwnPost;
+    const onSaveCaptionFn = source === 'saved' ? editSavedPostCaption : editOwnPostCaption;
+    const onReportFn = source === 'saved' ? reportSavedPost : reportPost;
+    return (
+      <div
+        key={post.id}
+        className="profile-post-tile"
+        role="link"
+        tabIndex={0}
+        onClick={openTile}
+        onKeyDown={(e) => { if (e.key === 'Enter') openTile(); }}
+      >
+        {imageSrc ? (
+          <>
+            <div className="profile-post-tile-backdrop" style={{ backgroundImage: `url(${imageSrc})` }} />
+            <div className="profile-post-tile-fg" style={{ backgroundImage: `url(${imageSrc})` }} />
+          </>
+        ) : (
+          <span className="profile-post-tile-caption">&ldquo;{post.caption}&rdquo;</span>
+        )}
+
+        {/* One combined badge instead of two separately-positioned
+            pieces (a bare camera icon top-left, duration text
+            bottom-right) — video gets icon+duration together, a
+            photo/caption post gets its own icon so the two kinds still
+            read apart now that their tiles are the same shape. */}
+        <span className={`profile-post-tile-type-badge ${post.kind !== 'video' ? 'profile-post-tile-type-badge-icon-only' : ''}`}>
+          {post.kind === 'video' ? (
+            <>
+              <VideoCameraIcon size={12} />
+              Snippet{post.durationSeconds != null && ` · ${formatRuntime(post.durationSeconds)}`}
+            </>
+          ) : (
+            <ImageIcon size={12} />
+          )}
+        </span>
+
+        <div className="profile-post-tile-menu">
+          <PostMenu
+            isOwner={isOwner}
+            isSignedIn={isSignedIn}
+            caption={post.caption}
+            onDelete={() => onDeleteFn(post.id)}
+            onSaveCaption={(text) => onSaveCaptionFn(post.id, text)}
+            onReport={(reason) => onReportFn(post.id, reason)}
+          />
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -275,78 +411,22 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
             <div className="profile-section-divider" />
             <div className="profile-section-label">Posts</div>
             <div className="profile-posts-grid">
-              {posts.map((post, i) => {
-                // Plain clickable <div>s, not <Link>/<a> — PostMenu's own
-                // trigger button sits inside this tile, and a button
-                // nested in a real anchor still triggers the anchor's
-                // native navigation on click even with stopPropagation()
-                // (that stops JS bubbling, not the browser's built-in
-                // anchor behavior). Same workaround already used for
-                // "Similar projects" cards in pages/pitches/[id].js.
-                // Opens the Instagram-style viewer in place (see
-                // PostViewerModal below) rather than navigating anywhere —
-                // this used to push video posts to /snippets/discover and
-                // window.open() a photo's raw storage URL.
-                const openTile = () => setViewerIndex(i);
-                // Every tile is the same 9:16 shape now (see .profile-post-tile),
-                // matching the "+" composer's own video/thumbnail preview
-                // exactly — a video always fills it natively. A photo could be
-                // any shape someone happens to upload, so instead of cropping
-                // it to fit (the old aspect-ratio:1/1 + background-size:cover
-                // combination — reliably wrong for anything that wasn't
-                // already square), it's shown in full via object-fit:contain,
-                // over a blurred/darkened cover-fill of the same image so the
-                // letterboxed edges aren't just bare color. Nothing ever gets
-                // unexpectedly cut off, regardless of what gets uploaded.
-                const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
-                return (
-                  <div
-                    key={post.id}
-                    className="profile-post-tile"
-                    role="link"
-                    tabIndex={0}
-                    onClick={openTile}
-                    onKeyDown={(e) => { if (e.key === 'Enter') openTile(); }}
-                  >
-                    {imageSrc ? (
-                      <>
-                        <div className="profile-post-tile-backdrop" style={{ backgroundImage: `url(${imageSrc})` }} />
-                        <div className="profile-post-tile-fg" style={{ backgroundImage: `url(${imageSrc})` }} />
-                      </>
-                    ) : (
-                      <span className="profile-post-tile-caption">&ldquo;{post.caption}&rdquo;</span>
-                    )}
+              {posts.map((post, i) => renderPostTile(post, i, 'posts'))}
+            </div>
+          </>
+        )}
 
-                    {/* One combined badge instead of two separately-positioned
-                        pieces (a bare camera icon top-left, duration text
-                        bottom-right) — video gets icon+duration together,
-                        a photo/caption post gets its own icon so the two
-                        kinds still read apart now that their tiles are the
-                        same shape. */}
-                    <span className={`profile-post-tile-type-badge ${post.kind !== 'video' ? 'profile-post-tile-type-badge-icon-only' : ''}`}>
-                      {post.kind === 'video' ? (
-                        <>
-                          <VideoCameraIcon size={12} />
-                          Snippet{post.durationSeconds != null && ` · ${formatRuntime(post.durationSeconds)}`}
-                        </>
-                      ) : (
-                        <ImageIcon size={12} />
-                      )}
-                    </span>
-
-                    <div className="profile-post-tile-menu">
-                      <PostMenu
-                        isOwner={isOwnProfile}
-                        isSignedIn={isSignedIn}
-                        caption={post.caption}
-                        onDelete={() => deleteOwnPost(post.id)}
-                        onSaveCaption={(text) => editOwnPostCaption(post.id, text)}
-                        onReport={(reason) => reportPost(post.id, reason)}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
+        {/* Only the viewer's own — see isOwnProfile gating in
+            getServerSideProps, which skips fetching this list entirely
+            for anyone else. Liking a snippet (the heart in
+            PostViewerModal's action rail) is what saves it here, same as
+            Instagram's own Saved collection doubling up the like. */}
+        {isOwnProfile && savedSnippets.length > 0 && (
+          <>
+            <div className="profile-section-divider" />
+            <div className="profile-section-label">Saved Snippets</div>
+            <div className="profile-posts-grid">
+              {savedSnippets.map((post, i) => renderPostTile(post, i, 'saved'))}
             </div>
           </>
         )}
@@ -411,17 +491,17 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
       <Footer />
       <MobileTabBar />
 
-      {viewerIndex !== null && (
+      {viewer && (
         <PostViewerModal
-          posts={posts}
-          startIndex={viewerIndex}
-          onClose={() => setViewerIndex(null)}
-          isOwnProfile={isOwnProfile}
+          posts={viewer.source === 'saved' ? savedSnippets : posts}
+          startIndex={viewer.index}
+          onClose={() => setViewer(null)}
+          viewerId={viewerId}
           isSignedIn={isSignedIn}
-          onDelete={deleteOwnPost}
-          onSaveCaption={editOwnPostCaption}
-          onReport={reportPost}
-          onToggleLike={toggleLike}
+          onDelete={viewer.source === 'saved' ? deleteSavedPost : deleteOwnPost}
+          onSaveCaption={viewer.source === 'saved' ? editSavedPostCaption : editOwnPostCaption}
+          onReport={viewer.source === 'saved' ? reportSavedPost : reportPost}
+          onToggleLike={viewer.source === 'saved' ? toggleSavedLike : toggleLike}
         />
       )}
     </>
