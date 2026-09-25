@@ -13,7 +13,7 @@ import { getRecommendations } from '../../lib/recommendations';
 import { getRecentVideoPosts } from '../../lib/posts';
 import { getPublicDisplayNames } from '../../lib/userProfiles';
 import { useWishlist } from '../../lib/useWishlist';
-import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical } from '../../lib/verticalFeed';
+import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical, unitKey } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
 import PostMenu from '../../components/PostMenu';
@@ -147,7 +147,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
       : null;
     const first = requested || pickerRef.current.next(seenSeriesIds.current);
     if (!first) return;
-    if (first.type === 'series') seenSeriesIds.current.add(first.seriesId);
+    seenSeriesIds.current.add(unitKey(first));
     const firstSlides = expandUnitToSlides(first);
     setDeck(firstSlides);
     contentSlideCountRef.current += firstSlides.filter((s) => s.kind === 'episode').length;
@@ -163,7 +163,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   const extendDeck = useCallback(() => {
     const next = pickerRef.current && pickerRef.current.next(seenSeriesIds.current);
     if (!next) return;
-    if (next.type === 'series') seenSeriesIds.current.add(next.seriesId);
+    seenSeriesIds.current.add(unitKey(next));
     const nextSlides = expandUnitToSlides(next);
     setDeck((d) => [...d, ...nextSlides]);
     contentSlideCountRef.current += nextSlides.filter((s) => s.kind === 'episode').length;
@@ -237,13 +237,14 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     // itself, so this is honest about what it actually does rather than
     // implying it jumps to this exact clip. Standalone clips: the regular
     // episode page, since the discover feed has no "start on this one
-    // specific standalone clip" mode to link into. A user post has neither
-    // — no episode page, no per-post deep link yet — so it just shares the
-    // feed itself.
+    // specific standalone clip" mode to link into. A user post deep-links
+    // into the dedicated snippets-only feed instead (pages/snippets/
+    // discover.js), which — unlike this mixed catalog+posts one — can
+    // actually start on that exact post via its own ?post= param.
     const url = slide.seriesId
       ? `${window.location.origin}/vertical/discover?series=${slide.seriesId}`
       : slide.episode.isUserPost
-        ? `${window.location.origin}/vertical/discover`
+        ? `${window.location.origin}/snippets/discover?post=${slide.episode.postId}`
         : `${window.location.origin}/episode/${slide.episode.id}`;
     if (navigator.share) {
       navigator.share({ title: slide.episode.title, url }).catch(() => {});

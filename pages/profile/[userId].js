@@ -2,6 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
+import { createPortal } from 'react-dom';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
@@ -141,6 +142,7 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [posts, setPosts] = useState(initialPosts);
+  const [lightboxPost, setLightboxPost] = useState(null);
   const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
@@ -269,8 +271,8 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
                 // anchor behavior). Same workaround already used for
                 // "Similar projects" cards in pages/pitches/[id].js.
                 const openTile = () => {
-                  if (post.kind === 'video') router.push('/vertical/discover');
-                  else if (post.imageUrl) window.open(post.imageUrl, '_blank', 'noopener,noreferrer');
+                  if (post.kind === 'video') router.push(`/snippets/discover?post=${post.id}`);
+                  else if (post.imageUrl) setLightboxPost(post);
                 };
                 // Every tile is the same 9:16 shape now (see .profile-post-tile),
                 // matching the "+" composer's own video/thumbnail preview
@@ -311,7 +313,7 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
                       {post.kind === 'video' ? (
                         <>
                           <VideoCameraIcon size={12} />
-                          {post.durationSeconds != null && formatRuntime(post.durationSeconds)}
+                          Snippet{post.durationSeconds != null && ` · ${formatRuntime(post.durationSeconds)}`}
                         </>
                       ) : (
                         <ImageIcon size={12} />
@@ -394,6 +396,18 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
 
       <Footer />
       <MobileTabBar />
+
+      {lightboxPost && typeof document !== 'undefined' && createPortal((
+        <div className="post-lightbox-backdrop" onClick={() => setLightboxPost(null)}>
+          <div className="post-lightbox-card" onClick={(e) => e.stopPropagation()}>
+            <button className="post-lightbox-close" onClick={() => setLightboxPost(null)} aria-label="Close">✕</button>
+            <img className="post-lightbox-img" src={lightboxPost.imageUrl} alt="" />
+            {lightboxPost.caption && (
+              <div className="post-lightbox-caption">&ldquo;{lightboxPost.caption}&rdquo;</div>
+            )}
+          </div>
+        </div>
+      ), document.body)}
     </>
   );
 }

@@ -2512,6 +2512,43 @@ button { font-family: inherit; cursor: pointer; }
   z-index: 2;
 }
 
+/* Tapping a photo/caption post tile used to window.open() the raw
+   storage URL — an off-site navigation with nothing else on the page.
+   This shows it full-size in place instead. */
+.post-lightbox-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(10, 10, 14, 0.9);
+  display: flex; align-items: center; justify-content: center;
+  padding: 1.2rem;
+  z-index: 300;
+}
+.post-lightbox-card {
+  position: relative;
+  max-width: min(92vw, 520px);
+  display: flex; flex-direction: column; align-items: center;
+}
+.post-lightbox-img {
+  max-width: 100%;
+  max-height: 72vh;
+  object-fit: contain;
+  border-radius: 10px;
+  background: var(--void-1);
+}
+.post-lightbox-caption {
+  margin-top: 0.9rem;
+  color: var(--ink-dim);
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 0.85rem;
+  text-align: center;
+}
+.post-lightbox-close {
+  position: absolute;
+  top: -2.6rem; right: 0;
+  background: none; border: none; color: var(--ink);
+  font-size: 1.7rem; line-height: 1; cursor: pointer;
+}
+
 /* Vertical discover feed — caption line identifying a user post as such,
    reusing the same slot/style series names already occupy above the
    title (see .reel-caption-series in pages/vertical/discover.js). */
@@ -6139,6 +6176,17 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .reel-end-btn.primary { background: var(--olive); color: var(--void); border-color: var(--olive); }
 .reel-end-btn.secondary { background: transparent; color: var(--ink); border-color: rgba(251,232,211,0.4); }
 .reel-end-home { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); text-decoration: underline; margin-top: 0.4rem; }
+
+/* Empty state for pages/snippets/discover.js — no posts to swipe through
+   yet, so there's no .reel-slide to host a normal .reel-end-card inside;
+   this is the same look, just anchored to the full viewport directly. */
+.reel-feed-empty {
+  position: fixed; inset: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  padding: 2rem;
+  background: linear-gradient(to bottom, var(--surface-1) 0%, var(--void) 100%);
+  text-align: center;
+}
 
 /* ============================================================
    Browse other vertical series (pages/vertical/browse.js)

@@ -16,6 +16,16 @@ const nextConfig = {
         protocol: 'https',
         hostname: '*.supabase.co',
         pathname: '/storage/v1/object/public/**'
+      },
+      // A video post's poster (components/ReelPlayer.js) falls back to
+      // Cloudflare Stream's own auto-grabbed frame (lib/cloudflareUpload.js's
+      // cloudflareThumbnailUrl) whenever no custom thumbnail was uploaded —
+      // that URL lives on this host, not Supabase Storage, and next/image
+      // throws on any src outside the allowlist above without this.
+      {
+        protocol: 'https',
+        hostname: 'customer-*.cloudflarestream.com',
+        pathname: '/**'
       }
     ]
   }
