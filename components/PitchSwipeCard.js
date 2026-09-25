@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { HeartIcon, CloseIcon, InfoIcon } from './PlayerIcons';
+import { HeartIcon, CloseIcon, InfoIcon, BackArrowIcon } from './PlayerIcons';
 
 const THRESHOLD_X = 100; // px horizontal drag to commit like/dislike
 const THRESHOLD_Y = 120; // px vertical drag to commit skip — taller than
@@ -40,6 +40,15 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
     // otherwise a stray right-click or a second touch finger could start
     // tracking a drag the user never intended.
     if (e.button !== undefined && e.button !== 0) return;
+    // The back face's own content (description/team/funding) can be
+    // taller than the card and needs to scroll on its own — if this
+    // still claimed the touch, every attempt to read a long pitch would
+    // drag/swipe the whole card out from under it instead. Left entirely
+    // to native scrolling (see touch-action:pan-y on .swipe-card-back-
+    // body); flipping back to front from here uses its own explicit
+    // button rather than "tap anywhere," since a tap here can no longer
+    // be told apart from the start of a scroll.
+    if (e.target.closest && e.target.closest('.swipe-card-back-body')) return;
     startRef.current = { x: e.clientX, y: e.clientY };
     pointerIdRef.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -133,7 +142,11 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
       <div className={`swipe-card-flip-inner ${flipped ? 'flipped' : ''}`}>
         <div className="swipe-card-face swipe-card-front" style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}>
           <div className="swipe-card-scrim" />
-          <div className="swipe-card-flip-hint"><InfoIcon size={13} /> Tap for more</div>
+          {/* Hidden mid-drag — it shares the top-right corner with the
+              PASS badge (see .swipe-badge-nope), so the two would
+              otherwise sit on top of each other the moment a leftward
+              drag starts. */}
+          <div className={`swipe-card-flip-hint ${drag.dragging ? 'swipe-card-flip-hint-hidden' : ''}`}><InfoIcon size={13} /> Tap for more</div>
           <div className="swipe-card-body">
             {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
             <h2>{pitch.title}</h2>
@@ -155,6 +168,23 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
         </div>
 
         <div className="swipe-card-face swipe-card-back">
+          {/* An explicit control rather than "tap anywhere to flip back"
+              — the body below scrolls on its own (see
+              .swipe-card-back-body's touch-action and the matching skip
+              in handlePointerDown), so a tap landing on that scrollable
+              text can no longer be told apart from the start of a
+              scroll gesture. stopPropagation on pointerdown keeps this
+              out of the drag-tracking entirely, same pattern as the
+              creator link and "View full pitch" below. */}
+          <button
+            type="button"
+            className="swipe-card-back-btn"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => setFlipped(false)}
+            aria-label="Back to front"
+          >
+            <BackArrowIcon size={13} /> Back
+          </button>
           <div className="swipe-card-body swipe-card-back-body">
             {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
             <h2>{pitch.title}</h2>

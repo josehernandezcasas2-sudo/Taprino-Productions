@@ -5894,6 +5894,26 @@ body:has(.mini-player) { padding-bottom: 72px; }
   background: var(--void);
   text-align: center;
 }
+/* Floats over the top of the stage instead of sitting in the centered
+   flex column with the card — a banner (admin-bypass notice, sign-in
+   prompt, a save error) used to push the card down off true-center by
+   however tall it happened to be, since centering the whole column
+   together meant the card's position depended on whether a banner was
+   present at all. This keeps the card centered on the viewport
+   regardless of banner state; .pitch-discover-stage's own overflow-y:
+   auto is still there as a fallback for the rare case where a banner
+   and a tall card genuinely can't both fit. */
+.pitch-discover-banners {
+  position: absolute;
+  top: max(4.2rem, calc(3.4rem + env(safe-area-inset-top, 0px)));
+  left: 1.2rem;
+  right: 1.2rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+}
 /* Below 1180px the tab bar is visible (see MobileTabBar/.tabbar's own
    breakpoint) — reserve room for its floating pill so the card and swipe
    buttons never sit underneath it. */
@@ -6011,13 +6031,71 @@ body:has(.mini-player) { padding-bottom: 72px; }
   padding: 0.25rem 0.55rem;
   border-radius: 999px;
   pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.15s ease;
 }
+/* Shares the top-right corner with .swipe-badge-nope (both anchor near
+   top:1.6rem/right:1.4rem) — faded out instead of repositioned, so this
+   stays correct regardless of which badge (like/nope/skip) is actually
+   showing at a given moment during the drag. */
+.swipe-card-flip-hint-hidden { opacity: 0; }
+.swipe-card-back-btn {
+  position: absolute;
+  top: 0.9rem;
+  left: 1rem;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.35);
+  border: none;
+  padding: 0.3rem 0.6rem 0.3rem 0.5rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+.swipe-card-back-btn:hover { background: rgba(0, 0, 0, 0.5); }
 .swipe-card-back-body {
-  position: static;
   width: 100%;
+  /* min-height:0 overrides the flex default of auto, which would
+     otherwise let this refuse to shrink below its own content's natural
+     height inside .swipe-card-back's column flex — without it, a long
+     description could push past max-height instead of actually
+     scrolling within it. */
+  min-height: 0;
   max-height: 100%;
   overflow-y: auto;
-  padding: 1.3rem;
+  /* Lets a touch that starts on this element pan it vertically instead
+     of being claimed by .swipe-card's own touch-action:none (there for
+     the drag-to-swipe gesture) — paired with the matching skip in
+     PitchSwipeCard.js's handlePointerDown, which stops this element's
+     touches from ALSO being read as a card drag at the same time. */
+  touch-action: pan-y;
+}
+/* Compound selector, not just .swipe-card-back-body — this element
+   carries both classes (className="swipe-card-body swipe-card-back-
+   body"), and .swipe-card-body's own padding rule below shares this
+   class's exact specificity but comes later in the file, so a plain
+   .swipe-card-back-body { padding-top: ... } here was silently losing
+   to it. The extra top padding clears .swipe-card-back-btn, which sits
+   absolutely positioned over this same corner. */
+.swipe-card-body.swipe-card-back-body { padding-top: 2.6rem; }
+/* .pitch-tag is shared with poster-overlay badges elsewhere (hence its
+   own position:absolute; top:0.6rem; left:0.6rem) — an absolutely
+   positioned element's offsets are measured from its containing
+   block's PADDING edge, not its content edge, so no amount of
+   padding-top up there actually moves it: it was landing at a fixed
+   spot regardless, which happened to be directly on .swipe-card-back-
+   btn. Simplest fix is to stop it from being absolutely positioned
+   here at all — flow it normally as plain content above the title,
+   which is what it visually reads as anyway. */
+.swipe-card-back-body .pitch-tag {
+  position: static;
+  display: inline-block;
+  margin-bottom: 0.5rem;
 }
 .swipe-card-description {
   font-size: 0.86rem;

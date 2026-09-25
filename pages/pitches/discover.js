@@ -241,19 +241,21 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
           <CloseIcon size={16} />
         </button>
 
-        {bypassingDisabled && (
-          <div className="admin-preview-banner pitch-discover-banner">
-            ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
-            <Link href="/admin">Go turn it back on</Link>
-          </div>
-        )}
-        {saveError && <div className="admin-preview-banner pitch-discover-banner">{saveError}</div>}
-        {requireSignIn && (
-          <div className="poster-empty pitch-discover-banner">
-            Sign in to like and follow projects — you can still browse without an account, but likes
-            won&rsquo;t be saved anywhere.
-          </div>
-        )}
+        <div className="pitch-discover-banners">
+          {bypassingDisabled && (
+            <div className="admin-preview-banner pitch-discover-banner">
+              ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.
+              <Link href="/admin">Go turn it back on</Link>
+            </div>
+          )}
+          {saveError && <div className="admin-preview-banner pitch-discover-banner">{saveError}</div>}
+          {requireSignIn && (
+            <div className="poster-empty pitch-discover-banner">
+              Sign in to like and follow projects — you can still browse without an account, but likes
+              won&rsquo;t be saved anywhere.
+            </div>
+          )}
+        </div>
 
         <div className="swipe-deck-wrap">
           {loading ? (
