@@ -22,7 +22,17 @@ import { SITE } from '../../lib/siteConfig';
 const MAX_GENRE_TAGS = 4;
 
 export async function getServerSideProps({ req, res, params }) {
-  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  // Signed-in requests skip the shared cache entirely — same rule as
+  // about.js/channel.js/stream.js/etc. Without this, a creator who just
+  // posted and immediately checks their own profile can be served an
+  // edge-cached copy from before their post existed, for up to five
+  // minutes (longer under stale-while-revalidate).
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  }
 
   const account = await getAccountContext(req);
   const [episodes, profile] = await Promise.all([
