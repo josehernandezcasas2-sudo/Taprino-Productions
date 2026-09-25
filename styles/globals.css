@@ -2541,6 +2541,14 @@ button { font-family: inherit; cursor: pointer; }
   font: inherit;
   font-size: 0.82rem;
 }
+/* iOS Safari auto-zooms the whole page on focus for any input under
+   16px — 0.82rem (~13px) is well below that threshold, which is why
+   tapping into this exact textarea "zoomed in." Same fix already used
+   for .header-search-input: only force 16px at the breakpoint where the
+   zoom actually triggers, so the compact desktop size is untouched. */
+@media (max-width: 900px) {
+  .post-menu-edit textarea { font-size: 16px; }
+}
 .post-menu-edit-error { color: var(--danger); font-size: 0.75rem; margin: 0; }
 .post-menu-edit-actions { display: flex; gap: 0.4rem; }
 
