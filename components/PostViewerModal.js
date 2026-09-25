@@ -2,19 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import PostMenu from './PostMenu';
 import ReelPlayer from './ReelPlayer';
+import { HeartIcon, ShareIcon, CheckIcon, WarningIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const SWIPE_THRESHOLD = 50;
+const REPORT_REASONS = ['Spam', 'Harassment', 'Off-topic', 'Other'];
 
 // Instagram-style post viewer — opens in place over the profile grid
 // instead of navigating anywhere, and lets you step through every post
 // (photos and snippets mixed, same order as the grid) without closing
 // and reopening. `posts` and the index into it are read live from the
-// parent's own state, so an edit/delete made from the PostMenu inside
-// here (same component the grid tiles already use) shows up immediately
-// — no separate copy of the post to keep in sync.
-export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfile, isSignedIn, onDelete, onSaveCaption, onReport }) {
+// parent's own state, so an edit/delete/like made from inside here (same
+// PostMenu the grid tiles already use, plus the action rail below) shows
+// up immediately — no separate copy of the post to keep in sync.
+export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfile, isSignedIn, onDelete, onSaveCaption, onReport, onToggleLike }) {
+  const iconOverrides = usePlayerIconOverrides();
   const [index, setIndex] = useState(startIndex);
   const [muted, setMuted] = useState(true);
+  const [shareCopied, setShareCopied] = useState(false);
+  // 'closed' | 'picking' | 'reported' — reset on every post change so
+  // switching to the next post never carries over the last one's
+  // half-open reason picker or "Reported" confirmation.
+  const [reportState, setReportState] = useState('closed');
   const touchStartX = useRef(null);
   const post = posts[index];
 
@@ -33,6 +41,10 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
     document.addEventListener('keydown', onKeyDown);
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [posts.length, onClose]);
+
+  useEffect(() => {
+    setReportState('closed');
+  }, [index]);
 
   // A delete can shrink `posts` out from under the index this modal is
   // showing (see the component doc above) — this is the fallback for
@@ -60,7 +72,32 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
     else goPrev();
   }
 
+  // A snippet already has a real deep link (pages/snippets/discover.js's
+  // ?post= param). A photo/caption post has no permalink of its own yet
+  // — the profile page is the only place it lives — so that's what gets
+  // shared for now, same honesty-over-pretending tradeoff vertical/
+  // discover.js's own share() already makes for a different gap.
+  function share() {
+    const url = post.kind === 'video'
+      ? `${window.location.origin}/snippets/discover?post=${post.id}`
+      : window.location.href;
+    if (navigator.share) {
+      navigator.share({ title: post.caption || undefined, url }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(url).then(() => {
+        setShareCopied(true);
+        setTimeout(() => setShareCopied(false), 2000);
+      });
+    }
+  }
+
+  async function handleReport(reason) {
+    setReportState('reported');
+    await onReport(post.id, reason).catch(() => {});
+  }
+
   const hasMedia = post.kind === 'video' || Boolean(post.imageUrl);
+  const canReport = isSignedIn && !isOwnProfile;
 
   if (typeof document === 'undefined') return null;
   return createPortal((
@@ -108,6 +145,56 @@ export default function PostViewerModal({ posts, startIndex, onClose, isOwnProfi
             </>
           ) : (
             <div className="post-viewer-caption-only">&ldquo;{post.caption}&rdquo;</div>
+          )}
+
+          <div className="reel-action-rail post-viewer-action-rail">
+            {isSignedIn && (
+              <div className="reel-action-item">
+                <button
+                  type="button"
+                  className={`reel-action-btn ${post.likedByViewer ? 'active' : ''}`}
+                  onClick={() => onToggleLike(post.id)}
+                  aria-label={post.likedByViewer ? 'Unlike' : 'Like'}
+                >
+                  <HeartIcon active={post.likedByViewer} size={20} />
+                </button>
+                {post.likesCount > 0 && <span className="reel-action-count">{post.likesCount}</span>}
+              </div>
+            )}
+
+            <div className="reel-action-item">
+              <button type="button" className="reel-action-btn" onClick={share} aria-label="Share">
+                {shareCopied ? <CheckIcon size={20} /> : <ShareIcon src={iconOverrides.share} size={20} />}
+              </button>
+            </div>
+
+            {canReport && (
+              <div className="reel-action-item">
+                <button
+                  type="button"
+                  className="reel-action-btn"
+                  onClick={() => setReportState((s) => (s === 'picking' ? 'closed' : 'picking'))}
+                  aria-label="Report"
+                  aria-expanded={reportState === 'picking'}
+                >
+                  <WarningIcon size={20} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {reportState === 'picking' && (
+            <div className="post-viewer-report-popover" onClick={(e) => e.stopPropagation()}>
+              {REPORT_REASONS.map((r) => (
+                <button key={r} type="button" className="post-menu-item" onClick={() => handleReport(r)}>{r}</button>
+              ))}
+              <button type="button" className="post-menu-item" onClick={() => setReportState('closed')}>Cancel</button>
+            </div>
+          )}
+          {reportState === 'reported' && (
+            <div className="post-viewer-report-popover" onClick={(e) => e.stopPropagation()}>
+              <div className="post-menu-note">Reported — thank you.</div>
+            </div>
           )}
         </div>
 

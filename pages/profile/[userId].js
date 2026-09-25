@@ -56,7 +56,7 @@ export async function getServerSideProps({ req, res, params }) {
     getBackedPitches(profile.userId),
     getUserRole(profile.userId),
     needsViewCounts ? getViewCounts() : Promise.resolve({}),
-    getPostsForUser(profile.userId)
+    getPostsForUser(profile.userId, account.userId)
   ]);
   // Public profile — only ever show approved, public pitches, never a
   // pending or rejected submission's review status.
@@ -170,6 +170,21 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ postId, reason })
     }).catch(() => {});
+  }
+
+  async function toggleLike(postId) {
+    const res = await fetch('/api/posts/like', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ postId })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not update that like.');
+    // Trusts the server's fresh count/liked state over an optimistic
+    // guess — two taps in quick succession (or two tabs) racing each
+    // other should settle on whatever actually landed, not whichever
+    // request's optimistic update happened to render last.
+    setPosts((p) => p.map((post) => (post.id === postId ? { ...post, likesCount: data.likesCount, likedByViewer: data.liked } : post)));
   }
 
   function share() {
@@ -406,6 +421,7 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
           onDelete={deleteOwnPost}
           onSaveCaption={editOwnPostCaption}
           onReport={reportPost}
+          onToggleLike={toggleLike}
         />
       )}
     </>

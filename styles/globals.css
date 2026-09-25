@@ -6228,6 +6228,57 @@ body:has(.mini-player) { padding-bottom: 72px; }
   background: var(--ink);
   cursor: pointer;
 }
+.reel-mute-toggle {
+  position: absolute;
+  left: 0.7rem;
+  bottom: 2.3rem;
+  z-index: 3;
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+
+/* Like/share/report rail on the post viewer (components/
+   PostViewerModal.js) — reuses .reel-action-rail/.reel-action-btn as-is
+   (already styled for the vertical feeds), just pulled up off the very
+   bottom edge so it clears the progress bar/mute toggle a snippet slide
+   also has there, which a full-screen feed slide never needs to share
+   space with. */
+.post-viewer-action-rail {
+  bottom: 2.3rem;
+}
+.reel-action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+}
+.reel-action-count {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--ink-dim);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+.post-viewer-report-popover {
+  position: absolute;
+  right: 3.4rem;
+  bottom: 2.3rem;
+  z-index: 5;
+  min-width: 150px;
+  background: rgba(20, 19, 12, 0.97);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(251, 232, 211, 0.12);
+  border-radius: 10px;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  padding: 0.35rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
 
 .reel-close {
   position: absolute;

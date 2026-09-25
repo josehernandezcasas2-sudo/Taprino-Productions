@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
-import { PlayIcon, PauseIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { PlayIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Deliberately not VideoPlayer.js — that component carries ads, captions,
 // quality settings, and watch-progress tracking that the immersive reel
@@ -107,7 +107,7 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
   }
 
   return (
-    <div className="reel-video-wrap" onClick={onToggleMute}>
+    <div className="reel-video-wrap" onClick={showControls ? togglePlayPause : onToggleMute}>
       {loading && thumbnail && <Image src={thumbnail} alt="" fill sizes="480px" className="reel-video-poster" />}
       <video
         ref={videoRef}
@@ -126,13 +126,25 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
 
       {showControls && (
         <>
+          {/* Purely decorative — the whole wrap above already toggles
+              play/pause on tap, so this can't also be a button of its
+              own without double-firing the toggle (tap bubbles from the
+              icon to the wrap, both would fire). Only shown while
+              paused; playing needs no affordance, same as it not
+              needing one while it's already going. */}
+          {paused && (
+            <div className="reel-play-toggle" aria-hidden="true">
+              <PlayIcon size={26} src={iconOverrides.play} />
+            </div>
+          )}
+
           <button
             type="button"
-            className="reel-play-toggle"
-            onClick={togglePlayPause}
-            aria-label={paused ? 'Play' : 'Pause'}
+            className="reel-mute-toggle"
+            onClick={(e) => { e.stopPropagation(); onToggleMute(); }}
+            aria-label={muted ? 'Unmute' : 'Mute'}
           >
-            {paused ? <PlayIcon size={22} src={iconOverrides.play} /> : <PauseIcon size={22} src={iconOverrides.pause} />}
+            <VolumeIcon muted={muted} size={17} src={muted ? iconOverrides.volume_muted : iconOverrides.volume_on} />
           </button>
 
           <div
