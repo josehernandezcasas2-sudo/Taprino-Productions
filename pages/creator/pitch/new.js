@@ -8,7 +8,13 @@ import Footer from '../../../components/Footer';
 import AddPitchForm from '../../../components/AddPitchForm';
 import { SITE } from '../../../lib/siteConfig';
 
-export async function getServerSideProps({ req }) {
+export async function getServerSideProps({ req, res }) {
+  // Creator-only, never publicly reachable (see the redirect below) —
+  // same unconditional private header every other creator-dashboard page
+  // uses (pages/creator.js, pages/creator/series.js, etc). This page had
+  // no Cache-Control set at all.
+  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+
   const account = await getAccountContext(req);
   // Same gate as the video-episode submission page — pitch submission
   // requires the creator role, not just any signed-in account.

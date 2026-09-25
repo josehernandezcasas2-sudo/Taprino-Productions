@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
@@ -23,7 +24,18 @@ import { SITE } from '../lib/siteConfig';
 // lib/userProfiles.js getFeaturedCreators), so it shows the most
 // recently active real creators instead — a reasonable stand-in until
 // that curation exists, not a design shortcut.
-export async function getServerSideProps({ req }) {
+export async function getServerSideProps({ req, res }) {
+  // Same signed-in-vs-anonymous split as stream.js/channel.js/etc. — this
+  // is the most-visited page in the app and had no Cache-Control at all,
+  // so every request (including every anonymous one that could safely
+  // share a cached response) was hitting getServerSideProps fresh.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  }
+
   const account = await getAccountContext(req);
   const needsViewCounts = isRedisConfigured();
   const [episodes, announcements, featuredCreators, pitchRows, allSeries, liveStream, viewCounts] = await Promise.all([
@@ -169,10 +181,11 @@ export default function Home({
           <div className="zine-hero">
             <div className="zine-hero-collage">
               <div className="zine-hero-art-wrap">
-                <div
-                  className="zine-hero-art"
-                  style={heroItem.poster || heroItem.heroImage ? { backgroundImage: `url(${heroItem.poster || heroItem.heroImage})` } : undefined}
-                />
+                <div className="zine-hero-art">
+                  {(heroItem.poster || heroItem.heroImage) && (
+                    <Image src={heroItem.poster || heroItem.heroImage} alt="" fill sizes="(max-width: 640px) 100vw, 380px" className="zine-fill-img" priority />
+                  )}
+                </div>
                 <div className="zine-hero-art-tag">NOW STREAMING</div>
               </div>
               <div className="zine-hero-text">
@@ -190,7 +203,8 @@ export default function Home({
             <div className="zine-filmstrip">
               {trending.map((item, i) => (
                 <Link key={`${item.isSeries ? 'series' : 'ep'}-${item.id}`} href={item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`} className="zine-filmstrip-item">
-                  <div className="zine-filmstrip-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined}>
+                  <div className="zine-filmstrip-poster">
+                    {item.poster && <Image src={item.poster} alt="" fill sizes="150px" className="zine-fill-img" />}
                     <span className="zine-trending-rank">#{i + 1}</span>
                   </div>
                   <h5>{item.title}</h5>
@@ -229,7 +243,9 @@ export default function Home({
             <div className="zine-people-row">
               {featuredCreators.map((c) => (
                 <Link key={c.userId} href={`/profile/${c.userId}`} className="zine-polaroid">
-                  <div className="zine-polaroid-photo" style={c.avatarUrl ? { backgroundImage: `url(${c.avatarUrl})` } : undefined} />
+                  <div className="zine-polaroid-photo">
+                    {c.avatarUrl && <Image src={c.avatarUrl} alt="" fill sizes="140px" className="zine-fill-img" />}
+                  </div>
                   <h5>{c.displayName}</h5>
                   <span className="zine-credit">{c.credits.slice(0, 2).join(', ')}</span>
                 </Link>
@@ -244,7 +260,9 @@ export default function Home({
             <div className="zine-filmstrip">
               {filmsAndShorts.map((e) => (
                 <Link key={e.id} href={`/episode/${e.id}`} className="zine-filmstrip-item">
-                  <div className="zine-filmstrip-poster" style={e.poster ? { backgroundImage: `url(${e.poster})` } : undefined} />
+                  <div className="zine-filmstrip-poster">
+                    {e.poster && <Image src={e.poster} alt="" fill sizes="150px" className="zine-fill-img" />}
+                  </div>
                   <h5>{e.title}</h5>
                   <span>{e.contentType === 'movie' ? 'FILM' : 'SHORT'}{e.runtime ? ` · ${e.runtime}` : ''}</span>
                 </Link>
@@ -262,7 +280,9 @@ export default function Home({
             <div className="zine-filmstrip">
               {seriesRows.map((s) => (
                 <Link key={s.id} href={`/series/${s.id}`} className="zine-filmstrip-item">
-                  <div className="zine-filmstrip-poster" style={s.poster ? { backgroundImage: `url(${s.poster})` } : undefined} />
+                  <div className="zine-filmstrip-poster">
+                    {s.poster && <Image src={s.poster} alt="" fill sizes="150px" className="zine-fill-img" />}
+                  </div>
                   <h5>{s.title}</h5>
                   <span>{s.count} episode{s.count === 1 ? '' : 's'}</span>
                 </Link>

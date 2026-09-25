@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import Image from 'next/image';
 import PostMenu from './PostMenu';
 import ReelPlayer from './ReelPlayer';
 import { HeartIcon, ShareIcon, CheckIcon, WarningIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -146,8 +147,13 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
             />
           ) : post.imageUrl ? (
             <>
-              <div className="post-viewer-media-backdrop" style={{ backgroundImage: `url(${post.imageUrl})` }} />
-              <img className="post-viewer-media-img" src={post.imageUrl} alt="" />
+              {/* Two renders of the same photo, but both now go through
+                  next/image's optimizer (resized + WebP/AVIF) instead of
+                  each fetching the full original — this used to be a
+                  CSS background-image plus a separate plain <img>,
+                  downloading the same file twice at full resolution. */}
+              <Image src={post.imageUrl} alt="" fill sizes="420px" className="post-viewer-media-backdrop" quality={20} />
+              <Image src={post.imageUrl} alt="" fill sizes="420px" className="post-viewer-media-img" />
             </>
           ) : (
             <div className="post-viewer-caption-only">&ldquo;{post.caption}&rdquo;</div>

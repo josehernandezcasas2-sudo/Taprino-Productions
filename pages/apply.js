@@ -10,7 +10,16 @@ import { SITE } from '../lib/siteConfig';
 import Footer from '../components/Footer';
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
-export async function getServerSideProps({ req }) {
+export async function getServerSideProps({ req, res }) {
+  // Same public-page-with-optional-personalization split as about.js/
+  // contact.js — this page had no Cache-Control at all.
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+  }
+
   const account = await getAccountContext(req);
   const episodes = await getPublicEpisodes();
   return {

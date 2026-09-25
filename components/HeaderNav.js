@@ -375,9 +375,12 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
           aria-label="Account menu"
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
-          style={ownAvatarUrl ? { backgroundImage: `url(${ownAvatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
         >
-          {!ownAvatarUrl && (isSignedIn ? avatarLetter : '☺')}
+          {ownAvatarUrl ? (
+            <Image src={ownAvatarUrl} alt="" fill sizes="34px" className="avatar-img" />
+          ) : (
+            isSignedIn ? avatarLetter : '☺'
+          )}
         </button>
 
         {openMenu === 'account' && (
@@ -386,8 +389,12 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               <>
                 {ownProfileHref ? (
                   <Link href={ownProfileHref} className="account-dropdown-header account-dropdown-header-link" onClick={() => setOpenMenu(null)}>
-                    <div className="account-dropdown-avatar" style={ownAvatarUrl ? { backgroundImage: `url(${ownAvatarUrl})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}>
-                      {!ownAvatarUrl && (avatarLetter || '☺')}
+                    <div className="account-dropdown-avatar">
+                      {ownAvatarUrl ? (
+                        <Image src={ownAvatarUrl} alt="" fill sizes="38px" className="avatar-img" />
+                      ) : (
+                        avatarLetter || '☺'
+                      )}
                     </div>
                     <div>
                       <div className="account-dropdown-email">{email || 'Your account'}</div>

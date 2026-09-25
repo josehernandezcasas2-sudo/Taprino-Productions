@@ -273,6 +273,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .account-dropdown-header-link:hover { background: rgba(251, 232, 211, 0.06); }
 .account-dropdown-avatar {
+  position: relative;
+  overflow: hidden;
   flex: 0 0 auto;
   width: 38px;
   height: 38px;
@@ -2544,9 +2546,11 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--void-1);
 }
 .post-viewer-media-backdrop {
-  position: absolute; inset: 0;
-  background-size: cover;
-  background-position: center;
+  /* next/image's `fill` sets position/inset/width/height itself; this
+     just needs the crop-to-fill behavior a plain <img> doesn't get for
+     free the way a CSS background-image used to. */
+  object-fit: cover;
+  object-position: center;
   filter: blur(18px) brightness(0.5);
   transform: scale(1.15);
 }
@@ -4671,6 +4675,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .tapa-plus-pill:hover { background: var(--olive-bright); }
 
 .avatar-btn {
+  position: relative;
+  overflow: hidden;
   width: 34px;
   height: 34px;
   min-width: 34px;
@@ -4687,6 +4693,12 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   flex-shrink: 0;
 }
 .avatar-btn:hover, .avatar-btn.active { background: var(--brass-deep); }
+/* next/image `fill` child for both the nav avatar button and the account
+   dropdown's own avatar — swapped from a CSS background-image, which
+   downloaded whatever resolution a creator actually uploaded (nothing
+   in the upload path resizes it) to show a ~34-38px circle, on every
+   single page load via HeaderNav. */
+.avatar-img { object-fit: cover; }
 
 /* Below this width there's no room for the full link row — collapse to
    logo + hamburger (which already carries every type link plus genres)
@@ -6726,15 +6738,20 @@ body:has(.mini-player) { padding-bottom: 72px; }
    shrinking the image was flexbox's first resort instead. */
 .zine-hero-art-wrap { position: relative; margin-right: -1.5rem; z-index: 2; flex-shrink: 0; }
 .zine-hero-art {
+  position: relative;
   width: 380px;
   max-width: 100%;
   height: 260px;
   border: 6px solid var(--ink);
   transform: rotate(-3deg);
-  background-size: cover;
-  background-position: center;
   background-color: var(--surface-2);
 }
+/* Shared by every zine-* poster/avatar that switched from a CSS
+   background-image to a next/image `fill` child (hero art, filmstrip
+   posters, polaroid photos) — `fill` handles position/inset/width/height
+   itself, this is just the "crop to cover, don't stretch" behavior the
+   background-image shorthand used to give for free. */
+.zine-fill-img { object-fit: cover; object-position: center; }
 .zine-hero-art-tag {
   position: absolute;
   top: -0.8rem;
@@ -6809,10 +6826,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-polaroid:nth-child(3n) { transform: rotate(1.5deg); }
 .zine-polaroid:nth-child(4n) { transform: rotate(-1deg); margin-top: 0.5rem; }
 .zine-polaroid-photo {
+  position: relative;
   width: 100%;
   height: 110px;
-  background-size: cover;
-  background-position: center;
   background-color: var(--surface-2);
   margin-bottom: 0.6rem;
 }
@@ -6830,8 +6846,6 @@ body:has(.mini-player) { padding-bottom: 72px; }
      of looking like an actual poster. */
   width: 100%;
   aspect-ratio: 2 / 3;
-  background-size: cover;
-  background-position: center;
   background-color: var(--surface-2);
   margin-bottom: 0.6rem;
   border: 3px solid var(--surface-0);

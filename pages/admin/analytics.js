@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 
 export async function getServerSideProps({ req, res }) {
+  // Same unconditional private header every other pages/admin/*.js file
+  // sets — this one and admin/theme.js were the two outliers with none.
+  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+
   const account = await getAccountContext(req);
   if (!account.isAdmin) {
     res.statusCode = 404;
