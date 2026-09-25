@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSmartBack } from '../../components/BackButton';
@@ -68,8 +68,39 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const [likedPitches, setLikedPitches] = useState([]);
   const [finished, setFinished] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  const bannersRef = useRef(null);
 
   const current = deck[0];
+
+  // .pitch-discover-banners floats over the stage rather than sitting in
+  // the centered flex column (see its own CSS comment) so the card stays
+  // centered on the viewport regardless of whether a banner is showing —
+  // but a fixed top offset for that banner can't know how tall its own
+  // text will actually wrap to at a given width (three lines on a narrow
+  // phone vs. one on desktop), so a sufficiently long banner on a
+  // sufficiently narrow screen could still overlap a big enough card.
+  // Measuring the banner's real height and feeding it back in as
+  // --pitch-banner-clearance (consumed by .swipe-deck-wrap) means the
+  // deck only ever gives up exactly as much room as this specific
+  // banner, on this specific screen, actually needs — same pattern
+  // MobileTabBar.js already uses for --vv-bottom-gap. ResizeObserver
+  // (not just a window resize listener) also catches the banner's own
+  // height changing from text reflow alone, e.g. a saveError banner
+  // appearing/changing without any viewport resize at all.
+  useEffect(() => {
+    const el = bannersRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return undefined;
+    const observer = new ResizeObserver(([entry]) => {
+      const height = entry.contentRect.height;
+      const clearance = height > 0 ? height + 24 : 0;
+      document.documentElement.style.setProperty('--pitch-banner-clearance', `${clearance}px`);
+    });
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      document.documentElement.style.setProperty('--pitch-banner-clearance', '0px');
+    };
+  }, [bypassingDisabled, saveError, requireSignIn]);
 
   // Restore progress on mount, or start a fresh shuffled deck if there's
   // nothing to restore.
@@ -241,7 +272,7 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
           <CloseIcon size={16} />
         </button>
 
-        <div className="pitch-discover-banners">
+        <div className="pitch-discover-banners" ref={bannersRef}>
           {bypassingDisabled && (
             <div className="admin-preview-banner pitch-discover-banner">
               ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.

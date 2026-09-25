@@ -5885,7 +5885,6 @@ body:has(.mini-player) { padding-bottom: 72px; }
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 0.9rem;
   padding: 1.2rem;
   padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
@@ -5938,7 +5937,37 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .pitch-discover-close:hover { background: rgba(251, 232, 211, 0.16); }
 .pitch-discover-banner { max-width: 420px; }
 
-.swipe-deck-wrap { display: flex; flex-direction: column; align-items: center; }
+/* width:100% here matters more than it looks like it should — without
+   it, .swipe-card-stack's own width:100% (needed for its max-width to
+   ever mean anything) has nothing definite to resolve against: this
+   wrap has no explicit width of its own, and its only other child
+   (.swipe-card, inside the stack) is position:absolute, so it
+   contributes no in-flow content either for the browser to size this
+   from. The two compound into a circular "shrink to fit content that
+   has no fittable size" that quietly settled around a few hundred
+   pixels regardless of .swipe-card-stack's own max-width — invisible
+   on a phone, where that accidental size happened to look plausible
+   anyway, but a badly undersized card on anything wider. */
+/* flex:1 fills the whole stage (the banner slot above is position:
+   absolute, so it doesn't consume any flex space itself), then centers
+   the card+buttons within that — padding-top: var(--pitch-banner-
+   clearance) is what actually keeps this out from under a banner: it's
+   0px (no effect, full true-viewport centering) whenever there's no
+   banner, and set to that specific banner's own real measured height
+   (see the ResizeObserver in pages/pitches/discover.js) whenever there
+   is one, so the deck only ever gives up exactly as much room as this
+   banner, on this screen, actually needs — never more, and never too
+   little regardless of how many lines its text wraps to. */
+.swipe-deck-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+  padding-top: var(--pitch-banner-clearance, 0px);
+}
 
 .swipe-round-tag {
   font-family: var(--font-mono);
@@ -5954,6 +5983,15 @@ body:has(.mini-player) { padding-bottom: 72px; }
   width: 100%;
   max-width: 360px;
   aspect-ratio: 3 / 4.6;
+  /* Caps height (and, through aspect-ratio, width along with it) to a
+     share of the viewport, independent of .swipe-deck-wrap's own
+     banner-clearance padding — this is just a sanity limit so the card
+     can't grow absurdly tall on a very tall/ultrawide desktop screen
+     even with no banner at all, not the thing keeping it clear of a
+     banner (that's --pitch-banner-clearance's job). Scales down
+     naturally on a short viewport too (a laptop in a small window, a
+     phone in landscape), not just up on a tall one. */
+  max-height: 72vh;
 }
 
 .swipe-card {
@@ -6198,6 +6236,45 @@ body:has(.mini-player) { padding-bottom: 72px; }
   .swipe-card-stack { max-width: 320px; }
   .swipe-btn { width: 50px; height: 50px; }
   .swipe-btn-like { width: 60px; height: 60px; }
+}
+
+/* Everything above tops out at max-width:360px (320px below 480px) —
+   fine on a phone, but .pitch-discover-stage fills the entire viewport
+   on any screen, so the same card just sat tiny and lost in a mostly
+   empty desktop window. Scales the card (and, since aspect-ratio locks
+   its height to its width, its height too) plus the buttons/text that
+   would otherwise look mismatched next to a bigger card, in two steps —
+   tablet, then desktop. 641px matches the breakpoint the reel feed's
+   own .reel-slide already scales up at. */
+@media (min-width: 641px) {
+  .swipe-card-stack { max-width: 420px; }
+  .swipe-btn { width: 60px; height: 60px; }
+  .swipe-btn-like { width: 74px; height: 74px; }
+  .swipe-buttons { gap: 1.6rem; margin-top: 1.9rem; }
+  .swipe-card-body h2 { font-size: 1.7rem; }
+  .swipe-card-logline { font-size: 1rem; }
+  .swipe-card-creator { font-size: 0.8rem; }
+  .swipe-card-description { font-size: 0.94rem; }
+  .swipe-card-funding span, .swipe-card-deadline { font-size: 0.76rem; }
+  .swipe-card-team-member { font-size: 0.85rem; }
+  .swipe-badge { font-size: 1.7rem; top: 1.9rem; }
+  .swipe-round-tag { font-size: 0.78rem; }
+  .swipe-card-flip-hint, .swipe-card-back-btn { font-size: 0.7rem; }
+  .pitch-discover-banner { max-width: 480px; }
+}
+
+/* 1180px matches the breakpoint the header/tab-bar handoff already
+   uses — genuinely wide desktop, not just "not a phone." */
+@media (min-width: 1180px) {
+  .swipe-card-stack { max-width: 480px; }
+  .swipe-btn { width: 68px; height: 68px; }
+  .swipe-btn-like { width: 84px; height: 84px; }
+  .swipe-buttons { gap: 1.8rem; margin-top: 2.1rem; }
+  .swipe-card-body h2 { font-size: 2rem; }
+  .swipe-card-logline { font-size: 1.08rem; }
+  .swipe-card-description { font-size: 1rem; }
+  .swipe-badge { font-size: 1.9rem; }
+  .pitch-discover-banner { max-width: 520px; }
 }
 
 /* ============================================================
