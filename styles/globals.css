@@ -6035,20 +6035,45 @@ body:has(.mini-player) { padding-bottom: 72px; }
   transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1);
 }
 .swipe-card-flip-inner.flipped { transform: rotateY(180deg); }
+/* Only backface-visibility + the 3D rotation live here — deliberately
+   NOT border-radius/overflow (see .swipe-card-front-surface/.swipe-
+   card-back-surface below for why they're split out onto a separate
+   element instead of just being added to this one). */
 .swipe-card-face {
   position: absolute;
   inset: 0;
-  border-radius: 18px;
-  overflow: hidden;
-  background-color: var(--surface-2, #221c11);
-  background-size: cover;
-  background-position: center;
   backface-visibility: hidden;
 }
 .swipe-card-front { -webkit-backface-visibility: hidden; }
 .swipe-card-back {
   transform: rotateY(180deg);
   -webkit-backface-visibility: hidden;
+}
+/* The actual visible surface of each face — split out from .swipe-
+   card-face itself because Safari has a long-standing, well-documented
+   bug where backface-visibility:hidden silently stops working on an
+   element that ALSO has overflow:hidden + border-radius on it, on at
+   least some iOS versions. When it misfires, the face that's supposed
+   to be rotated away and hidden instead renders through — mirrored,
+   since it's turned 180° — on top of the visible one, which is exactly
+   what showed up on a real phone as garbled, overlapping, upside-down
+   text despite looking completely correct in every desktop-browser
+   test this was verified with. Keeping backface-visibility on a plain
+   box with nothing else on it, and moving the overflow/radius/
+   background to this separate absolutely-positioned child instead, is
+   the standard workaround. */
+.swipe-card-front-surface, .swipe-card-back-surface {
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+  overflow: hidden;
+  background-color: var(--surface-2, #221c11);
+}
+.swipe-card-front-surface {
+  background-size: cover;
+  background-position: center;
+}
+.swipe-card-back-surface {
   display: flex;
   flex-direction: column;
   justify-content: flex-end;

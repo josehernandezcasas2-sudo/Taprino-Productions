@@ -140,91 +140,99 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
           independent of the outer .swipe-card's own drag transform, so
           swiping still works identically whichever face is showing. */}
       <div className={`swipe-card-flip-inner ${flipped ? 'flipped' : ''}`}>
-        <div className="swipe-card-face swipe-card-front" style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}>
-          <div className="swipe-card-scrim" />
-          {/* Hidden mid-drag — it shares the top-right corner with the
-              PASS badge (see .swipe-badge-nope), so the two would
-              otherwise sit on top of each other the moment a leftward
-              drag starts. */}
-          <div className={`swipe-card-flip-hint ${drag.dragging ? 'swipe-card-flip-hint-hidden' : ''}`}><InfoIcon size={13} /> Tap for more</div>
-          <div className="swipe-card-body">
-            {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
-            <h2>{pitch.title}</h2>
-            <p className="swipe-card-logline">{pitch.logline}</p>
-            {pitch.creator_name && (
-              pitch.created_by ? (
-                <Link
-                  href={`/profile/${pitch.created_by}`}
-                  className="swipe-card-creator swipe-card-creator-link"
-                  onPointerDown={(e) => e.stopPropagation()}
-                >
-                  {pitch.creator_name}
-                </Link>
-              ) : (
-                <div className="swipe-card-creator">{pitch.creator_name}</div>
-              )
-            )}
+        <div className="swipe-card-face swipe-card-front">
+          {/* The overflow/border-radius/background live on this inner
+              surface, not .swipe-card-face itself — see that class's own
+              CSS comment for the Safari backface-visibility bug this
+              works around. */}
+          <div className="swipe-card-front-surface" style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}>
+            <div className="swipe-card-scrim" />
+            {/* Hidden mid-drag — it shares the top-right corner with the
+                PASS badge (see .swipe-badge-nope), so the two would
+                otherwise sit on top of each other the moment a leftward
+                drag starts. */}
+            <div className={`swipe-card-flip-hint ${drag.dragging ? 'swipe-card-flip-hint-hidden' : ''}`}><InfoIcon size={13} /> Tap for more</div>
+            <div className="swipe-card-body">
+              {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
+              <h2>{pitch.title}</h2>
+              <p className="swipe-card-logline">{pitch.logline}</p>
+              {pitch.creator_name && (
+                pitch.created_by ? (
+                  <Link
+                    href={`/profile/${pitch.created_by}`}
+                    className="swipe-card-creator swipe-card-creator-link"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
+                    {pitch.creator_name}
+                  </Link>
+                ) : (
+                  <div className="swipe-card-creator">{pitch.creator_name}</div>
+                )
+              )}
+            </div>
           </div>
         </div>
 
         <div className="swipe-card-face swipe-card-back">
-          {/* An explicit control rather than "tap anywhere to flip back"
-              — the body below scrolls on its own (see
-              .swipe-card-back-body's touch-action and the matching skip
-              in handlePointerDown), so a tap landing on that scrollable
-              text can no longer be told apart from the start of a
-              scroll gesture. stopPropagation on pointerdown keeps this
-              out of the drag-tracking entirely, same pattern as the
-              creator link and "View full pitch" below. */}
-          <button
-            type="button"
-            className="swipe-card-back-btn"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => setFlipped(false)}
-            aria-label="Back to front"
-          >
-            <BackArrowIcon size={13} /> Back
-          </button>
-          <div className="swipe-card-body swipe-card-back-body">
-            {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
-            <h2>{pitch.title}</h2>
-
-            {(pitch.description || pitch.logline) && (
-              <p className="swipe-card-description">{pitch.description || pitch.logline}</p>
-            )}
-
-            {pct != null && (
-              <div className="swipe-card-funding">
-                <div className="pitch-progress-track">
-                  <div className="pitch-progress-fill" style={{ width: `${pct}%` }} />
-                </div>
-                <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
-              </div>
-            )}
-            {deadline && <div className="swipe-card-deadline">Funding closes {deadline}</div>}
-
-            {Array.isArray(pitch.team) && pitch.team.length > 0 && (
-              <div className="swipe-card-team">
-                {pitch.team.map((m, i) => (
-                  <span key={i} className="swipe-card-team-member">
-                    {m.name}{m.role ? ` — ${m.role}` : ''}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            <Link
-              href={`/pitches/${pitch.id}`}
-              className="swipe-card-learn-more"
-              target="_blank"
-              rel="noopener noreferrer"
-              // A tap here is "show me the full page," not a swipe/flip —
-              // it must never register as a drag or tap on the card
-              // underneath it.
+          <div className="swipe-card-back-surface">
+            {/* An explicit control rather than "tap anywhere to flip back"
+                — the body below scrolls on its own (see
+                .swipe-card-back-body's touch-action and the matching skip
+                in handlePointerDown), so a tap landing on that scrollable
+                text can no longer be told apart from the start of a
+                scroll gesture. stopPropagation on pointerdown keeps this
+                out of the drag-tracking entirely, same pattern as the
+                creator link and "View full pitch" below. */}
+            <button
+              type="button"
+              className="swipe-card-back-btn"
               onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => setFlipped(false)}
+              aria-label="Back to front"
             >
-              View full pitch &rarr;
-            </Link>
+              <BackArrowIcon size={13} /> Back
+            </button>
+            <div className="swipe-card-body swipe-card-back-body">
+              {pitch.tag && <span className="pitch-tag">{pitch.tag}</span>}
+              <h2>{pitch.title}</h2>
+
+              {(pitch.description || pitch.logline) && (
+                <p className="swipe-card-description">{pitch.description || pitch.logline}</p>
+              )}
+
+              {pct != null && (
+                <div className="swipe-card-funding">
+                  <div className="pitch-progress-track">
+                    <div className="pitch-progress-fill" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
+                </div>
+              )}
+              {deadline && <div className="swipe-card-deadline">Funding closes {deadline}</div>}
+
+              {Array.isArray(pitch.team) && pitch.team.length > 0 && (
+                <div className="swipe-card-team">
+                  {pitch.team.map((m, i) => (
+                    <span key={i} className="swipe-card-team-member">
+                      {m.name}{m.role ? ` — ${m.role}` : ''}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <Link
+                href={`/pitches/${pitch.id}`}
+                className="swipe-card-learn-more"
+                target="_blank"
+                rel="noopener noreferrer"
+                // A tap here is "show me the full page," not a swipe/flip —
+                // it must never register as a drag or tap on the card
+                // underneath it.
+                onPointerDown={(e) => e.stopPropagation()}
+              >
+                View full pitch &rarr;
+              </Link>
+            </div>
           </div>
         </div>
       </div>
