@@ -2494,10 +2494,16 @@ button { font-family: inherit; cursor: pointer; }
   width: 26px; height: 26px;
   background: rgba(0,0,0,0.5);
 }
+/* position:fixed (not absolute) plus top/left set inline by PostMenu.js
+   itself, computed from the trigger button's real screen position —
+   this now renders via a portal to document.body, escaping any clipped
+   ancestor (the profile grid's post tiles are overflow:hidden squares,
+   needed to crop each one's own background-image to a clean 1:1 tile;
+   a plain CSS-anchored dropdown nested inside one was getting clipped
+   invisible instead of shown). z-index matches this codebase's other
+   body-level overlays. */
 .post-menu-dropdown {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
+  position: fixed;
   min-width: 150px;
   background: rgba(20, 19, 12, 0.97);
   backdrop-filter: blur(10px);
@@ -2508,6 +2514,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   gap: 0.1rem;
+  z-index: 200;
 }
 .post-menu-item {
   background: none;
@@ -5345,7 +5352,15 @@ body:has(.mini-player) { padding-bottom: 72px; }
    works fine for the small account/search dropdowns was never enough
    here — on a real phone this either felt cramped and narrow, or ran
    taller than the viewport with no way to scroll it. */
-@media (max-width: 640px) {
+/* This used to match at max-width:640px only, but .nav-hamburger itself
+   is shown (and .nav-links hidden) at max-width:1180px — anywhere in the
+   641-1180px gap (a tablet, a small laptop, a narrower browser window)
+   could open this menu with none of the sizing below applied, so a tall
+   render (Browse by type + every main genre + My List/Recs/Live TV/Shop)
+   still ran past the viewport with no way to scroll it. Widened to match
+   the button's own breakpoint so the fix applies whenever this menu can
+   actually be opened. */
+@media (max-width: 1180px) {
   .hamburger-dropdown {
     /* Deliberately NOT overriding position/top here — the base .dropdown
        rule (position: absolute; top: calc(100% + 8px)) already anchors
