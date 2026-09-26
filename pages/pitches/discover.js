@@ -237,7 +237,14 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
 
     if (direction === 'right') {
       setLikedPitches((prev) => [...prev, pitch]);
-      trySave(pitch);
+      // /api/pitch-save always 401s when signed out — that's correct,
+      // not a bug, but calling it anyway and surfacing the failure as a
+      // "couldn't be saved" error was redundant and confusing right
+      // next to the requireSignIn banner already explaining the exact
+      // same thing ("you can still browse without an account, but
+      // likes won't be saved anywhere"). Signed-out likes still count
+      // locally for this session's own summary screen either way.
+      if (isSignedIn) trySave(pitch);
     } else if (direction === 'down' && round === 1) {
       // A down-swipe only earns a second chance in round 1 — the replay
       // round is everyone's actual second chance, so a down-swipe there
