@@ -2,8 +2,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import BackButton from '../components/BackButton';
 import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
-import { getAccountContext } from '../lib/accountContext';
-import { getPromoAccessExpiry } from '../lib/promoCodes';
+import { getAccountDashboardData } from '../lib/accountDashboard';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
@@ -13,51 +12,10 @@ import Footer from '../components/Footer';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  let newsletterStatus = 'undecided';
-  let subscriptionDetails = null;
-
-  if (account.isSignedIn && process.env.STRIPE_SECRET_KEY && account.stripeCustomerId) {
-    try {
-      const Stripe = (await import('stripe')).default;
-      const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
-      const customer = await stripe.customers.retrieve(account.stripeCustomerId);
-      newsletterStatus = (customer.metadata && customer.metadata.newsletter) || 'undecided';
-
-      // Real subscription details for the account card — admins/sub-admins/
-      // comped accounts never actually have a Stripe subscription (their
-      // isSubscriber comes from role/invite, not billing), so this only
-      // fetches when there's an actual paying subscription to describe.
-      if (account.isSubscriber && !account.isAdmin && !account.isSubAdmin && !account.isComped) {
-        const subs = await stripe.subscriptions.list({
-          customer: account.stripeCustomerId,
-          status: 'active',
-          limit: 1,
-          expand: ['data.items.data.price.product']
-        });
-        const sub = subs.data[0];
-        if (sub) {
-          const item = sub.items.data[0];
-          const price = item && item.price;
-          subscriptionDetails = {
-            renewsAt: sub.current_period_end * 1000,
-            cancelsAtPeriodEnd: sub.cancel_at_period_end,
-            amount: price ? price.unit_amount : null,
-            currency: price ? price.currency : null,
-            interval: price && price.recurring ? price.recurring.interval : null,
-            productName: price && price.product && typeof price.product === 'object' ? price.product.name : null
-          };
-        }
-      }
-    } catch (err) {
-      console.error('account subscription fetch error:', err.message);
-      newsletterStatus = 'undecided';
-    }
-  }
+  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt } = await getAccountDashboardData(req);
 
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-  const promoAccessExpiresAt = account.isSignedIn ? await getPromoAccessExpiry(account.userId) : null;
 
   return {
     props: {

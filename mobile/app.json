@@ -31,7 +31,13 @@
       "@clerk/expo",
       "expo-secure-store",
       "expo-web-browser",
-      "expo-video"
+      "expo-video",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Studio Tapa TV needs access to your photos to set a profile avatar."
+        }
+      ]
     ]
   }
 }
