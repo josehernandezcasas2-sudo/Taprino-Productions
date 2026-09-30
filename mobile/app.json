@@ -2,6 +2,7 @@
   "expo": {
     "name": "mobile",
     "slug": "mobile",
+    "scheme": "studiotapatv",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -21,7 +22,15 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      ["expo-router", { "root": "src/app" }]
+      [
+        "expo-router",
+        {
+          "root": "src/app"
+        }
+      ],
+      "@clerk/expo",
+      "expo-secure-store",
+      "expo-web-browser"
     ]
   }
 }
