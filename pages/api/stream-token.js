@@ -1,6 +1,6 @@
 import { findEpisode } from '../../lib/episodes';
 import { getAccountContext } from '../../lib/accountContext';
-import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
+import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { SITE } from '../../lib/siteConfig';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.

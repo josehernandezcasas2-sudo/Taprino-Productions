@@ -1,7 +1,7 @@
 import { findEpisode } from '../../../lib/episodes';
 import { findPost } from '../../../lib/posts';
 import { getAccountContext } from '../../../lib/accountContext';
-import { signedSrcForStoredUrl } from '../../../lib/cloudflareUpload';
+import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 
 // Server-only playback source lookup for the vertical discover feed. The
 // feed's own deck-building already filters premium episodes out for

@@ -14,7 +14,7 @@ import { findSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { getOwnProfile } from '../../lib/userProfiles';
 import { meetsAgeRequirement, MIN_AGE_BY_RATING } from '../../lib/ageGate';
-import { signedSrcForStoredUrl } from '../../lib/cloudflareUpload';
+import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { recordView, recordDailyView } from '../../lib/redis';
 import { isEpisodeWatched, getWatchHistory } from '../../lib/watchHistory';
 import { getRecommendations } from '../../lib/recommendations';
