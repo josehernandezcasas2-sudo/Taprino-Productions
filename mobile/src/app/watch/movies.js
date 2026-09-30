@@ -1,5 +1,5 @@
-import ComingSoon from '../../components/ComingSoon';
+import TypeBrowseScreen from '../../components/TypeBrowseScreen';
 
 export default function WatchMovies() {
-  return <ComingSoon title="Watch Movies" />;
+  return <TypeBrowseScreen type="movie" />;
 }
