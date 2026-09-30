@@ -3,13 +3,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
-import { getPublicEpisodes } from '../lib/publicEpisodes';
-import { getActiveAnnouncements } from '../lib/announcements';
-import { getFeaturedCreators } from '../lib/userProfiles';
-import { getApprovedPitches } from '../lib/pitches';
-import { getAllSeries } from '../lib/series';
-import { getCurrentLiveStream } from '../lib/liveStreams';
-import { getViewCounts, isRedisConfigured } from '../lib/redis';
+import { getHomeFeedData } from '../lib/homeFeed';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
@@ -37,82 +31,7 @@ export async function getServerSideProps({ req, res }) {
   }
 
   const account = await getAccountContext(req);
-  const needsViewCounts = isRedisConfigured();
-  const [episodes, announcements, featuredCreators, pitchRows, allSeries, liveStream, viewCounts] = await Promise.all([
-    getPublicEpisodes(),
-    getActiveAnnouncements(),
-    getFeaturedCreators(4),
-    getApprovedPitches(),
-    getAllSeries(),
-    getCurrentLiveStream(),
-    needsViewCounts ? getViewCounts() : Promise.resolve({})
-  ]);
-
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-  const filmsAndShorts = episodes
-    .filter((e) => e.contentType === 'movie' || e.contentType === 'short')
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 8);
-  const podcasts = episodes
-    .filter((e) => e.contentType === 'podcast')
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
-    .slice(0, 6);
-  // Simple, honest hero pick for now: the most recent admin-flagged
-  // "featured" item, falling back to the most recent film/short of any
-  // kind so the hero is never empty just because nothing's been flagged.
-  const heroItem = episodes.find((e) => e.featured) || filmsAndShorts[0] || null;
-  const pitches = pitchRows.slice(0, 3).map((p) => ({
-    id: p.id,
-    title: p.title,
-    tag: p.tag,
-    logline: p.logline || p.description,
-    fundingRaised: p.funding_raised,
-    creatorName: p.creator_name || null,
-    creatorUserId: p.created_by || null
-  }));
-
-  // Series row — same "consolidate episodes into one card per show"
-  // rule GenreRow uses on /stream, since the zine homepage never
-  // surfaced series at all before this. Ranked by most recently active
-  // (latest episode), same as the filmstrip above rather than a
-  // separate sort convention.
-  const seriesEpisodeList = episodes.filter((e) => e.contentType === 'series');
-  const seriesIds = [...new Set(seriesEpisodeList.map((e) => e.seriesId))];
-  const seriesRows = seriesIds
-    .map((sid) => {
-      const info = allSeries.find((s) => s.id === sid);
-      const eps = seriesEpisodeList.filter((e) => e.seriesId === sid);
-      if (!info) return null;
-      const latestCreatedAt = eps.reduce((max, e) => (e.createdAt > max ? e.createdAt : max), eps[0].createdAt);
-      return {
-        id: info.id,
-        title: info.name,
-        poster: info.poster || info.thumbnail,
-        count: eps.length,
-        latestCreatedAt,
-        views: eps.reduce((sum, e) => sum + (viewCounts[e.id] || 0), 0)
-      };
-    })
-    .filter(Boolean)
-    .sort((a, b) => (a.latestCreatedAt < b.latestCreatedAt ? 1 : -1))
-    .slice(0, 8);
-
-  // Trending — standalone titles and whole series ranked together by
-  // view count, the same cross-type ranking GenreRow already does for
-  // its own rows. Falls back to insertion order when nothing has views
-  // yet (a fresh library, or Redis not configured), same as everywhere
-  // else this ranking is used — never empty just because there's no
-  // view data yet. The hero's own pick is excluded so the same title
-  // doesn't appear twice in a row at the top of the page.
-  const trending = [
-    ...episodes
-      .filter((e) => e.contentType !== 'series')
-      .map((e) => ({ id: e.id, title: e.title, poster: e.poster || e.thumbnail, tag: e.contentType.toUpperCase(), views: viewCounts[e.id] || 0 })),
-    ...seriesRows.map((s) => ({ id: s.id, title: s.title, poster: s.poster, tag: 'SERIES', views: s.views, isSeries: true }))
-  ]
-    .filter((item) => !heroItem || item.id !== heroItem.id)
-    .sort((a, b) => b.views - a.views)
-    .slice(0, 6);
+  const feed = await getHomeFeedData();
 
   return {
     props: {
@@ -121,16 +40,7 @@ export async function getServerSideProps({ req, res }) {
       email: account.email,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
-      mainGenres,
-      announcements,
-      featuredCreators,
-      filmsAndShorts,
-      podcasts,
-      heroItem,
-      pitches,
-      seriesRows,
-      trending,
-      liveStream
+      ...feed
     }
   };
 }
