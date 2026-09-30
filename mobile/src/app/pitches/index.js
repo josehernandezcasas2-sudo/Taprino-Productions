@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, FlatList, Image, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { apiGet } from '../lib/api';
+import { apiGet } from '../../lib/api';
+import { colors } from '../../lib/theme';
 
-// Proves the real pipeline end to end: this screen calls the live
-// /api/pitches/list route on studiotapatv.site, which reads the same
-// Supabase `pitches` table the web Pitch Room uses — no mock data.
-export default function Discover() {
+// Calls the live /api/pitches/list route on studiotapatv.site, which
+// reads the same Supabase `pitches` table the web Pitch Room uses.
+export default function PitchRoom() {
   const [state, setState] = useState({ loading: true, error: null, pitches: [] });
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export default function Discover() {
   if (state.loading) {
     return (
       <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color="#e8b923" />
+        <ActivityIndicator color={colors.brass} />
       </SafeAreaView>
     );
   }
@@ -50,6 +50,7 @@ export default function Discover() {
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
       <FlatList
+        style={styles.flatList}
         data={state.pitches}
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
@@ -69,19 +70,16 @@ export default function Discover() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#161005' },
-  center: { flex: 1, backgroundColor: '#161005', alignItems: 'center', justifyContent: 'center', padding: 24 },
-  list: { padding: 16, gap: 14 },
-  card: {
-    backgroundColor: '#221c11',
-    borderRadius: 14,
-    overflow: 'hidden'
-  },
+  screen: { flex: 1, backgroundColor: colors.surface0 },
+  center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  flatList: { flex: 1 },
+  list: { padding: 16, gap: 14, paddingBottom: 120 },
+  card: { backgroundColor: colors.surface2, borderRadius: 14, overflow: 'hidden' },
   thumb: { width: '100%', height: 160 },
   cardBody: { padding: 14 },
-  tag: { color: '#e8b923', fontSize: 12, fontWeight: '600', marginBottom: 4 },
-  cardTitle: { color: '#f5e9d3', fontSize: 18, fontWeight: '700' },
-  logline: { color: '#b8ab8f', fontSize: 14, marginTop: 4 },
-  subtitle: { color: '#b8ab8f', fontSize: 15, textAlign: 'center' },
-  error: { color: '#e2745a', fontSize: 15, textAlign: 'center' }
+  tag: { color: colors.brass, fontSize: 12, fontWeight: '600', marginBottom: 4 },
+  cardTitle: { color: colors.ink, fontSize: 18, fontWeight: '700' },
+  logline: { color: colors.inkDim, fontSize: 14, marginTop: 4 },
+  subtitle: { color: colors.inkDim, fontSize: 15, textAlign: 'center' },
+  error: { color: colors.danger, fontSize: 15, textAlign: 'center' }
 });

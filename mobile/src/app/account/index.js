@@ -3,12 +3,12 @@ import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth, useUser } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
+import { colors } from '../../lib/theme';
 
 // Hosted Account Portal auth (an in-app browser, same sign-in page the
-// website uses) rather than a hand-rolled form — it's the one Expo auth
-// approach that works inside Expo Go with no dev build, and it inherits
-// bot-protection/CAPTCHA handling for free instead of us reimplementing it.
-export default function Profile() {
+// website uses) rather than a hand-rolled form — the one Expo auth
+// approach that works inside Expo Go with no dev build.
+export default function Account() {
   const { isLoaded, isSignedIn, signOut } = useAuth();
   const { user } = useUser();
   const { startHostedAuth } = useHostedAuth();
@@ -17,10 +17,7 @@ export default function Profile() {
   async function handleSignIn() {
     setBusy(true);
     try {
-      const { createdSessionId } = await startHostedAuth();
-      if (!createdSessionId) {
-        // User closed the browser before finishing — not an error.
-      }
+      await startHostedAuth();
     } catch (err) {
       Alert.alert('Sign-in failed', err.message || 'Something went wrong.');
     } finally {
@@ -40,7 +37,7 @@ export default function Profile() {
   if (!isLoaded) {
     return (
       <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color="#e8b923" />
+        <ActivityIndicator color={colors.brass} />
       </SafeAreaView>
     );
   }
@@ -55,7 +52,7 @@ export default function Profile() {
           <Text style={styles.subtitle}>{user.primaryEmailAddress.emailAddress}</Text>
         ) : null}
         <Pressable style={[styles.button, styles.buttonSecondary]} onPress={handleSignOut} disabled={busy}>
-          {busy ? <ActivityIndicator color="#f5e9d3" /> : <Text style={styles.buttonText}>Sign out</Text>}
+          {busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.buttonText}>Sign out</Text>}
         </Pressable>
       </SafeAreaView>
     );
@@ -66,34 +63,18 @@ export default function Profile() {
       <Text style={styles.title}>Not signed in</Text>
       <Text style={styles.subtitle}>Sign in with the same account you use on studiotapatv.site.</Text>
       <Pressable style={styles.button} onPress={handleSignIn} disabled={busy}>
-        {busy ? <ActivityIndicator color="#161005" /> : <Text style={styles.buttonTextDark}>Sign in</Text>}
+        {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.buttonTextDark}>Sign in</Text>}
       </Pressable>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
-    flex: 1,
-    backgroundColor: '#161005',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24
-  },
-  title: { color: '#f5e9d3', fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  subtitle: { color: '#b8ab8f', fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  button: {
-    backgroundColor: '#e8b923',
-    borderRadius: 999,
-    paddingVertical: 12,
-    paddingHorizontal: 28,
-    minWidth: 140,
-    alignItems: 'center'
-  },
-  buttonSecondary: {
-    backgroundColor: '#3a3120',
-    marginTop: 4
-  },
-  buttonText: { color: '#f5e9d3', fontSize: 15, fontWeight: '600' },
-  buttonTextDark: { color: '#161005', fontSize: 15, fontWeight: '700' }
+  center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  title: { color: colors.ink, fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
+  subtitle: { color: colors.inkDim, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
+  button: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 28, minWidth: 140, alignItems: 'center' },
+  buttonSecondary: { backgroundColor: colors.surface2, marginTop: 4 },
+  buttonText: { color: colors.ink, fontSize: 15, fontWeight: '600' },
+  buttonTextDark: { color: colors.onBrass, fontSize: 15, fontWeight: '700' }
 });
