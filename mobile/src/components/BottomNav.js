@@ -69,6 +69,13 @@ export default function BottomNav() {
 
   const openGroup = openKey ? GROUPS[openKey] : null;
 
+  // Vertical Discover is a full-screen immersive takeover (edge-to-edge
+  // video, its own close button) — matches pages/vertical/discover.js,
+  // which likewise renders no MobileTabBar. Pitch Discover, by contrast,
+  // keeps the tab bar on the website (pages/pitches/discover.js does
+  // render MobileTabBar), so it stays visible here too.
+  if (pathname === '/vertical/discover') return null;
+
   return (
     <>
       {openGroup && <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenKey(null)} />}

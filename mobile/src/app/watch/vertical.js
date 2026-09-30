@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
@@ -10,12 +11,11 @@ import { colors } from '../../lib/theme';
 // admins see everything, everyone else only free-tier vertical episodes)
 // exposed as GET /api/vertical-series.
 //
-// The website's version is really an entry point into /vertical/discover
-// (the swipe/reel feature) for each series — since that feature isn't
-// built on mobile yet (see Pitch/Vertical Discover in the backlog),
-// tapping a card here is a no-op rather than a dead link. No search box
-// either (same simplification as everywhere else).
+// Each card is an entry point into /vertical/discover?series=<id> (the
+// swipe/reel feature), same as the website's own cards — no search box
+// though (same simplification as everywhere else).
 export default function Vertical() {
+  const router = useRouter();
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, series: [] });
 
@@ -62,11 +62,11 @@ export default function Vertical() {
         ) : (
           <View style={styles.grid}>
             {state.series.map((s) => (
-              <View key={s.id} style={styles.card}>
+              <Pressable key={s.id} style={styles.card} onPress={() => router.push(`/vertical/discover?series=${s.id}`)}>
                 {s.thumbnail ? <Image source={{ uri: s.thumbnail }} style={styles.cardArt} /> : <View style={styles.cardArt} />}
                 <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
                 <Text style={styles.cardCount}>{s.episodeCount} episode{s.episodeCount === 1 ? '' : 's'}</Text>
-              </View>
+              </Pressable>
             ))}
           </View>
         )}
