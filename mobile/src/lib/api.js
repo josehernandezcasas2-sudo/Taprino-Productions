@@ -4,8 +4,11 @@
 // mobile/README.md for how to point this at localhost during development.
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://studiotapatv.site';
 
-export async function apiGet(path) {
-  const res = await fetch(`${API_BASE_URL}${path}`);
+// `token` is a Clerk session token (from useAuth().getToken()) — same
+// reasoning as apiPost below. Omit it for anonymous/free-tier requests.
+export async function apiGet(path, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const res = await fetch(`${API_BASE_URL}${path}`, { headers });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `Request failed (${res.status})`);
