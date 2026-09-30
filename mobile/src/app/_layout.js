@@ -2,6 +2,7 @@ import { ClerkProvider } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from '../components/BottomNav';
 import { colors } from '../lib/theme';
@@ -17,6 +18,7 @@ if (!publishableKey) {
 // website's page stack (rendered once in _app.js, not tied to routing).
 export default function RootLayout() {
   return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
       <SafeAreaProvider>
         <StatusBar style="light" />
@@ -44,5 +46,6 @@ export default function RootLayout() {
         <BottomNav />
       </SafeAreaProvider>
     </ClerkProvider>
+    </GestureHandlerRootView>
   );
 }
