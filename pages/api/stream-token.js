@@ -15,6 +15,17 @@ import { SITE } from '../../lib/siteConfig';
 // It is never inferred from what the client sends — the request body only
 // says WHICH episode, never whether the caller is allowed to watch it.
 export default async function handler(req, res) {
+  // Open to any origin — this is an external client endpoint (the mobile
+  // app, and its web preview) by design; entitlement is what actually
+  // gates access, not the origin. The Authorization header lets the app
+  // pass a Clerk session token the same way it would a cookie on web.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
+
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
 
@@ -8,6 +9,7 @@ import { colors } from '../lib/theme';
 // rules (lib/homeFeed.js) via the public GET /api/home-feed route — no
 // separate "mobile version" of what belongs on the homepage.
 export default function Home() {
+  const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
 
   useEffect(() => {
@@ -73,9 +75,9 @@ export default function Home() {
             </View>
             <Text style={styles.heroTitle}>{heroItem.title}</Text>
             {heroItem.desc ? <Text style={styles.heroDesc}>{heroItem.desc}</Text> : null}
-            <View style={styles.watchBtn}>
+            <Pressable style={styles.watchBtn} onPress={() => router.push(`/episode/${heroItem.id}`)}>
               <Text style={styles.watchBtnText}>▶ WATCH</Text>
-            </View>
+            </Pressable>
           </View>
         )}
 
@@ -85,6 +87,7 @@ export default function Home() {
               items={trending.map((t, i) => ({ ...t, rank: i + 1 }))}
               subtitle={(item) => item.tag}
               showRank
+              onPressItem={(item) => !item.isSeries && router.push(`/episode/${item.id}`)}
             />
           </Section>
         )}
@@ -126,6 +129,7 @@ export default function Home() {
             <PosterRow
               items={filmsAndShorts}
               subtitle={(item) => `${item.contentType === 'movie' ? 'FILM' : 'SHORT'}${item.runtime ? ` · ${item.runtime}` : ''}`}
+              onPressItem={(item) => router.push(`/episode/${item.id}`)}
             />
           </Section>
         )}
@@ -190,23 +194,26 @@ function Section({ label, color, children }) {
   );
 }
 
-function PosterRow({ items, subtitle, showRank }) {
+function PosterRow({ items, subtitle, showRank, onPressItem }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
-      {items.map((item) => (
-        <View key={item.id} style={styles.posterItem}>
-          <View style={styles.posterWrap}>
-            {item.poster ? <Image source={{ uri: item.poster }} style={styles.poster} /> : null}
-            {showRank ? (
-              <View style={styles.rankBadge}>
-                <Text style={styles.rankText}>#{item.rank}</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={styles.posterTitle} numberOfLines={1}>{item.title}</Text>
-          <Text style={styles.posterSubtitle}>{subtitle(item)}</Text>
-        </View>
-      ))}
+      {items.map((item) => {
+        const Wrapper = onPressItem ? Pressable : View;
+        return (
+          <Wrapper key={item.id} style={styles.posterItem} onPress={onPressItem ? () => onPressItem(item) : undefined}>
+            <View style={styles.posterWrap}>
+              {item.poster ? <Image source={{ uri: item.poster }} style={styles.poster} /> : null}
+              {showRank ? (
+                <View style={styles.rankBadge}>
+                  <Text style={styles.rankText}>#{item.rank}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={styles.posterTitle} numberOfLines={1}>{item.title}</Text>
+            <Text style={styles.posterSubtitle}>{subtitle(item)}</Text>
+          </Wrapper>
+        );
+      })}
     </ScrollView>
   );
 }
