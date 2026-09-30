@@ -2,36 +2,12 @@ import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { getAllSeries } from '../../lib/series';
-import { getAccountContext } from '../../lib/accountContext';
-import { filterEntitledVertical } from '../../lib/verticalFeed';
+import { getVerticalSeriesBrowseData } from '../../lib/verticalSeriesBrowse';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  const [episodes, allSeries] = await Promise.all([getPublicEpisodes(), getAllSeries()]);
-
-  const entitled = account.isSubscriber || account.isAdmin;
-  const verticalEpisodes = filterEntitledVertical(episodes, entitled);
-
-  const seriesById = new Map(allSeries.map((s) => [s.id, s]));
-  const countBySeriesId = {};
-  for (const e of verticalEpisodes) {
-    if (e.seriesId) countBySeriesId[e.seriesId] = (countBySeriesId[e.seriesId] || 0) + 1;
-  }
-
-  const series = Object.keys(countBySeriesId)
-    .map((id) => seriesById.get(id))
-    .filter(Boolean)
-    .map((s) => ({
-      id: s.id,
-      name: s.name,
-      thumbnail: s.thumbnail || s.poster || null,
-      episodeCount: countBySeriesId[s.id]
-    }));
-
+  const { series } = await getVerticalSeriesBrowseData(req);
   return { props: { series } };
 }
 
