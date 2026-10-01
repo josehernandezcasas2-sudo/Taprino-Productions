@@ -48,7 +48,7 @@ export default function Account() {
   const { isLoaded, isSignedIn, signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
 
-  const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState(null);
   const [dashboard, setDashboard] = useState(null);
   const [profile, setProfile] = useState(null);
   const [originalAge, setOriginalAge] = useState(null);
@@ -108,14 +108,14 @@ export default function Account() {
     return undefined;
   }, [isLoaded, isSignedIn]);
 
-  async function handleSignIn() {
-    setBusy(true);
+  async function handleStartAuth(mode) {
+    setBusyMode(mode);
     try {
-      await startHostedAuth();
+      await startHostedAuth({ mode });
     } catch (err) {
-      Alert.alert('Sign-in failed', err.message || 'Something went wrong.');
+      Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {
-      setBusy(false);
+      setBusyMode(null);
     }
   }
 
@@ -239,10 +239,14 @@ export default function Account() {
       <SafeAreaView style={styles.center} edges={['bottom']}>
         <Text style={styles.title}>Sign in or create your account</Text>
         <Text style={styles.subtitle}>
-          Real email + password — sign in with the same account you use on studiotapatv.site.
+          Real email + password — sign in if you've been here before, or create a free account if
+          you're new. Either way, it's the same account you use on studiotapatv.site.
         </Text>
-        <Pressable style={styles.primaryBtn} onPress={handleSignIn} disabled={busy}>
-          {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+        <Pressable style={styles.primaryBtn} onPress={() => handleStartAuth('sign-in')} disabled={!!busyMode}>
+          {busyMode === 'sign-in' ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+        </Pressable>
+        <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => handleStartAuth('sign-up')} disabled={!!busyMode}>
+          {busyMode === 'sign-up' ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.secondaryBtnText}>Create a free account</Text>}
         </Pressable>
       </SafeAreaView>
     );
