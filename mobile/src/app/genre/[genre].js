@@ -47,10 +47,11 @@ export default function GenreLibrary() {
   }
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
       return;
     }
-    goToCard(item);
+    if (item.contentType === 'podcast' && item.seriesId) { router.push(`/podcasts/${item.seriesId}`); return; }
+    router.push(`/episode/${item.id}?autoplay=1`);
   }
 
   if (state.loading) {

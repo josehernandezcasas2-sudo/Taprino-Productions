@@ -64,10 +64,11 @@ export default function TypeBrowseScreen({ type }) {
   // The hero's Play button — a series hero jumps straight to episode 1.
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
       return;
     }
-    goToEpisode(item);
+    if (item.contentType === 'podcast' && item.seriesId) { router.push(`/podcasts/${item.seriesId}`); return; }
+    router.push(`/episode/${item.id}?autoplay=1`);
   }
 
   function goBack() {

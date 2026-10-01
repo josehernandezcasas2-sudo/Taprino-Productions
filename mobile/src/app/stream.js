@@ -46,14 +46,14 @@ export default function Stream() {
   // pages/stream.js goToEpisode — Play means "start watching now".
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
       return;
     }
     if (item.contentType === 'podcast' && item.seriesId) {
       router.push(`/podcasts/${item.seriesId}`);
       return;
     }
-    router.push(`/episode/${item.id}`);
+    router.push(`/episode/${item.id}?autoplay=1`);
   }
 
   // goToTrailer ("More info") and goToEpisodeInfo (browsing a card): tell
@@ -99,7 +99,7 @@ export default function Stream() {
         {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToInfo} />}
 
         <View style={styles.stage}>
-          <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(`/episode/${ep.id}`)} />
+          <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(`/episode/${ep.id}?autoplay=1`)} />
           <CardRow title="New Releases" cards={newReleases} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/new-releases')} />
           <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/leaving-soon')} />
 

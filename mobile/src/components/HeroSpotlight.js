@@ -20,7 +20,7 @@ function tierMeta(tier, adsEnabled) {
   return { label: 'Free with ads', bg: colors.brass, fg: '#241a05' };
 }
 
-function PlayIcon({ size = 16, color = '#1a1408' }) {
+export function PlayIcon({ size = 16, color = '#1a1408' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
       <Path d="M8 5v14l11-7z" />
@@ -64,10 +64,24 @@ function TrailerBackground({ src, muted, paused, height }) {
     if (!player) return;
     if (paused) player.pause(); else player.play();
   }, [paused, player]);
+  // A play() issued before the stream has loaded can be silently dropped
+  // (the trailer would load and then just sit paused on its first frame),
+  // so ask again the moment the player reports it's ready.
+  useEffect(() => {
+    if (!player) return undefined;
+    const sub = player.addListener('statusChange', ({ status }) => {
+      if (status === 'readyToPlay' && !paused) player.play();
+    });
+    return () => sub.remove();
+  }, [player, paused]);
   return <VideoView player={player} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height }} contentFit="cover" nativeControls={false} />;
 }
 
-export default function HeroSpotlight({ pool, onPlay, onTrailer }) {
+// eyebrow / renderActions / preferTrailer let the episode landing view
+// (pages/episode/[id].js) reuse this: it labels the hero Movie/Short, has
+// Play / Save / Back-this-project buttons, and plays a trailer even when
+// artwork exists.
+export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, renderActions, preferTrailer }) {
   const { height: windowHeight } = useWindowDimensions();
   const [index, setIndex] = useState(Math.max(pool.length - 1, 0));
   const [paused, setPaused] = useState(false);
@@ -86,7 +100,9 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer }) {
 
   const ep = pool[index % pool.length];
   const fallbackImage = !ep.trailerSrc ? (ep.poster || ep.thumbnail) : null;
-  const imageSrc = ep.heroImage || fallbackImage;
+  const imageSrc = preferTrailer
+    ? (ep.trailerSrc ? null : (ep.heroImage || ep.poster || ep.thumbnail))
+    : (ep.heroImage || fallbackImage);
   const isImageMode = !!imageSrc;
   const tier = tierMeta(ep.tier, ep.adsEnabled);
   const runtime = formatRuntimeLong(ep.runtime) || ep.runtime;
@@ -130,7 +146,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer }) {
       ) : null}
 
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>{ep.isSeries ? 'Most viewed series' : 'Most viewed'}</Text>
+        <Text style={styles.eyebrow}>{eyebrow || (ep.isSeries ? 'Most viewed series' : 'Most viewed')}</Text>
         {ep.titleImageUrl ? (
           <Image source={{ uri: ep.titleImageUrl }} style={styles.titleImage} resizeMode="contain" />
         ) : (
@@ -140,9 +156,11 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer }) {
           <View style={[styles.tierBadge, { backgroundColor: tier.bg }]}><Text style={[styles.tierBadgeText, { color: tier.fg }]}>{tier.label}</Text></View>
           {metaText ? (<><Text style={styles.metaDot}>{'•'}</Text><Text style={styles.metaText}>{metaText}</Text></>) : null}
           {ep.rating ? (<><Text style={styles.metaDot}>{'•'}</Text><View style={styles.ratingTag}><Text style={styles.ratingText}>{ep.rating}</Text></View></>) : null}
+          {ep.isOriginal ? (<><Text style={styles.metaDot}>{'•'}</Text><View style={styles.originalTag}><Text style={styles.originalText}>Tapa Original</Text></View></>) : null}
           {ep.isSeries ? (<><Text style={styles.metaDot}>{'•'}</Text><Text style={styles.metaText}>{'▤'} Series</Text></>) : null}
         </View>
         {ep.desc ? <Text style={styles.desc}>{ep.desc}</Text> : null}
+        {renderActions ? renderActions(ep) : (
         <View style={styles.actions}>
           <Pressable style={styles.playBtn} onPress={() => onPlay(ep)}>
             <PlayIcon />
@@ -153,6 +171,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer }) {
             <Text style={styles.infoText}>More info</Text>
           </Pressable>
         </View>
+        )}
       </View>
     </View>
   );
@@ -185,5 +204,11 @@ const styles = StyleSheet.create({
   playBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.ink, borderRadius: 8, paddingVertical: 12, paddingHorizontal: 18 },
   playText: { fontFamily: fonts.displayBold, fontSize: 13.6, color: '#1a1408' },
   infoBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: 'rgba(20,21,28,0.4)', borderWidth: 1, borderColor: 'rgba(251,232,211,0.4)', borderRadius: 8, paddingVertical: 12, paddingHorizontal: 18 },
-  infoText: { fontFamily: fonts.displaySemi, fontSize: 13.6, color: colors.ink }
+  infoText: { fontFamily: fonts.displaySemi, fontSize: 13.6, color: colors.ink },
+  originalTag: { backgroundColor: colors.oliveBright, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2 },
+  originalText: { fontFamily: fonts.monoBold, fontSize: 11.5, color: '#1a1408' }
 });
+
+// The hero's Play / secondary button styles, for screens that pass their
+// own renderActions (the episode landing view).
+export const heroButtonStyles = { playBtn: styles.playBtn, playText: styles.playText, infoBtn: styles.infoBtn, infoText: styles.infoText, actions: styles.actions };
