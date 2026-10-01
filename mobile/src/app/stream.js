@@ -9,6 +9,7 @@ import { colors, fonts } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import HeroSpotlight from '../components/HeroSpotlight';
 import { CardRow, ContinueWatchingRow } from '../components/LibraryRows';
+import { useWishlist } from '../lib/useWishlist';
 
 // Mirrors pages/stream.js: live banner, full-bleed HeroSpotlight, Continue
 // Watching, New Releases, Leaving Soon, the Tapa + promo, then one row per
@@ -21,6 +22,7 @@ import { CardRow, ContinueWatchingRow } from '../components/LibraryRows';
 export default function Stream() {
   const router = useRouter();
   const { getToken } = useAuth();
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
 
   useEffect(() => {
@@ -98,8 +100,8 @@ export default function Stream() {
 
         <View style={styles.stage}>
           <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(`/episode/${ep.id}`)} />
-          <CardRow title="New Releases" cards={newReleases} onPressCard={goToInfo} onSeeAll={() => router.push('/collection/new-releases')} />
-          <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToInfo} onSeeAll={() => router.push('/collection/leaving-soon')} />
+          <CardRow title="New Releases" cards={newReleases} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/new-releases')} />
+          <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/leaving-soon')} />
 
           {!isSubscriber && (
             <LinearGradient colors={[colors.brass, '#c98a2c']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.promo}>
@@ -117,7 +119,7 @@ export default function Stream() {
           )}
 
           {genreRows.map((row) => (
-            <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToInfo} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
+            <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
           ))}
         </View>
 

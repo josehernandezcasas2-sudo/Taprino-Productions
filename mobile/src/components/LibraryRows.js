@@ -4,6 +4,7 @@ import Svg, { Path } from 'react-native-svg';
 import { colors, fonts } from '../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds } from '../lib/runtime';
 import SmartImage from './SmartImage';
+import WishlistHeart from './WishlistHeart';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_LINE_COLOR = { series: colors.brass, movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -37,7 +38,7 @@ function RowHeading({ title, onSeeAll }) {
 // top-left, a bottom scrim, and the title + "runtime · type" laid over the
 // artwork itself. `cards` are the consolidated cards from
 // lib/libraryCards.js (one per series, one per standalone title).
-export function CardRow({ title, cards, onPressCard, onSeeAll }) {
+export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onToggleWishlist }) {
   if (!cards || cards.length === 0) return null;
   return (
     <View style={styles.catRow}>
@@ -57,6 +58,7 @@ export function CardRow({ title, cards, onPressCard, onSeeAll }) {
                 )}
                 <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
+                {onToggleWishlist ? <WishlistHeart active={isWishlisted(card.id)} onToggle={() => onToggleWishlist(card.id)} top={card.hasNew ? 27 : 8} /> : null}
                 <View style={[styles.badge, { backgroundColor: badge.bg, top: card.hasNew ? 27 : 8 }]}>
                   <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
                 </View>

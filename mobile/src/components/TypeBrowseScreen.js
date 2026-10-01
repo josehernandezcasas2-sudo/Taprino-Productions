@@ -9,6 +9,7 @@ import TopNav from './TopNav';
 import SmartImage from './SmartImage';
 import HeroSpotlight from './HeroSpotlight';
 import { CardRow } from './LibraryRows';
+import { useWishlist } from '../lib/useWishlist';
 
 
 // Default emoji icons from components/GenreBrowseRow.js — an admin-uploaded
@@ -37,6 +38,7 @@ function BackArrowIcon({ size = 16, color = colors.olive }) {
 // this always shows the default one-row-per-genre layout.
 export default function TypeBrowseScreen({ type }) {
   const router = useRouter();
+  const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
 
   useEffect(() => {
@@ -133,7 +135,7 @@ export default function TypeBrowseScreen({ type }) {
             <Text style={styles.emptyText}>Nothing in {label} yet — check back soon.</Text>
           ) : (
             genreRows.map((row) => row.cards.length > 0 && (
-              <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
+              <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} />
             ))
           )}
         </View>
