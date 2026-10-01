@@ -4,18 +4,10 @@ import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { getAuth } from '@clerk/nextjs/server';
 import { SignInButton } from '@clerk/nextjs';
-import { getAccountContext } from '../../lib/accountContext';
 import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import WishlistButton from '../../components/WishlistButton';
-import {
-  getPitchById, getSimilarPitches, getPitchUpdates, getPitchComments, isPitchSaved
-} from '../../lib/pitches';
-import { getDonationsForPitch } from '../../lib/pitchDonations';
-import { getPublicDisplayNames } from '../../lib/userProfiles';
-import { getSiteSettings } from '../../lib/siteSettings';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { getPitchDetailData } from '../../lib/pitchDetailHub';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
@@ -23,68 +15,11 @@ import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res, params }) {
-  const account = await getAccountContext(req);
-  const siteSettings = await getSiteSettings();
-  const bypassingDisabled = !siteSettings.elevatorPitchEnabled && account.isAdmin;
-
-  if (!siteSettings.elevatorPitchEnabled && !account.isAdmin) {
-    return { notFound: true };
-  }
-
-  const pitch = await getPitchById(params.id);
-  if (!pitch || pitch.status !== 'approved') {
-    return { notFound: true };
-  }
+  const data = await getPitchDetailData(params.id, req);
+  if (!data) return { notFound: true };
 
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const { userId } = getAuth(req);
-  const [similar, updates, comments, episodes, saved, donations] = await Promise.all([
-    getSimilarPitches(pitch.tag, pitch.id),
-    getPitchUpdates(pitch.id),
-    getPitchComments(pitch.id),
-    getPublicEpisodes(),
-    userId ? isPitchSaved(userId, pitch.id) : false,
-    pitch.funding_enabled ? getDonationsForPitch(pitch.id) : Promise.resolve([])
-  ]);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-  const totalRaisedCents = pitch.funding_enabled ? donations.reduce((sum, d) => sum + d.amountCents, 0) : null;
-  const backerCount = pitch.funding_enabled ? new Set(donations.map((d) => d.donorUserId)).size : null;
-
-  // Most recent unique backers, most-recent-donation-first — donations
-  // already come back ordered newest-first (getDonationsForPitch), so
-  // the first time a donor id appears in that order is their latest
-  // donation. Capped at 8 so this stays a strip, not another grid.
-  const seenDonors = new Set();
-  const recentBackerIds = [];
-  for (const d of donations) {
-    if (seenDonors.has(d.donorUserId)) continue;
-    seenDonors.add(d.donorUserId);
-    recentBackerIds.push(d.donorUserId);
-    if (recentBackerIds.length >= 8) break;
-  }
-  const backerNames = recentBackerIds.length > 0 ? await getPublicDisplayNames(recentBackerIds) : {};
-  const recentBackers = recentBackerIds.map((id) => ({ userId: id, displayName: backerNames[id] }));
-
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      bypassingDisabled,
-      isCreator: account.isCreator,
-      userId: userId || null,
-      mainGenres,
-      pitch,
-      similar,
-      updates,
-      comments,
-      initialSaved: saved,
-      totalRaisedCents,
-      backerCount,
-      recentBackers
-    }
-  };
+  return { props: data };
 }
 
 const DONATION_PRESETS = [10, 25, 50];

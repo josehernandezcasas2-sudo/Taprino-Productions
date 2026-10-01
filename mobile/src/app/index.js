@@ -160,14 +160,14 @@ export default function Home() {
           <Section label="PITCH ROOM" color={colors.mint}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
               {pitches.map((p) => (
-                <View key={p.id} style={styles.flyerCard}>
+                <Pressable key={p.id} style={styles.flyerCard} onPress={() => router.push(`/pitches/${p.id}`)}>
                   <Text style={styles.flyerTitle}>{p.title}</Text>
                   {p.logline ? <Text style={styles.flyerLogline} numberOfLines={3}>{p.logline}</Text> : null}
                   {p.creatorName ? <Text style={styles.flyerBy}>by {p.creatorName}</Text> : null}
                   {p.fundingRaised != null ? (
                     <Text style={styles.flyerRaised}>${Number(p.fundingRaised).toLocaleString()} raised</Text>
                   ) : null}
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </Section>

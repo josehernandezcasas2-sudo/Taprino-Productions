@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 
 // Calls the live /api/pitches/list route on studiotapatv.site, which
-// reads the same Supabase `pitches` table the web Pitch Room uses.
+// reads the same Supabase `pitches` table the web Pitch Room uses. Each
+// card links to /pitches/[id], same as the website.
 export default function PitchRoom() {
+  const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, pitches: [] });
 
   useEffect(() => {
@@ -55,14 +58,14 @@ export default function PitchRoom() {
         keyExtractor={(item) => String(item.id)}
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
-          <View style={styles.card}>
+          <Pressable style={styles.card} onPress={() => router.push(`/pitches/${item.id}`)}>
             {item.thumbnail ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} /> : null}
             <View style={styles.cardBody}>
               {item.tag ? <Text style={styles.tag}>{item.tag}</Text> : null}
               <Text style={styles.cardTitle}>{item.title}</Text>
               {item.logline ? <Text style={styles.logline}>{item.logline}</Text> : null}
             </View>
-          </View>
+          </Pressable>
         )}
       />
     </SafeAreaView>
