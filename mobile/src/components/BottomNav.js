@@ -1,8 +1,8 @@
-import { useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon } from './TabBarIcons';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
@@ -58,8 +58,19 @@ export default function BottomNav() {
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
   const [openKey, setOpenKey] = useState(null);
+  // Measured layouts, used to center the drop-up over the tab that opened
+  // it (same approach as MobileTabBar.js's useLayoutEffect).
+  const [barLayout, setBarLayout] = useState(null);
+  const [itemLayouts, setItemLayouts] = useState({});
+  const [dropupWidth, setDropupWidth] = useState(0);
+  const anim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => { setOpenKey(null); }, [pathname]);
+
+
 
   function toggle(key) {
+    setDropupWidth(0);
     setOpenKey((k) => (k === key ? null : key));
   }
   function go(href) {
@@ -68,6 +79,25 @@ export default function BottomNav() {
   }
 
   const openGroup = openKey ? GROUPS[openKey] : null;
+
+  let dropupLeft = 0;
+  const item = openKey ? itemLayouts[openKey] : null;
+  // Until the drop-up reports its own width, assume .tabbar-dropup's
+  // 180px min-width — close enough that the later correction is invisible.
+  const width = dropupWidth || 180;
+  if (item && barLayout) {
+    const margin = 6;
+    const center = item.x + item.width / 2;
+    dropupLeft = Math.max(margin, Math.min(center - width / 2, barLayout.width - width - margin));
+  }
+  const measured = !!(item && barLayout);
+
+  // Fade/slide in only once the position is known (.tabbar-dropup's 0.14s
+  // tabbar-dropup-in), so it never animates from the wrong spot.
+  useEffect(() => {
+    if (!openKey || !measured) { anim.setValue(0); return; }
+    Animated.timing(anim, { toValue: 1, duration: 140, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
+  }, [openKey, measured]);
 
   // Vertical Discover is a full-screen immersive takeover (edge-to-edge
   // video, its own close button) — matches pages/vertical/discover.js,
@@ -80,33 +110,51 @@ export default function BottomNav() {
     <>
       {openGroup && <Pressable style={StyleSheet.absoluteFill} onPress={() => setOpenKey(null)} />}
       <View style={[styles.wrap, { bottom: insets.bottom + 18 }]} pointerEvents="box-none">
-        {openGroup && (
-          <View style={styles.dropup}>
-            {openGroup.items.map((item) => (
+        {openGroup && barLayout && (
+          <Animated.View
+            key={openKey}
+            style={[
+              styles.dropup,
+              { left: dropupLeft, bottom: barLayout.height + 10 },
+              { opacity: measured ? anim : 0, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }
+            ]}
+          >
+            <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
+            {openGroup.items.map((entry) => (
               <Pressable
-                key={item.href}
+                key={entry.href}
                 style={({ pressed }) => [styles.dropupItem, pressed && styles.dropupItemPressed]}
-                onPress={() => go(item.href)}
+                onPress={() => go(entry.href)}
               >
-                <Text style={styles.dropupItemText}>{item.label}</Text>
+                <Text style={styles.dropupItemText}>{entry.label}</Text>
               </Pressable>
             ))}
-          </View>
+            </View>
+          </Animated.View>
         )}
-        <View style={styles.bar}>
+        <View style={styles.bar} onLayout={(e) => setBarLayout(e.nativeEvent.layout)}>
           {Object.entries(GROUPS).map(([key, group]) => {
             const active = group.match(pathname);
             const isDiscover = key === 'discover';
             const tint = active ? colors.onBrass : isDiscover ? colors.sky : colors.inkDim;
             const Icon = group.Icon;
             return (
-              <Pressable key={key} style={[styles.item, active && styles.itemActive]} onPress={() => toggle(key)}>
-                <Icon size={20} color={tint} />
-                <View style={styles.labelRow}>
-                  <Text style={[styles.label, { color: tint }]}>{group.label}</Text>
-                  <CaretUpIcon size={7} color={tint} />
-                </View>
-              </Pressable>
+              <View
+                key={key}
+                style={styles.itemSlot}
+                onLayout={(e) => {
+                  const { x, width } = e.nativeEvent.layout;
+                  setItemLayouts((prev) => ({ ...prev, [key]: { x, width } }));
+                }}
+              >
+                <Pressable style={[styles.item, active && styles.itemActive]} onPress={() => toggle(key)}>
+                  <Icon size={20} color={tint} />
+                  <View style={styles.labelRow}>
+                    <Text style={[styles.label, { color: tint }]}>{group.label}</Text>
+                    {isDiscover ? null : <CaretUpIcon size={7} color={tint} />}
+                  </View>
+                </Pressable>
+              </View>
             );
           })}
         </View>
@@ -132,12 +180,13 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 8 },
     elevation: 12
   },
+  itemSlot: { flex: 1 },
   item: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 999, paddingVertical: 4 },
   itemActive: { backgroundColor: colors.brass },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  label: { fontSize: 9, fontWeight: '700', letterSpacing: 0.6, textTransform: 'uppercase' },
+  label: { fontFamily: fonts.mono, fontSize: 8.3, letterSpacing: 0.8, textTransform: 'uppercase' },
   dropup: {
-    marginBottom: 10,
+    position: 'absolute',
     backgroundColor: colors.dropupBackground,
     borderRadius: 18,
     borderWidth: 1,
@@ -148,10 +197,9 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 10 },
     elevation: 14,
-    minWidth: 200,
-    alignSelf: 'flex-start'
+    minWidth: 180
   },
-  dropupItem: { paddingVertical: 12, paddingHorizontal: 18 },
+  dropupItem: { paddingVertical: 11, paddingHorizontal: 18 },
   dropupItemPressed: { backgroundColor: 'rgba(248,95,115,0.15)' },
-  dropupItemText: { color: colors.ink, fontSize: 14 }
+  dropupItemText: { color: colors.ink, fontSize: 13.6, fontFamily: fonts.body }
 });
