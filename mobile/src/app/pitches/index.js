@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, FlatList, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 // Calls the live /api/pitches/list route on studiotapatv.site, which
 // reads the same Supabase `pitches` table the web Pitch Room uses. Each
@@ -64,7 +65,7 @@ export default function PitchRoom() {
         contentContainerStyle={styles.list}
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => router.push(`/pitches/${item.id}`)}>
-            {item.thumbnail ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} /> : null}
+            {item.thumbnail ? <SmartImage uri={item.thumbnail} style={styles.thumb} /> : null}
             <View style={styles.cardBody}>
               {item.tag ? <Text style={styles.tag}>{item.tag}</Text> : null}
               <Text style={styles.cardTitle}>{item.title}</Text>

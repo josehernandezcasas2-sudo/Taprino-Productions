@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/expo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 function tierBadge(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
@@ -159,7 +160,7 @@ export default function SeriesHub() {
       <Stack.Screen options={{ title: seriesInfo.name }} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <View style={styles.hero}>
-          {heroImage ? <Image source={{ uri: heroImage }} style={styles.heroImage} /> : <View style={styles.heroImage} />}
+          {heroImage ? <SmartImage uri={heroImage} style={styles.heroImage} /> : <View style={styles.heroImage} />}
           <View style={styles.heroOverlay}>
             <Text style={styles.heroEyebrow}>Series{seriesInfo.isOriginal ? ' · Tapa Original' : ''}</Text>
             <Text style={styles.heroTitle}>{seriesInfo.name}</Text>
@@ -224,7 +225,7 @@ export default function SeriesHub() {
                 return (
                   <Pressable key={ep.id} style={styles.episodeRow} onPress={() => router.push(`/episode/${ep.id}`)}>
                     <View style={styles.episodeThumb}>
-                      {ep.thumbnail ? <Image source={{ uri: ep.thumbnail }} style={styles.episodeThumbImg} /> : null}
+                      {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={styles.episodeThumbImg} /> : null}
                       <View style={[styles.episodeBadge, { backgroundColor: epBadge.color }]}>
                         <Text style={[styles.episodeBadgeText, { color: epBadge.text }]}>{epBadge.label}</Text>
                       </View>
@@ -254,7 +255,7 @@ export default function SeriesHub() {
           <View style={styles.bonusGrid}>
             {bonusContent.map((b) => (
               <Pressable key={b.id} style={styles.bonusCard} onPress={() => router.push(`/episode/${b.id}`)}>
-                {b.thumbnail ? <Image source={{ uri: b.thumbnail }} style={styles.bonusThumb} /> : <View style={styles.bonusThumb} />}
+                {b.thumbnail ? <SmartImage uri={b.thumbnail} style={styles.bonusThumb} /> : <View style={styles.bonusThumb} />}
                 <Text style={styles.bonusTitle} numberOfLines={1}>{b.title}</Text>
                 <Text style={styles.bonusRuntime}>{formatRuntimeLong(b.runtime) || b.runtime}</Text>
               </Pressable>

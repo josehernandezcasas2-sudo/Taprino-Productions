@@ -7,6 +7,7 @@ import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, apiDelete } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 function tierBadge(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
@@ -245,7 +246,7 @@ function GridCard({ item, subtitle, tagOverride, removing, onPress, onRemove, he
       <Pressable style={styles.removeBtn} onPress={onRemove} disabled={removing} hitSlop={8}>
         {removing ? <ActivityIndicator size="small" color={colors.ink} /> : <Text style={styles.removeBtnText}>{heart ? '♥' : '✕'}</Text>}
       </Pressable>
-      {item.thumbnail ? <Image source={{ uri: item.thumbnail }} style={styles.cardImg} /> : <View style={styles.cardImg} />}
+      {item.thumbnail ? <SmartImage uri={item.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
       <View style={[styles.badge, { backgroundColor: badge.color }]}>
         <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
       </View>

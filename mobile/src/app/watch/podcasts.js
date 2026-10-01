@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 // Mirrors pages/podcasts.js: a grid of shows (audio/video, side by side),
 // via the same lib/podcastShow.js getPodcastShows() the website already
@@ -56,7 +57,7 @@ export default function Podcasts() {
           <View style={styles.grid}>
             {state.shows.map((show) => (
               <Pressable key={show.id} style={styles.card} onPress={() => router.push(`/podcasts/${show.id}`)}>
-                {show.art ? <Image source={{ uri: show.art }} style={styles.cardArt} /> : <View style={styles.cardArt} />}
+                {show.art ? <SmartImage uri={show.art} style={styles.cardArt} /> : <View style={styles.cardArt} />}
                 <View style={styles.mediaTag}>
                   <Text style={styles.mediaTagText}>
                     {show.hasAudio && show.hasVideo ? '🎧📹 Both' : show.hasVideo ? '📹 Video' : '🎧 Audio'}

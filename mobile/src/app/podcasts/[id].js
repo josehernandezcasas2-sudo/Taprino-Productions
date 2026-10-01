@@ -1,11 +1,12 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 function PlayIcon({ size = 15, color = colors.ink }) {
   return (
@@ -142,7 +143,7 @@ export default function PodcastShow() {
       <Stack.Screen options={{ title: show.name }} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
-          {art ? <Image source={{ uri: art }} style={styles.art} /> : <View style={styles.art} />}
+          {art ? <SmartImage uri={art} style={styles.art} /> : <View style={styles.art} />}
           <View style={styles.headerInfo}>
             <Text style={styles.eyebrow}>Podcast</Text>
             <Text style={styles.showTitle}>{show.name}</Text>

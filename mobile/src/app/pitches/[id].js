@@ -1,11 +1,12 @@
 import { useAuth } from '@clerk/expo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 const DONATION_PRESETS = [10, 25, 50];
@@ -372,7 +373,7 @@ export default function PitchDetail() {
 
         <View style={styles.hero}>
           {pitch.hero_image || pitch.thumbnail ? (
-            <Image source={{ uri: pitch.hero_image || pitch.thumbnail }} style={styles.heroImage} />
+            <SmartImage uri={pitch.hero_image || pitch.thumbnail} style={styles.heroImage} />
           ) : <View style={styles.heroImage} />}
           <View style={styles.heroOverlay}>
             <Text style={styles.heroEyebrow}>{pitch.tag || 'Project'} · Pitch Room</Text>
@@ -489,7 +490,7 @@ export default function PitchDetail() {
             <>
               <Text style={styles.sectionLabel}>Photos</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.photoRow}>
-                {pitch.photos.map((url, i) => <Image key={i} source={{ uri: url }} style={styles.photoItem} />)}
+                {pitch.photos.map((url, i) => <SmartImage key={i} uri={url} style={styles.photoItem} />)}
               </ScrollView>
             </>
           ) : null}
@@ -527,7 +528,7 @@ export default function PitchDetail() {
               <View style={styles.similarGrid}>
                 {similar.map((p) => (
                   <Pressable key={p.id} style={styles.similarCard} onPress={() => router.push(`/pitches/${p.id}`)}>
-                    {p.thumbnail ? <Image source={{ uri: p.thumbnail }} style={styles.similarThumb} /> : <View style={styles.similarThumb} />}
+                    {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.similarThumb} /> : <View style={styles.similarThumb} />}
                     {p.tag ? <Text style={styles.similarTag}>{p.tag}</Text> : null}
                     <Text style={styles.similarTitle} numberOfLines={1}>{p.title}</Text>
                     {p.creator_name ? (

@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
 import TopNav from '../components/TopNav';
+import SmartImage from '../components/SmartImage';
 
 const ROTATE_MS = 9000;
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
@@ -124,7 +125,7 @@ export default function Stream() {
         {hero && (
           <Pressable style={styles.hero} onPress={() => goToEpisode(hero)}>
             {(hero.heroImage || hero.poster || hero.thumbnail) ? (
-              <Image source={{ uri: hero.heroImage || hero.poster || hero.thumbnail }} style={styles.heroImage} />
+              <SmartImage uri={hero.heroImage || hero.poster || hero.thumbnail} style={styles.heroImage} />
             ) : null}
             <View style={styles.heroScrim} />
             <View style={styles.heroContent}>
@@ -162,7 +163,7 @@ export default function Stream() {
                 const pct = parseRuntimeSeconds(ep.runtime) ? Math.min(100, Math.round((ep.resumeSeconds / parseRuntimeSeconds(ep.runtime)) * 100)) : null;
                 return (
                   <Pressable key={ep.id} style={styles.card} onPress={() => router.push(`/episode/${ep.id}`)}>
-                    {ep.thumbnail ? <Image source={{ uri: ep.thumbnail }} style={styles.cardImg} /> : <View style={styles.cardImg} />}
+                    {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
                     <View style={styles.cardInfo}>
                       <Text style={styles.cardTitle} numberOfLines={1}>{ep.title}</Text>
                       {ep.artist ? <Text style={styles.cardSubtitle} numberOfLines={1}>{ep.artist}</Text> : null}
@@ -234,7 +235,7 @@ function CardRow({ title, cards, onPressCard, onSeeAll }) {
           return (
             <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
               <View>
-                {card.thumbnail ? <Image source={{ uri: card.thumbnail }} style={styles.cardImg} /> : <View style={styles.cardImg} />}
+                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
                 <View style={[styles.badge, styles.badgeOnCard, { backgroundColor: badge.color }]}>
                   <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>

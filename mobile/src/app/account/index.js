@@ -10,6 +10,7 @@ import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to answer' },
@@ -270,7 +271,7 @@ export default function Account() {
         {/* Identity header */}
         <View style={styles.identityRow}>
           <View style={styles.avatarWrap}>
-            {avatarSrc ? <Image source={{ uri: avatarSrc }} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
+            {avatarSrc ? <SmartImage uri={avatarSrc} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
           </View>
           <View style={{ flex: 1 }}>
             <View style={styles.nameRow}>
@@ -300,7 +301,7 @@ export default function Account() {
               <Label>Avatar</Label>
               <View style={styles.avatarRow}>
                 <View style={styles.avatarWrapSmall}>
-                  {avatarSrc ? <Image source={{ uri: avatarSrc }} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
+                  {avatarSrc ? <SmartImage uri={avatarSrc} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
                 </View>
                 <Pressable style={styles.secondaryBtn} onPress={pickAvatar}><Text style={styles.secondaryBtnText}>Choose photo</Text></Pressable>
                 {avatarSrc ? (

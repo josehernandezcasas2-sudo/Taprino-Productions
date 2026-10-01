@@ -10,6 +10,7 @@ import {
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -285,7 +286,7 @@ export default function MyWork() {
               return (
                 <View key={group.key} style={styles.projectGroup}>
                   <View style={styles.projectHeader}>
-                    {groupArt ? <Image source={{ uri: groupArt.thumbnail || groupArt.poster }} style={styles.projectArt} /> : <View style={styles.projectArt} />}
+                    {groupArt ? <SmartImage uri={groupArt.thumbnail || groupArt.poster} style={styles.projectArt} /> : <View style={styles.projectArt} />}
                     <View style={styles.projectTitleWrap}>
                       <View style={styles.projectTitleRow}>
                         <Text style={styles.projectTitle} numberOfLines={1}>{group.label}</Text>
@@ -316,7 +317,7 @@ export default function MyWork() {
                     if (s.deletionRequested) flags.push({ key: 'deletion', Icon: TrashIcon });
                     return (
                       <Pressable key={s.id} style={styles.row} onPress={() => setActionSheet({ type: 'episode', item: s })}>
-                        {s.thumbnail ? <Image source={{ uri: s.thumbnail }} style={styles.rowThumb} /> : <View style={styles.rowThumb} />}
+                        {s.thumbnail ? <SmartImage uri={s.thumbnail} style={styles.rowThumb} /> : <View style={styles.rowThumb} />}
                         <View style={styles.rowMain}>
                           <View style={styles.rowTitleLine}>
                             <Text style={styles.rowTitle} numberOfLines={1}>{s.title}</Text>

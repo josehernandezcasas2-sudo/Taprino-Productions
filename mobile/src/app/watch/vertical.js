@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 
 // Mirrors pages/vertical/browse.js: a grid of vertical series, via
 // lib/verticalSeriesBrowse.js's entitlement-filtered list (subscribers/
@@ -67,7 +68,7 @@ export default function Vertical() {
           <View style={styles.grid}>
             {state.series.map((s) => (
               <Pressable key={s.id} style={styles.card} onPress={() => router.push(`/vertical/discover?series=${s.id}`)}>
-                {s.thumbnail ? <Image source={{ uri: s.thumbnail }} style={styles.cardArt} /> : <View style={styles.cardArt} />}
+                {s.thumbnail ? <SmartImage uri={s.thumbnail} style={styles.cardArt} /> : <View style={styles.cardArt} />}
                 <Text style={styles.cardTitle} numberOfLines={1}>{s.name}</Text>
                 <Text style={styles.cardCount}>{s.episodeCount} episode{s.episodeCount === 1 ? '' : 's'}</Text>
               </Pressable>

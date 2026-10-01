@@ -4,6 +4,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -77,7 +78,7 @@ export default function GenreLibrary() {
         {hero ? (
           <Pressable style={styles.hero} onPress={() => goToCard(hero)}>
             {(hero.heroImage || hero.poster || hero.thumbnail) ? (
-              <Image source={{ uri: hero.heroImage || hero.poster || hero.thumbnail }} style={styles.heroImage} />
+              <SmartImage uri={hero.heroImage || hero.poster || hero.thumbnail} style={styles.heroImage} />
             ) : null}
             <View style={styles.heroScrim} />
             <View style={styles.heroContent}>
@@ -119,7 +120,7 @@ function CardRow({ title, cards, onPressCard }) {
           return (
             <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
               <View>
-                {card.thumbnail ? <Image source={{ uri: card.thumbnail }} style={styles.cardImg} /> : <View style={styles.cardImg} />}
+                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
                 <View style={[styles.cardBadge, { backgroundColor: badge.color }]}>
                   <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>

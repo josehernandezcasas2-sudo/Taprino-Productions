@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
 import TopNav from '../components/TopNav';
+import SmartImage from '../components/SmartImage';
 
 // Mirrors pages/index.js section for section, fed by the same ranking
 // rules (lib/homeFeed.js) via the public GET /api/home-feed route — no
@@ -72,7 +73,7 @@ export default function Home() {
         {heroItem && (
           <View style={styles.hero}>
             {(heroItem.poster || heroItem.heroImage) ? (
-              <Image source={{ uri: heroItem.poster || heroItem.heroImage }} style={styles.heroImage} />
+              <SmartImage uri={heroItem.poster || heroItem.heroImage} style={styles.heroImage} />
             ) : null}
             <View style={styles.heroTagPill}>
               <Text style={styles.heroTagText}>NOW STREAMING</Text>
@@ -118,7 +119,7 @@ export default function Home() {
               {featuredCreators.map((c) => (
                 <Pressable key={c.userId} style={styles.creatorCard} onPress={() => router.push(`/profile/${c.userId}`)}>
                   <View style={styles.creatorPhotoWrap}>
-                    {c.avatarUrl ? <Image source={{ uri: c.avatarUrl }} style={styles.creatorPhoto} /> : null}
+                    {c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={styles.creatorPhoto} /> : null}
                   </View>
                   <Text style={styles.creatorName}>{c.displayName}</Text>
                   <Text style={styles.creatorCredit} numberOfLines={1}>{c.credits.slice(0, 2).join(', ')}</Text>
@@ -207,7 +208,7 @@ function PosterRow({ items, subtitle, showRank, onPressItem }) {
         return (
           <Wrapper key={item.id} style={styles.posterItem} onPress={onPressItem ? () => onPressItem(item) : undefined}>
             <View style={styles.posterWrap}>
-              {item.poster ? <Image source={{ uri: item.poster }} style={styles.poster} /> : null}
+              {item.poster ? <SmartImage uri={item.poster} style={styles.poster} /> : null}
               {showRank ? (
                 <View style={styles.rankBadge}>
                   <Text style={styles.rankText}>#{item.rank}</Text>

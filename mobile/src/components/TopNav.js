@@ -1,8 +1,9 @@
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useUser } from '@clerk/expo';
 import { colors } from '../lib/theme';
 import { SearchIcon } from './TabBarIcons';
+import SmartImage from './SmartImage';
 
 // The branded header for every screen that's a direct bottom-nav
 // destination (Home, Stream, the four Watch screens, Pitch Room/Discover,
@@ -33,7 +34,7 @@ export default function TopNav() {
         </Pressable>
         <Pressable style={styles.avatarBtn} onPress={() => router.push('/account')} hitSlop={8}>
           {isSignedIn && user && user.imageUrl ? (
-            <Image source={{ uri: user.imageUrl }} style={styles.avatarImg} />
+            <SmartImage uri={user.imageUrl} style={styles.avatarImg} />
           ) : (
             <Text style={styles.avatarText}>{avatarLetter || '☺'}</Text>
           )}

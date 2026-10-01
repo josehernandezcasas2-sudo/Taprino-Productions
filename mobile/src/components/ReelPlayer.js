@@ -1,8 +1,9 @@
 import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Line, Polygon, Path } from 'react-native-svg';
 import { colors } from '../lib/theme';
+import SmartImage from './SmartImage';
 
 // Minimal reel player, mirroring components/ReelPlayer.js's own scope cut
 // (deliberately not the full VideoPlayer.js — no ads/captions/progress
@@ -52,7 +53,7 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
 
   return (
     <Pressable style={styles.wrap} onPress={onToggleMute}>
-      {!src && thumbnail ? <Image source={{ uri: thumbnail }} style={styles.poster} /> : null}
+      {!src && thumbnail ? <SmartImage uri={thumbnail} style={styles.poster} /> : null}
       {src ? (
         <VideoView player={player} style={styles.video} contentFit="cover" nativeControls={false} />
       ) : null}

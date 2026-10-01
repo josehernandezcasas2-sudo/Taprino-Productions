@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -156,7 +157,7 @@ export default function Collection() {
                   ) : null}
                   <Pressable onPress={() => router.push(episodeHref(ep))}>
                     <View style={styles.posterWrap}>
-                      {ep.poster ? <Image source={{ uri: ep.poster }} style={styles.poster} /> : <View style={styles.poster} />}
+                      {ep.poster ? <SmartImage uri={ep.poster} style={styles.poster} /> : <View style={styles.poster} />}
                       <View style={[styles.badge, { backgroundColor: badge.color }]}>
                         <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
                       </View>

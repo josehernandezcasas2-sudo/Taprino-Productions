@@ -1,10 +1,11 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -123,7 +124,7 @@ export default function PublicProfile() {
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           {profile.avatarUrl ? (
-            <Image source={{ uri: profile.avatarUrl }} style={styles.avatar} />
+            <SmartImage uri={profile.avatarUrl} style={styles.avatar} />
           ) : (
             <View style={styles.avatar}><Text style={styles.avatarInitial}>{initial}</Text></View>
           )}
@@ -198,7 +199,7 @@ export default function PublicProfile() {
           <View style={styles.workGrid}>
             {creditedWork.map((item) => (
               <Pressable key={`${item.type}-${item.id}`} style={styles.workItem} onPress={() => router.push(workHref(item))}>
-                {item.poster ? <Image source={{ uri: item.poster }} style={styles.workPoster} /> : <View style={styles.workPoster} />}
+                {item.poster ? <SmartImage uri={item.poster} style={styles.workPoster} /> : <View style={styles.workPoster} />}
                 <Text style={styles.workTitle} numberOfLines={1}>{item.title}</Text>
                 <Text style={styles.workType}>{workTypeLabel(item)}</Text>
               </Pressable>
@@ -213,7 +214,7 @@ export default function PublicProfile() {
             <View style={styles.pitchGrid}>
               {pitches.map((p) => (
                 <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
-                  {p.thumbnail ? <Image source={{ uri: p.thumbnail }} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
+                  {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
                   {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
                   <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
                 </Pressable>
@@ -229,7 +230,7 @@ export default function PublicProfile() {
             <View style={styles.pitchGrid}>
               {backedPitches.map((p) => (
                 <Pressable key={p.id} style={styles.pitchCard} onPress={() => router.push(`/pitches/${p.id}`)}>
-                  {p.thumbnail ? <Image source={{ uri: p.thumbnail }} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
+                  {p.thumbnail ? <SmartImage uri={p.thumbnail} style={styles.pitchThumb} /> : <View style={styles.pitchThumb} />}
                   {p.tag ? <Text style={styles.pitchTag}>{p.tag}</Text> : null}
                   <Text style={styles.pitchTitle} numberOfLines={1}>{p.title}</Text>
                 </Pressable>
@@ -246,7 +247,7 @@ function PostTile({ post, onPress }) {
   const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
   return (
     <Pressable style={styles.postTile} onPress={onPress} disabled={post.kind !== 'video'}>
-      {imageSrc ? <Image source={{ uri: imageSrc }} style={styles.postTileImg} /> : (
+      {imageSrc ? <SmartImage uri={imageSrc} style={styles.postTileImg} /> : (
         <View style={[styles.postTileImg, styles.postTileCaptionWrap]}>
           <Text style={styles.postTileCaptionText} numberOfLines={4}>&ldquo;{post.caption}&rdquo;</Text>
         </View>

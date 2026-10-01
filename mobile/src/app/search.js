@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
+import SmartImage from '../components/SmartImage';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -74,7 +75,7 @@ export default function Search() {
             const subtitle = item.contentType === 'series' ? 'Series' : (CONTENT_TYPE_LABEL[item.contentType] || item.genre);
             return (
               <Pressable style={styles.row} onPress={() => goToResult(item)}>
-                {item.thumbnail ? <Image source={{ uri: item.thumbnail }} style={styles.thumb} /> : <View style={styles.thumb} />}
+                {item.thumbnail ? <SmartImage uri={item.thumbnail} style={styles.thumb} /> : <View style={styles.thumb} />}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
                   <Text style={styles.subtitle} numberOfLines={1}>{item.artist ? `${item.artist} · ` : ''}{subtitle}</Text>
