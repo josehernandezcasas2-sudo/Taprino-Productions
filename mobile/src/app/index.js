@@ -112,13 +112,13 @@ export default function Home() {
           <Section label="THE FACES BEHIND IT" color={colors.sky}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
               {featuredCreators.map((c) => (
-                <View key={c.userId} style={styles.creatorCard}>
+                <Pressable key={c.userId} style={styles.creatorCard} onPress={() => router.push(`/profile/${c.userId}`)}>
                   <View style={styles.creatorPhotoWrap}>
                     {c.avatarUrl ? <Image source={{ uri: c.avatarUrl }} style={styles.creatorPhoto} /> : null}
                   </View>
                   <Text style={styles.creatorName}>{c.displayName}</Text>
                   <Text style={styles.creatorCredit} numberOfLines={1}>{c.credits.slice(0, 2).join(', ')}</Text>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </Section>

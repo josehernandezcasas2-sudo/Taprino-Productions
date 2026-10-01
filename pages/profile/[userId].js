@@ -5,21 +5,12 @@ import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
 import PostViewerModal from '../../components/PostViewerModal';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { getPublicProfile, getCreditedWork } from '../../lib/userProfiles';
-import { getPitchesForCreator } from '../../lib/pitches';
-import { getBackedPitches } from '../../lib/pitchDonations';
-import { getPostsForUser, getLikedVideoPosts } from '../../lib/posts';
+import { getProfileHubData } from '../../lib/profileHub';
 import { formatRuntime } from '../../lib/videoMetadata';
-import { getUserRole } from '../../lib/roles';
-import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
-
-const MAX_GENRE_TAGS = 4;
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -34,87 +25,10 @@ export async function getServerSideProps({ req, res, params }) {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
   }
 
-  const account = await getAccountContext(req);
-  const [episodes, profile] = await Promise.all([
-    getPublicEpisodes(),
-    getPublicProfile(params.userId)
-  ]);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const data = await getProfileHubData(params.userId, req);
+  if (!data) return { notFound: true };
 
-  if (!profile) {
-    return { notFound: true };
-  }
-
-  // Everything below only matters once we know the profile actually
-  // exists, so it runs after the notFound check rather than racing it in
-  // the Promise.all above — no point fetching a stranger's credited work
-  // for a userId that turns out to have no profile at all.
-  const isOwnProfile = Boolean(account.userId) && account.userId === profile.userId;
-  const needsViewCounts = isRedisConfigured();
-  const [creditedWork, pitchRows, backedPitchRows, role, viewCounts, posts, savedSnippets] = await Promise.all([
-    getCreditedWork(profile.userId),
-    getPitchesForCreator(profile.userId),
-    getBackedPitches(profile.userId),
-    getUserRole(profile.userId),
-    needsViewCounts ? getViewCounts() : Promise.resolve({}),
-    getPostsForUser(profile.userId, account.userId),
-    // Saved Snippets — everything the VIEWER has liked, not anything
-    // about the profile owner — so there's no point fetching it for
-    // anyone but the viewer looking at their own profile.
-    isOwnProfile ? getLikedVideoPosts(account.userId) : Promise.resolve([])
-  ]);
-  // Public profile — only ever show approved, public pitches, never a
-  // pending or rejected submission's review status.
-  const pitches = pitchRows.filter((p) => p.status === 'approved');
-
-  // Total views across their credited work — a standalone item's views
-  // come straight from viewCounts by its own id, but a series has no
-  // view count of its own (only its individual episodes do), so that
-  // half sums every episode in `episodes` (already fetched above) that
-  // belongs to the series. Same aggregation GenreRow/pages/index.js
-  // already do for their own series rankings.
-  const totalViews = creditedWork.reduce((sum, item) => {
-    if (item.type === 'episode') return sum + (viewCounts[item.id] || 0);
-    const seriesViews = episodes
-      .filter((e) => e.seriesId === item.id)
-      .reduce((s, e) => s + (viewCounts[e.id] || 0), 0);
-    return sum + seriesViews;
-  }, 0);
-
-  // "Known for" — the genres their own credited episodes actually carry
-  // (series rows don't have a genre of their own), most-common first,
-  // capped so this stays a short tag row rather than a genre dump.
-  const genreCounts = {};
-  for (const item of creditedWork) {
-    if (item.mainGenre) genreCounts[item.mainGenre] = (genreCounts[item.mainGenre] || 0) + 1;
-  }
-  const knownForGenres = Object.keys(genreCounts)
-    .sort((a, b) => genreCounts[b] - genreCounts[a])
-    .slice(0, MAX_GENRE_TAGS);
-
-  return {
-    props: {
-      profile,
-      creditedWork,
-      pitches,
-      backedPitches: backedPitchRows,
-      posts,
-      savedSnippets,
-      totalViews,
-      knownForGenres,
-      // Same priority-order rule as account.js's own role badge — an
-      // admin is also technically a creator, but only the single
-      // highest-privilege badge should ever show.
-      roleBadge: role === 'admin' ? 'Admin' : role === 'sub_admin' ? 'Sub-admin' : role === 'creator' ? 'Creator' : null,
-      mainGenres,
-      isSignedIn: account.isSignedIn,
-      viewerId: account.userId,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+  return { props: data };
 }
 
 function hostnameFor(url) {

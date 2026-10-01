@@ -269,12 +269,12 @@ export default function PitchDetail() {
 
     return (
       <View key={c.id} style={[styles.commentCard, isReply && styles.replyCard]}>
-        <View style={styles.commentMetaRow}>
+        <Pressable style={styles.commentMetaRow} onPress={() => router.push(`/profile/${c.user_id}`)}>
           <View style={styles.commentAvatar}><Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text></View>
           <Text style={styles.commentName}>{c.displayName}</Text>
           {isCreatorComment ? <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View> : null}
           <Text style={styles.commentDate}> · {formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</Text>
-        </View>
+        </Pressable>
 
         {isEditing ? (
           <View style={styles.editForm}>
@@ -386,7 +386,13 @@ export default function PitchDetail() {
 
             <View style={styles.metaLine}>
               {pct !== null ? <Text style={styles.metaChip}>{pct}% funded</Text> : null}
-              {pitch.creator_name ? <Text style={styles.metaText}> · By {pitch.creator_name}</Text> : null}
+              {pitch.creator_name ? (
+                pitch.created_by ? (
+                  <Text style={styles.metaText}> · By <Text style={styles.metaLink} onPress={() => router.push(`/profile/${pitch.created_by}`)}>{pitch.creator_name}</Text></Text>
+                ) : (
+                  <Text style={styles.metaText}> · By {pitch.creator_name}</Text>
+                )
+              ) : null}
               {pitch.funding_enabled ? (
                 <Text style={styles.metaText}>
                   {' '}· ${((currentTotalRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} raised
@@ -506,10 +512,10 @@ export default function PitchDetail() {
               <Text style={styles.sectionLabel}>Backers{backerCount > recentBackers.length ? ` (${backerCount})` : ''}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.backerRow}>
                 {recentBackers.map((b) => (
-                  <View key={b.userId} style={styles.backer}>
+                  <Pressable key={b.userId} style={styles.backer} onPress={() => router.push(`/profile/${b.userId}`)}>
                     <View style={styles.backerAvatar}><Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text></View>
                     <Text style={styles.backerName}>{b.displayName}</Text>
-                  </View>
+                  </Pressable>
                 ))}
               </ScrollView>
             </>
@@ -524,7 +530,15 @@ export default function PitchDetail() {
                     {p.thumbnail ? <Image source={{ uri: p.thumbnail }} style={styles.similarThumb} /> : <View style={styles.similarThumb} />}
                     {p.tag ? <Text style={styles.similarTag}>{p.tag}</Text> : null}
                     <Text style={styles.similarTitle} numberOfLines={1}>{p.title}</Text>
-                    {p.creator_name ? <Text style={styles.similarCreator} numberOfLines={1}>{p.creator_name}</Text> : null}
+                    {p.creator_name ? (
+                      p.created_by ? (
+                        <Pressable onPress={() => router.push(`/profile/${p.created_by}`)}>
+                          <Text style={[styles.similarCreator, styles.metaLink]} numberOfLines={1}>{p.creator_name}</Text>
+                        </Pressable>
+                      ) : (
+                        <Text style={styles.similarCreator} numberOfLines={1}>{p.creator_name}</Text>
+                      )
+                    ) : null}
                   </Pressable>
                 ))}
               </View>
@@ -587,6 +601,7 @@ const styles = StyleSheet.create({
   metaLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', marginBottom: 10 },
   metaChip: { color: colors.olive, fontSize: 12, fontWeight: '700' },
   metaText: { color: colors.inkDim, fontSize: 12 },
+  metaLink: { color: colors.olive, fontWeight: '600' },
   metaDeadline: { color: colors.olive, fontSize: 12, fontWeight: '700' },
   heroLogline: { color: colors.ink, fontSize: 14, lineHeight: 20, marginBottom: 14 },
   heroActions: { flexDirection: 'row', gap: 10, alignItems: 'center', marginBottom: 6 },
