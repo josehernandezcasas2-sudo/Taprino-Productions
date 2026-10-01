@@ -37,7 +37,8 @@
         {
           "photosPermission": "Studio Tapa TV needs access to your photos to set a profile avatar."
         }
-      ]
+      ],
+      "expo-font"
     ]
   }
 }

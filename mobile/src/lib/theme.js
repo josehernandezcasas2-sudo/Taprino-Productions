@@ -3,6 +3,21 @@
 // uses the website's actual colors instead of a separately invented set.
 // Keep this in sync by hand if that palette changes — there's no shared
 // build step between the two codebases to do it automatically.
+// Same three families as styles/globals.css's --font-display / --font-body /
+// --font-mono. RN custom fonts are one registered name per weight, so
+// these are the exact names _layout.js loads — never combine with
+// fontWeight (it would synthesize bold on top of an already-bold face).
+export const fonts = {
+  display: 'SpaceGrotesk_400Regular',
+  displaySemi: 'SpaceGrotesk_600SemiBold',
+  displayBold: 'SpaceGrotesk_700Bold',
+  body: 'Fraunces_400Regular',
+  bodyBold: 'Fraunces_700Bold',
+  mono: 'IBMPlexMono_400Regular',
+  monoMedium: 'IBMPlexMono_500Medium',
+  monoBold: 'IBMPlexMono_700Bold'
+};
+
 export const colors = {
   surface0: '#0c131f', // page background
   surface1: '#121c2d', // raised: header, footer, panels

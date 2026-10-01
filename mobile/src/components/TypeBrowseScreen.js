@@ -1,33 +1,51 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet } from '../lib/api';
-import { colors } from '../lib/theme';
+import { colors, fonts } from '../lib/theme';
+import { formatRuntimeLong } from '../lib/runtime';
 import TopNav from './TopNav';
 import SmartImage from './SmartImage';
+import HeroSpotlight from './HeroSpotlight';
 
-const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
+const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
+const TYPE_LINE_COLOR = { series: colors.brass, movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
 
-function tierBadge(tier, adsEnabled) {
-  if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
-  if (adsEnabled === false) return { label: 'Free', color: colors.mint, text: colors.onBrass };
-  return { label: 'Free with ads', color: colors.surface3, text: colors.ink };
+// Default emoji icons from components/GenreBrowseRow.js — an admin-uploaded
+// image (genreIcons) overrides any of these per genre.
+const GENRE_ICONS = {
+  Comedy: '😂', Action: '💥', Horror: '👻', 'Science Fiction': '🛸', Fantasy: '⚔️',
+  Romance: '💕', Documentary: '🎬', Mystery: '🔍', Animation: '🎨', Anime: '🌸'
+};
+
+// Mirrors components/GenreRow.js's tierBadge classes: free-ads = olive-deep
+// pill, free-noads = green, premium = brass.
+function cardBadge(tier, adsEnabled) {
+  if (tier === 'premium') return { label: 'Tapa +', bg: colors.brass, fg: '#241a05' };
+  if (adsEnabled === false) return { label: 'Free', bg: colors.ok, fg: '#14261a' };
+  return { label: 'Free with ads', bg: colors.oliveDeep, fg: colors.ink };
 }
 
-// Shared by every Watch screen (watch/series.js, watch/movies.js, and —
-// once built — podcasts/vertical): mirrors pages/type/[type].js for
-// whichever `type` is passed in. Hero spotlight (image only, same
-// simplification as Stream/Home), a "Browse by Genre" icon row, the
-// library heading + count, and one row per genre — via
-// GET /api/type-feed?type=<type> (lib/typeFeed.js), sharing
-// lib/libraryCards.js's ranking with the Stream screen.
+function BackArrowIcon({ size = 16, color = colors.olive }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="9.5" />
+      <Path d="M13.5 8.5L10 12l3.5 3.5" />
+    </Svg>
+  );
+}
+
+// Mirrors pages/type/[type].js (HeroSpotlight, back button, "Browse by
+// Genre" row, library heading + count, one GenreRow per genre) for
+// whichever `type` is passed in, via GET /api/type-feed?type=<type>
+// (lib/typeFeed.js), sharing lib/libraryCards.js's ranking with Stream.
 //
-// One real simplification from the website beyond the usual (hero video,
-// search, filters): the website's rows come from an admin-configurable
-// curated-groups system that defaults to "one row per genre" but can be
-// hand-customized; this always shows that default, so a custom curated
-// layout on the website won't appear here yet.
+// Differences from the website that remain: no wishlist heart on cards yet,
+// and the website's admin-configurable "curated rows" layout isn't read —
+// this always shows the default one-row-per-genre layout.
 export default function TypeBrowseScreen({ type }) {
   const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
@@ -41,24 +59,30 @@ export default function TypeBrowseScreen({ type }) {
     return () => { cancelled = true; };
   }, [type]);
 
-  // Card row taps and the hero's own card body / "More info".
+  // Card taps and the hero's "More info" (website: goToInfo / onTrailer).
   function goToEpisode(item) {
     if (item.isSeries || item.type === 'series') {
       router.push(`/series/${item.id}`);
       return;
     }
-    if (item.contentType === 'podcast' || (item.type === 'standalone' && CONTENT_TYPE_LABEL[item.contentType] === 'Podcast')) return; // podcasts play from their show page, not built yet
+    if (item.contentType === 'podcast' && item.seriesId) {
+      router.push(`/podcasts/${item.seriesId}`);
+      return;
+    }
     router.push(`/episode/${item.id}`);
   }
 
-  // The hero's Play button specifically — jumps a series hero straight to
-  // its first episode, same reasoning as stream.js's playHero.
+  // The hero's Play button — a series hero jumps straight to episode 1.
   function playHero(item) {
     if (item.isSeries) {
       router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
       return;
     }
     goToEpisode(item);
+  }
+
+  function goBack() {
+    if (router.canGoBack()) router.back(); else router.replace('/stream');
   }
 
   if (state.loading) {
@@ -78,8 +102,7 @@ export default function TypeBrowseScreen({ type }) {
     );
   }
 
-  const { label, heroPool, mainGenres, genreRows, seriesCount, totalCount } = state.feed;
-  const hero = heroPool[0];
+  const { label, heroPool, mainGenres, genreIcons, genreRows, seriesCount, totalCount } = state.feed;
   const countLabel = seriesCount != null ? `${seriesCount} series` : `${totalCount} title${totalCount === 1 ? '' : 's'}`;
 
   return (
@@ -87,85 +110,84 @@ export default function TypeBrowseScreen({ type }) {
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
-        {hero && (
-          <Pressable style={styles.hero} onPress={() => goToEpisode(hero)}>
-            {(hero.heroImage || hero.poster || hero.thumbnail) ? (
-              <SmartImage uri={hero.heroImage || hero.poster || hero.thumbnail} style={styles.heroImage} />
-            ) : null}
-            <View style={styles.heroScrim} />
-            <View style={styles.heroContent}>
-              <Text style={styles.heroEyebrow}>{hero.isSeries ? 'Most viewed series' : 'Most viewed'}</Text>
-              <Text style={styles.heroTitle} numberOfLines={2}>{hero.title}</Text>
-              <View style={[styles.badge, { backgroundColor: tierBadge(hero.tier, hero.adsEnabled).color }]}>
-                <Text style={[styles.badgeText, { color: tierBadge(hero.tier, hero.adsEnabled).text }]}>{tierBadge(hero.tier, hero.adsEnabled).label}</Text>
-              </View>
-              {hero.desc ? <Text style={styles.heroDesc} numberOfLines={2}>{hero.desc}</Text> : null}
-              <View style={styles.heroActions}>
-                <Pressable style={styles.playBtn} onPress={() => playHero(hero)}>
-                  <Text style={styles.playBtnText}>▶ {hero.isSeries ? 'Play first episode' : 'Play'}</Text>
-                </Pressable>
-                <Pressable style={styles.infoBtn} onPress={() => goToEpisode(hero)}><Text style={styles.infoBtnText}>ⓘ More info</Text></Pressable>
-              </View>
-            </View>
+        {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToEpisode} />}
+
+        <View style={styles.stage}>
+          <Pressable style={styles.backBtn} onPress={goBack}>
+            <BackArrowIcon />
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
-        )}
 
-        {mainGenres.length > 0 && (
-          <View style={styles.genreBrowseSection}>
-            <Text style={styles.sectionTitle}>Browse by Genre</Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
-              {mainGenres.map((g) => (
-                <Pressable key={g} style={styles.genreCircleItem} onPress={() => router.push(`/genre/${encodeURIComponent(g)}`)}>
-                  <View style={styles.genreCircle}><Text style={styles.genreCircleGlyph}>◆</Text></View>
-                  <Text style={styles.genreCircleLabel}>{g}</Text>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        )}
+          {mainGenres.length > 0 && (
+            <View style={styles.genreBrowseRow}>
+              <Text style={styles.rowHeading}>Browse by Genre</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.genreTrack}>
+                {mainGenres.map((g) => {
+                  const custom = genreIcons && genreIcons[g];
+                  return (
+                    <Pressable key={g} style={styles.genreItem} onPress={() => router.push(`/genre/${encodeURIComponent(g)}`)}>
+                      <View style={styles.genreCircle}>
+                        {custom ? <SmartImage uri={custom} style={styles.genreImg} /> : <Text style={styles.genreGlyph}>{GENRE_ICONS[g] || '◆'}</Text>}
+                      </View>
+                      <Text style={styles.genreLabel}>{g}</Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
 
-        <View style={styles.libraryHeading}>
-          <Text style={styles.libraryTitle}>{label}</Text>
+          <Text style={styles.libraryHeading}>{label}</Text>
           <Text style={styles.librarySub}>{countLabel}</Text>
-        </View>
 
-        {genreRows.length === 0 ? (
-          <Text style={styles.emptyText}>Nothing in {label} yet — check back soon.</Text>
-        ) : (
-          genreRows.map((row) => row.cards.length > 0 && (
-            <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
-          ))
-        )}
+          {genreRows.length === 0 ? (
+            <Text style={styles.emptyText}>Nothing in {label} yet — check back soon.</Text>
+          ) : (
+            genreRows.map((row) => row.cards.length > 0 && (
+              <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
+            ))
+          )}
+        </View>
 
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// Mirrors components/GenreRow.js: a 190px-wide 2:3 poster card with the
+// tier badge top-left, a bottom scrim, and the title + "runtime · type"
+// laid over the artwork itself (not underneath it).
 function CardRow({ title, cards, onPressCard, onSeeAll }) {
   return (
-    <View style={styles.section}>
-      <View style={styles.sectionHeadRow}>
-        <Text style={styles.sectionTitle}>{title}</Text>
-        {onSeeAll ? <Pressable onPress={onSeeAll}><Text style={styles.seeAll}>See all</Text></Pressable> : null}
+    <View style={styles.catRow}>
+      <View style={styles.rowHeadingRow}>
+        <Text style={styles.rowHeadingInline}>{title}</Text>
+        {onSeeAll ? <Pressable onPress={onSeeAll} hitSlop={8}><Text style={styles.seeAll}>See all</Text></Pressable> : null}
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trackContent}>
         {cards.map((card) => {
-          const badge = tierBadge(card.tier, card.adsEnabled);
-          const typeLabel = card.type === 'series' ? 'Series' : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
-          const subtitle = card.type === 'series' ? `${card.episodeCount} episode${card.episodeCount === 1 ? '' : 's'}` : (card.runtime || '');
+          const badge = cardBadge(card.tier, card.adsEnabled);
+          const isSeries = card.type === 'series';
+          const typeKey = isSeries ? 'series' : card.contentType;
+          const typeLabel = isSeries ? '▤ Series' : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
+          const first = isSeries ? `${card.episodeCount} episode${card.episodeCount === 1 ? '' : 's'}` : (formatRuntimeLong(card.runtime) || card.runtime || '');
           return (
             <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
-              <View>
-                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
+              <View style={styles.thumb}>
+                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={StyleSheet.absoluteFillObject} /> : (
+                  <Text style={styles.thumbFallback}>{card.tier === 'premium' ? 'locked' : isSeries ? '▤ series' : '▶ preview'}</Text>
+                )}
+                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
-                <View style={[styles.badge, styles.badgeOnCard, { backgroundColor: badge.color }]}>
-                  <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
+                <View style={[styles.badge, { backgroundColor: badge.bg, top: card.hasNew ? 27 : 8 }]}>
+                  <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
                 </View>
-              </View>
-              <View style={styles.cardInfo}>
-                <Text style={styles.cardTitle} numberOfLines={1}>{card.title}</Text>
-                <Text style={styles.cardSubtitle} numberOfLines={1}>{subtitle}{subtitle ? ' · ' : ''}{typeLabel}</Text>
+                <View style={styles.info}>
+                  <Text style={styles.cardTitle}>{card.title}</Text>
+                  <Text style={styles.cardMeta}>
+                    {first}{first ? ' · ' : ''}<Text style={{ color: TYPE_LINE_COLOR[typeKey] || colors.inkDim }}>{typeLabel}</Text>
+                  </Text>
+                </View>
               </View>
             </Pressable>
           );
@@ -175,53 +197,54 @@ function CardRow({ title, cards, onPressCard, onSeeAll }) {
   );
 }
 
+const CARD_W = 190;
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
   scroll: { paddingBottom: 120 },
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: colors.danger, fontSize: 15, textAlign: 'center' },
-  emptyText: { color: colors.inkDim, fontSize: 14, textAlign: 'center', marginTop: 24 },
+  errorText: { color: colors.danger, fontSize: 15, textAlign: 'center', fontFamily: fonts.display },
+  emptyText: { color: colors.inkDim, fontSize: 14, marginTop: 24, fontFamily: fonts.mono },
 
-  hero: { width: '100%', height: 360 },
-  heroImage: { ...StyleSheet.absoluteFillObject },
-  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,19,31,0.35)' },
-  heroContent: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 20 },
-  heroEyebrow: { color: colors.brass, fontSize: 11, fontWeight: '800', letterSpacing: 1, marginBottom: 6 },
-  heroTitle: { color: colors.ink, fontSize: 26, fontWeight: '800', marginBottom: 8 },
-  heroDesc: { color: colors.inkDim, fontSize: 13, lineHeight: 19, marginVertical: 8, maxWidth: 480 },
-  heroActions: { flexDirection: 'row', gap: 10, marginTop: 8 },
-  playBtn: { backgroundColor: colors.ink, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20 },
-  playBtnText: { color: colors.surface0, fontWeight: '800', fontSize: 13 },
-  infoBtn: { backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingVertical: 10, paddingHorizontal: 20 },
-  infoBtnText: { color: colors.ink, fontWeight: '700', fontSize: 13 },
+  // .library-stage
+  stage: { paddingTop: 26, paddingHorizontal: 19 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.4, borderColor: colors.olive, marginBottom: 19 },
+  backText: { color: colors.olive, fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.4, textTransform: 'uppercase' },
 
-  genreBrowseSection: { marginTop: 20 },
-  genreCircleItem: { width: 86, alignItems: 'center' },
-  genreCircle: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginBottom: 6 },
-  genreCircleGlyph: { color: colors.brass, fontSize: 22 },
-  genreCircleLabel: { color: colors.inkDim, fontSize: 11, textAlign: 'center' },
+  // .cat-row-heading
+  rowHeading: { fontFamily: fonts.mono, fontSize: 20, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim, marginBottom: 11 },
+  rowHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
+  rowHeadingInline: { fontFamily: fonts.mono, fontSize: 20, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim },
+  seeAll: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase', color: colors.brass },
 
-  libraryHeading: { marginTop: 24, marginBottom: 4, paddingHorizontal: 16 },
-  libraryTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  librarySub: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
+  // .genre-browse-*
+  genreBrowseRow: { marginBottom: 32 },
+  genreTrack: { flexDirection: 'row', gap: 24, paddingTop: 6, paddingBottom: 8 },
+  genreItem: { width: 90, alignItems: 'center', gap: 10 },
+  genreCircle: { width: 84, height: 84, borderRadius: 42, backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.12)', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  genreImg: { width: 84, height: 84 },
+  genreGlyph: { fontSize: 32, color: colors.ink },
+  genreLabel: { fontFamily: fonts.displaySemi, fontSize: 12.5, color: colors.ink, textAlign: 'center' },
 
-  section: { marginTop: 20 },
-  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 16 },
-  sectionTitle: { color: colors.inkDim, fontSize: 13, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, marginLeft: 16 },
-  seeAll: { color: colors.olive, fontSize: 11.5, fontWeight: '600', marginBottom: 10 },
-  rowContent: { paddingHorizontal: 16, gap: 12 },
+  // .library-heading / .library-sub
+  libraryHeading: { fontFamily: fonts.displayBold, fontSize: 27, color: colors.ink, marginBottom: 5 },
+  librarySub: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim, marginBottom: 26 },
 
-  card: { width: 150 },
-  cardImg: { width: 150, height: 225, borderRadius: 10, backgroundColor: colors.surface2 },
-  cardInfo: { marginTop: 6 },
-  cardTitle: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  cardSubtitle: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
+  // .cat-row / .cat-row-track (2rem top, 3.6rem bottom, 22px gap)
+  catRow: { marginBottom: 29 },
+  trackContent: { flexDirection: 'row', gap: 22, paddingTop: 32, paddingBottom: 58, paddingHorizontal: 5 },
 
-  badge: { position: 'relative', borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2, alignSelf: 'flex-start' },
-  badgeOnCard: { position: 'absolute', top: 6, left: 6 },
-  badgeText: { fontSize: 9, fontWeight: '800' },
-
-  newBanner: { position: 'absolute', top: 6, right: 6, backgroundColor: colors.mint, borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2 },
-  newBannerText: { color: colors.onBrass, fontSize: 8, fontWeight: '800' }
+  // .ep-card / .ep-thumb / .ep-info
+  card: { width: CARD_W, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)', backgroundColor: colors.surface1, overflow: 'hidden' },
+  thumb: { width: '100%', aspectRatio: 2 / 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface1 },
+  thumbFallback: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,232,211,0.5)' },
+  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
+  badge: { position: 'absolute', left: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
+  badgeText: { fontFamily: fonts.mono, fontSize: 8.8, letterSpacing: 0.7, textTransform: 'uppercase' },
+  newBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.sky, paddingVertical: 5 },
+  newBannerText: { color: colors.surface0, fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', textAlign: 'center' },
+  info: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 11, paddingBottom: 11 },
+  cardTitle: { fontFamily: fonts.displaySemi, fontSize: 13.6, lineHeight: 17, color: colors.ink, textTransform: 'uppercase', marginBottom: 3 },
+  cardMeta: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: colors.inkDim }
 });

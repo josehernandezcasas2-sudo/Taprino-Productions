@@ -1,5 +1,10 @@
+import { useEffect, useState } from 'react';
 import { ClerkProvider } from '@clerk/expo';
 import { tokenCache } from '@clerk/expo/token-cache';
+import { useFonts } from 'expo-font';
+import { SpaceGrotesk_400Regular, SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold } from '@expo-google-fonts/space-grotesk';
+import { Fraunces_400Regular, Fraunces_700Bold } from '@expo-google-fonts/fraunces';
+import { IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
@@ -17,6 +22,20 @@ if (!publishableKey) {
 // persistent overlay, same relationship MobileTabBar.js has to the
 // website's page stack (rendered once in _app.js, not tied to routing).
 export default function RootLayout() {
+  const [fontsLoaded, fontError] = useFonts({
+    SpaceGrotesk_400Regular, SpaceGrotesk_600SemiBold, SpaceGrotesk_700Bold,
+    Fraunces_400Regular, Fraunces_700Bold,
+    IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold
+  });
+  // Hold the first paint for the fonts (so text doesn't visibly swap), but
+  // never block forever — after 3s fall through to system fonts.
+  const [fontWaitExpired, setFontWaitExpired] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setFontWaitExpired(true), 3000);
+    return () => clearTimeout(t);
+  }, []);
+  if (!fontsLoaded && !fontError && !fontWaitExpired) return null;
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
     <ClerkProvider publishableKey={publishableKey} tokenCache={tokenCache}>
