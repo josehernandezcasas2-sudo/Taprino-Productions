@@ -74,7 +74,7 @@ export default function BottomNav() {
   // which likewise renders no MobileTabBar. Pitch Discover, by contrast,
   // keeps the tab bar on the website (pages/pitches/discover.js does
   // render MobileTabBar), so it stays visible here too.
-  if (pathname === '/vertical/discover') return null;
+  if (pathname === '/vertical/discover' || pathname === '/snippets/discover') return null;
 
   return (
     <>

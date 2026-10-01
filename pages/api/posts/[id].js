@@ -9,6 +9,12 @@ const MAX_CAPTION_LENGTH = 2200;
 // review in the first place — there's nothing to preserve an audit trail
 // of.
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'DELETE, PATCH, OPTIONS');
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
+  }
   if (req.method !== 'DELETE' && req.method !== 'PATCH') {
     res.setHeader('Allow', 'DELETE, PATCH');
     return res.status(405).json({ error: 'Method not allowed' });

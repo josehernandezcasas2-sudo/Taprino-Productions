@@ -3,9 +3,7 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSmartBack } from '../../components/BackButton';
-import { getAccountContext } from '../../lib/accountContext';
-import { getRecentVideoPosts } from '../../lib/posts';
-import { getPublicDisplayNames } from '../../lib/userProfiles';
+import { getSnippetsFeedData } from '../../lib/snippetsFeed';
 import { buildVerticalUnits, pickNextUnit, expandUnitToSlides, unitKey } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
@@ -25,34 +23,8 @@ export async function getServerSideProps({ req, res }) {
   // report only to signed-in viewers) — same reasoning as
   // pages/vertical/discover.js's own Cache-Control.
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  const posts = await getRecentVideoPosts();
-  const authorNames = await getPublicDisplayNames(posts.map((p) => p.userId));
-
-  // Normalized to the same shape buildVerticalUnits/expandUnitToSlides
-  // expect (see pages/vertical/discover.js) — videoSrc is embedded
-  // directly rather than fetched via /api/vertical/playback, since a
-  // post's manifest URL (lib/cloudflareUpload.js's cloudflarePlaybackUrl)
-  // is already public and unsigned, unlike a premium episode's.
-  const snippetEpisodes = posts.map((p) => ({
-    id: `post:${p.id}`,
-    postId: p.id,
-    ownerId: p.userId,
-    title: p.caption || '',
-    thumbnail: p.thumbnailUrl,
-    videoSrc: p.videoSrc,
-    seriesId: null,
-    isUserPost: true,
-    authorName: authorNames[p.userId] || 'A viewer'
-  }));
-
-  return {
-    props: {
-      snippetEpisodes,
-      isSignedIn: account.isSignedIn,
-      viewerId: account.userId
-    }
-  };
+  const data = await getSnippetsFeedData(req);
+  return { props: data };
 }
 
 // One ad card per this many snippets — same cadence as /vertical/discover,

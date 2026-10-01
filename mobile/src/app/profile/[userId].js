@@ -2,7 +2,7 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 
@@ -14,6 +14,22 @@ function ShareIconSvg({ size = 17 }) {
       <Path d="M12 15V4" />
       <Path d="M8 8l4-4 4 4" />
       <Path d="M5 13v6a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-6" />
+    </Svg>
+  );
+}
+function VideoCameraIconSvg({ size = 12, color = colors.ink }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="2.5" y="6.5" width="13" height="11" rx="1.8" />
+      <Path d="M15.5 10.5l6-3.3v9.6l-6-3.3z" />
+    </Svg>
+  );
+}
+function ImageIconSvg({ size = 12, color = colors.ink }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="2.5" y="4.5" width="19" height="15" rx="2" />
+      <Path d="M4 17l5-5 4 4 3-3 4 4" />
     </Svg>
   );
 }
@@ -39,14 +55,23 @@ function formatViews(n) {
   if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}K`;
   return String(n);
 }
+function formatRuntime(totalSeconds) {
+  const secs = Math.round(totalSeconds);
+  const hours = Math.floor(secs / 3600);
+  const minutes = Math.floor((secs % 3600) / 60);
+  const seconds = secs % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
 
 // Mirrors pages/profile/[userId].js — header (avatar, role badge, joined
-// date, stats, known-for genres, bio, social links, share), "Tagged in"
-// credited work, Pitch Room projects created, and projects backed.
-// Deliberately leaves out Posts/Saved Snippets — the "Snippets" feature
-// (user-posted video/photos, viewed via an Instagram-style modal with
-// its own like/delete/edit/report) has no mobile screen anywhere yet,
-// same scope cut already made for Vertical Discover's catalog-only feed.
+// date, stats, known-for genres, bio, social links, share), Posts,
+// Saved Snippets (own profile only), "Tagged in" credited work, Pitch
+// Room projects created, and projects backed. A post tile opens
+// /snippets/discover?post=<id> (the full reel viewer) instead of an
+// in-place Instagram-style modal like the website's PostViewerModal —
+// only video posts are tappable this way, since that's the only kind
+// with a mobile viewer; a photo tile just isn't interactive yet.
 export default function PublicProfile() {
   const { userId: profileUserId } = useLocalSearchParams();
   const router = useRouter();
@@ -81,11 +106,16 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge } = state.data;
+  const { profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+  const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
+
+  function openPost(post) {
+    if (post.kind === 'video') router.push(`/snippets/discover?post=${post.id}`);
+  }
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
@@ -135,6 +165,30 @@ export default function PublicProfile() {
             <ShareIconSvg size={16} />
           </Pressable>
         </View>
+
+        {posts.length > 0 ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>Posts</Text>
+            <View style={styles.postGrid}>
+              {posts.map((post) => (
+                <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
+              ))}
+            </View>
+          </>
+        ) : null}
+
+        {isOwnProfile && savedSnippets.length > 0 ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>Saved Snippets</Text>
+            <View style={styles.postGrid}>
+              {savedSnippets.map((post) => (
+                <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
+              ))}
+            </View>
+          </>
+        ) : null}
 
         <View style={styles.divider} />
         <Text style={styles.sectionLabel}>Tagged in</Text>
@@ -188,6 +242,29 @@ export default function PublicProfile() {
   );
 }
 
+function PostTile({ post, onPress }) {
+  const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
+  return (
+    <Pressable style={styles.postTile} onPress={onPress} disabled={post.kind !== 'video'}>
+      {imageSrc ? <Image source={{ uri: imageSrc }} style={styles.postTileImg} /> : (
+        <View style={[styles.postTileImg, styles.postTileCaptionWrap]}>
+          <Text style={styles.postTileCaptionText} numberOfLines={4}>&ldquo;{post.caption}&rdquo;</Text>
+        </View>
+      )}
+      <View style={styles.postTileBadge}>
+        {post.kind === 'video' ? (
+          <>
+            <VideoCameraIconSvg size={11} />
+            {post.durationSeconds != null ? <Text style={styles.postTileBadgeText}> {formatRuntime(post.durationSeconds)}</Text> : null}
+          </>
+        ) : (
+          <ImageIconSvg size={11} />
+        )}
+      </View>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
@@ -218,6 +295,14 @@ const styles = StyleSheet.create({
 
   divider: { height: 1, backgroundColor: colors.hairline, marginVertical: 18 },
   sectionLabel: { color: colors.ink, fontSize: 14, fontWeight: '700', marginBottom: 10 },
+
+  postGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  postTile: { width: '31.5%', aspectRatio: 9 / 16, position: 'relative' },
+  postTileImg: { width: '100%', height: '100%', borderRadius: 6, backgroundColor: colors.surface2 },
+  postTileCaptionWrap: { alignItems: 'center', justifyContent: 'center', padding: 10 },
+  postTileCaptionText: { color: colors.inkDim, fontSize: 10.5, textAlign: 'center', fontStyle: 'italic' },
+  postTileBadge: { position: 'absolute', bottom: 5, left: 5, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(12,19,31,0.75)', borderRadius: 999, paddingVertical: 2, paddingHorizontal: 6 },
+  postTileBadgeText: { color: colors.ink, fontSize: 9 },
 
   workGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   workItem: { width: '30%' },

@@ -1,11 +1,13 @@
 import { getProfileHubData } from '../../lib/profileHub';
 
 // The mobile app's equivalent of pages/profile/[userId].js's
-// getServerSideProps — same lib/profileHub.js. Leaves out posts/
-// savedSnippets (the Snippets feature — user-posted video/photos — has
-// no mobile viewer built yet, same scope cut as Vertical Discover's
-// catalog-only feed) and the fields that only exist for the website's
-// own HeaderNav (mainGenres, email, isAdmin, isCreator, isSubscriber).
+// getServerSideProps — same lib/profileHub.js. Forwards posts/
+// savedSnippets now that /snippets/discover exists as a mobile viewer
+// for video posts specifically — a photo post tile still has nowhere to
+// open (no PostViewerModal-equivalent built), so the mobile screen only
+// makes a tile tappable when post.kind === 'video'. Leaves out the
+// fields that only exist for the website's own HeaderNav (mainGenres,
+// email, isAdmin, isCreator, isSubscriber).
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
@@ -29,6 +31,8 @@ export default async function handler(req, res) {
     totalViews: data.totalViews,
     knownForGenres: data.knownForGenres,
     roleBadge: data.roleBadge,
+    posts: data.posts,
+    savedSnippets: data.savedSnippets,
     isSignedIn: data.isSignedIn,
     viewerId: data.viewerId
   });
