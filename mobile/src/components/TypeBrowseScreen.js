@@ -1,18 +1,15 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
-import { formatRuntimeLong } from '../lib/runtime';
 import TopNav from './TopNav';
 import SmartImage from './SmartImage';
 import HeroSpotlight from './HeroSpotlight';
+import { CardRow } from './LibraryRows';
 
-const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
-const TYPE_LINE_COLOR = { series: colors.brass, movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
 
 // Default emoji icons from components/GenreBrowseRow.js — an admin-uploaded
 // image (genreIcons) overrides any of these per genre.
@@ -20,14 +17,6 @@ const GENRE_ICONS = {
   Comedy: '😂', Action: '💥', Horror: '👻', 'Science Fiction': '🛸', Fantasy: '⚔️',
   Romance: '💕', Documentary: '🎬', Mystery: '🔍', Animation: '🎨', Anime: '🌸'
 };
-
-// Mirrors components/GenreRow.js's tierBadge classes: free-ads = olive-deep
-// pill, free-noads = green, premium = brass.
-function cardBadge(tier, adsEnabled) {
-  if (tier === 'premium') return { label: 'Tapa +', bg: colors.brass, fg: '#241a05' };
-  if (adsEnabled === false) return { label: 'Free', bg: colors.ok, fg: '#14261a' };
-  return { label: 'Free with ads', bg: colors.oliveDeep, fg: colors.ink };
-}
 
 function BackArrowIcon({ size = 16, color = colors.olive }) {
   return (
@@ -154,51 +143,6 @@ export default function TypeBrowseScreen({ type }) {
   );
 }
 
-// Mirrors components/GenreRow.js: a 190px-wide 2:3 poster card with the
-// tier badge top-left, a bottom scrim, and the title + "runtime · type"
-// laid over the artwork itself (not underneath it).
-function CardRow({ title, cards, onPressCard, onSeeAll }) {
-  return (
-    <View style={styles.catRow}>
-      <View style={styles.rowHeadingRow}>
-        <Text style={styles.rowHeadingInline}>{title}</Text>
-        {onSeeAll ? <Pressable onPress={onSeeAll} hitSlop={8}><Text style={styles.seeAll}>See all</Text></Pressable> : null}
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trackContent}>
-        {cards.map((card) => {
-          const badge = cardBadge(card.tier, card.adsEnabled);
-          const isSeries = card.type === 'series';
-          const typeKey = isSeries ? 'series' : card.contentType;
-          const typeLabel = isSeries ? '▤ Series' : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
-          const first = isSeries ? `${card.episodeCount} episode${card.episodeCount === 1 ? '' : 's'}` : (formatRuntimeLong(card.runtime) || card.runtime || '');
-          return (
-            <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
-              <View style={styles.thumb}>
-                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={StyleSheet.absoluteFillObject} /> : (
-                  <Text style={styles.thumbFallback}>{card.tier === 'premium' ? 'locked' : isSeries ? '▤ series' : '▶ preview'}</Text>
-                )}
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
-                {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
-                <View style={[styles.badge, { backgroundColor: badge.bg, top: card.hasNew ? 27 : 8 }]}>
-                  <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
-                </View>
-                <View style={styles.info}>
-                  <Text style={styles.cardTitle}>{card.title}</Text>
-                  <Text style={styles.cardMeta}>
-                    {first}{first ? ' · ' : ''}<Text style={{ color: TYPE_LINE_COLOR[typeKey] || colors.inkDim }}>{typeLabel}</Text>
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
-          );
-        })}
-      </ScrollView>
-    </View>
-  );
-}
-
-const CARD_W = 190;
-
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
@@ -214,9 +158,6 @@ const styles = StyleSheet.create({
 
   // .cat-row-heading
   rowHeading: { fontFamily: fonts.mono, fontSize: 20, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim, marginBottom: 11 },
-  rowHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
-  rowHeadingInline: { fontFamily: fonts.mono, fontSize: 20, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim },
-  seeAll: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase', color: colors.brass },
 
   // .genre-browse-*
   genreBrowseRow: { marginBottom: 32 },
@@ -229,22 +170,5 @@ const styles = StyleSheet.create({
 
   // .library-heading / .library-sub
   libraryHeading: { fontFamily: fonts.displayBold, fontSize: 27, color: colors.ink, marginBottom: 5 },
-  librarySub: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim, marginBottom: 26 },
-
-  // .cat-row / .cat-row-track (2rem top, 3.6rem bottom, 22px gap)
-  catRow: { marginBottom: 29 },
-  trackContent: { flexDirection: 'row', gap: 22, paddingTop: 32, paddingBottom: 58, paddingHorizontal: 5 },
-
-  // .ep-card / .ep-thumb / .ep-info
-  card: { width: CARD_W, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)', backgroundColor: colors.surface1, overflow: 'hidden' },
-  thumb: { width: '100%', aspectRatio: 2 / 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface1 },
-  thumbFallback: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,232,211,0.5)' },
-  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-  badge: { position: 'absolute', left: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  badgeText: { fontFamily: fonts.mono, fontSize: 8.8, letterSpacing: 0.7, textTransform: 'uppercase' },
-  newBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.sky, paddingVertical: 5 },
-  newBannerText: { color: colors.surface0, fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', textAlign: 'center' },
-  info: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 11, paddingBottom: 11 },
-  cardTitle: { fontFamily: fonts.displaySemi, fontSize: 13.6, lineHeight: 17, color: colors.ink, textTransform: 'uppercase', marginBottom: 3 },
-  cardMeta: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: colors.inkDim }
+  librarySub: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim, marginBottom: 26 }
 });
