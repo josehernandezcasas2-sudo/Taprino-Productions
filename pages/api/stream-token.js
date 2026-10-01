@@ -2,6 +2,8 @@ import { findEpisode } from '../../lib/episodes';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { SITE } from '../../lib/siteConfig';
+import { getOwnProfile } from '../../lib/userProfiles';
+import { meetsAgeRequirement } from '../../lib/ageGate';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.
 //
@@ -44,6 +46,19 @@ export default async function handler(req, res) {
   }
 
   const account = await getAccountContext(req);
+
+  // Same age gate as pages/episode/[id].js — without it, anything that asks
+  // this endpoint for a src directly (the mobile app does) could play an
+  // age-restricted title the website itself would refuse to show. Admins
+  // bypass; unknown age fails closed (see lib/ageGate.js).
+  if (!account.isAdmin) {
+    const profile = account.isSignedIn ? await getOwnProfile(account.userId) : null;
+    const viewerAge = profile && profile.age != null ? profile.age : null;
+    if (!meetsAgeRequirement(viewerAge, episode.rating)) {
+      return res.status(403).json({ error: 'This title is age-restricted.', ageRestricted: true, rating: episode.rating || 'Not Rated' });
+    }
+  }
+
   const entitled = episode.tier === 'free' || account.isSubscriber;
   if (!entitled) {
     return res.status(403).json({ error: `This episode is for ${SITE.premiumTier} members.` });
