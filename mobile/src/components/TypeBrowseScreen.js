@@ -33,9 +33,7 @@ function BackArrowIcon({ size = 16, color = colors.olive }) {
 // whichever `type` is passed in, via GET /api/type-feed?type=<type>
 // (lib/typeFeed.js), sharing lib/libraryCards.js's ranking with Stream.
 //
-// Differences from the website that remain: no wishlist heart on cards yet,
-// and the website's admin-configurable "curated rows" layout isn't read —
-// this always shows the default one-row-per-genre layout.
+// Rows come from the admin Curated Rows (see lib/typeFeed.js), same as the site.
 export default function TypeBrowseScreen({ type }) {
   const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
@@ -93,7 +91,7 @@ export default function TypeBrowseScreen({ type }) {
     );
   }
 
-  const { label, heroPool, mainGenres, genreIcons, genreRows, seriesCount, totalCount } = state.feed;
+  const { label, heroPool, mainGenres, genreIcons, rows, seriesCount, totalCount } = state.feed;
   const countLabel = seriesCount != null ? `${seriesCount} series` : `${totalCount} title${totalCount === 1 ? '' : 's'}`;
 
   return (
@@ -131,11 +129,19 @@ export default function TypeBrowseScreen({ type }) {
           <Text style={styles.libraryHeading}>{label}</Text>
           <Text style={styles.librarySub}>{countLabel}</Text>
 
-          {genreRows.length === 0 ? (
+          {rows.length === 0 ? (
             <Text style={styles.emptyText}>Nothing in {label} yet — check back soon.</Text>
           ) : (
-            genreRows.map((row) => row.cards.length > 0 && (
-              <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} />
+            rows.map((row) => (
+              <CardRow
+                key={row.id}
+                title={row.title}
+                cards={row.cards}
+                onPressCard={goToEpisode}
+                onSeeAll={row.groupType === 'genre' ? () => router.push(`/genre/${encodeURIComponent(row.genreName)}`) : undefined}
+                isWishlisted={isWishlisted}
+                onToggleWishlist={toggleWishlist}
+              />
             ))
           )}
         </View>
