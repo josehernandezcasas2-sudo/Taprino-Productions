@@ -14,7 +14,12 @@ import { SvgUri } from 'react-native-svg';
 export default function SmartImage({ uri, style, ...rest }) {
   if (!uri) return null;
   if (uri.startsWith('data:image/svg+xml')) {
-    return <SvgUri uri={uri} style={style} width="100%" height="100%" preserveAspectRatio="xMidYMid slice" />;
+    // No explicit width/height props here — react-native-svg's <Svg> (which
+    // SvgUri wraps) lets props override `style`, and a bare "100%" prop
+    // doesn't resolve against this box the way RN style percentages do.
+    // `style` alone (a fixed {width, height} for cards, or
+    // absoluteFillObject for the hero) sizes it correctly, same as Image.
+    return <SvgUri uri={uri} style={style} preserveAspectRatio="xMidYMid slice" />;
   }
   return <Image source={{ uri }} style={style} {...rest} />;
 }
