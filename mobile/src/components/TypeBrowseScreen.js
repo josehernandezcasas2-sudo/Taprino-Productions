@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
+import TopNav from './TopNav';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -61,15 +62,17 @@ export default function TypeBrowseScreen({ type }) {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load this page: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load this page: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
@@ -79,7 +82,8 @@ export default function TypeBrowseScreen({ type }) {
   const countLabel = seriesCount != null ? `${seriesCount} series` : `${totalCount} title${totalCount === 1 ? '' : 's'}`;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
         {hero && (

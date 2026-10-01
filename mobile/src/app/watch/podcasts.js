@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 // Mirrors pages/podcasts.js: a grid of shows (audio/video, side by side),
 // via the same lib/podcastShow.js getPodcastShows() the website already
@@ -25,21 +26,24 @@ export default function Podcasts() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load Podcasts: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load Podcasts: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Podcasts</Text>
         <Text style={styles.subtitle}>

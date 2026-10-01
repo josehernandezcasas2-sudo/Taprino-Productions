@@ -1,6 +1,7 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../lib/theme';
+import TopNav from '../components/TopNav';
 
 // Mirrors pages/about.js content, stacked single-column the same way the
 // site's own @media (max-width: 900px) rule collapses the two-column
@@ -9,7 +10,8 @@ const CONTACT_EMAIL = 'info@studiotapa.com';
 
 export default function About() {
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <Text style={styles.eyebrow}>ABOUT</Text>
         <Text style={styles.h1}>Indie work has a distribution problem.</Text>

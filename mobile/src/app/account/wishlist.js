@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, apiDelete } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 function tierBadge(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
@@ -27,7 +28,7 @@ export default function Wishlist() {
   const { getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
   const router = useRouter();
-  const [busy, setBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState(null);
   const [state, setState] = useState({ loading: true, error: null, feed: null });
   const [removingId, setRemovingId] = useState(null);
 
@@ -50,15 +51,15 @@ export default function Wishlist() {
     load();
   }, []);
 
-  async function handleSignIn() {
-    setBusy(true);
+  async function handleStartAuth(mode) {
+    setBusyMode(mode);
     try {
-      await startHostedAuth();
+      await startHostedAuth({ mode });
       load();
     } catch (err) {
       // Swallow — the screen just stays on the sign-in prompt.
     } finally {
-      setBusy(false);
+      setBusyMode(null);
     }
   }
 
@@ -111,26 +112,34 @@ export default function Wishlist() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load My List: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load My List: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
   if (!state.feed.isSignedIn) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.title}>Sign in to see your list</Text>
-        <Text style={styles.subtitle}>Wishlist, Continue Watching, and Previously Watched all live on your account.</Text>
-        <Pressable style={styles.primaryBtn} onPress={handleSignIn} disabled={busy}>
-          {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
-        </Pressable>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}>
+          <Text style={styles.title}>Sign in to see your list</Text>
+          <Text style={styles.subtitle}>Wishlist, Continue Watching, and Previously Watched all live on your account.</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => handleStartAuth('sign-in')} disabled={!!busyMode}>
+            {busyMode === 'sign-in' ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+          </Pressable>
+          <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => handleStartAuth('sign-up')} disabled={!!busyMode}>
+            {busyMode === 'sign-up' ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.secondaryBtnText}>Create a free account</Text>}
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -138,7 +147,8 @@ export default function Wishlist() {
   const { continueWatching, watchHistory, wishlistedSeries, wishlistedEpisodes, totalCount } = state.feed;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
         {continueWatching.length > 0 && (
@@ -259,6 +269,8 @@ const styles = StyleSheet.create({
   subtitle: { color: colors.inkDim, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
   primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 28, minWidth: 140, alignItems: 'center' },
   primaryBtnText: { color: colors.onBrass, fontSize: 15, fontWeight: '700' },
+  secondaryBtn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 28, minWidth: 140, alignItems: 'center' },
+  secondaryBtnText: { color: colors.ink, fontSize: 15, fontWeight: '600' },
 
   section: { marginBottom: 20 },
   sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginBottom: 10 },

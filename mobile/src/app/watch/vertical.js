@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 // Mirrors pages/vertical/browse.js: a grid of vertical series, via
 // lib/verticalSeriesBrowse.js's entitlement-filtered list (subscribers/
@@ -39,21 +40,24 @@ export default function Vertical() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load Vertical: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load Vertical: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <Text style={styles.title}>Vertical</Text>
 

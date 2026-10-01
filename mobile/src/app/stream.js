@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
+import TopNav from '../components/TopNav';
 
 const ROTATE_MS = 9000;
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
@@ -90,15 +91,17 @@ export default function Stream() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load Stream: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load Stream: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
@@ -107,7 +110,8 @@ export default function Stream() {
   const hero = heroPool[heroIndex % heroPool.length];
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
         {liveStream && (

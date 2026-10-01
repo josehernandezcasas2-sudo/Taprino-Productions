@@ -1,4 +1,4 @@
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
 
 // Same path data as components/PlayerIcons.js on the website, ported to
 // react-native-svg — kept in sync by hand for the same reason theme.js is.
@@ -35,6 +35,15 @@ export function AccountIcon({ size = 20, color = '#fbe8d3' }) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="12" cy="8" r="3.5" />
       <Path d="M4.5 20c1.4-3.5 4.2-5.5 7.5-5.5s6.1 2 7.5 5.5" />
+    </Svg>
+  );
+}
+
+export function SearchIcon({ size = 18, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="11" cy="11" r="7" />
+      <Line x1="21" y1="21" x2="16.65" y2="16.65" />
     </Svg>
   );
 }

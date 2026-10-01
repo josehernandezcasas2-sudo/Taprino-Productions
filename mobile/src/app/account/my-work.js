@@ -9,6 +9,7 @@ import {
 } from '../../components/WorkIcons';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -140,25 +141,30 @@ export default function MyWork() {
 
   if (feedState.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (feedState.forbidden) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.title}>Creator access required</Text>
-        <Text style={styles.note}>This section is only for accounts with creator or admin access.</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}>
+          <Text style={styles.title}>Creator access required</Text>
+          <Text style={styles.note}>This section is only for accounts with creator or admin access.</Text>
+        </View>
       </SafeAreaView>
     );
   }
 
   if (feedState.error || !feedState.submissions) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load your work: {feedState.error || 'unknown error'}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load your work: {feedState.error || 'unknown error'}</Text></View>
       </SafeAreaView>
     );
   }
@@ -210,7 +216,8 @@ export default function MyWork() {
   });
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <View style={styles.head}>
           <Text style={styles.eyebrow}>Creator Studio</Text>

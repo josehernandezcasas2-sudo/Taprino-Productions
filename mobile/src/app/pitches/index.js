@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 // Calls the live /api/pitches/list route on studiotapatv.site, which
 // reads the same Supabase `pitches` table the web Pitch Room uses. Each
@@ -28,30 +29,34 @@ export default function PitchRoom() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.error}>Couldn't load pitches: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.error}>Couldn't load pitches: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
 
   if (state.pitches.length === 0) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.subtitle}>No approved pitches right now.</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.subtitle}>No approved pitches right now.</Text></View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <FlatList
         style={styles.flatList}
         data={state.pitches}

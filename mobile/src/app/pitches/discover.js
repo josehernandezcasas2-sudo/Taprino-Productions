@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import PitchSwipeCard, { SwipeButtons } from '../../components/PitchSwipeCard';
 import { apiDelete, apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 function shuffled(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
@@ -175,16 +176,18 @@ export default function PitchDiscover() {
 
   if (feedState.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (feedState.error || !feedState.feed) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load the pitch deck: {feedState.error || 'not found'}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.errorText}>Couldn't load the pitch deck: {feedState.error || 'not found'}</Text></View>
       </SafeAreaView>
     );
   }
@@ -193,7 +196,8 @@ export default function PitchDiscover() {
   const current = deck[0];
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       {bypassingDisabled ? (
         <View style={styles.banner}>
           <Text style={styles.bannerText}>⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.</Text>

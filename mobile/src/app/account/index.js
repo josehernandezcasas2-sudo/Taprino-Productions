@@ -9,6 +9,7 @@ import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import TopNav from '../../components/TopNav';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to answer' },
@@ -228,26 +229,30 @@ export default function Account() {
 
   if (!dashboard) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (!dashboard.isSignedIn) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.title}>Sign in or create your account</Text>
-        <Text style={styles.subtitle}>
-          Real email + password — sign in if you've been here before, or create a free account if
-          you're new. Either way, it's the same account you use on studiotapatv.site.
-        </Text>
-        <Pressable style={styles.primaryBtn} onPress={() => handleStartAuth('sign-in')} disabled={!!busyMode}>
-          {busyMode === 'sign-in' ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
-        </Pressable>
-        <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => handleStartAuth('sign-up')} disabled={!!busyMode}>
-          {busyMode === 'sign-up' ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.secondaryBtnText}>Create a free account</Text>}
-        </Pressable>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}>
+          <Text style={styles.title}>Sign in or create your account</Text>
+          <Text style={styles.subtitle}>
+            Real email + password — sign in if you've been here before, or create a free account if
+            you're new. Either way, it's the same account you use on studiotapatv.site.
+          </Text>
+          <Pressable style={styles.primaryBtn} onPress={() => handleStartAuth('sign-in')} disabled={!!busyMode}>
+            {busyMode === 'sign-in' ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}
+          </Pressable>
+          <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => handleStartAuth('sign-up')} disabled={!!busyMode}>
+            {busyMode === 'sign-up' ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.secondaryBtnText}>Create a free account</Text>}
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -258,7 +263,8 @@ export default function Account() {
   const priceLabel = dashboard.subscriptionDetails ? formatMoney(dashboard.subscriptionDetails.amount, dashboard.subscriptionDetails.currency) : null;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
         {/* Identity header */}

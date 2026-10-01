@@ -29,19 +29,25 @@ export default function RootLayout() {
             contentStyle: { backgroundColor: colors.surface0 }
           }}
         >
-          <Stack.Screen name="index" options={{ title: 'Home' }} />
-          <Stack.Screen name="stream" options={{ title: 'Stream' }} />
-          <Stack.Screen name="about" options={{ title: 'About' }} />
-          <Stack.Screen name="pitches/index" options={{ title: 'Pitch Room' }} />
-          <Stack.Screen name="pitches/discover" options={{ title: 'Pitch Discover' }} />
+          {/* These 12 are TopNav's screens — every direct bottom-nav
+              destination except Vertical Discover (its own full-screen
+              takeover, no chrome at all, matching the website). Each
+              screen renders <TopNav /> itself, so the native header is
+              turned off here rather than just re-titled. */}
+          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="stream" options={{ headerShown: false }} />
+          <Stack.Screen name="about" options={{ headerShown: false }} />
+          <Stack.Screen name="pitches/index" options={{ headerShown: false }} />
+          <Stack.Screen name="pitches/discover" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />
-          <Stack.Screen name="watch/series" options={{ title: 'Watch Series' }} />
-          <Stack.Screen name="watch/movies" options={{ title: 'Watch Movies' }} />
-          <Stack.Screen name="watch/podcasts" options={{ title: 'Podcasts' }} />
-          <Stack.Screen name="watch/vertical" options={{ title: 'Vertical' }} />
-          <Stack.Screen name="account/index" options={{ title: 'Account' }} />
-          <Stack.Screen name="account/wishlist" options={{ title: 'My List' }} />
-          <Stack.Screen name="account/my-work" options={{ title: 'My Work' }} />
+          <Stack.Screen name="watch/series" options={{ headerShown: false }} />
+          <Stack.Screen name="watch/movies" options={{ headerShown: false }} />
+          <Stack.Screen name="watch/podcasts" options={{ headerShown: false }} />
+          <Stack.Screen name="watch/vertical" options={{ headerShown: false }} />
+          <Stack.Screen name="account/index" options={{ headerShown: false }} />
+          <Stack.Screen name="account/wishlist" options={{ headerShown: false }} />
+          <Stack.Screen name="account/my-work" options={{ headerShown: false }} />
+          <Stack.Screen name="search" options={{ title: 'Search' }} />
         </Stack>
         <BottomNav />
       </SafeAreaProvider>

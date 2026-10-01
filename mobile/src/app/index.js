@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { apiGet } from '../lib/api';
 import { colors } from '../lib/theme';
+import TopNav from '../components/TopNav';
 
 // Mirrors pages/index.js section for section, fed by the same ranking
 // rules (lib/homeFeed.js) via the public GET /api/home-feed route — no
@@ -28,16 +29,18 @@ export default function Home() {
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (state.error) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.error}>Couldn't load the homepage: {state.error}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}><Text style={styles.error}>Couldn't load the homepage: {state.error}</Text></View>
       </SafeAreaView>
     );
   }
@@ -48,7 +51,8 @@ export default function Home() {
   } = state.feed;
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
         <View style={styles.masthead}>
           <Text style={styles.mastheadTitle}>Studio Tapa TV</Text>
