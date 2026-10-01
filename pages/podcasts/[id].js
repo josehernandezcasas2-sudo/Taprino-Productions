@@ -3,10 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
 import VideoPlayer from '../../components/VideoPlayer';
-import { getAccountContext } from '../../lib/accountContext';
-import { findSeries } from '../../lib/series';
-import { getPodcastShowEpisodes } from '../../lib/podcastShow';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { getPodcastShowHubData } from '../../lib/podcastShowHub';
 import { usePodcastPlayer } from '../../contexts/PodcastPlayerContext';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
@@ -17,34 +14,10 @@ import { SITE } from '../../lib/siteConfig';
 import { formatRuntimeLong } from '../../lib/videoMetadata';
 
 export async function getServerSideProps({ req, res, params }) {
-  const show = await findSeries(params.id);
-  if (!show) return { notFound: true };
-
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  const [episodesRaw, allEpisodes] = await Promise.all([
-    getPodcastShowEpisodes(params.id, account.isSubscriber),
-    getPublicEpisodes()
-  ]);
-
-  const episodes = episodesRaw;
-
-  if (episodesRaw.length === 0) return { notFound: true };
-
-  const mainGenres = [...new Set(allEpisodes.map((e) => e.mainGenre).filter(Boolean))];
-
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator,
-      mainGenres,
-      show,
-      episodes
-    }
-  };
+  const data = await getPodcastShowHubData(params.id, req);
+  if (!data) return { notFound: true };
+  return { props: data };
 }
 
 function formatDate(iso) {

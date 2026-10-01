@@ -148,9 +148,9 @@ export default function Home() {
           <Section label="ON AIR" color={colors.brass}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
               {podcasts.map((p) => (
-                <View key={p.id} style={styles.cassette}>
+                <Pressable key={p.id} style={styles.cassette} onPress={() => router.push(`/podcasts/${p.seriesId}`)}>
                   <Text style={styles.cassetteText} numberOfLines={2}>{p.title}</Text>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </Section>

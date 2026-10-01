@@ -66,6 +66,10 @@ export default function Stream() {
       router.push(`/series/${item.id}`);
       return;
     }
+    if (item.contentType === 'podcast' && item.seriesId) {
+      router.push(`/podcasts/${item.seriesId}`);
+      return;
+    }
     router.push(`/episode/${item.id}`);
   }
 
@@ -75,6 +79,10 @@ export default function Stream() {
   function playHero(item) {
     if (item.isSeries) {
       router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      return;
+    }
+    if (item.contentType === 'podcast' && item.seriesId) {
+      router.push(`/podcasts/${item.seriesId}`);
       return;
     }
     router.push(`/episode/${item.id}`);

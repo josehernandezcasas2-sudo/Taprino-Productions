@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 
@@ -8,9 +9,10 @@ import { colors } from '../../lib/theme';
 // via the same lib/podcastShow.js getPodcastShows() the website already
 // uses, exposed as a new public GET /api/podcasts-feed.
 //
-// Tapping a show is a no-op for now — the website links to /podcasts/[id]
-// (a show's own episode-list page), which doesn't exist on mobile yet.
+// Each card links to /podcasts/[id] (a show's own episode list), same as
+// the website.
 export default function Podcasts() {
+  const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, shows: [] });
 
   useEffect(() => {
@@ -49,7 +51,7 @@ export default function Podcasts() {
         ) : (
           <View style={styles.grid}>
             {state.shows.map((show) => (
-              <View key={show.id} style={styles.card}>
+              <Pressable key={show.id} style={styles.card} onPress={() => router.push(`/podcasts/${show.id}`)}>
                 {show.art ? <Image source={{ uri: show.art }} style={styles.cardArt} /> : <View style={styles.cardArt} />}
                 <View style={styles.mediaTag}>
                   <Text style={styles.mediaTagText}>
@@ -61,7 +63,7 @@ export default function Podcasts() {
                   {show.host ? <Text style={styles.cardHost} numberOfLines={1}>Hosted by {show.host}</Text> : null}
                   <Text style={styles.cardCount}>{show.episodeCount} episode{show.episodeCount === 1 ? '' : 's'}</Text>
                 </View>
-              </View>
+              </Pressable>
             ))}
           </View>
         )}
