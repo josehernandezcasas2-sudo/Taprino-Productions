@@ -3,14 +3,11 @@ import Link from 'next/link';
 import Image from 'next/image';
 import BackButton from '../../components/BackButton';
 import { episodeHref } from '../../lib/episodeLinks';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { getAccountContext } from '../../lib/accountContext';
-import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
+import { getCollectionFeedData } from '../../lib/collectionFeed';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import Footer from '../../components/Footer';
-import { getAllSeries } from '../../lib/series';
 import { useWishlist } from '../../lib/useWishlist';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
@@ -24,17 +21,7 @@ import { contentTypeTag } from '../../lib/contentTypeTags';
 // full grid instead of a 4-wide shelf. /collection/new-releases and
 // /collection/leaving-soon are the only two valid slugs; anything else
 // 404s via notFound below rather than silently rendering an empty page.
-const COLLECTIONS = {
-  'new-releases': { label: 'New Releases' },
-  'leaving-soon': { label: 'Leaving Soon' }
-};
-
 export async function getServerSideProps({ req, params, res }) {
-  const config = COLLECTIONS[params.slug];
-  if (!config) {
-    return { notFound: true };
-  }
-
   const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -43,42 +30,14 @@ export async function getServerSideProps({ req, params, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [episodesWithBonus, allSeries, lifecycleSettings] = await Promise.all([
-    getPublicEpisodes(),
-    getAllSeries(),
-    getLifecycleSettings()
-  ]);
-  const episodesNoBonus = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
-  const account = await getAccountContext(req);
+  const data = await getCollectionFeedData(params.slug, req);
+  if (!data) return { notFound: true };
 
-  // Same reasoning as series/[id].js — null age for the cacheable
-  // signed-out path (shared across visitors), real profile age only for
-  // the never-cached signed-in path.
-  const episodes = episodesNoBonus;
-
-  const matches = params.slug === 'new-releases'
-    ? episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays))
-    : episodes.filter((e) => isLeavingSoon(e.availableUntil, lifecycleSettings.leavingSoonDays));
-
-  return {
-    props: {
-      slug: params.slug,
-      label: config.label,
-      isSubscriber: account.isSubscriber,
-      isSignedIn: account.isSignedIn,
-      wishlist: account.wishlist,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator,
-      episodes: matches,
-      allSeries
-    }
-  };
+  return { props: data };
 }
 
-export default function Collection({ slug, label, isSubscriber, isSignedIn, wishlist, email, episodes, allSeries, isAdmin, isCreator }) {
+export default function Collection({ slug, label, isSubscriber, isSignedIn, wishlist, email, episodes, allSeries, mainGenres, isAdmin, isCreator }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   return (
     <>

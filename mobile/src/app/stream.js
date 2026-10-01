@@ -173,8 +173,8 @@ export default function Stream() {
           </Section>
         )}
 
-        {newReleases.length > 0 && <CardRow title="New Releases" cards={newReleases} onPressCard={goToEpisode} />}
-        {leavingSoon.length > 0 && <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToEpisode} />}
+        {newReleases.length > 0 && <CardRow title="New Releases" cards={newReleases} onPressCard={goToEpisode} onSeeAll={() => router.push('/collection/new-releases')} />}
+        {leavingSoon.length > 0 && <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToEpisode} onSeeAll={() => router.push('/collection/leaving-soon')} />}
 
         {!isSubscriber && (
           <View style={styles.promo}>
@@ -188,7 +188,7 @@ export default function Stream() {
         )}
 
         {genreRows.map((row) => row.cards.length > 0 && (
-          <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} />
+          <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
         ))}
 
       </ScrollView>
@@ -205,18 +205,23 @@ function parseRuntimeSeconds(runtime) {
   return null;
 }
 
-function Section({ title, children }) {
+function Section({ title, children, onSeeAll }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeadRow}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {onSeeAll ? (
+          <Pressable onPress={onSeeAll}><Text style={styles.seeAll}>See all</Text></Pressable>
+        ) : null}
+      </View>
       {children}
     </View>
   );
 }
 
-function CardRow({ title, cards, onPressCard }) {
+function CardRow({ title, cards, onPressCard, onSeeAll }) {
   return (
-    <Section title={title}>
+    <Section title={title} onSeeAll={onSeeAll}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
         {cards.map((card) => {
           const badge = tierBadge(card.tier, card.adsEnabled);
@@ -273,7 +278,9 @@ const styles = StyleSheet.create({
   dotActive: { backgroundColor: colors.brass, width: 18 },
 
   section: { marginTop: 20 },
+  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 16 },
   sectionTitle: { color: colors.inkDim, fontSize: 13, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, marginLeft: 16 },
+  seeAll: { color: colors.olive, fontSize: 11.5, fontWeight: '600', marginBottom: 10 },
   rowContent: { paddingHorizontal: 16, gap: 12 },
 
   card: { width: 150 },

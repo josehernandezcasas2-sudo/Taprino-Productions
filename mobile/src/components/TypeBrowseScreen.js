@@ -110,10 +110,10 @@ export default function TypeBrowseScreen({ type }) {
             <Text style={styles.sectionTitle}>Browse by Genre</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
               {mainGenres.map((g) => (
-                <View key={g} style={styles.genreCircleItem}>
+                <Pressable key={g} style={styles.genreCircleItem} onPress={() => router.push(`/genre/${encodeURIComponent(g)}`)}>
                   <View style={styles.genreCircle}><Text style={styles.genreCircleGlyph}>◆</Text></View>
                   <Text style={styles.genreCircleLabel}>{g}</Text>
-                </View>
+                </Pressable>
               ))}
             </ScrollView>
           </View>
@@ -128,7 +128,7 @@ export default function TypeBrowseScreen({ type }) {
           <Text style={styles.emptyText}>Nothing in {label} yet — check back soon.</Text>
         ) : (
           genreRows.map((row) => row.cards.length > 0 && (
-            <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} />
+            <CardRow key={row.genre} title={row.genre} cards={row.cards} onPressCard={goToEpisode} onSeeAll={() => router.push(`/genre/${encodeURIComponent(row.genre)}`)} />
           ))
         )}
 
@@ -137,10 +137,13 @@ export default function TypeBrowseScreen({ type }) {
   );
 }
 
-function CardRow({ title, cards, onPressCard }) {
+function CardRow({ title, cards, onPressCard, onSeeAll }) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>{title}</Text>
+      <View style={styles.sectionHeadRow}>
+        <Text style={styles.sectionTitle}>{title}</Text>
+        {onSeeAll ? <Pressable onPress={onSeeAll}><Text style={styles.seeAll}>See all</Text></Pressable> : null}
+      </View>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rowContent}>
         {cards.map((card) => {
           const badge = tierBadge(card.tier, card.adsEnabled);
@@ -199,7 +202,9 @@ const styles = StyleSheet.create({
   librarySub: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
 
   section: { marginTop: 20 },
+  sectionHeadRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginRight: 16 },
   sectionTitle: { color: colors.inkDim, fontSize: 13, fontWeight: '800', letterSpacing: 0.5, textTransform: 'uppercase', marginBottom: 10, marginLeft: 16 },
+  seeAll: { color: colors.olive, fontSize: 11.5, fontWeight: '600', marginBottom: 10 },
   rowContent: { paddingHorizontal: 16, gap: 12 },
 
   card: { width: 150 },
