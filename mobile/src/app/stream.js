@@ -59,8 +59,24 @@ export default function Stream() {
     return () => clearTimeout(heroTimer.current);
   }, [heroIndex, heroPool.length]);
 
+  // Card row taps and the hero's own card body / "More info" — "tell me
+  // more about this," same reasoning as goToTrailer on the website.
   function goToEpisode(item) {
-    if (item.isSeries || item.type === 'series') return; // no series screen yet
+    if (item.isSeries || item.type === 'series') {
+      router.push(`/series/${item.id}`);
+      return;
+    }
+    router.push(`/episode/${item.id}`);
+  }
+
+  // The hero's Play button specifically — "start watching now," so a
+  // series hero jumps straight to its first episode (matches
+  // pages/stream.js's own goToEpisode) rather than the series overview.
+  function playHero(item) {
+    if (item.isSeries) {
+      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      return;
+    }
     router.push(`/episode/${item.id}`);
   }
 
@@ -111,10 +127,10 @@ export default function Stream() {
               </View>
               {hero.desc ? <Text style={styles.heroDesc} numberOfLines={2}>{hero.desc}</Text> : null}
               <View style={styles.heroActions}>
-                <Pressable style={styles.playBtn} onPress={() => goToEpisode(hero)}>
+                <Pressable style={styles.playBtn} onPress={() => playHero(hero)}>
                   <Text style={styles.playBtnText}>▶ {hero.isSeries ? 'Play first episode' : 'Play'}</Text>
                 </Pressable>
-                <View style={styles.infoBtn}><Text style={styles.infoBtnText}>ⓘ More info</Text></View>
+                <Pressable style={styles.infoBtn} onPress={() => goToEpisode(hero)}><Text style={styles.infoBtnText}>ⓘ More info</Text></Pressable>
               </View>
               {heroPool.length > 1 ? (
                 <View style={styles.dotsRow}>

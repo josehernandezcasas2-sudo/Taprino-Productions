@@ -39,10 +39,24 @@ export default function TypeBrowseScreen({ type }) {
     return () => { cancelled = true; };
   }, [type]);
 
+  // Card row taps and the hero's own card body / "More info".
   function goToEpisode(item) {
-    if (item.isSeries || item.type === 'series') return; // no series detail screen yet
+    if (item.isSeries || item.type === 'series') {
+      router.push(`/series/${item.id}`);
+      return;
+    }
     if (item.contentType === 'podcast' || (item.type === 'standalone' && CONTENT_TYPE_LABEL[item.contentType] === 'Podcast')) return; // podcasts play from their show page, not built yet
     router.push(`/episode/${item.id}`);
+  }
+
+  // The hero's Play button specifically — jumps a series hero straight to
+  // its first episode, same reasoning as stream.js's playHero.
+  function playHero(item) {
+    if (item.isSeries) {
+      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}` : `/series/${item.id}`);
+      return;
+    }
+    goToEpisode(item);
   }
 
   if (state.loading) {
@@ -82,10 +96,10 @@ export default function TypeBrowseScreen({ type }) {
               </View>
               {hero.desc ? <Text style={styles.heroDesc} numberOfLines={2}>{hero.desc}</Text> : null}
               <View style={styles.heroActions}>
-                <Pressable style={styles.playBtn} onPress={() => goToEpisode(hero)}>
+                <Pressable style={styles.playBtn} onPress={() => playHero(hero)}>
                   <Text style={styles.playBtnText}>▶ {hero.isSeries ? 'Play first episode' : 'Play'}</Text>
                 </Pressable>
-                <View style={styles.infoBtn}><Text style={styles.infoBtnText}>ⓘ More info</Text></View>
+                <Pressable style={styles.infoBtn} onPress={() => goToEpisode(hero)}><Text style={styles.infoBtnText}>ⓘ More info</Text></Pressable>
               </View>
             </View>
           </Pressable>

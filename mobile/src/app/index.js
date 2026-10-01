@@ -87,7 +87,7 @@ export default function Home() {
               items={trending.map((t, i) => ({ ...t, rank: i + 1 }))}
               subtitle={(item) => item.tag}
               showRank
-              onPressItem={(item) => !item.isSeries && router.push(`/episode/${item.id}`)}
+              onPressItem={(item) => router.push(item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`)}
             />
           </Section>
         )}
@@ -139,6 +139,7 @@ export default function Home() {
             <PosterRow
               items={seriesRows}
               subtitle={(item) => `${item.count} episode${item.count === 1 ? '' : 's'}`}
+              onPressItem={(item) => router.push(`/series/${item.id}`)}
             />
           </Section>
         )}

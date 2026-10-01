@@ -3,10 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import BackButton from '../../components/BackButton';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { getBonusContentFor } from '../../lib/bonusContent';
-import { findSeries } from '../../lib/series';
-import { getAccountContext } from '../../lib/accountContext';
+import { getSeriesHubData } from '../../lib/seriesHub';
 import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
@@ -40,46 +37,17 @@ export async function getServerSideProps({ req, params, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [episodesRaw, seriesInfo] = await Promise.all([getPublicEpisodes(), findSeries(params.id)]);
-  if (!seriesInfo) {
+  const data = await getSeriesHubData(params.id, req);
+  if (!data) {
     return { notFound: true };
   }
 
-  const account = await getAccountContext(req);
-
-  // hasSession false means this response may be served from cache to many
-  // different anonymous visitors — using null (unknown age) for that case
-  // keeps the cached HTML identical and safe for everyone in that
-  // population, exactly like the cache-control split above already
-  // assumes. Signed-in responses are never cached (private, no-store
-  // above), so resolving a real profile age here doesn't leak across
-  // visitors.
-  const episodes = episodesRaw;
-
-  return {
-    props: {
-      seriesInfo,
-      isSubscriber: account.isSubscriber,
-      isSignedIn: account.isSignedIn,
-      wishlist: account.wishlist,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator,
-      episodes
-    }
-  };
+  return { props: data };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, episodes, isAdmin, isCreator }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-
-  const seriesEpisodes = episodes
-    .filter((e) => e.seriesId === seriesInfo.id)
-    .sort((a, b) => (a.seriesOrder || 0) - (b.seriesOrder || 0));
-
-  const bonusContent = getBonusContentFor(episodes, 'series', seriesInfo.id);
 
   // Group by season — episodes without an explicit season default to 1, so
   // existing single-season series don't need every episode retagged.

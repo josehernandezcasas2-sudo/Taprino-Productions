@@ -191,7 +191,7 @@ export default function Wishlist() {
                 subtitle="You'll get an email when a new episode drops"
                 tagOverride="Series"
                 removing={removingId === s.id}
-                onPress={() => {}}
+                onPress={() => router.push(`/series/${s.id}`)}
                 onRemove={() => removeFromWishlist(s.id, true)}
                 heart
               />
