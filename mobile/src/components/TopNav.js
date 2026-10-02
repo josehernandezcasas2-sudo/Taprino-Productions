@@ -1,25 +1,93 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
-import { useUser } from '@clerk/expo';
-import { colors } from '../lib/theme';
+import { useEffect, useState } from 'react';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname, useRouter } from 'expo-router';
+import { useAuth, useUser } from '@clerk/expo';
+import { apiGet } from '../lib/api';
+import { colors, fonts } from '../lib/theme';
 import { SearchIcon } from './TabBarIcons';
 import SmartImage from './SmartImage';
 
-// The branded header for every screen that's a direct bottom-nav
-// destination (Home, Stream, the four Watch screens, Pitch Room/Discover,
-// Vertical Discover, Account/Wishlist/My Work) — those set
-// headerShown: false in _layout.js and render this instead. Drill-down
-// detail screens (episode, series, profile, etc.) keep Expo Router's
-// default back-button header, unchanged.
-//
-// Deliberately NOT a port of components/HeaderNav.js — that bar's nav
-// links, hamburger genre menu, and notification bell all duplicate what
-// BottomNav's drop-ups already cover on mobile. This is just brand +
-// search + account, agreed with Jose as the minimal direction (see
-// mobile_top_nav_options mockup).
+// The mobile routes that count as the Stream half of the site — the same
+// pages lib/streamSection.js's isStreamPath() marks on the website, mapped
+// to their app routes (/type/series|movie → /watch/series|movies,
+// /podcasts → /watch/podcasts, /vertical/browse → /watch/vertical). Search
+// counts too: on the website a search runs inside /stream. Everything else
+// (home, pitches, about, account, profiles, genre, collections…) is Connect.
+export function isStreamRoute(pathname) {
+  return (
+    pathname === '/stream' ||
+    pathname === '/search' ||
+    pathname === '/watch/series' ||
+    pathname === '/watch/movies' ||
+    pathname === '/watch/podcasts' ||
+    pathname === '/watch/vertical' ||
+    pathname.startsWith('/podcasts/') ||
+    pathname.startsWith('/episode/') ||
+    pathname.startsWith('/series/')
+  );
+}
+
+// Site settings and the viewer's "stay in the stream" preference are the
+// same for every screen, so fetch them once per app session, not per screen.
+let settingsCache = null;
+let settingsPromise = null;
+function loadSettings() {
+  if (settingsCache) return Promise.resolve(settingsCache);
+  if (!settingsPromise) {
+    settingsPromise = apiGet('/api/site-settings')
+      .then((s) => { settingsCache = s; return s; })
+      .catch(() => { settingsPromise = null; return null; });
+  }
+  return settingsPromise;
+}
+let stayInStreamCache = null;
+// Called by the Account screen when the viewer flips "Here only for the
+// stream?", so the brand's tap target updates without a refetch.
+export function setStayInStreamPreference(value) { stayInStreamCache = !!value; }
+
+// The branded header on every screen that's a direct bottom-nav
+// destination (detail screens keep Expo Router's back-button header).
+// Top-left mirrors components/HeaderNav.js's .brand-mark: the admin-set
+// logo image (Site Settings), "Studio Tapa", and the green CONNECT / amber
+// STREAM kicker for whichever half of the site this screen belongs to,
+// with labels editable in Site Settings. Tapping it goes home, or straight
+// to Stream for an account with "Here only for the stream?" turned on.
+// The rest stays deliberately minimal (search + account) since BottomNav
+// already covers HeaderNav's links.
 export default function TopNav() {
   const router = useRouter();
+  const pathname = usePathname();
   const { isSignedIn, user } = useUser();
+  const { getToken } = useAuth();
+  const [settings, setSettings] = useState(settingsCache);
+  const [stayInStream, setStayInStream] = useState(stayInStreamCache);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadSettings().then((s) => { if (!cancelled && s) setSettings(s); });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!isSignedIn) { stayInStreamCache = null; setStayInStream(null); return undefined; }
+    if (stayInStreamCache !== null) return undefined;
+    let cancelled = false;
+    (async () => {
+      const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+      if (!token) return;
+      const profile = await apiGet('/api/account/profile', token).catch(() => null);
+      if (!cancelled && profile) {
+        stayInStreamCache = !!profile.stayInStream;
+        setStayInStream(stayInStreamCache);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isSignedIn]);
+
+  const stream = isStreamRoute(pathname);
+  const kicker = stream
+    ? (settings && settings.streamLabel) || 'Stream'
+    : (settings && settings.connectLabel) || 'Connect';
 
   const avatarLetter = isSignedIn && user && user.primaryEmailAddress
     ? user.primaryEmailAddress.emailAddress[0].toUpperCase()
@@ -27,7 +95,15 @@ export default function TopNav() {
 
   return (
     <View style={styles.bar}>
-      <Text style={styles.brand}>Studio <Text style={styles.brandBold}>Tapa</Text></Text>
+      <Pressable style={styles.brandMark} onPress={() => router.push(stayInStream ? '/stream' : '/')} hitSlop={6}>
+        {settings && settings.logoUrl ? (
+          <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
+        ) : null}
+        <View style={styles.brandText}>
+          <Text style={styles.brandWord}>Studio <Text style={styles.brandStrong}>Tapa</Text></Text>
+          <Text style={[styles.kicker, { color: stream ? colors.olive : colors.ok }]}>{kicker}</Text>
+        </View>
+      </Pressable>
       <View style={styles.actions}>
         <Pressable style={styles.iconBtn} onPress={() => router.push('/search')} hitSlop={8}>
           <SearchIcon size={20} color={colors.ink} />
@@ -47,14 +123,19 @@ export default function TopNav() {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    backgroundColor: colors.surface1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 14,
+    backgroundColor: colors.surface1, paddingHorizontal: 16, paddingTop: 10, paddingBottom: 12,
     borderBottomWidth: 1, borderBottomColor: colors.hairline
   },
-  brand: { color: colors.ink, fontSize: 17, fontWeight: '500' },
-  brandBold: { fontWeight: '800' },
+  // .brand-mark / .nav-logo-image / .brand-text / .brand-word / .brand-kicker
+  brandMark: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1 },
+  logoImage: { height: 32, width: 96, maxWidth: 128 },
+  brandText: { gap: 2 },
+  brandWord: { fontFamily: fonts.display, fontSize: 16.8, color: colors.ink },
+  brandStrong: { fontFamily: fonts.displayBold, color: colors.brass },
+  kicker: { fontFamily: fonts.monoMedium, fontSize: 9.3, letterSpacing: 1.5, textTransform: 'uppercase' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 16 },
   iconBtn: { alignItems: 'center', justifyContent: 'center' },
   avatarBtn: { width: 30, height: 30, borderRadius: 15, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarImg: { width: '100%', height: '100%' },
-  avatarText: { color: colors.onBrass, fontSize: 13, fontWeight: '700' }
+  avatarText: { color: colors.onBrass, fontSize: 13, fontFamily: fonts.displayBold }
 });

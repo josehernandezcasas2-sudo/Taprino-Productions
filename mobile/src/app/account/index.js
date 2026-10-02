@@ -12,7 +12,7 @@ import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
-import TopNav from '../../components/TopNav';
+import TopNav, { setStayInStreamPreference } from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
 const GENDERS = [
@@ -241,11 +241,13 @@ export default function Account() {
   async function toggleStayInStream() {
     const next = !(profile && profile.stayInStream);
     setProfile((p) => ({ ...p, stayInStream: next }));
+    setStayInStreamPreference(next);
     try {
       const token = await withToken();
       await apiPost('/api/account/profile', { stayInStream: next }, token);
     } catch {
       setProfile((p) => ({ ...p, stayInStream: !next }));
+      setStayInStreamPreference(!next);
     }
   }
 
