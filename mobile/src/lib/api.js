@@ -2,7 +2,14 @@
 // backend. Defaults to production; override with EXPO_PUBLIC_API_URL
 // (e.g. your PC's LAN IP) to hit a local `npm run dev` instead. See
 // mobile/README.md for how to point this at localhost during development.
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://studiotapatv.site';
+//
+// Must be the www host: the bare studiotapatv.site 308-redirects to
+// www.studiotapatv.site, and fetch drops the Authorization header when it
+// follows a redirect to a different host — every signed-in request then
+// reached the server anonymous (sign-in "worked" but the app still showed
+// you as signed out, hearts/Continue Watching/premium playback never knew
+// who you were).
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.studiotapatv.site';
 
 // `token` is a Clerk session token (from useAuth().getToken()) — same
 // reasoning as apiPost below. Omit it for anonymous/free-tier requests.
