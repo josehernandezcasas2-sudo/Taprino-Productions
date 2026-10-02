@@ -43,8 +43,8 @@ export const colors = {
   inkFaint: '#b3a18c',
 
   ok: '#84cd98',
-  warn: '#e0b34d',
-  danger: '#e2745a',
+  warn: '#e0863c',
+  danger: '#d67c51',
 
   // Approximations of the website's translucent bar/dropup fills
   // (rgba(41,39,25,x) — a warm near-black, distinct from the navy

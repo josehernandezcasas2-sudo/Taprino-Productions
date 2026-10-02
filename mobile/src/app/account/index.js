@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView,
-  StyleSheet, Switch, Text, TextInput, View
+  ActivityIndicator, Alert, Linking, Pressable, ScrollView,
+  StyleSheet, Text, TextInput, View
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
@@ -41,12 +44,14 @@ function formatDate(ms) {
 // /api/account/request-deletion, /api/newsletter-preference,
 // /api/create-portal-session, all now CORS-open for the app).
 //
-// Two deliberate mobile-shaped differences from the web page: "Manage"
-// under Security opens the website's own account page in the device
-// browser instead of Clerk's openUserProfile() modal (no app-embedded
-// equivalent here), and quick-links to screens that don't exist on
-// mobile yet (My Recs, Continue Watching) are shown but not pressable.
+// Mobile-shaped differences from the web page: "Manage" under Security
+// opens the website's account page in the browser (no in-app equivalent of
+// Clerk's openUserProfile modal); My Recs and Your Numbers open the website
+// (no mobile screens yet); Continue Watching goes to My List, where the app
+// shows it; the membership rail stacks below the main column, as the
+// website itself does under 900px; gender is a pill row instead of a select.
 export default function Account() {
+  const router = useRouter();
   const { isLoaded, isSignedIn, signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
 
@@ -294,34 +299,47 @@ export default function Account() {
 
   const avatarLetter = dashboard.email && dashboard.email[0] ? dashboard.email[0].toUpperCase() : '?';
   const roleBadge = dashboard.isAdmin ? 'Admin' : dashboard.isSubAdmin ? 'Sub-admin' : dashboard.isCreator ? 'Creator' : null;
+  const canSeeNumbers = dashboard.isCreator || dashboard.isAdmin || dashboard.isSubAdmin;
   const avatarSrc = profile && (profile.avatarBase64 || profile.avatarUrl);
-  const priceLabel = dashboard.subscriptionDetails ? formatMoney(dashboard.subscriptionDetails.amount, dashboard.subscriptionDetails.currency) : null;
+  const sub = dashboard.subscriptionDetails;
+  const priceLabel = sub ? formatMoney(sub.amount, sub.currency) : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.stage}>
+        <Pressable style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/stream'))}>
+          <BackArrowIcon /><Text style={styles.backText}>Back</Text>
+        </Pressable>
 
-        {/* Identity header */}
-        <View style={styles.identityRow}>
-          <View style={styles.avatarWrap}>
-            {avatarSrc ? <SmartImage uri={avatarSrc} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
-          </View>
-          <View style={{ flex: 1 }}>
-            <View style={styles.nameRow}>
-              <Text style={styles.name}>{(profile && profile.displayName) || dashboard.email || 'Your account'}</Text>
-              {roleBadge ? <Badge text={roleBadge} /> : null}
-              {dashboard.isSubscriber ? <Badge text="Tapa + member" color={colors.brass} /> : null}
+        {/* .account-identity */}
+        <LinearGradient colors={[colors.surface2, colors.surface1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.identity}>
+          <View style={styles.identityTop}>
+            <View style={styles.identityAvatar}>
+              {avatarSrc ? <SmartImage uri={avatarSrc} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.identityAvatarLetter}>{avatarLetter}</Text>}
             </View>
-            <Text style={styles.subtle}>{dashboard.email ? `Signed in as ${dashboard.email}` : 'Signed in'}</Text>
+            <View style={styles.identityMeta}>
+              <View style={styles.nameRow}>
+                <Text style={styles.identityName}>{(profile && profile.displayName) || dashboard.email || 'Your account'}</Text>
+                {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
+                {dashboard.isSubscriber ? <View style={styles.tierBadge}><Text style={styles.tierBadgeText}>Tapa + member</Text></View> : null}
+              </View>
+              <Text style={styles.identitySub}>{dashboard.email ? `Signed in as ${dashboard.email}` : 'Signed in'}</Text>
+            </View>
           </View>
-        </View>
+          {dashboard.userId ? (
+            <Pressable style={[styles.btnSecondary, { marginBottom: 0 }]} onPress={() => router.push(`/profile/${dashboard.userId}`)}>
+              <Text style={styles.btnSecondaryText}>View public profile {'→'}</Text>
+            </Pressable>
+          ) : null}
+        </LinearGradient>
 
         {/* Public profile */}
-        <Card title="Public profile" visibility="Visible to anyone on Studio Tapa TV" visibilityColor={colors.mint}>
-          {!profile ? <ActivityIndicator color={colors.brass} /> : (
+        <View style={styles.card}>
+          <CardHead title="Public profile" visibility="Visible to anyone on Studio Tapa TV" color={colors.ok} />
+          {!profile ? <Text style={styles.cardP}>Loading…</Text> : (
             <>
-              {profileError ? <Text style={styles.errorText}>{profileError}</Text> : null}
+              {profileError ? <Text style={styles.errorInline}>{profileError}</Text> : null}
               <Label>Display name</Label>
               <TextInput
                 style={styles.input}
@@ -332,15 +350,15 @@ export default function Account() {
                 placeholderTextColor={colors.inkFaint}
               />
 
-              <Label>Avatar</Label>
+              <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
-                <View style={styles.avatarWrapSmall}>
-                  {avatarSrc ? <SmartImage uri={avatarSrc} style={styles.avatarImg} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
+                <View style={styles.avatar}>
+                  {avatarSrc ? <SmartImage uri={avatarSrc} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
                 </View>
-                <Pressable style={styles.secondaryBtn} onPress={pickAvatar}><Text style={styles.secondaryBtnText}>Choose photo</Text></Pressable>
+                <Pressable style={styles.btnSmall} onPress={pickAvatar}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
                 {avatarSrc ? (
-                  <Pressable style={styles.secondaryBtn} onPress={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: undefined, removeAvatar: true }))}>
-                    <Text style={styles.secondaryBtnText}>Remove</Text>
+                  <Pressable style={styles.btnSmall} onPress={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: undefined, removeAvatar: true }))}>
+                    <Text style={styles.btnSmallText}>Remove</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -358,9 +376,9 @@ export default function Account() {
 
               <Label>Links <Text style={styles.labelNote}>up to 6</Text></Label>
               {(profile.socialLinks || []).map((link, i) => (
-                <View key={i} style={styles.linkRow}>
+                <View key={i} style={{ marginBottom: 8 }}>
                   <TextInput
-                    style={[styles.input, styles.linkPlatform]}
+                    style={[styles.input, { marginBottom: 8 }]}
                     value={link.platform || ''}
                     placeholder="Instagram"
                     placeholderTextColor={colors.inkFaint}
@@ -368,46 +386,46 @@ export default function Account() {
                       const next = [...(p.socialLinks || [])]; next[i] = { ...next[i], platform: v }; return { ...p, socialLinks: next };
                     })}
                   />
-                  <TextInput
-                    style={[styles.input, { flex: 1 }]}
-                    value={link.url || ''}
-                    placeholder="https://instagram.com/you"
-                    placeholderTextColor={colors.inkFaint}
-                    onChangeText={(v) => setProfile((p) => {
-                      const next = [...(p.socialLinks || [])]; next[i] = { ...next[i], url: v }; return { ...p, socialLinks: next };
-                    })}
-                  />
-                  <Pressable onPress={() => setProfile((p) => ({ ...p, socialLinks: (p.socialLinks || []).filter((_, idx) => idx !== i) }))}>
-                    <Text style={styles.removeX}>×</Text>
-                  </Pressable>
+                  <View style={styles.inlineRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                      value={link.url || ''}
+                      placeholder="https://instagram.com/you"
+                      placeholderTextColor={colors.inkFaint}
+                      autoCapitalize="none"
+                      onChangeText={(v) => setProfile((p) => {
+                        const next = [...(p.socialLinks || [])]; next[i] = { ...next[i], url: v }; return { ...p, socialLinks: next };
+                      })}
+                    />
+                    <Pressable style={styles.btnSmall} onPress={() => setProfile((p) => ({ ...p, socialLinks: (p.socialLinks || []).filter((_, idx) => idx !== i) }))}>
+                      <Text style={styles.btnSmallText}>{'×'}</Text>
+                    </Pressable>
+                  </View>
                 </View>
               ))}
               {(profile.socialLinks || []).length < 6 ? (
-                <Pressable style={styles.secondaryBtn} onPress={() => setProfile((p) => ({ ...p, socialLinks: [...(p.socialLinks || []), { platform: '', url: '' }] }))}>
-                  <Text style={styles.secondaryBtnText}>+ Add link</Text>
+                <Pressable style={[styles.btnSmall, { alignSelf: 'flex-start', marginBottom: 10 }]} onPress={() => setProfile((p) => ({ ...p, socialLinks: [...(p.socialLinks || []), { platform: '', url: '' }] }))}>
+                  <Text style={styles.btnSmallText}>+ Add link</Text>
                 </Pressable>
               ) : null}
 
-              <Pressable style={[styles.primaryBtn, { marginTop: 14 }]} onPress={saveProfile} disabled={profileSaving}>
-                {profileSaving ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Save profile</Text>}
-              </Pressable>
-              {profileSaved ? <Text style={styles.savedText}>Saved.</Text> : null}
+              <SaveRow label="Save profile" saving={profileSaving} saved={profileSaved} onPress={saveProfile} />
             </>
           )}
-        </Card>
+        </View>
 
         {/* Privacy */}
         {profile ? (
-          <Card title="Privacy" visibility="Never shown publicly" visibilityColor={colors.inkFaint}>
+          <View style={styles.card}>
+            <CardHead title="Privacy" visibility="Never shown publicly — for our own understanding of who uses Studio Tapa TV" color={colors.warn} />
             <Label>Gender</Label>
             <View style={styles.pillRow}>
               {GENDERS.map((g) => (
-                <Pressable key={g.value} style={[styles.pill, profile.gender === g.value && styles.pillActive]} onPress={() => setProfile((p) => ({ ...p, gender: g.value }))}>
-                  <Text style={[styles.pillText, profile.gender === g.value && styles.pillTextActive]}>{g.label}</Text>
+                <Pressable key={g.value} style={[styles.pill, (profile.gender || '') === g.value && styles.pillActive]} onPress={() => setProfile((p) => ({ ...p, gender: g.value }))}>
+                  <Text style={[styles.pillText, (profile.gender || '') === g.value && styles.pillTextActive]}>{g.label}</Text>
                 </Pressable>
               ))}
             </View>
-
             <Label>Age</Label>
             <TextInput
               style={styles.input}
@@ -417,147 +435,173 @@ export default function Account() {
               placeholder="13–120"
               placeholderTextColor={colors.inkFaint}
             />
-
             {ageWasChanged ? (
-              <View style={styles.warnBox}>
-                <Text style={styles.warnText}>
-                  Before you save this change: the age you provide determines which age-restricted titles are
-                  shown to you. By changing your age, you're confirming the new value is accurate.
+              <View style={styles.ageWarn}>
+                <Text style={styles.ageWarnText}>
+                  <Text style={{ fontFamily: fonts.bodyBold }}>Before you save this change:</Text> the age you provide here determines
+                  which age-restricted titles are shown to you — content rated for adults won’t appear for an account listed as a
+                  minor. By changing your age, you’re confirming the new value is accurate. Providing an inaccurate age to access
+                  content that wouldn’t otherwise be shown to you may violate our Terms of Service and applicable law, and Studio
+                  Tapa TV is not responsible for content viewed as a result of inaccurate age information you provided.
                 </Text>
                 <Pressable style={styles.checkboxRow} onPress={() => setAgeChangeConfirmed((v) => !v)}>
-                  <View style={[styles.checkbox, ageChangeConfirmed && styles.checkboxChecked]} />
+                  <View style={[styles.checkbox, ageChangeConfirmed && styles.checkboxChecked]}>{ageChangeConfirmed ? <Text style={styles.checkMark}>{'✓'}</Text> : null}</View>
                   <Text style={styles.checkboxLabel}>I confirm this age is accurate.</Text>
                 </Pressable>
               </View>
             ) : null}
-
-            <Pressable style={[styles.primaryBtn, { marginTop: 10 }]} onPress={saveProfile} disabled={profileSaving}>
-              {profileSaving ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Save</Text>}
-            </Pressable>
-          </Card>
+            <SaveRow label="Save" saving={profileSaving} saved={profileSaved} onPress={saveProfile} />
+          </View>
         ) : null}
 
         {/* Preferences */}
-        <Card title="Preferences">
+        <View style={styles.card}>
+          <Text style={styles.subheading}>Preferences</Text>
           <Row
             label="Newsletter"
             detail={
               dashboard.newsletterStatus === 'subscribed' ? "You're subscribed to new episode and creator-update emails."
                 : dashboard.newsletterStatus === 'opted_out' ? "You've opted out — you won't be asked again unless you opt back in."
-                : "You haven't chosen yet."
+                : "You haven't chosen yet — the signup panel will keep showing until you do."
             }
           >
-            <Pressable style={styles.secondaryBtn} onPress={() => toggleNewsletter(dashboard.newsletterStatus === 'subscribed' ? 'optOut' : 'optIn')} disabled={newsletterLoading}>
-              <Text style={styles.secondaryBtnText}>{newsletterLoading ? 'Updating…' : dashboard.newsletterStatus === 'subscribed' ? 'Opt out' : 'Opt in'}</Text>
+            <Pressable style={styles.btnSmall} onPress={() => toggleNewsletter(dashboard.newsletterStatus === 'subscribed' ? 'optOut' : 'optIn')} disabled={newsletterLoading}>
+              <Text style={styles.btnSmallText}>{newsletterLoading ? 'Updating…' : dashboard.newsletterStatus === 'subscribed' ? 'Opt out' : 'Opt in'}</Text>
             </Pressable>
           </Row>
           {profile ? (
             <Row
               label="Here only for the stream?"
-              detail={profile.stayInStream ? 'On — Home takes you straight to Stream.' : 'Off — Home shows the Connect homepage by default.'}
+              detail={profile.stayInStream ? 'On — Home takes you straight to Stream, skipping the Studio Tapa TV homepage.' : 'Off — Home shows the Studio Tapa TV homepage by default.'}
+              divider
             >
-              <Switch value={!!profile.stayInStream} onValueChange={toggleStayInStream} trackColor={{ true: colors.brass, false: colors.surface2 }} />
+              <Pressable style={styles.btnSmall} onPress={toggleStayInStream}>
+                <Text style={styles.btnSmallText}>{profile.stayInStream ? 'Turn off' : 'Stay in the stream'}</Text>
+              </Pressable>
             </Row>
           ) : null}
-        </Card>
+          <View style={styles.quicklinks}>
+            <Quicklink icon={<HeartGlyph />} label="My Wishlist" onPress={() => router.push('/account/wishlist')} />
+            <Quicklink icon={<SparkleGlyph />} label="My Recs" external onPress={() => Linking.openURL(`${API_BASE_URL}/recs`)} />
+            <Quicklink icon={<PlayGlyph />} label="Continue Watching" onPress={() => router.push('/account/wishlist')} />
+            {canSeeNumbers ? <Quicklink icon={<BarsGlyph />} label="Your Numbers" external onPress={() => Linking.openURL(`${API_BASE_URL}/creator/analytics`)} /> : null}
+          </View>
+        </View>
 
         {/* Security */}
-        <Card title="Security">
+        <View style={styles.card}>
+          <Text style={styles.subheading}>Security</Text>
           <Row label="Email & password" detail="Change your email, reset your password, or manage active sessions.">
-            <Pressable style={styles.secondaryBtn} onPress={() => Linking.openURL(`${API_BASE_URL}/account`)}>
-              <Text style={styles.secondaryBtnText}>Manage</Text>
+            <Pressable style={styles.btnSmall} onPress={() => Linking.openURL(`${API_BASE_URL}/account`)}>
+              <Text style={styles.btnSmallText}>Manage</Text>
             </Pressable>
           </Row>
-        </Card>
+        </View>
 
         {/* Danger zone */}
-        <Card title="Danger zone" danger>
+        <View style={[styles.card, styles.cardDanger]}>
+          <Text style={[styles.subheading, { color: colors.danger }]}>Danger zone</Text>
           <Row label="Log out" detail="Sign out of Studio Tapa TV on this device.">
-            <Pressable style={styles.secondaryBtn} onPress={() => signOut()}>
-              <Text style={styles.secondaryBtnText}>Log out</Text>
+            <Pressable style={styles.btnSmall} onPress={() => signOut()}>
+              <Text style={styles.btnSmallText}>Log out</Text>
             </Pressable>
           </Row>
-          <Row label="Delete account" detail="Permanently removes your profile, wishlist, and viewing history. This can't be undone." labelDanger>
+          <Row label="Delete account" labelDanger divider detail="Permanently removes your profile, wishlist, and viewing history. This can’t be undone.">
             {!deleteConfirmOpen && !deleteRequested ? (
-              <Pressable style={styles.dangerBtn} onPress={() => setDeleteConfirmOpen(true)}>
-                <Text style={styles.dangerBtnText}>Delete…</Text>
+              <Pressable style={styles.btnDanger} onPress={() => setDeleteConfirmOpen(true)}>
+                <Text style={styles.btnDangerText}>Delete account…</Text>
               </Pressable>
             ) : null}
           </Row>
           {deleteConfirmOpen ? (
-            <View style={styles.warnBox}>
-              <Text style={styles.warnText}>
-                This sends a deletion request to our team, who will action it and confirm by email. Type DELETE to confirm.
+            <View style={styles.deleteBox}>
+              <Text style={styles.deleteText}>
+                This sends a deletion request to our team, who will action it and confirm by email — it doesn’t delete anything
+                instantly. Type <Text style={{ fontFamily: fonts.bodyBold }}>DELETE</Text> to confirm.
               </Text>
-              {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
+              {deleteError ? <Text style={styles.errorInline}>{deleteError}</Text> : null}
               <TextInput
-                style={styles.input}
+                style={[styles.input, { marginBottom: 10 }]}
                 value={deleteConfirmText}
                 onChangeText={setDeleteConfirmText}
                 placeholder="DELETE"
                 placeholderTextColor={colors.inkFaint}
                 autoCapitalize="characters"
               />
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                <Pressable style={[styles.dangerBtn, (deleteRequesting || deleteConfirmText.trim().toUpperCase() !== 'DELETE') && { opacity: 0.5 }]} disabled={deleteRequesting || deleteConfirmText.trim().toUpperCase() !== 'DELETE'} onPress={handleRequestDeletion}>
-                  <Text style={styles.dangerBtnText}>{deleteRequesting ? 'Sending…' : 'Confirm request'}</Text>
+              <View style={styles.inlineRow}>
+                <Pressable
+                  style={[styles.btnDanger, (deleteRequesting || deleteConfirmText.trim().toUpperCase() !== 'DELETE') && { opacity: 0.6 }]}
+                  disabled={deleteRequesting || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
+                  onPress={handleRequestDeletion}
+                >
+                  <Text style={styles.btnDangerText}>{deleteRequesting ? 'Sending…' : 'Confirm request'}</Text>
                 </Pressable>
-                <Pressable style={styles.secondaryBtn} onPress={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(''); setDeleteError(null); }}>
-                  <Text style={styles.secondaryBtnText}>Cancel</Text>
+                <Pressable style={styles.btnSmall} onPress={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(''); setDeleteError(null); }}>
+                  <Text style={styles.btnSmallText}>Cancel</Text>
                 </Pressable>
               </View>
             </View>
           ) : null}
           {deleteRequested ? <Text style={styles.okText}>Request sent — our team will follow up by email to confirm.</Text> : null}
-        </Card>
+        </View>
 
-        {/* Membership */}
-        <Card title="Membership">
+        {/* Membership (the website's right rail, stacked below on phones) */}
+        <View style={styles.card}>
+          <Text style={styles.subheading}>Membership</Text>
           {dashboard.isSubscriber ? (
             (dashboard.isAdmin || dashboard.isSubAdmin || dashboard.isComped) ? (
-              <View style={styles.freeAccessNote}>
-                <Badge text="Free access" color={colors.mint} />
-                <Text style={styles.subtle}>
-                  {dashboard.isAdmin && 'You have Tapa + as part of the Studio Tapa team — no payment needed, ever.'}
-                  {!dashboard.isAdmin && dashboard.isSubAdmin && 'You have Tapa + as a sub-admin on the team.'}
-                  {!dashboard.isAdmin && !dashboard.isSubAdmin && dashboard.isComped && 'Your access was given to you by the team — free, no payment needed.'}
+              <View style={styles.freeNote}>
+                <View style={styles.freeBadge}><Text style={styles.freeBadgeText}>Free access</Text></View>
+                <Text style={styles.freeNoteText}>
+                  {dashboard.isAdmin ? 'You have Tapa + as part of the Studio Tapa team — no payment needed, ever.'
+                    : dashboard.isSubAdmin ? 'You have Tapa + as a sub-admin on the team — no payment needed, ever.'
+                    : "Your access was given to you by the team — it's free, and no payment is needed."}
                 </Text>
               </View>
             ) : dashboard.promoAccessExpiresAt ? (
-              <View style={styles.freeAccessNote}>
-                <Badge text="Free access" color={colors.mint} />
-                <Text style={styles.subtle}>You have Tapa + from a redeemed code, through {formatDate(dashboard.promoAccessExpiresAt)}.</Text>
+              <View style={styles.freeNote}>
+                <View style={styles.freeBadge}><Text style={styles.freeBadgeText}>Free access</Text></View>
+                <Text style={styles.freeNoteText}>
+                  You have Tapa + from a redeemed code, through {formatDate(dashboard.promoAccessExpiresAt)}. Redeeming another code before then adds to this instead of replacing it.
+                </Text>
               </View>
             ) : (
               <>
-                {dashboard.subscriptionDetails ? (
-                  <View style={{ marginBottom: 10 }}>
-                    {dashboard.subscriptionDetails.productName ? <DetailRow label="Plan" value={dashboard.subscriptionDetails.productName} /> : null}
-                    {priceLabel ? <DetailRow label="Price" value={`${priceLabel}${dashboard.subscriptionDetails.interval ? ` / ${dashboard.subscriptionDetails.interval}` : ''}`} /> : null}
-                    <DetailRow label={dashboard.subscriptionDetails.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'} value={formatDate(dashboard.subscriptionDetails.renewsAt)} />
+                {sub ? (
+                  <View style={styles.subDetails}>
+                    {sub.productName ? <DetailRow label="Plan" value={sub.productName} /> : null}
+                    {priceLabel ? <DetailRow label="Price" value={`${priceLabel}${sub.interval ? ` / ${sub.interval}` : ''}`} /> : null}
+                    <DetailRow label={sub.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'} value={formatDate(sub.renewsAt)} />
+                    {sub.cancelsAtPeriodEnd ? (
+                      <Text style={styles.cancelNote}>Your subscription is set to cancel — you'll keep Tapa + access until then.</Text>
+                    ) : null}
                   </View>
                 ) : null}
-                <Pressable style={styles.primaryBtn} onPress={openPortal} disabled={portalLoading}>
-                  {portalLoading ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Manage subscription</Text>}
+                <Pressable style={styles.btnPrimary} onPress={openPortal} disabled={portalLoading}>
+                  {portalLoading ? <ActivityIndicator color={colors.oliveShadow} /> : <Text style={styles.btnPrimaryText}>Manage subscription</Text>}
                 </Pressable>
+                <Text style={styles.fineprint}>"Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.</Text>
               </>
             )
           ) : (
             <>
               {['Ad-free viewing across the whole library', 'Early access to new episodes before free release', 'Gated series only Tapa + members can watch', 'Back the creators you watch, directly'].map((t) => (
-                <Text key={t} style={styles.upsellItem}>• {t}</Text>
+                <View key={t} style={styles.upsellItem}>
+                  <Text style={styles.upsellCheck}>{'✓'}</Text>
+                  <Text style={styles.upsellText}>{t}</Text>
+                </View>
               ))}
-              <Pressable style={[styles.primaryBtn, { marginTop: 10 }]} onPress={() => Linking.openURL(`${API_BASE_URL}/account`)}>
-                <Text style={styles.primaryBtnText}>Join Tapa +</Text>
+              <Pressable style={[styles.btnPrimary, { marginTop: 6 }]} onPress={() => router.push('/stream')}>
+                <Text style={styles.btnPrimaryText}>Join Tapa +</Text>
               </Pressable>
             </>
           )}
 
           <View style={styles.divider} />
-          <Text style={styles.smallLabel}>Have a code?</Text>
-          <View style={styles.linkRow}>
+          <Text style={[styles.subheading, { fontSize: 11.5 }]}>Have a code?</Text>
+          <View style={styles.inlineRow}>
             <TextInput
-              style={[styles.input, { flex: 1 }]}
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
               value={redeemInput}
               onChangeText={setRedeemInput}
               placeholder="XXXX-XXXX-XXXX"
@@ -565,43 +609,37 @@ export default function Account() {
               autoCapitalize="characters"
               editable={!redeeming}
             />
-            <Pressable style={styles.secondaryBtn} onPress={handleRedeemCode} disabled={redeeming || !redeemInput.trim()}>
-              <Text style={styles.secondaryBtnText}>{redeeming ? 'Checking…' : 'Redeem'}</Text>
+            <Pressable style={[styles.btnSmall, (redeeming || !redeemInput.trim()) && { opacity: 0.6 }]} onPress={handleRedeemCode} disabled={redeeming || !redeemInput.trim()}>
+              <Text style={styles.btnSmallText}>{redeeming ? 'Checking…' : 'Redeem'}</Text>
             </Pressable>
           </View>
-          {redeemError ? <Text style={styles.errorText}>{redeemError}</Text> : null}
-          {redeemSuccess ? <Text style={styles.okText}>Code accepted — Tapa + through {formatDate(redeemSuccess)}.</Text> : null}
-        </Card>
-
+          {redeemError ? <Text style={styles.errorInline}>{redeemError}</Text> : null}
+          {redeemSuccess ? <Text style={styles.okText}>Code accepted — you now have Tapa + through {formatDate(redeemSuccess)}. Refreshing…</Text> : null}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
-function Badge({ text, color = colors.oliveBright }) {
+// .account-card-head: Space Grotesk brass title + a colored "visibility" dot line.
+function CardHead({ title, visibility, color }) {
   return (
-    <View style={[styles.badge, { borderColor: color }]}>
-      <Text style={[styles.badgeText, { color }]}>{text}</Text>
-    </View>
-  );
-}
-function Label({ children }) {
-  return <Text style={styles.label}>{children}</Text>;
-}
-function Card({ title, visibility, visibilityColor, danger, children }) {
-  return (
-    <View style={[styles.card, danger && styles.cardDanger]}>
-      <View style={styles.cardHead}>
-        <Text style={styles.cardTitle}>{title}</Text>
-        {visibility ? <Text style={[styles.cardVisibility, { color: visibilityColor }]}>{visibility}</Text> : null}
+    <View style={styles.cardHead}>
+      <Text style={styles.cardTitle}>{title}</Text>
+      <View style={styles.visibility}>
+        <View style={[styles.visibilityDot, { backgroundColor: color }]} />
+        <Text style={[styles.visibilityText, { color }]}>{visibility}</Text>
       </View>
-      {children}
     </View>
   );
 }
-function Row({ label, detail, labelDanger, children }) {
+function Label({ children, style }) {
+  return <Text style={[styles.label, style]}>{children}</Text>;
+}
+// .account-row: label + detail on the left, a compact button on the right.
+function Row({ label, detail, labelDanger, divider, children }) {
   return (
-    <View style={styles.row}>
+    <View style={[styles.row, divider && styles.rowDivider]}>
       <View style={{ flex: 1 }}>
         <Text style={[styles.rowLabel, labelDanger && { color: colors.danger }]}>{label}</Text>
         <Text style={styles.rowDetail}>{detail}</Text>
@@ -610,83 +648,176 @@ function Row({ label, detail, labelDanger, children }) {
     </View>
   );
 }
+function SaveRow({ label, saving, saved, onPress }) {
+  return (
+    <View style={[styles.inlineRow, { marginTop: 6 }]}>
+      <Pressable style={[styles.btnPrimary, { alignSelf: 'flex-start', paddingHorizontal: 24, marginBottom: 0 }, saving && { opacity: 0.6 }]} onPress={onPress} disabled={saving}>
+        <Text style={styles.btnPrimaryText}>{saving ? 'Saving…' : label}</Text>
+      </Pressable>
+      {saved ? <Text style={styles.savedText}>Saved.</Text> : null}
+    </View>
+  );
+}
+function Quicklink({ icon, label, onPress, external }) {
+  return (
+    <Pressable style={styles.quicklink} onPress={onPress}>
+      {icon}
+      <Text style={styles.quicklinkText}>{label}</Text>
+      {external ? <Text style={styles.quicklinkExternal}>opens website {'↗'}</Text> : null}
+    </Pressable>
+  );
+}
 function DetailRow({ label, value }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.subtle}>{label}</Text>
+      <Text style={styles.detailLabel}>{label}</Text>
       <Text style={styles.detailValue}>{value}</Text>
     </View>
+  );
+}
+
+function BackArrowIcon({ size = 16, color = colors.olive }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="9.5" />
+      <Path d="M13.5 8.5L10 12l3.5 3.5" />
+    </Svg>
+  );
+}
+function HeartGlyph() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.danger}>
+      <Path d="M12 21s-6.7-4.35-9.33-8.2C.86 10.1 1.3 6.6 4.1 4.9a5.4 5.4 0 0 1 7.1 1.2 5.4 5.4 0 0 1 7.1-1.2c2.8 1.7 3.24 5.2 1.43 7.9C18.7 16.65 12 21 12 21z" />
+    </Svg>
+  );
+}
+function SparkleGlyph() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.olive}>
+      <Path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7z" />
+    </Svg>
+  );
+}
+function PlayGlyph() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.ink}>
+      <Path d="M8 5v14l11-7z" />
+    </Svg>
+  );
+}
+function BarsGlyph() {
+  return (
+    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={colors.sky} strokeWidth={2.2} strokeLinecap="round">
+      <Path d="M5 20V12M12 20V5M19 20v-9" />
+    </Svg>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 120, gap: 14 },
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  title: { color: colors.ink, fontSize: 20, fontWeight: '700', marginBottom: 8, textAlign: 'center' },
-  subtitle: { color: colors.inkDim, fontSize: 14, textAlign: 'center', lineHeight: 20, marginBottom: 20 },
-  subtle: { color: colors.inkDim, fontSize: 13, lineHeight: 19 },
+  title: { color: colors.ink, fontSize: 21, fontFamily: fonts.displayBold, marginBottom: 8, textAlign: 'center' },
+  subtitle: { color: colors.inkDim, fontSize: 14.4, fontFamily: fonts.body, textAlign: 'center', lineHeight: 21, marginBottom: 20 },
+  primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 12, alignItems: 'center', minWidth: 160, paddingHorizontal: 24 },
+  primaryBtnText: { color: colors.onBrass, fontSize: 14, fontFamily: fonts.displayBold },
+  secondaryBtn: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999, paddingVertical: 11, paddingHorizontal: 22, alignItems: 'center' },
+  secondaryBtnText: { color: colors.ink, fontSize: 13.6, fontFamily: fonts.display },
 
-  identityRow: { flexDirection: 'row', alignItems: 'center', gap: 14, marginBottom: 4 },
-  avatarWrap: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarWrapSmall: { width: 48, height: 48, borderRadius: 24, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  avatarImg: { width: '100%', height: '100%' },
-  avatarLetter: { color: colors.ink, fontSize: 22, fontWeight: '700' },
-  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 10 },
-  nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
-  name: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  // .stage.stage-single.stage-wide
+  stage: { paddingTop: 38, paddingHorizontal: 19, paddingBottom: 140, gap: 19 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.4, borderColor: colors.olive },
+  backText: { color: colors.olive, fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.4, textTransform: 'uppercase' },
 
-  badge: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
+  // .account-identity
+  identity: { borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 4, paddingVertical: 22, paddingHorizontal: 24, gap: 16, marginBottom: 3 },
+  identityTop: { flexDirection: 'row', alignItems: 'center', gap: 19 },
+  identityAvatar: { width: 64, height: 64, borderRadius: 32, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  identityAvatarLetter: { fontFamily: fonts.monoBold, fontSize: 24, color: '#241a05' },
+  identityMeta: { flex: 1, minWidth: 0, gap: 6 },
+  nameRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10 },
+  identityName: { fontFamily: fonts.bodyBold, fontSize: 20, color: colors.ink },
+  roleBadge: { backgroundColor: colors.oliveShadow, borderWidth: 1, borderColor: colors.oliveDeep, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  roleBadgeText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.oliveBright },
+  tierBadge: { backgroundColor: colors.brassDeep, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 },
+  tierBadgeText: { fontFamily: fonts.mono, fontSize: 10.2, letterSpacing: 0.5, textTransform: 'uppercase', color: colors.ink },
+  identitySub: { fontFamily: fonts.body, fontSize: 13, color: colors.inkDim },
 
-  card: { backgroundColor: colors.surface2, borderRadius: 14, borderWidth: 1, borderColor: colors.oceanInk, padding: 16 },
-  cardDanger: { borderColor: colors.danger },
-  cardHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 4 },
-  cardTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
-  cardVisibility: { fontSize: 10, fontWeight: '600' },
+  // .account-card
+  card: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 4, paddingVertical: 25, paddingHorizontal: 24 },
+  cardDanger: { borderColor: '#5c2c22' },
+  cardHead: { marginBottom: 18, gap: 8 },
+  cardTitle: { fontFamily: fonts.displayBold, fontSize: 19.2, color: colors.brass },
+  cardP: { fontFamily: fonts.body, fontSize: 14.4, color: colors.inkDim },
+  visibility: { flexDirection: 'row', alignItems: 'flex-start', gap: 6 },
+  visibilityDot: { width: 6, height: 6, borderRadius: 3, marginTop: 5 },
+  visibilityText: { flex: 1, fontFamily: fonts.mono, fontSize: 10.9, letterSpacing: 0.3, lineHeight: 15 },
+  subheading: { fontFamily: fonts.mono, fontSize: 10.9, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.brass, marginBottom: 8 },
 
-  label: { color: colors.inkDim, fontSize: 12, fontWeight: '600', marginBottom: 6, marginTop: 10 },
-  labelNote: { fontWeight: '400', opacity: 0.7 },
-  smallLabel: { color: colors.inkDim, fontSize: 11, fontWeight: '700', marginBottom: 8 },
-  input: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.ink, fontSize: 14 },
-  textarea: { minHeight: 80, textAlignVertical: 'top' },
+  // labels / inputs (.account-card label / input)
+  label: { fontFamily: fonts.mono, fontSize: 10.4, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.inkDim, marginBottom: 5 },
+  labelNote: { textTransform: 'none', letterSpacing: 0, opacity: 0.65 },
+  input: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', borderRadius: 4, paddingVertical: 10, paddingHorizontal: 13, fontFamily: fonts.body, fontSize: 14.4, color: colors.ink, marginBottom: 14 },
+  textarea: { minHeight: 70, textAlignVertical: 'top' },
+  inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
+  avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  avatarLetter: { fontFamily: fonts.monoBold, fontSize: 20.8, color: '#241a05' },
+  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
+  pill: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', backgroundColor: colors.surface0, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
+  pillActive: { borderColor: colors.brass },
+  pillText: { fontFamily: fonts.body, fontSize: 13.6, color: colors.inkDim },
+  pillTextActive: { color: colors.ink },
 
-  linkRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 },
-  linkPlatform: { width: 100 },
-  removeX: { color: colors.inkFaint, fontSize: 20, paddingHorizontal: 6 },
+  // buttons
+  btnPrimary: { backgroundColor: colors.olive, borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginBottom: 11 },
+  btnPrimaryText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.oliveShadow },
+  btnSecondary: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999, paddingVertical: 11, alignItems: 'center', marginBottom: 11 },
+  btnSecondaryText: { fontFamily: fonts.display, fontSize: 13.6, color: colors.ink },
+  btnSmall: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
+  btnSmallText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.ink },
+  btnDanger: { borderWidth: 1, borderColor: '#5c2c22', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
+  btnDangerText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.danger },
+  savedText: { fontFamily: fonts.body, fontSize: 14, color: colors.brass },
 
-  pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  pill: { borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
-  pillActive: { backgroundColor: colors.brass, borderColor: colors.brass },
-  pillText: { color: colors.inkDim, fontSize: 12 },
-  pillTextActive: { color: colors.onBrass, fontWeight: '700' },
+  // .account-row
+  row: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 14 },
+  rowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(251,232,211,0.08)' },
+  rowLabel: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink },
+  rowDetail: { fontFamily: fonts.body, fontSize: 12.8, lineHeight: 18, color: colors.inkDim, marginTop: 2 },
 
-  primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 12, alignItems: 'center', minWidth: 140, alignSelf: 'flex-start', paddingHorizontal: 22 },
-  primaryBtnText: { color: colors.onBrass, fontSize: 14, fontWeight: '800' },
-  secondaryBtn: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
-  secondaryBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
-  dangerBtn: { backgroundColor: colors.danger, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
-  dangerBtnText: { color: colors.surface0, fontSize: 13, fontWeight: '700' },
+  // .account-quicklinks
+  quicklinks: { gap: 8, marginTop: 10 },
+  quicklink: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 6, paddingVertical: 11, paddingHorizontal: 14 },
+  quicklinkText: { fontFamily: fonts.body, fontSize: 14, color: colors.ink, flex: 1 },
+  quicklinkExternal: { fontFamily: fonts.mono, fontSize: 9.6, color: colors.inkFaint },
 
-  savedText: { color: colors.brass, fontSize: 12, marginTop: 6 },
-  errorText: { color: colors.danger, fontSize: 12, marginVertical: 6 },
-  okText: { color: colors.ok, fontSize: 12, marginTop: 8 },
-
-  warnBox: { backgroundColor: 'rgba(214,124,81,0.1)', borderWidth: 1, borderColor: colors.danger, borderRadius: 10, padding: 12, marginTop: 10, gap: 8 },
-  warnText: { color: colors.ink, fontSize: 12, lineHeight: 18 },
+  // age warning / delete confirm
+  ageWarn: { backgroundColor: 'rgba(248,95,115,0.1)', borderWidth: 1, borderColor: 'rgba(248,95,115,0.3)', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 12, gap: 10 },
+  ageWarnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  checkbox: { width: 18, height: 18, borderRadius: 4, borderWidth: 1, borderColor: colors.inkDim },
+  checkbox: { width: 18, height: 18, borderRadius: 3, borderWidth: 1, borderColor: colors.inkDim, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: colors.brass, borderColor: colors.brass },
-  checkboxLabel: { color: colors.inkDim, fontSize: 12 },
+  checkMark: { color: colors.onBrass, fontSize: 12, fontFamily: fonts.monoBold },
+  checkboxLabel: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
+  deleteBox: { backgroundColor: 'rgba(214,124,81,0.08)', borderWidth: 1, borderColor: '#5c2c22', borderRadius: 6, paddingVertical: 14, paddingHorizontal: 16, marginTop: 6 },
+  deleteText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink, marginBottom: 11 },
+  errorInline: { fontFamily: fonts.body, fontSize: 13, color: colors.danger, marginBottom: 10 },
+  okText: { fontFamily: fonts.body, fontSize: 13.6, color: colors.ok, marginTop: 10 },
 
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.oceanInk },
-  rowLabel: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  rowDetail: { color: colors.inkFaint, fontSize: 12, marginTop: 2 },
-
-  freeAccessNote: { gap: 8, alignItems: 'flex-start' },
-  upsellItem: { color: colors.inkDim, fontSize: 13, marginBottom: 4 },
-  divider: { height: 1, backgroundColor: colors.oceanInk, marginVertical: 14 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 3 },
-  detailValue: { color: colors.ink, fontSize: 13, fontWeight: '600' }
+  // membership (.account-sub-*, .account-free-access-*, .account-upsell-list)
+  subDetails: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)', borderRadius: 6, paddingVertical: 13, paddingHorizontal: 14, marginBottom: 14 },
+  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
+  detailLabel: { fontFamily: fonts.body, fontSize: 13.6, color: colors.inkDim },
+  detailValue: { fontFamily: fonts.bodyBold, fontSize: 13.6, color: colors.ink },
+  cancelNote: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(251,232,211,0.08)', fontFamily: fonts.body, fontSize: 12.5, color: colors.warn },
+  fineprint: { fontFamily: fonts.mono, fontSize: 10.6, lineHeight: 17, color: colors.inkFaint },
+  freeNote: { backgroundColor: colors.oliveShadow, borderWidth: 1, borderColor: colors.oliveDeep, borderRadius: 6, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'flex-start' },
+  freeBadge: { backgroundColor: colors.olive, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8 },
+  freeBadgeText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.5, textTransform: 'uppercase', color: '#1a1408' },
+  freeNoteText: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 20, color: colors.inkDim },
+  upsellItem: { flexDirection: 'row', gap: 10, marginBottom: 8 },
+  upsellCheck: { fontFamily: fonts.monoBold, fontSize: 13.6, color: colors.brass, width: 14 },
+  upsellText: { flex: 1, fontFamily: fonts.body, fontSize: 13.6, lineHeight: 19, color: colors.inkDim },
+  divider: { height: 1, backgroundColor: 'rgba(251,232,211,0.12)', marginTop: 16, marginBottom: 18 }
 });
