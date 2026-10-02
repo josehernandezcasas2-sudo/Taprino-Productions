@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { ImageBackground, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useRouter } from 'expo-router';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Extrapolation,
@@ -72,6 +73,7 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
   // Resets on its own each time a new pitch comes up — this component is
   // rendered with key={pitch.id} in the discover screen, so React fully
   // remounts it per card rather than reusing this state, same as the web.
+  const router = useRouter();
   const [flipped, setFlipped] = useState(false);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -112,15 +114,25 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
         runOnJS(commitExit)('left');
       } else if (absY > absX && dy > THRESHOLD_Y) {
         runOnJS(commitExit)('down');
-      } else if (absX < TAP_THRESHOLD && absY < TAP_THRESHOLD) {
-        translateX.value = 0;
-        translateY.value = 0;
-        runOnJS(toggleFlip)();
       } else {
         translateX.value = withTiming(0, { duration: EXIT_MS });
         translateY.value = withTiming(0, { duration: EXIT_MS });
       }
     });
+
+  // "Tap for more" needs its own Tap gesture: a Pan only activates once the
+  // finger has moved several pixels, so a real tap never activated it and
+  // its onEnd (where the tap used to be detected) never ran — the card
+  // couldn't be flipped at all on a phone. Race = whichever recognizes
+  // first wins: lift without moving → flip; start dragging → swipe.
+  const tapGesture = Gesture.Tap()
+    .enabled(!flipped)
+    .maxDistance(TAP_THRESHOLD * 2)
+    .onEnd((_e, success) => {
+      if (success) runOnJS(toggleFlip)();
+    });
+
+  const cardGesture = Gesture.Race(panGesture, tapGesture);
 
   const cardStyle = useAnimatedStyle(() => {
     const rotate = interpolate(translateX.value, [-300, 0, 300], [-24, 0, 24], Extrapolation.CLAMP);
@@ -158,7 +170,7 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
   const deadline = formatDeadline(pitch.funding_deadline);
 
   return (
-    <GestureDetector gesture={panGesture}>
+    <GestureDetector gesture={cardGesture}>
       <Animated.View style={[styles.card, cardStyle]}>
         <Animated.View style={[styles.badge, styles.badgeLike, likeBadgeStyle]} pointerEvents="none">
           <Text style={[styles.badgeText, { color: colors.ok, borderColor: colors.ok }]}>LIKE</Text>
@@ -226,7 +238,7 @@ export default function PitchSwipeCard({ pitch, onSwipe }) {
                 </View>
               ) : null}
 
-              <Pressable onPress={() => Linking.openURL(`https://studiotapatv.site/pitches/${pitch.id}`)}>
+              <Pressable onPress={() => router.push(`/pitches/${pitch.id}`)}>
                 <Text style={styles.learnMore}>View full pitch →</Text>
               </Pressable>
             </ScrollView>
