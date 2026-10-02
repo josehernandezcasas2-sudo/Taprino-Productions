@@ -78,14 +78,30 @@ export default function Account() {
     return Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
   }
 
-  async function loadAll() {
+  async function loadAll(attempt = 0) {
     const token = await withToken();
     const [dash, profileData] = await Promise.all([
-      apiGet('/api/account/dashboard-info').catch(() => null),
+      // The token matters here: without it the server can't see the session
+      // and answers isSignedIn:false, which bounced people straight back to
+      // the sign-in screen right after signing in.
+      apiGet('/api/account/dashboard-info', token).catch(() => null),
       fetch(`${API_BASE_URL}/api/account/profile`, { headers: token ? { Authorization: `Bearer ${token}` } : {} })
         .then((res) => (res.ok ? res.json() : null))
         .catch(() => null)
     ]);
+    // Only called while Clerk says we're signed in. If the server still
+    // can't see the session (a token that isn't ready yet just after
+    // sign-in, or a network blip), try again before giving up — and never
+    // fall back to the sign-in screen, which made it look like signing in
+    // had silently failed.
+    if (!dash || !dash.isSignedIn) {
+      if (attempt < 2) {
+        setTimeout(() => loadAll(attempt + 1), 1500);
+        return;
+      }
+      setDashboard({ isSignedIn: true, loadError: true });
+      return;
+    }
     setDashboard(dash);
     setProfile(profileData);
     setOriginalAge(profileData ? profileData.age ?? null : null);
@@ -233,6 +249,24 @@ export default function Account() {
       <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
         <TopNav />
         <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
+      </SafeAreaView>
+    );
+  }
+
+  if (dashboard.loadError) {
+    return (
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
+        <View style={styles.center}>
+          <Text style={styles.title}>You're signed in, but your account didn't load</Text>
+          <Text style={styles.subtitle}>Check your connection and try again. If it keeps happening, log out and sign back in.</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => { setDashboard(null); loadAll(); }}>
+            <Text style={styles.primaryBtnText}>Retry</Text>
+          </Pressable>
+          <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => signOut()}>
+            <Text style={styles.secondaryBtnText}>Log out</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }

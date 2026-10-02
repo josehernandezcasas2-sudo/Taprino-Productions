@@ -1,4 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -76,14 +77,23 @@ function formatRuntime(totalSeconds) {
 export default function PublicProfile() {
   const { userId: profileUserId } = useLocalSearchParams();
   const router = useRouter();
+  const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
 
   useEffect(() => {
     if (!profileUserId) return undefined;
     let cancelled = false;
-    apiGet(`/api/profile?userId=${encodeURIComponent(profileUserId)}`)
-      .then((data) => { if (!cancelled) setState({ loading: false, error: null, data }); })
-      .catch((err) => { if (!cancelled) setState({ loading: false, error: err.message, data: null }); });
+    (async () => {
+      // Token so the server can tell whether this is the viewer's own
+      // profile (isSignedIn / viewerId); never blocks for more than 4s.
+      const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+      try {
+        const data = await apiGet(`/api/profile?userId=${encodeURIComponent(profileUserId)}`, token);
+        if (!cancelled) setState({ loading: false, error: null, data });
+      } catch (err) {
+        if (!cancelled) setState({ loading: false, error: err.message, data: null });
+      }
+    })();
     return () => { cancelled = true; };
   }, [profileUserId]);
 
