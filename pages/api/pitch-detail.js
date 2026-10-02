@@ -39,6 +39,8 @@ export default async function handler(req, res) {
     initialSaved: data.initialSaved,
     totalRaisedCents: data.totalRaisedCents,
     backerCount: data.backerCount,
-    recentBackers: data.recentBackers
+    recentBackers: data.recentBackers,
+    creatorAvatarUrl: data.creatorAvatarUrl,
+    creatorDisplayName: data.creatorDisplayName
   });
 }

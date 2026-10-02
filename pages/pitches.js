@@ -3,12 +3,9 @@ import Link from 'next/link';
 import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { getAuth } from '@clerk/nextjs/server';
-import { getAccountContext } from '../lib/accountContext';
 import { HeartIcon, SwipeDeckIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
-import { getApprovedPitches, getSavedPitchIds, PITCH_TAGS } from '../lib/pitches';
-import { getSupabase } from '../lib/supabase';
-import { getSiteSettings } from '../lib/siteSettings';
+import { PITCH_TAGS } from '../lib/pitches';
+import { getPitchRoomData } from '../lib/pitchRoom';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
@@ -17,13 +14,9 @@ import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
-  const account = await getAccountContext(req);
-  const siteSettings = await getSiteSettings();
-  const bypassingDisabled = !siteSettings.elevatorPitchEnabled && account.isAdmin;
-
-  if (!siteSettings.elevatorPitchEnabled && !account.isAdmin) {
-    return { notFound: true };
-  }
+  const data = await getPitchRoomData(req);
+  if (data.disabled) return { notFound: true };
+  const { account } = data;
 
   // SECURITY: this response embeds personalized account data (email,
   // admin/creator status) for any signed-in user, not just during the
@@ -38,37 +31,8 @@ export async function getServerSideProps({ req, res }) {
     account.isSignedIn ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=60, stale-while-revalidate=300'
   );
 
-  const { userId } = getAuth(req);
-  const [pitches, episodes, savedIds] = await Promise.all([
-    getApprovedPitches(),
-    getPublicEpisodes(),
-    userId ? getSavedPitchIds(userId) : []
-  ]);
+  const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-
-  // Save count per pitch, for the "Most saved" sort option — a separate,
-  // lightweight query (just pitch_id) rather than pulling full save rows.
-  const supabase = getSupabase();
-  const { data: saveRows } = await supabase.from('pitch_saves').select('pitch_id');
-  const saveCountsByPitchId = {};
-  for (const row of saveRows || []) {
-    saveCountsByPitchId[row.pitch_id] = (saveCountsByPitchId[row.pitch_id] || 0) + 1;
-  }
-  // Same lightweight-aggregate pattern as saveCountsByPitchId above, for
-  // the same reason pages/pitches/[id].js switched to this: a
-  // funding_enabled pitch's real progress lives in pitch_donations, not
-  // the self-reported funding_raised column, which never gets updated
-  // once a project is on real in-platform funding.
-  const { data: donationRows } = await supabase.from('pitch_donations').select('pitch_id, amount_cents');
-  const raisedCentsByPitchId = {};
-  for (const row of donationRows || []) {
-    raisedCentsByPitchId[row.pitch_id] = (raisedCentsByPitchId[row.pitch_id] || 0) + row.amount_cents;
-  }
-  const pitchesWithSaveCounts = pitches.map((p) => ({
-    ...p,
-    savedCount: saveCountsByPitchId[p.id] || 0,
-    liveRaisedCents: p.funding_enabled ? (raisedCentsByPitchId[p.id] || 0) : null
-  }));
 
   return {
     props: {
@@ -78,9 +42,9 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       mainGenres,
-      pitches: pitchesWithSaveCounts,
-      savedIds,
-      bypassingDisabled
+      pitches: data.pitches,
+      savedIds: data.savedIds,
+      bypassingDisabled: data.bypassingDisabled
     }
   };
 }
