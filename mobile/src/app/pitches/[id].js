@@ -271,7 +271,7 @@ export default function PitchDetail() {
     return (
       <View key={c.id} style={[styles.commentCard, isReply && styles.replyCard]}>
         <Pressable style={styles.commentMetaRow} onPress={() => router.push(`/profile/${c.user_id}`)}>
-          <View style={styles.commentAvatar}><Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text></View>
+          <View style={styles.commentAvatar}>{c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
           <Text style={styles.commentName}>{c.displayName}</Text>
           {isCreatorComment ? <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View> : null}
           <Text style={styles.commentDate}> · {formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</Text>
@@ -514,7 +514,7 @@ export default function PitchDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.backerRow}>
                 {recentBackers.map((b) => (
                   <Pressable key={b.userId} style={styles.backer} onPress={() => router.push(`/profile/${b.userId}`)}>
-                    <View style={styles.backerAvatar}><Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text></View>
+                    <View style={styles.backerAvatar}>{b.avatarUrl ? <SmartImage uri={b.avatarUrl} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
                     <Text style={styles.backerName}>{b.displayName}</Text>
                   </Pressable>
                 ))}
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
 
   backerRow: { gap: 14, paddingRight: 8 },
   backer: { alignItems: 'center', width: 64 },
-  backerAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
+  backerAvatar: { width: 36, height: 36, borderRadius: 18, overflow: 'hidden', backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },
   backerAvatarText: { color: colors.ink, fontSize: 14, fontWeight: '700' },
   backerName: { color: colors.inkDim, fontSize: 10.5, textAlign: 'center' },
 
@@ -663,7 +663,7 @@ const styles = StyleSheet.create({
   commentCard: { marginBottom: 14, paddingBottom: 2 },
   replyCard: { marginLeft: 20, marginTop: 10, marginBottom: 0 },
   commentMetaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 5, flexWrap: 'wrap' },
-  commentAvatar: { width: 24, height: 24, borderRadius: 12, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 7 },
+  commentAvatar: { width: 24, height: 24, borderRadius: 12, overflow: 'hidden', backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginRight: 7 },
   commentAvatarText: { color: colors.ink, fontSize: 11, fontWeight: '700' },
   commentName: { color: colors.ink, fontSize: 12.5, fontWeight: '700' },
   creatorBadge: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 1, paddingHorizontal: 6, marginLeft: 6 },

@@ -44,6 +44,12 @@ function formatCommentDate(iso) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+// The person's account-page photo over the letter circle, same as the
+// header and profile page; undefined leaves the plain brass letter.
+function avatarStyle(url) {
+  return url ? { backgroundImage: `url(${url})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined;
+}
+
 function countComments(list) {
   return list.reduce((sum, c) => sum + 1 + (c.replies ? c.replies.length : 0), 0);
 }
@@ -278,7 +284,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
       <div key={c.id} className={`pitch-comment-card${isReply ? ' pitch-reply-card' : ''}`}>
         <div className="pitch-comment-meta">
           <div className="pitch-comment-who">
-            <Link href={`/profile/${c.user_id}`} className="pitch-comment-avatar">{(c.displayName || '?')[0].toUpperCase()}</Link>
+            <Link href={`/profile/${c.user_id}`} className="pitch-comment-avatar" style={avatarStyle(c.avatarUrl)}>{!c.avatarUrl && (c.displayName || '?')[0].toUpperCase()}</Link>
             <Link href={`/profile/${c.user_id}`} className="pitch-comment-name">{c.displayName}</Link>
             {isCreatorComment && <span className="pitch-comment-badge">Creator</span>}
           </div>
@@ -562,7 +568,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-backer-row">
               {recentBackers.map((b) => (
                 <Link key={b.userId} href={`/profile/${b.userId}`} className="pitch-backer">
-                  <div className="pitch-backer-avatar">{(b.displayName || '?')[0].toUpperCase()}</div>
+                  <div className="pitch-backer-avatar" style={avatarStyle(b.avatarUrl)}>{!b.avatarUrl && (b.displayName || '?')[0].toUpperCase()}</div>
                   <span>{b.displayName}</span>
                 </Link>
               ))}

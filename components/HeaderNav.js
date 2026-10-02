@@ -65,6 +65,15 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       .catch(() => {});
   }, [isSignedIn]);
 
+  // The account page announces a newly saved photo (see pages/account.js).
+  useEffect(() => {
+    function handleProfileUpdated(e) {
+      setOwnProfile((p) => (p ? { ...p, ...e.detail } : p));
+    }
+    window.addEventListener('taprino:own-profile-updated', handleProfileUpdated);
+    return () => window.removeEventListener('taprino:own-profile-updated', handleProfileUpdated);
+  }, []);
+
   useEffect(() => {
     function handleOutside(e) {
       if (rootRef.current && !rootRef.current.contains(e.target)) {

@@ -27,8 +27,8 @@ export function isStreamRoute(pathname) {
   );
 }
 
-// Site settings and the viewer's "stay in the stream" preference are the
-// same for every screen, so fetch them once per app session, not per screen.
+// Site settings are the same for every screen, so fetch them once per app
+// session, not per screen.
 let settingsCache = null;
 let settingsPromise = null;
 function loadSettings() {
@@ -40,10 +40,18 @@ function loadSettings() {
   }
   return settingsPromise;
 }
-let stayInStreamCache = null;
-// Called by the Account screen when the viewer flips "Here only for the
-// stream?", so the brand's tap target updates without a refetch.
-export function setStayInStreamPreference(value) { stayInStreamCache = !!value; }
+// The signed-in viewer's own profile bits the header needs: their site
+// photo (user_profiles.avatar_url, set on the Account screen — the same one
+// the website's header, profile page, and comments show, never Clerk's
+// sign-in-provider image) and the "Here only for the stream?" preference.
+let ownProfileCache = null;
+const ownProfileListeners = new Set();
+// Called by the Account screen after a save so every mounted header picks
+// up a new photo / preference immediately instead of on the next launch.
+export function updateOwnProfileCache(patch) {
+  ownProfileCache = { ...(ownProfileCache || {}), ...patch };
+  ownProfileListeners.forEach((fn) => fn(ownProfileCache));
+}
 
 // The branded header on every screen that's a direct bottom-nav
 // destination (detail screens keep Expo Router's back-button header).
@@ -60,7 +68,7 @@ export default function TopNav() {
   const { isSignedIn, user } = useUser();
   const { getToken } = useAuth();
   const [settings, setSettings] = useState(settingsCache);
-  const [stayInStream, setStayInStream] = useState(stayInStreamCache);
+  const [ownProfile, setOwnProfile] = useState(ownProfileCache);
 
   useEffect(() => {
     let cancelled = false;
@@ -69,16 +77,20 @@ export default function TopNav() {
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn) { stayInStreamCache = null; setStayInStream(null); return undefined; }
-    if (stayInStreamCache !== null) return undefined;
+    ownProfileListeners.add(setOwnProfile);
+    return () => { ownProfileListeners.delete(setOwnProfile); };
+  }, []);
+
+  useEffect(() => {
+    if (!isSignedIn) { ownProfileCache = null; setOwnProfile(null); return undefined; }
+    if (ownProfileCache) { setOwnProfile(ownProfileCache); return undefined; }
     let cancelled = false;
     (async () => {
       const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
       if (!token) return;
       const profile = await apiGet('/api/account/profile', token).catch(() => null);
       if (!cancelled && profile) {
-        stayInStreamCache = !!profile.stayInStream;
-        setStayInStream(stayInStreamCache);
+        updateOwnProfileCache({ avatarUrl: profile.avatarUrl || null, stayInStream: !!profile.stayInStream });
       }
     })();
     return () => { cancelled = true; };
@@ -95,7 +107,7 @@ export default function TopNav() {
 
   return (
     <View style={styles.bar}>
-      <Pressable style={styles.brandMark} onPress={() => router.push(stayInStream ? '/stream' : '/')} hitSlop={6}>
+      <Pressable style={styles.brandMark} onPress={() => router.push(ownProfile && ownProfile.stayInStream ? '/stream' : '/')} hitSlop={6}>
         {settings && settings.logoUrl ? (
           <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
         ) : null}
@@ -109,8 +121,8 @@ export default function TopNav() {
           <SearchIcon size={20} color={colors.ink} />
         </Pressable>
         <Pressable style={styles.avatarBtn} onPress={() => router.push('/account')} hitSlop={8}>
-          {isSignedIn && user && user.imageUrl ? (
-            <SmartImage uri={user.imageUrl} style={styles.avatarImg} />
+          {isSignedIn && ownProfile && ownProfile.avatarUrl ? (
+            <SmartImage uri={ownProfile.avatarUrl} style={styles.avatarImg} />
           ) : (
             <Text style={styles.avatarText}>{avatarLetter || '☺'}</Text>
           )}

@@ -12,7 +12,7 @@ import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
-import TopNav, { setStayInStreamPreference } from '../../components/TopNav';
+import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
 const GENDERS = [
@@ -109,6 +109,7 @@ export default function Account() {
     }
     setDashboard(dash);
     setProfile(profileData);
+    if (profileData) updateOwnProfileCache({ avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
     setOriginalAge(profileData ? profileData.age ?? null : null);
   }
 
@@ -156,6 +157,7 @@ export default function Account() {
       const token = await withToken();
       const data = await apiPost('/api/account/profile', profile, token);
       setProfile((p) => ({ ...p, avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl, avatarBase64: undefined, removeAvatar: false }));
+      if ('avatarUrl' in data) updateOwnProfileCache({ avatarUrl: data.avatarUrl });
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
       setAgeChangeConfirmed(false);
@@ -241,13 +243,13 @@ export default function Account() {
   async function toggleStayInStream() {
     const next = !(profile && profile.stayInStream);
     setProfile((p) => ({ ...p, stayInStream: next }));
-    setStayInStreamPreference(next);
+    updateOwnProfileCache({ stayInStream: next });
     try {
       const token = await withToken();
       await apiPost('/api/account/profile', { stayInStream: next }, token);
     } catch {
       setProfile((p) => ({ ...p, stayInStream: !next }));
-      setStayInStreamPreference(!next);
+      updateOwnProfileCache({ stayInStream: !next });
     }
   }
 

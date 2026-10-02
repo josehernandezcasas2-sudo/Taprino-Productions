@@ -122,6 +122,11 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
         avatarFileName: null,
         removeAvatar: false
       }));
+      // HeaderNav fetched the old photo once on load — tell it about the
+      // new one so the header avatar changes now, not on the next reload.
+      if ('avatarUrl' in data) {
+        window.dispatchEvent(new CustomEvent('taprino:own-profile-updated', { detail: { avatarUrl: data.avatarUrl } }));
+      }
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
       setAgeChangeConfirmed(false);
