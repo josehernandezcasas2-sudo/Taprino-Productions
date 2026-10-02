@@ -4,7 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import SmartImage from './SmartImage';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatRuntimeLong } from '../lib/runtime';
 
 const ROTATE_MS = 9000;
@@ -112,14 +112,14 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
   return (
     <View style={[styles.hero, { height: heroHeight }]}>
       {isImageMode ? (
-        <SmartImage key={ep.id} uri={imageSrc} style={StyleSheet.absoluteFillObject} />
+        <SmartImage key={ep.id} uri={imageSrc} style={absoluteFill} />
       ) : ep.trailerSrc ? (
         <TrailerBackground key={ep.id} src={ep.trailerSrc} muted={muted} paused={paused} height={heroHeight} />
       ) : null}
       <LinearGradient
         colors={['rgba(10,10,14,0.35)', 'rgba(10,10,14,0.15)', 'rgba(10,10,14,0.45)', 'rgba(10,10,14,0.92)']}
         locations={[0, 0.3, 0.55, 1]}
-        style={StyleSheet.absoluteFillObject}
+        style={absoluteFill}
         pointerEvents="none"
       />
 

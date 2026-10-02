@@ -6,7 +6,7 @@ import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
-import { colors, fonts } from '../../lib/theme';
+import { colors, fonts, absoluteFill } from '../../lib/theme';
 import { formatRuntimeLong } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
@@ -358,7 +358,7 @@ function SideCard({ item, showCode, watched, onPress }) {
   return (
     <Pressable style={styles.sideCard} onPress={onPress}>
       <View style={styles.sideThumb}>
-        {item.thumbnail ? <SmartImage uri={item.thumbnail} style={StyleSheet.absoluteFillObject} /> : null}
+        {item.thumbnail ? <SmartImage uri={item.thumbnail} style={absoluteFill} /> : null}
         {watched ? (
           <View style={styles.watchedBadge}><Text style={styles.watchedText}>{'↺'} Watched</Text></View>
         ) : (

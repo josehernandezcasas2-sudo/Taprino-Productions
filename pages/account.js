@@ -35,6 +35,34 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+// Avatars are only ever shown at 22–96px, so there's no reason to upload a
+// multi-MB original — that's how existing ones ended up 2–3MB each (heavy
+// in every comment list), and anything over ~3.3MB hit Vercel's 4.5MB
+// request cap as base64. Center-crops to a square and shrinks to a 512px
+// JPEG (~50–100KB), same as the app does with expo-image-manipulator.
+function shrinkAvatar(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const out = Math.min(512, side);
+      const canvas = document.createElement('canvas');
+      canvas.width = out;
+      canvas.height = out;
+      canvas.getContext('2d').drawImage(
+        img,
+        (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side,
+        0, 0, out, out
+      );
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+    img.src = url;
+  });
+}
+
 function formatMoney(amountInCents, currency) {
   if (amountInCents == null || !currency) return null;
   try {
@@ -311,8 +339,8 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
 
                     <label style={{ marginTop: '1rem' }}>Avatar</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
-                      <div className="account-avatar" style={{ backgroundImage: profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
-                        {!profile.avatarUrl && avatarLetter}
+                      <div className="account-avatar" style={{ backgroundImage: (profile.avatarBase64 || profile.avatarUrl) ? `url(${profile.avatarBase64 || profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                        {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
                       </div>
                       <input
                         type="file"
@@ -320,12 +348,12 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                         onChange={(e) => {
                           const file = e.target.files && e.target.files[0];
                           if (!file) return;
-                          const reader = new FileReader();
-                          reader.onload = () => setProfile((p) => ({ ...p, avatarBase64: reader.result, avatarFileName: file.name, removeAvatar: false }));
-                          reader.readAsDataURL(file);
+                          shrinkAvatar(file)
+                            .then((dataUrl) => setProfile((p) => ({ ...p, avatarBase64: dataUrl, avatarFileName: 'avatar.jpg', removeAvatar: false })))
+                            .catch(() => setProfileError('Could not read that image — try a JPG or PNG.'));
                         }}
                       />
-                      {profile.avatarUrl && (
+                      {(profile.avatarBase64 || profile.avatarUrl) && (
                         <button
                           type="button"
                           className="account-btn-secondary"
@@ -336,6 +364,11 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                         </button>
                       )}
                     </div>
+                    {profile.avatarBase64 && (
+                      <p style={{ marginTop: '-0.4rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
+                        New photo selected — press Save profile below to apply it.
+                      </p>
+                    )}
 
                     <label>Bio <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional, up to 400 characters</span></label>
                     <textarea

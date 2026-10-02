@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { apiGet } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
@@ -148,8 +148,8 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.inkDim, fontSize: 14, paddingHorizontal: 16, marginTop: 10 },
 
   hero: { width: '100%', aspectRatio: 3 / 4, position: 'relative', backgroundColor: colors.surface2, marginBottom: 16 },
-  heroImage: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
-  heroScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,19,31,0.4)' },
+  heroImage: { ...absoluteFill, resizeMode: 'cover' },
+  heroScrim: { ...absoluteFill, backgroundColor: 'rgba(12,19,31,0.4)' },
   heroContent: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 18, paddingTop: 50 },
   heroEyebrow: { color: colors.olive, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
   heroTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', marginBottom: 8 },

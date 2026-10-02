@@ -5,7 +5,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleS
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -271,7 +271,7 @@ export default function PitchDetail() {
     return (
       <View key={c.id} style={[styles.commentCard, isReply && styles.replyCard]}>
         <Pressable style={styles.commentMetaRow} onPress={() => router.push(`/profile/${c.user_id}`)}>
-          <View style={styles.commentAvatar}>{c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
+          <View style={styles.commentAvatar}>{c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={absoluteFill} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
           <Text style={styles.commentName}>{c.displayName}</Text>
           {isCreatorComment ? <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View> : null}
           <Text style={styles.commentDate}> · {formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</Text>
@@ -514,7 +514,7 @@ export default function PitchDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.backerRow}>
                 {recentBackers.map((b) => (
                   <Pressable key={b.userId} style={styles.backer} onPress={() => router.push(`/profile/${b.userId}`)}>
-                    <View style={styles.backerAvatar}>{b.avatarUrl ? <SmartImage uri={b.avatarUrl} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
+                    <View style={styles.backerAvatar}>{b.avatarUrl ? <SmartImage uri={b.avatarUrl} style={absoluteFill} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
                     <Text style={styles.backerName}>{b.displayName}</Text>
                   </Pressable>
                 ))}

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, absoluteFill } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import SmartImage from '../components/SmartImage';
 
@@ -104,7 +104,7 @@ export default function Home() {
             <View style={styles.heroArtWrap}>
               <View style={styles.heroArt}>
                 {(heroItem.poster || heroItem.heroImage) ? (
-                  <SmartImage uri={heroItem.poster || heroItem.heroImage} style={StyleSheet.absoluteFillObject} />
+                  <SmartImage uri={heroItem.poster || heroItem.heroImage} style={absoluteFill} />
                 ) : null}
               </View>
               <View style={styles.heroArtTag}><Text style={styles.heroArtTagText}>NOW STREAMING</Text></View>
@@ -164,7 +164,7 @@ export default function Home() {
                 return (
                   <Pressable key={c.userId} style={[styles.polaroid, { marginTop, transform: [{ rotate }] }]} onPress={() => router.push(`/profile/${c.userId}`)}>
                     <View style={styles.polaroidPhoto}>
-                      {c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={StyleSheet.absoluteFillObject} /> : null}
+                      {c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={absoluteFill} /> : null}
                     </View>
                     <Text style={styles.polaroidName}>{c.displayName}</Text>
                     <Text style={styles.polaroidCredit}>{c.credits.slice(0, 2).join(', ')}</Text>
@@ -284,7 +284,7 @@ function Filmstrip({ items, meta, showRank, onPressItem }) {
       {items.map((item, i) => (
         <Pressable key={`${item.isSeries ? 's' : 'e'}-${item.id}`} style={styles.filmItem} onPress={() => onPressItem(item)}>
           <View style={styles.filmPoster}>
-            {item.poster ? <SmartImage uri={item.poster} style={StyleSheet.absoluteFillObject} /> : null}
+            {item.poster ? <SmartImage uri={item.poster} style={absoluteFill} /> : null}
             {showRank ? <View style={styles.rankBadge}><Text style={styles.rankText}>#{i + 1}</Text></View> : null}
           </View>
           <Text style={styles.filmTitle}>{item.title}</Text>

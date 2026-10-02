@@ -1,7 +1,7 @@
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path } from 'react-native-svg';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds } from '../lib/runtime';
 import SmartImage from './SmartImage';
 import WishlistHeart from './WishlistHeart';
@@ -53,7 +53,7 @@ export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onT
           return (
             <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
               <View style={styles.thumb}>
-                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={StyleSheet.absoluteFillObject} /> : (
+                {card.thumbnail ? <SmartImage uri={card.thumbnail} style={absoluteFill} /> : (
                   <Text style={styles.thumbFallback}>{card.tier === 'premium' ? 'locked' : isSeries ? '▤ series' : '▶ preview'}</Text>
                 )}
                 <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
@@ -92,7 +92,7 @@ export function ContinueWatchingRow({ items, onPressItem }) {
           return (
             <Pressable key={ep.id} style={styles.card} onPress={() => onPressItem(ep)}>
               <View style={styles.thumb}>
-                {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={StyleSheet.absoluteFillObject} /> : (
+                {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={absoluteFill} /> : (
                   <View style={styles.resumeFallback}><PlayGlyph /><Text style={styles.thumbFallback}> Resume</Text></View>
                 )}
                 <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />

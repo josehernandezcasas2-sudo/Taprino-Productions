@@ -11,7 +11,7 @@ import Animated, {
   withTiming
 } from 'react-native-reanimated';
 import Svg, { Circle, Line, Path } from 'react-native-svg';
-import { colors } from '../lib/theme';
+import { colors, absoluteFill } from '../lib/theme';
 
 // Port of components/PitchSwipeCard.js from the website — same thresholds,
 // same state machine (drag to swipe, tap to flip, explicit Back button to
@@ -255,7 +255,7 @@ export function SwipeButtons({ onLike, onSkip, onDislike, disabled }) {
 
 const styles = StyleSheet.create({
   card: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     borderRadius: 18,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 18 },
@@ -264,7 +264,7 @@ const styles = StyleSheet.create({
     elevation: 12
   },
   face: {
-    ...StyleSheet.absoluteFillObject,
+    ...absoluteFill,
     backfaceVisibility: 'hidden',
     borderRadius: 18,
     overflow: 'hidden',

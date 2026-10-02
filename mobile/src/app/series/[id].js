@@ -5,7 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 
 function tierBadge(tier, adsEnabled) {
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
   emptyText: { color: colors.inkDim, fontSize: 14, paddingHorizontal: 16 },
 
   hero: { width: '100%', aspectRatio: 3 / 4, position: 'relative', backgroundColor: colors.surface2 },
-  heroImage: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  heroImage: { ...absoluteFill, resizeMode: 'cover' },
   heroOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 18, paddingTop: 60, backgroundColor: 'rgba(12,19,31,0.55)' },
   heroEyebrow: { color: colors.olive, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' },
   heroTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', marginBottom: 6 },
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
 
   episodeRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.hairline },
   episodeThumb: { width: 110, height: 66, borderRadius: 8, backgroundColor: colors.surface2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  episodeThumbImg: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  episodeThumbImg: { ...absoluteFill, resizeMode: 'cover' },
   episodeThumbIconRow: { alignItems: 'center', justifyContent: 'center' },
   episodeBadge: { position: 'absolute', top: 5, left: 5, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 6 },
   episodeBadgeText: { fontSize: 8, fontWeight: '700' },

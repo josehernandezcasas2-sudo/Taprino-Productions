@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Line, Polygon, Path } from 'react-native-svg';
-import { colors } from '../lib/theme';
+import { colors, absoluteFill } from '../lib/theme';
 import SmartImage from './SmartImage';
 
 // Minimal reel player, mirroring components/ReelPlayer.js's own scope cut
@@ -65,9 +65,9 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
 }
 
 const styles = StyleSheet.create({
-  wrap: { ...StyleSheet.absoluteFillObject, backgroundColor: '#000' },
-  video: { ...StyleSheet.absoluteFillObject },
-  poster: { ...StyleSheet.absoluteFillObject, resizeMode: 'cover' },
+  wrap: { ...absoluteFill, backgroundColor: '#000' },
+  video: { ...absoluteFill },
+  poster: { ...absoluteFill, resizeMode: 'cover' },
   muteToggle: {
     position: 'absolute',
     left: 12,

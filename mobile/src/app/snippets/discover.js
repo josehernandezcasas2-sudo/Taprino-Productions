@@ -7,7 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import ReelPlayer from '../../components/ReelPlayer';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, absoluteFill } from '../../lib/theme';
+import SmartImage from '../../components/SmartImage';
 import { buildVerticalUnits, expandUnitToSlides, pickNextUnit, unitKey } from '../../lib/verticalFeed';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -264,6 +265,7 @@ export default function SnippetsDiscover() {
               onShare={() => share(slide)}
               shareCopied={shareCopiedKey === slide.key}
               onOpenMenu={isSignedIn ? () => openMenu(slide) : null}
+              onOpenAuthor={slide.episode.ownerId ? () => router.push(`/profile/${slide.episode.ownerId}`) : null}
               insets={insets}
             />
           </View>
@@ -304,9 +306,10 @@ export default function SnippetsDiscover() {
   );
 }
 
-function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onShare, shareCopied, onOpenMenu, insets }) {
+function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onShare, shareCopied, onOpenMenu, onOpenAuthor, insets }) {
+  const authorName = slide.episode.authorName || 'A viewer';
   return (
-    <View style={StyleSheet.absoluteFillObject}>
+    <View style={absoluteFill}>
       <ReelPlayer
         src={slide.episode.videoSrc}
         active={active}
@@ -328,8 +331,17 @@ function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onSha
           {shareCopied ? <CheckIconSvg size={22} /> : <ShareIconSvg size={22} />}
         </Pressable>
       </View>
-      <View style={[styles.caption, { paddingBottom: insets.bottom + 30 }]} pointerEvents="none">
-        <Text style={styles.captionAuthor}>{slide.episode.authorName}</Text>
+      {/* box-none: taps fall through to the video except on the author row,
+          which opens their profile (components/ReelAuthor.js on the site). */}
+      <View style={[styles.caption, { paddingBottom: insets.bottom + 30 }]} pointerEvents="box-none">
+        <Pressable style={styles.authorRow} onPress={onOpenAuthor} disabled={!onOpenAuthor} hitSlop={6}>
+          <View style={styles.authorAvatar}>
+            {slide.episode.authorAvatarUrl
+              ? <SmartImage uri={slide.episode.authorAvatarUrl} style={absoluteFill} />
+              : <Text style={styles.authorAvatarLetter}>{authorName[0].toUpperCase()}</Text>}
+          </View>
+          <Text style={styles.captionAuthor}>{authorName}</Text>
+        </Pressable>
         {slide.episode.title ? <Text style={styles.captionTitle}>{slide.episode.title}</Text> : null}
       </View>
     </View>
@@ -413,7 +425,10 @@ const styles = StyleSheet.create({
   actionRail: { position: 'absolute', right: 12, zIndex: 4, gap: 18, alignItems: 'center' },
   actionBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   caption: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, paddingHorizontal: 18, paddingTop: 60 },
-  captionAuthor: { color: colors.brass, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 3, textTransform: 'uppercase' },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 6 },
+  authorAvatar: { width: 28, height: 28, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.brass, borderWidth: 1.5, borderColor: 'rgba(251,232,211,0.7)', alignItems: 'center', justifyContent: 'center' },
+  authorAvatarLetter: { color: colors.onBrass, fontSize: 11, fontWeight: '700' },
+  captionAuthor: { color: colors.brass, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },
   captionTitle: { color: colors.ink, fontSize: 16, fontWeight: '700' },
 
   sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },

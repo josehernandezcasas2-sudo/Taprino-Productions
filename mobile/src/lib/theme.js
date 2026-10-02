@@ -55,3 +55,11 @@ export const colors = {
   dropupBackground: 'rgba(30, 28, 18, 0.98)',
   hairline: 'rgba(251, 232, 211, 0.12)'
 };
+
+// Use this instead of StyleSheet.absoluteFillObject — React Native 0.86
+// removed that export (only StyleSheet.absoluteFill remains), so on a real
+// device it's undefined: every image/overlay styled with it rendered at
+// zero size or lost its positioning (blank avatars, posters, hero art),
+// while the web preview still had it and hid the bug. A plain object is
+// safe both as a style and spread into another style, on every platform.
+export const absoluteFill = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 };

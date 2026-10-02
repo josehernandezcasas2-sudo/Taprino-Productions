@@ -8,6 +8,7 @@ import { buildVerticalUnits, pickNextUnit, expandUnitToSlides, unitKey } from '.
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
 import PostMenu from '../../components/PostMenu';
+import ReelAuthor from '../../components/ReelAuthor';
 import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -230,7 +231,7 @@ export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId
                     </button>
                   </div>
                   <div className="reel-caption">
-                    <div className="reel-caption-series reel-caption-post-author">{slide.episode.authorName}</div>
+                    <ReelAuthor episode={slide.episode} />
                     {slide.episode.title && <div className="reel-caption-title">{slide.episode.title}</div>}
                   </div>
                 </>

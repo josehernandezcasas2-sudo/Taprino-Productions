@@ -11,12 +11,13 @@ import { getWatchHistory } from '../../lib/watchHistory';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getRecommendations } from '../../lib/recommendations';
 import { getRecentVideoPosts } from '../../lib/posts';
-import { getPublicDisplayNames } from '../../lib/userProfiles';
+import { getPublicIdentities } from '../../lib/userProfiles';
 import { useWishlist } from '../../lib/useWishlist';
 import { buildVerticalUnits, createDiscoverPicker, buildPersonalUnitKeys, expandUnitToSlides, filterEntitledVertical, unitKey } from '../../lib/verticalFeed';
 import ReelAdCard from '../../components/ReelAdCard';
 import ReelPlayer from '../../components/ReelPlayer';
 import PostMenu from '../../components/PostMenu';
+import ReelAuthor from '../../components/ReelAuthor';
 import { HeartIcon, ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -39,7 +40,7 @@ export async function getServerSideProps({ req, res }) {
   // episode-shape buildVerticalUnits/expandUnitToSlides already expect.
   // Always free/standalone (no seriesId): the posts table has no
   // tier/entitlement concept of its own yet.
-  const authorNames = await getPublicDisplayNames(videoPosts.map((p) => p.userId));
+  const authors = await getPublicIdentities(videoPosts.map((p) => p.userId));
   const postUnits = videoPosts.map((p) => ({
     id: `post:${p.id}`,
     postId: p.id,
@@ -50,7 +51,8 @@ export async function getServerSideProps({ req, res }) {
     tier: 'free',
     seriesId: null,
     isUserPost: true,
-    authorName: authorNames[p.userId] || 'A viewer'
+    authorName: authors[p.userId].displayName,
+    authorAvatarUrl: authors[p.userId].avatarUrl
   }));
   const verticalEpisodes = [...catalogVertical, ...postUnits];
 
@@ -378,7 +380,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
                     <div className="reel-caption-series">{(seriesNameById[slide.seriesId] || '').toUpperCase()}</div>
                   )}
                   {slide.episode.isUserPost && (
-                    <div className="reel-caption-series reel-caption-post-author">{slide.episode.authorName}</div>
+                    <ReelAuthor episode={slide.episode} />
                   )}
                   {slide.episode.title && <div className="reel-caption-title">{slide.episode.title}</div>}
                   {slide.positionInSeries && (

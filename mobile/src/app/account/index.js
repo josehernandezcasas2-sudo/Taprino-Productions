@@ -8,10 +8,11 @@ import { useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
-import { colors, fonts } from '../../lib/theme';
+import { colors, fonts, absoluteFill } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
@@ -64,6 +65,8 @@ export default function Account() {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
+  // null | 'saving' | 'saved' | an error message — shown right under the photo.
+  const [avatarStatus, setAvatarStatus] = useState(null);
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -169,16 +172,52 @@ export default function Account() {
     }
   }
 
+  // The photo saves the moment it's chosen (or removed) rather than waiting
+  // for "Save profile" at the bottom — before, picking a photo and leaving
+  // the screen silently dropped it, and a full-size iPhone photo (2–4MB,
+  // ~1.33x that as base64) could exceed Vercel's 4.5MB request limit and
+  // fail with an error shown far above the Save button. Shrinking to a
+  // 512px JPEG first (~50–100KB) fixes the size problem and keeps every
+  // avatar on the site light to load.
+  async function saveAvatar(body, optimistic) {
+    setAvatarStatus('saving');
+    setProfile((p) => ({ ...p, ...optimistic }));
+    try {
+      const token = await withToken();
+      const data = await apiPost('/api/account/profile', body, token);
+      const avatarUrl = 'avatarUrl' in data ? data.avatarUrl : null;
+      setProfile((p) => ({ ...p, avatarUrl, avatarBase64: undefined, removeAvatar: false }));
+      updateOwnProfileCache({ avatarUrl });
+      setAvatarStatus('saved');
+      setTimeout(() => setAvatarStatus((st) => (st === 'saved' ? null : st)), 2500);
+    } catch (err) {
+      setProfile((p) => ({ ...p, avatarBase64: undefined, removeAvatar: false }));
+      setAvatarStatus(`Couldn't save your photo: ${err.message}`);
+    }
+  }
+
   async function pickAvatar() {
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
       Alert.alert('Permission needed', 'Allow photo library access to change your avatar.');
       return;
     }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8, base64: true });
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 1 });
     if (result.canceled || !result.assets || !result.assets[0]) return;
-    const asset = result.assets[0];
-    setProfile((p) => ({ ...p, avatarBase64: `data:image/jpeg;base64,${asset.base64}`, avatarFileName: asset.fileName || 'avatar.jpg', removeAvatar: false }));
+    let base64;
+    try {
+      const rendered = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 512 }).renderAsync();
+      const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.85, base64: true });
+      base64 = `data:image/jpeg;base64,${saved.base64}`;
+    } catch (err) {
+      setAvatarStatus(`Couldn't read that photo: ${err.message}`);
+      return;
+    }
+    saveAvatar({ avatarBase64: base64, avatarFileName: 'avatar.jpg' }, { avatarBase64: base64 });
+  }
+
+  function removeAvatar() {
+    saveAvatar({ removeAvatar: true }, { avatarUrl: null, avatarBase64: undefined });
   }
 
   async function openPortal() {
@@ -320,7 +359,7 @@ export default function Account() {
         <LinearGradient colors={[colors.surface2, colors.surface1]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.identity}>
           <View style={styles.identityTop}>
             <View style={styles.identityAvatar}>
-              {avatarSrc ? <SmartImage uri={avatarSrc} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.identityAvatarLetter}>{avatarLetter}</Text>}
+              {avatarSrc ? <SmartImage uri={avatarSrc} style={absoluteFill} /> : <Text style={styles.identityAvatarLetter}>{avatarLetter}</Text>}
             </View>
             <View style={styles.identityMeta}>
               <View style={styles.nameRow}>
@@ -357,15 +396,20 @@ export default function Account() {
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
-                  {avatarSrc ? <SmartImage uri={avatarSrc} style={StyleSheet.absoluteFillObject} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
+                  {avatarSrc ? <SmartImage uri={avatarSrc} style={absoluteFill} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
                 </View>
-                <Pressable style={styles.btnSmall} onPress={pickAvatar}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
+                <Pressable style={styles.btnSmall} onPress={pickAvatar} disabled={avatarStatus === 'saving'}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
                 {avatarSrc ? (
-                  <Pressable style={styles.btnSmall} onPress={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: undefined, removeAvatar: true }))}>
+                  <Pressable style={styles.btnSmall} onPress={removeAvatar} disabled={avatarStatus === 'saving'}>
                     <Text style={styles.btnSmallText}>Remove</Text>
                   </Pressable>
                 ) : null}
               </View>
+              {avatarStatus ? (
+                <Text style={[styles.avatarStatus, avatarStatus !== 'saving' && avatarStatus !== 'saved' && { color: colors.danger }]}>
+                  {avatarStatus === 'saving' ? 'Saving photo…' : avatarStatus === 'saved' ? '✓ Photo saved — it now shows everywhere you appear.' : avatarStatus}
+                </Text>
+              ) : null}
 
               <Label>Bio <Text style={styles.labelNote}>optional, up to 400 characters</Text></Label>
               <TextInput
@@ -413,6 +457,9 @@ export default function Account() {
                 </Pressable>
               ) : null}
 
+              {/* Repeated by the button too — the copy at the top of the card
+                  is off-screen by the time you've scrolled down to save. */}
+              {profileError ? <Text style={styles.errorInline}>{profileError}</Text> : null}
               <SaveRow label="Save profile" saving={profileSaving} saved={profileSaved} onPress={saveProfile} />
             </>
           )}
@@ -767,6 +814,7 @@ const styles = StyleSheet.create({
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarLetter: { fontFamily: fonts.monoBold, fontSize: 20.8, color: '#241a05' },
+  avatarStatus: { fontFamily: fonts.mono, fontSize: 12, color: colors.ok, marginTop: -6, marginBottom: 14 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   pill: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', backgroundColor: colors.surface0, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
   pillActive: { borderColor: colors.brass },
