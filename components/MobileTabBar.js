@@ -57,12 +57,15 @@ const GROUPS = {
     Icon: WatchTabIcon,
     iconKey: 'tab_watch',
     items: [
+      { href: '/live', label: 'Live TV' },
       { href: '/type/series', label: 'Watch Series' },
       { href: '/type/movie', label: 'Watch Movies' },
       { href: '/podcasts', label: 'Podcasts' },
       { href: '/vertical/browse', label: 'Vertical' }
     ],
     match: (p, q) =>
+      p === '/live' ||
+      p === '/live/[slug]' ||
       (p === '/type/[type]' && (q.type === 'series' || q.type === 'movie')) ||
       p === '/podcasts' ||
       p === '/podcasts/[id]' ||

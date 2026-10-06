@@ -18,7 +18,9 @@ export default async function handler(req, res) {
     if (date < today || date > addDays(today, 6)) date = today;
 
     const days = await planChannelDays(channel, [date], { includeLive: true });
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=120');
+    // CDN-only cache; clients always fetch fresh (see now.js).
+    res.setHeader('Vercel-CDN-Cache-Control', 'max-age=60, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json({ date, today, segments: mergeForGuide(days[date]) });
   } catch (err) {
     console.error('channel/guide error:', err.message);
