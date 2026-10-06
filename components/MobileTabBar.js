@@ -79,9 +79,10 @@ const GROUPS = {
     items: (roles) => [
       { href: '/account', label: 'Settings / Account' },
       { href: '/wishlist', label: 'My List' },
-      ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : [])
+      ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
+      ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
     ],
-    match: (p) => p === '/account' || p === '/wishlist' || p.startsWith('/creator')
+    match: (p) => p === '/account' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'
   }
 };
 

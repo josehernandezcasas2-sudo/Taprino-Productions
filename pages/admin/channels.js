@@ -116,7 +116,7 @@ export default function AdminChannels({ isSignedIn, isSubscriber, email, isAdmin
             <h1>Channels</h1>
             <p className="ca-sub">
               Every channel at <Link href="/live">/live</Link>. You create channels and assign the Content Schedulers who
-              maintain them. Give someone that role on <Link href="/admin/team">Team &amp; permissions</Link>.
+              maintain them. Give someone that role on <Link href="/admin/team">Team &amp; permissions</Link>. Schedules and loops are built in the <Link href="/schedule">scheduler</Link>.
             </p>
           </div>
           <Link href="/admin" className="library-back">← Back to admin</Link>
@@ -219,7 +219,7 @@ function ChannelCard({ channel: c, candidates, busy, onEdit, onDelete, onAssign,
       <div className="chadm-acts">
         <button type="button" className="account-btn-secondary" onClick={onEdit} disabled={busy}>Edit</button>
         {c.visibility === 'public' && <Link href={c.isMain ? '/live' : `/live/${c.slug}`} className="account-btn-secondary">View on /live</Link>}
-        {c.isMain && <Link href="/admin/channel" className="account-btn-secondary">Edit loop</Link>}
+        <Link href={`/schedule?channel=${c.slug}`} className="account-btn-secondary">Open scheduler</Link>
         {!c.isMain && <button type="button" className="account-btn-danger" onClick={onDelete} disabled={busy}>Delete</button>}
       </div>
     </div>

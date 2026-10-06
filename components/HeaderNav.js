@@ -6,7 +6,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
 import { isStreamPath } from '../lib/streamSection';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -29,6 +29,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [portalLoading, setPortalLoading] = useState(false);
   const [siteSettings, setShopSettings] = useState(null);
   const [ownProfile, setOwnProfile] = useState(null);
+  const [isScheduler, setIsScheduler] = useState(false);
   const rootRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -52,6 +53,16 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
       .then((data) => setShopSettings(data))
       .catch(() => setShopSettings({ shopEnabled: false, shopUrl: null }));
   }, [isAdmin]);
+
+  // Content Schedulers are creators too, so only creators need to ask
+  // whether they also get the channel scheduler link.
+  useEffect(() => {
+    if (!isCreator || isAdmin) return;
+    fetch('/api/my-role')
+      .then((r) => r.json())
+      .then((d) => setIsScheduler(!!d.isContentScheduler))
+      .catch(() => {});
+  }, [isCreator, isAdmin]);
 
   // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
   // every page, so this is cheaper than threading userId/avatarUrl/
@@ -442,6 +453,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}
                 {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Submit your work</Link>}
                 {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item"><FolderIcon size={15} src={iconOverrides.folder} /> Your work</Link>}
+                {(isAdmin || isScheduler) && <Link href="/schedule" className="dropdown-item"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel scheduler</Link>}
                 {!isCreator && !isAdmin && <div className="dropdown-divider" />}
                 {!isCreator && !isAdmin && <Link href="/apply" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Become a creator</Link>}
                 <div className="dropdown-divider" />
