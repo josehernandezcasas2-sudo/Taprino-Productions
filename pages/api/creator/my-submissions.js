@@ -29,7 +29,7 @@ export default async function handler(req, res) {
   const [{ data, error }, { data: allSeries }, viewCounts] = await Promise.all([
     supabase
       .from('episodes')
-      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label, release_year, ads_enabled, rating, ad_break_seconds, available_from, available_until, bonus_parent_type, bonus_parent_id, featured, funding_url, is_original, channel_opt_in')
+      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label, release_year, ads_enabled, rating, ad_break_seconds, available_from, available_until, bonus_parent_type, bonus_parent_id, featured, funding_url, is_original, channel_opt_in, moderation_hold')
       .eq('submitted_by', userId)
       .order('created_at', { ascending: false }),
     supabase.from('series').select('id, name, poster, thumbnail, channel_opt_in, creator_id'),
@@ -82,6 +82,8 @@ export default async function handler(req, res) {
         fundingUrl: ep.funding_url || '',
         isOriginal: !!ep.is_original,
         channelOptIn: !!ep.channel_opt_in,
+        // Pulled from everywhere while an admin reviews it (lib/moderation.js).
+        held: !!ep.moderation_hold,
         seriesChannelOptIn: !!(seriesArt && seriesArt.channel_opt_in),
         src: ep.src,
         createdAt: ep.created_at,

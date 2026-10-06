@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
@@ -440,6 +441,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                 {!showingTrailer && episode.trailerSrc && (
                   <button className="trailer-link" onClick={() => setShowingTrailer(true)}>🎬 Watch trailer</button>
                 )}
+                <ReportButton targetType="episode" targetId={episode.id} title={episode.title} />
               </div>
               {!showingTrailer && getPosition(episode.id) > 0 && (() => {
                 const totalSeconds = parseRuntimeToSeconds(episode.runtime);

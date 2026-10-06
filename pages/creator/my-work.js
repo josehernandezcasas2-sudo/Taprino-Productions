@@ -370,7 +370,9 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           )}
           {s.deletionRequested && <p className="submission-rejection">Deletion reason: {s.deletionReason}</p>}
         </div>
-        <span className={`status-pill ${s.status}`}>{(STATUS_LABEL[s.status] || {}).text || s.status}</span>
+        {s.held && s.status === 'approved'
+          ? <span className="status-pill rejected" title="Taken off the site while an admin reviews it. You'll get a notice when it's decided.">Pulled for review</span>
+          : <span className={`status-pill ${s.status}`}>{(STATUS_LABEL[s.status] || {}).text || s.status}</span>}
         <div className="row-views">{s.status === 'approved' ? <><EyeIcon size={12} src={iconOverrides.eye} /> {s.viewCount}</> : '—'}</div>
         {flags.length > 0 && (
           <div className="row-flags">

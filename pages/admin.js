@@ -14,7 +14,7 @@ import ManualEpisodeForm from '../components/ManualEpisodeForm';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 
 import Footer from '../components/Footer';
-import { ClapperboardIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, BarChartIcon, TicketIcon, BrowserTabIcon, RowsIcon, SparkleIcon, PlayIcon, BellIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { ClapperboardIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, BarChartIcon, TicketIcon, BrowserTabIcon, RowsIcon, SparkleIcon, PlayIcon, BellIcon, EyeIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 // SECURITY: this is the enforcement point for "private, admin-only." A
 // non-admin (or anyone not signed in) gets redirected server-side before
 // any admin data is ever fetched or rendered — there's no client-side-only
@@ -884,6 +884,7 @@ export default function AdminPortal({ mainGenres, allSeries: initialAllSeries, i
         <Link href="/admin/channels"><TvIcon size={15} src={iconOverrides.tv} /> Channels →</Link>
         <Link href="/schedule"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel scheduler →</Link>
         <Link href="/admin/channel-uploads"><InboxIcon size={15} src={iconOverrides.inbox} /> Channel uploads →</Link>
+        <Link href="/admin/content"><EyeIcon size={15} /> All content &amp; flags →</Link>
         <Link href="/admin/applications"><InboxIcon size={15} src={iconOverrides.inbox} /> Applications →</Link>
         <Link href="/admin/genre-icons"><ImageIcon size={15} src={iconOverrides.image} /> Genre icons →</Link>
         <Link href="/admin/player-icons"><SlidersIcon size={15} src={iconOverrides.sliders} /> Icons →</Link>

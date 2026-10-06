@@ -7,6 +7,7 @@ import InstallButton from './InstallButton';
 import MobileTabBar from './MobileTabBar';
 import Footer from './Footer';
 import ChannelPlayer from './ChannelPlayer';
+import ReportButton from './ReportButton';
 import { SITE } from '../lib/siteConfig';
 
 // Channel time is Pacific for everyone, like a broadcast schedule.
@@ -311,11 +312,10 @@ function NowInfo({ now, channel }) {
       <div className="tv-info-when">Until {ptTime(p.endsAt)}</div>
       <Chips p={p} />
       {p.description && <p>{p.description}</p>}
-      {page && (
-        <div className="tv-info-acts">
-          <Link href={page.href} className="account-btn-primary">{page.label} &rarr;</Link>
-        </div>
-      )}
+      <div className="tv-info-acts">
+        {page && <Link href={page.href} className="account-btn-primary">{page.label} &rarr;</Link>}
+        {p.kind === 'episode' && p.episodeId && <ReportButton key={p.episodeId} targetType="episode" targetId={p.episodeId} title={p.seriesName ? `${p.seriesName} · ${p.title}` : p.title} className="tv-report" />}
+      </div>
       <UpNext next={now.next} />
     </>
   );
@@ -343,6 +343,7 @@ function SegmentInfo({ seg, state, channel, date, today, onBack }) {
       <div className="tv-info-acts">
         {page && <Link href={page.href} className="account-btn-primary">{page.label} &rarr;</Link>}
         <button type="button" className="account-btn-secondary" onClick={onBack}>Back to what&rsquo;s on</button>
+        {seg.kind === 'episode' && seg.episodeId && <ReportButton key={seg.episodeId} targetType="episode" targetId={seg.episodeId} title={seg.seriesName ? `${seg.seriesName} · ${seg.title}` : seg.title} className="tv-report" />}
       </div>
     </>
   );
