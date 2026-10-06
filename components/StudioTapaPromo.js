@@ -19,7 +19,7 @@ export default function StudioTapaPromo({ isSubscriber }) {
       <div className="promo-banner-inner">
         <div>
           <span className="promo-eyebrow">{SITE.premiumTier}</span>
-          <h3>Go ad-free and back the creators directly.</h3>
+          <h3>Go on demand and back the creators directly.</h3>
           <p>
             Members get early episodes, gated series, and a direct line to what they fund.
           </p>

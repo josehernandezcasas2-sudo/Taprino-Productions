@@ -665,7 +665,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                 ) : (
                   <>
                     <ul className="account-upsell-list">
-                      <li>Ad-free viewing across the whole library</li>
+                      <li>Ad-free on-demand viewing across the whole library (live channels run ads for everyone)</li>
                       <li>Early access to new episodes before free release</li>
                       <li>Gated series only {SITE.premiumTier} members can watch</li>
                       <li>Back the creators you watch, directly</li>
