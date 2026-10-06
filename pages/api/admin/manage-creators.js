@@ -1,5 +1,6 @@
 import { getRoleContext, findUserByEmail, setUserRole } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
+import { removeAllAssignments } from '../../../lib/channelAdmin';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -18,8 +19,9 @@ export default async function handler(req, res) {
   }
   // Defaults to 'creator' for backwards compatibility with the existing
   // grant-creator-access UI, which never sends a role field. Pass
-  // role: 'sub_admin' explicitly to grant limited admin access instead.
-  const grantRole = ['creator', 'sub_admin'].includes(requestedRole) ? requestedRole : 'creator';
+  // role: 'sub_admin' for limited admin access, or 'content_scheduler'
+  // for someone who maintains the channels you assign them.
+  const grantRole = ['creator', 'content_scheduler', 'sub_admin'].includes(requestedRole) ? requestedRole : 'creator';
 
   const user = await findUserByEmail(targetEmail);
   if (!user) {
@@ -30,6 +32,9 @@ export default async function handler(req, res) {
   // explicit removal, not just "stop checking." setUserRole() also clears
   // any leftover sub_admin permissions array automatically.
   await setUserRole(user.id, action === 'grant' ? grantRole : null);
+  if (action === 'revoke' || grantRole !== 'content_scheduler') {
+    await removeAllAssignments(user.id);
+  }
 
   await recordAudit({
     adminId: userId,

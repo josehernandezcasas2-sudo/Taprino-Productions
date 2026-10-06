@@ -31,6 +31,7 @@ export async function getServerSideProps({ req, res }) {
 }
 
 const REVOKE_VALUE = '__revoke__';
+const ROLE_LABELS = { creator: 'Creator', content_scheduler: 'Content Scheduler', sub_admin: 'Sub-admin' };
 
 export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const [roster, setRoster] = useState(null);
@@ -39,6 +40,8 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
   const [grantEmail, setGrantEmail] = useState('');
   const [grantRole, setGrantRole] = useState('sub_admin');
   const [pendingPerms, setPendingPerms] = useState({}); // { [userId]: Set(keys) }
+
+  const [channelsByUser, setChannelsByUser] = useState({}); // { [userId]: ['TapaTV', ...] }
 
   const [compedList, setCompedList] = useState(null);
   const [compedEmail, setCompedEmail] = useState('');
@@ -57,6 +60,8 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
         if (c.role === 'sub_admin') initial[c.id] = new Set(c.permissions || []);
       });
       setPendingPerms(initial);
+      // role changes can drop channel assignments, so refresh those too
+      loadChannelAssignments();
     } catch (err) {
       setError(err.message);
     }
@@ -70,6 +75,21 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
       setCompedList(data.comped);
     } catch (err) {
       setError(err.message);
+    }
+  }
+
+  // Which channels each Content Scheduler maintains. Assignments are made
+  // on /admin/channels; this is just the read-out.
+  async function loadChannelAssignments() {
+    try {
+      const res = await fetch('/api/admin/channels');
+      const data = await res.json();
+      if (!res.ok) return;
+      const map = {};
+      data.channels.forEach((c) => c.schedulerIds.forEach((id) => { (map[id] = map[id] || []).push(c.name); }));
+      setChannelsByUser(map);
+    } catch (err) {
+      // non-essential on this page
     }
   }
 
@@ -240,7 +260,8 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
         <p style={{ opacity: 0.75, maxWidth: 640 }}>
           Grant sub-admin access, then choose exactly what each sub-admin can do below.
           A sub-admin only sees the admin sections you've switched on for them — everything
-          else is hidden, not just locked.
+          else is hidden, not just locked. A Content Scheduler can do everything a creator can,
+          plus schedule the channels you assign them on <Link href="/admin/channels">Channels</Link>.
         </p>
 
         {error && (
@@ -262,6 +283,7 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
             />
             <select value={grantRole} onChange={(e) => setGrantRole(e.target.value)} style={{ padding: 8 }}>
               <option value="sub_admin">Sub-admin (limited)</option>
+              <option value="content_scheduler">Content Scheduler</option>
               <option value="creator">Creator</option>
             </select>
             <button type="submit" disabled={busyId === 'grant'}>
@@ -283,7 +305,7 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
                 <div>
                   <strong>{person.email}</strong>
                   <span style={{ marginLeft: 8, opacity: 0.65, fontSize: 13 }}>
-                    {person.role === 'sub_admin' ? 'Sub-admin' : 'Creator'}
+                    {ROLE_LABELS[person.role] || 'Creator'}
                   </span>
                 </div>
                 <select
@@ -293,10 +315,20 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
                   style={{ padding: 6 }}
                 >
                   <option value="creator">Creator</option>
+                  <option value="content_scheduler">Content Scheduler</option>
                   <option value="sub_admin">Sub-admin</option>
                   <option value={REVOKE_VALUE} style={{ color: '#c55' }}>— Revoke access —</option>
                 </select>
               </div>
+
+              {person.role === 'content_scheduler' && (
+                <p style={{ marginTop: 10, marginBottom: 0, fontSize: 14, opacity: 0.8 }}>
+                  {(channelsByUser[person.id] || []).length
+                    ? <>Schedules {channelsByUser[person.id].join(', ')}. </>
+                    : <>Not assigned to a channel yet. </>}
+                  <Link href="/admin/channels">Manage on Channels</Link>
+                </p>
+              )}
 
               {person.role === 'sub_admin' && (
                 <div style={{ marginTop: 12 }}>

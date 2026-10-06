@@ -12,10 +12,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   res.setHeader('Cache-Control', 'private, no-store');
-  const { userId, isAdmin, isCreator } = await getRoleContext(req);
+  const { userId, isAdmin, isCreator, isContentScheduler } = await getRoleContext(req);
   return res.status(200).json({
     isSignedIn: !!userId,
     isCreator: !!isCreator,
-    isAdmin: !!isAdmin
+    isAdmin: !!isAdmin,
+    isContentScheduler: !!isContentScheduler
   });
 }

@@ -3,6 +3,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { listChannels } from '../../lib/channelEngine';
 import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
@@ -15,9 +16,14 @@ export async function getServerSideProps({ req, res }) {
   if (!account.isAdmin) {
     return { redirect: { destination: '/stream', permanent: false } };
   }
-  const episodes = await getPublicEpisodes();
+  const [episodes, channels] = await Promise.all([
+    getPublicEpisodes(),
+    // drafts included: you might go live on a channel before it launches
+    listChannels({ includeDrafts: true }).catch(() => [])
+  ]);
   return {
     props: {
+      channels: channels.map((c) => ({ id: c.id, name: c.name, number: c.number, visibility: c.visibility })),
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
@@ -28,9 +34,9 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-const EMPTY = { title: '', description: '', genre: '', adsEnabled: true, adBreakMinutes: '10' };
+const EMPTY = { title: '', description: '', genre: '', adsEnabled: true, adBreakMinutes: '10', channelId: '' };
 
-export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function LiveAdmin({ channels, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
   const [form, setForm] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -61,6 +67,7 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: form.title,
+          channelId: form.channelId || (channels[0] ? channels[0].id : undefined),
           description: form.description,
           genre: form.genre,
           adsEnabled: form.adsEnabled,
@@ -156,6 +163,17 @@ export default function LiveAdmin({ mainGenres, isSignedIn, isSubscriber, email,
         {!current && (
           <div className="house-ad-form-wrap" style={{ marginTop: '1.4rem' }}>
             <form onSubmit={create} className="house-ad-form">
+              {channels.length > 0 && (
+                <>
+                  <label>Channel</label>
+                  <select value={form.channelId || channels[0].id} onChange={(e) => setForm((f) => ({ ...f, channelId: e.target.value }))}>
+                    {channels.map((c) => (
+                      <option key={c.id} value={c.id}>CH {String(c.number).padStart(2, '0')} · {c.name}{c.visibility === 'draft' ? ' (draft)' : ''}</option>
+                    ))}
+                  </select>
+                </>
+              )}
+
               <label>Title</label>
               <input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} required />
 
