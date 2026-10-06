@@ -1,241 +1,282 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import Link from 'next/link';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
-import { tierBadge } from '../lib/tierBadge';
-import { formatRuntimeLong } from '../lib/videoMetadata';
-import { SITE } from '../lib/siteConfig';
+import LiveVideoPlayer from './LiveVideoPlayer';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
+const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
 
 function formatClock(seconds) {
   const s = Math.max(0, Math.floor(seconds));
   const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${String(sec).padStart(2, '0')}`;
+  return `${m}:${String(s % 60).padStart(2, '0')}`;
 }
 
-// A third player, deliberately — alongside VideoPlayer (VOD) and
-// LiveVideoPlayer (live broadcast). The channel shares a little with each
-// (VOD-hosted content like the former; ad breaks between "shows" like the
-// latter) but its actual state machine — "what should be on right now,
-// re-derived from the server on a timer" — doesn't belong wedged into
-// either.
-export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
+// Plays one channel the way a TV does: whatever is on right now, from
+// wherever it is right now, for everyone at the same time. Ads run for
+// every viewer here, subscribers included.
+//
+// The snapshot from /api/channel/now says WHAT is on; the playable URL for
+// it comes from /api/channel/play, which only ever signs the program that's
+// airing at that moment. A live broadcast on the channel takes over the
+// whole player.
+export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) {
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const adContainerRef = useRef(null);
   const hlsRef = useRef(null);
   const endTimer = useRef(null);
-  const safetyPoll = useRef(null);
+  const tunedKey = useRef(null);
+  const nowRef = useRef(initialNow);
 
-  const [state, setState] = useState(initialState);
+  const [now, setNow] = useState(initialNow);
+  const [screen, setScreen] = useState(null); // null | 'ad' | 'age' | 'off_air' | 'unavailable' | 'loading'
+  const [ageInfo, setAgeInfo] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
   const [volume, setVolume] = useState(1);
-  const [onAdBreak, setOnAdBreak] = useState(false);
   const [errored, setErrored] = useState(false);
   const [progressPct, setProgressPct] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
+  const [adCountdown, setAdCountdown] = useState(null);
 
-  const fetchState = useCallback(async () => {
+  const nowUrl = `/api/channel/now?channel=${encodeURIComponent(channelSlug)}`;
+
+  const updateNow = useCallback((fresh) => {
+    nowRef.current = fresh;
+    setNow(fresh);
+    if (onNowChange) onNowChange(fresh);
+  }, [onNowChange]);
+
+  const fetchNow = useCallback(async () => {
     try {
-      const res = await fetch('/api/channel/now');
-      const data = await res.json();
-      return data;
+      const res = await fetch(nowUrl);
+      return await res.json();
     } catch (err) {
       return null;
     }
-  }, []);
+  }, [nowUrl]);
 
-  const attachProgram = useCallback((program) => {
-    const v = videoRef.current;
-    if (!v || !program || !program.src) return;
-
+  function detachVideo() {
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
-    setErrored(false);
+    const v = videoRef.current;
+    if (v) {
+      v.pause();
+      v.removeAttribute('src');
+      v.load();
+    }
+  }
 
-    const isHls = program.src.includes('.m3u8');
-    const startPlayback = () => {
-      v.currentTime = program.offsetSeconds || 0;
+  function attachSrc(src, offsetSeconds) {
+    const v = videoRef.current;
+    if (!v || !src) return;
+    detachVideo();
+    setErrored(false);
+    const startedAt = Date.now();
+    const start = () => {
+      v.currentTime = (offsetSeconds || 0) + (Date.now() - startedAt) / 1000;
       v.play().catch(() => {
         v.muted = true;
         setMuted(true);
         v.play().catch(() => {});
       });
     };
-
-    if (isHls) {
+    if (src.includes('.m3u8')) {
       import('hls.js').then(({ default: Hls }) => {
         if (Hls.isSupported()) {
           const hls = new Hls();
-          hls.loadSource(program.src);
+          hls.loadSource(src);
           hls.attachMedia(v);
           hlsRef.current = hls;
-          hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
+          hls.on(Hls.Events.MANIFEST_PARSED, start);
           hls.on(Hls.Events.ERROR, (_e, data) => {
             if (data.fatal) setErrored(true);
           });
         } else {
-          v.src = program.src;
-          v.addEventListener('loadedmetadata', startPlayback, { once: true });
+          v.src = src;
+          v.addEventListener('loadedmetadata', start, { once: true });
         }
       });
     } else {
-      v.src = program.src;
-      v.addEventListener('loadedmetadata', startPlayback, { once: true });
-    }
-  }, []);
-
-  // Schedules the next "check what should be on" right as the current
-  // program is expected to end (plus a small buffer), rather than relying
-  // purely on this device's video 'ended' event — a program that was
-  // scheduled with a slightly-off runtime, or a viewer whose tab was
-  // throttled, would otherwise leave the channel showing the wrong thing
-  // for longer than necessary. Re-deriving from the server (not just
-  // advancing to "the next index" locally) is what keeps this
-  // self-correcting rather than accumulating drift over a long session.
-  const scheduleTransition = useCallback(
-    (program) => {
-      if (endTimer.current) clearTimeout(endTimer.current);
-      const remainingMs = Math.max(2000, (program.durationSeconds - program.offsetSeconds) * 1000 + 1500);
-      endTimer.current = setTimeout(async () => {
-        const fresh = await fetchState();
-        if (!fresh || !fresh.onAir) {
-          setState({ onAir: false });
-          return;
-        }
-        transitionTo(fresh);
-      }, remainingMs);
-    },
-    [fetchState]
-  );
-
-  async function transitionTo(fresh) {
-    setState(fresh);
-    // SECURITY/BILLING: same bug fixed on the main VOD player and Live TV
-    // — this checked only the channel's own ads_enabled setting, never
-    // whether the viewer is a subscriber or admin.
-    if (fresh.adsEnabled && !isSubscriber && !isAdmin) {
-      runAdBreak(() => {
-        attachProgram(fresh.program);
-        scheduleTransition(fresh.program);
-      });
-    } else {
-      attachProgram(fresh.program);
-      scheduleTransition(fresh.program);
+      v.src = src;
+      v.addEventListener('loadedmetadata', start, { once: true });
     }
   }
 
-  function runAdBreak(onDone) {
+  // Plays house ads back to back until `untilMs`, or once if untilMs is
+  // null (the short break between two programs). Falls back to a plain
+  // "ad break" card with a countdown if no ad can be shown.
+  function runAds(untilMs, onDone) {
     const v = videoRef.current;
-    if (!v) return onDone();
-    if (typeof window === 'undefined' || !window.google || !window.google.ima) return onDone();
-
-    setOnAdBreak(true);
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-    v.pause();
-
-    const google = window.google;
+    detachVideo();
+    setScreen('ad');
+    let finished = false;
     const finish = () => {
-      setOnAdBreak(false);
+      if (finished) return;
+      finished = true;
+      setScreen(null);
+      setAdCountdown(null);
       onDone();
     };
-    try {
-      const adDisplayContainer = new google.ima.AdDisplayContainer(adContainerRef.current, v);
-      adDisplayContainer.initialize();
-      const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
+    const tick = setInterval(() => {
+      if (untilMs) setAdCountdown(Math.max(0, (untilMs - Date.now()) / 1000));
+    }, 500);
+    const stopAt = untilMs ? setTimeout(() => { clearInterval(tick); finish(); }, Math.max(0, untilMs - Date.now())) : null;
 
-      adsLoader.addEventListener(
-        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-        (evt) => {
-          const adsManager = evt.getAdsManager(v);
-          const AdEvent = google.ima.AdEvent.Type;
-          adsManager.addEventListener(AdEvent.ALL_ADS_COMPLETED, finish);
-          adsManager.addEventListener(AdEvent.COMPLETE, finish);
-          adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => {
-            adsManager.destroy();
-            finish();
-          });
+    const playOne = () => {
+      if (finished) return;
+      if (!v || typeof window === 'undefined' || !window.google || !window.google.ima) {
+        if (!untilMs) { clearInterval(tick); finish(); }
+        return;
+      }
+      const google = window.google;
+      const afterAd = () => {
+        if (untilMs && Date.now() < untilMs - 5000) playOne();
+        else if (!untilMs) { clearInterval(tick); finish(); }
+      };
+      try {
+        const container = new google.ima.AdDisplayContainer(adContainerRef.current, v);
+        container.initialize();
+        const loader = new google.ima.AdsLoader(container);
+        loader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, (evt) => {
+          const mgr = evt.getAdsManager(v);
+          mgr.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, afterAd);
+          mgr.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => { mgr.destroy(); if (!untilMs) { clearInterval(tick); finish(); } });
           try {
-            adsManager.init(v.clientWidth, v.clientHeight, google.ima.ViewMode.NORMAL);
-            adsManager.start();
+            mgr.init(v.clientWidth, v.clientHeight, google.ima.ViewMode.NORMAL);
+            mgr.start();
           } catch (err) {
-            finish();
+            if (!untilMs) { clearInterval(tick); finish(); }
           }
-        },
-        false
-      );
-      adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, finish, false);
-
-      const adsRequest = new google.ima.AdsRequest();
-      adsRequest.adTagUrl =
-        process.env.NEXT_PUBLIC_AD_TAG_URL ||
-        (typeof window !== 'undefined' ? `${window.location.origin}${DEFAULT_AD_TAG_PATH}` : '');
-      adsRequest.linearAdSlotWidth = v.clientWidth || 640;
-      adsRequest.linearAdSlotHeight = v.clientHeight || 360;
-      adsLoader.requestAds(adsRequest);
-    } catch (err) {
-      finish();
-    }
+        }, false);
+        loader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => { if (!untilMs) { clearInterval(tick); finish(); } }, false);
+        const req = new google.ima.AdsRequest();
+        req.adTagUrl = process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}`;
+        req.linearAdSlotWidth = v.clientWidth || 640;
+        req.linearAdSlotHeight = v.clientHeight || 360;
+        loader.requestAds(req);
+      } catch (err) {
+        if (!untilMs) { clearInterval(tick); finish(); }
+      }
+    };
+    playOne();
+    return () => { clearInterval(tick); if (stopAt) clearTimeout(stopAt); };
   }
 
-  // Initial attach.
-  useEffect(() => {
-    if (!state.onAir) return;
-    attachProgram(state.program);
-    scheduleTransition(state.program);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // Tunes the player to whatever `state` says is on.
+  async function tune(state, { withBreak = false } = {}) {
+    const program = state && state.program;
+    if (!state || !state.onAir || state.live || !program) {
+      detachVideo();
+      tunedKey.current = state && state.live ? 'live' : null;
+      setScreen(state && state.live ? null : 'off_air');
+      return;
+    }
+    if (program.kind === 'ad_break') {
+      tunedKey.current = program.key;
+      runAds(new Date(program.endsAt).getTime(), () => {});
+      return;
+    }
+    setScreen('loading');
+    let play;
+    try {
+      const res = await fetch('/api/channel/play', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ channel: channelSlug })
+      });
+      play = await res.json();
+    } catch (err) {
+      play = null;
+    }
+    tunedKey.current = program.key;
+    if (!play || !play.src) {
+      detachVideo();
+      if (play && play.kind === 'age_restricted') {
+        setAgeInfo({ rating: play.rating, signedIn: play.signedIn });
+        setScreen('age');
+      } else {
+        setScreen('unavailable');
+      }
+      return;
+    }
+    const go = () => {
+      setScreen(null);
+      attachSrc(play.src, play.offsetSeconds);
+    };
+    if (withBreak) runAds(null, go);
+    else go();
+  }
 
-  // Safety-net poll — corrects drift rather than driving normal playback.
+  const scheduleNextCheck = useCallback((state) => {
+    if (endTimer.current) clearTimeout(endTimer.current);
+    if (!state || !state.program || !state.program.endsAt) return;
+    const ms = Math.max(2000, new Date(state.program.endsAt).getTime() - Date.now() + 1500);
+    endTimer.current = setTimeout(async () => {
+      const fresh = await fetchNow();
+      if (!fresh) return;
+      const prev = nowRef.current || {};
+      const changed = !fresh.program || !prev.program || fresh.program.key !== prev.program.key || !!fresh.live !== !!prev.live;
+      updateNow(fresh);
+      // A short ad break between two programs, like TV — but not right
+      // after a scheduled ad break, and not into one.
+      const withBreak = !!(fresh.program && fresh.program.kind !== 'ad_break' && prev.program && prev.program.kind !== 'ad_break');
+      if (changed) tune(fresh, { withBreak });
+      scheduleNextCheck(fresh);
+    }, ms);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchNow, updateNow]);
+
+  // Initial tune (no ad on tune-in).
   useEffect(() => {
-    safetyPoll.current = setInterval(async () => {
-      // A background tab shouldn't keep polling — one forgotten open tab
-      // otherwise generates invocations indefinitely.
+    tune(initialNow);
+    scheduleNextCheck(initialNow);
+    return () => {
+      if (endTimer.current) clearTimeout(endTimer.current);
+      detachVideo();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [channelSlug]);
+
+  // Safety net: notices a live broadcast starting/ending and corrects drift.
+  useEffect(() => {
+    const id = setInterval(async () => {
       if (typeof document !== 'undefined' && document.hidden) return;
-      if (!state.onAir || onAdBreak) return;
-      // A deliberate pause is expected to make the video "drift" from the
-      // live schedule almost immediately — the feed keeps advancing in
-      // real time while the paused video stays frozen. Without this
-      // check, transitionTo (which resumes playback as part of
-      // reattaching) would force the video back to playing within a poll
-      // cycle or two of the user pausing it, which is exactly the bug
-      // this is fixing rather than a deliberate design choice. Catching
-      // up to the correct live position now happens when the user
-      // presses play again instead (see togglePlay below).
+      if (screen === 'ad') return;
       const v = videoRef.current;
-      if (v && v.paused) return;
-      const fresh = await fetchState();
-      if (!fresh || !fresh.onAir || !fresh.program) return;
-      const drift = Math.abs(fresh.program.offsetSeconds - (state.program.offsetSeconds || 0));
-      if (fresh.program.scheduleId !== state.program.scheduleId || drift > 8) {
-        transitionTo(fresh);
+      if (v && v.paused && screen === null && !(nowRef.current && nowRef.current.live)) return; // a deliberate pause
+      const fresh = await fetchNow();
+      if (!fresh) return;
+      const cur = nowRef.current || {};
+      const changed = !!fresh.live !== !!cur.live ||
+        (fresh.program && cur.program ? fresh.program.key !== cur.program.key : !!fresh.program !== !!cur.program);
+      const drift = fresh.program && v && screen === null && !fresh.live ? Math.abs(fresh.program.offsetSeconds - v.currentTime) : 0;
+      if (changed || drift > 8) {
+        updateNow(fresh);
+        tune(fresh);
+        scheduleNextCheck(fresh);
       }
     }, SAFETY_POLL_MS);
-    return () => clearInterval(safetyPoll.current);
+    return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, onAdBreak]);
+  }, [screen]);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const onPlay = () => setPlaying(true);
     const onPause = () => setPlaying(false);
-    const onVol = () => {
-      setVolume(v.volume);
-      setMuted(v.muted);
-    };
+    const onVol = () => { setVolume(v.volume); setMuted(v.muted); };
     const onTime = () => {
-      if (state.program) {
-        setProgressPct(Math.min(100, (v.currentTime / state.program.durationSeconds) * 100));
-        setTimeRemaining(Math.max(0, state.program.durationSeconds - v.currentTime));
+      const p = nowRef.current && nowRef.current.program;
+      if (p && p.durationSeconds) {
+        setProgressPct(Math.min(100, (v.currentTime / p.durationSeconds) * 100));
+        setTimeRemaining(Math.max(0, p.durationSeconds - v.currentTime));
       }
     };
     v.addEventListener('play', onPlay);
@@ -250,21 +291,16 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
     };
   });
 
-  useEffect(() => {
-    return () => {
-      if (endTimer.current) clearTimeout(endTimer.current);
-      if (safetyPoll.current) clearInterval(safetyPoll.current);
-      if (hlsRef.current) hlsRef.current.destroy();
-    };
-  }, []);
-
   async function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
     if (v.paused) {
-      const fresh = await fetchState();
-      if (fresh && fresh.onAir && fresh.program) {
-        transitionTo(fresh);
+      // Resuming catches back up to where the channel is now.
+      const fresh = await fetchNow();
+      if (fresh) {
+        updateNow(fresh);
+        tune(fresh);
+        scheduleNextCheck(fresh);
       } else {
         v.play();
       }
@@ -290,17 +326,15 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
     else if (videoRef.current && videoRef.current.webkitEnterFullscreen) videoRef.current.webkitEnterFullscreen();
   }
 
-  if (!state.onAir) {
-    return (
-      <div className="ca-empty">
-        <b>Nothing is scheduled on the channel yet</b>
-        Check back later, or explore the free episodes on the homepage in the meantime.
-      </div>
-    );
+  if (now && now.live) {
+    // Everyone gets the broadcast's ad breaks on a channel.
+    return <LiveVideoPlayer key={now.live.id} stream={now.live} isSubscriber={false} isAdmin={false} />;
   }
 
+  const program = now && now.program;
+  const channelName = now && now.channel ? now.channel.name : '';
+
   return (
-    <>
     <div ref={shellRef} className="tp-player channel-player controls-on" onContextMenu={(e) => e.preventDefault()}>
       <video
         ref={videoRef}
@@ -308,45 +342,72 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
         playsInline
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
-        onClick={() => !onAdBreak && togglePlay()}
+        onClick={() => screen === null && togglePlay()}
         onContextMenu={(e) => e.preventDefault()}
       />
-      <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: onAdBreak ? 'auto' : 'none' }} />
+      <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: screen === 'ad' ? 'auto' : 'none' }} />
 
       <div className="live-badge channel-badge">
         <i className="live-dot" aria-hidden="true" />
-        {onAdBreak ? 'Ad break' : 'On the channel'}
+        {screen === 'ad' ? 'Ad break' : `On air · ${channelName}`}
       </div>
 
-      {errored && !onAdBreak && (
-        <div className="tp-error" role="alert">
-          <strong>Lost the connection.</strong>
-          <span>
-            <button type="button" onClick={() => attachProgram(state.program)} className="a11y-link">
-              Try reconnecting
-            </button>
+      {screen === 'ad' && (
+        <div className="tp-adbar">
+          <span className="tp-adbar-tag">Ad</span>
+          <span className="tp-adbar-note">
+            {adCountdown != null ? `Back to ${channelName} in ${formatClock(adCountdown)}` : `Back to ${channelName} right after this`}
           </span>
         </div>
       )}
 
-      {onAdBreak && (
-        <div className="tp-adbar">
-          <span className="tp-adbar-tag">Ad</span>
-          <span className="tp-adbar-note">Back to the channel right after this</span>
+      {screen && screen !== 'ad' && (
+        <div className="channel-card-screen" role="status">
+          {screen === 'loading' && <span>Tuning in…</span>}
+          {screen === 'off_air' && (
+            <>
+              <strong>{channelName} is off the air right now</strong>
+              <span>Check the guide for what&rsquo;s coming up.</span>
+            </>
+          )}
+          {screen === 'unavailable' && (
+            <>
+              <strong>{program ? program.title : 'This program'} can&rsquo;t play right now</strong>
+              <span>The channel moves on to the next program on schedule.</span>
+            </>
+          )}
+          {screen === 'age' && ageInfo && (
+            <>
+              <strong>Rated {ageInfo.rating}</strong>
+              <span>
+                {ageInfo.signedIn
+                  ? <>Add your age on your <Link href="/account">account page</Link> to watch this one.</>
+                  : <><Link href="/account">Sign in</Link> and add your age to watch this one.</>}
+              </span>
+              {program && program.endsAt && <span className="channel-card-sub">The channel moves on at {ptTime(program.endsAt)}.</span>}
+            </>
+          )}
         </div>
       )}
 
-      {!onAdBreak && (
+      {errored && screen === null && (
+        <div className="tp-error" role="alert">
+          <strong>Lost the connection.</strong>
+          <span>
+            <button type="button" onClick={() => tune(nowRef.current)} className="a11y-link">Try reconnecting</button>
+          </span>
+        </div>
+      )}
+
+      {screen !== 'ad' && (
         <div className="tp-controls">
-          {/* Read-only — no seeking. This is meant to feel like tuning
-              into a channel, not browsing a video. */}
           <div className="tp-scrub channel-scrub" aria-hidden="true">
             <div className="tp-track">
-              <div className="tp-track-played" style={{ width: `${progressPct}%` }} />
+              <div className="tp-track-played" style={{ width: `${screen === null ? progressPct : 0}%` }} />
             </div>
           </div>
           <div className="tp-buttons">
-            <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
+            <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'} disabled={screen !== null}>
               {playing ? <PauseIcon src={iconOverrides.pause} /> : <PlayIcon src={iconOverrides.play} />}
             </button>
             <div className="tp-volume">
@@ -364,51 +425,11 @@ export default function ChannelPlayer({ initialState, isSubscriber, isAdmin }) {
                 aria-label="Volume"
               />
             </div>
-            <button className="tp-btn" onClick={toggleFullscreen} aria-label="Fullscreen">
-              ⤢
-            </button>
+            {screen === null && timeRemaining != null && <span className="channel-time-left">{formatClock(timeRemaining)} left</span>}
+            <button className="tp-btn" onClick={toggleFullscreen} aria-label="Fullscreen">⤢</button>
           </div>
         </div>
       )}
     </div>
-
-    {state.onAir && state.program && (
-      <div className="player-meta">
-        <span>
-          Playing now — {state.program.title}
-          {timeRemaining != null && ` · ${formatClock(timeRemaining)} left`}
-        </span>
-        {state.next && <span>Up next: {state.next.title}</span>}
-      </div>
-    )}
-
-    <div className="now-heading">
-      <div className="eyebrow">The channel</div>
-      <h1>{state.onAir ? state.program.title : SITE.name}</h1>
-      {state.onAir && (
-        <div className="hero-meta" style={{ margin: '0.4rem 0 0.7rem' }}>
-          <span className={`ca-tier ${tierBadge(state.program.tier, state.adsEnabled).key}`}>
-            {tierBadge(state.program.tier, state.adsEnabled).label}
-          </span>
-          {(state.program.genre || state.program.releaseYear || state.program.runtime) && (
-            <>
-              <span className="hero-meta-dot">&bull;</span>
-              <span>
-                {[state.program.genre, state.program.releaseYear, formatRuntimeLong(state.program.runtime) || state.program.runtime]
-                  .filter(Boolean).join(' \u00b7 ')}
-              </span>
-            </>
-          )}
-          {state.program.rating && (
-            <>
-              <span className="hero-meta-dot">&bull;</span>
-              <span className="hero-rating-tag">{state.program.rating}</span>
-            </>
-          )}
-        </div>
-      )}
-      {state.onAir && state.program.description && <p>{state.program.description}</p>}
-    </div>
-    </>
   );
 }

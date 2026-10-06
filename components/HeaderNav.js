@@ -130,7 +130,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const currentTypeParam = currentPath === '/type/[type]' ? router.query.type : null;
   const isWishlistPage = currentPath === '/wishlist';
   const isRecsPage = currentPath === '/recs';
-  const isChannelPage = currentPath === '/channel';
+  const isChannelPage = currentPath === '/live' || currentPath.startsWith('/live/');
   const isPitchesPage = currentPath === '/pitches' || currentPath === '/pitches/[id]';
   // Distinguishes the zine-style homepage (/, community/discovery — pitches,
   // profiles, creator tools, everything that isn't the watch library) from
@@ -223,7 +223,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               everything else here now — same fix as Vertical/Podcasts
               above, see that comment for why. */}
           {siteSettings && siteSettings.liveTvEnabled !== false && (
-            <Link href="/channel" className={`nav-link nav-link-live ${isChannelPage ? 'active' : ''}`}>
+            <Link href="/live" className={`nav-link nav-link-live ${isChannelPage ? 'active' : ''}`}>
               <i className="live-dot" aria-hidden="true" />
               Live TV
             </Link>
@@ -263,7 +263,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             {isSignedIn && <Link href="/recs" className="dropdown-item" onClick={() => setOpenMenu(null)}>My Recs</Link>}
             {/* Pitch Room moved into typeLinks above — Connect-side only now. */}
             {siteSettings && siteSettings.liveTvEnabled !== false && (
-              <Link href="/channel" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
+              <Link href="/live" className="dropdown-item" onClick={() => setOpenMenu(null)}>Live TV</Link>
             )}
             {siteSettings && siteSettings.shopEnabled && siteSettings.shopUrl && (
               <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="dropdown-item">Shop</a>

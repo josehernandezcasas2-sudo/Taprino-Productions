@@ -24,10 +24,10 @@ export async function getServerSideProps({ req, res }) {
   const episodes = await getPublicEpisodes();
   return {
     props: {
-      // Only free-tier episodes can go on the channel — see
-      // lib/channelSchedule.js for why this is enforced server-side too,
+      // Any tier can air on a channel (premium with ads); the server
+      // rejects anything not opted in to channels by its creator,
       // not just filtered here for display.
-      availableEpisodes: episodes.filter((e) => e.tier === 'free'),
+      availableEpisodes: episodes,
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
@@ -109,25 +109,6 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
     }
   }
 
-  async function toggleAds() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/admin/channel/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adsEnabled: !settings.ads_enabled })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setSettings(data.settings);
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function restart() {
     if (!window.confirm('Restart the channel from the top of the schedule?')) return;
     setBusy(true);
@@ -170,10 +151,10 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
-            <h1>Channel schedule</h1>
+            <h1>TapaTV loop</h1>
             <p className="ca-sub">
-              A looping, free-tier-only playlist that plays continuously at{' '}
-              <Link href="/channel">/channel</Link> — like a TV channel, not on-demand.
+              The playlist that fills any time TapaTV&rsquo;s schedule leaves open at{' '}
+              <Link href="/live">/live</Link>. Only titles their creators opted in to channels can be added.
             </p>
           </div>
           <Link href="/admin" className="library-back">← Back to admin</Link>
@@ -191,10 +172,9 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
         {settings && (
           <div className="house-ad-notice" style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
             <span style={{ flex: 1 }}>
-              Ads between programs are <strong>{settings.ads_enabled ? 'on' : 'off'}</strong>. Loop started{' '}
+              Ads run between programs for every viewer. Loop started{' '}
               {new Date(settings.loop_started_at).toLocaleString()}.
             </span>
-            <button onClick={toggleAds} disabled={busy}>{settings.ads_enabled ? 'Turn ads off' : 'Turn ads on'}</button>
             <button onClick={restart} disabled={busy}>Restart from the top</button>
           </div>
         )}
@@ -241,14 +221,14 @@ export default function ChannelAdmin({ availableEpisodes, mainGenres, isSignedIn
         )}
 
         <button className="account-btn-primary" onClick={() => setPickerOpen((p) => !p)} style={{ marginTop: '1.2rem' }}>
-          {pickerOpen ? 'Close' : '+ Add an episode to the schedule'}
+          {pickerOpen ? 'Close' : '+ Add an episode to the loop'}
         </button>
 
         {pickerOpen && (
           <div className="house-ad-form-wrap" style={{ marginTop: '0.8rem' }}>
             {pickable.length === 0 ? (
               <p className="ca-sub" style={{ margin: 0 }}>
-                Every free-tier episode is already on the schedule.
+                Every episode is already in the loop.
               </p>
             ) : (
               <div className="house-ad-list">

@@ -7555,3 +7555,93 @@ body:has(.mini-player) { padding-bottom: 72px; }
   font-size: 0.9rem;
   text-decoration: none;
 }
+
+/* ===================================================================
+   Live channels (/live) — channel list, player + info panel, TV guide
+   =================================================================== */
+.tv-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 1.2rem; margin-top: 1rem; }
+.tv-main { min-width: 0; }
+
+.tv-dial { display: flex; flex-direction: column; gap: 0.4rem; background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 0.7rem; align-self: start; }
+.tv-dial-label { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); padding: 0.2rem 0.4rem 0.4rem; }
+.tv-ch { display: grid; grid-template-columns: 2.4rem auto 1fr; align-items: center; gap: 0.6rem; padding: 0.6rem; border-radius: 8px; border: 1px solid transparent; color: var(--ink); text-decoration: none; }
+.tv-ch:hover { background: var(--surface-2); }
+.tv-ch.active { background: var(--surface-2); border-color: var(--brass); }
+.tv-ch-num { font-family: var(--font-mono); font-size: 1.2rem; color: var(--ink-faint); text-align: center; font-variant-numeric: tabular-nums; }
+.tv-ch.active .tv-ch-num { color: var(--brass); }
+.tv-ch-logo { width: 28px; height: 28px; border-radius: 6px; object-fit: cover; }
+.tv-ch-text { min-width: 0; display: flex; flex-direction: column; }
+.tv-ch-name { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; line-height: 1.2; }
+.tv-ch-now { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-dial-keys { display: flex; gap: 0.4rem; padding-top: 0.4rem; }
+.tv-key { flex: 1; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 8px; padding: 0.35rem; font-family: var(--font-mono); font-size: 0.72rem; }
+.tv-key:hover { background: var(--surface-3); }
+
+.tv-stage { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 1rem; align-items: start; }
+.tv-player { margin: 0; }
+.tv-player .tp-player.channel-player { height: auto; aspect-ratio: 16 / 9; }
+.tv-player .tp-player.channel-player.is-fullscreen { height: 100%; aspect-ratio: auto; }
+
+.channel-card-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; text-align: center; padding: 1.5rem; background: radial-gradient(120% 90% at 20% 15%, var(--surface-3), transparent 60%), var(--surface-0); color: var(--ink-dim); font-size: 0.92rem; z-index: 2; }
+.channel-card-screen strong { font-family: var(--font-display); color: var(--ink); font-size: 1.15rem; }
+.channel-card-screen a { color: var(--olive-bright); }
+.channel-card-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); }
+.channel-time-left { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); margin-left: auto; margin-right: 0.6rem; }
+
+.tv-info { background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.tv-info h2 { font-family: var(--font-display); font-size: 1.35rem; margin: 0; text-wrap: balance; }
+.tv-info p { margin: 0; color: var(--ink-dim); font-size: 0.95rem; }
+.tv-info-eyebrow { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); display: flex; align-items: center; gap: 0.5rem; }
+.tv-info-sub { font-family: var(--font-display); font-size: 0.95rem; color: var(--ink-dim); }
+.tv-info-when { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-dim); }
+.tv-info-acts { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.2rem; }
+.tv-live-pill { background: var(--brass); color: #1b0a0e; border-radius: 4px; padding: 0.05rem 0.4rem; font-weight: 600; }
+.tv-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; }
+.tv-chip { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.12rem 0.45rem; border-radius: 4px; background: var(--surface-3); color: var(--ink-dim); }
+.tv-chip.free { background: rgba(132, 205, 152, 0.18); color: var(--ok); }
+.tv-chip.prem { background: rgba(248, 95, 115, 0.16); color: var(--brass); }
+.tv-upnext { border-top: 1px solid var(--ocean-ink); padding-top: 0.7rem; margin-top: 0.3rem; display: grid; gap: 0.35rem; }
+.tv-upnext-row { display: flex; justify-content: space-between; gap: 0.6rem; font-size: 0.88rem; }
+.tv-upnext-time { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); flex: none; }
+
+.tv-guide { margin-top: 1.2rem; background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 0.9rem; }
+.tv-guide-head { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
+.tv-guide-head h2 { font-family: var(--font-display); font-size: 1.05rem; margin: 0; }
+.tv-guide-days { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.tv-day { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink-dim); border-radius: 999px; padding: 0.25rem 0.7rem; font-family: var(--font-mono); font-size: 0.68rem; }
+.tv-day.active { background: var(--ink); color: var(--surface-0); border-color: var(--ink); }
+.tv-guide-scroll { overflow-x: auto; }
+.tv-guide-grid { position: relative; }
+.tv-guide-times { display: flex; font-family: var(--font-mono); font-size: 0.64rem; color: var(--ink-faint); padding-bottom: 0.3rem; }
+.tv-guide-times span { flex: none; border-left: 1px solid var(--ocean-ink); padding-left: 0.3rem; }
+.tv-guide-track { position: relative; height: 64px; background: var(--surface-0); border-radius: 6px; }
+.tv-blk { position: absolute; top: 4px; bottom: 4px; border-radius: 5px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); padding: 0.35rem 0.5rem; text-align: left; overflow: hidden; display: flex; flex-direction: column; justify-content: center; min-width: 0; cursor: pointer; }
+.tv-blk:hover { background: var(--surface-3); }
+.tv-blk b { font-family: var(--font-display); font-size: 0.8rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-blk small { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tv-blk.now { border-color: var(--brass); }
+.tv-blk.past { opacity: 0.55; }
+.tv-blk.selected { outline: 2px solid var(--ink); outline-offset: 1px; }
+.tv-blk.k-live_slot { background: linear-gradient(90deg, rgba(248, 95, 115, 0.22), rgba(248, 95, 115, 0.08)); border-color: var(--brass); }
+.tv-blk.k-ad_break { background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--surface-1) 6px 12px); }
+.tv-blk.k-loop, .tv-blk.k-off_air { background: repeating-linear-gradient(135deg, rgba(231, 162, 85, 0.1) 0 6px, transparent 6px 12px); border-style: dashed; border-color: var(--olive-deep); }
+.tv-blk.k-loop b { color: var(--olive); }
+.tv-nowline { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--brass); pointer-events: none; z-index: 2; }
+.tv-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); margin-top: 0.7rem; align-items: center; }
+.tv-legend i { display: inline-block; width: 18px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 0.35rem; border: 1px solid var(--ocean-ink); }
+.tv-legend .lg-show { background: var(--surface-2); }
+.tv-legend .lg-live { background: rgba(248, 95, 115, 0.3); border-color: var(--brass); }
+.tv-legend .lg-ads { background: repeating-linear-gradient(135deg, var(--surface-2) 0 3px, var(--surface-1) 3px 6px); }
+.tv-legend .lg-loop { background: repeating-linear-gradient(135deg, rgba(231, 162, 85, 0.3) 0 3px, transparent 3px 6px); border-style: dashed; }
+.tv-legend-tz { margin-left: auto; }
+
+@media (max-width: 1000px) {
+  .tv-stage { grid-template-columns: 1fr; }
+}
+@media (max-width: 760px) {
+  .tv-layout { grid-template-columns: 1fr; }
+  .tv-dial { flex-direction: row; overflow-x: auto; padding: 0.5rem; }
+  .tv-dial-label, .tv-dial-keys { display: none; }
+  .tv-ch { flex: none; grid-template-columns: auto auto auto; }
+  .tv-ch-now { max-width: 9rem; }
+}

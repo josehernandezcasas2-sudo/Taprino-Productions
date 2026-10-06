@@ -1,22 +1,20 @@
-import { getChannelState } from '../../../lib/channelSchedule';
+import { getChannelNow } from '../../../lib/channelEngine';
+import { resolvePublicChannel } from '../../../lib/channelRequest';
 
-// Public, no auth — same trust level as the /channel page itself. Polled
-// by ChannelPlayer both periodically (a safety net against drift) and
-// specifically timed to fire right as the current program is expected to
-// end, so the switch to the next one is prompt rather than waiting for the
-// next slow poll.
+// Public, no auth: what's airing on a channel right now. Same answer for
+// every viewer and never contains a playable URL (see /api/channel/play),
+// so a short CDN cache is safe. Polled by the channel player, and fired
+// right as the current program is due to end.
 export default async function handler(req, res) {
-  // Polled by every viewer on /channel, and the response is identical for
-  // all of them — no auth, no per-user data. A 10-second CDN cache means a
-  // hundred concurrent viewers cost one invocation per 10s instead of a
-  // hundred. Short enough that a program change still lands promptly, and
-  // the player re-derives its own position from serverTime regardless.
-  res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+  res.setHeader('Access-Control-Allow-Origin', '*');
   try {
-    const state = await getChannelState(new Date());
+    const channel = await resolvePublicChannel(req.query.channel);
+    if (!channel) return res.status(404).json({ error: 'No such channel.' });
+    const state = await getChannelNow(channel, new Date());
+    res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
     return res.status(200).json(state);
   } catch (err) {
     console.error('channel/now error:', err.message);
-    return res.status(200).json({ onAir: false, serverTime: new Date().toISOString() });
+    return res.status(200).json({ onAir: false, serverTime: new Date().toISOString(), error: 'unavailable' });
   }
 }

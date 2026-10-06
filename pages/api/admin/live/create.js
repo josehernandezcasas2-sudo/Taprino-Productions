@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const { title, description, genre, adsEnabled, adBreakSeconds } = req.body || {};
+  const { title, description, genre, adsEnabled, adBreakSeconds, channelId } = req.body || {};
   if (!title || !title.trim()) {
     return res.status(400).json({ error: 'Give the stream a title.' });
   }
@@ -32,6 +32,12 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
+  // Every broadcast airs on a channel; the main channel (CH 01) unless one is picked.
+  let targetChannelId = channelId || null;
+  if (!targetChannelId) {
+    const { data: main } = await supabase.from('channels').select('id').order('number', { ascending: true }).limit(1).maybeSingle();
+    targetChannelId = main ? main.id : null;
+  }
   const { data, error } = await supabase
     .from('live_streams')
     .insert({
@@ -41,7 +47,8 @@ export default async function handler(req, res) {
       cloudflare_uid: liveInput.uid,
       ads_enabled: adsEnabled !== false,
       ad_break_seconds: adBreakSeconds ? Math.max(120, Number(adBreakSeconds)) : 600,
-      created_by: userId
+      created_by: userId,
+      channel_id: targetChannelId
     })
     .select()
     .single();

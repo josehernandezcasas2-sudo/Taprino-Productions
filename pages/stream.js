@@ -18,7 +18,6 @@ import InstallButton from '../components/InstallButton';
 import Link from 'next/link';
 import HeaderNav from '../components/HeaderNav';
 import { getCurrentLiveStream } from '../lib/liveStreams';
-import { getChannelState } from '../lib/channelSchedule';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
@@ -59,11 +58,10 @@ export async function getServerSideProps({ req, res }) {
   // compute bills for exactly that: how long the function is active,
   // including time spent awaiting a response.
   const needsViewCounts = isRedisConfigured();
-  const [episodesWithBonus, allSeries, liveStream, channelState, account, viewCountsResult, lifecycleSettings] = await Promise.all([
+  const [episodesWithBonus, allSeries, liveStream, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getCurrentLiveStream(),
-    getChannelState(),
     getAccountContext(req),
     needsViewCounts ? getViewCounts() : Promise.resolve(null),
     getLifecycleSettings()
@@ -128,7 +126,6 @@ export async function getServerSideProps({ req, res }) {
   return {
     props: {
       liveStream,
-      channelOnAir: channelState.onAir ? { title: channelState.program.title } : null,
       isSubscriber: account.isSubscriber,
       isSignedIn: account.isSignedIn,
       showNewsletterPanel,
@@ -147,7 +144,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function Home({ liveStream, channelOnAir, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching, viewCounts }) {
+export default function Home({ liveStream, isSubscriber, isSignedIn, showNewsletterPanel, heroPool, wishlist, email, episodes, allSeries, isAdmin, isCreator, newReleases, leavingSoon, continueWatching, viewCounts }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();

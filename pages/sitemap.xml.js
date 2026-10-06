@@ -12,7 +12,6 @@ function buildSitemap(origin, episodes, series, genres) {
     { path: '/about', priority: '0.6', freq: 'monthly' },
     { path: '/contact', priority: '0.6', freq: 'monthly' },
     { path: '/apply', priority: '0.7', freq: 'monthly' },
-    { path: '/channel', priority: '0.7', freq: 'hourly' },
     { path: '/live', priority: '0.6', freq: 'hourly' },
     { path: '/terms', priority: '0.3', freq: 'yearly' },
     { path: '/privacy', priority: '0.3', freq: 'yearly' },
