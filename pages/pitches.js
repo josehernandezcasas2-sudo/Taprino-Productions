@@ -152,7 +152,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         <div style={{ margin: '1rem 0 1.4rem' }}>
           <Link href="/pitches/discover" className="account-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', width: 'auto', textDecoration: 'none' }}>
             <SwipeDeckIcon size={18} src={iconOverrides.pitch_swipe} />
-            Discover — swipe through ideas
+            Discover — ride through ideas
           </Link>
         </div>
 

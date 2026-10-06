@@ -32,24 +32,37 @@ export default async function handler(req, res) {
         deckIds: data.deck_ids || [],
         secondChanceIds: data.second_chance_ids || [],
         round: data.round || 1,
-        likedIds: data.liked_ids || []
+        likedIds: data.liked_ids || [],
+        floorIndex: Number.isInteger(data.floor_index) ? data.floor_index : 0
       }
     });
   }
 
   if (req.method === 'POST') {
-    const { deckIds, secondChanceIds, round, likedIds } = req.body || {};
+    const { deckIds, secondChanceIds, round, likedIds, floorIndex } = req.body || {};
     if (!Array.isArray(deckIds) || !Array.isArray(secondChanceIds) || !Array.isArray(likedIds)) {
       return res.status(400).json({ error: 'deckIds, secondChanceIds, and likedIds must be arrays.' });
     }
-    const { error } = await supabase.from('pitch_swipe_progress').upsert({
+    const row = {
       user_id: userId,
       deck_ids: deckIds,
       second_chance_ids: secondChanceIds,
       round: round === 2 ? 2 : 1,
       liked_ids: likedIds,
       updated_at: new Date().toISOString()
-    });
+    };
+    // Only the website's elevator sends floorIndex (it keeps the whole
+    // ordered deck and a position in it; the mobile swipe deck still
+    // sends just the cards ahead of you). Written only when present so
+    // the mobile app isn't affected by the floor_index column from
+    // migration 073 either way.
+    if (floorIndex !== undefined) {
+      if (!Number.isInteger(floorIndex) || floorIndex < 0) {
+        return res.status(400).json({ error: 'floorIndex must be a non-negative integer.' });
+      }
+      row.floor_index = floorIndex;
+    }
+    const { error } = await supabase.from('pitch_swipe_progress').upsert(row);
     if (error) {
       console.error('pitch-swipe-progress POST error:', error.message);
       return res.status(500).json({ error: 'Could not save your progress.' });

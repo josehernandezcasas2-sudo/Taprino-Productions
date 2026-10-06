@@ -5882,11 +5882,11 @@ body:has(.mini-player) { padding-bottom: 72px; }
 }
 
 /* ============================================================
-   Pitch Room "Discover" swipe deck (pages/pitches/discover.js,
-   components/PitchSwipeCard.js)
+   Pitch Room "Discover" elevator (pages/pitches/discover.js,
+   components/PitchElevator.js)
    ============================================================ */
 /* Full-screen takeover, same idea as .reel-feed (vertical discover) —
-   no HeaderNav/Footer, just the swipe deck centered in the viewport with
+   no HeaderNav/Footer, just the elevator centered in the viewport with
    the tab bar still visible at the bottom. A fixed "×" stands in for
    HeaderNav's back link (same smart-back behavior, see useSmartBack). */
 .pitch-discover-stage {
@@ -5949,14 +5949,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .pitch-discover-banner { max-width: 420px; }
 
 /* width:100% here matters more than it looks like it should — without
-   it, .swipe-card-stack's own width:100% (needed for its max-width to
+   it, .elev-stage's own width:100% (needed for its max-width to
    ever mean anything) has nothing definite to resolve against: this
-   wrap has no explicit width of its own, and its only other child
-   (.swipe-card, inside the stack) is position:absolute, so it
-   contributes no in-flow content either for the browser to size this
+   wrap has no explicit width of its own, and the car's contents
+   (everything inside .elev-cab) are position:absolute, so they
+   contribute no in-flow content either for the browser to size this
    from. The two compound into a circular "shrink to fit content that
    has no fittable size" that quietly settled around a few hundred
-   pixels regardless of .swipe-card-stack's own max-width — invisible
+   pixels regardless of .elev-stage's own max-width — invisible
    on a phone, where that accidental size happened to look plausible
    anyway, but a badly undersized card on anything wider. */
 /* flex:1 fills the whole stage (the banner slot above is position:
@@ -5989,350 +5989,206 @@ body:has(.mini-player) { padding-bottom: 72px; }
   margin-bottom: 0.8rem;
 }
 
-.swipe-card-stack {
+/* ---- The elevator (components/PitchElevator.js) ----
+   Steel tones are hue-biased toward --ocean-ink rather than neutral greys
+   so the cab reads as part of the same navy world as the rest of the
+   site; --elev-lamp is the illuminated button ring and floor display,
+   the same amber the site already uses for its signal/tier accents.
+   --elev-door-ms mirrors DOOR_MS in PitchElevator.js — keep in sync. */
+.elev-stage {
+  --elev-steel-0: #1a2338; --elev-steel-1: #2b3852; --elev-steel-2: #3d4b6a; --elev-steel-3: #5a6a8d; --elev-steel-hi: #8c9bbd;
+  --elev-lamp: var(--olive); --elev-lamp-glow: rgba(231, 162, 85, 0.55);
+  --elev-door-ms: 480ms; --elev-flip-ms: 520ms;
   position: relative;
   width: 100%;
-  max-width: 360px;
-  aspect-ratio: 3 / 4.6;
-  /* Caps height (and, through aspect-ratio, width along with it) to a
-     share of the viewport, independent of .swipe-deck-wrap's own
-     banner-clearance padding — this is just a sanity limit so the card
-     can't grow absurdly tall on a very tall/ultrawide desktop screen
-     even with no banner at all, not the thing keeping it clear of a
-     banner (that's --pitch-banner-clearance's job). Scales down
-     naturally on a short viewport too (a laptop in a small window, a
-     phone in landscape), not just up on a tall one. */
-  max-height: 72vh;
-}
-
-.swipe-card {
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  box-shadow: 0 18px 40px rgba(0,0,0,0.45);
-  cursor: grab;
-  user-select: none;
-  /* Without this, a touch device tries to scroll/pan the page as soon as
-     a finger moves — fighting the pointermove-based drag tracking below
-     instead of letting this element own the gesture entirely. */
-  touch-action: none;
-  will-change: transform;
-}
-.swipe-card:active { cursor: grabbing; }
-/* perspective used to live on .swipe-card itself, but that's also the
-   element carrying the drag gesture's own constantly-changing inline
-   transform (translate/rotate) plus will-change:transform — on Safari,
-   an element that establishes a 3D perspective context AND has its own
-   animated transform + will-change can get promoted to a compositing
-   layer in a way that breaks backface-visibility for everything inside
-   it, which is almost certainly why .swipe-card-face's own backface-
-   visibility fix alone wasn't enough: correctly hiding the rotated-away
-   face requires the perspective context itself to be stable, not just
-   the thing being hidden. Perspective now lives on this separate,
-   never-transformed wrapper instead. */
-.swipe-card-perspective {
-  position: absolute;
-  inset: 0;
-  perspective: 1400px;
-  -webkit-perspective: 1400px;
-}
-.swipe-card-behind {
-  position: absolute;
-  inset: 0.6rem 0.9rem;
-  border-radius: 18px;
-  background-color: var(--surface-2, #221c11);
-  background-size: cover;
-  background-position: center;
-  filter: brightness(0.6);
-  z-index: -1;
-  pointer-events: none;
-}
-
-/* The flip — a tap toggles .flipped (see TAP_THRESHOLD in
-   PitchSwipeCard.js), rotating this inner wrapper 180° while each face
-   stays flat and hides itself once it's rotated away from the viewer.
-   Independent of .swipe-card's own drag transform (translate/rotate for
-   the swipe gesture), so dragging feels identical on either face. */
-.swipe-card-flip-inner {
-  position: absolute;
-  inset: 0;
-  transform-style: preserve-3d;
-  -webkit-transform-style: preserve-3d;
-  transition: transform 0.5s cubic-bezier(0.4, 0.1, 0.2, 1);
-}
-.swipe-card-flip-inner.flipped { transform: rotateY(180deg); }
-/* Only backface-visibility + the 3D rotation live here — deliberately
-   NOT border-radius/overflow (see .swipe-card-front-surface/.swipe-
-   card-back-surface below for why they're split out onto a separate
-   element instead of just being added to this one). */
-.swipe-card-face {
-  position: absolute;
-  inset: 0;
-  backface-visibility: hidden;
-}
-.swipe-card-front { -webkit-backface-visibility: hidden; }
-.swipe-card-back {
-  transform: rotateY(180deg);
-  -webkit-backface-visibility: hidden;
-}
-/* The actual visible surface of each face — split out from .swipe-
-   card-face itself because Safari has a long-standing, well-documented
-   bug where backface-visibility:hidden silently stops working on an
-   element that ALSO has overflow:hidden + border-radius on it, on at
-   least some iOS versions. When it misfires, the face that's supposed
-   to be rotated away and hidden instead renders through — mirrored,
-   since it's turned 180° — on top of the visible one, which is exactly
-   what showed up on a real phone as garbled, overlapping, upside-down
-   text despite looking completely correct in every desktop-browser
-   test this was verified with. Keeping backface-visibility on a plain
-   box with nothing else on it, and moving the overflow/radius/
-   background to this separate absolutely-positioned child instead, is
-   the standard workaround. */
-.swipe-card-front-surface, .swipe-card-back-surface {
-  position: absolute;
-  inset: 0;
-  border-radius: 18px;
-  overflow: hidden;
-  background-color: var(--surface-2, #221c11);
-  /* Belt-and-suspenders alongside .swipe-card-face's own — a rotated-
-     away face bleeding through was reproducible even with .swipe-card-
-     face's backface-visibility correctly separated from overflow/
-     radius, which turned out to trace back to .swipe-card-perspective
-     (see its own comment) rather than this element specifically. Costs
-     nothing to also set it here. */
-  backface-visibility: hidden;
-  -webkit-backface-visibility: hidden;
-}
-.swipe-card-front-surface {
-  background-size: cover;
-  background-position: center;
-}
-.swipe-card-back-surface {
+  max-width: 400px;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
-}
-.swipe-card-flip-hint {
-  position: absolute;
-  top: 0.9rem;
-  right: 1rem;
-  z-index: 2;
-  display: flex;
   align-items: center;
-  gap: 0.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.04em;
-  color: rgba(251, 232, 211, 0.75);
-  background: rgba(0, 0, 0, 0.35);
-  padding: 0.25rem 0.55rem;
-  border-radius: 999px;
-  pointer-events: none;
-  opacity: 1;
-  transition: opacity 0.15s ease;
+  gap: 0.7rem;
 }
-/* Shares the top-right corner with .swipe-badge-nope (both anchor near
-   top:1.6rem/right:1.4rem) — faded out instead of repositioned, so this
-   stays correct regardless of which badge (like/nope/skip) is actually
-   showing at a given moment during the drag. */
-.swipe-card-flip-hint-hidden { opacity: 0; }
-.swipe-card-back-btn {
-  position: absolute;
-  top: 0.9rem;
-  left: 1rem;
-  z-index: 2;
-  display: flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-family: var(--font-mono);
-  font-size: 0.64rem;
-  letter-spacing: 0.04em;
-  color: var(--ink);
-  background: rgba(0, 0, 0, 0.35);
-  border: none;
-  padding: 0.3rem 0.6rem 0.3rem 0.5rem;
-  border-radius: 999px;
-  cursor: pointer;
-}
-.swipe-card-back-btn:hover { background: rgba(0, 0, 0, 0.5); }
-.swipe-card-back-body {
-  width: 100%;
-  /* min-height:0 overrides the flex default of auto, which would
-     otherwise let this refuse to shrink below its own content's natural
-     height inside .swipe-card-back's column flex — without it, a long
-     description could push past max-height instead of actually
-     scrolling within it. */
-  min-height: 0;
-  max-height: 100%;
-  overflow-y: auto;
-  /* Lets a touch that starts on this element pan it vertically instead
-     of being claimed by .swipe-card's own touch-action:none (there for
-     the drag-to-swipe gesture) — paired with the matching skip in
-     PitchSwipeCard.js's handlePointerDown, which stops this element's
-     touches from ALSO being read as a card drag at the same time. */
-  touch-action: pan-y;
-}
-/* Compound selector, not just .swipe-card-back-body — this element
-   carries both classes (className="swipe-card-body swipe-card-back-
-   body"), and .swipe-card-body's own padding rule below shares this
-   class's exact specificity but comes later in the file, so a plain
-   .swipe-card-back-body { padding-top: ... } here was silently losing
-   to it. The extra top padding clears .swipe-card-back-btn, which sits
-   absolutely positioned over this same corner. */
-.swipe-card-body.swipe-card-back-body { padding-top: 2.6rem; }
-/* .pitch-tag is shared with poster-overlay badges elsewhere (hence its
-   own position:absolute; top:0.6rem; left:0.6rem) — an absolutely
-   positioned element's offsets are measured from its containing
-   block's PADDING edge, not its content edge, so no amount of
-   padding-top up there actually moves it: it was landing at a fixed
-   spot regardless, which happened to be directly on .swipe-card-back-
-   btn. Simplest fix is to stop it from being absolutely positioned
-   here at all — flow it normally as plain content above the title,
-   which is what it visually reads as anyway. */
-.swipe-card-back-body .pitch-tag {
-  position: static;
-  display: inline-block;
-  margin-bottom: 0.5rem;
-}
-.swipe-card-description {
-  font-size: 0.86rem;
-  color: var(--ink);
-  opacity: 0.9;
-  line-height: 1.5;
-  margin: 0 0 0.9rem;
-}
-.swipe-card-funding { margin-bottom: 0.7rem; }
-.swipe-card-funding span { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); }
-.swipe-card-deadline { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); margin-bottom: 0.9rem; }
-.swipe-card-team { display: flex; flex-direction: column; gap: 0.3rem; margin-bottom: 1rem; }
-.swipe-card-team-member { font-size: 0.78rem; color: var(--ink-dim); }
-
-.swipe-card-scrim {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(to top, rgba(10,10,14,0.94) 0%, rgba(10,10,14,0.55) 42%, rgba(10,10,14,0.05) 75%);
-  pointer-events: none;
-}
-.swipe-card-body {
-  position: absolute;
-  left: 0; right: 0; bottom: 0;
-  padding: 1.2rem 1.3rem 1.4rem;
-  text-align: left;
-}
-.swipe-card-body h2 {
-  font-family: var(--font-body);
-  font-size: 1.5rem;
-  margin: 0.4rem 0 0.5rem;
-  color: var(--ink);
-}
-.swipe-card-logline {
-  font-size: 0.92rem;
-  color: var(--ink);
-  opacity: 0.92;
-  margin: 0 0 0.5rem;
-  line-height: 1.4;
-}
-.swipe-card-creator { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); margin-bottom: 0.7rem; }
-.swipe-card-creator-link { display: block; text-decoration: none; width: fit-content; }
-.swipe-card-creator-link:hover { color: var(--brass); text-decoration: underline; }
-.swipe-card-learn-more {
-  display: inline-block;
-  font-family: var(--font-mono);
-  font-size: 0.74rem;
-  color: var(--signal-amber);
-  text-decoration: underline;
+@media (prefers-reduced-motion: reduce) {
+  .elev-stage { --elev-door-ms: 120ms; --elev-flip-ms: 120ms; }
 }
 
-.swipe-badge {
-  position: absolute;
-  top: 1.6rem;
-  z-index: 3;
-  font-family: var(--font-display);
-  font-weight: 800;
-  font-size: 1.5rem;
-  letter-spacing: 0.08em;
-  padding: 0.3rem 0.8rem;
-  border-radius: 8px;
-  border-width: 3px;
-  border-style: solid;
-  pointer-events: none;
+/* Floor indicator — the display on the lintel above the doors. */
+.elev-indicator {
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0.8rem; border-radius: 8px;
+  background: linear-gradient(180deg, var(--elev-steel-1), var(--elev-steel-0));
+  border: 1px solid var(--elev-steel-2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 14px rgba(0,0,0,0.4);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
 }
-.swipe-badge-like { left: 1.4rem; color: var(--ok); border-color: var(--ok); transform: rotate(-18deg); }
-.swipe-badge-nope { right: 1.4rem; color: var(--danger); border-color: var(--danger); transform: rotate(18deg); }
-.swipe-badge-skip { left: 50%; transform: translateX(-50%); color: var(--signal-amber); border-color: var(--signal-amber); }
+.elev-indicator-label { font-size: 0.6rem; letter-spacing: 0.14em; color: var(--ink-faint); text-transform: uppercase; }
+.elev-indicator-num { font-size: 1.35rem; font-weight: 600; color: var(--elev-lamp); text-shadow: 0 0 10px var(--elev-lamp-glow), 0 0 2px var(--elev-lamp); letter-spacing: 0.06em; min-width: 2.2ch; text-align: center; }
+.elev-indicator-of { font-size: 0.7rem; color: var(--ink-faint); }
+.elev-indicator-arrows { display: flex; flex-direction: column; gap: 2px; line-height: 1; font-size: 0.6rem; color: var(--elev-steel-3); }
+.elev-indicator-arrows .on { color: var(--elev-lamp); text-shadow: 0 0 8px var(--elev-lamp-glow); animation: elev-blink 0.5s steps(2) infinite; }
+@keyframes elev-blink { 50% { opacity: 0.35; } }
+.elev-indicator-round { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--surface-0); background: var(--mint); border-radius: 3px; padding: 1px 5px; }
 
-.swipe-buttons { display: flex; gap: 1.4rem; align-items: center; margin-top: 1.6rem; }
-.swipe-btn {
-  display: flex; align-items: center; justify-content: center;
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  background: var(--surface-1, #1e1a10);
-  border: 2px solid rgba(251,232,211,0.18);
-  color: var(--ink);
-  cursor: pointer;
-  transition: transform 0.12s ease;
+/* The car: brushed frame around the cab. aspect-ratio + max-height keep
+   it phone-card shaped and never taller than the viewport allows (same
+   sanity limit the old .swipe-card-stack had). */
+.elev-car {
+  position: relative; width: 100%; max-width: 100%;
+  aspect-ratio: 3 / 4.6; max-height: 72vh;
+  border-radius: 18px; padding: 8px;
+  background: linear-gradient(90deg, var(--elev-steel-1), var(--elev-steel-3) 18%, var(--elev-steel-1) 46%, var(--elev-steel-3) 72%, var(--elev-steel-1));
+  box-shadow: 0 24px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
 }
-.swipe-btn:hover { transform: scale(1.08); }
-.swipe-btn:disabled { opacity: 0.4; cursor: default; transform: none; }
-.swipe-btn-dislike { color: var(--danger); border-color: rgba(201,97,79,0.4); }
-.swipe-btn-skip { color: var(--signal-amber); border-color: rgba(232,163,61,0.4); font-size: 1.3rem; font-weight: 700; }
-.swipe-btn-like { width: 68px; height: 68px; color: var(--ok); border-color: rgba(132,205,152,0.4); }
-
-.swipe-summary {
-  border: 1px solid rgba(251,232,211,0.14);
-  border-radius: 12px;
-  padding: 2rem 1.6rem;
-  text-align: left;
-  max-width: 360px;
-  margin: 0 auto;
+.elev-car::before {
+  content: ""; position: absolute; inset: 0; border-radius: 18px; pointer-events: none;
+  mix-blend-mode: overlay; opacity: 0.5;
+  background: repeating-linear-gradient(90deg, rgba(255,255,255,0.05) 0 1px, transparent 1px 3px);
 }
-.swipe-summary h3 { margin: 0 0 0.6rem; font-family: var(--font-body); }
-.swipe-summary-list { list-style: none; padding: 0; margin: 0.6rem 0 0; }
-.swipe-summary-list li { padding: 0.4rem 0; border-bottom: 1px solid rgba(251,232,211,0.08); }
-.swipe-summary-list a { color: var(--signal-amber); }
+.elev-cab { position: absolute; inset: 8px; border-radius: 12px; overflow: hidden; background: var(--surface-1); text-align: left; }
 
-@media (max-width: 480px) {
-  .swipe-card-stack { max-width: 320px; }
-  .swipe-btn { width: 50px; height: 50px; }
-  .swipe-btn-like { width: 60px; height: 60px; }
+/* Cab interior: wall panels with seams, handrail, floor, ceiling lamp.
+   Deliberately quiet so the poster on the card carries the color. */
+.elev-interior { position: absolute; inset: 0; z-index: 0; }
+.elev-wall {
+  position: absolute; inset: 0 0 18% 0;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 calc(25% - 1px), rgba(0,0,0,0.45) calc(25% - 1px) 25%),
+    linear-gradient(180deg, var(--elev-steel-2) 0%, var(--elev-steel-1) 55%, var(--elev-steel-0) 100%);
 }
+.elev-wall::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.035) 0 1px, transparent 1px 3px); }
+.elev-rail { position: absolute; left: 4%; right: 4%; top: 58%; height: 7px; border-radius: 4px; background: linear-gradient(180deg, var(--elev-steel-hi), var(--elev-steel-2) 60%, var(--elev-steel-0)); box-shadow: 0 6px 10px rgba(0,0,0,0.5); }
+.elev-floor { position: absolute; left: 0; right: 0; bottom: 0; height: 18%; background: linear-gradient(180deg, #0a1020, #0d1526 40%, #111a2e); }
+.elev-floor::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; background: var(--elev-steel-3); }
+.elev-floor::after { content: ""; position: absolute; left: 20%; right: 20%; top: 2px; height: 60%; background: linear-gradient(180deg, rgba(140,155,189,0.14), transparent); filter: blur(6px); }
+.elev-ceiling { position: absolute; left: 22%; right: 22%; top: 0; height: 6px; border-radius: 0 0 4px 4px; background: var(--ink); box-shadow: 0 0 18px 4px rgba(251,232,211,0.35), 0 30px 80px 30px rgba(251,232,211,0.08); }
 
-/* Everything above tops out at max-width:360px (320px below 480px) —
-   fine on a phone, but .pitch-discover-stage fills the entire viewport
-   on any screen, so the same card just sat tiny and lost in a mostly
-   empty desktop window. Scales the card (and, since aspect-ratio locks
-   its height to its width, its height too) plus the buttons/text that
-   would otherwise look mismatched next to a bigger card, in two steps —
-   tablet, then desktop. 641px matches the breakpoint the reel feed's
-   own .reel-slide already scales up at. */
+/* Doors sit above everything in the cab (card, plates) so a ride really
+   does close over the whole interior. */
+.elev-door {
+  position: absolute; top: 0; bottom: 0; width: 50.5%; z-index: 6;
+  background: linear-gradient(90deg, var(--elev-steel-2), var(--elev-steel-3) 35%, var(--elev-steel-2) 70%, var(--elev-steel-1));
+  transition: transform var(--elev-door-ms) cubic-bezier(0.4, 0, 0.2, 1);
+}
+.elev-door::before { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, rgba(255,255,255,0.045) 0 1px, transparent 1px 4px); }
+.elev-door-l { left: 0; transform: translateX(-101%); border-right: 1px solid var(--elev-steel-hi); }
+.elev-door-r { right: 0; transform: translateX(101%); border-left: 1px solid var(--elev-steel-0); }
+.elev-cab-closed .elev-door { transform: translateX(0); }
+.elev-cab-closed .elev-door-l { box-shadow: 6px 0 14px rgba(0,0,0,0.35); }
+
+/* Button plates on the cab's inner walls, vertically centered either
+   side of the card. */
+.elev-plate {
+  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+  display: flex; flex-direction: column; align-items: center; gap: 0.7rem;
+  padding: 0.7rem 0.4rem; border-radius: 10px;
+  background: linear-gradient(180deg, var(--elev-steel-2), var(--elev-steel-1));
+  border: 1px solid var(--elev-steel-3);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px rgba(0,0,0,0.45);
+}
+.elev-plate-left { left: 9px; }
+.elev-plate-right { right: 9px; }
+
+/* One round steel button: raised cap with a concentric ring, which lights
+   amber (red for Like) while .elev-btn-lit. */
+.elev-btn { display: flex; flex-direction: column; align-items: center; gap: 0.28rem; background: none; border: 0; padding: 0; cursor: pointer; color: var(--ink); -webkit-tap-highlight-color: transparent; }
+.elev-btn-cap {
+  width: 44px; height: 44px; border-radius: 50%; position: relative;
+  display: grid; place-items: center;
+  background: radial-gradient(circle at 35% 30%, var(--elev-steel-3), var(--elev-steel-1) 60%, var(--elev-steel-0));
+  border: 2px solid var(--elev-steel-hi);
+  box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -3px 6px rgba(0,0,0,0.55), 0 3px 6px rgba(0,0,0,0.5), 0 0 0 3px var(--elev-steel-0), 0 0 0 4px var(--elev-steel-3);
+  transition: box-shadow 160ms ease, transform 90ms ease;
+}
+.elev-btn:active:not(:disabled) .elev-btn-cap { transform: translateY(1px); box-shadow: inset 0 3px 6px rgba(0,0,0,0.6), 0 0 0 3px var(--elev-steel-0), 0 0 0 4px var(--elev-steel-3); }
+.elev-btn-label { font-family: var(--font-mono); font-size: 0.54rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-faint); }
+.elev-btn-count { font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); margin-top: -0.1rem; font-variant-numeric: tabular-nums; }
+.elev-btn-lit .elev-btn-cap { border-color: var(--elev-lamp); color: var(--elev-lamp); box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -3px 6px rgba(0,0,0,0.5), 0 0 0 3px var(--elev-steel-0), 0 0 0 4px var(--elev-lamp), 0 0 18px 4px var(--elev-lamp-glow); }
+.elev-btn-lit .elev-btn-label, .elev-btn-lit .elev-btn-count { color: var(--elev-lamp); }
+.elev-btn-heart.elev-btn-lit { --elev-lamp: var(--brass); --elev-lamp-glow: rgba(248, 95, 115, 0.5); }
+.elev-btn:disabled { opacity: 0.45; cursor: default; }
+.elev-btn:focus-visible { outline: none; }
+.elev-btn:focus-visible .elev-btn-cap { box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -3px 6px rgba(0,0,0,0.55), 0 0 0 3px var(--elev-steel-0), 0 0 0 5px var(--ink); }
+
+.elev-hold-lamp { position: absolute; top: 0.7rem; left: 0.7rem; z-index: 4; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mint); background: rgba(12,19,31,0.6); border: 1px solid rgba(147,208,164,0.5); border-radius: 4px; padding: 0.2rem 0.5rem; }
+
+/* The card: centered between the plates, 3D-flippable. perspective lives
+   on the slot (a static ancestor), never on the element that also
+   transforms — see the Safari backface note the old swipe card carried. */
+.elev-card-slot {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
+  width: calc(100% - 152px); max-width: 250px; aspect-ratio: 3 / 5; max-height: 86%;
+  perspective: 1000px;
+}
+.elev-card { position: relative; width: 100%; height: 100%; }
+.elev-card-flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform var(--elev-flip-ms) cubic-bezier(0.4, 0, 0.2, 1); }
+.elev-card-flipped { transform: rotateY(180deg); }
+.elev-card-face {
+  position: absolute; inset: 0; border-radius: 14px; overflow: hidden;
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  box-shadow: 0 18px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(251,232,211,0.08);
+}
+.elev-card-front { background-size: cover; background-position: center; background-color: var(--surface-2); display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; user-select: none; }
+.elev-card-front-blank { background-image: linear-gradient(135deg, var(--surface-3), var(--surface-1)); }
+.elev-card-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12,19,31,0.05) 35%, rgba(12,19,31,0.94) 100%); }
+.elev-card-hint { position: absolute; z-index: 1; top: 0.6rem; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); background: rgba(12,19,31,0.6); border: 1px solid rgba(251,232,211,0.15); border-radius: 999px; padding: 0.2rem 0.55rem; white-space: nowrap; }
+.elev-card-copy { position: relative; z-index: 1; padding: 0 0.8rem 0.85rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.elev-card-copy h2 { margin: 0; font-family: var(--font-display); font-size: 1.12rem; line-height: 1.15; color: var(--ink); text-wrap: balance; }
+.elev-card-logline { margin: 0; font-size: 0.8rem; line-height: 1.35; color: var(--ink-dim); }
+.elev-card-creator { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em; color: var(--ink-faint); width: fit-content; }
+.elev-card-creator-link { text-decoration: none; }
+.elev-card-creator-link:hover { color: var(--brass); text-decoration: underline; }
+/* Own class rather than .pitch-tag, which is the poster-corner badge
+   (position:absolute) elsewhere in the Pitch Room. */
+.elev-tag { display: inline-block; align-self: flex-start; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--olive-deep); color: var(--olive-bright); background: var(--olive-shadow); border-radius: 999px; padding: 0.12rem 0.5rem; }
+.elev-card-back { transform: rotateY(180deg); background: linear-gradient(180deg, var(--surface-2), var(--surface-1)); display: flex; flex-direction: column; }
+.elev-card-back-btn { position: absolute; top: 0.5rem; left: 0.6rem; z-index: 1; display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid rgba(251,232,211,0.2); background: rgba(12,19,31,0.4); color: var(--ink); border-radius: 999px; padding: 0.2rem 0.55rem; cursor: pointer; }
+.elev-card-back-btn:hover { background: rgba(12,19,31,0.7); }
+/* Scrolls on its own; touch-action keeps a finger on long text scrolling
+   the text rather than the page. */
+.elev-card-back-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 2rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.elev-card-back-body h3 { margin: 0; font-family: var(--font-display); font-size: 1rem; line-height: 1.2; color: var(--ink); }
+.elev-card-description { margin: 0; font-size: 0.78rem; line-height: 1.4; color: var(--ink-dim); }
+.elev-card-funding { display: flex; flex-direction: column; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); }
+.elev-card-funding .pitch-progress-track { margin-bottom: 0; }
+.elev-card-deadline { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); }
+.elev-card-team { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); display: flex; flex-direction: column; gap: 0.15rem; }
+.elev-card-learn-more { color: var(--olive); font-family: var(--font-mono); font-size: 0.66rem; margin-top: auto; text-decoration: none; }
+.elev-card-learn-more:hover { text-decoration: underline; }
+
+/* The lobby — what the doors open onto after the last floor. */
+.elev-lobby { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 0.8rem; padding: 1.4rem; text-align: center; background: radial-gradient(ellipse at 50% 20%, var(--surface-3), var(--surface-1) 70%); }
+.elev-lobby-eyebrow { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--olive); }
+.elev-lobby h3 { margin: 0; font-family: var(--font-display); font-size: 1.3rem; color: var(--ink); }
+.elev-lobby p { margin: 0; color: var(--ink-dim); font-size: 0.92rem; }
+.elev-lobby p a { color: var(--olive); }
+.elev-lobby-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.9rem; max-height: 30%; overflow-y: auto; }
+.elev-lobby-list li { padding: 0.3rem 0; border-bottom: 1px solid rgba(251,232,211,0.08); }
+.elev-lobby-list a { color: var(--signal-amber); }
+.elev-lobby-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 0.4rem; }
+
+.elev-toast { position: absolute; bottom: -2.2rem; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 999px; padding: 0.3rem 0.8rem; white-space: nowrap; opacity: 0; transition: opacity 200ms; pointer-events: none; }
+.elev-toast-on { opacity: 1; }
+
+/* The stage tops out at 400px — fine on a phone, but .pitch-discover-
+   stage fills the entire viewport on any screen, so the same car would
+   sit small in a mostly empty desktop window. Scales the car and the
+   type inside it in two steps: tablet, then desktop. 641px matches the
+   breakpoint the reel feed's own .reel-slide already scales up at; 1180px
+   matches the header/tab-bar handoff. */
 @media (min-width: 641px) {
-  .swipe-card-stack { max-width: 420px; }
-  .swipe-btn { width: 60px; height: 60px; }
-  .swipe-btn-like { width: 74px; height: 74px; }
-  .swipe-buttons { gap: 1.6rem; margin-top: 1.9rem; }
-  .swipe-card-body h2 { font-size: 1.7rem; }
-  .swipe-card-logline { font-size: 1rem; }
-  .swipe-card-creator { font-size: 0.8rem; }
-  .swipe-card-description { font-size: 0.94rem; }
-  .swipe-card-funding span, .swipe-card-deadline { font-size: 0.76rem; }
-  .swipe-card-team-member { font-size: 0.85rem; }
-  .swipe-badge { font-size: 1.7rem; top: 1.9rem; }
-  .swipe-round-tag { font-size: 0.78rem; }
-  .swipe-card-flip-hint, .swipe-card-back-btn { font-size: 0.7rem; }
+  .elev-stage { max-width: 440px; }
+  .elev-card-slot { max-width: 280px; }
+  .elev-btn-cap { width: 48px; height: 48px; }
+  .elev-card-copy h2 { font-size: 1.25rem; }
+  .elev-card-logline { font-size: 0.86rem; }
+  .elev-card-description { font-size: 0.84rem; }
   .pitch-discover-banner { max-width: 480px; }
 }
-
-/* 1180px matches the breakpoint the header/tab-bar handoff already
-   uses — genuinely wide desktop, not just "not a phone." */
 @media (min-width: 1180px) {
-  .swipe-card-stack { max-width: 480px; }
-  .swipe-btn { width: 68px; height: 68px; }
-  .swipe-btn-like { width: 84px; height: 84px; }
-  .swipe-buttons { gap: 1.8rem; margin-top: 2.1rem; }
-  .swipe-card-body h2 { font-size: 2rem; }
-  .swipe-card-logline { font-size: 1.08rem; }
-  .swipe-card-description { font-size: 1rem; }
-  .swipe-badge { font-size: 1.9rem; }
+  .elev-stage { max-width: 480px; }
+  .elev-card-slot { max-width: 310px; }
+  .elev-btn-cap { width: 52px; height: 52px; }
+  .elev-card-copy h2 { font-size: 1.35rem; }
+  .elev-card-logline { font-size: 0.9rem; }
   .pitch-discover-banner { max-width: 520px; }
 }
 

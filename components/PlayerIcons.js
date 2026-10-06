@@ -692,3 +692,47 @@ export function BackArrowIcon({ src, size = 16 }) {
     </svg>
   );
 }
+
+// Discover's elevator plates (components/PitchElevator.js). The arrows
+// are the call buttons; the door-hold glyph is two door leaves held apart.
+export function ArrowUpIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 19V5" />
+      <path d="M5 12l7-7 7 7" />
+    </svg>
+  );
+}
+
+export function ArrowDownIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M12 5v14" />
+      <path d="M19 12l-7 7-7-7" />
+    </svg>
+  );
+}
+
+export function DoorHoldIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9 6L5 12l4 6" />
+      <path d="M15 6l4 6-4 6" />
+      <path d="M12 4v16" />
+    </svg>
+  );
+}
+
+// Save (bookmark) — distinct from HeartIcon now that Discover has both a
+// Save (follow) and a Like (lightweight thumbs-up) button.
+export function BookmarkIcon({ active, src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill={active ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 3h12v18l-6-4-6 4z" />
+    </svg>
+  );
+}

@@ -9,6 +9,7 @@ import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
 import { getContinueWatching } from '../lib/continueWatching';
 import { getWatchHistory } from '../lib/watchHistory';
+import { getSavedPitches } from '../lib/pitches';
 import { useWishlist } from '../lib/useWishlist';
 import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
@@ -17,7 +18,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
 import { tierBadge } from '../lib/tierBadge';
 import { formatRuntimeLong } from '../lib/videoMetadata';
-import { HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { BookmarkIcon, HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 
 import Footer from '../components/Footer';
 export async function getServerSideProps({ req, res }) {
@@ -28,9 +29,13 @@ export async function getServerSideProps({ req, res }) {
   const episodes = episodesRaw;
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
-  const [continueWatching, watchHistory] = await Promise.all([
+  const [continueWatching, watchHistory, savedPitches] = await Promise.all([
     account.isSignedIn ? getContinueWatching(req, episodes) : [],
-    userId ? getWatchHistory(userId, episodes) : []
+    userId ? getWatchHistory(userId, episodes) : [],
+    // Pitch saves live in pitch_saves (the Pitch Room follow), not the
+    // episode/series wishlist — a separate list on this page, same as
+    // Continue Watching and Previously Watched are.
+    userId ? getSavedPitches(userId) : []
   ]);
 
   return {
@@ -45,17 +50,38 @@ export async function getServerSideProps({ req, res }) {
       episodes,
       allSeries,
       continueWatching,
-      watchHistory
+      watchHistory,
+      savedPitches
     }
   };
 }
 
-export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenres, email, episodes, allSeries, isAdmin, isCreator, continueWatching, watchHistory }) {
+export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenres, email, episodes, allSeries, isAdmin, isCreator, continueWatching, watchHistory, savedPitches }) {
   const iconOverrides = usePlayerIconOverrides();
   const { ids, isWishlisted, toggle } = useWishlist(isSignedIn, wishlist);
   const [continueList, setContinueList] = useState(continueWatching);
   const [historyList, setHistoryList] = useState(watchHistory);
+  const [pitchList, setPitchList] = useState(savedPitches || []);
   const [removingId, setRemovingId] = useState(null);
+
+  // Same toggle the Pitch Room grid and Discover's Save button use —
+  // /api/pitch-save flips the row, so one call here unsaves it.
+  async function removeSavedPitch(pitchId) {
+    setRemovingId(pitchId);
+    try {
+      const res = await fetch('/api/pitch-save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pitchId })
+      });
+      if (!res.ok) throw new Error();
+      setPitchList((prev) => prev.filter((p) => p.id !== pitchId));
+    } catch (err) {
+      // Non-fatal — worst case it's still there next reload.
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   async function removeContinueWatching(episodeId) {
     setRemovingId(episodeId);
@@ -176,6 +202,46 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                   </Link>
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {pitchList.length > 0 && (
+          <>
+            <div className="library-heading" style={{ fontSize: '1rem' }}>Saved Pitches</div>
+            <div className="library-sub">
+              {pitchList.length} saved · you&rsquo;ll get an email when a project posts an update
+            </div>
+            <div className="poster-grid" style={{ marginBottom: '2.2rem' }}>
+              {pitchList.map((p) => {
+                const pct = p.funding_goal ? Math.min(100, Math.round(((p.funding_raised || 0) / p.funding_goal) * 100)) : null;
+                return (
+                  <div key={p.id} className="card-wrap">
+                    <button
+                      className="wishlist-btn active"
+                      onClick={() => removeSavedPitch(p.id)}
+                      disabled={removingId === p.id}
+                      aria-label="Remove from Saved Pitches"
+                      title="Remove from Saved Pitches"
+                    >
+                      <BookmarkIcon active size={16} />
+                    </button>
+                    <Link href={`/pitches/${p.id}`} className="poster-card free">
+                      <div
+                        className="poster-art"
+                        style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                      >
+                        {p.tag && <span className="poster-badge">{p.tag}</span>}
+                        {!p.thumbnail && '◈'}
+                      </div>
+                      <div className="poster-title-wrap">
+                        <h4>{p.title}</h4>
+                        <span>{pct != null ? `${pct}% funded` : (p.creator_name || 'Pitch Room')}</span>
+                      </div>
+                    </Link>
+                  </div>
+                );
+              })}
             </div>
           </>
         )}
