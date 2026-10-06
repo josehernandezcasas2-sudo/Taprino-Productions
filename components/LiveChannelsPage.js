@@ -13,6 +13,7 @@ import { SITE } from '../lib/siteConfig';
 // Channel time is Pacific for everyone, like a broadcast schedule.
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
 const HALF_HOUR_PX = 132;
+const LABEL_EVERY = HALF_HOUR_PX * 4; // two hours
 const DAY = 86400;
 
 function timeLabel(sec) {
@@ -223,7 +224,16 @@ export default function LiveChannelsPage(props) {
                           onClick={() => setSelected(s)}
                           aria-label={`${s.seriesName ? `${s.seriesName}, ` : ''}${s.title}, ${timeLabel(s.start)}`}
                         >
-                          {width > 40 && (
+                          {(s.kind === 'loop' || s.kind === 'off_air') && width > LABEL_EVERY * 2 ? (
+                            // Long stretches repeat their label every two hours, so
+                            // it's visible wherever the guide is scrolled to.
+                            Array.from({ length: Math.ceil(width / LABEL_EVERY) }, (_, k) => k * LABEL_EVERY).filter((x) => x < width - 70).map((x) => (
+                              <span key={x} className="tv-blk-repeat" style={{ left: 8 + x }}>
+                                <b>{s.title}</b>
+                                <small>{timeLabel(s.start + (x / HALF_HOUR_PX) * 1800)}</small>
+                              </span>
+                            ))
+                          ) : width > 40 && (
                             <>
                               <b>{s.kind === 'live_slot' ? '● ' : ''}{s.seriesName ? s.seriesName : s.title}</b>
                               <small>{timeLabel(s.start)}{s.label ? ` · ${s.label}` : ''}</small>
@@ -323,7 +333,7 @@ function NowInfo({ now, channel }) {
 
 function SegmentInfo({ seg, state, channel, date, today, onBack }) {
   const page = titlePageFor(seg);
-  const when = `${timeLabel(seg.start)} – ${timeLabel(seg.end)} PT${date !== today ? ` · ${dayTabLabel(date, today)}` : ''}`;
+  const when = `${timeLabel(seg.start)} – ${seg.end >= DAY ? 'midnight' : timeLabel(seg.end)} PT${date !== today ? ` · ${dayTabLabel(date, today)}` : ''}`;
   const eyebrow = state === 'now' ? 'On now' : state === 'earlier' ? 'Aired earlier' : 'Coming up';
   let body = null;
   if (seg.kind === 'loop') body = <p>Nothing is booked here, so the channel loop fills the time.</p>;

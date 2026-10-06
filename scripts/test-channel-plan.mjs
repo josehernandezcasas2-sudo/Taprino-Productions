@@ -2,7 +2,7 @@
 // Exercises lib/channelPlan.js — the rules that decide what airs on a channel.
 import assert from 'node:assert/strict';
 import {
-  planDay, fitEpisodes, advanceBookmark, weekStartOf, weekdayOf, addDays, segmentAt, slotsForDay
+  planDay, fitEpisodes, advanceBookmark, weekStartOf, weekdayOf, addDays, segmentAt, slotsForDay, mergeForGuide
 } from '../lib/channelPlan.js';
 
 let passed = 0;
@@ -151,6 +151,17 @@ test('slotsForDay sorts and tags layers', () => {
   const a = { id: 'a', kind: 'ad_break', start_time: T(10), duration_seconds: 60 };
   const b = { id: 'b', kind: 'ad_break', start_time: T(9), duration_seconds: 60 };
   assert.deepEqual(slotsForDay({ weekPublished: true, weekSlots: [a], defaultSlots: [b] }).map((c) => c.layer + c.slot.id), ['defaultb', 'weeka']);
+});
+
+test("guide merges loop pieces into one block without any one episode's details", () => {
+  const m = mergeForGuide([
+    { start: 0, end: 600, kind: 'episode', layer: 'loop', episodeId: 'a', description: 'only about a' },
+    { start: 600, end: 1200, kind: 'episode', layer: 'loop', episodeId: 'b' },
+    { start: 1200, end: 1800, kind: 'episode', layer: 'default', episodeId: 'c' }
+  ]);
+  assert.equal(m.length, 2);
+  assert.deepEqual([m[0].kind, m[0].start, m[0].end, m[0].episodeId, m[0].description], ['loop', 0, 1200, undefined, undefined]);
+  assert.equal(m[1].episodeId, 'c');
 });
 
 console.log(`\n${passed} passed`);

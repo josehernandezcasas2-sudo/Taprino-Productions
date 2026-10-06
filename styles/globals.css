@@ -7813,3 +7813,6 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
   .ac-reasons { grid-template-columns: 1fr; }
 }
 .visually-hidden { position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+.tv-blk-repeat { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; width: 160px; pointer-events: none; }
+.tv-blk-repeat b { color: var(--olive); }

@@ -16,6 +16,8 @@ import SmartImage from './SmartImage';
 export function isStreamRoute(pathname) {
   return (
     pathname === '/stream' ||
+    pathname === '/live' ||
+    pathname.startsWith('/live/') ||
     pathname === '/search' ||
     pathname === '/watch/series' ||
     pathname === '/watch/movies' ||

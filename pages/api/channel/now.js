@@ -11,7 +11,11 @@ export default async function handler(req, res) {
     const channel = await resolvePublicChannel(req.query.channel);
     if (!channel) return res.status(404).json({ error: 'No such channel.' });
     const state = await getChannelNow(channel, new Date());
-    res.setHeader('Cache-Control', 'public, s-maxage=10, stale-while-revalidate=30');
+    // Short cache on Vercel's CDN only (same answer for every viewer);
+    // phones and browsers must never reuse a copy, or the player could be
+    // handed a stale "what's on" right as a program changes.
+    res.setHeader('Vercel-CDN-Cache-Control', 'max-age=10, stale-while-revalidate=30');
+    res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json(state);
   } catch (err) {
     console.error('channel/now error:', err.message);
