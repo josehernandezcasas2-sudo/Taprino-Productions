@@ -34,12 +34,13 @@ const GROUPS = {
     label: 'Watch',
     Icon: WatchTabIcon,
     items: [
+      { href: '/live', label: 'Live TV' },
       { href: '/watch/series', label: 'Watch Series' },
       { href: '/watch/movies', label: 'Watch Movies' },
       { href: '/watch/podcasts', label: 'Podcasts' },
       { href: '/watch/vertical', label: 'Vertical' }
     ],
-    match: (p) => p.startsWith('/watch')
+    match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/')
   },
   account: {
     label: 'Account',

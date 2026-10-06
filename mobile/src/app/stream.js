@@ -94,7 +94,7 @@ export default function Stream() {
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
-        {liveStream ? <LiveBanner title={liveStream.title} /> : null}
+        {liveStream ? <LiveBanner title={liveStream.title} onPress={() => router.push('/live')} /> : null}
 
         {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToInfo} />}
 
@@ -108,7 +108,7 @@ export default function Stream() {
               <View style={styles.promoInner}>
                 <View style={{ flexShrink: 1 }}>
                   <Text style={styles.promoEyebrow}>Tapa +</Text>
-                  <Text style={styles.promoTitle}>Go ad-free and back the creators directly.</Text>
+                  <Text style={styles.promoTitle}>Go on demand and back the creators directly.</Text>
                   <Text style={styles.promoBody}>Members get early episodes, gated series, and a direct line to what they fund.</Text>
                 </View>
                 <Pressable style={styles.promoCta} onPress={() => router.push('/account')}>
@@ -128,9 +128,8 @@ export default function Stream() {
   );
 }
 
-// .live-now-banner (the live screen itself isn't built on mobile yet, so
-// this isn't tappable like the website's link).
-function LiveBanner({ title }) {
+// .live-now-banner — opens the Live screen, like the website's link.
+function LiveBanner({ title, onPress }) {
   const pulse = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     const loop = Animated.loop(Animated.sequence([
@@ -141,11 +140,11 @@ function LiveBanner({ title }) {
     return () => loop.stop();
   }, [pulse]);
   return (
-    <View style={styles.liveBanner}>
+    <Pressable style={styles.liveBanner} onPress={onPress} accessibilityRole="link">
       <Animated.View style={[styles.liveDot, { opacity: pulse }]} />
       <Text style={styles.liveText} numberOfLines={1}><Text style={styles.liveStrong}>Live now</Text> {'—'} {title}</Text>
       <Text style={styles.liveArrow}>Watch {'→'}</Text>
-    </View>
+    </Pressable>
   );
 }
 

@@ -45,7 +45,7 @@ Mobile: Expo APIs change every SDK. Check `mobile/AGENTS.md` and the versioned d
 - Some test/placeholder content still live; a tablet-breakpoint layout bug is flagged but unfixed.
 - PWA install button shows instructions instead of using `beforeinstallprompt` on Chrome/Android.
 - Shopify (studiotapa.com) integration blocked on a billing/plan issue on the Shopify side.
-- Live channels aren't in the mobile app yet (web only). Channel ads run for everyone, so mobile channel playback is tied to the paused IMA ads work.
+- Live channels on mobile (`mobile/src/app/live/`, Watch → Live TV) play without ads: scheduled ad breaks show a countdown card and the between-program break is skipped, until the mobile IMA ads work lands.
 - Mobile app: most `BottomNav` destinations are still `ComingSoon` placeholders (Stream, Watch Series/Movies/Podcasts/Vertical, Pitch/Vertical Discover, My List, My Work) — only Home, Pitch Room, Account, About, and single-episode playback are real. Ad breaks (house-ads VAST feed is ready; needs a mobile Google IMA SDK integration, deliberately paused), captions, and watch-progress saving aren't built for mobile playback yet. Mobile still uses the system default font everywhere, not the site's real Space Grotesk/Fraunces/IBM Plex Mono.
 
 ## Memory

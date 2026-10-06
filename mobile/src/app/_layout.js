@@ -55,6 +55,8 @@ export default function RootLayout() {
               turned off here rather than just re-titled. */}
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="stream" options={{ headerShown: false }} />
+          <Stack.Screen name="live/index" options={{ headerShown: false }} />
+          <Stack.Screen name="live/[slug]" options={{ headerShown: false }} />
           <Stack.Screen name="about" options={{ headerShown: false }} />
           <Stack.Screen name="pitches/index" options={{ headerShown: false }} />
           <Stack.Screen name="pitches/discover" options={{ headerShown: false }} />
