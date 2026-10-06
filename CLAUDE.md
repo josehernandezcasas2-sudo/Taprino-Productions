@@ -9,8 +9,9 @@ Repo: https://github.com/josehernandezcasas2-sudo/Taprino-Productions (branch `m
 ## Layout
 
 - Web app (repo root): Next.js 14, **Pages Router**, plain JS. `pages/`, `components/`, `lib/` (data + helpers), `contexts/`, `styles/`, `middleware.js`.
-- `supabase/migrations/NNN_name.sql`: numbered migrations, run **manually** in the Supabase SQL Editor (latest: 071). Never assume one is applied; features fail with "table not found" until it is.
+- `supabase/migrations/NNN_name.sql`: numbered migrations, run **manually** in the Supabase SQL Editor (latest: 072). Never assume one is applied; features fail with "table not found" until it is.
 - `mobile/`: Expo SDK 57 / React Native 0.86 app, Expo Router in `mobile/src/app/`, plain JS. Calls the web app's API via `mobile/src/lib/api.js` (add a new `pages/api/*` route when a screen needs data `getServerSideProps` currently provides). Bottom nav (`mobile/src/components/BottomNav.js`) mirrors `MobileTabBar.js`'s full site map (Home/Discover/Watch/Account groups) even where the destination screen is still a placeholder — check what's actually built before assuming a nav entry has real content behind it. Colors/spacing/radii live in `mobile/src/lib/theme.js`, pulled from `styles/globals.css`'s real `:root` values, not invented. A Figma file (https://www.figma.com/design/4bWVu8cjMI1otCAyvSxs5T) holds a matching design system (variables, Nav/Tab Bar components, reference pages) built from the same code — edits there get manually ported back into both codebases on request, there's no live sync. Real device testing is via Expo Go on Jose's iPhone; the Expo CLI on this PC and Expo Go must both be signed into the same Expo account ("studiotapa237") or opening the project fails.
+- Live channels (`/live`, TapaTV is CH 01): the rules for what airs live in `lib/channelPlan.js` (pure, tested by `node scripts/test-channel-plan.mjs`); `lib/channelEngine.js` loads data and answers "what's on." Order: live broadcast > published week > default schedule > loop. Scheduler at `/schedule`, channels at `/admin/channels`, moderation (flags, reports, `moderation_hold`) in `lib/moderation.js` and `/admin/content`. Every public episode/series query filters `moderation_hold = false`; keep that in any new public query.
 - Root `*.md` files (HANDOFF, DEPLOY_NOTES, *-NOTES) are historical session notes. HANDOFF.md has the fullest product background but is partly dated.
 
 ## Stack
@@ -44,6 +45,7 @@ Mobile: Expo APIs change every SDK. Check `mobile/AGENTS.md` and the versioned d
 - Some test/placeholder content still live; a tablet-breakpoint layout bug is flagged but unfixed.
 - PWA install button shows instructions instead of using `beforeinstallprompt` on Chrome/Android.
 - Shopify (studiotapa.com) integration blocked on a billing/plan issue on the Shopify side.
+- Live channels aren't in the mobile app yet (web only). Channel ads run for everyone, so mobile channel playback is tied to the paused IMA ads work.
 - Mobile app: most `BottomNav` destinations are still `ComingSoon` placeholders (Stream, Watch Series/Movies/Podcasts/Vertical, Pitch/Vertical Discover, My List, My Work) — only Home, Pitch Room, Account, About, and single-episode playback are real. Ad breaks (house-ads VAST feed is ready; needs a mobile Google IMA SDK integration, deliberately paused), captions, and watch-progress saving aren't built for mobile playback yet. Mobile still uses the system default font everywhere, not the site's real Space Grotesk/Fraunces/IBM Plex Mono.
 
 ## Memory
