@@ -10,6 +10,7 @@ export default function AddSeriesForm({ onSubmitted }) {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [releaseYear, setReleaseYear] = useState('');
+  const [channelOptIn, setChannelOptIn] = useState(false);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -44,6 +45,7 @@ export default function AddSeriesForm({ onSubmitted }) {
           name,
           description,
           releaseYear: releaseYear || undefined,
+          channelOptIn,
           posterBase64,
           posterFileName: posterFile ? posterFile.name : undefined,
           thumbnailBase64,
@@ -81,6 +83,14 @@ export default function AddSeriesForm({ onSubmitted }) {
 
       <label>Release year — optional</label>
       <input type="number" value={releaseYear} onChange={(e) => setReleaseYear(e.target.value)} placeholder={String(new Date().getFullYear())} />
+
+      <div className="optin-box">
+        <label className="optin-toggle">
+          <input type="checkbox" checked={channelOptIn} onChange={(e) => setChannelOptIn(e.target.checked)} />
+          <span>Let channels air this series</span>
+        </label>
+        <p>Covers every episode, now and later. Schedulers can put it on TapaTV and other channels; premium episodes air there with ads. You can turn it off any time from Your work.</p>
+      </div>
 
       <label>Poster — optional</label>
       <input type="file" accept="image/*" onChange={(e) => setPosterFile(e.target.files[0] || null)} />

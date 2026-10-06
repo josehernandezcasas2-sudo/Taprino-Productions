@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const { name, description, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, releaseYear } = req.body || {};
+  const { name, description, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, releaseYear, channelOptIn } = req.body || {};
   if (!name || String(name).trim() === '') {
     return res.status(400).json({ error: 'A series name is required.' });
   }
@@ -59,6 +59,7 @@ export default async function handler(req, res) {
       thumbnail,
       release_year: releaseYear ? Number(releaseYear) : null,
       creator_id: userId,
+      channel_opt_in: channelOptIn === true,
       submitted_by: email,
       status: 'pending'
     });

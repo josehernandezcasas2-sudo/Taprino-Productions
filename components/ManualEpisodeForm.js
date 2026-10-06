@@ -27,7 +27,8 @@ const EMPTY_FORM = {
   creatorEmail: '', title: '', description: '', contentType: 'short', rating: '', bonusParent: '',
   seriesId: '', newSeriesName: '', season: '1', seriesOrder: '',
   genre: '', mainGenre: MAIN_GENRES[0], artist: '', runtime: '', releaseYear: '',
-  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
+  tier: 'free', status: 'pending', featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00',
+  channelOptIn: true
 };
 
 function readAsDataUrl(f) {
@@ -645,6 +646,11 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
         <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
           <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
           Tapa Original <span style={{ opacity: 0.65 }}>— exclusive to Studio Tapa, independent of free/premium tier</span>
+        </label>
+
+        <label style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 'normal' }}>
+          <input type="checkbox" checked={form.channelOptIn !== false} onChange={(e) => update('channelOptIn', e.target.checked)} />
+          Channels can air this <span style={{ opacity: 0.65 }}>— schedulers can put it on TapaTV and other channels (premium airs with ads)</span>
         </label>
 
         <label>Funding link <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — the creator's own project/funding page</span></label>

@@ -27,7 +27,8 @@ const EMPTY_FORM = {
   title: '', description: '', tier: 'free',
   genre: '', mainGenre: MAIN_GENRES[0], contentType: 'short', rating: '',
   seriesId: '', season: '1', seriesOrder: '', artist: '', runtime: '', releaseYear: '',
-  featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00'
+  featured: false, adsEnabled: true, isOriginal: false, fundingUrl: '', adBreaksText: '0:00',
+  channelOptIn: false
 };
 
 // Reads an image file as a base64 data URL — small enough (posters/
@@ -646,6 +647,19 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
               <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
               Tapa Original <span style={{ opacity: 0.65 }}>— exclusive to Studio Tapa, independent of free/premium tier</span>
             </label>
+
+            <div className="optin-box">
+              <label className="optin-toggle">
+                <input type="checkbox" checked={!!form.channelOptIn} onChange={(e) => update('channelOptIn', e.target.checked)} />
+                <span>Let channels air this</span>
+              </label>
+              <p>Channel schedulers can put this on TapaTV and other Studio Tapa channels at <a href="/live" target="_blank" rel="noreferrer">/live</a>.</p>
+              <ul>
+                <li>Premium titles air on channels <b>with ads</b>, so people without a subscription can watch them live.</li>
+                <li>You can turn this off any time from Your work.</li>
+                <li>Nothing changes for the on-demand version.</li>
+              </ul>
+            </div>
 
             <label>Funding link <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — your own project/funding page</span></label>
             <input type="url" value={form.fundingUrl} onChange={(e) => update('fundingUrl', e.target.value)} placeholder="https://kickstarter.com/..." style={{ marginBottom: '0.8rem' }} />

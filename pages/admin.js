@@ -883,6 +883,7 @@ export default function AdminPortal({ mainGenres, allSeries: initialAllSeries, i
         <Link href="/admin/live"><LiveDotIcon size={15} src={iconOverrides.live_dot} /> Go live →</Link>
         <Link href="/admin/channels"><TvIcon size={15} src={iconOverrides.tv} /> Channels →</Link>
         <Link href="/schedule"><AntennaIcon size={15} src={iconOverrides.antenna} /> Channel scheduler →</Link>
+        <Link href="/admin/channel-uploads"><InboxIcon size={15} src={iconOverrides.inbox} /> Channel uploads →</Link>
         <Link href="/admin/applications"><InboxIcon size={15} src={iconOverrides.inbox} /> Applications →</Link>
         <Link href="/admin/genre-icons"><ImageIcon size={15} src={iconOverrides.image} /> Genre icons →</Link>
         <Link href="/admin/player-icons"><SlidersIcon size={15} src={iconOverrides.sliders} /> Icons →</Link>

@@ -29,10 +29,10 @@ export default async function handler(req, res) {
   const [{ data, error }, { data: allSeries }, viewCounts] = await Promise.all([
     supabase
       .from('episodes')
-      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label, release_year, ads_enabled, rating, ad_break_seconds, available_from, available_until, bonus_parent_type, bonus_parent_id, featured, funding_url, is_original')
+      .select('id, title, description, tier, status, rejection_reason, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, src, poster, thumbnail, pending_poster, pending_thumbnail, created_at, reviewed_at, deletion_requested, deletion_reason, deletion_requested_at, captions_url, captions_language, captions_label, release_year, ads_enabled, rating, ad_break_seconds, available_from, available_until, bonus_parent_type, bonus_parent_id, featured, funding_url, is_original, channel_opt_in')
       .eq('submitted_by', userId)
       .order('created_at', { ascending: false }),
-    supabase.from('series').select('id, name, poster, thumbnail'),
+    supabase.from('series').select('id, name, poster, thumbnail, channel_opt_in, creator_id'),
     getViewCounts()
   ]);
 
@@ -81,6 +81,8 @@ export default async function handler(req, res) {
         featured: !!ep.featured,
         fundingUrl: ep.funding_url || '',
         isOriginal: !!ep.is_original,
+        channelOptIn: !!ep.channel_opt_in,
+        seriesChannelOptIn: !!(seriesArt && seriesArt.channel_opt_in),
         src: ep.src,
         createdAt: ep.created_at,
         reviewedAt: ep.reviewed_at,
@@ -111,5 +113,13 @@ export default async function handler(req, res) {
     })
   );
 
-  return res.status(200).json({ submissions: enriched });
+  // Channel opt-in per show, and whether this creator owns the show (only
+  // the owner can change it — see pages/api/creator/channel-opt-in.js).
+  const seriesIds = [...new Set((data || []).map((ep) => ep.series_id).filter(Boolean))];
+  const seriesChannel = Object.fromEntries(seriesIds.map((id) => {
+    const s = seriesArtById[id];
+    return [id, { channelOptIn: !!(s && s.channel_opt_in), canChange: !!(s && (isAdmin || s.creator_id === userId)) }];
+  }));
+
+  return res.status(200).json({ submissions: enriched, seriesChannel });
 }

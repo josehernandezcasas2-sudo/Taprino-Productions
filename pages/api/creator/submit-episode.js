@@ -177,6 +177,9 @@ export default async function handler(req, res) {
     ad_break_seconds: Array.isArray(body.adBreakSeconds) && body.adBreakSeconds.length > 0 ? body.adBreakSeconds : [0],
     is_original: !!body.isOriginal,
     funding_url: body.fundingUrl && body.fundingUrl.trim() ? normalizeUrl(body.fundingUrl) : null,
+    // Off unless the creator ticked "Let channels air this" — see
+    // lib/channelEngine.js for what opting in allows.
+    channel_opt_in: body.channelOptIn === true,
     status: 'pending',
     submitted_by: userId
   });

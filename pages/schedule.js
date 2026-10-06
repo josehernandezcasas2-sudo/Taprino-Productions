@@ -11,6 +11,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
+import { useUpload } from '../contexts/UploadContext';
 
 // The channel scheduler: admins, sub-admins with "manage the channel
 // schedule", and Content Schedulers (only for channels assigned to them).
@@ -101,6 +102,7 @@ export default function Scheduler(props) {
   const [data, setData] = useState(null);
   const [library, setLibrary] = useState(null);
   const [loop, setLoop] = useState(null);
+  const [media, setMedia] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState(null); // library item waiting to be placed
@@ -140,6 +142,11 @@ export default function Scheduler(props) {
     setLibrary(null);
     api(`/api/schedule/library?channelId=${channelId}`).then(setLibrary).catch((err) => setError(err.message));
   }, [channelId]);
+
+  const loadMedia = useCallback(() => {
+    api(`/api/schedule/media?channelId=${channelId}`).then((d) => setMedia(d.media)).catch((err) => setError(err.message));
+  }, [channelId]);
+  useEffect(() => { loadMedia(); }, [loadMedia]);
 
   // Keep the URL shareable (?channel=&view=) without reloading the page.
   useEffect(() => {
@@ -199,6 +206,7 @@ export default function Scheduler(props) {
       const block = Math.max(3600, Math.ceil(longest / 900) * 900);
       return { ...base, kind: layer === 'default' ? 'series_continue' : 'series_pinned', seriesId: item.id, durationSeconds: block };
     }
+    if (item.type === 'media') return { ...base, kind: 'media', mediaId: item.id };
     if (item.type === 'ad_break') return { ...base, kind: 'ad_break', durationSeconds: 120 };
     if (item.type === 'live') return { ...base, kind: 'live', durationSeconds: 3600, title: 'Live broadcast' };
     return null;
@@ -299,7 +307,7 @@ export default function Scheduler(props) {
             </div>
 
             <div className="sch-grid">
-              <Library library={library} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) setSelectedId(null); }} />
+              <Library library={library} media={media} reloadMedia={loadMedia} channelId={channelId} setError={setError} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) setSelectedId(null); }} />
 
               <Timeline
                 key={`${channelId}-${view}-${day}`}
@@ -355,7 +363,7 @@ export default function Scheduler(props) {
 
 /* ---------------- library ---------------- */
 
-function Library({ library, layer, canLive, picked, setPicked }) {
+function Library({ library, media, reloadMedia, channelId, setError, layer, canLive, picked, setPicked }) {
   const [tab, setTab] = useState('series');
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(null);
@@ -369,14 +377,16 @@ function Library({ library, layer, canLive, picked, setPicked }) {
   return (
     <div className="sch-lib">
       <div className="sch-seg sch-seg-sm" role="tablist" aria-label="Library">
-        {[['series', 'Series'], ['titles', 'Titles'], ['breaks', 'Breaks']].map(([k, label]) => (
+        {[['series', 'Series'], ['titles', 'Titles'], ['uploads', 'Uploads'], ['breaks', 'Breaks']].map(([k, label]) => (
           <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}>{label}</button>
         ))}
       </div>
-      {tab !== 'breaks' && <input id="sch-search" type="search" className="sch-search" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the library" />}
-      <p className="sch-lib-note">Only titles their creators opted in to channels show up here. Premium titles air with ads.</p>
+      {(tab === 'series' || tab === 'titles') && <input id="sch-search" type="search" className="sch-search" placeholder="Search…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search the library" />}
+      {(tab === 'series' || tab === 'titles') && <p className="sch-lib-note">Only titles their creators opted in to channels show up here. Premium titles air with ads.</p>}
+      {tab === 'uploads' && <Uploads media={media} reload={reloadMedia} channelId={channelId} setError={setError} picked={picked} setPicked={setPicked} drag={drag} />}
+      {tab !== 'uploads' && (
       <div className="sch-items">
-        {!library && <div className="sch-muted">Loading…</div>}
+        {!library && tab !== 'breaks' && <div className="sch-muted">Loading…</div>}
         {library && tab === 'series' && library.series.filter((s) => !query || s.name.toLowerCase().includes(query)).map((s) => {
           const item = { type: 'series', id: s.id, name: s.name, series: s };
           return (
@@ -438,6 +448,134 @@ function Library({ library, layer, canLive, picked, setPicked }) {
           </>
         )}
       </div>
+      )}
+    </div>
+  );
+}
+
+/* ---------------- uploads ---------------- */
+
+const MEDIA_KINDS = [['bumper', 'Bumper'], ['station_id', 'Station ID'], ['promo', 'Promo'], ['show', 'Show']];
+const MEDIA_STATUS = { pending: 'Waiting for review', approved: 'Approved', rejected: 'Not approved' };
+
+function Uploads({ media, reload, channelId, setError, picked, setPicked, drag }) {
+  const { activeUpload, startUpload } = useUpload();
+  const [open, setOpen] = useState(false);
+  const [file, setFile] = useState(null);
+  const [title, setTitle] = useState('');
+  const [kind, setKind] = useState('bumper');
+  const [where, setWhere] = useState('channels');
+  const [formError, setFormError] = useState(null);
+  const uploading = !!activeUpload && ['requesting-url', 'uploading', 'saving'].includes(activeUpload.status);
+
+  // The upload widget does the transfer; refresh the list once it lands.
+  const lastStatus = useRef(null);
+  useEffect(() => {
+    const st = activeUpload ? activeUpload.status : null;
+    if (st === 'done' && lastStatus.current && lastStatus.current !== 'done') reload();
+    lastStatus.current = st;
+  }, [activeUpload, reload]);
+
+  function submit(e) {
+    e.preventDefault();
+    setFormError(null);
+    if (!file) return setFormError('Choose a video file.');
+    if (!title.trim()) return setFormError('Give it a title.');
+    startUpload(file, { channelId, title: title.trim(), kind }, undefined, 'tus', '/api/schedule/media', {
+      label: 'Uploaded for review',
+      meta: 'An admin reviews channel uploads before they can air.'
+    }).catch((err) => setFormError(err.message));
+    setOpen(false);
+    setFile(null);
+    setTitle('');
+    return undefined;
+  }
+
+  async function remove(m) {
+    if (!window.confirm(`Delete "${m.title}"? It also comes off every schedule it's on.`)) return;
+    try {
+      await api('/api/schedule/media', 'DELETE', { channelId, id: m.id });
+      reload();
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  return (
+    <div className="sch-items">
+      {!open && (
+        <button type="button" className="sch-btn" onClick={() => setOpen(true)} disabled={uploading}>
+          {uploading ? 'Uploading… (see the progress box)' : '+ Upload a bumper, ID or show'}
+        </button>
+      )}
+      {formError && !open && <div className="house-ad-error" role="alert">{formError}</div>}
+      {open && (
+        <form className="sch-upform" onSubmit={submit}>
+          <label className="sch-field"><span>Video</span><input id="sch-up-file" type="file" accept="video/*" onChange={(e) => setFile(e.target.files[0] || null)} /></label>
+          <label className="sch-field"><span>Title</span><input id="sch-up-title" value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} placeholder="TapaTV 10 PM station ID" /></label>
+          <label className="sch-field">
+            <span>What is it</span>
+            <select id="sch-up-kind" value={kind} onChange={(e) => setKind(e.target.value)}>
+              {MEDIA_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+            </select>
+          </label>
+          <fieldset className="sch-field sch-where">
+            <span>Where can it play</span>
+            <label>
+              <input type="radio" name="sch-where" checked={where === 'channels'} onChange={() => setWhere('channels')} />
+              <span><b>Channels only</b><small>Stays in your uploads here. Never shows up on-demand.</small></span>
+            </label>
+            <label>
+              <input type="radio" name="sch-where" checked={where === 'ondemand'} onChange={() => setWhere('ondemand')} />
+              <span><b>Channels and on-demand</b><small>Joins the on-demand library after the usual review.</small></span>
+            </label>
+          </fieldset>
+          {where === 'ondemand' ? (
+            <p className="sch-muted">
+              Submit it in <Link href="/creator">Creator Studio</Link> like any title and tick &ldquo;Let channels air this&rdquo;.
+              Once it&rsquo;s approved it shows up under Series or Titles here.
+            </p>
+          ) : (
+            <p className="sch-muted">An admin reviews it before it can be scheduled.</p>
+          )}
+          {formError && <div className="house-ad-error" role="alert">{formError}</div>}
+          <div className="sch-editor-acts">
+            {where === 'channels' && <button type="submit" className="sch-btn primary" disabled={uploading}>Upload for review</button>}
+            <button type="button" className="sch-btn" onClick={() => setOpen(false)}>Cancel</button>
+          </div>
+        </form>
+      )}
+      {!media && <div className="sch-muted">Loading…</div>}
+      {media && media.length === 0 && !open && <div className="sch-muted">No uploads yet.</div>}
+      {media && media.map((m) => {
+        const ready = m.status === 'approved' && !m.held && !!m.durationSeconds;
+        const item = { type: 'media', id: m.id, name: m.title, durationSeconds: m.durationSeconds };
+        const isPicked = !!picked && picked.type === 'media' && picked.id === m.id;
+        return (
+          <div key={m.id} className={`sch-item ${isPicked ? 'picked' : ''}`}>
+            <button
+              type="button"
+              className="sch-item-main"
+              aria-disabled={!ready}
+              onClick={() => ready && setPicked(isPicked ? null : item)}
+              {...(ready ? drag(item) : {})}
+              style={ready ? undefined : { cursor: 'default' }}
+            >
+              <span className="sch-thumb" style={m.thumbnail ? { backgroundImage: `url(${m.thumbnail})` } : undefined} />
+              <span className="sch-item-text">
+                <b>{m.title}</b>
+                <small>{m.kindLabel}{m.durationSeconds ? ` · ${dur(m.durationSeconds)}` : ' · processing'}</small>
+                <span className="sch-chips">
+                  <span className={`sch-chip ${m.held ? 'bad' : m.status === 'approved' ? 'ok' : m.status === 'rejected' ? 'bad' : 'wait'}`}>{m.held ? 'Pulled for review' : MEDIA_STATUS[m.status]}</span>
+                  <span className="sch-chip">Channels only</span>
+                </span>
+                {m.status === 'rejected' && m.rejectionReason && <small className="sch-reject">Admin&rsquo;s note: {m.rejectionReason}</small>}
+              </span>
+            </button>
+            <button type="button" className="sch-expand" onClick={() => remove(m)}>Delete</button>
+          </div>
+        );
+      })}
     </div>
   );
 }

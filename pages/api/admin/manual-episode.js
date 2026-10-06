@@ -190,6 +190,8 @@ export default async function handler(req, res) {
     thumbnail,
     featured: !!body.featured,
     is_original: !!body.isOriginal,
+    // Studio Tapa's own uploads: on unless unticked.
+    channel_opt_in: body.channelOptIn !== false,
     funding_url: normalizeUrl(body.fundingUrl),
     audio_url: body.audioUrl || null,
     audio_bytes: body.audioBytes || null,

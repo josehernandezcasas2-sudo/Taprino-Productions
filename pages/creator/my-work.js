@@ -58,6 +58,9 @@ export async function getServerSideProps({ req, res }) {
 export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, allSeries }) {
   const iconOverrides = usePlayerIconOverrides();
   const [submissions, setSubmissions] = useState(null);
+  const [seriesChannel, setSeriesChannel] = useState({}); // seriesId -> { channelOptIn, canChange }
+  const [channelBusy, setChannelBusy] = useState(null);
+  const [channelError, setChannelError] = useState(null);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -132,7 +135,10 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     try {
       const res = await fetch('/api/creator/my-submissions');
       const data = await res.json();
-      if (res.ok) setSubmissions(data.submissions);
+      if (res.ok) {
+        setSubmissions(data.submissions);
+        setSeriesChannel(data.seriesChannel || {});
+      }
     } catch (err) {
       // Leave submissions as whatever it already was — a failed refresh
       // shouldn't wipe out what's already showing.
@@ -141,6 +147,31 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   }
 
   useEffect(() => { loadSubmissions(); }, []);
+
+  // "Let channels air this" — per title, or per show (covers every episode).
+  async function setChannelOptIn(type, id, optIn) {
+    setChannelBusy(`${type}:${id}`);
+    setChannelError(null);
+    try {
+      const res = await fetch('/api/creator/channel-opt-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, id, optIn })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not change that.');
+      if (type === 'series') {
+        setSeriesChannel((m) => ({ ...m, [id]: { ...(m[id] || {}), channelOptIn: optIn } }));
+        setSubmissions((list) => (list || []).map((x) => (x.seriesId === id ? { ...x, seriesChannelOptIn: optIn } : x)));
+      } else {
+        setSubmissions((list) => (list || []).map((x) => (x.id === id ? { ...x, channelOptIn: optIn } : x)));
+      }
+    } catch (err) {
+      setChannelError(err.message);
+    } finally {
+      setChannelBusy(null);
+    }
+  }
 
   async function requestEpisodeDeletion(reason) {
     const res = await fetch('/api/creator/request-episode-deletion', {
@@ -315,6 +346,22 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
               ? (CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState)
               : (s.runtime || s.description)}
           </div>
+          {s.contentType !== 'bonus' && (
+            s.seriesId && s.seriesChannelOptIn ? (
+              <span className="chan-optin on static" title="Set for the whole show">Channels: on for the whole show</span>
+            ) : (
+              <button
+                type="button"
+                className={`chan-optin ${s.channelOptIn ? 'on' : ''}`}
+                aria-pressed={s.channelOptIn}
+                disabled={channelBusy === `episode:${s.id}`}
+                onClick={() => setChannelOptIn('episode', s.id, !s.channelOptIn)}
+                title={s.channelOptIn ? 'Channels can air this. Click to stop.' : 'Let channels like TapaTV air this'}
+              >
+                <i aria-hidden="true" />Channels: {s.channelOptIn ? 'on' : 'off'}
+              </button>
+            )
+          )}
           {s.status === 'rejected' && s.rejectionReason && (
             <p className="submission-rejection">Admin's note: {s.rejectionReason}</p>
           )}
@@ -396,6 +443,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           </p>
 
           {deleteActionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{deleteActionError}</p>}
+          {channelError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }} role="alert">{channelError}</p>}
 
           {loadingSubmissions && <p>Loading…</p>}
 
@@ -522,6 +570,25 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                         </div>
                         <div className="project-sub">
                           {group.items.length} episode{group.items.length === 1 ? '' : 's'}
+                          {group.isGrouped && (() => {
+                            const sid = group.key.replace('series:', '');
+                            const sc = seriesChannel[sid];
+                            if (!sc) return null;
+                            if (!sc.canChange) return <span className="chan-optin-note"> · Channels: {sc.channelOptIn ? 'on for the whole show' : 'set per episode'}</span>;
+                            return (
+                              <button
+                                type="button"
+                                className={`chan-optin ${sc.channelOptIn ? 'on' : ''}`}
+                                aria-pressed={sc.channelOptIn}
+                                disabled={channelBusy === `series:${sid}`}
+                                onClick={() => setChannelOptIn('series', sid, !sc.channelOptIn)}
+                                title="Covers every episode of this show, now and later"
+                                style={{ marginLeft: '0.6rem' }}
+                              >
+                                <i aria-hidden="true" />Channels: {sc.channelOptIn ? 'on for the whole show' : 'off'}
+                              </button>
+                            );
+                          })()}
                         </div>
                       </div>
                       <div className="project-badges">

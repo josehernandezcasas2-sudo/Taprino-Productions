@@ -7849,3 +7849,38 @@ button.sch-item.sch-item-main.picked { border-color: var(--brass); }
   .sch-items { max-height: 320px; }
   .sch-scroll { max-height: 520px; }
 }
+
+/* Channel opt-in (upload forms, My Work) */
+.optin-box { border: 1px solid var(--brass); background: rgba(248, 95, 115, 0.06); border-radius: 10px; padding: 0.75rem 0.9rem; margin: 0.6rem 0 0.9rem; display: grid; gap: 0.4rem; }
+.optin-box p, .optin-box ul { margin: 0; font-size: 0.85rem; color: var(--ink-dim); }
+.optin-box ul { padding-left: 1.1rem; display: grid; gap: 0.15rem; }
+.optin-box a { color: var(--olive-bright); }
+label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; margin: 0; }
+.optin-toggle input { accent-color: var(--brass); width: auto; margin: 0; }
+.chan-optin { display: inline-flex; align-items: center; gap: 0.35rem; background: transparent; border: 1px solid var(--ocean-ink); color: var(--ink-faint); border-radius: 999px; padding: 0.1rem 0.55rem; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.03em; cursor: pointer; margin-top: 0.3rem; }
+.chan-optin i { width: 7px; height: 7px; border-radius: 50%; background: var(--ink-faint); }
+.chan-optin.on { border-color: var(--brass); color: var(--brass); }
+.chan-optin.on i { background: var(--brass); }
+.chan-optin.static { cursor: default; opacity: 0.85; }
+.chan-optin:disabled:not(.static) { opacity: 0.5; cursor: wait; }
+.chan-optin-note { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
+.sch-upform { display: grid; gap: 0.6rem; background: var(--surface-2); border: 1px solid var(--brass); border-radius: 10px; padding: 0.7rem; }
+.sch-upform input[type='file'] { font-size: 0.78rem; padding: 0.3rem; }
+.sch-where { border: 0; padding: 0; margin: 0; display: grid; gap: 0.35rem; }
+.sch-where label { display: flex; gap: 0.5rem; align-items: flex-start; background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 8px; padding: 0.45rem 0.55rem; }
+.sch-where label input { width: auto; margin-top: 0.25rem; accent-color: var(--brass); }
+.sch-where b { font-family: var(--font-display); font-size: 0.82rem; display: block; }
+.sch-where small { font-size: 0.74rem; color: var(--ink-faint); }
+.sch-chip.ok { background: rgba(132, 205, 152, 0.16); color: var(--ok); }
+.sch-chip.wait { background: var(--olive-shadow); color: var(--olive); }
+.sch-chip.bad { background: var(--danger-deep); color: var(--danger); }
+.sch-reject { color: var(--danger) !important; font-family: var(--font-body) !important; font-size: 0.74rem !important; }
+.sch-slot.k-media { background: linear-gradient(180deg, rgba(200, 89, 36, 0.2), rgba(200, 89, 36, 0.06)); border-color: var(--rust); }
+.cu-list { display: grid; gap: 0.9rem; margin-top: 1.2rem; }
+.cu-card { background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 1rem; display: grid; gap: 0.7rem; }
+.cu-top { display: flex; gap: 0.8rem; align-items: center; }
+.cu-top h3 { font-family: var(--font-display); font-size: 1rem; margin: 0; }
+.cu-thumb { width: 112px; aspect-ratio: 16 / 9; border-radius: 6px; flex: none; background: var(--surface-3) center / cover; }
+.cu-meta { font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); }
+.cu-video { width: 100%; max-width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 8px; }
+.cu-reject textarea { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 8px; padding: 0.5rem; font: inherit; width: 100%; }
