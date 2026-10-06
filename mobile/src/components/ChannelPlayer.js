@@ -1,18 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { LinearGradient } from 'expo-linear-gradient';
+import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet, apiPost } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 
 const SAFETY_POLL_MS = 45000;
+const CONTROLS_HIDE_MS = 3000;
+const { OrientationLock, Orientation } = ScreenOrientation;
 
 function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
 }
+const lock = (o) => ScreenOrientation.lockAsync(o).catch(() => {});
+const isLandscape = (o) => o === Orientation.LANDSCAPE_LEFT || o === Orientation.LANDSCAPE_RIGHT;
+// Turning the device sideways only means something on a phone or tablet;
+// a desktop browser reports its monitor as landscape.
+const CAN_ROTATE = Platform.OS === 'ios' || Platform.OS === 'android';
 
 // Mirrors components/ChannelPlayer.js on the website: plays whatever is on
 // the channel right now, from wherever it is right now, and retunes when
@@ -22,15 +33,28 @@ function withTimeout(promise, ms) {
 // No seeking (it's TV). Scheduled ad breaks show a countdown card: ads
 // aren't on mobile yet, and nothing plays in the gap. The short break the
 // website runs between programs is skipped here for the same reason.
+//
+// Controls sit on the video and fade out while it plays (tap to bring them
+// back). Fullscreen is this component's own sideways view with an exit
+// button, not the system player: turning the phone sideways on the Live
+// screen goes fullscreen, turning it back comes out. The rest of the app
+// stays locked to portrait (src/app/_layout.js).
 export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) {
   const router = useRouter();
   const { getToken } = useAuth();
-  const viewRef = useRef(null);
   const nowRef = useRef(initialNow);
   const pendingSeek = useRef(null);
   const endTimer = useRef(null);
+  const hideTimer = useRef(null);
   const tuneSeq = useRef(0);
   const appActive = useRef(true);
+  const focused = useRef(true);
+  // Turning the phone sideways goes fullscreen until someone leaves
+  // fullscreen with the ✕ button; after that it waits for the button (or
+  // the next visit to the screen), so a phone still held sideways doesn't
+  // bounce straight back in.
+  const autoRotate = useRef(true);
+  const fullscreenRef = useRef(false);
 
   const [now, setNow] = useState(initialNow);
   const [screen, setScreen] = useState('loading'); // null | loading | ad | age | off_air | unavailable
@@ -40,6 +64,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [remaining, setRemaining] = useState(null);
   const [progress, setProgress] = useState(0);
   const [adLeft, setAdLeft] = useState(null);
+  const [fullscreen, setFullscreen] = useState(false);
+  const [controlsShown, setControlsShown] = useState(true);
 
   const player = useVideoPlayer(null, (p) => {
     p.timeUpdateEventInterval = 1;
@@ -100,10 +126,19 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       setScreen('unavailable');
       return;
     }
-    if (seq !== tuneSeq.current) return;
+    if (seq !== tuneSeq.current || !focused.current) return;
     setScreen(null);
-    player.muted = muted;
     player.play();
+  }
+
+  async function catchUp() {
+    const fresh = await fetchNow();
+    if (fresh) {
+      updateNow(fresh);
+      tune(fresh);
+      scheduleNextCheck(fresh);
+    }
+    return fresh;
   }
 
   // Once the new program has loaded, jump to where the channel is now.
@@ -113,7 +148,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         const { offset, at } = pendingSeek.current;
         pendingSeek.current = null;
         player.currentTime = offset + (Date.now() - at) / 1000;
-        player.play();
+        if (focused.current) player.play();
       }
     });
     const playSub = player.addListener('playingChange', ({ isPlaying }) => setPlaying(isPlaying));
@@ -133,6 +168,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     if (!p || !p.endsAt) return;
     const ms = Math.max(2000, Date.parse(p.endsAt) - Date.now() + 1500);
     endTimer.current = setTimeout(async () => {
+      if (!focused.current) return;
       const fresh = await fetchNow();
       if (!fresh) return;
       const prev = nowRef.current || {};
@@ -157,15 +193,86 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelSlug, initialNow]);
 
+  /* ---------------- fullscreen and rotation ---------------- */
+
+  function rememberSpot() {
+    if (screen === null) switchedAt.current = { time: player.currentTime, at: Date.now(), resume: wasPlaying.current };
+  }
+  function enterFullscreen(fromButton) {
+    if (fullscreenRef.current) return;
+    rememberSpot();
+    fullscreenRef.current = true;
+    setFullscreen(true);
+    showControls();
+    if (fromButton) lock(OrientationLock.LANDSCAPE);
+  }
+  function exitFullscreen(fromButton) {
+    if (!fullscreenRef.current) return;
+    rememberSpot();
+    fullscreenRef.current = false;
+    setFullscreen(false);
+    showControls();
+    if (fromButton) autoRotate.current = false;
+    if (fromButton || !autoRotate.current) lock(OrientationLock.PORTRAIT_UP);
+  }
+
+  // The video moves between the inline view and the fullscreen view; keep
+  // it playing across the move if it was playing before (some platforms
+  // pause when a player's view changes).
+  const wasPlaying = useRef(false);
+  const switchedAt = useRef(null); // { time, at } just before the move
+  useEffect(() => {
+    if (!switchedAt.current || !focused.current) return undefined;
+    const { time, at, resume } = switchedAt.current;
+    switchedAt.current = null;
+    const t = setTimeout(() => {
+      // Same spot as before the move (on web each view reloads the video).
+      const expected = time + (resume ? (Date.now() - at) / 1000 : 0);
+      if (Math.abs(player.currentTime - expected) > 2) player.currentTime = expected;
+      if (resume) player.play();
+    }, 150);
+    return () => clearTimeout(t);
+  }, [fullscreen, player]);
+  useEffect(() => {
+    wasPlaying.current = playing;
+  }, [playing]);
+
+  // While the Live screen is showing: rotation allowed (sideways =
+  // fullscreen). Leaving it: back to portrait, out of fullscreen, and the
+  // channel stops playing behind whatever screen is on top. Coming back
+  // catches up to wherever the channel is now.
+  useFocusEffect(
+    useCallback(() => {
+      const wasAway = !focused.current;
+      focused.current = true;
+      autoRotate.current = CAN_ROTATE;
+      if (CAN_ROTATE) ScreenOrientation.unlockAsync().catch(() => {});
+      const sub = ScreenOrientation.addOrientationChangeListener(({ orientationInfo }) => {
+        const o = orientationInfo && orientationInfo.orientation;
+        if (isLandscape(o) && autoRotate.current) enterFullscreen(false);
+        else if (o === Orientation.PORTRAIT_UP && fullscreenRef.current && autoRotate.current) exitFullscreen(false);
+      });
+      if (wasAway) catchUp();
+      return () => {
+        focused.current = false;
+        sub.remove();
+        player.pause();
+        if (fullscreenRef.current) {
+          fullscreenRef.current = false;
+          setFullscreen(false);
+        }
+        lock(OrientationLock.PORTRAIT_UP);
+      };
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [player])
+  );
+
   // Coming back to the app catches up to wherever the channel is now.
   useEffect(() => {
-    const sub = AppState.addEventListener('change', async (st) => {
+    const sub = AppState.addEventListener('change', (st) => {
       const wasActive = appActive.current;
       appActive.current = st === 'active';
-      if (st === 'active' && !wasActive) {
-        const fresh = await fetchNow();
-        if (fresh) { updateNow(fresh); tune(fresh); scheduleNextCheck(fresh); }
-      }
+      if (st === 'active' && !wasActive && focused.current) catchUp();
     });
     return () => sub.remove();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -174,7 +281,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // Safety net: notices a live broadcast starting/ending and corrects drift.
   useEffect(() => {
     const id = setInterval(async () => {
-      if (!appActive.current || screen === 'loading') return;
+      if (!appActive.current || !focused.current || screen === 'loading') return;
       if (!playing && screen === null && !(nowRef.current && nowRef.current.live)) return; // paused on purpose
       const fresh = await fetchNow();
       if (!fresh) return;
@@ -202,16 +309,32 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     return () => clearInterval(id);
   }, [screen, now]);
 
+  /* ---------------- controls ---------------- */
+
+  // Controls fade out a few seconds after the last tap while playing.
+  function showControls() {
+    setControlsShown(true);
+  }
+  useEffect(() => {
+    if (hideTimer.current) clearTimeout(hideTimer.current);
+    if (controlsShown && playing && screen === null) {
+      hideTimer.current = setTimeout(() => setControlsShown(false), CONTROLS_HIDE_MS);
+    }
+    return () => hideTimer.current && clearTimeout(hideTimer.current);
+  }, [controlsShown, playing, screen]);
+
   async function togglePlay() {
+    showControls();
     if (playing) {
       player.pause();
       return;
     }
     // Resuming catches back up to where the channel is now.
-    const fresh = await fetchNow();
-    if (fresh) { updateNow(fresh); tune(fresh); scheduleNextCheck(fresh); } else player.play();
+    const fresh = await catchUp();
+    if (!fresh) player.play();
   }
   function toggleMute() {
+    showControls();
     player.muted = !muted;
     setMuted(!muted);
   }
@@ -219,15 +342,25 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const channelName = now && now.channel ? now.channel.name : '';
   const offset = pacificOffset(now);
   const program = now && now.program;
+  const isLive = !!(now && now.live);
 
-  return (
-    <View>
-      <View style={styles.frame}>
-        <VideoView ref={viewRef} player={player} style={styles.video} contentFit="contain" nativeControls={false} fullscreenOptions={{ enable: true }} />
-        <View style={styles.badge} pointerEvents="none">
-          <View style={[styles.dot, now && now.live ? styles.dotLive : null]} />
-          <Text style={styles.badgeText}>{screen === 'ad' ? 'Ad break' : now && now.live ? `Live · ${channelName}` : `On air · ${channelName}`}</Text>
-        </View>
+  // One overlay for both the inline player and fullscreen (a render
+  // function, not a component, so it isn't remounted on every render).
+  function renderOverlay(full) {
+    return (
+      <>
+        <Pressable style={absoluteFill} onPress={() => setControlsShown((v) => !v)} accessibilityLabel={controlsShown ? 'Hide controls' : 'Show controls'} />
+        {(controlsShown || screen !== null) && (
+          <View style={[styles.badge, full && styles.badgeFull]} pointerEvents="none">
+            <View style={[styles.dot, isLive && styles.dotLive]} />
+            <Text style={styles.badgeText}>{screen === 'ad' ? 'Ad break' : isLive ? `Live · ${channelName}` : `On air · ${channelName}`}</Text>
+          </View>
+        )}
+        {full && (
+          <Pressable style={styles.exit} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Exit fullscreen" hitSlop={12}>
+            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
+          </Pressable>
+        )}
 
         {screen && (
           <View style={styles.card}>
@@ -244,56 +377,107 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               <>
                 <Text style={styles.cardTitle}>Rated {ageInfo.rating}</Text>
                 <Text style={styles.cardSub}>{ageInfo.signedIn ? 'Add your age on your account to watch this one.' : 'Sign in and add your age to watch this one.'}</Text>
-                <Pressable style={styles.cardBtn} onPress={() => router.push('/account')}><Text style={styles.cardBtnText}>{ageInfo.signedIn ? 'Go to account' : 'Sign in'}</Text></Pressable>
+                <Pressable style={styles.cardBtn} onPress={() => { if (full) exitFullscreen(true); router.push('/account'); }}><Text style={styles.cardBtnText}>{ageInfo.signedIn ? 'Go to account' : 'Sign in'}</Text></Pressable>
                 {program && program.endsAt ? <Text style={styles.cardMono}>The channel moves on at {pacificLabel(program.endsAt, offset)}.</Text> : null}
               </>
             )}
+            {full && screen !== 'loading' && (
+              <Pressable style={styles.cardExit} onPress={() => exitFullscreen(true)}><Text style={styles.cardExitText}>Exit fullscreen</Text></Pressable>
+            )}
           </View>
+        )}
+
+        {screen === null && controlsShown && (
+          <LinearGradient colors={['transparent', 'rgba(8,12,20,0.88)']} style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
+            {!isLive && <View style={styles.track}><View style={[styles.trackFill, { width: `${progress * 100}%` }]} /></View>}
+            <View style={styles.buttons}>
+              <Pressable onPress={togglePlay} style={styles.btn} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={10}>
+                <Svg width={full ? 28 : 24} height={full ? 28 : 24} viewBox="0 0 24 24">
+                  {playing
+                    ? <><Rect x="6" y="5" width="4" height="14" rx="1" fill={colors.ink} /><Rect x="14" y="5" width="4" height="14" rx="1" fill={colors.ink} /></>
+                    : <Path d="M8 5v14l11-7z" fill={colors.ink} />}
+                </Svg>
+              </Pressable>
+              <Pressable onPress={toggleMute} style={styles.btn} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute' : 'Mute'} hitSlop={10}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  <Path d="M11 5L6 9H3v6h3l5 4z" />
+                  {muted ? <Path d="M22 9l-6 6M16 9l6 6" /> : <Path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
+                </Svg>
+              </Pressable>
+              <Text style={styles.timeLeft} numberOfLines={1}>
+                {full && program ? `${program.seriesName || program.title}  ·  ` : ''}{!isLive && remaining != null ? `${formatClock(remaining)} left` : isLive ? 'Live' : ''}
+              </Text>
+              <Pressable onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} style={styles.btn} accessibilityRole="button" accessibilityLabel={full ? 'Exit fullscreen' : 'Fullscreen'} hitSlop={10}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                  {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
+                </Svg>
+              </Pressable>
+            </View>
+          </LinearGradient>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <View>
+      <View style={styles.frame}>
+        {fullscreen ? (
+          <View style={styles.elsewhere}><Text style={styles.cardSub}>Playing fullscreen</Text></View>
+        ) : (
+          <>
+            <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />
+            {renderOverlay(false)}
+          </>
         )}
       </View>
 
-      <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${screen === null && !(now && now.live) ? progress * 100 : 0}%` }]} /></View>
-      <View style={styles.controls}>
-        <Pressable onPress={togglePlay} disabled={screen !== null} style={styles.ctrl} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={8}>
-          <Svg width={20} height={20} viewBox="0 0 24 24">
-            {playing
-              ? <><Rect x="6" y="5" width="4" height="14" rx="1" fill={colors.ink} /><Rect x="14" y="5" width="4" height="14" rx="1" fill={colors.ink} /></>
-              : <Path d="M8 5v14l11-7z" fill={screen !== null ? colors.inkFaint : colors.ink} />}
-          </Svg>
-        </Pressable>
-        <Pressable onPress={toggleMute} style={styles.ctrl} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute' : 'Mute'} hitSlop={8}>
-          <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <Path d="M11 5L6 9H3v6h3l5 4z" />
-            {muted ? <Path d="M22 9l-6 6M16 9l6 6" /> : <Path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
-          </Svg>
-        </Pressable>
-        <Text style={styles.timeLeft}>{screen === null && remaining != null && !(now && now.live) ? `${formatClock(remaining)} left` : ''}</Text>
-        <Pressable onPress={() => viewRef.current && viewRef.current.enterFullscreen()} disabled={screen !== null} style={styles.ctrl} accessibilityRole="button" accessibilityLabel="Fullscreen" hitSlop={8}>
-          <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={screen !== null ? colors.inkFaint : colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-            <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-          </Svg>
-        </Pressable>
-      </View>
+      <Modal
+        visible={fullscreen}
+        animationType="fade"
+        presentationStyle="fullScreen"
+        supportedOrientations={['landscape', 'landscape-left', 'landscape-right', 'portrait']}
+        onRequestClose={() => exitFullscreen(true)}
+        statusBarTranslucent
+      >
+        <StatusBar hidden />
+        <View style={styles.fullRoot}>
+          {fullscreen && <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />}
+          <SafeAreaView style={absoluteFill} edges={['left', 'right', 'top', 'bottom']} pointerEvents="box-none">
+            <View style={styles.fullInner} pointerEvents="box-none">
+              {renderOverlay(true)}
+            </View>
+          </SafeAreaView>
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  frame: { aspectRatio: 16 / 9, width: '100%', backgroundColor: '#000', borderTopLeftRadius: 12, borderTopRightRadius: 12, overflow: 'hidden' },
-  video: { ...absoluteFill },
+  frame: { aspectRatio: 16 / 9, width: '100%', backgroundColor: '#000', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.oceanInk },
+  elsewhere: { ...absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface0 },
+  fullRoot: { flex: 1, backgroundColor: '#000' },
+  fullInner: { flex: 1 },
   badge: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,11,15,0.7)', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999 },
+  badgeFull: { top: 14, left: 64 },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.olive },
   dotLive: { backgroundColor: colors.brass },
   badgeText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.ink },
+  exit: { position: 'absolute', top: 8, left: 12, width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(10,11,15,0.7)', alignItems: 'center', justifyContent: 'center' },
   card: { ...absoluteFill, alignItems: 'center', justifyContent: 'center', gap: 6, padding: 20, backgroundColor: colors.surface0 },
   cardTitle: { fontFamily: fonts.displaySemi, fontSize: 17, color: colors.ink, textAlign: 'center' },
   cardSub: { fontFamily: fonts.body, fontSize: 14, color: colors.inkDim, textAlign: 'center' },
   cardMono: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint, marginTop: 4 },
   cardBtn: { marginTop: 6, backgroundColor: colors.olive, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 18 },
   cardBtnText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.oliveShadow },
-  progressTrack: { height: 3, backgroundColor: 'rgba(251,232,211,0.15)' },
-  progressFill: { height: 3, backgroundColor: colors.brass },
-  controls: { flexDirection: 'row', alignItems: 'center', gap: 14, paddingVertical: 9, paddingHorizontal: 12, backgroundColor: colors.surface1, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, borderWidth: 1, borderTopWidth: 0, borderColor: colors.oceanInk },
-  ctrl: { padding: 2 },
-  timeLeft: { flex: 1, textAlign: 'right', fontFamily: fonts.mono, fontSize: 11, color: colors.inkDim }
+  cardExit: { marginTop: 10, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 16 },
+  cardExitText: { fontFamily: fonts.display, fontSize: 13, color: colors.ink },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 26, paddingHorizontal: 10, paddingBottom: 8 },
+  barFull: { paddingHorizontal: 18, paddingBottom: 14 },
+  track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.22)', marginBottom: 8, marginHorizontal: 4 },
+  trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },
+  buttons: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  btn: { padding: 4 },
+  timeLeft: { flex: 1, textAlign: 'right', fontFamily: fonts.mono, fontSize: 11.5, color: colors.ink }
 });

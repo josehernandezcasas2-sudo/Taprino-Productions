@@ -7,6 +7,7 @@ import { Fraunces_400Regular, Fraunces_700Bold } from '@expo-google-fonts/fraunc
 import { IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold } from '@expo-google-fonts/ibm-plex-mono';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import * as ScreenOrientation from 'expo-screen-orientation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from '../components/BottomNav';
@@ -27,6 +28,13 @@ export default function RootLayout() {
     Fraunces_400Regular, Fraunces_700Bold,
     IBMPlexMono_400Regular, IBMPlexMono_500Medium, IBMPlexMono_700Bold
   });
+  // The app is portrait everywhere. app.json allows rotation only so the
+  // Live player's fullscreen can turn sideways (components/ChannelPlayer.js
+  // unlocks and relocks around it).
+  useEffect(() => {
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.PORTRAIT_UP).catch(() => {});
+  }, []);
+
   // Hold the first paint for the fonts (so text doesn't visibly swap), but
   // never block forever — after 3s fall through to system fonts.
   const [fontWaitExpired, setFontWaitExpired] = useState(false);
