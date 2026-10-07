@@ -110,6 +110,18 @@ body {
 a { color: inherit; }
 button { font-family: inherit; cursor: pointer; }
 
+/* Scrollbars match the dark theme everywhere: the page itself, guide and
+   category rows, the scheduler's panels. Rows that hide their scrollbar on
+   purpose (scrollbar-width: none / ::-webkit-scrollbar { display: none })
+   still do; those rules are more specific than these. Chrome 121+ and
+   Firefox use the standard properties, Safari the -webkit- ones. */
+* { scrollbar-width: thin; scrollbar-color: var(--ocean-ink) var(--surface-1); }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: var(--surface-1); border-radius: 6px; }
+::-webkit-scrollbar-thumb { background: var(--ocean-ink); border-radius: 6px; border: 2px solid var(--surface-1); }
+::-webkit-scrollbar-thumb:hover { background: #3b5283; }
+::-webkit-scrollbar-corner { background: var(--surface-1); }
+
 :focus-visible {
   outline: 2px solid var(--signal-amber);
   outline-offset: 3px;
@@ -7796,11 +7808,6 @@ button.sch-item.sch-item-main.picked { border-color: var(--brass); }
 
 /* Scheduler v2: a draft you save, calendar-style drag/resize, ghosts of
    the default schedule, the now line, tablet/computer only. */
-.sch-page .sch-scroll, .sch-page .sch-items { scrollbar-width: thin; scrollbar-color: var(--ocean-ink) var(--surface-1); }
-.sch-page .sch-scroll::-webkit-scrollbar, .sch-page .sch-items::-webkit-scrollbar { width: 10px; height: 10px; }
-.sch-page .sch-scroll::-webkit-scrollbar-track, .sch-page .sch-items::-webkit-scrollbar-track { background: var(--surface-1); border-radius: 6px; }
-.sch-page .sch-scroll::-webkit-scrollbar-thumb, .sch-page .sch-items::-webkit-scrollbar-thumb { background: var(--ocean-ink); border-radius: 6px; border: 2px solid var(--surface-1); }
-.sch-page .sch-scroll::-webkit-scrollbar-thumb:hover, .sch-page .sch-items::-webkit-scrollbar-thumb:hover { background: #3b5283; }
 .sch-phone { display: none; }
 .sch-phone p { color: var(--ink-dim); max-width: 40ch; }
 .sch-phone h1 { font-family: var(--font-display); font-size: 1.6rem; margin: 0.2rem 0 0.8rem; }
