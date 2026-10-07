@@ -8,7 +8,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches, getLikedPitchIds, getPitchLikeCounts, getSavedPitchIds } from '../../lib/pitches';
 import { getSiteSettings } from '../../lib/siteSettings';
 import MobileTabBar from '../../components/MobileTabBar';
-import { ElevatorButton, ElevatorCab, ElevatorCard, FloorIndicator, motionTimings } from '../../components/PitchElevator';
+import { ElevatorButton, ElevatorCab, ElevatorCard, motionTimings } from '../../components/PitchElevator';
 import { SITE } from '../../lib/siteConfig';
 import { readLocalProgress, saveLocalProgress, clearLocalProgress, reconstructFromIds } from '../../lib/swipeProgressStorage';
 
@@ -56,8 +56,8 @@ function shuffled(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
 }
 
-// Every pitch is a floor. Swiping the card rides the elevator — left or
-// right goes up to the next floor (right also likes, Tinder-style, same as
+// Every pitch is a floor. Swiping the card rides the elevator — left, right
+// or up goes to the next floor (right also likes, Tinder-style, same as
 // the old swipe deck), down holds the pitch for a second look and moves
 // on. The right plate reacts to the pitch on this floor (Save/Share/Like).
 // Unlike the old swipe deck, the whole ordered deck is kept and you ride it
@@ -92,12 +92,10 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const [likeCounts, setLikeCounts] = useState(initialLikeCounts || {});
   const [finished, setFinished] = useState(false);
 
-  // The car itself: doors, which way the indicator arrow points, and
-  // whether a ride is mid-flight (swipes and keyboard rides are ignored
-  // until the doors have reopened).
+  // The car itself: doors, and whether a ride is mid-flight (swipes and
+  // keyboard rides are ignored until the doors have reopened).
   const [doorsClosed, setDoorsClosed] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [direction, setDirection] = useState(null);
   const [flipped, setFlipped] = useState(false);
 
   const [toast, setToast] = useState(null);
@@ -111,16 +109,16 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const current = deck[floor];
   const currentHeld = Boolean(current) && held.some((p) => p.id === current.id);
 
-  // .pitch-discover-banners floats over the stage rather than sitting in
-  // the centered flex column (see its own CSS comment) so the car isn't
-  // pushed around by whether a banner is showing — but a fixed top offset
-  // for that banner can't know how tall its own text will actually wrap
-  // to at a given width (three lines on a narrow phone vs. one on
-  // desktop). Measuring the banner and feeding the result back in as
-  // --pitch-banner-clearance (consumed by .swipe-deck-wrap as padding)
-  // means the car only ever gives up exactly as much room as this
-  // specific banner, on this specific screen, actually needs — same
-  // pattern MobileTabBar.js already uses for --vv-bottom-gap.
+  // .pitch-discover-banners floats over the car's top strip (see its own
+  // CSS comment) so the car keeps the whole screen whether or not a
+  // banner is showing — but the card inside has to start below the
+  // banner, and a fixed offset can't know how tall the banner's text
+  // will actually wrap to at a given width (three lines on a narrow
+  // phone vs. one on desktop). Measuring the banner and feeding the
+  // result back in as --pitch-banner-clearance (consumed by .elev-stage
+  // as --elev-top-inset) means the card only ever gives up exactly as
+  // much room as this specific banner, on this specific screen, actually
+  // needs — same pattern MobileTabBar.js already uses for --vv-bottom-gap.
   // ResizeObserver (not just a window resize listener) also catches the
   // banner's own height changing from text reflow alone, e.g. a saveError
   // banner appearing/changing without any viewport resize at all.
@@ -129,17 +127,15 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(([entry]) => {
       const height = entry.contentRect.height;
-      // The banner floats from its own fixed top offset (see .pitch-
-      // discover-banners), which is lower than where .swipe-deck-wrap
-      // starts — so the clearance the wrap needs is "down to the
-      // banner's bottom edge", measured from the wrap's own top, not
-      // just the banner's height. The wrap's top edge doesn't move when
-      // its padding changes, so this doesn't feed back on itself.
+      // Measured as "from the car's top edge (= the deck wrap's top) down
+      // to the banner's bottom edge", not just the banner's height, since
+      // the banner floats from its own offset. Nothing here moves when
+      // the card's inset changes, so this doesn't feed back on itself.
       let clearance = 0;
       if (height > 0) {
         const bannerRect = el.getBoundingClientRect();
         const wrapTop = deckWrapRef.current ? deckWrapRef.current.getBoundingClientRect().top : bannerRect.top;
-        clearance = Math.max(0, Math.round(bannerRect.bottom - wrapTop + 16));
+        clearance = Math.max(0, Math.round(bannerRect.bottom - wrapTop + 12));
       }
       document.documentElement.style.setProperty('--pitch-banner-clearance', `${clearance}px`);
     });
@@ -290,7 +286,6 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     const { door, dwell } = motionTimings();
 
     setMoving(true);
-    setDirection(dir > 0 ? 'up' : 'down');
     setDoorsClosed(true);
 
     later(() => {
@@ -313,7 +308,6 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
       }
       later(() => {
         setDoorsClosed(false);
-        setDirection(null);
         later(() => setMoving(false), door);
       }, dwell);
     }, door);
@@ -334,14 +328,15 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     ride(1, nextHeld);
   }
 
-  // What a swipe on the card means — same mapping as the old swipe deck:
-  // right = like (and move on), left = pass, down = hold for a second look.
+  // What a swipe on the card means — same mapping as the old swipe deck,
+  // plus up: right = like (and move on), left or up = next, down = hold
+  // for a second look.
   function handleSwipe(swipeDirection) {
     if (!current || moving) return;
     if (swipeDirection === 'right') {
       if (!likedIds.has(current.id)) toggleLike(current);
       ride(1);
-    } else if (swipeDirection === 'left') {
+    } else if (swipeDirection === 'left' || swipeDirection === 'up') {
       ride(1);
     } else if (swipeDirection === 'down') {
       hold();
@@ -492,13 +487,6 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
           ) : (
             <div className="elev-stage">
               <ElevatorCab closed={doorsClosed}>
-                <FloorIndicator
-                  floor={floor}
-                  total={Math.max(deck.length, 1)}
-                  direction={direction}
-                  secondLook={round === 2 && !finished}
-                  lobby={finished}
-                />
                 {round === 2 && !finished && (
                   <div className="elev-round-tag">Second look — the ones you held</div>
                 )}

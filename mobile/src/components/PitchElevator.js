@@ -10,10 +10,9 @@ import Svg, { Circle, Line, Path } from 'react-native-svg';
 import SmartImage from './SmartImage';
 import { absoluteFill, colors, fonts } from '../lib/theme';
 
-// Port of components/PitchElevator.js from the website: the floor
-// indicator (inside the cab, above the doors), the cab (interior + sliding
-// doors), the round steel buttons on the right-hand plate, and the
-// swipeable, flippable pitch card in the middle. Same split as the web —
+// Port of components/PitchElevator.js from the website: the cab (interior
+// + sliding doors), the round steel buttons on the right-hand plate, and
+// the swipeable, flippable pitch card in the middle. Same split as the web —
 // these only render; the discover screen owns the ride state machine.
 
 // Same numbers as the web's DOOR_MS / DWELL_MS / EXIT_MS.
@@ -33,10 +32,6 @@ const steel = { s0: '#1a2338', s1: '#2b3852', s2: '#3d4b6a', s3: '#5a6a8d', hi: 
 const LAMP = colors.olive;
 const LAMP_GLOW = 'rgba(231,162,85,0.55)';
 const easeDoors = Easing.bezier(0.4, 0, 0.2, 1);
-
-function pad(n) {
-  return String(n).padStart(2, '0');
-}
 
 // ---------- Icons (color passed in, like currentColor on the web) ----------
 export function BookmarkIcon({ size = 19, color = colors.ink, active }) {
@@ -79,22 +74,6 @@ function BackArrowIcon({ size = 12, color = colors.ink }) {
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="12" cy="12" r="9.5" /><Path d="M13.5 8.5L10 12l3.5 3.5" />
     </Svg>
-  );
-}
-
-// ---------- Floor indicator ----------
-export function FloorIndicator({ floor, total, direction, secondLook, lobby }) {
-  return (
-    <LinearGradient colors={[steel.s1, steel.s0]} style={styles.indicator}>
-      <Text style={styles.indicatorLabel}>FLOOR</Text>
-      <Text style={styles.indicatorNum}>{lobby ? 'L' : pad(floor + 1)}</Text>
-      <Text style={styles.indicatorOf}>/ {pad(total)}</Text>
-      <View style={styles.indicatorArrows}>
-        <Text style={[styles.indicatorArrow, direction === 'up' && styles.indicatorArrowOn]}>▲</Text>
-        <Text style={[styles.indicatorArrow, direction === 'down' && styles.indicatorArrowOn]}>▼</Text>
-      </View>
-      {secondLook ? <Text style={styles.indicatorRound}>2ND LOOK</Text> : null}
-    </LinearGradient>
   );
 }
 
@@ -172,10 +151,13 @@ export function ElevatorButton({ icon, label, lit, variant, disabled, onPress, a
 // ---------- The card: drag to swipe, tap to flip ----------
 // Same gesture rules as the old PitchSwipeCard: a Pan for the swipe and a
 // Tap for the flip, raced (a Pan only activates once the finger has moved
-// several pixels, so a real tap would never reach it). Both are enabled
-// on the front only — the back's body scrolls on its own and has its own
-// Front button. onSwipe fires as soon as a swipe commits so the screen can
-// start closing the doors while the card is still flying out.
+// several pixels, so a real tap would never reach it). The front takes
+// swipes in every direction. The back swipes sideways only — a vertical
+// drag there fails the Pan fast so the body's ScrollView scrolls — and
+// flips back on a tap of its text (a Pressable, so it yields to the
+// scroll and to the links inside). onSwipe fires as soon as a swipe
+// commits so the screen can start closing the doors while the card is
+// still flying out.
 export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
   const router = useRouter();
   const translateX = useSharedValue(0);
@@ -192,7 +174,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
     if (exiting) return;
     setExiting(true);
     const exitX = direction === 'right' ? 600 : direction === 'left' ? -600 : 0;
-    const exitY = direction === 'down' ? 800 : -200;
+    const exitY = direction === 'down' ? 800 : direction === 'up' ? -800 : -200;
     translateX.value = withTiming(exitX, { duration: EXIT_MS });
     translateY.value = withTiming(exitY, { duration: EXIT_MS });
     cardOpacity.value = withTiming(0, { duration: EXIT_MS });
@@ -203,10 +185,10 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
     onFlip(true);
   }
 
-  const gesturesOn = !flipped && !disabled && !exiting;
+  const live = !disabled && !exiting;
 
   const panGesture = Gesture.Pan()
-    .enabled(gesturesOn)
+    .enabled(live)
     .onUpdate((e) => {
       translateX.value = e.translationX;
       translateY.value = e.translationY;
@@ -220,6 +202,8 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
         runOnJS(commitExit)('right');
       } else if (absX >= absY && dx < -THRESHOLD_X) {
         runOnJS(commitExit)('left');
+      } else if (absY > absX && dy < -THRESHOLD_Y) {
+        runOnJS(commitExit)('up');
       } else if (absY > absX && dy > THRESHOLD_Y) {
         runOnJS(commitExit)('down');
       } else {
@@ -227,9 +211,12 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
         translateY.value = withTiming(0, { duration: EXIT_MS });
       }
     });
+  // On the back, only a clearly sideways drag is a swipe — a vertical one
+  // fails within a few pixels so the body's ScrollView gets to scroll.
+  if (flipped) panGesture.activeOffsetX([-16, 16]).failOffsetY([-12, 12]);
 
   const tapGesture = Gesture.Tap()
-    .enabled(gesturesOn)
+    .enabled(live && !flipped)
     .maxDistance(TAP_THRESHOLD * 2)
     .onEnd((_e, success) => {
       if (success) runOnJS(flipToBack)();
@@ -255,6 +242,10 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
   const holdBadgeStyle = useAnimatedStyle(() => {
     const dominant = Math.abs(translateY.value) > Math.abs(translateX.value);
     return { opacity: dominant ? Math.max(0, Math.min(1, translateY.value / THRESHOLD_Y)) : 0 };
+  });
+  const nextBadgeStyle = useAnimatedStyle(() => {
+    const dominant = Math.abs(translateY.value) > Math.abs(translateX.value);
+    return { opacity: dominant ? Math.max(0, Math.min(1, -translateY.value / THRESHOLD_Y)) : 0 };
   });
   // The hint shares the top-center with the HOLD badge; it steps aside
   // as soon as a drag starts.
@@ -286,6 +277,9 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
         <Animated.View style={[styles.badge, styles.badgeHold, holdBadgeStyle]} pointerEvents="none">
           <Text style={[styles.badgeText, { color: colors.olive, borderColor: colors.olive }]}>HOLD</Text>
         </Animated.View>
+        <Animated.View style={[styles.badge, styles.badgeNext, nextBadgeStyle]} pointerEvents="none">
+          <Text style={[styles.badgeText, { color: colors.sky, borderColor: colors.sky }]}>NEXT</Text>
+        </Animated.View>
 
         {/* Front: the whole face is the tap target (via the Tap gesture). */}
         <Animated.View style={[styles.face, frontStyle]} pointerEvents={flipped ? 'none' : 'auto'}>
@@ -303,14 +297,16 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
           </View>
         </Animated.View>
 
-        {/* Back: scrolls on its own, so only the Front button turns it back. */}
+        {/* Back: the body scrolls on its own; a tap on its text (not on a
+            link) turns the card back over, and so does the Front button. */}
         <Animated.View style={[styles.face, backStyle]} pointerEvents={flipped ? 'auto' : 'none'}>
           <LinearGradient colors={[colors.surface2, colors.surface1]} style={absoluteFill} pointerEvents="none" />
           <Pressable style={styles.backBtn} onPress={() => onFlip(false)} hitSlop={6} accessibilityLabel="Back to the front of the card">
             <BackArrowIcon size={11} />
             <Text style={styles.backBtnText}>  FRONT</Text>
           </Pressable>
-          <ScrollView style={styles.backBody} contentContainerStyle={styles.backBodyContent}>
+          <ScrollView style={styles.backBody} contentContainerStyle={styles.backScroll}>
+            <Pressable style={styles.backBodyContent} onPress={() => onFlip(false)} accessibilityRole="button" accessibilityLabel="Turn the card back over">
             {pitch.tag ? <Text style={styles.tag}>{pitch.tag.toUpperCase()}</Text> : null}
             <Text style={styles.backTitle}>{pitch.title}</Text>
             {(pitch.description || pitch.logline) ? <Text style={styles.description}>{pitch.description || pitch.logline}</Text> : null}
@@ -336,6 +332,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
             <Pressable onPress={() => router.push(`/pitches/${pitch.id}`)} hitSlop={6}>
               <Text style={styles.learnMore}>View full pitch →</Text>
             </Pressable>
+            </Pressable>
           </ScrollView>
         </Animated.View>
       </Animated.View>
@@ -344,20 +341,6 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
 }
 
 const styles = StyleSheet.create({
-  // Indicator (positioned by the screen, inside the cab)
-  indicator: {
-    flexDirection: 'row', alignItems: 'center', gap: 9,
-    paddingVertical: 6, paddingHorizontal: 13, borderRadius: 8,
-    borderWidth: 1, borderColor: steel.s2
-  },
-  indicatorLabel: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 1.8, color: colors.inkFaint },
-  indicatorNum: { fontFamily: fonts.monoBold, fontSize: 21, color: LAMP, letterSpacing: 1, minWidth: 30, textAlign: 'center', textShadowColor: LAMP_GLOW, textShadowRadius: 10, fontVariant: ['tabular-nums'] },
-  indicatorOf: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint, fontVariant: ['tabular-nums'] },
-  indicatorArrows: { gap: 1 },
-  indicatorArrow: { fontSize: 8, lineHeight: 9, color: steel.s3 },
-  indicatorArrowOn: { color: LAMP, textShadowColor: LAMP_GLOW, textShadowRadius: 8 },
-  indicatorRound: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1, color: colors.surface0, backgroundColor: colors.mint, borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1, overflow: 'hidden' },
-
   // Car + cab — the car takes the box it's given (the screen makes it
   // fill the space between the top nav and the tab bar).
   car: {
@@ -396,14 +379,15 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 18 }, shadowOpacity: 0.55, shadowRadius: 40, elevation: 12
   },
   face: { ...absoluteFill, borderRadius: 14, overflow: 'hidden', backfaceVisibility: 'hidden', backgroundColor: colors.surface2 },
-  badge: { position: 'absolute', top: 24, zIndex: 3 },
+  badge: { position: 'absolute', zIndex: 3 },
   badgeText: {
     fontFamily: fonts.displayBold, fontSize: 22, letterSpacing: 2,
     paddingVertical: 4, paddingHorizontal: 12, borderRadius: 8, borderWidth: 3, overflow: 'hidden'
   },
-  badgeLike: { left: 18, transform: [{ rotate: '-18deg' }] },
-  badgePass: { right: 18, transform: [{ rotate: '18deg' }] },
-  badgeHold: { left: '50%', marginLeft: -48 },
+  badgeLike: { top: 24, left: 18, transform: [{ rotate: '-18deg' }] },
+  badgePass: { top: 24, right: 18, transform: [{ rotate: '18deg' }] },
+  badgeHold: { top: 24, left: '50%', marginLeft: -48 },
+  badgeNext: { bottom: 24, left: '50%', marginLeft: -46 },
   hint: { position: 'absolute', top: 10, alignSelf: 'center', flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(251,232,211,0.15)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
   hintText: { fontFamily: fonts.mono, fontSize: 8.5, letterSpacing: 1, color: colors.inkDim },
   copy: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 15, paddingBottom: 16, gap: 5 },
@@ -414,7 +398,8 @@ const styles = StyleSheet.create({
   backBtn: { position: 'absolute', top: 8, left: 10, zIndex: 2, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', backgroundColor: 'rgba(12,19,31,0.4)', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
   backBtnText: { fontFamily: fonts.mono, fontSize: 8.5, letterSpacing: 1, color: colors.ink },
   backBody: { flex: 1 },
-  backBodyContent: { padding: 15, paddingTop: 36, gap: 9 },
+  backScroll: { flexGrow: 1 },
+  backBodyContent: { flexGrow: 1, padding: 15, paddingTop: 36, gap: 9 },
   backTitle: { fontFamily: fonts.displayBold, fontSize: 17, lineHeight: 20, color: colors.ink },
   description: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.inkDim },
   funding: { gap: 5 },

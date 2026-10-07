@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { BackArrowIcon, InfoIcon } from './PlayerIcons';
 
 // The pieces of Pitch Room Discover's elevator (pages/pitches/discover.js):
-// the floor indicator above the doors, the cab (interior + sliding doors),
+// the cab (interior + sliding doors),
 // the round steel buttons on the right-hand plate, and the swipeable,
 // flippable pitch card in the middle. None of these know about the deck,
 // the floor you're on, or what a swipe means — the page owns that state
@@ -27,28 +27,9 @@ export function motionTimings() {
   return { door: DOOR_MS, dwell: DWELL_MS, exit: EXIT_MS };
 }
 
-function pad(n) {
-  return String(n).padStart(2, '0');
-}
-
-export function FloorIndicator({ floor, total, direction, secondLook, lobby }) {
-  return (
-    <div className={`elev-indicator ${secondLook ? 'elev-indicator-second' : ''}`} aria-live="polite" aria-atomic="true">
-      <span className="elev-indicator-label">Floor</span>
-      <span className="elev-indicator-num">{lobby ? 'L' : pad(floor + 1)}</span>
-      <span className="elev-indicator-of">/ {pad(total)}</span>
-      <span className="elev-indicator-arrows" aria-hidden="true">
-        <span className={direction === 'up' ? 'on' : ''}>▲</span>
-        <span className={direction === 'down' ? 'on' : ''}>▼</span>
-      </span>
-      {secondLook && <span className="elev-indicator-round">2nd look</span>}
-    </div>
-  );
-}
-
 // The cab interior (wall panels, handrail, floor, ceiling lamp) with the
 // two door leaves on top of everything. `closed` slides the doors shut;
-// whatever's rendered as children (card, plate, indicator, lobby) sits
+// whatever's rendered as children (card, plate, lobby) sits
 // behind them unless it raises its own z-index above the doors'.
 export function ElevatorCab({ closed, children }) {
   return (
@@ -98,19 +79,21 @@ function formatDeadline(dateStr) {
 }
 
 const THRESHOLD_X = 100; // px horizontal drag to commit a left/right swipe
-const THRESHOLD_Y = 120; // px downward drag to commit a hold — taller than
-// THRESHOLD_X since a downward drag is easier to do accidentally while
-// scrolling on a touch device than a deliberate sideways swipe is.
+const THRESHOLD_Y = 120; // px vertical drag to commit a hold (down) or a
+// next (up) — taller than THRESHOLD_X since a vertical drag is easier to
+// do accidentally while scrolling on a touch device than a deliberate
+// sideways swipe is.
 const TAP_THRESHOLD = 6; // px — below this, a released pointer counts as a
 // tap (flips the card) rather than an aborted drag (snaps back to center).
 
 // Front: poster, tag, title, logline, creator. Back: full description,
-// funding, deadline, team, link to the pitch page. Drag it left/right/down
+// funding, deadline, team, link to the pitch page. Drag it in any direction
 // to swipe (onSwipe gets the direction; the page decides what that means
-// and rides the elevator), tap it to flip. Same thresholds and gesture
-// rules as the old PitchSwipeCard. The back flips only via its own Front
-// button, because its body scrolls on its own and a tap landing on that
-// text can't be told apart from the start of a scroll.
+// and rides the elevator), tap either face to flip it. Same thresholds as
+// the old PitchSwipeCard. Both faces drag and tap; on the back, the
+// scrolling body keeps touch-action: pan-y, so a vertical finger there
+// scrolls the text (the browser cancels our pointer — see
+// handlePointerCancel) while a sideways one still swipes.
 export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
   const [drag, setDrag] = useState({ dx: 0, dy: 0, dragging: false });
   const [exiting, setExiting] = useState(null); // null | 'left' | 'right' | 'down'
@@ -123,10 +106,8 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
     // otherwise a stray right-click or a second touch finger could start
     // tracking a drag the user never intended.
     if (e.button !== undefined && e.button !== 0) return;
-    // Links and buttons inside the card own their own taps, and the back
-    // face's scrolling body owns its own touch (see .elev-card-back-body's
-    // touch-action) — none of those should start a drag.
-    if (e.target.closest && e.target.closest('a, button, .elev-card-back-body')) return;
+    // Links and buttons inside the card own their own taps.
+    if (e.target.closest && e.target.closest('a, button')) return;
     startRef.current = { x: e.clientX, y: e.clientY };
     pointerIdRef.current = e.pointerId;
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -144,6 +125,13 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
     }
   }
 
+  // The browser took the pointer for its own scrolling (a vertical finger
+  // on the back's body) — abandon the drag without committing anything.
+  function handlePointerCancel(e) {
+    releaseDrag(e);
+    if (drag.dragging) setDrag({ dx: 0, dy: 0, dragging: false });
+  }
+
   function handlePointerUp(e) {
     releaseDrag(e);
     if (!drag.dragging || exiting) return;
@@ -155,13 +143,15 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
       commit('right');
     } else if (absX >= absY && dx < -THRESHOLD_X) {
       commit('left');
+    } else if (absY > absX && dy < -THRESHOLD_Y) {
+      commit('up');
     } else if (absY > absX && dy > THRESHOLD_Y) {
       commit('down');
     } else if (absX < TAP_THRESHOLD && absY < TAP_THRESHOLD) {
-      // Barely moved at all — a tap, not an aborted drag. Flips the card
-      // (front only; the back has its own Front button).
+      // Barely moved at all — a tap, not an aborted drag. Turns the card
+      // over, whichever face is showing.
       setDrag({ dx: 0, dy: 0, dragging: false });
-      if (!flipped) onFlip(true);
+      onFlip(!flipped);
     } else {
       // Below threshold but moved more than a tap — snap back to center.
       // The CSS transition only applies once dragging stops, so this
@@ -183,10 +173,12 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
   const likeOpacity = dominant === 'horizontal' ? Math.max(0, Math.min(1, drag.dx / THRESHOLD_X)) : 0;
   const passOpacity = dominant === 'horizontal' ? Math.max(0, Math.min(1, -drag.dx / THRESHOLD_X)) : 0;
   const holdOpacity = dominant === 'vertical' ? Math.max(0, Math.min(1, drag.dy / THRESHOLD_Y)) : 0;
+  const nextOpacity = dominant === 'vertical' ? Math.max(0, Math.min(1, -drag.dy / THRESHOLD_Y)) : 0;
 
   const exitTransforms = {
     right: 'translate(160%, -30%) rotate(24deg)',
     left: 'translate(-160%, -30%) rotate(-24deg)',
+    up: 'translate(0, -160%) rotate(0deg)',
     down: 'translate(0, 160%) rotate(0deg)'
   };
   const transform = exiting
@@ -209,7 +201,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      onPointerCancel={handlePointerUp}
+      onPointerCancel={handlePointerCancel}
       // No transition while actively dragging — the card must track the
       // pointer with zero lag. Once released (committed or snapping back),
       // the stylesheet's transition eases it the rest of the way.
@@ -218,6 +210,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
       <div className="elev-badge elev-badge-like" style={{ opacity: likeOpacity }}>LIKE</div>
       <div className="elev-badge elev-badge-pass" style={{ opacity: passOpacity }}>PASS</div>
       <div className="elev-badge elev-badge-hold" style={{ opacity: holdOpacity }}>HOLD</div>
+      <div className="elev-badge elev-badge-next" style={{ opacity: nextOpacity }}>NEXT</div>
 
       <div className="elev-card-perspective">
       <div className={`elev-card-flip ${flipped ? 'elev-card-flipped' : ''}`}>

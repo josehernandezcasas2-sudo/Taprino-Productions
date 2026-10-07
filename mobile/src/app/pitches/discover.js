@@ -4,7 +4,7 @@ import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  BookmarkIcon, CheckIcon, DOOR_MS, DWELL_MS, ElevatorButton, ElevatorCab, ElevatorCard, FloorIndicator, HeartIcon, ShareIcon
+  BookmarkIcon, CheckIcon, DOOR_MS, DWELL_MS, ElevatorButton, ElevatorCab, ElevatorCard, HeartIcon, ShareIcon
 } from '../../components/PitchElevator';
 import { API_BASE_URL, apiDelete, apiGet, apiPost } from '../../lib/api';
 import { absoluteFill, colors, fonts } from '../../lib/theme';
@@ -35,9 +35,9 @@ function withTimeout(promise, ms) {
 }
 
 // Port of pages/pitches/discover.js: every pitch is a floor. Swiping the
-// card rides the elevator — left or right goes up to the next floor (right
-// also likes, same as the old swipe deck), down holds the pitch for a
-// second look and moves on. The right plate reacts to the pitch on this
+// card rides the elevator — left, right or up goes to the next floor
+// (right also likes, same as the old swipe deck), down holds the pitch for
+// a second look and moves on. The right plate reacts to the pitch on this
 // floor (Save/Share/Like). Same ride state machine and progress
 // persistence (with floorIndex) as the web. Signed-out visitors get a
 // fresh ride each time — no AsyncStorage equivalent of the website's
@@ -60,7 +60,6 @@ export default function PitchDiscover() {
 
   const [doorsClosed, setDoorsClosed] = useState(false);
   const [moving, setMoving] = useState(false);
-  const [direction, setDirection] = useState(null);
   const [flipped, setFlipped] = useState(false);
 
   const [toast, setToast] = useState(null);
@@ -203,7 +202,6 @@ export default function PitchDiscover() {
     const queue = heldOverride || held;
 
     setMoving(true);
-    setDirection(dir > 0 ? 'up' : 'down');
     setDoorsClosed(true);
 
     later(() => {
@@ -224,7 +222,6 @@ export default function PitchDiscover() {
       }
       later(() => {
         setDoorsClosed(false);
-        setDirection(null);
         later(() => setMoving(false), DOOR_MS);
       }, DWELL_MS);
     }, DOOR_MS);
@@ -243,14 +240,15 @@ export default function PitchDiscover() {
     ride(1, nextHeld);
   }
 
-  // What a swipe on the card means — same mapping as the old swipe deck:
-  // right = like (and move on), left = pass, down = hold for a second look.
+  // What a swipe on the card means — same mapping as the old swipe deck,
+  // plus up: right = like (and move on), left or up = next, down = hold
+  // for a second look.
   function handleSwipe(swipeDirection) {
     if (!current || moving) return;
     if (swipeDirection === 'right') {
       if (!likedIds.has(current.id)) toggleLike(current);
       ride(1);
-    } else if (swipeDirection === 'left') {
+    } else if (swipeDirection === 'left' || swipeDirection === 'up') {
       ride(1);
     } else if (swipeDirection === 'down') {
       hold();
@@ -365,15 +363,6 @@ export default function PitchDiscover() {
           <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
         ) : (
           <ElevatorCab closed={doorsClosed}>
-            <View style={styles.indicatorWrap} pointerEvents="none">
-              <FloorIndicator
-                floor={floor}
-                total={Math.max(deck.length, 1)}
-                direction={direction}
-                secondLook={round === 2 && !finished}
-                lobby={finished}
-              />
-            </View>
             {round === 2 && !finished ? (
               <Text style={styles.roundTag} pointerEvents="none">SECOND LOOK — THE ONES YOU HELD</Text>
             ) : null}
@@ -479,15 +468,14 @@ const styles = StyleSheet.create({
   // the bottom inset, which SafeAreaView already adds) plus a breath.
   stage: { flex: 1, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 94 },
 
-  indicatorWrap: { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center', zIndex: 7 },
-  // The round-2 explainer and the held lamp share the strip under the
-  // indicator; they never show at the same time (held is round 1 only).
-  roundTag: { position: 'absolute', top: 58, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.olive, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.4)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
-  holdLamp: { position: 'absolute', top: 58, right: 10, zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.mint, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(147,208,164,0.5)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
+  // The round-2 explainer and the held lamp share the cab's top strip;
+  // they never show at the same time (held is round 1 only).
+  roundTag: { position: 'absolute', top: 10, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.olive, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.4)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
+  holdLamp: { position: 'absolute', top: 10, right: 10, zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.mint, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(147,208,164,0.5)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
 
   // The card sits in the room left of the plate (84px: ring + plate
-  // padding + inset), clear of the indicator strip above.
-  cardSlot: { ...absoluteFill, paddingLeft: 14, paddingRight: 84, paddingTop: 58, paddingBottom: 22, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  // padding + inset).
+  cardSlot: { ...absoluteFill, paddingLeft: 14, paddingRight: 84, paddingTop: 18, paddingBottom: 22, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
   cardBox: { width: '100%', maxWidth: 340, aspectRatio: 3 / 4.6, maxHeight: '100%' },
 
   plateCol: { position: 'absolute', right: 9, top: 0, bottom: 0, justifyContent: 'center', zIndex: 4 },
