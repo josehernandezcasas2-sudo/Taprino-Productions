@@ -7024,6 +7024,35 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .zine-live-flash-title { font-weight: 700; flex: 1; min-width: 120px; }
 .zine-live-flash-cta { font-family: var(--font-mono); font-size: 0.72rem; white-space: nowrap; }
 
+/* "On the telly" — a little TV set showing what the main channel is
+   airing (components/HomeOnNow.js). TV and its cream "next" slip sit
+   side by side on desktop and stack on phones. */
+.zine-tv-wrap { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 1.2rem 1.6rem; padding: 0 1.6rem; }
+.zine-tv { display: block; flex: 0 1 400px; max-width: 400px; text-decoration: none; color: var(--ink); transform: rotate(1.5deg); }
+.zine-tv-body { background: var(--ocean-ink); border-radius: 18px; padding: 14px 14px 12px; box-shadow: 0 8px 18px rgba(0,0,0,0.45); }
+.zine-tv:hover .zine-tv-body { background: #2f4674; }
+.zine-tv-screen { position: relative; aspect-ratio: 16 / 9; background: var(--surface-3); border: 3px solid var(--surface-0); border-radius: 12px; overflow: hidden; }
+.zine-tv-still { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.zine-tv-ch { position: absolute; top: 10px; right: 12px; font-family: var(--font-mono); font-size: 0.9rem; font-weight: 600; color: var(--mint); text-shadow: 0 1px 3px rgba(0,0,0,0.8); }
+.zine-tv-bug { position: absolute; top: 10px; left: 10px; display: flex; align-items: center; gap: 5px; background: var(--rust); color: var(--ink); font-family: var(--font-mono); font-size: 0.58rem; padding: 3px 7px; border-radius: 2px; }
+.zine-tv-bug-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--ink); animation: live-pulse 1.6s ease-in-out infinite; }
+.zine-tv-caption { position: absolute; left: 0; right: 0; bottom: 0; padding: 1.2rem 0.75rem 0.6rem; background: rgba(12,19,31,0.82); }
+.zine-tv-title { font-family: var(--font-display); font-weight: 700; font-size: 1rem; line-height: 1.2; }
+.zine-tv-sub { font-size: 0.7rem; color: var(--ink-dim); margin-top: 2px; }
+.zine-tv-panel { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; }
+.zine-tv-name { font-family: var(--font-display); font-weight: 700; font-size: 0.8rem; letter-spacing: 0.04em; text-transform: uppercase; }
+.zine-tv-knobs { display: flex; gap: 8px; }
+.zine-tv-knobs span { width: 16px; height: 16px; border-radius: 50%; background: var(--surface-0); border: 2px solid var(--sky); }
+.zine-tv-legs { display: flex; justify-content: center; gap: 70px; }
+.zine-tv-legs span { width: 6px; height: 14px; background: var(--ocean-ink); }
+.zine-tv-next { flex: 0 1 300px; background: var(--ink); color: #241a05; padding: 0.6rem 0.8rem; transform: rotate(-1deg); border-radius: 2px; font-size: 0.78rem; display: flex; flex-direction: column; gap: 3px; margin-bottom: 1.2rem; }
+.zine-tv-next-time { font-family: var(--font-mono); font-size: 0.62rem; font-weight: 600; margin-right: 0.5rem; }
+@media (max-width: 640px) {
+  .zine-tv { flex-basis: 100%; margin: 0 0.5rem; }
+  .zine-tv-next { flex-basis: 100%; margin-bottom: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .zine-tv-bug-dot { animation: none; } }
+
 /* membership classified — styled like a newspaper classifieds box
    (dashed rule, small-ad proportions) instead of reusing the gradient
    .promo-banner from /stream, so the upsell doesn't look like a

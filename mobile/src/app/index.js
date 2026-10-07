@@ -7,6 +7,7 @@ import { apiGet } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import SmartImage from '../components/SmartImage';
+import HomeOnNow from '../components/HomeOnNow';
 
 const PAPER_INK = '#241a05';
 const PAPER_MUTED = '#6b6248';
@@ -118,6 +119,8 @@ export default function Home() {
             </View>
           </View>
         )}
+
+        <HomeOnNow gutter={GUTTER} />
 
         {trending.length > 0 && (
           <Dept label="TRENDING NOW" color={colors.brass}>

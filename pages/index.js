@@ -8,6 +8,7 @@ import HeaderNav from '../components/HeaderNav';
 import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
+import HomeOnNow from '../components/HomeOnNow';
 import { SITE } from '../lib/siteConfig';
 
 // The zine-style homepage — built from the approved mockup (Variant C:
@@ -106,6 +107,8 @@ export default function Home({
             </div>
           </div>
         )}
+
+        <HomeOnNow />
 
         {trending.length > 0 && (
           <div className="zine-dept">
