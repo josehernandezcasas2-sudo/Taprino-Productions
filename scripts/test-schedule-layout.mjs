@@ -2,7 +2,7 @@
 // Exercises lib/scheduleLayout.js — how blocks move around a day in the scheduler.
 import assert from 'node:assert/strict';
 import {
-  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary, ripple, insertWithRipple
+  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary, ripple, insertWithRipple, spaceOut, arrangeMany, dayProblem
 } from '../lib/scheduleLayout.js';
 
 let passed = 0;
@@ -130,6 +130,49 @@ test('ripple insert: a new block makes room for itself', () => {
   assert.equal(out.problem, null);
   assert.deepEqual(out.slots.map((s) => [s.id, s.start]), [['a', H(15)], ['n', H(16)], ['b', H(16, 30)]]);
   assert.match(insertWithRipple(day, show('n', H(15, 30), H(0, 30))).problem, /would overlap/); // dropped inside a: a doesn't move
+});
+
+test('ad gap: magnets land a show the gap after the show before it, ad breaks stay flush', () => {
+  const others = [show('a', H(16), H(0, 28))];
+  assert.equal(magnetStart(H(16, 30), H(0, 30), others, 120), H(16, 30)); // 16:28 + 2 min
+  assert.equal(magnetStart(H(15, 25), H(0, 30), others, 120), H(15, 28)); // ends 2 min before 16:00
+  assert.equal(magnetStart(H(16, 30), H(0, 30), [ad('x', H(16, 26))], 120), H(16, 28)); // flush after an ad break
+  assert.equal(firstRoomAfter(others, H(16), H(0, 30), 120), H(16, 30));
+  assert.equal(firstRoomAfter([show('a', H(16), H(0, 28)), show('b', H(17), H(1))], H(16), H(0, 30), 120), H(18, 5)); // 16:30-17:00 would leave no gap before b, so it goes after b (+2 min, on the grid)
+});
+
+test('ad gap: first room respects the gap on both sides', () => {
+  const day = [show('a', H(16), H(0, 28)), show('b', H(16, 59), H(1))];
+  assert.equal(firstRoomAfter(day, H(16), H(0, 30), 120), H(18, 5)); // after b, plus the gap, on the grid
+  assert.equal(firstRoomAfter(day, H(16), H(0, 25), 120), H(16, 30)); // 16:30–16:55, 4 min before b: fine
+});
+
+test('ad gap: ripple insert makes room for the gap too', () => {
+  const day = [show('a', H(15), H(1)), show('b', H(16), H(1))];
+  const out = insertWithRipple(day, show('n', H(16), H(0, 30)), 120);
+  assert.deepEqual(out.slots.map((s) => [s.id, s.start]), [['a', H(15)], ['n', H(16)], ['b', H(16, 32)]]);
+  const far = insertWithRipple([show('a', H(15), H(1)), show('b', H(16, 10), H(1))], show('n', H(16), H(0, 30)), 120);
+  assert.equal(far.slots.find((s) => s.id === 'b').start, H(16, 40)); // b was already 10 min after the drop point: just the length
+});
+
+test('space out: shows closer than the gap move later, with everything after them', () => {
+  const day = [show('a', H(15), H(1)), show('b', H(16), H(1)), ad('ad1', H(17)), show('c', H(17, 2), H(0, 30)), show('d', H(18), H(1))];
+  const out = spaceOut(day, 120);
+  assert.equal(out.problem, null);
+  assert.deepEqual(out.slots.map((s) => [s.id, s.start]), [['a', H(15)], ['b', H(16, 2)], ['ad1', H(17, 2)], ['c', H(17, 4)], ['d', H(18, 2)]]);
+  assert.deepEqual(out.moved, ['b', 'ad1', 'c', 'd']);
+  assert.equal(spaceOut([show('a', H(22), H(1)), show('b', H(23), H(1))], 120).problem !== null, true); // b can't move past midnight
+  assert.deepEqual(spaceOut(out.slots, 120).moved, []); // already spaced
+});
+
+test('group move: the set shifts together and ad breaks hop out of the way', () => {
+  const day = [show('a', H(15), H(1)), show('b', H(16, 10), H(1)), ad('ad1', H(18)), show('c', H(19), H(1))];
+  const out = arrangeMany(day, [{ id: 'a', start: H(16, 50) }, { id: 'b', start: H(18) }]);
+  assert.equal(dayProblem(out.slots, ['a', 'b']), null);
+  assert.equal(out.slots.find((s) => s.id === 'ad1').start, H(17, 58)); // hopping over c (an hour) is past the 30-min cap, so it goes right before b
+  assert.deepEqual(out.pushed, ['ad1']);
+  const bad = arrangeMany(day, [{ id: 'a', start: H(18, 30) }, { id: 'b', start: H(19, 40) }]);
+  assert.match(dayProblem(bad.slots, ['a', 'b']), /would overlap/);
 });
 
 console.log(`\n${passed} passed`);

@@ -8,7 +8,7 @@ import { schedulableChannels } from '../lib/channelAccess';
 import { channelClock } from '../lib/channelEngine';
 import { addDays, weekStartOf, DAY_SECONDS } from '../lib/channelPlan';
 import {
-  SNAP_SECONDS, snapToGrid, magnetStart, arrange, ripple, insertWithRipple, blockerOf, rerunProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, limitFor
+  SNAP_SECONDS, snapToGrid, magnetStart, arrange, arrangeMany, ripple, insertWithRipple, spaceOut, dayProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, isHard, limitFor
 } from '../lib/scheduleLayout';
 import ScheduleTimeline, { ZOOM, KIND_ICON, clock, dur } from '../components/ScheduleTimeline';
 import ScheduleWeekStrip from '../components/ScheduleWeekStrip';
@@ -88,6 +88,7 @@ function nowPacificSec() {
     return null;
   }
 }
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 async function api(url, method = 'GET', body) {
   const res = await fetch(url, method === 'GET' ? undefined : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -113,11 +114,12 @@ export default function Scheduler(props) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [picked, setPicked] = useState(null); // library item waiting to be placed
-  const [selectedId, setSelectedId] = useState(null);
+  const [selection, setSelection] = useState(() => new Set()); // block ids on the open day
   const [toast, setToast] = useState(null);
   const [zoom, setZoom] = useState('normal');
   const [nowSec, setNowSec] = useState(null);
   const [hoverTab, setHoverTab] = useState(null);
+  const [adGap, setAdGap] = useState(120);
   // The draft: every day of the view, edited locally until "Save schedule".
   const [draft, setDraft] = useState({});
   const [dirty, setDirty] = useState(() => new Set());
@@ -130,6 +132,8 @@ export default function Scheduler(props) {
   const layer = view === 'default' ? 'default' : 'week';
   const px = ZOOM[zoom];
   const isDirty = dirty.size > 0;
+  const selectedId = selection.size === 1 ? [...selection][0] : null;
+  const selectOne = (id) => setSelection(id ? new Set([id]) : new Set());
   // Where this view's unsaved draft is kept in the browser, in case the tab closes.
   const draftKey = `sch-draft:${channelId}:${layer}:${layer === 'week' ? weekStart : 'default'}`;
 
@@ -155,6 +159,7 @@ export default function Scheduler(props) {
       setDraft(groupByDay(d.slots, d.layer));
       setDirty(new Set());
       setHistory([]);
+      if (Number.isFinite(d.adGapSeconds)) setAdGap(d.adGapSeconds);
       // A draft left behind earlier (the tab closed with unsaved changes)?
       let stored = null;
       try {
@@ -219,7 +224,7 @@ export default function Scheduler(props) {
   }, [draftKey]);
   function restoreDraft() {
     if (!recoverable) return;
-    setHistory([{ draft, dirty: new Set(dirty), selectedId }]);
+    setHistory([{ draft, dirty: new Set(dirty), selection }]);
     setDraft({ ...draft, ...recoverable.draft });
     setDirty(new Set(recoverable.dirty));
     setRecoverable(null);
@@ -237,7 +242,7 @@ export default function Scheduler(props) {
   function switchView(next) {
     if (next === view || !okToLeave()) return;
     setView(next);
-    setSelectedId(null);
+    selectOne(null);
     setPicked(null);
     if (next === 'default') setDay(weekdayOfDate(today));
     if (next === 'week') {
@@ -250,13 +255,18 @@ export default function Scheduler(props) {
     const ws = addDays(weekStart, 7 * n);
     setWeekStart(ws);
     setDay(ws <= today && today <= addDays(ws, 6) ? today : ws);
-    setSelectedId(null);
+    selectOne(null);
   }
   function switchChannel(id) {
     if (!okToLeave()) return;
     setChannelId(id);
-    setSelectedId(null);
+    selectOne(null);
     setPicked(null);
+  }
+  function pickDay(key, id) {
+    setDay(key);
+    selectOne(id || null);
+    if (id) setPicked(null);
   }
 
   /* ---------- the draft ---------- */
@@ -265,17 +275,23 @@ export default function Scheduler(props) {
   const daySlots = useMemo(() => (draft[day] || []).slice().sort((a, b) => a.start - b.start), [draft, day]);
   const savedById = useMemo(() => Object.fromEntries(((data && data.slots) || []).map((s) => [s.id, s])), [data]);
   const selected = daySlots.find((s) => s.id === selectedId) || null;
+  const selectedSlots = daySlots.filter((s) => selection.has(s.id));
   const seriesById = useMemo(() => Object.fromEntries((library ? library.series : []).map((s) => [s.id, s])), [library]);
   const isPastDay = layer === 'week' && day < today;
   const isToday = layer === 'week' ? day === today : day === weekdayOfDate(today);
-  const ghosts = layer === 'week' && data && data.defaults ? (data.defaults[weekdayOfDate(day)] || []) : [];
+  const ghostsFor = (key) => (layer === 'week' && data && data.defaults ? (data.defaults[weekdayOfDate(key)] || []) : []);
+  const dayTabs = layer === 'week'
+    ? dayKeys.map((d) => ({ key: d, label: `${DAY_SHORT[weekdayOfDate(d)]} ${dateParts(d).getUTCDate()}`, isToday: d === today, past: d < today }))
+    : DAYS.map((d) => ({ key: d, label: DAY_SHORT[d], isToday: d === weekdayOfDate(today), past: false }));
+  const dayLabel = (key) => { const t = dayTabs.find((x) => x.key === key); return t ? t.label : key; };
+  const weekIsCurrent = weekStart === weekStartOf(today);
 
   // Every change to the draft goes through here, so it can be undone.
   function edit(nextDraft, keys, msg, select) {
-    setHistory((h) => [...h.slice(-49), { draft, dirty: new Set(dirty), selectedId }]);
+    setHistory((h) => [...h.slice(-49), { draft, dirty: new Set(dirty), selection }]);
     setDraft(nextDraft);
     setDirty((d) => new Set([...d, ...keys]));
-    if (select !== undefined) setSelectedId(select);
+    if (select !== undefined) selectOne(select);
     setError(null);
     if (msg) flash(msg, true);
   }
@@ -285,17 +301,13 @@ export default function Scheduler(props) {
     setHistory((h) => h.slice(0, -1));
     setDraft(last.draft);
     setDirty(last.dirty);
-    setSelectedId(last.selectedId);
+    setSelection(last.selection || new Set());
     setError(null);
     return flash('Undone');
   }
   const withDay = (key, slots) => ({ ...draft, [key]: slots });
-  const problemFor = (slots, id) => {
-    const hit = blockerOf(slots, id);
-    if (hit) return `No room there, it overlaps ${hit.title} (${clock(hit.start)}–${clock(hit.start + hit.durationSeconds)}).`;
-    return rerunProblem(slots, id);
-  };
-  const removedNote = (removed) => (removed && removed.length ? ` · ${removed.length} ad break${removed.length === 1 ? '' : 's'} didn't fit anymore and came off` : '');
+  const removedNote = (removed) => (removed && removed.length ? ` · ${plural(removed.length, 'ad break')} didn't fit anymore and came off` : '');
+  const movedNote = (moved) => (moved && moved.length ? `, and the ${plural(moved.length, 'block')} after it moved along` : '');
 
   // What a library item becomes when it lands on the day.
   function slotFor(item, start) {
@@ -316,17 +328,17 @@ export default function Scheduler(props) {
     if (isPastDay) return flash('This day already aired');
     const slot = slotFor(item, 0);
     if (!slot) return null;
-    slot.start = magnetStart(Math.max(0, Math.min(DAY_SECONDS - slot.durationSeconds, snapToGrid(sec))), slot.durationSeconds, daySlots);
+    slot.start = magnetStart(Math.max(0, Math.min(DAY_SECONDS - slot.durationSeconds, snapToGrid(sec))), slot.durationSeconds, daySlots, adGap);
     if (opts.ripple) {
       // Make room: everything from here on moves later by the new block's length.
-      const r = insertWithRipple(daySlots, slot);
+      const r = insertWithRipple(daySlots, slot, adGap);
       if (r.problem) return flash(`${item.name} needs ${dur(slot.durationSeconds)}. ${r.problem}`);
       setPicked(null);
-      edit(withDay(day, r.slots), [day], `Added at ${clock(slot.start)}${r.moved.length ? `, and ${r.moved.length} block${r.moved.length === 1 ? '' : 's'} after it moved along` : ''}`, slot.id);
+      edit(withDay(day, r.slots), [day], `Added at ${clock(slot.start)}${movedNote(r.moved)}`, slot.id);
       return slot.id;
     }
     const res = arrange(daySlots.concat([slot]), { id: slot.id, start: slot.start, durationSeconds: slot.durationSeconds });
-    const problem = problemFor(res.slots, slot.id);
+    const problem = dayProblem(res.slots, [slot.id]);
     if (problem) return flash(`${item.name} needs ${dur(slot.durationSeconds)}. ${problem}`);
     setPicked(null);
     edit(withDay(day, res.slots), [day], `Added at ${clock(slot.start)}${removedNote(res.removed)}`, slot.id);
@@ -338,18 +350,33 @@ export default function Scheduler(props) {
     return edit(withDay(day, slots), [day], `${info.msg}${removedNote(info.removed)}`, info.select);
   }
 
-  function moveToDay(id, key) {
-    const s = daySlots.find((x) => x.id === id);
-    if (!s || key === day) return;
-    if (s.kind === 'series_rerun' || daySlots.some((o) => o.rerunOf === s.id)) return flash('Reruns stay with the block they copy. Change the rerun first.');
+  // Blocks dropped on another day's row: same times, that day.
+  function moveToDay(ids, key) {
+    const moving = daySlots.filter((s) => ids.includes(s.id));
+    if (!moving.length || key === day) return undefined;
     if (layer === 'week' && key < today) return flash('That day already aired');
-    const moved = { ...s, airDate: layer === 'week' ? key : null, dayOfWeek: layer === 'default' ? key : null };
-    const target = (draft[key] || []).filter((o) => o.id !== id);
-    const res = arrange(target.concat([moved]), { id, start: s.start, durationSeconds: s.durationSeconds });
-    const problem = problemFor(res.slots, id);
-    const label = dayTabs.find((t) => t.key === key);
-    if (problem) return flash(`No room on ${label ? label.label : key} at ${clock(s.start)}. ${problem}`);
-    return edit({ ...draft, [day]: daySlots.filter((o) => o.id !== id), [key]: res.slots }, [day, key], `Moved to ${label ? label.label : key} at ${clock(s.start)}${removedNote(res.removed)}`, null);
+    if (moving.some((s) => s.kind === 'series_rerun' || daySlots.some((o) => o.rerunOf === s.id && !ids.includes(o.id)))) return flash('Reruns stay with the block they copy. Move them together, or change the rerun first.');
+    const carried = moving.map((s) => ({ ...s, airDate: layer === 'week' ? key : null, dayOfWeek: layer === 'default' ? key : null }));
+    const target = (draft[key] || []).filter((o) => !ids.includes(o.id));
+    const res = arrangeMany(target.concat(carried), carried.map((s) => ({ id: s.id, start: s.start, durationSeconds: s.durationSeconds })));
+    const problem = dayProblem(res.slots, ids);
+    if (problem) return flash(`No room on ${dayLabel(key)}. ${problem}`);
+    const msg = moving.length === 1 ? `Moved to ${dayLabel(key)} at ${clock(moving[0].start)}` : `Moved ${plural(moving.length, 'block')} to ${dayLabel(key)}`;
+    return edit({ ...draft, [day]: daySlots.filter((o) => !ids.includes(o.id)), [key]: res.slots }, [day, key], `${msg}${removedNote(res.removed)}`, null);
+  }
+
+  // A bar dragged in the week strip: a new time, maybe a new day.
+  function moveBar(result, problem) {
+    if (!result) return flash(problem);
+    const { id, fromKey, toKey, start, slots, removed } = result;
+    const s = (draft[fromKey] || []).find((x) => x.id === id);
+    if (!s) return null;
+    const next = { ...draft };
+    if (toKey !== fromKey) next[fromKey] = (draft[fromKey] || []).filter((x) => x.id !== id);
+    next[toKey] = slots.map((x) => (x.id === id ? { ...x, airDate: layer === 'week' ? toKey : null, dayOfWeek: layer === 'default' ? toKey : null } : x));
+    const msg = toKey === fromKey ? `Moved to ${clock(start)}` : `Moved to ${dayLabel(toKey)} at ${clock(start)}`;
+    if (toKey !== day) setDay(toKey);
+    return edit(next, toKey === fromKey ? [toKey] : [fromKey, toKey], `${msg}${removedNote(removed)}`, id);
   }
 
   // Edits from the side panel. Returns an error message, or null when applied.
@@ -362,45 +389,78 @@ export default function Scheduler(props) {
     if (next.start + next.durationSeconds > DAY_SECONDS) return `That runs past midnight (it would end at ${clock(next.start + next.durationSeconds)}). Start it earlier, or put the rest on the next day.`;
     const others = daySlots.map((o) => (o.id === id ? next : o));
     const res = arrange(others, { id, start: next.start, durationSeconds: next.durationSeconds });
-    const problem = problemFor(res.slots, id);
+    const problem = dayProblem(res.slots, [id]);
     if (problem) return problem;
     edit(withDay(day, res.slots), [day], `${msg || 'Updated'}${removedNote(res.removed)}`);
     return null;
   }
 
   function nudge(delta, withRipple = false) {
-    if (!selected || isPastDay || (selected.kind === 'live' && !canLive)) return;
-    const start = Math.max(0, Math.min(DAY_SECONDS - selected.durationSeconds, selected.start + delta));
-    if (start === selected.start) return;
-    if (withRipple) {
-      const r = ripple(daySlots, { id: selected.id, start, durationSeconds: selected.durationSeconds }, { start: selected.start, durationSeconds: selected.durationSeconds });
-      const problem = r.problem || rerunProblem(r.slots, selected.id);
+    const group = selectedSlots.filter((s) => !(s.kind === 'live' && !canLive));
+    if (!group.length || isPastDay) return undefined;
+    if (group.length > 1) {
+      const lo = Math.min(...group.map((g) => g.start));
+      const hi = Math.max(...group.map((g) => g.start + g.durationSeconds));
+      const d = Math.max(-lo, Math.min(DAY_SECONDS - hi, delta));
+      if (!d) return undefined;
+      const res = arrangeMany(daySlots, group.map((g) => ({ id: g.id, start: g.start + d, durationSeconds: g.durationSeconds })));
+      const problem = dayProblem(res.slots, group.map((g) => g.id));
       if (problem) return flash(problem);
-      return edit(withDay(day, r.slots), [day], `Moved to ${clock(start)}${r.moved.length ? `, and the ${r.moved.length} block${r.moved.length === 1 ? '' : 's'} after it moved along` : ''}`);
+      return edit(withDay(day, res.slots), [day], `Moved ${plural(group.length, 'block')}, the first now at ${clock(lo + d)}${removedNote(res.removed)}`);
     }
-    const err = changeSlot(selected.id, { start }, `Moved to ${clock(start)}`);
+    const s = group[0];
+    const start = Math.max(0, Math.min(DAY_SECONDS - s.durationSeconds, s.start + delta));
+    if (start === s.start) return undefined;
+    if (withRipple) {
+      const r = ripple(daySlots, { id: s.id, start, durationSeconds: s.durationSeconds }, { start: s.start, durationSeconds: s.durationSeconds });
+      if (r.problem) return flash(r.problem);
+      return edit(withDay(day, r.slots), [day], `Moved to ${clock(start)}${movedNote(r.moved)}`);
+    }
+    const err = changeSlot(s.id, { start }, `Moved to ${clock(start)}`);
     return err ? flash(err) : undefined;
   }
 
-  function removeSlot(id) {
-    const s = daySlots.find((x) => x.id === id);
-    if (!s || isPastDay || (s.kind === 'live' && !canLive)) return;
-    const reruns = daySlots.filter((o) => o.rerunOf === id);
-    if (reruns.length && !window.confirm(`Removing this also removes ${reruns.length} rerun${reruns.length === 1 ? '' : 's'} of it. Continue?`)) return;
-    const gone = new Set([id, ...reruns.map((r) => r.id)]);
-    edit(withDay(day, daySlots.filter((o) => !gone.has(o.id))), [day], reruns.length ? `Removed, with ${reruns.length} rerun${reruns.length === 1 ? '' : 's'} of it` : 'Removed', null);
+  function removeSelected() {
+    const ids = selectedSlots.filter((s) => !(s.kind === 'live' && !canLive)).map((s) => s.id);
+    if (!ids.length || isPastDay) return;
+    const reruns = daySlots.filter((o) => o.rerunOf && ids.includes(o.rerunOf) && !ids.includes(o.id));
+    if (reruns.length && !window.confirm(`Removing this also removes ${plural(reruns.length, 'rerun')} of it. Continue?`)) return;
+    const gone = new Set([...ids, ...reruns.map((r) => r.id)]);
+    const what = ids.length === 1 ? 'Removed' : `Removed ${plural(ids.length, 'block')}`;
+    edit(withDay(day, daySlots.filter((o) => !gone.has(o.id))), [day], reruns.length ? `${what}, with ${plural(reruns.length, 'rerun')}` : what, null);
   }
 
   function duplicateSlot(id) {
     const s = daySlots.find((x) => x.id === id);
-    if (!s || isPastDay) return;
+    if (!s || isPastDay) return undefined;
     const copy = { ...s, id: newTmpId(), rerunOf: null, kind: s.kind === 'series_rerun' ? 'series_pinned' : s.kind };
     if (copy.kind === 'series_pinned' && !copy.pinEpisodeId && seriesById[copy.seriesId]) copy.pinEpisodeId = seriesById[copy.seriesId].episodes[0].id;
-    const start = firstRoomAfter(daySlots, s.start + s.durationSeconds, copy.durationSeconds);
+    const start = firstRoomAfter(daySlots, s.start + s.durationSeconds, copy.durationSeconds, isHard(copy) ? adGap : 0);
     if (start === null) return flash('No room later today for a copy');
     copy.start = start;
     const res = arrange(daySlots.concat([copy]), { id: copy.id, start, durationSeconds: copy.durationSeconds });
     return edit(withDay(day, res.slots), [day], `Copied to ${clock(start)}${removedNote(res.removed)}`, copy.id);
+  }
+
+  // Space the open day out so every show has the ad gap after it.
+  function spaceOutDay() {
+    if (isPastDay || !adGap) return undefined;
+    const r = spaceOut(daySlots, adGap);
+    if (r.problem) return flash(r.problem);
+    if (!r.moved.length) return flash(`Every show already has ${dur(adGap)} after it`);
+    return edit(withDay(day, r.slots), [day], `Spaced out: ${plural(r.moved.length, 'block')} moved so every show has ${dur(adGap)} of ads after it`);
+  }
+
+  async function changeAdGap(seconds) {
+    const before = adGap;
+    setAdGap(seconds);
+    try {
+      await api('/api/schedule/settings', 'POST', { channelId, adGapSeconds: seconds });
+      flash(seconds ? `Shows now land ${dur(seconds)} apart` : 'Shows now butt up with no gap');
+    } catch (err) {
+      setAdGap(before);
+      setError(err.message);
+    }
   }
 
   // Copies one day's lineup onto other days of this view, replacing what they had.
@@ -419,7 +479,7 @@ export default function Scheduler(props) {
       for (const c of copies) if (c.rerunOf) c.rerunOf = idMap[c.rerunOf] || null;
       next[key] = kept.concat(copies.filter((c) => c.kind !== 'series_rerun' || c.rerunOf)).sort((a, b) => a.start - b.start);
     }
-    edit(next, targets, `Copied to ${targets.length} day${targets.length === 1 ? '' : 's'}`);
+    edit(next, targets, `Copied to ${plural(targets.length, 'day')}`);
   }
 
   /* ---------- saving ---------- */
@@ -431,7 +491,7 @@ export default function Scheduler(props) {
     try {
       const days = Object.fromEntries([...dirty].map((k) => [k, (draft[k] || []).map((s) => Object.fromEntries(SAVE_FIELDS.map((f) => [f, s[f] ?? null])))]));
       const out = await api('/api/schedule/save', 'POST', { channelId, layer, days });
-      if (selectedId && out.ids && out.ids[selectedId]) setSelectedId(out.ids[selectedId]);
+      if (out.ids) setSelection(new Set([...selection].map((id) => out.ids[id] || id)));
       forgetStoredDraft();
       await loadView();
       flash('Schedule saved');
@@ -445,7 +505,7 @@ export default function Scheduler(props) {
   }
   function discard() {
     if (!isDirty || !window.confirm('Throw away your unsaved changes?')) return;
-    setSelectedId(null);
+    selectOne(null);
     forgetStoredDraft();
     loadView();
   }
@@ -477,7 +537,8 @@ export default function Scheduler(props) {
     }
   }
 
-  // Keyboard: arrows nudge, Delete removes, Esc deselects, Ctrl+Z undoes, Ctrl+S saves.
+  // Keyboard: arrows nudge (Alt = ripple, Shift = 30 min), Delete removes,
+  // Esc deselects, Ctrl+Z undoes, Ctrl+S saves.
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target.tagName || '').toLowerCase();
@@ -485,20 +546,15 @@ export default function Scheduler(props) {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(); return; }
       if (typing || view === 'loop') return;
-      if (e.key === 'Escape') { setSelectedId(null); setPicked(null); return; }
-      if (!selectedId) return;
+      if (e.key === 'Escape') { selectOne(null); setPicked(null); return; }
+      if (!selection.size) return;
       if (e.key === 'ArrowUp') { e.preventDefault(); nudge(e.shiftKey ? -1800 : -SNAP_SECONDS, e.altKey); }
       if (e.key === 'ArrowDown') { e.preventDefault(); nudge(e.shiftKey ? 1800 : SNAP_SECONDS, e.altKey); }
-      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSlot(selectedId); }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSelected(); }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   });
-
-  const dayTabs = layer === 'week'
-    ? dayKeys.map((d) => ({ key: d, label: `${DAY_SHORT[weekdayOfDate(d)]} ${dateParts(d).getUTCDate()}`, isToday: d === today, past: d < today }))
-    : DAYS.map((d) => ({ key: d, label: DAY_SHORT[d], isToday: d === weekdayOfDate(today), past: false }));
-  const weekIsCurrent = weekStart === weekStartOf(today);
 
   return (
     <>
@@ -577,7 +633,7 @@ export default function Scheduler(props) {
                 <CopyDay key={`${view}-${day}`} layer={layer} day={day} tabs={dayTabs} busy={busy || saving} onCopy={copyDayTo} />
                 {isDirty && <button type="button" className="sch-btn" onClick={discard} disabled={saving}>Discard</button>}
                 <button type="button" className={`sch-btn ${isDirty ? 'primary' : ''}`} onClick={save} disabled={!isDirty || saving} title="Ctrl+S">
-                  {saving ? 'Saving…' : isDirty ? `Save schedule · ${dirty.size} day${dirty.size === 1 ? '' : 's'}` : 'Saved'}
+                  {saving ? 'Saving…' : isDirty ? `Save schedule · ${plural(dirty.size, 'day')}` : 'Saved'}
                 </button>
                 {layer === 'week' && data && (
                   <button type="button" className={data.published ? 'sch-btn' : 'sch-btn primary'} disabled={busy || saving} onClick={togglePublish}>
@@ -598,38 +654,48 @@ export default function Scheduler(props) {
             <ScheduleWeekStrip
               days={dayTabs}
               draft={draft}
-              ghostsFor={(key) => (layer === 'week' && data && data.defaults ? (data.defaults[weekdayOfDate(key)] || []) : [])}
+              ghostsFor={ghostsFor}
               selectedDay={day}
-              selectedId={selectedId}
+              selectedIds={selection}
               dirty={dirty}
               hoverDay={hoverTab}
               nowSec={nowSec}
-              onPickDay={(k) => { setDay(k); setSelectedId(null); }}
-              onPickSlot={(k, id) => { setDay(k); setSelectedId(id); setPicked(null); }}
+              canLive={canLive}
+              adGap={adGap}
+              onPickDay={(k) => pickDay(k)}
+              onPickSlot={(k, id) => pickDay(k, id)}
+              onMoveBar={moveBar}
             />
 
             <div className="sch-grid">
-              <Library library={library} media={media} reloadMedia={loadMedia} channelId={channelId} setError={setError} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) setSelectedId(null); }} />
+              <Library library={library} media={media} reloadMedia={loadMedia} channelId={channelId} setError={setError} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) selectOne(null); }} />
 
               {data ? (
                 <ScheduleTimeline
                   key={`${channelId}-${view}-${day}-${weekStart}`}
                   slots={daySlots}
-                  ghosts={ghosts}
+                  ghosts={ghostsFor(day)}
                   seriesById={seriesById}
                   layer={layer}
                   px={px}
                   picked={picked}
-                  selectedId={selectedId}
+                  selectedIds={selection}
                   canLive={canLive}
                   isPastDay={isPastDay}
                   isToday={isToday}
                   nowSec={nowSec}
-                  onSelect={(id) => { setSelectedId(id); setPicked(null); }}
+                  adGap={adGap}
+                  onSelect={(id, opts) => {
+                    setPicked(null);
+                    if (opts && opts.toggle) setSelection((cur) => { const n = new Set(cur); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+                    else selectOne(id);
+                  }}
                   onPlace={place}
                   onArrange={onArrange}
                   onMoveToDay={moveToDay}
                   onTabHover={setHoverTab}
+                  onAdGapChange={changeAdGap}
+                  onSpaceOut={spaceOutDay}
                   needPick={() => flash('Pick something from the library first')}
                 />
               ) : (
@@ -639,6 +705,8 @@ export default function Scheduler(props) {
               <aside className="sch-insp" aria-live="polite">
                 {picked ? (
                   <PickedInfo picked={picked} layer={layer} onCancel={() => setPicked(null)} />
+                ) : selectedSlots.length > 1 ? (
+                  <GroupPanel slots={selectedSlots} isPastDay={isPastDay} onClear={() => selectOne(null)} onRemove={removeSelected} />
                 ) : selected ? (
                   <SlotEditor
                     key={selected.id}
@@ -651,16 +719,17 @@ export default function Scheduler(props) {
                     isDirty={isDirty}
                     canLive={canLive}
                     isPastDay={isPastDay}
+                    adGap={adGap}
                     busy={busy || saving}
                     onChange={(changes, msg) => changeSlot(selected.id, changes, msg)}
-                    onRemove={() => removeSlot(selected.id)}
+                    onRemove={removeSelected}
                     onDuplicate={() => duplicateSlot(selected.id)}
                     onResetBookmark={() => resetBookmark(selected.id)}
                   />
                 ) : (
                   <div className="sch-empty-insp">
                     <div className="tv-info-eyebrow">Slot</div>
-                    <p>Pick something from the library, then click an open stretch or drag it onto the day. Click a block to edit it, drag it to move it, pull its bottom edge to change its length.</p>
+                    <p>Pick something from the library, then click an open stretch or drag it onto the day. Click a block to edit it, drag it to move it, pull its bottom edge to change its length. Shift-click to select several and move them together.</p>
                     <p className="sch-tz">All times are Pacific, the same for every viewer. Changes land when you save the schedule.</p>
                   </div>
                 )}
@@ -919,7 +988,24 @@ function PickedInfo({ picked, layer, onCancel }) {
   );
 }
 
-function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty, canLive, isPastDay, busy, onChange, onRemove, onDuplicate, onResetBookmark }) {
+function GroupPanel({ slots, isPastDay, onClear, onRemove }) {
+  const sorted = slots.slice().sort((a, b) => a.start - b.start);
+  return (
+    <div className="sch-editor">
+      <div className="tv-info-eyebrow">{plural(slots.length, 'block')} selected</div>
+      <div className="sch-group-list">
+        {sorted.map((s) => <div key={s.id}><span>{KIND_ICON[s.kind] ? `${KIND_ICON[s.kind]} ` : ''}{s.title}</span><span>{clock(s.start)}</span></div>)}
+      </div>
+      <p>Drag any of them to move them all together, or use the arrow keys. Shift-click a block to add or remove it.</p>
+      <div className="sch-editor-acts">
+        <button type="button" className="sch-btn" onClick={onClear}>Clear selection</button>
+        {!isPastDay && <button type="button" className="sch-btn danger" onClick={onRemove}>Remove all {slots.length}</button>}
+      </div>
+    </div>
+  );
+}
+
+function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty, canLive, isPastDay, adGap, busy, onChange, onRemove, onDuplicate, onResetBookmark }) {
   const [start, setStart] = useState(hhmm(slot.start));
   const [minutes, setMinutes] = useState(String(Math.round(slot.durationSeconds / 60)));
   const [seconds, setSeconds] = useState(String(slot.durationSeconds));
@@ -949,9 +1035,10 @@ function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty
   const upcoming = preview && unchanged ? Object.entries(preview).slice(0, 4) : [];
   const edges = isSeries && eps.length && slot.kind !== 'series_rerun' ? episodeEdges(eps, Math.max(0, eps.findIndex((e) => e.id === slot.pinEpisodeId))) : [];
   const lim = limitFor(slot);
-  // The block right before this one, to butt up against.
+  // The block right before this one, to butt up against (with the ad gap, or flush).
   const prev = daySlots.filter((s) => s.id !== slot.id && s.start < slot.start).sort((a, b) => b.start - a.start)[0] || null;
   const prevEnd = prev ? prev.start + prev.durationSeconds : null;
+  const afterPrev = prev ? prevEnd + (isHard(prev) && isHard(slot) ? adGap : 0) : null;
 
   function apply() {
     const changes = {};
@@ -1026,9 +1113,14 @@ function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty
           </div>
         )}
       </div>
-      {prev && prevEnd !== slot.start && !locked && (
-        <button type="button" className="sch-link" disabled={busy} onClick={() => setFormError(onChange({ start: prevEnd }, `Starts right after ${prev.title}`))}>
-          Start right after {prev.title} ({clock(prevEnd)})
+      {prev && !locked && afterPrev !== slot.start && (
+        <button type="button" className="sch-link" disabled={busy} onClick={() => setFormError(onChange({ start: afterPrev }, `Starts right after ${prev.title}`))}>
+          Start right after {prev.title} ({clock(afterPrev)}{afterPrev !== prevEnd ? `, ${dur(afterPrev - prevEnd)} of ads between` : ''})
+        </button>
+      )}
+      {prev && !locked && afterPrev !== prevEnd && prevEnd !== slot.start && (
+        <button type="button" className="sch-link" disabled={busy} onClick={() => setFormError(onChange({ start: prevEnd }, `Starts flush after ${prev.title}`))}>
+          Or flush after it, no ads ({clock(prevEnd)})
         </button>
       )}
       {edges.length > 0 && lengthEditable && (

@@ -1,24 +1,30 @@
 import { useEffect, useRef, useState } from 'react';
 import { DAY_SECONDS, SHORT_GAP_SECONDS } from '../lib/channelPlan';
 import {
-  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, ripple, blockerOf, rerunProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps
+  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, arrangeMany, ripple, dayProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps
 } from '../lib/scheduleLayout';
 
 // One day of the channel scheduler: the hour lane with every block on it.
 // Blocks drag to move (pointer events, so mouse, pen and touch all work),
 // pull from the bottom edge to change length, and can be dropped on a day
-// tab (anything with data-daykey) to move days. All the rules live in
-// lib/scheduleLayout.js; this only draws and reports what the pointer did:
-//   onSelect(id)                      a plain click
+// row (anything with data-daykey) to move days. Shift-click or Ctrl-click
+// adds blocks to the selection; dragging any selected block moves the
+// whole set. All the rules live in lib/scheduleLayout.js; this only draws
+// and reports what the pointer did:
+//   onSelect(id, { toggle })          a plain click (toggle: add to / remove from the selection)
 //   onPlace(item, sec, { ripple })    a library item dropped or placed in a gap
 //   onArrange(slots | null, info)     a finished drag: the new day, or null + info.error
-//   onMoveToDay(id, dayKey)           dropped on another day's row
+//   onMoveToDay(ids, dayKey)          dropped on another day's row
 //   onTabHover(dayKey | null)         so the page can light the row up
+//   onAdGapChange(seconds)            the "ads between shows" setting
+//   onSpaceOut()                      space the day out with that gap
 // Ripple (the toggle, or Alt while dragging) moves everything after the
 // block along with it instead of only shuffling ad breaks out of the way.
+// It applies to single blocks; a group drag always moves just the group.
 
 export const ZOOM = { compact: 40, normal: 64, roomy: 100 };
 export const KIND_ICON = { series_continue: '⟳', series_rerun: '↺', series_pinned: '▣', live: '●' };
+export const AD_GAP_CHOICES = [[0, 'none, shows butt up'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [240, '4 min']];
 
 const pad = (n) => String(n).padStart(2, '0');
 export function clock(sec, withSec) {
@@ -41,8 +47,8 @@ export function dur(sec) {
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export default function ScheduleTimeline({
-  slots, ghosts = [], seriesById = {}, layer, px, picked, selectedId, canLive, isPastDay, isToday, nowSec,
-  onSelect, onPlace, onArrange, onMoveToDay, onTabHover, needPick
+  slots, ghosts = [], seriesById = {}, layer, px, picked, selectedIds, canLive, isPastDay, isToday, nowSec, adGap = 0,
+  onSelect, onPlace, onArrange, onMoveToDay, onTabHover, onAdGapChange, onSpaceOut, needPick
 }) {
   const laneRef = useRef(null);
   const scrollRef = useRef(null);
@@ -72,18 +78,18 @@ export default function ScheduleTimeline({
   const secAt = (clientY) => ((clientY - laneRef.current.getBoundingClientRect().top) / px) * 3600;
   const epsFor = (s) => (s.seriesId && seriesById[s.seriesId] ? seriesById[s.seriesId].episodes : []);
   const locked = (s) => isPastDay || (s.kind === 'live' && !canLive);
-  const problemFor = (daySlots, id) => {
-    const hit = blockerOf(daySlots, id);
-    if (hit) return `No room there, it overlaps ${hit.title} (${clock(hit.start)}–${clock(hit.start + hit.durationSeconds)})`;
-    return rerunProblem(daySlots, id);
-  };
+  const isSelected = (id) => !!(selectedIds && selectedIds.has(id));
 
   function startDrag(e, s) {
     if (e.button !== 0 || locked(s)) return;
     const onHandle = !!(e.target.closest && e.target.closest('.sch-handle'));
     if (onHandle && hasFixedLength(s)) return;
     e.preventDefault();
-    const d = { mode: onHandle ? 'resize' : 'move', id: s.id, y0: e.clientY, orig: { start: s.start, durationSeconds: s.durationSeconds }, moved: false, result: null, tab: null };
+    const toggle = e.shiftKey || e.ctrlKey || e.metaKey;
+    // Dragging a selected block drags the whole selection along.
+    const group = !onHandle && isSelected(s.id) && selectedIds.size > 1 ? slots.filter((x) => isSelected(x.id) && !locked(x)) : [s];
+    const ids = group.map((x) => x.id);
+    const d = { mode: onHandle ? 'resize' : 'move', id: s.id, ids, y0: e.clientY, orig: { start: s.start, durationSeconds: s.durationSeconds }, moved: false, result: null, tab: null, toggle };
     dragRef.current = d;
     const others = slots.filter((x) => x.id !== s.id);
 
@@ -93,29 +99,48 @@ export default function ScheduleTimeline({
       if (!d.moved) document.body.classList.add('sch-dragging');
       d.moved = true;
       const dsec = (dy / px) * 3600;
-      let change;
-      if (d.mode === 'move') {
-        const start = magnetStart(clamp(snapToGrid(d.orig.start + dsec), 0, DAY_SECONDS - s.durationSeconds), s.durationSeconds, others);
-        change = { id: s.id, start, durationSeconds: s.durationSeconds };
-      } else {
-        change = { id: s.id, start: s.start, durationSeconds: fitLength(s, snapToGrid(d.orig.durationSeconds + dsec), others, epsFor(s)) };
-      }
       let res;
       let problem;
-      if (rippleFor(ev)) {
-        const r = ripple(slots, change, d.orig);
-        res = { slots: r.slots, removed: [], pushed: r.moved };
-        problem = r.problem || rerunProblem(r.slots, s.id);
+      let change;
+      let rippled = 0;
+      if (d.mode === 'move' && group.length > 1) {
+        const lo = Math.min(...group.map((g) => g.start));
+        const hi = Math.max(...group.map((g) => g.start + g.durationSeconds));
+        const delta = clamp(snapToGrid(dsec), -lo, DAY_SECONDS - hi);
+        const changes = group.map((g) => ({ id: g.id, start: g.start + delta, durationSeconds: g.durationSeconds }));
+        res = arrangeMany(slots, changes);
+        problem = dayProblem(res.slots, ids);
+        change = changes.find((c) => c.id === s.id);
+      } else if (d.mode === 'move') {
+        const start = magnetStart(clamp(snapToGrid(d.orig.start + dsec), 0, DAY_SECONDS - s.durationSeconds), s.durationSeconds, others, adGap);
+        change = { id: s.id, start, durationSeconds: s.durationSeconds };
+        if (rippleFor(ev)) {
+          const r = ripple(slots, change, d.orig);
+          res = { slots: r.slots, removed: [], pushed: r.moved };
+          problem = r.problem;
+          rippled = r.moved.length;
+        } else {
+          res = arrange(slots, change);
+          problem = dayProblem(res.slots, [s.id]);
+        }
       } else {
-        res = arrange(slots, change);
-        problem = problemFor(res.slots, s.id);
+        change = { id: s.id, start: s.start, durationSeconds: fitLength(s, snapToGrid(d.orig.durationSeconds + dsec), others, epsFor(s)) };
+        if (rippleFor(ev)) {
+          const r = ripple(slots, change, d.orig);
+          res = { slots: r.slots, removed: [], pushed: r.moved };
+          problem = r.problem;
+          rippled = r.moved.length;
+        } else {
+          res = arrange(slots, change);
+          problem = dayProblem(res.slots, [s.id]);
+        }
       }
-      d.result = { slots: res.slots, removed: res.removed, pushed: res.pushed, change, valid: !problem, problem, rippled: rippleFor(ev) ? res.pushed.length : 0 };
+      d.result = { slots: res.slots, removed: res.removed, pushed: res.pushed, change, valid: !problem, problem, rippled, groupSize: group.length };
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const tab = d.mode === 'move' && el && el.closest ? el.closest('[data-daykey]') : null;
       d.tab = tab && tab.getAttribute('data-droppable') === 'true' ? tab.getAttribute('data-daykey') : null;
       if (onTabHover) onTabHover(d.tab);
-      setPreview({ slots: res.slots, id: s.id, mode: d.mode, valid: !problem, pushed: res.pushed });
+      setPreview({ slots: res.slots, ids, mode: d.mode, valid: !problem, pushed: res.pushed });
       const r = scrollRef.current.getBoundingClientRect();
       if (ev.clientY < r.top + 28) scrollRef.current.scrollTop -= 10;
       else if (ev.clientY > r.bottom - 28) scrollRef.current.scrollTop += 10;
@@ -128,17 +153,23 @@ export default function ScheduleTimeline({
       document.body.classList.remove('sch-dragging');
       setPreview(null);
       if (onTabHover) onTabHover(null);
-      if (!d.moved) { onSelect(s.id); return; }
-      if (d.tab) { onMoveToDay(s.id, d.tab); return; }
+      if (!d.moved) { onSelect(s.id, { toggle: d.toggle }); return; }
+      if (d.tab) { onMoveToDay(ids, d.tab); return; }
       const r = d.result;
       if (!r) return;
       if (!r.valid) { onArrange(null, { error: r.problem }); return; }
       if (r.change.start === d.orig.start && r.change.durationSeconds === d.orig.durationSeconds) return;
-      const msg = (d.mode === 'move'
-        ? `Moved to ${clock(r.change.start)}`
-        : `Now ${dur(r.change.durationSeconds)}, ends ${clock(r.change.start + r.change.durationSeconds)}`)
-        + (r.rippled ? `, and the ${r.rippled} block${r.rippled === 1 ? '' : 's'} after it moved along` : '');
-      onArrange(r.slots, { removed: r.removed, msg, select: s.id });
+      let msg;
+      if (r.groupSize > 1) {
+        const first = Math.min(...r.slots.filter((x) => ids.includes(x.id)).map((x) => x.start));
+        msg = `Moved ${r.groupSize} blocks, the first now at ${clock(first)}`;
+      } else {
+        msg = (d.mode === 'move'
+          ? `Moved to ${clock(r.change.start)}`
+          : `Now ${dur(r.change.durationSeconds)}, ends ${clock(r.change.start + r.change.durationSeconds)}`)
+          + (r.rippled ? `, and the ${r.rippled} block${r.rippled === 1 ? '' : 's'} after it moved along` : '');
+      }
+      onArrange(r.slots, { removed: r.removed, msg, select: r.groupSize > 1 ? undefined : s.id });
     };
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
@@ -154,14 +185,23 @@ export default function ScheduleTimeline({
     <div className="sch-timeline">
       {isPastDay && <div className="sch-past-note">This day has already aired. Changes here won&rsquo;t show anywhere.</div>}
       <div className="sch-tl-top">
-        <span className="sch-tl-hint">Drag to move · pull the bottom edge for length · drop on a day row to move days</span>
-        <div className="sch-ripple" role="group" aria-label="Ripple">
-          <span>Ripple</span>
-          <div className="sch-seg sch-seg-xs">
-            <button type="button" aria-selected={!rippleMode} onClick={() => setRipple(false)}>Off</button>
-            <button type="button" aria-selected={rippleMode} onClick={() => setRipple(true)}>On</button>
+        <span className="sch-tl-hint">Drag to move · pull the bottom edge for length · drop on a day row to move days · Shift-click to select several</span>
+        <div className="sch-tl-ctrls">
+          <label className="sch-gapset">
+            <span>Ads between shows</span>
+            <select id="sch-adgap" value={adGap} onChange={(e) => onAdGapChange(Number(e.target.value))} aria-label="Ads between shows">
+              {AD_GAP_CHOICES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+            <button type="button" className="sch-btn sm" onClick={onSpaceOut} disabled={isPastDay || !adGap} title="Move shows apart so each one has the gap after it">Space out</button>
+          </label>
+          <div className="sch-ripple" role="group" aria-label="Ripple">
+            <span>Ripple</span>
+            <div className="sch-seg sch-seg-xs">
+              <button type="button" aria-selected={!rippleMode} onClick={() => setRipple(false)}>Off</button>
+              <button type="button" aria-selected={rippleMode} onClick={() => setRipple(true)}>On</button>
+            </div>
+            <small>{rippleMode ? 'Moving or stretching a block pushes everything after it along. Alt turns it off for one drag.' : 'Hold Alt while dragging to push everything after the block along.'}</small>
           </div>
-          <small>{rippleMode ? 'Moving or stretching a block pushes everything after it along. Alt turns it off for one drag.' : 'Hold Alt while dragging to push everything after the block along.'}</small>
         </div>
       </div>
       <div className="sch-scroll" ref={scrollRef}>
@@ -214,13 +254,13 @@ export default function ScheduleTimeline({
 
             {shown.map((s) => {
               const h = Math.max(y(s.durationSeconds) - 2, 16);
-              const dragging = preview && preview.id === s.id;
+              const dragging = preview && preview.ids.includes(s.id);
               const eps = isSeriesKind(s.kind) ? epsFor(s) : [];
               const fit = eps.length ? fitSummary(s, eps, shown) : null;
               const cls = [
                 'sch-slot', `k-${s.kind}`,
                 s.unavailable ? 'unavailable' : '',
-                selectedId === s.id ? 'selected' : '',
+                isSelected(s.id) ? 'selected' : '',
                 dragging ? 'dragging' : '',
                 dragging && !preview.valid ? 'invalid' : '',
                 preview && preview.pushed.includes(s.id) ? 'pushed' : '',
@@ -234,9 +274,9 @@ export default function ScheduleTimeline({
                   className={cls}
                   style={{ top: y(s.start) + 1, height: h }}
                   onPointerDown={(e) => startDrag(e, s)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(s.id); } }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(s.id, { toggle: e.shiftKey || e.ctrlKey || e.metaKey }); } }}
                   aria-label={`${s.title}, ${clock(s.start)} to ${clock(s.start + s.durationSeconds)}`}
-                  aria-pressed={selectedId === s.id}
+                  aria-pressed={isSelected(s.id)}
                 >
                   <span className="sch-slot-hd">
                     <b>

@@ -7881,6 +7881,18 @@ body.sch-dragging .sch-ws-row[data-droppable='true'] .sch-ws-lane { outline: 1px
 .sch-link:disabled { opacity: 0.5; cursor: default; }
 @media (max-width: 900px) { .sch-ws-hours, .sch-ws-row { grid-template-columns: 92px minmax(0, 1fr); } }
 
+/* Scheduler v4: ad gap setting, space out, multi-select, dragging in the week strip */
+.sch-tl-ctrls { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.sch-gapset { display: flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-dim); }
+.sch-gapset select { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 6px; padding: 0.2rem 0.4rem; font-family: var(--font-mono); font-size: 0.64rem; }
+.sch-ws-bar { touch-action: none; user-select: none; }
+.sch-ws-bar.dragging { z-index: 5; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5); opacity: 0.95; cursor: grabbing; }
+.sch-ws-bar.dragging.invalid { border-color: var(--danger) !important; background: rgba(214, 124, 81, 0.35) !important; }
+.sch-group-list { display: grid; gap: 3px; font-family: var(--font-mono); font-size: 0.68rem; max-height: 260px; overflow: auto; }
+.sch-group-list div { display: flex; justify-content: space-between; gap: 0.6rem; padding: 0.25rem 0.45rem; border-radius: 4px; background: var(--surface-2); }
+.sch-group-list div span:last-child { text-align: right; white-space: nowrap; }
+.sch-group-list div span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
 /* Channel opt-in (upload forms, My Work) */
 .optin-box { border: 1px solid var(--brass); background: rgba(248, 95, 115, 0.06); border-radius: 10px; padding: 0.75rem 0.9rem; margin: 0.6rem 0 0.9rem; display: grid; gap: 0.4rem; }
 .optin-box p, .optin-box ul { margin: 0; font-size: 0.85rem; color: var(--ink-dim); }
