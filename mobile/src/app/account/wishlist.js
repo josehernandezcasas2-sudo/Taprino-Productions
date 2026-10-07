@@ -90,6 +90,21 @@ export default function Wishlist() {
     }
   }
 
+  // Same toggle the Pitch Room grid and Discover's Save button use —
+  // /api/pitch-save flips the row, so one call here unsaves it.
+  async function removeSavedPitch(pitchId) {
+    setRemovingId(pitchId);
+    try {
+      const token = await withToken();
+      await apiPost('/api/pitch-save', { pitchId }, token);
+      setState((s) => ({ ...s, feed: { ...s.feed, savedPitches: (s.feed.savedPitches || []).filter((p) => p.id !== pitchId) } }));
+    } catch {
+      // Non-fatal.
+    } finally {
+      setRemovingId(null);
+    }
+  }
+
   async function removeFromWishlist(id, isSeries) {
     setRemovingId(id);
     try {
@@ -146,6 +161,7 @@ export default function Wishlist() {
   }
 
   const { continueWatching, watchHistory, wishlistedSeries, wishlistedEpisodes, totalCount } = state.feed;
+  const savedPitches = state.feed.savedPitches || [];
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -180,6 +196,26 @@ export default function Wishlist() {
                   removing={removingId === ep.id}
                   onPress={() => router.push(`/episode/${ep.id}`)}
                   onRemove={() => removeWatchHistory(ep.id)}
+                />
+              ))}
+            </Grid>
+          </Section>
+        )}
+
+        {savedPitches.length > 0 && (
+          <Section title="Saved Pitches">
+            <Text style={styles.sectionSub}>{savedPitches.length} saved · you'll get an email when a project posts an update</Text>
+            <Grid>
+              {savedPitches.map((p) => (
+                <GridCard
+                  key={p.id}
+                  item={{ id: p.id, title: p.title, thumbnail: p.thumbnail }}
+                  subtitle={p.fundingPct != null ? `${p.fundingPct}% funded` : (p.creatorName || 'Pitch Room')}
+                  tagOverride={p.tag || 'Pitch'}
+                  removing={removingId === p.id}
+                  onPress={() => router.push(`/pitches/${p.id}`)}
+                  onRemove={() => removeSavedPitch(p.id)}
+                  removeGlyph="▮"
                 />
               ))}
             </Grid>
@@ -239,12 +275,12 @@ function Grid({ children }) {
   return <View style={styles.grid}>{children}</View>;
 }
 
-function GridCard({ item, subtitle, tagOverride, removing, onPress, onRemove, heart }) {
+function GridCard({ item, subtitle, tagOverride, removing, onPress, onRemove, heart, removeGlyph }) {
   const badge = tagOverride ? { label: tagOverride, color: colors.sky, text: colors.onBrass } : tierBadge(item.tier, item.adsEnabled);
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <Pressable style={styles.removeBtn} onPress={onRemove} disabled={removing} hitSlop={8}>
-        {removing ? <ActivityIndicator size="small" color={colors.ink} /> : <Text style={styles.removeBtnText}>{heart ? '♥' : '✕'}</Text>}
+        {removing ? <ActivityIndicator size="small" color={colors.ink} /> : <Text style={styles.removeBtnText}>{removeGlyph || (heart ? '♥' : '✕')}</Text>}
       </Pressable>
       {item.thumbnail ? <SmartImage uri={item.thumbnail} style={styles.cardImg} /> : <View style={styles.cardImg} />}
       <View style={[styles.badge, { backgroundColor: badge.color }]}>
@@ -275,6 +311,7 @@ const styles = StyleSheet.create({
 
   section: { marginBottom: 20 },
   sectionTitle: { color: colors.ink, fontSize: 16, fontWeight: '800', marginBottom: 10 },
+  sectionSub: { color: colors.inkFaint, fontSize: 12, marginTop: -6, marginBottom: 10 },
   libraryHeading: { marginBottom: 4 },
   libraryTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   librarySub: { color: colors.inkFaint, fontSize: 12, marginTop: 2, marginBottom: 12 },

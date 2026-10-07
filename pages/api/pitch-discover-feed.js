@@ -1,6 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
-import { getApprovedPitches } from '../../lib/pitches';
+import { getApprovedPitches, getLikedPitchIds, getPitchLikeCounts, getSavedPitchIds } from '../../lib/pitches';
 import { getSiteSettings } from '../../lib/siteSettings';
 
 // The mobile app's equivalent of pages/pitches/discover.js's
@@ -33,12 +33,23 @@ export default async function handler(req, res) {
   }
 
   const { userId } = getAuth(req);
-  const pitches = await getApprovedPitches();
+  // Same four reads the page does — which pitches this viewer has saved
+  // (the follow) and liked, plus every pitch's like count for the Like
+  // button's counter.
+  const [pitches, savedIds, likedIds, likeCounts] = await Promise.all([
+    getApprovedPitches(),
+    userId ? getSavedPitchIds(userId) : [],
+    userId ? getLikedPitchIds(userId) : [],
+    getPitchLikeCounts()
+  ]);
 
   return res.status(200).json({
     isSignedIn: account.isSignedIn,
     pitches,
     bypassingDisabled,
-    requireSignIn: !userId
+    requireSignIn: !userId,
+    savedIds,
+    likedIds,
+    likeCounts
   });
 }
