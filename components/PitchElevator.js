@@ -113,8 +113,15 @@ export function ElevatorCard({ pitch, flipped, onFlip }) {
   return (
     <div className="elev-card">
       <div className={`elev-card-flip ${flipped ? 'elev-card-flipped' : ''}`}>
+        {/* Each face is a plain box carrying only backface-visibility; the
+            radius/overflow/background live on the surface inside it. iOS
+            Safari silently drops backface-visibility on an element that
+            also has overflow:hidden + border-radius, and the rotated-away
+            face then renders through, mirrored, on top of the visible
+            one — the exact bug the old swipe card hit on a real phone. */}
+        <div className="elev-card-face elev-card-front">
         <div
-          className={`elev-card-face elev-card-front ${pitch.thumbnail ? '' : 'elev-card-front-blank'}`}
+          className={`elev-card-surface elev-card-front-surface ${pitch.thumbnail ? '' : 'elev-card-front-blank'}`}
           style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}
           role="button"
           tabIndex={flipped ? -1 : 0}
@@ -144,8 +151,10 @@ export function ElevatorCard({ pitch, flipped, onFlip }) {
             )}
           </div>
         </div>
+        </div>
 
         <div className="elev-card-face elev-card-back" aria-hidden={!flipped}>
+        <div className="elev-card-surface elev-card-back-surface">
           <button
             type="button"
             className="elev-card-back-btn"
@@ -185,6 +194,7 @@ export function ElevatorCard({ pitch, flipped, onFlip }) {
               View full pitch &rarr;
             </Link>
           </div>
+        </div>
         </div>
       </div>
     </div>

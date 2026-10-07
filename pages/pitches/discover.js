@@ -105,6 +105,7 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const [shareCopiedId, setShareCopiedId] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const bannersRef = useRef(null);
+  const deckWrapRef = useRef(null);
   const timersRef = useRef([]);
   const toastTimerRef = useRef(null);
 
@@ -131,7 +132,18 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
     const observer = new ResizeObserver(([entry]) => {
       const height = entry.contentRect.height;
-      const clearance = height > 0 ? height + 24 : 0;
+      // The banner floats from its own fixed top offset (see .pitch-
+      // discover-banners), which is lower than where .swipe-deck-wrap
+      // starts — so the clearance the wrap needs is "down to the
+      // banner's bottom edge", measured from the wrap's own top, not
+      // just the banner's height. The wrap's top edge doesn't move when
+      // its padding changes, so this doesn't feed back on itself.
+      let clearance = 0;
+      if (height > 0) {
+        const bannerRect = el.getBoundingClientRect();
+        const wrapTop = deckWrapRef.current ? deckWrapRef.current.getBoundingClientRect().top : bannerRect.top;
+        clearance = Math.max(0, Math.round(bannerRect.bottom - wrapTop + 16));
+      }
       document.documentElement.style.setProperty('--pitch-banner-clearance', `${clearance}px`);
     });
     observer.observe(el);
@@ -463,7 +475,7 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
           )}
         </div>
 
-        <div className="swipe-deck-wrap">
+        <div className="swipe-deck-wrap" ref={deckWrapRef}>
           {loading ? (
             <div className="poster-empty">Calling the elevator…</div>
           ) : (

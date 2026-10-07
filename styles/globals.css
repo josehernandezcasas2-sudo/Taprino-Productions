@@ -5999,6 +5999,12 @@ body:has(.mini-player) { padding-bottom: 72px; }
   --elev-steel-0: #1a2338; --elev-steel-1: #2b3852; --elev-steel-2: #3d4b6a; --elev-steel-3: #5a6a8d; --elev-steel-hi: #8c9bbd;
   --elev-lamp: var(--olive); --elev-lamp-glow: rgba(231, 162, 85, 0.55);
   --elev-door-ms: 480ms; --elev-flip-ms: 520ms;
+  /* Everything on the stage that isn't the car, top to bottom: the
+     stage's own padding (incl. the tab-bar reserve below 1180px, see
+     .pitch-discover-stage), the floor indicator + gap (+ the round tag),
+     and whatever banner is showing (the measured clearance). The car
+     sizes itself to whatever height is left — see .elev-car. */
+  --elev-chrome: calc(1.2rem + env(safe-area-inset-top, 0px) + 110px + env(safe-area-inset-bottom, 0px) + 4.4rem + var(--pitch-banner-clearance, 0px));
   position: relative;
   width: 100%;
   max-width: 400px;
@@ -6031,9 +6037,20 @@ body:has(.mini-player) { padding-bottom: 72px; }
 /* The car: brushed frame around the cab. aspect-ratio + max-height keep
    it phone-card shaped and never taller than the viewport allows (same
    sanity limit the old .swipe-card-stack had). */
+/* Fills the stage's width and takes its height from the aspect ratio
+   when there's room; when there isn't (a short phone, Safari's toolbars
+   up, or a three-line sign-in banner eating a third of the screen), the
+   height is clamped to whatever is left after --elev-chrome and the car
+   goes a little squatter instead of sliding up under the banner and down
+   under the tab bar. Squatter beats narrower here: the plates and card
+   keep their width, so the pitch text stays readable. dvh so the iOS
+   toolbar collapsing doesn't leave it sized for the wrong viewport; vh
+   is the fallback. */
 .elev-car {
   position: relative; width: 100%; max-width: 100%;
-  aspect-ratio: 3 / 4.6; max-height: 72vh;
+  aspect-ratio: 3 / 4.6;
+  max-height: calc(100vh - var(--elev-chrome));
+  max-height: calc(100dvh - var(--elev-chrome));
   border-radius: 18px; padding: 8px;
   background: linear-gradient(90deg, var(--elev-steel-1), var(--elev-steel-3) 18%, var(--elev-steel-1) 46%, var(--elev-steel-3) 72%, var(--elev-steel-1));
   box-shadow: 0 24px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
@@ -6116,17 +6133,30 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-card-slot {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
   width: calc(100% - 152px); max-width: 250px; aspect-ratio: 3 / 5; max-height: 86%;
-  perspective: 1000px;
+  perspective: 1000px; -webkit-perspective: 1000px;
 }
 .elev-card { position: relative; width: 100%; height: 100%; }
-.elev-card-flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform var(--elev-flip-ms) cubic-bezier(0.4, 0, 0.2, 1); }
+.elev-card-flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform var(--elev-flip-ms) cubic-bezier(0.4, 0, 0.2, 1); }
 .elev-card-flipped { transform: rotateY(180deg); }
-.elev-card-face {
+/* Only backface-visibility + the back's 180° live on the face itself —
+   deliberately NOT border-radius/overflow. iOS Safari has a long-
+   standing bug where backface-visibility:hidden silently stops working
+   on an element that also has overflow:hidden + border-radius, and the
+   rotated-away face then renders through, mirrored, on top of the
+   visible one (seen on a real iPhone, invisible in every desktop
+   browser). Radius/overflow/background go on .elev-card-surface, a
+   plain absolutely-positioned child, the same split the old swipe card
+   used (.swipe-card-face / .swipe-card-*-surface). */
+.elev-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.elev-card-back { transform: rotateY(180deg); }
+.elev-card-surface {
   position: absolute; inset: 0; border-radius: 14px; overflow: hidden;
-  backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background-color: var(--surface-2);
   box-shadow: 0 18px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(251,232,211,0.08);
+  /* Belt and suspenders alongside the face's own, same as the old card. */
+  backface-visibility: hidden; -webkit-backface-visibility: hidden;
 }
-.elev-card-front { background-size: cover; background-position: center; background-color: var(--surface-2); display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; user-select: none; }
+.elev-card-front-surface { background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; user-select: none; }
 .elev-card-front-blank { background-image: linear-gradient(135deg, var(--surface-3), var(--surface-1)); }
 .elev-card-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12,19,31,0.05) 35%, rgba(12,19,31,0.94) 100%); }
 .elev-card-hint { position: absolute; z-index: 1; top: 0.6rem; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); background: rgba(12,19,31,0.6); border: 1px solid rgba(251,232,211,0.15); border-radius: 999px; padding: 0.2rem 0.55rem; white-space: nowrap; }
@@ -6139,7 +6169,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 /* Own class rather than .pitch-tag, which is the poster-corner badge
    (position:absolute) elsewhere in the Pitch Room. */
 .elev-tag { display: inline-block; align-self: flex-start; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; border: 1px solid var(--olive-deep); color: var(--olive-bright); background: var(--olive-shadow); border-radius: 999px; padding: 0.12rem 0.5rem; }
-.elev-card-back { transform: rotateY(180deg); background: linear-gradient(180deg, var(--surface-2), var(--surface-1)); display: flex; flex-direction: column; }
+.elev-card-back-surface { background: linear-gradient(180deg, var(--surface-2), var(--surface-1)); display: flex; flex-direction: column; }
 .elev-card-back-btn { position: absolute; top: 0.5rem; left: 0.6rem; z-index: 1; display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid rgba(251,232,211,0.2); background: rgba(12,19,31,0.4); color: var(--ink); border-radius: 999px; padding: 0.2rem 0.55rem; cursor: pointer; }
 .elev-card-back-btn:hover { background: rgba(12,19,31,0.7); }
 /* Scrolls on its own; touch-action keeps a finger on long text scrolling
@@ -6168,6 +6198,18 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-toast { position: absolute; bottom: -2.2rem; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 999px; padding: 0.3rem 0.8rem; white-space: nowrap; opacity: 0; transition: opacity 200ms; pointer-events: none; }
 .elev-toast-on { opacity: 1; }
 
+/* On a short viewport (an SE-sized phone, or a banner eating a third of
+   a normal one) the car is squat and every pixel of width counts —
+   tighten the plates a little so the card keeps more of it. */
+@media (max-height: 700px) {
+  .elev-btn-cap { width: 40px; height: 40px; }
+  .elev-btn-cap svg { width: 17px; height: 17px; }
+  .elev-plate { gap: 0.5rem; padding: 0.55rem 0.35rem; }
+  .elev-plate-left { left: 6px; }
+  .elev-plate-right { right: 6px; }
+  .elev-card-slot { width: calc(100% - 136px); }
+}
+
 /* The stage tops out at 400px — fine on a phone, but .pitch-discover-
    stage fills the entire viewport on any screen, so the same car would
    sit small in a mostly empty desktop window. Scales the car and the
@@ -6184,7 +6226,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
   .pitch-discover-banner { max-width: 480px; }
 }
 @media (min-width: 1180px) {
-  .elev-stage { max-width: 480px; }
+  .elev-stage { max-width: 480px; --elev-chrome: calc(1.2rem + env(safe-area-inset-top, 0px) + 2rem + env(safe-area-inset-bottom, 0px) + 4.4rem + var(--pitch-banner-clearance, 0px)); }
   .elev-card-slot { max-width: 310px; }
   .elev-btn-cap { width: 52px; height: 52px; }
   .elev-card-copy h2 { font-size: 1.35rem; }
