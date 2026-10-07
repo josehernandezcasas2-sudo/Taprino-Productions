@@ -2,7 +2,7 @@
 // Exercises lib/channelPlan.js — the rules that decide what airs on a channel.
 import assert from 'node:assert/strict';
 import {
-  planDay, fitEpisodes, advanceBookmark, weekStartOf, weekdayOf, addDays, segmentAt, slotsForDay, mergeForGuide
+  planDay, fitEpisodes, advanceBookmark, weekStartOf, weekdayOf, addDays, segmentAt, slotsForDay, mergeForGuide, wholeMinutes
 } from '../lib/channelPlan.js';
 
 let passed = 0;
@@ -162,6 +162,32 @@ test("guide merges loop pieces into one block without any one episode's details"
   assert.equal(m.length, 2);
   assert.deepEqual([m[0].kind, m[0].start, m[0].end, m[0].episodeId, m[0].description], ['loop', 0, 1200, undefined, undefined]);
   assert.equal(m[1].episodeId, 'c');
+});
+
+test('a gap shorter than 5 minutes is ads and bumpers, not the loop', () => {
+  const a = { id: 'a', kind: 'episode', episode_id: 'film', day_of_week: 'tuesday', start_time: T(19), duration_seconds: 3480 };
+  const b = { id: 'b', kind: 'episode', episode_id: 'film', day_of_week: 'tuesday', start_time: T(20, 2), duration_seconds: 3480 };
+  const segs = planDay(ctxFor('2026-10-06', { defaultSlots: [a, b] }));
+  const gap = segmentAt(segs, H(20, 1));
+  assert.equal(gap.kind, 'ad_break');
+  assert.equal(gap.filler, true);
+  assert.deepEqual([gap.start, gap.end], [H(19, 58), H(20, 2)]);
+  assert.equal(segmentAt(segs, H(18)).layer, 'loop'); // long gaps still loop
+  assert.equal(mergeForGuide(segs).filter((s) => s.kind === 'ad_break').length, 1);
+});
+
+test('whole-minute slots: the seconds left after a title are ads', () => {
+  assert.equal(wholeMinutes(1660), 1680);
+  assert.equal(wholeMinutes(1680), 1680);
+  const s = { id: 's', kind: 'episode', episode_id: 'film', day_of_week: 'tuesday', start_time: T(19), duration_seconds: wholeMinutes(3480) };
+  const segs = planDay(ctxFor('2026-10-06', { defaultSlots: [s] }));
+  assert.equal(segmentAt(segs, H(19, 57)).kind, 'episode');
+  assert.equal(segs.filter((x) => x.slotId === 's').length, 1); // 3480 is already whole minutes: no filler
+  const odd = { ...s, duration_seconds: wholeMinutes(3490) };
+  const segs2 = planDay(ctxFor('2026-10-06', { episodesById: { film: { id: 'film', durationSeconds: 3490 } }, defaultSlots: [odd] }));
+  const tail = segs2.filter((x) => x.slotId === 's');
+  assert.deepEqual(tail.map((x) => x.kind), ['episode', 'ad_break']);
+  assert.deepEqual([tail[1].start, tail[1].end], [H(19) + 3490, H(19) + 3540]); // 58:10 takes a 59-minute slot
 });
 
 console.log(`\n${passed} passed`);

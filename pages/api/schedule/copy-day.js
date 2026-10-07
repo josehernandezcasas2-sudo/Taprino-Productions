@@ -1,18 +1,6 @@
-import { requireScheduler, sendError } from '../../../lib/scheduleRequest';
-import { copyDay } from '../../../lib/scheduleAdmin';
-
-// POST { channelId, layer, from, to: [...] } — replaces the target days.
-export default async function handler(req, res) {
-  if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-  const body = req.body || {};
-  const roleContext = await requireScheduler(req, res, body.channelId);
-  if (!roleContext) return undefined;
-  try {
-    return res.status(200).json(await copyDay(roleContext, body.channelId, body));
-  } catch (err) {
-    return sendError(res, err);
-  }
+// Copying a day happens in the scheduler's draft now and lands with the
+// rest of the week through /api/schedule/save. This route can be deleted.
+export default function handler(req, res) {
+  res.setHeader('Allow', '');
+  return res.status(410).json({ error: 'Copy a day in the scheduler and save the week instead.' });
 }

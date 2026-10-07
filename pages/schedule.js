@@ -6,7 +6,11 @@ import { getAccountContext } from '../lib/accountContext';
 import { getRoleContext } from '../lib/roles';
 import { schedulableChannels } from '../lib/channelAccess';
 import { channelClock } from '../lib/channelEngine';
-import { addDays, weekStartOf, fitEpisodes, DAY_SECONDS } from '../lib/channelPlan';
+import { addDays, weekStartOf, DAY_SECONDS } from '../lib/channelPlan';
+import {
+  LENGTH_LIMITS, SNAP_SECONDS, snapToGrid, magnetStart, arrange, blockerOf, rerunProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, isSeriesKind, limitFor
+} from '../lib/scheduleLayout';
+import ScheduleTimeline, { ZOOM, KIND_ICON, clock, dur } from '../components/ScheduleTimeline';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
@@ -15,6 +19,10 @@ import { useUpload } from '../contexts/UploadContext';
 
 // The channel scheduler: admins, sub-admins with "manage the channel
 // schedule", and Content Schedulers (only for channels assigned to them).
+// Built for tablets and computers; phones get a note instead.
+//
+// Edits happen in a draft of the whole view (a week, or the default
+// schedule) and land together with "Save schedule" (/api/schedule/save).
 export async function getServerSideProps({ req, res, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const [account, roleContext] = await Promise.all([getAccountContext(req), getRoleContext(req)]);
@@ -46,33 +54,19 @@ export async function getServerSideProps({ req, res, query }) {
 
 const DAYS = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
 const DAY_SHORT = { monday: 'Mon', tuesday: 'Tue', wednesday: 'Wed', thursday: 'Thu', friday: 'Fri', saturday: 'Sat', sunday: 'Sun' };
-const PX_PER_HOUR = 56;
-const SNAP = 5 * 60;
 const KIND_INFO = {
-  series_continue: { icon: '⟳', name: 'Continue', help: 'Plays the next episodes in order. The next day picks up where this one stopped.' },
-  series_rerun: { icon: '↺', name: 'Rerun', help: 'Replays what another block aired earlier the same day.' },
-  series_pinned: { icon: '▣', name: 'Pinned', help: 'Always starts at the same episode. Never moves forward.' }
+  series_continue: { name: 'Continue', help: 'Plays the next episodes in order. The next day picks up where this one stopped.' },
+  series_rerun: { name: 'Rerun', help: 'Replays what another block aired earlier the same day.' },
+  series_pinned: { name: 'Pinned', help: 'Always starts at the same episode. Never moves forward.' }
 };
 const SERIES_KINDS = Object.keys(KIND_INFO);
+const KIND_COLOR = { series_continue: 'var(--sky)', series_rerun: 'var(--olive)', series_pinned: 'var(--mint)', episode: '#3b5283', media: 'var(--rust)', ad_break: '#6b7a99', live: 'var(--brass)' };
+const SAVE_FIELDS = ['id', 'kind', 'start', 'durationSeconds', 'episodeId', 'mediaId', 'seriesId', 'pinEpisodeId', 'rerunOf', 'title'];
+const sameSlot = (a, b) => !!a && !!b && SAVE_FIELDS.every((k) => (a[k] ?? null) === (b[k] ?? null));
 
 const pad = (n) => String(n).padStart(2, '0');
-function clock(sec) {
-  const s = ((Math.round(sec) % DAY_SECONDS) + DAY_SECONDS) % DAY_SECONDS;
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${h % 12 === 0 ? 12 : h % 12}:${pad(m)} ${h >= 12 ? 'PM' : 'AM'}`;
-}
 function hhmm(sec) {
   return `${pad(Math.floor(sec / 3600))}:${pad(Math.floor((sec % 3600) / 60))}`;
-}
-function dur(sec) {
-  const s = Math.round(sec);
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const r = s % 60;
-  if (h) return `${h}h${m ? ` ${m}m` : ''}`;
-  if (m) return `${m}m${r ? ` ${r}s` : ''}`;
-  return `${r}s`;
 }
 function dateParts(d) {
   const [y, m, day] = d.split('-').map(Number);
@@ -84,6 +78,16 @@ function shortDate(d) {
 function weekdayOfDate(d) {
   return DAYS[(dateParts(d).getUTCDay() + 6) % 7];
 }
+// Channel time (Pacific) right now, for the "now" line. Null if the browser can't say.
+function nowPacificSec() {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false }).formatToParts(new Date());
+    const g = (t) => Number(parts.find((p) => p.type === t).value);
+    return (g('hour') % 24) * 3600 + g('minute') * 60 + g('second');
+  } catch (err) {
+    return null;
+  }
+}
 
 async function api(url, method = 'GET', body) {
   const res = await fetch(url, method === 'GET' ? undefined : { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
@@ -91,6 +95,9 @@ async function api(url, method = 'GET', body) {
   if (!res.ok) throw new Error(data.error || 'Something went wrong.');
   return data;
 }
+
+let tmpCounter = 0;
+const newTmpId = () => `tmp-${Date.now().toString(36)}-${++tmpCounter}`;
 
 export default function Scheduler(props) {
   const { channels, initialChannelId, initialView, today, canLive, isSignedIn, isSubscriber, email, isAdmin, isCreator } = props;
@@ -108,25 +115,49 @@ export default function Scheduler(props) {
   const [picked, setPicked] = useState(null); // library item waiting to be placed
   const [selectedId, setSelectedId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [zoom, setZoom] = useState('normal');
+  const [nowSec, setNowSec] = useState(null);
+  const [hoverTab, setHoverTab] = useState(null);
+  // The draft: every day of the view, edited locally until "Save schedule".
+  const [draft, setDraft] = useState({});
+  const [dirty, setDirty] = useState(() => new Set());
+  const [history, setHistory] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const toastTimer = useRef(null);
 
   const channel = channels.find((c) => c.id === channelId);
   const layer = view === 'default' ? 'default' : 'week';
+  const px = ZOOM[zoom];
+  const isDirty = dirty.size > 0;
 
-  const flash = useCallback((msg) => {
-    setToast(msg);
-    setTimeout(() => setToast(null), 2200);
+  const flash = useCallback((msg, canUndo = false) => {
+    setToast({ msg, canUndo });
+    clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), canUndo ? 6000 : 2600);
+  }, []);
+
+  const groupByDay = useCallback((slots, lyr) => {
+    const out = {};
+    for (const s of slots) (out[lyr === 'week' ? s.airDate : s.dayOfWeek] = out[lyr === 'week' ? s.airDate : s.dayOfWeek] || []).push(s);
+    return out;
   }, []);
 
   const loadView = useCallback(async () => {
-    if (view === 'loop') return;
+    if (view === 'loop') return null;
     setError(null);
     try {
       const qs = view === 'default' ? 'layer=default' : `layer=week&weekStart=${weekStart}`;
-      setData(await api(`/api/schedule/view?channelId=${channelId}&${qs}`));
+      const d = await api(`/api/schedule/view?channelId=${channelId}&${qs}`);
+      setData(d);
+      setDraft(groupByDay(d.slots, d.layer));
+      setDirty(new Set());
+      setHistory([]);
+      return d;
     } catch (err) {
       setError(err.message);
+      return null;
     }
-  }, [channelId, view, weekStart]);
+  }, [channelId, view, weekStart, groupByDay]);
 
   const loadLoop = useCallback(async () => {
     try {
@@ -148,13 +179,36 @@ export default function Scheduler(props) {
   }, [channelId]);
   useEffect(() => { loadMedia(); }, [loadMedia]);
 
+  // The now line, and remembering the zoom.
+  useEffect(() => {
+    setNowSec(nowPacificSec());
+    const t = setInterval(() => setNowSec(nowPacificSec()), 30000);
+    try { const z = window.localStorage.getItem('sch-zoom'); if (ZOOM[z]) setZoom(z); } catch (err) { /* private mode */ }
+    return () => clearInterval(t);
+  }, []);
+  function pickZoom(z) {
+    setZoom(z);
+    try { window.localStorage.setItem('sch-zoom', z); } catch (err) { /* private mode */ }
+  }
+
+  // Don't lose a draft by accident.
+  useEffect(() => {
+    if (!isDirty) return undefined;
+    const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [isDirty]);
+  const okToLeave = () => !isDirty || window.confirm('You have unsaved changes. Leave without saving them?');
+
   // Keep the URL shareable (?channel=&view=) without reloading the page.
   useEffect(() => {
+    if (router.pathname !== '/schedule') return;
     router.replace({ pathname: '/schedule', query: { channel: channel ? channel.slug : undefined, view } }, undefined, { shallow: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelId, view]);
 
   function switchView(next) {
+    if (next === view || !okToLeave()) return;
     setView(next);
     setSelectedId(null);
     setPicked(null);
@@ -165,67 +219,242 @@ export default function Scheduler(props) {
     }
   }
   function moveWeek(n) {
+    if (!okToLeave()) return;
     const ws = addDays(weekStart, 7 * n);
     setWeekStart(ws);
     setDay(ws <= today && today <= addDays(ws, 6) ? today : ws);
     setSelectedId(null);
   }
+  function switchChannel(id) {
+    if (!okToLeave()) return;
+    setChannelId(id);
+    setSelectedId(null);
+    setPicked(null);
+  }
 
-  async function mutate(fn, okMsg) {
-    setBusy(true);
+  /* ---------- the draft ---------- */
+
+  const dayKeys = useMemo(() => (layer === 'week' ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)) : DAYS), [layer, weekStart]);
+  const daySlots = useMemo(() => (draft[day] || []).slice().sort((a, b) => a.start - b.start), [draft, day]);
+  const savedById = useMemo(() => Object.fromEntries(((data && data.slots) || []).map((s) => [s.id, s])), [data]);
+  const selected = daySlots.find((s) => s.id === selectedId) || null;
+  const seriesById = useMemo(() => Object.fromEntries((library ? library.series : []).map((s) => [s.id, s])), [library]);
+  const isPastDay = layer === 'week' && day < today;
+  const isToday = layer === 'week' ? day === today : day === weekdayOfDate(today);
+  const ghosts = layer === 'week' && data && data.defaults ? (data.defaults[weekdayOfDate(day)] || []) : [];
+
+  // Every change to the draft goes through here, so it can be undone.
+  function edit(nextDraft, keys, msg, select) {
+    setHistory((h) => [...h.slice(-49), { draft, dirty: new Set(dirty), selectedId }]);
+    setDraft(nextDraft);
+    setDirty((d) => new Set([...d, ...keys]));
+    if (select !== undefined) setSelectedId(select);
+    setError(null);
+    if (msg) flash(msg, true);
+  }
+  function undo() {
+    const last = history[history.length - 1];
+    if (!last) return flash('Nothing to undo');
+    setHistory((h) => h.slice(0, -1));
+    setDraft(last.draft);
+    setDirty(last.dirty);
+    setSelectedId(last.selectedId);
+    setError(null);
+    return flash('Undone');
+  }
+  const withDay = (key, slots) => ({ ...draft, [key]: slots });
+  const problemFor = (slots, id) => {
+    const hit = blockerOf(slots, id);
+    if (hit) return `No room there, it overlaps ${hit.title} (${clock(hit.start)}–${clock(hit.start + hit.durationSeconds)}).`;
+    return rerunProblem(slots, id);
+  };
+  const removedNote = (removed) => (removed && removed.length ? ` · ${removed.length} ad break${removed.length === 1 ? '' : 's'} didn't fit anymore and came off` : '');
+
+  // What a library item becomes when it lands on the day.
+  function slotFor(item, start) {
+    const base = { id: newTmpId(), layer, airDate: layer === 'week' ? day : null, dayOfWeek: layer === 'default' ? day : null, start, episodeId: null, mediaId: null, seriesId: null, pinEpisodeId: null, pinLabel: null, rerunOf: null, title: item.name, tier: item.tier || null, unavailable: false };
+    if (item.type === 'title') return { ...base, kind: 'episode', episodeId: item.id, durationSeconds: Math.ceil(item.durationSeconds / 60) * 60, runtimeSeconds: item.durationSeconds };
+    if (item.type === 'series') {
+      const s = seriesById[item.id];
+      return { ...base, kind: layer === 'default' ? 'series_continue' : 'series_pinned', seriesId: item.id, pinEpisodeId: layer === 'default' ? null : s.episodes[0].id, pinLabel: layer === 'default' ? null : (s.episodes[0].label || s.episodes[0].title), durationSeconds: defaultSeriesLength(s.episodes, 0), title: s.name };
+    }
+    if (item.type === 'media') return { ...base, kind: 'media', mediaId: item.id, durationSeconds: Math.ceil(item.durationSeconds / 60) * 60, runtimeSeconds: item.durationSeconds };
+    if (item.type === 'ad_break') return { ...base, kind: 'ad_break', durationSeconds: 120, title: 'Ad break' };
+    if (item.type === 'live') return { ...base, kind: 'live', durationSeconds: 3600, title: 'Live broadcast' };
+    return null;
+  }
+
+  function place(item, sec) {
+    if (!item) return flash('Pick something from the library first');
+    if (isPastDay) return flash('This day already aired');
+    const slot = slotFor(item, 0);
+    if (!slot) return null;
+    slot.start = magnetStart(Math.max(0, Math.min(DAY_SECONDS - slot.durationSeconds, snapToGrid(sec))), slot.durationSeconds, daySlots);
+    const res = arrange(daySlots.concat([slot]), { id: slot.id, start: slot.start, durationSeconds: slot.durationSeconds });
+    const problem = problemFor(res.slots, slot.id);
+    if (problem) return flash(`${item.name} needs ${dur(slot.durationSeconds)}. ${problem}`);
+    setPicked(null);
+    edit(withDay(day, res.slots), [day], `Added at ${clock(slot.start)}${removedNote(res.removed)}`, slot.id);
+    return slot.id;
+  }
+
+  function onArrange(slots, info) {
+    if (!slots) return flash(info.error);
+    return edit(withDay(day, slots), [day], `${info.msg}${removedNote(info.removed)}`, info.select);
+  }
+
+  function moveToDay(id, key) {
+    const s = daySlots.find((x) => x.id === id);
+    if (!s || key === day) return;
+    if (s.kind === 'series_rerun' || daySlots.some((o) => o.rerunOf === s.id)) return flash('Reruns stay with the block they copy. Change the rerun first.');
+    if (layer === 'week' && key < today) return flash('That day already aired');
+    const moved = { ...s, airDate: layer === 'week' ? key : null, dayOfWeek: layer === 'default' ? key : null };
+    const target = (draft[key] || []).filter((o) => o.id !== id);
+    const res = arrange(target.concat([moved]), { id, start: s.start, durationSeconds: s.durationSeconds });
+    const problem = problemFor(res.slots, id);
+    const label = dayTabs.find((t) => t.key === key);
+    if (problem) return flash(`No room on ${label ? label.label : key} at ${clock(s.start)}. ${problem}`);
+    return edit({ ...draft, [day]: daySlots.filter((o) => o.id !== id), [key]: res.slots }, [day, key], `Moved to ${label ? label.label : key} at ${clock(s.start)}${removedNote(res.removed)}`, null);
+  }
+
+  // Edits from the side panel. Returns an error message, or null when applied.
+  function changeSlot(id, changes, msg) {
+    const s = daySlots.find((x) => x.id === id);
+    if (!s) return 'That slot is gone.';
+    const next = { ...s, ...changes };
+    const lim = limitFor(next);
+    if (lim && (next.durationSeconds < lim.min || next.durationSeconds > lim.max)) return `That block has to be ${lim.label}.`;
+    if (next.start + next.durationSeconds > DAY_SECONDS) return `That runs past midnight (it would end at ${clock(next.start + next.durationSeconds)}). Start it earlier, or put the rest on the next day.`;
+    const others = daySlots.map((o) => (o.id === id ? next : o));
+    const res = arrange(others, { id, start: next.start, durationSeconds: next.durationSeconds });
+    const problem = problemFor(res.slots, id);
+    if (problem) return problem;
+    edit(withDay(day, res.slots), [day], `${msg || 'Updated'}${removedNote(res.removed)}`);
+    return null;
+  }
+
+  function nudge(delta) {
+    if (!selected || isPastDay || (selected.kind === 'live' && !canLive)) return;
+    const start = Math.max(0, Math.min(DAY_SECONDS - selected.durationSeconds, selected.start + delta));
+    if (start === selected.start) return;
+    const err = changeSlot(selected.id, { start }, `Moved to ${clock(start)}`);
+    if (err) flash(err);
+  }
+
+  function removeSlot(id) {
+    const s = daySlots.find((x) => x.id === id);
+    if (!s || isPastDay || (s.kind === 'live' && !canLive)) return;
+    const reruns = daySlots.filter((o) => o.rerunOf === id);
+    if (reruns.length && !window.confirm(`Removing this also removes ${reruns.length} rerun${reruns.length === 1 ? '' : 's'} of it. Continue?`)) return;
+    const gone = new Set([id, ...reruns.map((r) => r.id)]);
+    edit(withDay(day, daySlots.filter((o) => !gone.has(o.id))), [day], reruns.length ? `Removed, with ${reruns.length} rerun${reruns.length === 1 ? '' : 's'} of it` : 'Removed', null);
+  }
+
+  function duplicateSlot(id) {
+    const s = daySlots.find((x) => x.id === id);
+    if (!s || isPastDay) return;
+    const copy = { ...s, id: newTmpId(), rerunOf: null, kind: s.kind === 'series_rerun' ? 'series_pinned' : s.kind };
+    if (copy.kind === 'series_pinned' && !copy.pinEpisodeId && seriesById[copy.seriesId]) copy.pinEpisodeId = seriesById[copy.seriesId].episodes[0].id;
+    const start = firstRoomAfter(daySlots, s.start + s.durationSeconds, copy.durationSeconds);
+    if (start === null) return flash('No room later today for a copy');
+    copy.start = start;
+    const res = arrange(daySlots.concat([copy]), { id: copy.id, start, durationSeconds: copy.durationSeconds });
+    return edit(withDay(day, res.slots), [day], `Copied to ${clock(start)}${removedNote(res.removed)}`, copy.id);
+  }
+
+  // Copies one day's lineup onto other days of this view, replacing what they had.
+  function copyDayTo(targets) {
+    const source = daySlots.filter((s) => s.kind !== 'live' || canLive);
+    const next = { ...draft };
+    for (const key of targets) {
+      const idMap = {};
+      const kept = (draft[key] || []).filter((s) => s.kind === 'live' && !canLive);
+      const copies = [];
+      for (const s of source) {
+        const c = { ...s, id: newTmpId(), airDate: layer === 'week' ? key : null, dayOfWeek: layer === 'default' ? key : null };
+        idMap[s.id] = c.id;
+        copies.push(c);
+      }
+      for (const c of copies) if (c.rerunOf) c.rerunOf = idMap[c.rerunOf] || null;
+      next[key] = kept.concat(copies.filter((c) => c.kind !== 'series_rerun' || c.rerunOf)).sort((a, b) => a.start - b.start);
+    }
+    edit(next, targets, `Copied to ${targets.length} day${targets.length === 1 ? '' : 's'}`);
+  }
+
+  /* ---------- saving ---------- */
+
+  async function save() {
+    if (!isDirty || saving) return true;
+    setSaving(true);
     setError(null);
     try {
-      const out = await fn();
+      const days = Object.fromEntries([...dirty].map((k) => [k, (draft[k] || []).map((s) => Object.fromEntries(SAVE_FIELDS.map((f) => [f, s[f] ?? null])))]));
+      const out = await api('/api/schedule/save', 'POST', { channelId, layer, days });
+      if (selectedId && out.ids && out.ids[selectedId]) setSelectedId(out.ids[selectedId]);
       await loadView();
-      if (okMsg) flash(okMsg);
-      return out;
+      flash('Schedule saved');
+      return true;
     } catch (err) {
       setError(err.message);
-      return null;
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+  function discard() {
+    if (!isDirty || !window.confirm('Throw away your unsaved changes?')) return;
+    setSelectedId(null);
+    loadView();
+  }
+  async function togglePublish() {
+    if (!data) return;
+    setBusy(true);
+    try {
+      if (isDirty && !(await save())) return;
+      await api('/api/schedule/publish', 'POST', { channelId, weekStart, published: !data.published });
+      await loadView();
+      flash(data.published ? 'Week unpublished. The default schedule runs.' : 'Week published');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function resetBookmark(id) {
+    if (!window.confirm('Start this block over from the first episode?')) return;
+    setBusy(true);
+    try {
+      await api('/api/schedule/slots', 'PATCH', { channelId, id, resetBookmark: true });
+      await loadView();
+      flash('Back to the first episode');
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
   }
 
-  const daySlots = useMemo(() => {
-    if (!data) return [];
-    return data.slots
-      .filter((s) => (layer === 'week' ? s.airDate === day : s.dayOfWeek === day))
-      .sort((a, b) => a.start - b.start);
-  }, [data, layer, day]);
-  const selected = daySlots.find((s) => s.id === selectedId) || null;
-
-  const seriesById = useMemo(() => Object.fromEntries((library ? library.series : []).map((s) => [s.id, s])), [library]);
-
-  // What a library item becomes when it lands on the day.
-  function slotBodyFor(item, startSec) {
-    const base = { channelId, layer, startTime: hhmm(startSec), ...(layer === 'week' ? { airDate: day } : { dayOfWeek: day }) };
-    if (item.type === 'title') return { ...base, kind: 'episode', episodeId: item.id };
-    if (item.type === 'series') {
-      const longest = Math.max(...item.series.episodes.map((e) => e.durationSeconds));
-      const block = Math.max(3600, Math.ceil(longest / 900) * 900);
-      return { ...base, kind: layer === 'default' ? 'series_continue' : 'series_pinned', seriesId: item.id, durationSeconds: block };
-    }
-    if (item.type === 'media') return { ...base, kind: 'media', mediaId: item.id };
-    if (item.type === 'ad_break') return { ...base, kind: 'ad_break', durationSeconds: 120 };
-    if (item.type === 'live') return { ...base, kind: 'live', durationSeconds: 3600, title: 'Live broadcast' };
-    return null;
-  }
-
-  async function place(item, startSec) {
-    const snapped = Math.max(0, Math.min(DAY_SECONDS - SNAP, Math.round(startSec / SNAP) * SNAP));
-    const body = slotBodyFor(item, snapped);
-    const out = await mutate(() => api('/api/schedule/slots', 'POST', body), `Added at ${clock(snapped)}`);
-    if (out) {
-      setPicked(null);
-      setSelectedId(out.id);
-    }
-  }
+  // Keyboard: arrows nudge, Delete removes, Esc deselects, Ctrl+Z undoes, Ctrl+S saves.
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target.tagName || '').toLowerCase();
+      const typing = ['input', 'select', 'textarea'].includes(tag);
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); return; }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !typing) { e.preventDefault(); undo(); return; }
+      if (typing || view === 'loop') return;
+      if (e.key === 'Escape') { setSelectedId(null); setPicked(null); return; }
+      if (!selectedId) return;
+      if (e.key === 'ArrowUp') { e.preventDefault(); nudge(e.shiftKey ? -1800 : -SNAP_SECONDS); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); nudge(e.shiftKey ? 1800 : SNAP_SECONDS); }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSlot(selectedId); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  });
 
   const dayTabs = layer === 'week'
-    ? Array.from({ length: 7 }, (_, i) => addDays(weekStart, i)).map((d) => ({ key: d, label: `${DAY_SHORT[weekdayOfDate(d)]} ${dateParts(d).getUTCDate()}`, isToday: d === today, past: d < today }))
-    : DAYS.map((d) => ({ key: d, label: DAY_SHORT[d], isToday: d === weekdayOfDate(today) }));
-
+    ? dayKeys.map((d) => ({ key: d, label: `${DAY_SHORT[weekdayOfDate(d)]} ${dateParts(d).getUTCDate()}`, isToday: d === today, past: d < today }))
+    : DAYS.map((d) => ({ key: d, label: DAY_SHORT[d], isToday: d === weekdayOfDate(today), past: false }));
   const weekIsCurrent = weekStart === weekStartOf(today);
 
   return (
@@ -236,6 +465,14 @@ export default function Scheduler(props) {
       <HeaderNav activeType="All" isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
       <main className="stage stage-single stage-wide sch-page">
+        <div className="sch-phone">
+          <div className="eyebrow">Scheduler</div>
+          <h1>{channel.name} <span className="sch-chnum">CH {pad(channel.number)}</span></h1>
+          <p>The scheduler is built for a tablet or computer. Open this page on a bigger screen to plan {channel.name}.</p>
+          {channel.visibility === 'public' && <Link href={`/live/${channel.slug}`} className="sch-btn">Watch it live ↗</Link>}
+        </div>
+
+        <div className="sch-work">
         <div className="sch-head">
           <div>
             <div className="eyebrow">Scheduler</div>
@@ -245,7 +482,7 @@ export default function Scheduler(props) {
             {channels.length > 1 && (
               <label className="sch-field">
                 <span>Channel</span>
-                <select id="sch-channel" value={channelId} onChange={(e) => { setChannelId(e.target.value); setSelectedId(null); setPicked(null); }}>
+                <select id="sch-channel" value={channelId} onChange={(e) => switchChannel(e.target.value)}>
                   {channels.map((c) => <option key={c.id} value={c.id}>CH {pad(c.number)} · {c.name}{c.visibility === 'draft' ? ' (draft)' : ''}</option>)}
                 </select>
               </label>
@@ -255,6 +492,13 @@ export default function Scheduler(props) {
                 <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => switchView(k)}>{label}</button>
               ))}
             </div>
+            {view !== 'loop' && (
+              <div className="sch-seg" role="group" aria-label="Zoom">
+                {[['compact', 'Compact'], ['normal', 'Normal'], ['roomy', 'Roomy']].map(([k, label]) => (
+                  <button key={k} type="button" aria-selected={zoom === k} onClick={() => pickZoom(k)}>{label}</button>
+                ))}
+              </div>
+            )}
             {channel.visibility === 'public' && <Link href={`/live/${channel.slug}`} className="sch-btn">Watch it live ↗</Link>}
           </div>
         </div>
@@ -287,40 +531,69 @@ export default function Scheduler(props) {
                 <p className="sch-note">The default schedule runs on any day whose week isn&rsquo;t published. Series blocks here can pick up where they left off.</p>
               )}
               <div className="sch-bar-acts">
-                <CopyDay key={`${view}-${day}`} layer={layer} day={day} tabs={dayTabs} busy={busy}
-                  onCopy={(to) => mutate(() => api('/api/schedule/copy-day', 'POST', { channelId, layer, from: day, to }), `Copied to ${to.length} day${to.length === 1 ? '' : 's'}`)} />
+                <CopyDay key={`${view}-${day}`} layer={layer} day={day} tabs={dayTabs} busy={busy || saving} onCopy={copyDayTo} />
+                {isDirty && <button type="button" className="sch-btn" onClick={discard} disabled={saving}>Discard</button>}
+                <button type="button" className={`sch-btn ${isDirty ? 'primary' : ''}`} onClick={save} disabled={!isDirty || saving} title="Ctrl+S">
+                  {saving ? 'Saving…' : isDirty ? `Save schedule · ${dirty.size} day${dirty.size === 1 ? '' : 's'}` : 'Saved'}
+                </button>
                 {layer === 'week' && data && (
-                  <button type="button" className={data.published ? 'sch-btn' : 'sch-btn primary'} disabled={busy}
-                    onClick={() => mutate(() => api('/api/schedule/publish', 'POST', { channelId, weekStart, published: !data.published }), data.published ? 'Week unpublished. The default schedule runs.' : 'Week published')}>
-                    {data.published ? 'Unpublish week' : 'Publish week'}
+                  <button type="button" className={data.published ? 'sch-btn' : 'sch-btn primary'} disabled={busy || saving} onClick={togglePublish}>
+                    {data.published ? (isDirty ? 'Save & keep published' : 'Unpublish week') : (isDirty ? 'Save & publish week' : 'Publish week')}
                   </button>
                 )}
               </div>
             </div>
 
             <div className="sch-days" role="tablist" aria-label="Day">
-              {dayTabs.map((t) => (
-                <button key={t.key} type="button" role="tab" aria-selected={day === t.key} className={`${t.past ? 'past' : ''}`} onClick={() => { setDay(t.key); setSelectedId(null); }}>
-                  {t.label}{t.isToday ? ' · today' : ''}
-                </button>
-              ))}
+              {dayTabs.map((t) => {
+                const cov = (draft[t.key] || []);
+                return (
+                  <button
+                    key={t.key}
+                    type="button"
+                    role="tab"
+                    aria-selected={day === t.key}
+                    data-daykey={t.key}
+                    data-droppable={!t.past && t.key !== day}
+                    className={`${t.past ? 'past' : ''} ${dirty.has(t.key) ? 'dirty' : ''} ${hoverTab === t.key ? 'over' : ''}`}
+                    onClick={() => { setDay(t.key); setSelectedId(null); }}
+                  >
+                    <span>{t.label}{t.isToday ? ' · today' : ''}{dirty.has(t.key) ? ' •' : ''}</span>
+                    <i className="sch-cov" aria-hidden="true">
+                      {cov.map((s) => <b key={s.id} style={{ left: `${(s.start / DAY_SECONDS) * 100}%`, width: `${Math.max(0.6, (s.durationSeconds / DAY_SECONDS) * 100)}%`, background: KIND_COLOR[s.kind] || 'var(--ink-faint)' }} />)}
+                    </i>
+                  </button>
+                );
+              })}
             </div>
 
             <div className="sch-grid">
               <Library library={library} media={media} reloadMedia={loadMedia} channelId={channelId} setError={setError} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) setSelectedId(null); }} />
 
-              <Timeline
-                key={`${channelId}-${view}-${day}`}
-                slots={daySlots}
-                loading={!data}
-                layer={layer}
-                selectedId={selectedId}
-                picked={picked}
-                isPastDay={layer === 'week' && day < today}
-                onSelect={(id) => { setSelectedId(id); setPicked(null); }}
-                onPlace={(sec, item) => place(item || picked, sec)}
-                needPick={() => flash('Pick something from the library first')}
-              />
+              {data ? (
+                <ScheduleTimeline
+                  key={`${channelId}-${view}-${day}-${weekStart}`}
+                  slots={daySlots}
+                  ghosts={ghosts}
+                  seriesById={seriesById}
+                  layer={layer}
+                  px={px}
+                  picked={picked}
+                  selectedId={selectedId}
+                  canLive={canLive}
+                  isPastDay={isPastDay}
+                  isToday={isToday}
+                  nowSec={nowSec}
+                  onSelect={(id) => { setSelectedId(id); setPicked(null); }}
+                  onPlace={place}
+                  onArrange={onArrange}
+                  onMoveToDay={moveToDay}
+                  onTabHover={setHoverTab}
+                  needPick={() => flash('Pick something from the library first')}
+                />
+              ) : (
+                <div className="sch-timeline"><div className="sch-muted" style={{ padding: '1rem' }}>Loading…</div></div>
+              )}
 
               <aside className="sch-insp" aria-live="polite">
                 {picked ? (
@@ -333,27 +606,34 @@ export default function Scheduler(props) {
                     daySlots={daySlots}
                     series={selected.seriesId ? seriesById[selected.seriesId] : null}
                     preview={data && data.preview ? data.preview[selected.id] : null}
+                    unchanged={sameSlot(selected, savedById[selected.id])}
+                    isDirty={isDirty}
                     canLive={canLive}
-                    busy={busy}
-                    onSave={(changes, msg) => mutate(() => api('/api/schedule/slots', 'PATCH', { channelId, id: selected.id, ...changes }), msg || 'Saved')}
-                    onRemove={() => {
-                      const reruns = daySlots.filter((s) => s.rerunOf === selected.id).length;
-                      if (reruns && !window.confirm(`Removing this also removes ${reruns} rerun${reruns === 1 ? '' : 's'} of it. Continue?`)) return;
-                      mutate(() => api('/api/schedule/slots', 'DELETE', { channelId, id: selected.id }), 'Removed').then(() => setSelectedId(null));
-                    }}
+                    isPastDay={isPastDay}
+                    busy={busy || saving}
+                    onChange={(changes, msg) => changeSlot(selected.id, changes, msg)}
+                    onRemove={() => removeSlot(selected.id)}
+                    onDuplicate={() => duplicateSlot(selected.id)}
+                    onResetBookmark={() => resetBookmark(selected.id)}
                   />
                 ) : (
                   <div className="sch-empty-insp">
                     <div className="tv-info-eyebrow">Slot</div>
-                    <p>Pick something from the library, then click a dashed gap or drag it onto the day. Select a slot to edit it.</p>
-                    <p className="sch-tz">All times are Pacific, the same for every viewer.</p>
+                    <p>Pick something from the library, then click an open stretch or drag it onto the day. Click a block to edit it, drag it to move it, pull its bottom edge to change its length.</p>
+                    <p className="sch-tz">All times are Pacific, the same for every viewer. Changes land when you save the schedule.</p>
                   </div>
                 )}
               </aside>
             </div>
           </>
         )}
-        {toast && <div className="sch-toast" role="status">{toast}</div>}
+        </div>
+        {toast && (
+          <div className="sch-toast" role="status">
+            <span>{toast.msg}</span>
+            {toast.canUndo && history.length > 0 && <button type="button" onClick={undo}>Undo</button>}
+          </div>
+        )}
       </main>
       <Footer />
       <MobileTabBar />
@@ -388,14 +668,14 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
       <div className="sch-items">
         {!library && tab !== 'breaks' && <div className="sch-muted">Loading…</div>}
         {library && tab === 'series' && library.series.filter((s) => !query || s.name.toLowerCase().includes(query)).map((s) => {
-          const item = { type: 'series', id: s.id, name: s.name, series: s };
+          const item = { type: 'series', id: s.id, name: s.name, tier: s.tiers.includes('premium') ? 'premium' : null };
           return (
             <div key={s.id} className={`sch-item ${isPicked('series', s.id) ? 'picked' : ''}`}>
               <button type="button" className="sch-item-main" onClick={() => setPicked(isPicked('series', s.id) ? null : item)} {...drag(item)}>
                 <span className="sch-thumb" style={s.thumbnail ? { backgroundImage: `url(${s.thumbnail})` } : undefined} />
                 <span className="sch-item-text">
                   <b>{s.name}</b>
-                  <small>{s.episodes.length} episode{s.episodes.length === 1 ? '' : 's'} · whole series block</small>
+                  <small>{s.episodes.length} episode{s.episodes.length === 1 ? '' : 's'} · drops in at one episode ({dur(defaultSeriesLength(s.episodes, 0))})</small>
                   <span className="sch-chips">
                     <span className="sch-chip series">{layer === 'default' ? '⟳ Continue' : '▣ Pinned'}</span>
                     {s.tiers.includes('premium') && <span className="sch-chip prem">Premium · ads</span>}
@@ -408,7 +688,7 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
               {open === s.id && (
                 <div className="sch-eps">
                   {s.episodes.map((e) => {
-                    const epItem = { type: 'title', id: e.id, name: `${s.name} · ${e.label || e.title}`, durationSeconds: e.durationSeconds };
+                    const epItem = { type: 'title', id: e.id, name: `${s.name} · ${e.label || e.title}`, durationSeconds: e.durationSeconds, tier: e.tier };
                     return (
                       <button key={e.id} type="button" className={`sch-ep ${isPicked('title', e.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', e.id) ? null : epItem)} {...drag(epItem)}>
                         <span>{e.label ? `${e.label} · ` : ''}{e.title}</span><small>{dur(e.durationSeconds)}</small>
@@ -423,7 +703,7 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
         {library && tab === 'series' && library.series.length === 0 && <div className="sch-muted">No series are opted in to channels yet.</div>}
 
         {library && tab === 'titles' && library.titles.filter((t) => !query || t.title.toLowerCase().includes(query)).map((t) => {
-          const item = { type: 'title', id: t.id, name: t.title, durationSeconds: t.durationSeconds };
+          const item = { type: 'title', id: t.id, name: t.title, durationSeconds: t.durationSeconds, tier: t.tier };
           return (
             <button key={t.id} type="button" className={`sch-item sch-item-main ${isPicked('title', t.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', t.id) ? null : item)} {...drag(item)}>
               <span className="sch-thumb" style={t.thumbnail ? { backgroundImage: `url(${t.thumbnail})` } : undefined} />
@@ -439,9 +719,9 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
 
         {tab === 'breaks' && (
           <>
-            {[{ type: 'ad_break', id: 'ad', name: 'Ad break', sub: '2 min to start, adjustable' }, ...(canLive ? [{ type: 'live', id: 'live', name: 'Live broadcast', sub: 'A placeholder in the guide. If nobody goes live, the loop plays.' }] : [])].map((b) => (
+            {[{ type: 'ad_break', id: 'ad', name: 'Ad break', sub: '2 min to start · pull its edge to change', cls: 'ads' }, ...(canLive ? [{ type: 'live', id: 'live', name: 'Live broadcast', sub: 'A placeholder in the guide. If nobody goes live, the loop plays.', cls: 'live' }] : [])].map((b) => (
               <button key={b.id} type="button" className={`sch-item sch-item-main ${isPicked(b.type, b.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked(b.type, b.id) ? null : b)} {...drag(b)}>
-                <span className={`sch-thumb ${b.type === 'live' ? 'live' : 'ads'}`} />
+                <span className={`sch-thumb ${b.cls}`} />
                 <span className="sch-item-text"><b>{b.name}</b><small>{b.sub}</small></span>
               </button>
             ))}
@@ -580,90 +860,6 @@ function Uploads({ media, reload, channelId, setError, picked, setPicked, drag }
   );
 }
 
-/* ---------------- the day ---------------- */
-
-function Timeline({ slots, loading, layer, selectedId, picked, isPastDay, onSelect, onPlace, needPick }) {
-  const laneRef = useRef(null);
-  const scrollRef = useRef(null);
-  const [dropping, setDropping] = useState(false);
-
-  useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = 17 * PX_PER_HOUR; // 5 PM
-  }, []);
-
-  const gaps = [];
-  let cursor = 0;
-  for (const s of slots) {
-    if (s.start > cursor) gaps.push({ start: cursor, end: s.start });
-    cursor = Math.max(cursor, s.start + s.durationSeconds);
-  }
-  if (cursor < DAY_SECONDS) gaps.push({ start: cursor, end: DAY_SECONDS });
-
-  const y = (sec) => (sec / 3600) * PX_PER_HOUR;
-  const secFromEvent = (e) => {
-    const rect = laneRef.current.getBoundingClientRect();
-    return Math.max(0, ((e.clientY - rect.top) / PX_PER_HOUR) * 3600);
-  };
-  const gapLabel = layer === 'week' ? 'Default schedule fills this' : 'Loop fills this';
-
-  return (
-    <div className="sch-timeline">
-      {isPastDay && <div className="sch-past-note">This day has already aired. Changes here won&rsquo;t show anywhere.</div>}
-      <div className="sch-scroll" ref={scrollRef}>
-        <div className="sch-tl" style={{ height: y(DAY_SECONDS) }}>
-          <div className="sch-hours" aria-hidden="true">
-            {Array.from({ length: 24 }, (_, h) => <div key={h} style={{ height: PX_PER_HOUR }}>{clock(h * 3600).replace(':00', '')}</div>)}
-          </div>
-          <div
-            ref={laneRef}
-            className={`sch-lane ${dropping ? 'drop' : ''}`}
-            onDragOver={(e) => { e.preventDefault(); setDropping(true); }}
-            onDragLeave={() => setDropping(false)}
-            onDrop={(e) => {
-              e.preventDefault();
-              setDropping(false);
-              let item = null;
-              try { item = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { item = null; }
-              onPlace(secFromEvent(e), item);
-            }}
-          >
-            {loading && <div className="sch-muted" style={{ padding: '1rem' }}>Loading…</div>}
-            {!loading && gaps.filter((g) => g.end - g.start >= 60).map((g) => (
-              <button
-                key={`gap-${g.start}`}
-                type="button"
-                className={`sch-slot gap ${picked ? 'armed' : ''}`}
-                style={{ top: y(g.start) + 1, height: Math.max(y(g.end - g.start) - 2, 6) }}
-                onClick={(e) => (picked ? onPlace(Math.max(g.start, Math.min(secFromEvent(e), g.end - SNAP)), null) : needPick())}
-                aria-label={`Empty ${clock(g.start)} to ${clock(g.end)}${picked ? `, place ${picked.name} here` : ''}`}
-              >
-                {g.end - g.start >= 1200 && <span>{picked ? `Place ${picked.name} here` : gapLabel}</span>}
-                {g.end - g.start >= 1200 && <small>{clock(g.start)}–{clock(g.end)}</small>}
-              </button>
-            ))}
-            {!loading && slots.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={`sch-slot k-${s.kind} ${s.unavailable ? 'unavailable' : ''} ${selectedId === s.id ? 'selected' : ''}`}
-                style={{ top: y(s.start) + 1, height: Math.max(y(s.durationSeconds) - 2, 16) }}
-                onClick={() => onSelect(s.id)}
-              >
-                <span className="sch-slot-hd">
-                  <b>{KIND_INFO[s.kind] ? `${KIND_INFO[s.kind].icon} ` : s.kind === 'live' ? '● ' : ''}{s.title}</b>
-                  <small>{clock(s.start)}–{clock(s.start + s.durationSeconds)}</small>
-                </span>
-                {s.kind === 'series_pinned' && s.pinLabel && s.durationSeconds >= 1800 && <small>From {s.pinLabel}</small>}
-                {s.unavailable && <small>Not available anymore · falls through to {layer === 'week' ? 'the default' : 'the loop'}</small>}
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 /* ---------------- side panel ---------------- */
 
 function PickedInfo({ picked, layer, onCancel }) {
@@ -673,57 +869,74 @@ function PickedInfo({ picked, layer, onCancel }) {
       <h3>{picked.name}</h3>
       <p>
         {picked.type === 'series'
-          ? `Drops in as a ${layer === 'default' ? 'Continue' : 'Pinned'} block. Make it longer or shorter after placing it.`
-          : picked.durationSeconds ? `${dur(picked.durationSeconds)}. ` : ''}
-        Click a dashed gap, or drag it onto the day.
+          ? `Drops in as a ${layer === 'default' ? 'Continue' : 'Pinned'} block one episode long. Pull its bottom edge or use the fit buttons for more.`
+          : picked.durationSeconds ? `${dur(picked.durationSeconds)}, in a ${dur(Math.ceil(picked.durationSeconds / 60) * 60)} slot. ` : ''}
+        Click an open stretch of the day, or drag it on.
       </p>
       <button type="button" className="sch-btn" onClick={onCancel}>Cancel</button>
     </div>
   );
 }
 
-function SlotEditor({ slot, layer, daySlots, series, preview, canLive, busy, onSave, onRemove }) {
+function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty, canLive, isPastDay, busy, onChange, onRemove, onDuplicate, onResetBookmark }) {
   const [start, setStart] = useState(hhmm(slot.start));
-  const [minutes, setMinutes] = useState(Math.round(slot.durationSeconds / 60));
-  const [seconds, setSeconds] = useState(slot.durationSeconds);
+  const [minutes, setMinutes] = useState(String(Math.round(slot.durationSeconds / 60)));
+  const [seconds, setSeconds] = useState(String(slot.durationSeconds));
   const [title, setTitle] = useState(slot.title || '');
+  const [formError, setFormError] = useState(null);
   const isSeries = SERIES_KINDS.includes(slot.kind);
-  const lockedLive = slot.kind === 'live' && !canLive;
+  const locked = isPastDay || (slot.kind === 'live' && !canLive);
+  const lengthEditable = !hasFixedLength(slot) && !locked;
+  const eps = series ? series.episodes : [];
+  const isTemp = String(slot.id).startsWith('tmp-');
 
-  const fit = useMemo(() => {
-    if (!isSeries || !series) return null;
-    const eps = series.episodes;
-    let startIdx = 0;
-    if (slot.kind === 'series_pinned') startIdx = Math.max(0, eps.findIndex((e) => e.id === slot.pinEpisodeId));
-    return fitEpisodes(eps, startIdx, slot.durationSeconds);
-  }, [isSeries, series, slot]);
+  // Keep the fields in step with drags on the timeline.
+  useEffect(() => {
+    setStart(hhmm(slot.start));
+    setMinutes(String(Math.round(slot.durationSeconds / 60)));
+    setSeconds(String(slot.durationSeconds));
+    setFormError(null);
+  }, [slot.start, slot.durationSeconds]);
 
+  const startSec = /^\d{2}:\d{2}$/.test(start) ? Number(start.slice(0, 2)) * 3600 + Number(start.slice(3)) * 60 : NaN;
+  const lenSec = !lengthEditable ? slot.durationSeconds : slot.kind === 'ad_break' ? Number(seconds) : Number(minutes) * 60;
+  const timeChanged = Number.isFinite(startSec) && startSec !== slot.start;
+  const lenChanged = lengthEditable && Number.isFinite(lenSec) && lenSec !== slot.durationSeconds;
+  const titleChanged = slot.kind === 'live' && title !== slot.title;
+  const fit = isSeries && eps.length ? fitSummary(slot, eps, daySlots) : null;
   const sources = daySlots.filter((s) => s.id !== slot.id && s.seriesId === slot.seriesId && (s.kind === 'series_continue' || s.kind === 'series_pinned') && s.start < slot.start);
-  const upcoming = preview ? Object.entries(preview).slice(0, 4) : [];
+  const upcoming = preview && unchanged ? Object.entries(preview).slice(0, 4) : [];
+  const edges = isSeries && eps.length && slot.kind !== 'series_rerun' ? episodeEdges(eps, Math.max(0, eps.findIndex((e) => e.id === slot.pinEpisodeId))) : [];
+  const lim = limitFor(slot);
 
-  const timeChanged = start !== hhmm(slot.start);
-  const lenChanged = slot.kind === 'ad_break' ? Number(seconds) !== slot.durationSeconds : Number(minutes) * 60 !== slot.durationSeconds;
-  const lengthEditable = isSeries || slot.kind === 'ad_break' || slot.kind === 'live';
-
-  function saveBasics() {
+  function apply() {
     const changes = {};
-    if (timeChanged) changes.startTime = start;
-    if (lengthEditable && lenChanged) changes.durationSeconds = slot.kind === 'ad_break' ? Number(seconds) : Number(minutes) * 60;
-    if (slot.kind === 'live' && title !== slot.title) changes.title = title;
-    onSave(changes);
+    if (!Number.isFinite(startSec)) return setFormError('Pick a start time.');
+    if (lengthEditable && !Number.isFinite(lenSec)) return setFormError('Give it a length.');
+    if (lengthEditable && lim && (lenSec < lim.min || lenSec > lim.max)) return setFormError(`That block has to be ${lim.label}.`);
+    if (timeChanged) changes.start = startSec;
+    if (lenChanged) changes.durationSeconds = lenSec;
+    if (titleChanged) changes.title = title.trim().slice(0, 80) || slot.title;
+    const err = onChange(changes, 'Updated');
+    return setFormError(err);
+  }
+  function clearErr(fn) {
+    return (e) => { setFormError(null); fn(e.target.value); };
   }
 
   return (
     <div className="sch-editor">
       <div className="tv-info-eyebrow">
-        {isSeries ? 'Series block' : slot.kind === 'episode' ? 'Title' : slot.kind === 'ad_break' ? 'Ad break' : slot.kind === 'live' ? 'Live broadcast' : 'Slot'}
+        {isSeries ? 'Series block' : slot.kind === 'episode' ? 'Title' : slot.kind === 'media' ? 'Upload' : slot.kind === 'ad_break' ? 'Ad break' : slot.kind === 'live' ? 'Live broadcast' : 'Slot'}
         {layer === 'default' ? ' · default schedule' : ''}
+        {isTemp ? ' · not saved yet' : ''}
       </div>
       <h3>{slot.title}</h3>
       {slot.tier === 'premium' && <span className="sch-chip prem" style={{ alignSelf: 'flex-start' }}>Premium · airs with ads</span>}
       {slot.unavailable && <p className="sch-warn">This isn&rsquo;t available for channels anymore (unpublished, pulled, or opted out), so the time falls through to {layer === 'week' ? 'the default schedule' : 'the loop'}. Remove it or replace it.</p>}
+      {locked && slot.kind === 'live' && !isPastDay && <p className="sch-muted">Only admins can change live broadcast slots.</p>}
 
-      {isSeries && (
+      {isSeries && !locked && (
         <div className="sch-kinds" role="radiogroup" aria-label="Block type">
           {SERIES_KINDS.filter((k) => k !== 'series_continue' || layer === 'default').map((k) => {
             const disabled = busy || (k === 'series_rerun' && !sources.length);
@@ -731,12 +944,13 @@ function SlotEditor({ slot, layer, daySlots, series, preview, canLive, busy, onS
               <button key={k} type="button" role="radio" aria-checked={slot.kind === k} className={`sch-kind k-${k}`} disabled={disabled && slot.kind !== k}
                 onClick={() => {
                   if (slot.kind === k) return;
-                  const changes = { kind: k };
+                  const changes = { kind: k, rerunOf: null };
                   if (k === 'series_rerun') changes.rerunOf = sources[sources.length - 1].id;
-                  if (k === 'series_pinned' && series) changes.pinEpisodeId = series.episodes[0].id;
-                  onSave(changes, `Now a ${KIND_INFO[k].name} block`);
+                  if (k === 'series_pinned' && eps.length && !slot.pinEpisodeId) { changes.pinEpisodeId = eps[0].id; changes.pinLabel = eps[0].label || eps[0].title; }
+                  if (k !== 'series_pinned') { changes.pinEpisodeId = null; changes.pinLabel = null; }
+                  setFormError(onChange(changes, `Now a ${KIND_INFO[k].name} block`));
                 }}>
-                <b>{KIND_INFO[k].icon} {KIND_INFO[k].name}</b>
+                <b>{KIND_ICON[k]} {KIND_INFO[k].name}</b>
                 <small>{k === 'series_rerun' && !sources.length ? 'Needs a Continue or Pinned block of this series earlier the same day.' : KIND_INFO[k].help}</small>
               </button>
             );
@@ -747,55 +961,89 @@ function SlotEditor({ slot, layer, daySlots, series, preview, canLive, busy, onS
       <div className="sch-row">
         <label className="sch-field">
           <span>Starts</span>
-          <input id="sch-start" type="time" step={300} value={start} onChange={(e) => setStart(e.target.value)} disabled={lockedLive} />
+          <input id="sch-start" type="time" step={300} value={start} onChange={clearErr(setStart)} disabled={locked} />
         </label>
         {lengthEditable && slot.kind !== 'ad_break' && (
           <label className="sch-field">
             <span>Length (minutes)</span>
-            <input id="sch-len" type="number" min={slot.kind === 'live' ? 15 : 5} max={720} step={5} value={minutes} onChange={(e) => setMinutes(e.target.value)} disabled={lockedLive} />
+            <input id="sch-len" type="number" min={Math.round(lim.min / 60)} max={Math.round(lim.max / 60)} step={1} value={minutes} onChange={clearErr(setMinutes)} />
           </label>
         )}
-        {slot.kind === 'ad_break' && (
+        {lengthEditable && slot.kind === 'ad_break' && (
           <label className="sch-field">
             <span>Length (seconds)</span>
-            <input id="sch-len" type="number" min={30} max={1800} step={15} value={seconds} onChange={(e) => setSeconds(e.target.value)} />
+            <input id="sch-len" type="number" min={30} max={1800} step={15} value={seconds} onChange={clearErr(setSeconds)} />
           </label>
         )}
+        {!lengthEditable && (
+          <div className="sch-field">
+            <span>{hasFixedLength(slot) ? 'Runtime' : 'Length'}</span>
+            <div className="sch-static">{dur(slot.runtimeSeconds || slot.durationSeconds)}</div>
+          </div>
+        )}
       </div>
+      {edges.length > 0 && lengthEditable && (
+        <div className="sch-field">
+          <span>Fit exactly</span>
+          <div className="sch-fits">
+            {edges.slice(0, 6).map((len, i) => (
+              <button key={len} type="button" aria-pressed={lenSec === len} onClick={() => { setFormError(null); setMinutes(String(len / 60)); }}>
+                {i + 1} episode{i === 0 ? '' : 's'} · {dur(len)}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       {slot.kind === 'live' && (
         <label className="sch-field">
           <span>Title in the guide</span>
-          <input id="sch-live-title" value={title} maxLength={80} onChange={(e) => setTitle(e.target.value)} disabled={lockedLive} />
+          <input id="sch-live-title" value={title} maxLength={80} onChange={clearErr(setTitle)} disabled={locked} />
         </label>
       )}
-      <div className="sch-muted">Ends {clock(slot.start + slot.durationSeconds)}{!lengthEditable ? ` · ${dur(slot.durationSeconds)}, the title's own length` : ''}</div>
-      {(timeChanged || (lengthEditable && lenChanged) || (slot.kind === 'live' && title !== slot.title)) && (
-        <button type="button" className="sch-btn primary" disabled={busy} onClick={saveBasics}>Save changes</button>
+      <div className="sch-muted">
+        {Number.isFinite(startSec) && Number.isFinite(lenSec) ? `Ends ${clock(startSec + lenSec)}` : 'Give it a length'}
+        {hasFixedLength(slot) ? ` · ${dur(slot.durationSeconds)} slot for a ${dur(slot.runtimeSeconds || slot.durationSeconds)} title, the rest is ads` : ''}
+      </div>
+      {formError && <div className="sch-err" role="alert">{formError}</div>}
+      {(timeChanged || lenChanged || titleChanged) && !locked && (
+        <button type="button" className="sch-btn primary" disabled={busy} onClick={apply}>Apply</button>
       )}
 
-      {slot.kind === 'series_pinned' && series && (
+      {slot.kind === 'series_pinned' && eps.length > 0 && !locked && (
         <label className="sch-field">
           <span>Always start at</span>
-          <select id="sch-pin" value={slot.pinEpisodeId || ''} disabled={busy} onChange={(e) => onSave({ pinEpisodeId: e.target.value }, 'Saved')}>
-            {series.episodes.map((e) => <option key={e.id} value={e.id}>{e.label ? `${e.label} · ` : ''}{e.title}</option>)}
+          <select id="sch-pin" value={slot.pinEpisodeId || ''} disabled={busy} onChange={(e) => {
+            const ep = eps.find((x) => x.id === e.target.value);
+            setFormError(onChange({ pinEpisodeId: e.target.value, pinLabel: ep ? (ep.label || ep.title) : null }, `Starts at ${ep ? (ep.label || ep.title) : 'that episode'}`));
+          }}>
+            {eps.map((e) => <option key={e.id} value={e.id}>{e.label ? `${e.label} · ` : ''}{e.title}</option>)}
           </select>
         </label>
       )}
-      {slot.kind === 'series_rerun' && (
+      {slot.kind === 'series_rerun' && !locked && (
         <label className="sch-field">
           <span>Rerun of</span>
-          <select id="sch-rerun" value={slot.rerunOf || ''} disabled={busy} onChange={(e) => onSave({ rerunOf: e.target.value }, 'Saved')}>
+          <select id="sch-rerun" value={slot.rerunOf || ''} disabled={busy} onChange={(e) => setFormError(onChange({ rerunOf: e.target.value }, 'Updated'))}>
             {sources.map((s) => <option key={s.id} value={s.id}>{clock(s.start)} · {KIND_INFO[s.kind].name}</option>)}
           </select>
         </label>
       )}
 
-      {isSeries && fit && slot.kind !== 'series_continue' && slot.kind !== 'series_rerun' && (
+      {fit && (
         <p className="sch-muted">
           Fits {fit.count} episode{fit.count === 1 ? '' : 's'}
-          {slot.durationSeconds - fit.used > 0 ? `, then ${dur(slot.durationSeconds - fit.used)} of ads and bumpers` : ''}.
+          {fit.leftover > 0 ? `, then ${dur(fit.leftover)} of ads and bumpers` : ' exactly'}.
           {fit.count === 0 ? ' The episode is longer than the block, so only ads would play. Make the block longer.' : ''}
         </p>
+      )}
+      {fit && fit.count > 0 && slot.kind !== 'series_continue' && (
+        <div>
+          <div className="tv-info-eyebrow" style={{ marginBottom: '0.35rem' }}>What plays</div>
+          <div className="sch-runlog">
+            {fit.items.map((it) => <div key={it.episode.id}><span>{clock(slot.start + it.at)}</span><span>{it.episode.label ? `${it.episode.label} · ` : ''}{it.episode.title}</span></div>)}
+            {fit.leftover > 0 && <div><span>{clock(slot.start + fit.used)}</span><span>ads + bumpers</span></div>}
+          </div>
+        </div>
       )}
 
       {isSeries && upcoming.length > 0 && (
@@ -816,15 +1064,15 @@ function SlotEditor({ slot, layer, daySlots, series, preview, canLive, busy, onS
           )}
         </div>
       )}
-      {isSeries && !upcoming.length && layer === 'week' && (
-        <p className="sch-muted">This week isn&rsquo;t published, so this block doesn&rsquo;t air yet.</p>
-      )}
+      {isSeries && !upcoming.length && !unchanged && <p className="sch-muted">Save the schedule to see its upcoming airings.</p>}
+      {isSeries && !upcoming.length && unchanged && layer === 'week' && <p className="sch-muted">This week isn&rsquo;t published, so this block doesn&rsquo;t air yet.</p>}
 
       <div className="sch-editor-acts">
-        {slot.kind === 'series_continue' && (
-          <button type="button" className="sch-btn" disabled={busy} onClick={() => window.confirm('Start this block over from the first episode?') && onSave({ resetBookmark: true }, 'Back to the first episode')}>Start over from episode 1</button>
+        {!isPastDay && <button type="button" className="sch-btn" disabled={busy} onClick={onDuplicate}>Duplicate</button>}
+        {slot.kind === 'series_continue' && !isTemp && (
+          <button type="button" className="sch-btn" disabled={busy || isDirty} title={isDirty ? 'Save the schedule first' : undefined} onClick={onResetBookmark}>Start over from episode 1</button>
         )}
-        {!lockedLive && <button type="button" className="sch-btn danger" disabled={busy} onClick={onRemove}>Remove</button>}
+        {!locked && <button type="button" className="sch-btn danger" disabled={busy} onClick={onRemove}>Remove</button>}
       </div>
     </div>
   );
@@ -845,14 +1093,14 @@ function CopyDay({ layer, day, tabs, busy, onCopy }) {
         </label>
       ))}
       <button type="button" className="sch-btn primary" disabled={busy || !targets.length}
-        onClick={async () => {
+        onClick={() => {
           if (!window.confirm(`Replace everything on ${targets.length} day${targets.length === 1 ? '' : 's'} with ${label ? label.label : 'this day'}'s lineup?`)) return;
-          await onCopy(targets);
+          onCopy(targets);
           setOpen(false);
           setTargets([]);
         }}>Copy</button>
       <button type="button" className="sch-btn" onClick={() => { setOpen(false); setTargets([]); }}>Cancel</button>
-      {layer === 'default' && <small>Each copy of a Continue block keeps its own place in the series.</small>}
+      {layer === 'default' && <small>Each copy of a Continue block keeps its own place in the series. Copies land when you save.</small>}
     </div>
   );
 }
