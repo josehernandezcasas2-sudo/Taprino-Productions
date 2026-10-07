@@ -63,3 +63,17 @@ export const colors = {
 // while the web preview still had it and hid the bug. A plain object is
 // safe both as a style and spread into another style, on every platform.
 export const absoluteFill = { position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 };
+
+// Profile banner: the solid-color choices on the Account screen's banner
+// editor, and the default gradient stops when no photo/color is set. Same
+// list as lib/profileBanner.js on the website — keep them in sync.
+export const bannerColors = [
+  { value: '#283c63', label: 'Ocean ink' },
+  { value: '#f85f73', label: 'Tropical pink' },
+  { value: '#e7a255', label: 'Olive' },
+  { value: '#93d0a4', label: 'Mint' },
+  { value: '#8499dc', label: 'Sky' },
+  { value: '#c85924', label: 'Rust' },
+  { value: '#202f4e', label: 'Deep navy' }
+];
+export const bannerGradient = [colors.surface2, colors.oceanInk, colors.brassDeep];

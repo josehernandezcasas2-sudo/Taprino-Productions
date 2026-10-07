@@ -129,7 +129,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
   const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
   const ownAvatarUrl = isSignedIn && ownProfile ? ownProfile.avatarUrl : null;
-  const ownProfileHref = isSignedIn && ownProfile && ownProfile.userId ? `/profile/${ownProfile.userId}` : null;
+  const ownProfileHref = isSignedIn && ownProfile && ownProfile.userId ? `/profile/${ownProfile.handle || ownProfile.userId}` : null;
 
   // Deriving "what's active" from the real URL rather than trusting each
   // page to pass the right activeType prop — every page that wasn't one

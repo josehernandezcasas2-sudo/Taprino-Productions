@@ -1,5 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
-import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken } from '../../../lib/userProfiles';
+import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken, normalizeHandle, handleError, isHandleTaken, BANNER_COLOR_PATTERN } from '../../../lib/userProfiles';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
@@ -35,19 +35,35 @@ export default async function handler(req, res) {
     return res.status(200).json({
       userId,
       displayName: profile ? profile.display_name : null,
+      handle: profile ? profile.handle || null : null,
       gender: profile ? profile.gender : null,
       age: profile ? profile.age : null,
       bio: profile ? profile.bio : null,
       avatarUrl: profile ? profile.avatar_url : null,
+      bannerUrl: profile ? profile.banner_url || null : null,
+      bannerColor: profile ? profile.banner_color || null : null,
       socialLinks: profile && Array.isArray(profile.social_links) ? profile.social_links : [],
       stayInStream: profile ? Boolean(profile.stay_in_stream) : false
     });
   }
 
   if (req.method === 'POST') {
-    const { displayName, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, stayInStream } = req.body || {};
+    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, bannerBase64, bannerFileName, removeBanner, bannerColor, stayInStream } = req.body || {};
+    if (bannerColor !== undefined && bannerColor !== null && bannerColor !== '' && !BANNER_COLOR_PATTERN.test(String(bannerColor))) {
+      return res.status(400).json({ error: 'Banner color needs to be a hex color like #283c63.' });
+    }
     if (displayName !== undefined && displayName !== null && String(displayName).trim().length > 60) {
       return res.status(400).json({ error: 'Display name is limited to 60 characters.' });
+    }
+    const handle = normalizeHandle(rawHandle);
+    if (handle) {
+      const problem = handleError(handle);
+      if (problem) return res.status(400).json({ error: problem });
+      const current = await getOwnProfile(userId);
+      const unchanged = current && current.handle && current.handle.toLowerCase() === handle.toLowerCase();
+      if (!unchanged && await isHandleTaken(handle, userId)) {
+        return res.status(409).json({ error: `@${handle} is already taken — try another.` });
+      }
     }
     if (displayName && displayName.trim()) {
       const current = await getOwnProfile(userId);
@@ -89,11 +105,25 @@ export default async function handler(req, res) {
       } else if (avatarBase64) {
         avatarUrl = await uploadArtworkImage({ base64: avatarBase64, fileName: avatarFileName, pathPrefix: `avatar-${userId}` });
       }
+      // Banner: a new photo replaces whatever was there; "remove" clears
+      // the photo (the color, if any, shows instead). Sending a color
+      // alongside a photo is fine — the photo wins on the page, and the
+      // color is what shows if the photo is removed later.
+      let bannerUrl;
+      if (removeBanner) {
+        bannerUrl = null;
+      } else if (bannerBase64) {
+        bannerUrl = await uploadArtworkImage({ base64: bannerBase64, fileName: bannerFileName, pathPrefix: `banner-${userId}` });
+      }
       const cleanedLinks = socialLinks !== undefined
         ? socialLinks.map((l) => ({ platform: (l.platform || '').trim().slice(0, 30), url: l.url.trim() }))
         : undefined;
-      await upsertOwnProfile(userId, { displayName, gender, age, bio, socialLinks: cleanedLinks, avatarUrl, stayInStream });
-      return res.status(200).json({ ok: true, avatarUrl });
+      await upsertOwnProfile(userId, {
+        displayName, handle, gender, age, bio, socialLinks: cleanedLinks, avatarUrl, stayInStream,
+        bannerUrl,
+        bannerColor: bannerColor === undefined ? undefined : (bannerColor || null)
+      });
+      return res.status(200).json({ ok: true, avatarUrl, bannerUrl, handle });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

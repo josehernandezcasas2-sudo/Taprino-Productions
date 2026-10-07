@@ -1,11 +1,13 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, Share, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { apiGet } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { apiGet, apiPost } from '../../lib/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
+import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -79,6 +81,14 @@ export default function PublicProfile() {
   const router = useRouter();
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const [following, setFollowing] = useState(false);
+  const [followerCount, setFollowerCount] = useState(0);
+  const [followBusy, setFollowBusy] = useState(false);
+  // A tapped photo post — opened in a plain full-screen viewer below
+  // (the website's PostViewerModal has no mobile equivalent yet; video
+  // posts still go to /snippets/discover, which is the real reel viewer).
+  const [photoPost, setPhotoPost] = useState(null);
+  const tokenRef = useRef(null);
 
   useEffect(() => {
     if (!profileUserId) return undefined;
@@ -87,9 +97,16 @@ export default function PublicProfile() {
       // Token so the server can tell whether this is the viewer's own
       // profile (isSignedIn / viewerId); never blocks for more than 4s.
       const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+      tokenRef.current = token;
       try {
+        // /profile/<slug> on the site accepts a user id or an @handle;
+        // the API's userId param is the same slug.
         const data = await apiGet(`/api/profile?userId=${encodeURIComponent(profileUserId)}`, token);
-        if (!cancelled) setState({ loading: false, error: null, data });
+        if (!cancelled) {
+          setState({ loading: false, error: null, data });
+          setFollowing(Boolean(data.viewerFollows));
+          setFollowerCount(data.followerCount || 0);
+        }
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });
       }
@@ -97,9 +114,31 @@ export default function PublicProfile() {
     return () => { cancelled = true; };
   }, [profileUserId]);
 
-  function share(profile) {
-    const url = `${SITE_ORIGIN}/profile/${profile.userId}`;
+  function share(profile, canonicalPath) {
+    // The nice /profile/<handle> link when one exists, same as the site.
+    const url = `${SITE_ORIGIN}${canonicalPath || `/profile/${profile.userId}`}`;
     Share.share({ message: url, url, title: profile.displayName }).catch(() => {});
+  }
+
+  function promptSignIn() {
+    Alert.alert('Sign in to follow people', 'Following a creator keeps their work close by.', [
+      { text: 'Not now', style: 'cancel' },
+      { text: 'Sign in', onPress: () => router.push('/account') }
+    ]);
+  }
+
+  async function toggleFollow(profile) {
+    if (followBusy) return;
+    setFollowBusy(true);
+    try {
+      const data = await apiPost('/api/profile-follow', { followedId: profile.userId }, tokenRef.current);
+      setFollowing(data.following);
+      setFollowerCount(data.followers);
+    } catch (err) {
+      Alert.alert('Could not update that follow', err.message);
+    } finally {
+      setFollowBusy(false);
+    }
   }
 
   if (state.loading) {
@@ -117,40 +156,96 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
   const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
 
+  const statParts = [];
+  if (creditedWork.length > 0) statParts.push(`${creditedWork.length} title${creditedWork.length === 1 ? '' : 's'}`);
+  if (totalViews > 0) statParts.push(`${formatViews(totalViews)} views`);
+  if (followerCount > 0) statParts.push(`${formatViews(followerCount)} follower${followerCount === 1 ? '' : 's'}`);
+
   function openPost(post) {
     if (post.kind === 'video') router.push(`/snippets/discover?post=${post.id}`);
+    else if (post.imageUrl) setPhotoPost(post);
   }
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
       <Stack.Screen options={{ title: profile.displayName }} />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          {profile.avatarUrl ? (
-            <SmartImage uri={profile.avatarUrl} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatar}><Text style={styles.avatarInitial}>{initial}</Text></View>
-          )}
-          <View style={styles.nameRow}>
-            <Text style={styles.name}>{profile.displayName}</Text>
-            {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
+        {/* Banner (photo > color > default gradient, set on the Account
+            screen) with the avatar overlapping its bottom edge, then name /
+            @handle and Follow · Share · Report — mirrors the website's
+            profile hero (pages/profile/[userId].js). */}
+        <View style={styles.hero}>
+          <View style={styles.banner}>
+            {profile.bannerUrl ? (
+              <SmartImage uri={profile.bannerUrl} style={absoluteFill} resizeMode="cover" />
+            ) : profile.bannerColor ? (
+              <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
+            ) : (
+              <LinearGradient colors={bannerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={absoluteFill} />
+            )}
           </View>
-          {joinedLabel ? <Text style={styles.joined}>On Studio Tapa TV since {joinedLabel}</Text> : null}
-
-          {creditedWork.length > 0 || totalViews > 0 ? (
-            <View style={styles.statsRow}>
-              <Text style={styles.statsText}>{creditedWork.length} title{creditedWork.length === 1 ? '' : 's'}</Text>
-              {totalViews > 0 ? <Text style={styles.statsText}> · {formatViews(totalViews)} views</Text> : null}
+          <View style={styles.header}>
+            {profile.avatarUrl ? (
+              <SmartImage uri={profile.avatarUrl} style={styles.avatar} />
+            ) : (
+              <View style={styles.avatar}><Text style={styles.avatarInitial}>{initial}</Text></View>
+            )}
+            <View style={styles.nameRow}>
+              <Text style={styles.name}>{profile.displayName}</Text>
+              {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
             </View>
-          ) : null}
+            {profile.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}
+            {joinedLabel ? <Text style={styles.joined}>On Studio Tapa TV since {joinedLabel}</Text> : null}
+            {statParts.length > 0 ? <Text style={styles.statsText}>{statParts.join(' · ')}</Text> : null}
 
+            <View style={styles.actionsRow}>
+              {isOwnProfile ? (
+                <Pressable style={styles.actionBtn} onPress={() => router.push('/account')}>
+                  <Text style={styles.actionBtnText}>Edit profile</Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={[styles.actionBtn, following ? styles.actionBtnFollowing : styles.actionBtnPrimary, followBusy && { opacity: 0.6 }]}
+                  onPress={isSignedIn ? () => toggleFollow(profile) : promptSignIn}
+                  disabled={followBusy}
+                  accessibilityState={{ selected: following }}
+                >
+                  <Text style={[styles.actionBtnText, following ? styles.actionBtnTextFollowing : styles.actionBtnTextPrimary]}>
+                    {following ? 'Following' : 'Follow'}
+                  </Text>
+                </Pressable>
+              )}
+              <Pressable style={styles.shareBtn} onPress={() => share(profile, canonicalPath)} accessibilityLabel="Share profile">
+                <ShareIconSvg size={16} />
+              </Pressable>
+              {!isOwnProfile && isSignedIn ? (
+                <ReportSheet targetType="profile" targetId={profile.userId} title={profile.displayName} />
+              ) : null}
+            </View>
+
+            {profile.isPlaceholder ? (
+              <Text style={styles.placeholderNote}>
+                {isOwnProfile
+                  ? 'This is how your profile looks right now. Add a name, photo and bio in your account settings.'
+                  : 'This person hasn’t set up their profile yet.'}
+              </Text>
+            ) : null}
+          </View>
+
+          <View style={styles.divider} />
+          <Text style={styles.sectionLabel}>About</Text>
+          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : (
+            <Text style={styles.emptyText}>
+              {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
+            </Text>
+          )}
           {knownForGenres.length > 0 ? (
             <View style={styles.genreRow}>
               <Text style={styles.genreLabel}>Known for</Text>
@@ -160,32 +255,38 @@ export default function PublicProfile() {
             </View>
           ) : null}
 
-          {profile.bio ? <Text style={styles.bio}>{profile.bio}</Text> : null}
-
           {profile.socialLinks.length > 0 ? (
-            <View style={styles.linksRow}>
-              {profile.socialLinks.map((link, i) => (
-                <Pressable key={i} style={styles.linkPill} onPress={() => Linking.openURL(link.url)}>
-                  <Text style={styles.linkPillText}>{link.platform || hostnameFor(link.url)}</Text>
-                </Pressable>
-              ))}
+            <View style={styles.linksBox}>
+              <Text style={styles.linksBoxLabel}>Links</Text>
+              <View style={styles.linksRow}>
+                {profile.socialLinks.map((link, i) => (
+                  <Pressable key={i} style={styles.linkPill} onPress={() => Linking.openURL(link.url)}>
+                    <Text style={styles.linkPillText}>{link.platform || hostnameFor(link.url)}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : null}
-
-          <Pressable style={styles.shareBtn} onPress={() => share(profile)}>
-            <ShareIconSvg size={16} />
-          </Pressable>
         </View>
 
         {posts.length > 0 ? (
           <>
             <View style={styles.divider} />
-            <Text style={styles.sectionLabel}>Posts</Text>
-            <View style={styles.postGrid}>
-              {posts.map((post) => (
-                <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
-              ))}
+            <Text style={styles.sectionLabel}>Latest post</Text>
+            <View style={styles.latestWrap}>
+              <PostTile post={posts[0]} onPress={() => openPost(posts[0])} large />
+              {posts[0].caption ? <Text style={styles.latestCaption}>{posts[0].caption}</Text> : null}
             </View>
+            {posts.length > 1 ? (
+              <>
+                <Text style={[styles.sectionLabel, { marginTop: 18 }]}>Posts</Text>
+                <View style={styles.postGrid}>
+                  {posts.slice(1).map((post) => (
+                    <PostTile key={post.id} post={post} onPress={() => openPost(post)} />
+                  ))}
+                </View>
+              </>
+            ) : null}
           </>
         ) : null}
 
@@ -249,14 +350,35 @@ export default function PublicProfile() {
           </>
         ) : null}
       </ScrollView>
+
+      <PhotoPostViewer post={photoPost} onClose={() => setPhotoPost(null)} />
     </SafeAreaView>
   );
 }
 
-function PostTile({ post, onPress }) {
-  const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
+// Full-screen look at one photo post: the image shown whole (never
+// cropped), caption underneath, tap anywhere or the × to close.
+function PhotoPostViewer({ post, onClose }) {
+  const { width } = useWindowDimensions();
+  if (!post) return null;
   return (
-    <Pressable style={styles.postTile} onPress={onPress} disabled={post.kind !== 'video'}>
+    <Modal visible transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.viewerBackdrop} onPress={onClose}>
+        <Pressable style={styles.viewerClose} onPress={onClose} hitSlop={10} accessibilityLabel="Close">
+          <Text style={styles.viewerCloseText}>{'×'}</Text>
+        </Pressable>
+        <SmartImage uri={post.imageUrl} style={{ width: width - 32, height: (width - 32) * 1.25, borderRadius: 10 }} resizeMode="contain" />
+        {post.caption ? <Text style={styles.viewerCaption}>{post.caption}</Text> : null}
+      </Pressable>
+    </Modal>
+  );
+}
+
+function PostTile({ post, onPress, large }) {
+  const imageSrc = post.kind === 'video' ? post.thumbnailUrl : post.imageUrl;
+  const tappable = post.kind === 'video' || Boolean(post.imageUrl);
+  return (
+    <Pressable style={[styles.postTile, large && styles.postTileLarge]} onPress={onPress} disabled={!tappable}>
       {imageSrc ? <SmartImage uri={imageSrc} style={styles.postTileImg} /> : (
         <View style={[styles.postTileImg, styles.postTileCaptionWrap]}>
           <Text style={styles.postTileCaptionText} numberOfLines={4}>&ldquo;{post.caption}&rdquo;</Text>
@@ -284,22 +406,41 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontSize: 15, textAlign: 'center' },
   emptyText: { color: colors.inkDim, fontSize: 13, lineHeight: 19 },
 
-  header: { alignItems: 'flex-start', marginBottom: 6 },
-  avatar: { width: 76, height: 76, borderRadius: 38, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center', marginBottom: 12 },
-  avatarInitial: { color: colors.ink, fontSize: 28, fontWeight: '700' },
+  hero: { marginBottom: 4 },
+  banner: { height: 140, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.hairline },
+  header: { alignItems: 'flex-start', marginTop: -44, paddingHorizontal: 8, marginBottom: 6 },
+  avatar: { width: 88, height: 88, borderRadius: 44, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', marginBottom: 10, borderWidth: 4, borderColor: colors.surface0, overflow: 'hidden' },
+  statsText: { color: colors.inkDim, fontSize: 12.5, marginTop: 2 },
+  linksBox: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.hairline, borderRadius: 10, padding: 12, marginTop: 4 },
+  linksBoxLabel: { color: colors.inkFaint, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 },
+  latestWrap: { maxWidth: 260 },
+  latestCaption: { color: colors.inkDim, fontSize: 13.5, lineHeight: 19, marginTop: 8 },
+  postTileLarge: { width: '100%' },
+  avatarInitial: { color: colors.onBrass, fontSize: 32, fontWeight: '700' },
   nameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 },
   name: { color: colors.ink, fontSize: 21, fontWeight: '800' },
   roleBadge: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 8 },
   roleBadgeText: { color: colors.onBrass, fontSize: 10, fontWeight: '700' },
+  handle: { color: colors.inkDim, fontSize: 12.5, marginBottom: 2 },
   joined: { color: colors.inkFaint, fontSize: 11.5, marginBottom: 8 },
-  statsRow: { flexDirection: 'row', marginBottom: 8 },
-  statsText: { color: colors.inkDim, fontSize: 12.5 },
+  placeholderNote: { color: colors.inkDim, fontSize: 13, lineHeight: 19, marginBottom: 10 },
+  actionsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 10 },
+  actionBtn: { paddingVertical: 9, paddingHorizontal: 18, borderRadius: 999, borderWidth: 1, borderColor: colors.hairline },
+  actionBtnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
+  actionBtnFollowing: { borderColor: colors.brass },
+  actionBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  actionBtnTextPrimary: { color: colors.onBrass },
+  actionBtnTextFollowing: { color: colors.brass },
+  viewerBackdrop: { flex: 1, backgroundColor: 'rgba(12,19,31,0.96)', alignItems: 'center', justifyContent: 'center', padding: 16 },
+  viewerClose: { position: 'absolute', top: 52, right: 20, width: 36, height: 36, borderRadius: 18, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  viewerCloseText: { color: colors.ink, fontSize: 22, lineHeight: 24 },
+  viewerCaption: { color: colors.ink, fontSize: 14, lineHeight: 20, textAlign: 'center', marginTop: 14, paddingHorizontal: 8 },
   genreRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginBottom: 10 },
   genreLabel: { color: colors.inkFaint, fontSize: 10.5, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginRight: 2 },
   genreTag: { backgroundColor: colors.surface2, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
   genreTagText: { color: colors.inkDim, fontSize: 11 },
   bio: { color: colors.ink, fontSize: 13.5, lineHeight: 20, marginBottom: 10 },
-  linksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 12 },
+  linksRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   linkPill: { borderWidth: 1, borderColor: colors.hairline, borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
   linkPillText: { color: colors.olive, fontSize: 12, fontWeight: '600' },
   shareBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },

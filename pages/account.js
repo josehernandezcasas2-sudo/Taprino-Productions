@@ -7,6 +7,7 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
+import { BANNER_COLORS } from '../lib/profileBanner';
 import { HeartIcon, SparkleIcon, PlayIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
 
@@ -40,6 +41,26 @@ export async function getServerSideProps({ req, res }) {
 // in every comment list), and anything over ~3.3MB hit Vercel's 4.5MB
 // request cap as base64. Center-crops to a square and shrinks to a 512px
 // JPEG (~50–100KB), same as the app does with expo-image-manipulator.
+// Banner: wide, not square. Scaled to at most 1600px across, JPEG, so a
+// phone photo lands well under the API's size limit.
+function shrinkBanner(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new window.Image();
+    img.onload = () => {
+      const scale = Math.min(1, 1600 / img.naturalWidth);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.naturalWidth * scale);
+      canvas.height = Math.round(img.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
+    img.src = url;
+  });
+}
+
 function shrinkAvatar(file) {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
@@ -148,12 +169,19 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
         avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl,
         avatarBase64: null,
         avatarFileName: null,
-        removeAvatar: false
+        removeAvatar: false,
+        bannerUrl: 'bannerUrl' in data && data.bannerUrl !== undefined ? data.bannerUrl : (p.removeBanner ? null : p.bannerUrl),
+        bannerBase64: null,
+        bannerFileName: null,
+        removeBanner: false
       }));
       // HeaderNav fetched the old photo once on load — tell it about the
       // new one so the header avatar changes now, not on the next reload.
-      if ('avatarUrl' in data) {
-        window.dispatchEvent(new CustomEvent('taprino:own-profile-updated', { detail: { avatarUrl: data.avatarUrl } }));
+      if ('avatarUrl' in data || 'handle' in data) {
+        const detail = {};
+        if ('avatarUrl' in data) detail.avatarUrl = data.avatarUrl;
+        if ('handle' in data) detail.handle = data.handle;
+        window.dispatchEvent(new CustomEvent('taprino:own-profile-updated', { detail }));
       }
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
@@ -307,7 +335,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
               </div>
             </div>
             {userId && (
-              <Link href={`/profile/${userId}`} className="account-btn-secondary account-identity-link">
+              <Link href={`/profile/${(profile && profile.handle) || userId}`} className="account-btn-secondary account-identity-link">
                 View public profile →
               </Link>
             )}
@@ -336,6 +364,21 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       maxLength={60}
                       placeholder="How you'd like to appear publicly"
                     />
+
+                    <label style={{ marginTop: '1rem' }}>Handle <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — makes your profile link /profile/yourname instead of a long id</span></label>
+                    <div className="account-handle-field">
+                      <span className="account-handle-at">@</span>
+                      <input
+                        type="text"
+                        value={profile.handle || ''}
+                        onChange={(e) => setProfile((p) => ({ ...p, handle: e.target.value.replace(/^@+/, '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 30) }))}
+                        maxLength={30}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        spellCheck={false}
+                        placeholder="yourname"
+                      />
+                    </div>
 
                     <label style={{ marginTop: '1rem' }}>Avatar</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
@@ -368,6 +411,78 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       <p style={{ marginTop: '-0.4rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
                         New photo selected — press Save profile below to apply it.
                       </p>
+                    )}
+
+                    <label>Banner <span style={{ fontWeight: 'normal', opacity: 0.65 }}>the backdrop at the top of your profile — a photo or a solid color</span></label>
+                    <div
+                      className="account-banner-preview"
+                      style={
+                        (profile.bannerBase64 || profile.bannerUrl)
+                          ? { backgroundImage: `url(${profile.bannerBase64 || profile.bannerUrl})` }
+                          : profile.bannerColor ? { background: profile.bannerColor } : undefined
+                      }
+                    >
+                      <div className="account-banner-preview-avatar" style={{ backgroundImage: (profile.avatarBase64 || profile.avatarUrl) ? `url(${profile.avatarBase64 || profile.avatarUrl})` : undefined }}>
+                        {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
+                      </div>
+                    </div>
+                    <div className="account-banner-controls">
+                      <label className="account-btn-secondary account-banner-upload">
+                        {(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={(e) => {
+                            const file = e.target.files && e.target.files[0];
+                            if (!file) return;
+                            shrinkBanner(file)
+                              .then((dataUrl) => setProfile((p) => ({ ...p, bannerBase64: dataUrl, bannerFileName: 'banner.jpg', removeBanner: false })))
+                              .catch(() => setProfileError('Could not read that image — try a JPG or PNG.'));
+                          }}
+                        />
+                      </label>
+                      {(profile.bannerBase64 || profile.bannerUrl) && (
+                        <button
+                          type="button"
+                          className="account-btn-secondary"
+                          style={{ width: 'auto' }}
+                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true }))}
+                        >
+                          Remove photo
+                        </button>
+                      )}
+                    </div>
+                    <div className="account-banner-swatches" role="radiogroup" aria-label="Banner color">
+                      {BANNER_COLORS.map((c) => (
+                        <button
+                          key={c.value}
+                          type="button"
+                          role="radio"
+                          aria-checked={(profile.bannerColor || '').toLowerCase() === c.value}
+                          aria-label={c.label}
+                          title={c.label}
+                          className={`account-banner-swatch ${(profile.bannerColor || '').toLowerCase() === c.value ? 'is-active' : ''}`}
+                          style={{ background: c.value }}
+                          onClick={() => setProfile((p) => ({ ...p, bannerColor: c.value }))}
+                        />
+                      ))}
+                      <label className="account-banner-swatch account-banner-swatch-custom" title="Custom color">
+                        <input
+                          type="color"
+                          value={profile.bannerColor || '#283c63'}
+                          onChange={(e) => setProfile((p) => ({ ...p, bannerColor: e.target.value }))}
+                          aria-label="Custom banner color"
+                        />
+                        <span>+</span>
+                      </label>
+                      {profile.bannerColor && (
+                        <button type="button" className="account-banner-swatch-clear" onClick={() => setProfile((p) => ({ ...p, bannerColor: null }))}>
+                          No color
+                        </button>
+                      )}
+                    </div>
+                    {(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor && (
+                      <p className="account-banner-note">The photo shows on your profile; the color is what people see if you remove it.</p>
                     )}
 
                     <label>Bio <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional, up to 400 characters</span></label>

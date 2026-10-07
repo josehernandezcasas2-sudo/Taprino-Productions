@@ -12,7 +12,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
-import { colors, fonts, absoluteFill } from '../../lib/theme';
+import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
@@ -67,6 +67,7 @@ export default function Account() {
   const [profileError, setProfileError] = useState(null);
   // null | 'saving' | 'saved' | an error message — shown right under the photo.
   const [avatarStatus, setAvatarStatus] = useState(null);
+  const [bannerStatus, setBannerStatus] = useState(null);
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
@@ -220,6 +221,56 @@ export default function Account() {
     saveAvatar({ removeAvatar: true }, { avatarUrl: null, avatarBase64: undefined });
   }
 
+  // Banner (the backdrop at the top of the public profile) — same
+  // save-the-moment-it-changes rule as the avatar, for a photo or a solid
+  // color. Shrunk to 1600px across so a phone photo stays small.
+  async function saveBanner(body, optimistic) {
+    setBannerStatus('saving');
+    setProfile((p) => ({ ...p, ...optimistic }));
+    try {
+      const token = await withToken();
+      const data = await apiPost('/api/account/profile', body, token);
+      setProfile((p) => ({
+        ...p,
+        bannerUrl: 'bannerUrl' in data ? data.bannerUrl : (body.removeBanner ? null : p.bannerUrl),
+        bannerBase64: undefined
+      }));
+      setBannerStatus('saved');
+      setTimeout(() => setBannerStatus((st) => (st === 'saved' ? null : st)), 2500);
+    } catch (err) {
+      setProfile((p) => ({ ...p, bannerBase64: undefined }));
+      setBannerStatus(`Couldn't save your banner: ${err.message}`);
+    }
+  }
+
+  async function pickBanner() {
+    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!perm.granted) {
+      Alert.alert('Permission needed', 'Allow photo library access to change your banner.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: true, aspect: [3, 1], quality: 1 });
+    if (result.canceled || !result.assets || !result.assets[0]) return;
+    let base64;
+    try {
+      const rendered = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width: 1600 }).renderAsync();
+      const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.85, base64: true });
+      base64 = `data:image/jpeg;base64,${saved.base64}`;
+    } catch (err) {
+      setBannerStatus(`Couldn't read that photo: ${err.message}`);
+      return;
+    }
+    saveBanner({ bannerBase64: base64, bannerFileName: 'banner.jpg' }, { bannerBase64: base64 });
+  }
+
+  function removeBanner() {
+    saveBanner({ removeBanner: true }, { bannerUrl: null, bannerBase64: undefined });
+  }
+
+  function setBannerColor(color) {
+    saveBanner({ bannerColor: color }, { bannerColor: color });
+  }
+
   async function openPortal() {
     setPortalLoading(true);
     try {
@@ -371,7 +422,7 @@ export default function Account() {
             </View>
           </View>
           {dashboard.userId ? (
-            <Pressable style={[styles.btnSecondary, { marginBottom: 0 }]} onPress={() => router.push(`/profile/${dashboard.userId}`)}>
+            <Pressable style={[styles.btnSecondary, { marginBottom: 0 }]} onPress={() => router.push(`/profile/${(profile && profile.handle) || dashboard.userId}`)}>
               <Text style={styles.btnSecondaryText}>View public profile {'→'}</Text>
             </Pressable>
           ) : null}
@@ -393,6 +444,21 @@ export default function Account() {
                 placeholderTextColor={colors.inkFaint}
               />
 
+              <Label>Handle <Text style={styles.labelNote}>optional — makes your profile link /profile/yourname</Text></Label>
+              <View style={styles.handleRow}>
+                <Text style={styles.handleAt}>@</Text>
+                <TextInput
+                  style={[styles.input, styles.handleInput]}
+                  value={profile.handle || ''}
+                  onChangeText={(v) => setProfile((p) => ({ ...p, handle: v.replace(/^@+/, '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 30) }))}
+                  maxLength={30}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  placeholder="yourname"
+                  placeholderTextColor={colors.inkFaint}
+                />
+              </View>
+
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
                 <View style={styles.avatar}>
@@ -409,6 +475,73 @@ export default function Account() {
                 <Text style={[styles.avatarStatus, avatarStatus !== 'saving' && avatarStatus !== 'saved' && { color: colors.danger }]}>
                   {avatarStatus === 'saving' ? 'Saving photo…' : avatarStatus === 'saved' ? '✓ Photo saved — it now shows everywhere you appear.' : avatarStatus}
                 </Text>
+              ) : null}
+
+              <Label>Banner <Text style={styles.labelNote}>the backdrop at the top of your profile — a photo or a solid color</Text></Label>
+              <View style={styles.bannerPreview}>
+                {(profile.bannerBase64 || profile.bannerUrl) ? (
+                  <SmartImage uri={profile.bannerBase64 || profile.bannerUrl} style={absoluteFill} resizeMode="cover" />
+                ) : profile.bannerColor ? (
+                  <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
+                ) : (
+                  <LinearGradient colors={bannerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={absoluteFill} />
+                )}
+                <View style={styles.bannerPreviewAvatar}>
+                  {avatarSrc ? <SmartImage uri={avatarSrc} style={absoluteFill} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
+                </View>
+              </View>
+              <View style={[styles.avatarRow, { marginTop: 22 }]}>
+                <Pressable style={styles.btnSmall} onPress={pickBanner} disabled={bannerStatus === 'saving'}>
+                  <Text style={styles.btnSmallText}>{(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}</Text>
+                </Pressable>
+                {(profile.bannerBase64 || profile.bannerUrl) ? (
+                  <Pressable style={styles.btnSmall} onPress={removeBanner} disabled={bannerStatus === 'saving'}>
+                    <Text style={styles.btnSmallText}>Remove photo</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <View style={styles.swatchRow}>
+                {bannerColors.map((c) => {
+                  const active = (profile.bannerColor || '').toLowerCase() === c.value;
+                  return (
+                    <Pressable
+                      key={c.value}
+                      accessibilityRole="radio"
+                      accessibilityLabel={c.label}
+                      accessibilityState={{ checked: active }}
+                      style={[styles.swatch, { backgroundColor: c.value }, active && styles.swatchActive]}
+                      onPress={() => setBannerColor(c.value)}
+                    />
+                  );
+                })}
+                {profile.bannerColor ? (
+                  <Pressable onPress={() => setBannerColor(null)} hitSlop={6}>
+                    <Text style={styles.swatchClear}>No color</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              <TextInput
+                style={styles.input}
+                value={profile.bannerColor || ''}
+                onChangeText={(v) => setProfile((p) => ({ ...p, bannerColor: v }))}
+                onEndEditing={() => {
+                  const v = (profile.bannerColor || '').trim();
+                  if (!v) return setBannerColor(null);
+                  if (/^#[0-9a-f]{6}$/i.test(v)) setBannerColor(v.toLowerCase());
+                  else setBannerStatus('Custom color needs to be a hex like #283c63.');
+                }}
+                autoCapitalize="none"
+                autoCorrect={false}
+                placeholder="Custom color, e.g. #283c63"
+                placeholderTextColor={colors.inkFaint}
+              />
+              {bannerStatus ? (
+                <Text style={[styles.avatarStatus, bannerStatus !== 'saving' && bannerStatus !== 'saved' && { color: colors.danger }]}>
+                  {bannerStatus === 'saving' ? 'Saving banner…' : bannerStatus === 'saved' ? '✓ Banner saved.' : bannerStatus}
+                </Text>
+              ) : null}
+              {(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor ? (
+                <Text style={styles.bannerNote}>The photo shows on your profile; the color is what people see if you remove it.</Text>
               ) : null}
 
               <Label>Bio <Text style={styles.labelNote}>optional, up to 400 characters</Text></Label>
@@ -811,10 +944,20 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', borderRadius: 4, paddingVertical: 10, paddingHorizontal: 13, fontFamily: fonts.body, fontSize: 14.4, color: colors.ink, marginBottom: 14 },
   textarea: { minHeight: 70, textAlignVertical: 'top' },
   inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  handleRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 14 },
+  handleAt: { color: colors.inkDim, fontSize: 14.4, paddingHorizontal: 10, borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(251,232,211,0.18)', borderTopLeftRadius: 4, borderBottomLeftRadius: 4, textAlignVertical: 'center', lineHeight: 40 },
+  handleInput: { flex: 1, marginBottom: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarLetter: { fontFamily: fonts.monoBold, fontSize: 20.8, color: '#241a05' },
   avatarStatus: { fontFamily: fonts.mono, fontSize: 12, color: colors.ok, marginTop: -6, marginBottom: 14 },
+  bannerPreview: { height: 110, borderRadius: 8, overflow: 'visible', backgroundColor: colors.surface2, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)' },
+  bannerPreviewAvatar: { position: 'absolute', left: 14, bottom: -18, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderWidth: 3, borderColor: colors.surface1 },
+  swatchRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 10, marginBottom: 12 },
+  swatch: { width: 30, height: 30, borderRadius: 15, borderWidth: 2, borderColor: 'transparent' },
+  swatchActive: { borderColor: colors.ink },
+  swatchClear: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkFaint, textDecorationLine: 'underline' },
+  bannerNote: { fontSize: 12.5, color: colors.inkDim, marginTop: -6, marginBottom: 14 },
   pillRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 },
   pill: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', backgroundColor: colors.surface0, borderRadius: 4, paddingHorizontal: 12, paddingVertical: 8 },
   pillActive: { borderColor: colors.brass },

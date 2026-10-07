@@ -8003,3 +8003,153 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 
 .tv-blk-repeat { position: absolute; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; width: 160px; pointer-events: none; }
 .tv-blk-repeat b { color: var(--olive); }
+
+/* ============================================================
+   Public profile — Edit / Follow row, @handle, follower counts
+   (pages/profile/[userId].js) and the account page's handle field
+   ============================================================ */
+.profile-handle { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); margin-top: 0.15rem; }
+.profile-actions { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin-top: 1rem; flex-wrap: wrap; }
+.profile-action-btn {
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  padding: 0.5rem 1.1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(251, 232, 211, 0.3);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s, color 0.15s;
+}
+.profile-action-btn:hover { border-color: var(--brass); color: var(--brass); }
+.profile-action-btn:disabled { opacity: 0.6; cursor: default; }
+.profile-action-btn-primary { background: var(--brass); border-color: var(--brass); color: #241a05; font-weight: 700; }
+.profile-action-btn-primary:hover { background: var(--signal-amber); border-color: var(--signal-amber); color: #241a05; }
+.profile-action-btn-following { border-color: var(--brass); color: var(--brass); }
+.profile-action-btn-following:hover { border-color: var(--danger); color: var(--danger); }
+.profile-follow-error { font-size: 0.78rem; color: var(--danger); margin-top: 0.5rem; }
+.profile-placeholder-note {
+  font-size: 0.8rem; color: var(--ink-dim); max-width: 340px; margin: 0.6rem auto 0; line-height: 1.5;
+}
+
+.account-handle-field { display: flex; align-items: center; gap: 0; margin-bottom: 0.9rem; }
+.account-handle-at {
+  font-family: var(--font-mono); color: var(--ink-dim); padding: 0 0.6rem;
+  border: 1px solid rgba(251, 232, 211, 0.2); border-right: none; border-radius: 8px 0 0 8px;
+  align-self: stretch; display: flex; align-items: center;
+}
+.account-handle-field input { margin-bottom: 0; border-radius: 0 8px 8px 0; }
+
+/* ============================================================
+   Public profile v2 — banner hero, side nav, center column, right
+   rail (pages/profile/[userId].js). Account page banner editor.
+   ============================================================ */
+.profile-stage { max-width: 1080px; }
+.profile-hero { margin-bottom: 1.4rem; }
+.profile-banner {
+  height: 200px;
+  border-radius: 14px;
+  background: linear-gradient(120deg, var(--surface-2) 0%, var(--ocean-ink) 55%, var(--brass-deep) 100%);
+  background-size: cover;
+  background-position: center;
+  border: 1px solid rgba(251, 232, 211, 0.1);
+}
+.profile-hero-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1.2rem;
+  align-items: end;
+  padding: 0 1.4rem;
+  margin-top: -56px;
+}
+.profile-hero .profile-avatar {
+  width: 124px; height: 124px;
+  margin: 0;
+  font-size: 2.6rem;
+  border: 4px solid var(--surface-0);
+  box-shadow: 0 0 0 1px rgba(251, 232, 211, 0.15);
+}
+.profile-hero-id { padding-bottom: 0.4rem; min-width: 0; }
+.profile-hero .profile-name-row { justify-content: flex-start; }
+.profile-hero .profile-name { font-size: 1.9rem; line-height: 1.1; }
+.profile-hero .profile-handle { font-size: 0.86rem; }
+.profile-hero .profile-joined { margin: 0.3rem 0 0; font-size: 0.72rem; }
+.profile-hero .profile-actions { margin-top: 0; padding-bottom: 0.6rem; justify-content: flex-end; }
+.profile-report-btn.report-link { font-size: 0.76rem; padding: 0.5rem 0.4rem; }
+.profile-hero .profile-placeholder-note { margin: 1rem 1.4rem 0; }
+.profile-hero .profile-follow-error { margin: 0.5rem 1.4rem 0; }
+
+.profile-body {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr) 230px;
+  gap: 2rem;
+  align-items: start;
+}
+.profile-side-nav { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 0.2rem; }
+.profile-side-nav-link {
+  font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--ink-dim); text-decoration: none; padding: 0.5rem 0.7rem; border-radius: 8px;
+  border-left: 2px solid transparent;
+}
+.profile-side-nav-link:hover { color: var(--ink); background: var(--surface-1); border-left-color: var(--brass); }
+.profile-content { min-width: 0; }
+.profile-section { scroll-margin-top: 92px; padding-bottom: 1.6rem; margin-bottom: 1.6rem; border-bottom: 1px solid rgba(251,232,211,0.1); }
+.profile-section:last-child { border-bottom: 0; }
+.profile-content .profile-bio { max-width: none; margin: 0 0 0.9rem; text-align: left; color: var(--ink); font-size: 0.95rem; }
+.profile-bio-empty { color: var(--ink-faint); font-style: italic; }
+.profile-content .profile-genre-tags { justify-content: flex-start; }
+.profile-latest-post { max-width: 340px; }
+.profile-latest-post .profile-post-tile { width: 100%; }
+.profile-latest-caption { font-size: 0.9rem; color: var(--ink-dim); line-height: 1.5; margin: 0.7rem 0 0; }
+
+.profile-rail { position: sticky; top: 92px; display: flex; flex-direction: column; gap: 1rem; }
+.profile-rail-box { background: var(--surface-1); border: 1px solid rgba(251,232,211,0.1); border-radius: 10px; padding: 0.9rem; }
+.profile-rail-box-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); margin-bottom: 0.6rem; }
+.profile-rail .profile-links { justify-content: flex-start; }
+
+@media (max-width: 900px) {
+  .profile-body { grid-template-columns: 1fr; gap: 1.2rem; }
+  .profile-side-nav { position: static; flex-direction: row; flex-wrap: wrap; gap: 0.4rem; }
+  .profile-side-nav-link { border-left: 0; border: 1px solid rgba(251,232,211,0.15); padding: 0.4rem 0.7rem; }
+  .profile-side-nav-link:hover { border-color: var(--brass); }
+  .profile-rail { position: static; order: -1; }
+}
+@media (max-width: 640px) {
+  .profile-banner { height: 140px; border-radius: 10px; }
+  .profile-hero-row { grid-template-columns: 1fr; gap: 0.6rem; padding: 0 0.6rem; margin-top: -44px; align-items: start; }
+  .profile-hero .profile-avatar { width: 88px; height: 88px; font-size: 2rem; }
+  .profile-hero .profile-name { font-size: 1.5rem; }
+  .profile-hero .profile-actions { justify-content: flex-start; padding-bottom: 0; }
+}
+
+/* Account page — banner editor */
+.account-banner-preview {
+  position: relative; height: 120px; border-radius: 10px; margin-bottom: 0.7rem;
+  background: linear-gradient(120deg, var(--surface-2) 0%, var(--ocean-ink) 55%, var(--brass-deep) 100%);
+  background-size: cover; background-position: center;
+  border: 1px solid rgba(251,232,211,0.1);
+}
+.account-banner-preview-avatar {
+  position: absolute; left: 1rem; bottom: -18px;
+  width: 52px; height: 52px; border-radius: 50%; background: var(--brass) center/cover;
+  color: #241a05; font-family: var(--font-mono); font-weight: 700; font-size: 1.3rem;
+  display: flex; align-items: center; justify-content: center; border: 3px solid var(--surface-1);
+}
+.account-banner-controls { display: flex; gap: 0.6rem; align-items: center; margin: 1.4rem 0 0.7rem; flex-wrap: wrap; }
+.account-banner-upload { width: auto; cursor: pointer; margin: 0; font-weight: normal; }
+.account-banner-upload input { display: none; }
+.account-banner-swatches { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.9rem; }
+.account-banner-swatch {
+  width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
+  box-shadow: 0 0 0 1px rgba(251,232,211,0.2);
+}
+.account-banner-swatch.is-active { border-color: var(--ink); box-shadow: 0 0 0 2px var(--surface-1), 0 0 0 3px var(--ink); }
+.account-banner-swatch-custom {
+  position: relative; background: var(--surface-2); color: var(--ink); display: flex; align-items: center; justify-content: center;
+  font-size: 1rem; margin: 0; font-weight: normal;
+}
+.account-banner-swatch-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.account-banner-swatch-clear { background: none; border: 0; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-decoration: underline; }
+.account-banner-note { font-size: 0.78rem; color: var(--ink-dim); margin: -0.3rem 0 0.9rem; }

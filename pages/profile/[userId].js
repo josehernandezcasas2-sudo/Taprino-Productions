@@ -1,6 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
+import { SignInButton } from '@clerk/nextjs';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
@@ -11,6 +12,8 @@ import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
+import { bannerStyle } from '../../lib/profileBanner';
+import ReportButton from '../../components/ReportButton';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -56,9 +59,13 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, creditedWork, pitches, backedPitches, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
+  const [following, setFollowing] = useState(Boolean(initialViewerFollows));
+  const [followerCount, setFollowerCount] = useState(initialFollowerCount || 0);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followError, setFollowError] = useState(null);
   const [posts, setPosts] = useState(initialPosts);
   const [savedSnippets, setSavedSnippets] = useState(initialSavedSnippets);
   // Which grid opened the viewer — 'posts' or 'saved' — plus the index
@@ -70,6 +77,19 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
     : null;
+  // Newest post gets the big slot in the middle column; the rest grid up
+  // under it. Both still index into the same posts array for the viewer.
+  const latestPost = posts[0] || null;
+  const olderPosts = posts.slice(1);
+  const sections = [
+    { id: 'profile-about', label: 'About' },
+    latestPost && { id: 'profile-latest', label: 'Latest post' },
+    olderPosts.length > 0 && { id: 'profile-posts', label: 'Posts' },
+    isOwnProfile && savedSnippets.length > 0 && { id: 'profile-saved', label: 'Saved' },
+    { id: 'profile-tagged', label: 'Tagged in' },
+    pitches.length > 0 && { id: 'profile-pitches', label: 'Pitches' },
+    backedPitches.length > 0 && { id: 'profile-backed', label: 'Backed' }
+  ].filter(Boolean);
 
   async function deleteOwnPost(postId) {
     const res = await fetch(`/api/posts/${postId}`, { method: 'DELETE' });
@@ -158,8 +178,32 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
     }
   }
 
+  // Follow button — server state wins over the optimistic flip, same as
+  // post likes: two quick clicks settle on whatever actually landed.
+  async function toggleFollow() {
+    setFollowBusy(true);
+    setFollowError(null);
+    try {
+      const res = await fetch('/api/profile-follow', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ followedId: profile.userId })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not update that follow.');
+      setFollowing(data.following);
+      setFollowerCount(data.followers);
+    } catch (err) {
+      setFollowError(err.message);
+    } finally {
+      setFollowBusy(false);
+    }
+  }
+
   function share() {
-    const url = typeof window !== 'undefined' ? window.location.href : '';
+    // Always hand out the canonical link (/profile/<handle> when one is
+    // set), even if this page was reached through the raw-id URL.
+    const url = typeof window !== 'undefined' ? `${window.location.origin}${canonicalPath || window.location.pathname}` : '';
     if (navigator.share) {
       navigator.share({ title: profile.displayName, url }).catch(() => {});
     } else {
@@ -266,140 +310,219 @@ export default function PublicProfile({ profile, creditedWork, pitches, backedPi
         isSubscriber={isSubscriber}
       />
 
-      <main id="main-content" className="stage stage-single" style={{ maxWidth: '760px' }}>
+      <main id="main-content" className="stage stage-single profile-stage">
         <BackButton fallbackHref="/stream" />
-        <div className="profile-header">
-          <div
-            className="profile-avatar"
-            style={profile.avatarUrl ? { backgroundImage: `url(${profile.avatarUrl})` } : undefined}
-          >
-            {!profile.avatarUrl && initial}
-          </div>
-          <div className="profile-name-row">
-            <h1 className="profile-name">{profile.displayName}</h1>
-            {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
-          </div>
-          {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
 
-          {(creditedWork.length > 0 || totalViews > 0) && (
-            <div className="profile-stats">
-              <span>{creditedWork.length} title{creditedWork.length === 1 ? '' : 's'}</span>
-              {totalViews > 0 && (
-                <>
-                  <span className="profile-stats-dot">&bull;</span>
-                  <span>{formatViews(totalViews)} views</span>
-                </>
+        {/* Backdrop (photo > solid color > default gradient, set on the
+            account page), the avatar overlapping its bottom edge, then
+            name / @handle on the left and Follow · Share · Report on the
+            right — Jose's sketch, 2026-10-07. */}
+        <header className="profile-hero">
+          <div className={`profile-banner ${profile.bannerUrl ? 'has-photo' : ''}`} style={bannerStyle(profile)} />
+          <div className="profile-hero-row">
+            <div
+              className="profile-avatar"
+              style={profile.avatarUrl ? { backgroundImage: `url(${profile.avatarUrl})` } : undefined}
+            >
+              {!profile.avatarUrl && initial}
+            </div>
+            <div className="profile-hero-id">
+              <div className="profile-name-row">
+                <h1 className="profile-name">{profile.displayName}</h1>
+                {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+              </div>
+              {profile.handle && <div className="profile-handle">@{profile.handle}</div>}
+              {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
+              {(creditedWork.length > 0 || totalViews > 0 || followerCount > 0) && (
+                <div className="profile-stats">
+                  {creditedWork.length > 0 && <span>{creditedWork.length} title{creditedWork.length === 1 ? '' : 's'}</span>}
+                  {totalViews > 0 && (
+                    <>
+                      {creditedWork.length > 0 && <span className="profile-stats-dot">&bull;</span>}
+                      <span>{formatViews(totalViews)} views</span>
+                    </>
+                  )}
+                  {followerCount > 0 && (
+                    <>
+                      {(creditedWork.length > 0 || totalViews > 0) && <span className="profile-stats-dot">&bull;</span>}
+                      <span>{formatViews(followerCount)} follower{followerCount === 1 ? '' : 's'}</span>
+                    </>
+                  )}
+                </div>
               )}
             </div>
-          )}
-
-          {knownForGenres.length > 0 && (
-            <div className="profile-genre-tags">
-              <span className="profile-genre-tags-label">Known for</span>
-              {knownForGenres.map((g) => <span key={g} className="profile-genre-tag">{g}</span>)}
+            <div className="profile-actions">
+              {isOwnProfile ? (
+                <Link href="/account" className="profile-action-btn">Edit profile</Link>
+              ) : !isSignedIn ? (
+                <SignInButton mode="modal">
+                  <button type="button" className="profile-action-btn profile-action-btn-primary">Follow</button>
+                </SignInButton>
+              ) : (
+                <button
+                  type="button"
+                  className={`profile-action-btn ${following ? 'profile-action-btn-following' : 'profile-action-btn-primary'}`}
+                  onClick={toggleFollow}
+                  disabled={followBusy}
+                  aria-pressed={following}
+                >
+                  {following ? 'Following' : 'Follow'}
+                </button>
+              )}
+              <div className="pitch-share-wrap">
+                <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
+                  {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}
+                </button>
+                {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
+              </div>
+              {!isOwnProfile && isSignedIn && (
+                <ReportButton targetType="profile" targetId={profile.userId} title={profile.displayName} className="profile-report-btn" />
+              )}
             </div>
-          )}
-
-          {profile.bio && <p className="profile-bio">{profile.bio}</p>}
-
-          {profile.socialLinks.length > 0 && (
-            <div className="profile-links">
-              {profile.socialLinks.map((link, i) => (
-                <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="profile-link-pill">
-                  {link.platform || hostnameFor(link.url)}
-                </a>
-              ))}
-            </div>
-          )}
-
-          <div className="pitch-share-wrap" style={{ marginTop: '1rem' }}>
-            <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
-              {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}
-            </button>
-            {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
           </div>
-        </div>
+          {followError && <div className="profile-follow-error" role="alert">{followError}</div>}
 
-        {posts.length > 0 && (
-          <>
-            <div className="profile-section-divider" />
-            <div className="profile-section-label">Posts</div>
-            <div className="profile-posts-grid">
-              {posts.map((post, i) => renderPostTile(post, i, 'posts'))}
-            </div>
-          </>
-        )}
+          {profile.isPlaceholder && (
+            <p className="profile-placeholder-note">
+              {isOwnProfile
+                ? 'This is how your profile looks right now. Add a name, photo and bio in your account settings.'
+                : 'This person hasn’t set up their profile yet.'}
+            </p>
+          )}
+        </header>
 
-        {/* Only the viewer's own — see isOwnProfile gating in
-            getServerSideProps, which skips fetching this list entirely
-            for anyone else. Liking a snippet (the heart in
-            PostViewerModal's action rail) is what saves it here, same as
-            Instagram's own Saved collection doubling up the like. */}
-        {isOwnProfile && savedSnippets.length > 0 && (
-          <>
-            <div className="profile-section-divider" />
-            <div className="profile-section-label">Saved Snippets</div>
-            <div className="profile-posts-grid">
-              {savedSnippets.map((post, i) => renderPostTile(post, i, 'saved'))}
-            </div>
-          </>
-        )}
-
-        <div className="profile-section-divider" />
-        <div className="profile-section-label">Tagged in</div>
-        {creditedWork.length === 0 ? (
-          <div className="poster-empty">
-            Nothing tagged here yet — this fills in once {profile.displayName} is credited on something.
-          </div>
-        ) : (
-          <div className="profile-work-grid">
-            {creditedWork.map((item) => (
-              <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
-                <div className="profile-work-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined} />
-                <div className="profile-work-title">{item.title}</div>
-                <div className="profile-work-type">{workTypeLabel(item)}</div>
-              </Link>
+        <div className="profile-body">
+          {/* Left: jump list for the sections below. */}
+          <nav className="profile-side-nav" aria-label="Profile sections">
+            {sections.map((s) => (
+              <a key={s.id} href={`#${s.id}`} className="profile-side-nav-link">{s.label}</a>
             ))}
+          </nav>
+
+          {/* Center: the latest post big, then everything else in order. */}
+          <div className="profile-content">
+            <section id="profile-about" className="profile-section">
+              <div className="profile-section-label">About</div>
+              {profile.bio ? (
+                <p className="profile-bio">{profile.bio}</p>
+              ) : (
+                <p className="profile-bio profile-bio-empty">
+                  {isOwnProfile ? 'Add a line or two about what you make in your account settings.' : `${profile.displayName} hasn’t written a bio yet.`}
+                </p>
+              )}
+              {knownForGenres.length > 0 && (
+                <div className="profile-genre-tags">
+                  <span className="profile-genre-tags-label">Known for</span>
+                  {knownForGenres.map((g) => <span key={g} className="profile-genre-tag">{g}</span>)}
+                </div>
+              )}
+            </section>
+
+            {latestPost && (
+              <section id="profile-latest" className="profile-section">
+                <div className="profile-section-label">Latest post</div>
+                <div className="profile-latest-post">
+                  {renderPostTile(latestPost, 0, 'posts')}
+                  {latestPost.caption && <p className="profile-latest-caption">{latestPost.caption}</p>}
+                </div>
+              </section>
+            )}
+
+            {olderPosts.length > 0 && (
+              <section id="profile-posts" className="profile-section">
+                <div className="profile-section-label">Posts</div>
+                <div className="profile-posts-grid">
+                  {olderPosts.map((post, i) => renderPostTile(post, i + 1, 'posts'))}
+                </div>
+              </section>
+            )}
+
+            {/* Only the viewer's own — see isOwnProfile gating in
+                lib/profileHub.js, which skips fetching this list entirely
+                for anyone else. Liking a snippet (the heart in
+                PostViewerModal's action rail) is what saves it here, same
+                as Instagram's own Saved collection doubling up the like. */}
+            {isOwnProfile && savedSnippets.length > 0 && (
+              <section id="profile-saved" className="profile-section">
+                <div className="profile-section-label">Saved Snippets</div>
+                <div className="profile-posts-grid">
+                  {savedSnippets.map((post, i) => renderPostTile(post, i, 'saved'))}
+                </div>
+              </section>
+            )}
+
+            <section id="profile-tagged" className="profile-section">
+              <div className="profile-section-label">Tagged in</div>
+              {creditedWork.length === 0 ? (
+                <div className="poster-empty">
+                  Nothing tagged here yet &mdash; this fills in once {profile.displayName} is credited on something.
+                </div>
+              ) : (
+                <div className="profile-work-grid">
+                  {creditedWork.map((item) => (
+                    <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
+                      <div className="profile-work-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined} />
+                      <div className="profile-work-title">{item.title}</div>
+                      <div className="profile-work-type">{workTypeLabel(item)}</div>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {pitches.length > 0 && (
+              <section id="profile-pitches" className="profile-section">
+                <div className="profile-section-label">Pitch Room projects</div>
+                <div className="pitch-grid">
+                  {pitches.map((p) => (
+                    <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
+                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                        {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                      </div>
+                      <div className="pitch-info">
+                        <h4>{p.title}</h4>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {backedPitches.length > 0 && (
+              <section id="profile-backed" className="profile-section">
+                <div className="profile-section-label">Projects backed</div>
+                <div className="pitch-grid">
+                  {backedPitches.map((p) => (
+                    <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
+                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                        {p.tag && <span className="pitch-tag">{p.tag}</span>}
+                      </div>
+                      <div className="pitch-info">
+                        <h4>{p.title}</h4>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
-        )}
 
-        {pitches.length > 0 && (
-          <>
-            <div className="profile-section-divider" />
-            <div className="profile-section-label">Pitch Room projects</div>
-            <div className="pitch-grid">
-              {pitches.map((p) => (
-                <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
-                    {p.tag && <span className="pitch-tag">{p.tag}</span>}
-                  </div>
-                  <div className="pitch-info">
-                    <h4>{p.title}</h4>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
-
-        {backedPitches.length > 0 && (
-          <>
-            <div className="profile-section-divider" />
-            <div className="profile-section-label">Projects backed</div>
-            <div className="pitch-grid">
-              {backedPitches.map((p) => (
-                <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
-                    {p.tag && <span className="pitch-tag">{p.tag}</span>}
-                  </div>
-                  <div className="pitch-info">
-                    <h4>{p.title}</h4>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          </>
-        )}
+          {/* Right rail: the numbers, then links. */}
+          <aside className="profile-rail">
+            {profile.socialLinks.length > 0 && (
+              <div className="profile-rail-box">
+                <div className="profile-rail-box-label">Links</div>
+                <div className="profile-links">
+                  {profile.socialLinks.map((link, i) => (
+                    <a key={i} href={link.url} target="_blank" rel="noopener noreferrer" className="profile-link-pill">
+                      {link.platform || hostnameFor(link.url)}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </aside>
+        </div>
       </main>
 
       <Footer />

@@ -33,6 +33,11 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     profile: data.profile,
+    canonicalPath: data.canonicalPath,
+    followerCount: data.followerCount,
+    followingCount: data.followingCount,
+    viewerFollows: data.viewerFollows,
+    isOwnProfile: data.isOwnProfile,
     creditedWork: data.creditedWork,
     pitches: data.pitches,
     backedPitches: data.backedPitches,
