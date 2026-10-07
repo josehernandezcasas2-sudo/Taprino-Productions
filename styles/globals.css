@@ -5897,9 +5897,12 @@ body:has(.mini-player) { padding-bottom: 72px; }
   flex-direction: column;
   align-items: center;
   gap: 0.9rem;
-  padding: 1.2rem;
-  padding-top: calc(1.2rem + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(2rem + env(safe-area-inset-bottom, 0px));
+  /* Tight: the car is meant to fill the screen. The close button and
+     the floor indicator overlay the car's top strip rather than taking
+     a row of their own. */
+  padding: 0.6rem;
+  padding-top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(1rem + env(safe-area-inset-bottom, 0px));
   overflow-y: auto;
   background: var(--void);
   text-align: center;
@@ -5928,13 +5931,14 @@ body:has(.mini-player) { padding-bottom: 72px; }
    breakpoint) — reserve room for its floating pill so the card and swipe
    buttons never sit underneath it. */
 @media (max-width: 1180px) {
-  .pitch-discover-stage { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
+  .pitch-discover-stage { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
 }
+/* Overlays the car's top-left corner (above the doors, z 6). */
 .pitch-discover-close {
   position: absolute;
-  top: max(1rem, env(safe-area-inset-top));
-  left: 1rem;
-  z-index: 4;
+  top: calc(1.3rem + env(safe-area-inset-top, 0px));
+  left: 1.3rem;
+  z-index: 8;
   width: 34px; height: 34px;
   border-radius: 50%;
   border: none;
@@ -5945,7 +5949,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
   justify-content: center;
   cursor: pointer;
 }
-.pitch-discover-close:hover { background: rgba(251, 232, 211, 0.16); }
+.pitch-discover-close { background: rgba(12, 19, 31, 0.55); border: 1px solid rgba(251, 232, 211, 0.15); }
+.pitch-discover-close:hover { background: rgba(12, 19, 31, 0.8); }
 .pitch-discover-banner { max-width: 420px; }
 
 /* width:100% here matters more than it looks like it should — without
@@ -5980,77 +5985,36 @@ body:has(.mini-player) { padding-bottom: 72px; }
   padding-top: var(--pitch-banner-clearance, 0px);
 }
 
-.swipe-round-tag {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-  color: var(--signal-amber);
-  margin-bottom: 0.8rem;
-}
-
 /* ---- The elevator (components/PitchElevator.js) ----
    Steel tones are hue-biased toward --ocean-ink rather than neutral greys
    so the cab reads as part of the same navy world as the rest of the
    site; --elev-lamp is the illuminated button ring and floor display,
    the same amber the site already uses for its signal/tier accents.
-   --elev-door-ms mirrors DOOR_MS in PitchElevator.js — keep in sync. */
+   --elev-door-ms / --elev-exit-ms mirror DOOR_MS / EXIT_MS in
+   PitchElevator.js — keep them in sync. */
 .elev-stage {
   --elev-steel-0: #1a2338; --elev-steel-1: #2b3852; --elev-steel-2: #3d4b6a; --elev-steel-3: #5a6a8d; --elev-steel-hi: #8c9bbd;
   --elev-lamp: var(--olive); --elev-lamp-glow: rgba(231, 162, 85, 0.55);
-  --elev-door-ms: 480ms; --elev-flip-ms: 520ms;
-  /* Everything on the stage that isn't the car, top to bottom: the
-     stage's own padding (incl. the tab-bar reserve below 1180px, see
-     .pitch-discover-stage), the floor indicator + gap (+ the round tag),
-     and whatever banner is showing (the measured clearance). The car
-     sizes itself to whatever height is left — see .elev-car. */
-  --elev-chrome: calc(1.2rem + env(safe-area-inset-top, 0px) + 110px + env(safe-area-inset-bottom, 0px) + 4.4rem + var(--pitch-banner-clearance, 0px));
+  --elev-door-ms: 480ms; --elev-flip-ms: 520ms; --elev-exit-ms: 280ms;
   position: relative;
   width: 100%;
-  max-width: 400px;
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.7rem;
 }
 @media (prefers-reduced-motion: reduce) {
-  .elev-stage { --elev-door-ms: 120ms; --elev-flip-ms: 120ms; }
+  .elev-stage { --elev-door-ms: 120ms; --elev-flip-ms: 120ms; --elev-exit-ms: 120ms; }
 }
 
-/* Floor indicator — the display on the lintel above the doors. */
-.elev-indicator {
-  display: flex; align-items: center; gap: 0.6rem;
-  padding: 0.35rem 0.8rem; border-radius: 8px;
-  background: linear-gradient(180deg, var(--elev-steel-1), var(--elev-steel-0));
-  border: 1px solid var(--elev-steel-2);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 14px rgba(0,0,0,0.4);
-  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
-}
-.elev-indicator-label { font-size: 0.6rem; letter-spacing: 0.14em; color: var(--ink-faint); text-transform: uppercase; }
-.elev-indicator-num { font-size: 1.35rem; font-weight: 600; color: var(--elev-lamp); text-shadow: 0 0 10px var(--elev-lamp-glow), 0 0 2px var(--elev-lamp); letter-spacing: 0.06em; min-width: 2.2ch; text-align: center; }
-.elev-indicator-of { font-size: 0.7rem; color: var(--ink-faint); }
-.elev-indicator-arrows { display: flex; flex-direction: column; gap: 2px; line-height: 1; font-size: 0.6rem; color: var(--elev-steel-3); }
-.elev-indicator-arrows .on { color: var(--elev-lamp); text-shadow: 0 0 8px var(--elev-lamp-glow); animation: elev-blink 0.5s steps(2) infinite; }
-@keyframes elev-blink { 50% { opacity: 0.35; } }
-.elev-indicator-round { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--surface-0); background: var(--mint); border-radius: 3px; padding: 1px 5px; }
-
-/* The car: brushed frame around the cab. aspect-ratio + max-height keep
-   it phone-card shaped and never taller than the viewport allows (same
-   sanity limit the old .swipe-card-stack had). */
-/* Fills the stage's width and takes its height from the aspect ratio
-   when there's room; when there isn't (a short phone, Safari's toolbars
-   up, or a three-line sign-in banner eating a third of the screen), the
-   height is clamped to whatever is left after --elev-chrome and the car
-   goes a little squatter instead of sliding up under the banner and down
-   under the tab bar. Squatter beats narrower here: the plates and card
-   keep their width, so the pitch text stays readable. dvh so the iOS
-   toolbar collapsing doesn't leave it sized for the wrong viewport; vh
-   is the fallback. */
+/* The car fills whatever the stage leaves it — full-screen on a phone
+   (minus the close button strip above and the tab bar reserve below,
+   see .pitch-discover-stage), capped in width on a desktop so it doesn't
+   turn into a cinema screen. flex:1 + min-height:0 is what lets it
+   shrink when a banner takes its measured clearance at the top. */
 .elev-car {
-  position: relative; width: 100%; max-width: 100%;
-  aspect-ratio: 3 / 4.6;
-  max-height: calc(100vh - var(--elev-chrome));
-  max-height: calc(100dvh - var(--elev-chrome));
+  position: relative; width: 100%; flex: 1; min-height: 0;
   border-radius: 18px; padding: 8px;
   background: linear-gradient(90deg, var(--elev-steel-1), var(--elev-steel-3) 18%, var(--elev-steel-1) 46%, var(--elev-steel-3) 72%, var(--elev-steel-1));
   box-shadow: 0 24px 50px rgba(0,0,0,0.55), inset 0 1px 0 rgba(255,255,255,0.12);
@@ -6078,7 +6042,37 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-floor::after { content: ""; position: absolute; left: 20%; right: 20%; top: 2px; height: 60%; background: linear-gradient(180deg, rgba(140,155,189,0.14), transparent); filter: blur(6px); }
 .elev-ceiling { position: absolute; left: 22%; right: 22%; top: 0; height: 6px; border-radius: 0 0 4px 4px; background: var(--ink); box-shadow: 0 0 18px 4px rgba(251,232,211,0.35), 0 30px 80px 30px rgba(251,232,211,0.08); }
 
-/* Doors sit above everything in the cab (card, plates) so a ride really
+/* Floor indicator — the display above the doors, inside the cab (so
+   the car can take the whole screen). Sits above the doors (z 6) so it
+   stays readable while they're closed, like a real one. */
+.elev-indicator {
+  position: absolute; top: 0.8rem; left: 50%; transform: translateX(-50%); z-index: 7;
+  display: flex; align-items: center; gap: 0.6rem;
+  padding: 0.35rem 0.8rem; border-radius: 8px;
+  background: linear-gradient(180deg, var(--elev-steel-1), var(--elev-steel-0));
+  border: 1px solid var(--elev-steel-2);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 14px rgba(0,0,0,0.4);
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.elev-indicator-label { font-size: 0.6rem; letter-spacing: 0.14em; color: var(--ink-faint); text-transform: uppercase; }
+.elev-indicator-num { font-size: 1.35rem; font-weight: 600; color: var(--elev-lamp); text-shadow: 0 0 10px var(--elev-lamp-glow), 0 0 2px var(--elev-lamp); letter-spacing: 0.06em; min-width: 2.2ch; text-align: center; }
+.elev-indicator-of { font-size: 0.7rem; color: var(--ink-faint); }
+.elev-indicator-arrows { display: flex; flex-direction: column; gap: 2px; line-height: 1; font-size: 0.6rem; color: var(--elev-steel-3); }
+.elev-indicator-arrows .on { color: var(--elev-lamp); text-shadow: 0 0 8px var(--elev-lamp-glow); animation: elev-blink 0.5s steps(2) infinite; }
+@keyframes elev-blink { 50% { opacity: 0.35; } }
+.elev-indicator-round { font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--surface-0); background: var(--mint); border-radius: 3px; padding: 1px 5px; }
+/* The round-2 explainer and the "held" lamp share the strip under the
+   indicator; they never show at the same time (held is round 1 only). */
+.elev-round-tag, .elev-hold-lamp {
+  position: absolute; top: 3.6rem; z-index: 7;
+  font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase;
+  background: rgba(12,19,31,0.6); border-radius: 4px; padding: 0.2rem 0.5rem; white-space: nowrap;
+}
+.elev-round-tag { left: 50%; transform: translateX(-50%); color: var(--signal-amber); border: 1px solid rgba(231,162,85,0.4); max-width: calc(100% - 1.6rem); overflow: hidden; text-overflow: ellipsis; }
+.elev-hold-lamp { right: 0.8rem; color: var(--mint); border: 1px solid rgba(147,208,164,0.5); }
+
+/* Doors sit above everything in the cab (card, plate) so a ride really
    does close over the whole interior. */
 .elev-door {
   position: absolute; top: 0; bottom: 0; width: 50.5%; z-index: 6;
@@ -6091,18 +6085,16 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-cab-closed .elev-door { transform: translateX(0); }
 .elev-cab-closed .elev-door-l { box-shadow: 6px 0 14px rgba(0,0,0,0.35); }
 
-/* Button plates on the cab's inner walls, vertically centered either
-   side of the card. */
+/* The one button plate, on the cab's right wall: Save / Share / Like.
+   (Riding is a swipe on the card now — see ElevatorCard.) */
 .elev-plate {
-  position: absolute; top: 50%; transform: translateY(-50%); z-index: 4;
+  position: absolute; top: 50%; right: 9px; transform: translateY(-50%); z-index: 4;
   display: flex; flex-direction: column; align-items: center; gap: 0.7rem;
   padding: 0.7rem 0.4rem; border-radius: 10px;
   background: linear-gradient(180deg, var(--elev-steel-2), var(--elev-steel-1));
   border: 1px solid var(--elev-steel-3);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.12), 0 8px 20px rgba(0,0,0,0.45);
 }
-.elev-plate-left { left: 9px; }
-.elev-plate-right { right: 9px; }
 
 /* One round steel button: raised cap with a concentric ring, which lights
    amber (red for Like) while .elev-btn-lit. */
@@ -6125,18 +6117,31 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-btn:focus-visible { outline: none; }
 .elev-btn:focus-visible .elev-btn-cap { box-shadow: inset 0 2px 4px rgba(255,255,255,0.15), inset 0 -3px 6px rgba(0,0,0,0.55), 0 0 0 3px var(--elev-steel-0), 0 0 0 5px var(--ink); }
 
-.elev-hold-lamp { position: absolute; top: 0.7rem; left: 0.7rem; z-index: 4; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--mint); background: rgba(12,19,31,0.6); border: 1px solid rgba(147,208,164,0.5); border-radius: 4px; padding: 0.2rem 0.5rem; }
-
-/* The card: centered between the plates, 3D-flippable. perspective lives
-   on the slot (a static ancestor), never on the element that also
-   transforms — see the Safari backface note the old swipe card carried. */
+/* The card: centered in the room left of the plate, clear of the
+   indicator strip above. Width-driven by aspect-ratio, clamped to the
+   slot's height (a slightly squatter card on a short screen). */
 .elev-card-slot {
-  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 2;
-  width: calc(100% - 152px); max-width: 250px; aspect-ratio: 3 / 5; max-height: 86%;
-  perspective: 1000px; -webkit-perspective: 1000px;
+  position: absolute; top: 0; bottom: 0; left: 0.9rem; right: 5.2rem; z-index: 2;
+  display: flex; align-items: center; justify-content: center;
+  padding: 3.6rem 0 1.4rem;
 }
-.elev-card { position: relative; width: 100%; height: 100%; }
-.elev-card-flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform var(--elev-flip-ms) cubic-bezier(0.4, 0, 0.2, 1); }
+/* The drag transform (translate/rotate while swiping, the fly-off on
+   commit) lives here, on the outer box. perspective is NOT here — see
+   .elev-card-perspective. touch-action:none so a finger moving on the
+   card drags it instead of scrolling the page. */
+.elev-card {
+  position: relative; width: 100%; max-width: 340px; aspect-ratio: 3 / 4.6; max-height: 100%;
+  touch-action: none; cursor: grab; user-select: none; will-change: transform;
+  transition: transform var(--elev-exit-ms) ease, opacity var(--elev-exit-ms) ease;
+}
+.elev-card:active { cursor: grabbing; }
+/* perspective on its own never-transformed wrapper, inside the dragged
+   box — on Safari, an element that establishes the 3D perspective AND
+   carries its own constantly-changing transform + will-change breaks
+   backface-visibility for everything inside it (the old swipe card hit
+   exactly this). Same structure that card ended up with. */
+.elev-card-perspective { position: absolute; inset: 0; perspective: 1000px; -webkit-perspective: 1000px; }
+.elev-card-flip { position: absolute; inset: 0; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform var(--elev-flip-ms) cubic-bezier(0.4, 0, 0.2, 1); }
 .elev-card-flipped { transform: rotateY(180deg); }
 /* Only backface-visibility + the back's 180° live on the face itself —
    deliberately NOT border-radius/overflow. iOS Safari has a long-
@@ -6145,25 +6150,25 @@ body:has(.mini-player) { padding-bottom: 72px; }
    rotated-away face then renders through, mirrored, on top of the
    visible one (seen on a real iPhone, invisible in every desktop
    browser). Radius/overflow/background go on .elev-card-surface, a
-   plain absolutely-positioned child, the same split the old swipe card
-   used (.swipe-card-face / .swipe-card-*-surface). */
+   plain absolutely-positioned child. */
 .elev-card-face { position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; }
 .elev-card-back { transform: rotateY(180deg); }
 .elev-card-surface {
   position: absolute; inset: 0; border-radius: 14px; overflow: hidden;
   background-color: var(--surface-2);
   box-shadow: 0 18px 40px rgba(0,0,0,0.55), 0 0 0 1px rgba(251,232,211,0.08);
-  /* Belt and suspenders alongside the face's own, same as the old card. */
   backface-visibility: hidden; -webkit-backface-visibility: hidden;
 }
-.elev-card-front-surface { background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: flex-end; cursor: pointer; user-select: none; }
+.elev-card-front-surface { background-size: cover; background-position: center; display: flex; flex-direction: column; justify-content: flex-end; }
 .elev-card-front-blank { background-image: linear-gradient(135deg, var(--surface-3), var(--surface-1)); }
 .elev-card-scrim { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(12,19,31,0.05) 35%, rgba(12,19,31,0.94) 100%); }
-.elev-card-hint { position: absolute; z-index: 1; top: 0.6rem; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); background: rgba(12,19,31,0.6); border: 1px solid rgba(251,232,211,0.15); border-radius: 999px; padding: 0.2rem 0.55rem; white-space: nowrap; }
-.elev-card-copy { position: relative; z-index: 1; padding: 0 0.8rem 0.85rem; display: flex; flex-direction: column; gap: 0.35rem; }
-.elev-card-copy h2 { margin: 0; font-family: var(--font-display); font-size: 1.12rem; line-height: 1.15; color: var(--ink); text-wrap: balance; }
-.elev-card-logline { margin: 0; font-size: 0.8rem; line-height: 1.35; color: var(--ink-dim); }
-.elev-card-creator { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em; color: var(--ink-faint); width: fit-content; }
+.elev-card-hint { position: absolute; z-index: 1; top: 0.6rem; left: 50%; transform: translateX(-50%); display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); background: rgba(12,19,31,0.6); border: 1px solid rgba(251,232,211,0.15); border-radius: 999px; padding: 0.2rem 0.55rem; white-space: nowrap; transition: opacity 120ms; }
+/* Shares the top-center with the HOLD badge, so it steps aside mid-drag. */
+.elev-card-hint-hidden { opacity: 0; }
+.elev-card-copy { position: relative; z-index: 1; padding: 0 0.9rem 0.95rem; display: flex; flex-direction: column; gap: 0.35rem; }
+.elev-card-copy h2 { margin: 0; font-family: var(--font-display); font-size: 1.25rem; line-height: 1.15; color: var(--ink); text-wrap: balance; }
+.elev-card-logline { margin: 0; font-size: 0.86rem; line-height: 1.35; color: var(--ink-dim); }
+.elev-card-creator { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.06em; color: var(--ink-faint); width: fit-content; }
 .elev-card-creator-link { text-decoration: none; }
 .elev-card-creator-link:hover { color: var(--brass); text-decoration: underline; }
 /* Own class rather than .pitch-tag, which is the poster-corner badge
@@ -6172,17 +6177,31 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-card-back-surface { background: linear-gradient(180deg, var(--surface-2), var(--surface-1)); display: flex; flex-direction: column; }
 .elev-card-back-btn { position: absolute; top: 0.5rem; left: 0.6rem; z-index: 1; display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.56rem; letter-spacing: 0.08em; text-transform: uppercase; border: 1px solid rgba(251,232,211,0.2); background: rgba(12,19,31,0.4); color: var(--ink); border-radius: 999px; padding: 0.2rem 0.55rem; cursor: pointer; }
 .elev-card-back-btn:hover { background: rgba(12,19,31,0.7); }
-/* Scrolls on its own; touch-action keeps a finger on long text scrolling
-   the text rather than the page. */
-.elev-card-back-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 2rem 0.8rem 0.8rem; display: flex; flex-direction: column; gap: 0.5rem; }
-.elev-card-back-body h3 { margin: 0; font-family: var(--font-display); font-size: 1rem; line-height: 1.2; color: var(--ink); }
-.elev-card-description { margin: 0; font-size: 0.78rem; line-height: 1.4; color: var(--ink-dim); }
-.elev-card-funding { display: flex; flex-direction: column; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); }
+/* Scrolls on its own; pan-y here (overriding the card's touch-action:
+   none) keeps a finger on long text scrolling the text, and the card's
+   pointerdown handler skips drags that start in here for the same
+   reason. */
+.elev-card-back-body { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; touch-action: pan-y; padding: 2rem 0.9rem 0.9rem; display: flex; flex-direction: column; gap: 0.5rem; }
+.elev-card-back-body h3 { margin: 0; font-family: var(--font-display); font-size: 1.05rem; line-height: 1.2; color: var(--ink); }
+.elev-card-description { margin: 0; font-size: 0.82rem; line-height: 1.4; color: var(--ink-dim); }
+.elev-card-funding { display: flex; flex-direction: column; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
 .elev-card-funding .pitch-progress-track { margin-bottom: 0; }
-.elev-card-deadline { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); }
-.elev-card-team { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); display: flex; flex-direction: column; gap: 0.15rem; }
-.elev-card-learn-more { color: var(--olive); font-family: var(--font-mono); font-size: 0.66rem; margin-top: auto; text-decoration: none; }
+.elev-card-deadline { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
+.elev-card-team { font-family: var(--font-mono); font-size: 0.64rem; color: var(--ink-faint); display: flex; flex-direction: column; gap: 0.15rem; }
+.elev-card-learn-more { color: var(--olive); font-family: var(--font-mono); font-size: 0.68rem; margin-top: auto; text-decoration: none; }
 .elev-card-learn-more:hover { text-decoration: underline; }
+
+/* Drag badges — LIKE (right), PASS (left), HOLD (down) — fade in with
+   the drag distance, same as the old swipe card. */
+.elev-badge {
+  position: absolute; top: 1.6rem; z-index: 5;
+  font-family: var(--font-display); font-weight: 700; font-size: 1.5rem; letter-spacing: 0.1em;
+  padding: 0.2rem 0.7rem; border-radius: 8px; border: 3px solid currentColor;
+  pointer-events: none; opacity: 0;
+}
+.elev-badge-like { left: 1.2rem; color: var(--ok); transform: rotate(-18deg); }
+.elev-badge-pass { right: 1.2rem; color: var(--danger); transform: rotate(18deg); }
+.elev-badge-hold { left: 50%; color: var(--signal-amber); transform: translateX(-50%); }
 
 /* The lobby — what the doors open onto after the last floor. */
 .elev-lobby { position: absolute; inset: 0; z-index: 3; display: flex; flex-direction: column; justify-content: center; gap: 0.8rem; padding: 1.4rem; text-align: center; background: radial-gradient(ellipse at 50% 20%, var(--surface-3), var(--surface-1) 70%); }
@@ -6195,42 +6214,30 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .elev-lobby-list a { color: var(--signal-amber); }
 .elev-lobby-actions { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 0.4rem; }
 
-.elev-toast { position: absolute; bottom: -2.2rem; left: 50%; transform: translateX(-50%); font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 999px; padding: 0.3rem 0.8rem; white-space: nowrap; opacity: 0; transition: opacity 200ms; pointer-events: none; }
+.elev-toast { position: absolute; bottom: 1rem; left: 50%; transform: translateX(-50%); z-index: 7; font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink); background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 999px; padding: 0.3rem 0.8rem; white-space: nowrap; opacity: 0; transition: opacity 200ms; pointer-events: none; }
 .elev-toast-on { opacity: 1; }
 
-/* On a short viewport (an SE-sized phone, or a banner eating a third of
-   a normal one) the car is squat and every pixel of width counts —
-   tighten the plates a little so the card keeps more of it. */
-@media (max-height: 700px) {
+/* Short viewports: smaller buttons so the plate doesn't crowd the card. */
+@media (max-height: 640px) {
   .elev-btn-cap { width: 40px; height: 40px; }
   .elev-btn-cap svg { width: 17px; height: 17px; }
   .elev-plate { gap: 0.5rem; padding: 0.55rem 0.35rem; }
-  .elev-plate-left { left: 6px; }
-  .elev-plate-right { right: 6px; }
-  .elev-card-slot { width: calc(100% - 136px); }
 }
 
-/* The stage tops out at 400px — fine on a phone, but .pitch-discover-
-   stage fills the entire viewport on any screen, so the same car would
-   sit small in a mostly empty desktop window. Scales the car and the
-   type inside it in two steps: tablet, then desktop. 641px matches the
-   breakpoint the reel feed's own .reel-slide already scales up at; 1180px
-   matches the header/tab-bar handoff. */
+/* On a phone the car is the whole screen. Wider than that, cap it so it
+   stays a car and not a wall: 641px matches the breakpoint the reel
+   feed's own .reel-slide already scales up at; 1180px matches the
+   header/tab-bar handoff. */
 @media (min-width: 641px) {
-  .elev-stage { max-width: 440px; }
-  .elev-card-slot { max-width: 280px; }
+  .elev-stage { max-width: 480px; }
   .elev-btn-cap { width: 48px; height: 48px; }
-  .elev-card-copy h2 { font-size: 1.25rem; }
-  .elev-card-logline { font-size: 0.86rem; }
-  .elev-card-description { font-size: 0.84rem; }
   .pitch-discover-banner { max-width: 480px; }
 }
 @media (min-width: 1180px) {
-  .elev-stage { max-width: 480px; --elev-chrome: calc(1.2rem + env(safe-area-inset-top, 0px) + 2rem + env(safe-area-inset-bottom, 0px) + 4.4rem + var(--pitch-banner-clearance, 0px)); }
-  .elev-card-slot { max-width: 310px; }
+  .elev-stage { max-width: 540px; }
   .elev-btn-cap { width: 52px; height: 52px; }
-  .elev-card-copy h2 { font-size: 1.35rem; }
-  .elev-card-logline { font-size: 0.9rem; }
+  .elev-card-copy h2 { font-size: 1.4rem; }
+  .elev-card-logline { font-size: 0.92rem; }
   .pitch-discover-banner { max-width: 520px; }
 }
 

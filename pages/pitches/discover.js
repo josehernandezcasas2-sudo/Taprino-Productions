@@ -2,9 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useSmartBack } from '../../components/BackButton';
-import {
-  ArrowDownIcon, ArrowUpIcon, BookmarkIcon, CheckIcon, CloseIcon, DoorHoldIcon, HeartIcon, ShareIcon, usePlayerIconOverrides
-} from '../../components/PlayerIcons';
+import { BookmarkIcon, CheckIcon, CloseIcon, HeartIcon, ShareIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches, getLikedPitchIds, getPitchLikeCounts, getSavedPitchIds } from '../../lib/pitches';
@@ -58,12 +56,14 @@ function shuffled(arr) {
   return [...arr].sort(() => Math.random() - 0.5);
 }
 
-// Every pitch is a floor. The left plate moves the car (Next/Back/Hold),
-// the right plate reacts to the pitch on this floor (Save/Share/Like).
-// Unlike the old swipe deck, the whole ordered deck is kept and you ride
-// up and down it by index, so a pitch you just passed is one floor down
-// rather than gone for the session. Hold is the old "skip for a second
-// look": held pitches come back as a second ride once you reach the top.
+// Every pitch is a floor. Swiping the card rides the elevator — left or
+// right goes up to the next floor (right also likes, Tinder-style, same as
+// the old swipe deck), down holds the pitch for a second look and moves
+// on. The right plate reacts to the pitch on this floor (Save/Share/Like).
+// Unlike the old swipe deck, the whole ordered deck is kept and you ride it
+// by index, so a pitch you just passed is one floor down (↓ on a keyboard)
+// rather than gone for the session. Held pitches come back as a second
+// ride once you reach the top.
 export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, requireSignIn, savedIds: initialSavedIds, likedIds: initialLikedIds, likeCounts: initialLikeCounts }) {
   // Full-screen takeover, same idea as /vertical/discover — no HeaderNav
   // (this smart-back close button replaces it), just the tab bar staying
@@ -92,13 +92,12 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const [likeCounts, setLikeCounts] = useState(initialLikeCounts || {});
   const [finished, setFinished] = useState(false);
 
-  // The car itself: doors, which nav lamp is lit, which way the indicator
-  // arrow points, and whether a ride is mid-flight (every button on the
-  // left plate is ignored until the doors have reopened).
+  // The car itself: doors, which way the indicator arrow points, and
+  // whether a ride is mid-flight (swipes and keyboard rides are ignored
+  // until the doors have reopened).
   const [doorsClosed, setDoorsClosed] = useState(false);
   const [moving, setMoving] = useState(false);
   const [direction, setDirection] = useState(null);
-  const [litNav, setLitNav] = useState(null);
   const [flipped, setFlipped] = useState(false);
 
   const [toast, setToast] = useState(null);
@@ -113,20 +112,18 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   const currentHeld = Boolean(current) && held.some((p) => p.id === current.id);
 
   // .pitch-discover-banners floats over the stage rather than sitting in
-  // the centered flex column (see its own CSS comment) so the car stays
-  // centered on the viewport regardless of whether a banner is showing —
-  // but a fixed top offset for that banner can't know how tall its own
-  // text will actually wrap to at a given width (three lines on a narrow
-  // phone vs. one on desktop), so a sufficiently long banner on a
-  // sufficiently narrow screen could still overlap a big enough car.
-  // Measuring the banner's real height and feeding it back in as
-  // --pitch-banner-clearance (consumed by .swipe-deck-wrap) means the
-  // stage only ever gives up exactly as much room as this specific
-  // banner, on this specific screen, actually needs — same pattern
-  // MobileTabBar.js already uses for --vv-bottom-gap. ResizeObserver
-  // (not just a window resize listener) also catches the banner's own
-  // height changing from text reflow alone, e.g. a saveError banner
-  // appearing/changing without any viewport resize at all.
+  // the centered flex column (see its own CSS comment) so the car isn't
+  // pushed around by whether a banner is showing — but a fixed top offset
+  // for that banner can't know how tall its own text will actually wrap
+  // to at a given width (three lines on a narrow phone vs. one on
+  // desktop). Measuring the banner and feeding the result back in as
+  // --pitch-banner-clearance (consumed by .swipe-deck-wrap as padding)
+  // means the car only ever gives up exactly as much room as this
+  // specific banner, on this specific screen, actually needs — same
+  // pattern MobileTabBar.js already uses for --vv-bottom-gap.
+  // ResizeObserver (not just a window resize listener) also catches the
+  // banner's own height changing from text reflow alone, e.g. a saveError
+  // banner appearing/changing without any viewport resize at all.
   useEffect(() => {
     const el = bannersRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return undefined;
@@ -282,9 +279,9 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
   }
 
   // Doors close, the floor changes behind them, doors open. `heldOverride`
-  // lets Hold pass the queue it just added to — state updates aren't
+  // lets hold() pass the queue it just added to — state updates aren't
   // applied until the next render, so reading `held` here on the exact
-  // press that fills it would still see the pre-Hold value and the
+  // swipe that fills it would still see the pre-hold value and the
   // second-look transition below would wrongly think it's empty.
   function ride(dir, heldOverride) {
     if (moving || finished || loading) return;
@@ -293,12 +290,11 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     const { door, dwell } = motionTimings();
 
     setMoving(true);
-    setLitNav(dir > 0 ? 'up' : 'down');
     setDirection(dir > 0 ? 'up' : 'down');
-    setFlipped(false);
     setDoorsClosed(true);
 
     later(() => {
+      setFlipped(false);
       if (dir > 0) {
         if (floor + 1 < deck.length) {
           setFloor(floor + 1);
@@ -318,23 +314,38 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
       later(() => {
         setDoorsClosed(false);
         setDirection(null);
-        later(() => {
-          setMoving(false);
-          setLitNav(null);
-        }, door);
+        later(() => setMoving(false), door);
       }, dwell);
     }, door);
   }
 
   // Hold the door: mark this pitch for a second look, then ride on. Only
   // in round 1 — the second-look ride *is* the second look, so holding
-  // there would mean seeing it a third time.
+  // there would mean seeing it a third time; in round 2 a down-swipe just
+  // rides on.
   function hold() {
-    if (moving || finished || !current || round !== 1) return;
+    if (moving || finished || !current) return;
+    if (round !== 1) {
+      ride(1);
+      return;
+    }
     const nextHeld = currentHeld ? held : [...held, current];
     setHeld(nextHeld);
-    setLitNav('hold');
-    later(() => ride(1, nextHeld), 260);
+    ride(1, nextHeld);
+  }
+
+  // What a swipe on the card means — same mapping as the old swipe deck:
+  // right = like (and move on), left = pass, down = hold for a second look.
+  function handleSwipe(swipeDirection) {
+    if (!current || moving) return;
+    if (swipeDirection === 'right') {
+      if (!likedIds.has(current.id)) toggleLike(current);
+      ride(1);
+    } else if (swipeDirection === 'left') {
+      ride(1);
+    } else if (swipeDirection === 'down') {
+      hold();
+    }
   }
 
   async function toggleSave(pitch) {
@@ -419,9 +430,9 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
     }
   }
 
-  // Keyboard: ↑ next, ↓ back, F flip, S save, L like, H hold. Handlers
-  // read through a ref so the listener subscribes once and still sees
-  // the current floor/deck.
+  // Keyboard: ↑ next, ↓ back a floor, H hold, F flip, S save, L like.
+  // Handlers read through a ref so the listener subscribes once and still
+  // sees the current floor/deck.
   const actionsRef = useRef(null);
   actionsRef.current = { ride, hold, toggleSave, toggleLike, current, flip: () => setFlipped((f) => !f), finished };
   useEffect(() => {
@@ -480,18 +491,18 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
             <div className="poster-empty">Calling the elevator…</div>
           ) : (
             <div className="elev-stage">
-              {round === 2 && !finished && (
-                <div className="swipe-round-tag">Second look — one more ride for the ones you held</div>
-              )}
-              <FloorIndicator
-                floor={floor}
-                total={Math.max(deck.length, 1)}
-                direction={direction}
-                secondLook={round === 2 && !finished}
-                lobby={finished}
-              />
-
               <ElevatorCab closed={doorsClosed}>
+                <FloorIndicator
+                  floor={floor}
+                  total={Math.max(deck.length, 1)}
+                  direction={direction}
+                  secondLook={round === 2 && !finished}
+                  lobby={finished}
+                />
+                {round === 2 && !finished && (
+                  <div className="elev-round-tag">Second look — the ones you held</div>
+                )}
+
                 {finished || !current ? (
                   <div className="elev-lobby">
                     <span className="elev-lobby-eyebrow">Lobby</span>
@@ -527,37 +538,17 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
                     {currentHeld && round === 1 && <div className="elev-hold-lamp">Held · 2nd look</div>}
 
                     <div className="elev-card-slot">
-                      <ElevatorCard key={current.id} pitch={current} flipped={flipped} onFlip={(next) => setFlipped(next)} />
-                    </div>
-
-                    <div className="elev-plate elev-plate-left" role="group" aria-label="Elevator controls">
-                      <ElevatorButton
-                        icon={<ArrowUpIcon size={19} />}
-                        label="Next"
-                        ariaLabel="Next pitch"
-                        lit={litNav === 'up'}
+                      <ElevatorCard
+                        key={current.id}
+                        pitch={current}
+                        flipped={flipped}
+                        onFlip={(next) => setFlipped(next)}
+                        onSwipe={handleSwipe}
                         disabled={moving}
-                        onClick={() => ride(1)}
-                      />
-                      <ElevatorButton
-                        icon={<ArrowDownIcon size={19} />}
-                        label="Back"
-                        ariaLabel="Previous pitch"
-                        lit={litNav === 'down'}
-                        disabled={moving || floor === 0}
-                        onClick={() => ride(-1)}
-                      />
-                      <ElevatorButton
-                        icon={<DoorHoldIcon size={19} />}
-                        label="Hold"
-                        ariaLabel="Hold for a second look"
-                        lit={litNav === 'hold'}
-                        disabled={moving || round === 2}
-                        onClick={hold}
                       />
                     </div>
 
-                    <div className="elev-plate elev-plate-right" role="group" aria-label="Pitch actions">
+                    <div className="elev-plate" role="group" aria-label="Pitch actions">
                       <ElevatorButton
                         icon={<BookmarkIcon size={19} active={savedIds.has(current.id)} />}
                         label="Save"
@@ -587,9 +578,9 @@ export default function PitchDiscover({ isSignedIn, pitches, bypassingDisabled, 
                     </div>
                   </>
                 )}
-              </ElevatorCab>
 
-              <div className={`elev-toast ${toast ? 'elev-toast-on' : ''}`} role="status">{toast}</div>
+                <div className={`elev-toast ${toast ? 'elev-toast-on' : ''}`} role="status">{toast}</div>
+              </ElevatorCab>
             </div>
           )}
         </div>

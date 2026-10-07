@@ -1,11 +1,10 @@
 import { useAuth } from '@clerk/expo';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, Share, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import {
-  ArrowDownIcon, ArrowUpIcon, BookmarkIcon, CheckIcon, DOOR_MS, DWELL_MS, DoorHoldIcon, ElevatorButton, ElevatorCab,
-  ElevatorCard, FloorIndicator, HeartIcon, ShareIcon
+  BookmarkIcon, CheckIcon, DOOR_MS, DWELL_MS, ElevatorButton, ElevatorCab, ElevatorCard, FloorIndicator, HeartIcon, ShareIcon
 } from '../../components/PitchElevator';
 import { API_BASE_URL, apiDelete, apiGet, apiPost } from '../../lib/api';
 import { absoluteFill, colors, fonts } from '../../lib/theme';
@@ -35,12 +34,14 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
 }
 
-// Port of pages/pitches/discover.js: every pitch is a floor. The left
-// plate moves the car (Next/Back/Hold), the right plate reacts to the
-// pitch on this floor (Save/Share/Like). Same ride state machine, same
-// progress persistence for signed-in users via /api/pitch-swipe-progress
-// (now with floorIndex). Signed-out visitors get a fresh ride each time —
-// no AsyncStorage equivalent of the website's localStorage fallback yet.
+// Port of pages/pitches/discover.js: every pitch is a floor. Swiping the
+// card rides the elevator — left or right goes up to the next floor (right
+// also likes, same as the old swipe deck), down holds the pitch for a
+// second look and moves on. The right plate reacts to the pitch on this
+// floor (Save/Share/Like). Same ride state machine and progress
+// persistence (with floorIndex) as the web. Signed-out visitors get a
+// fresh ride each time — no AsyncStorage equivalent of the website's
+// localStorage fallback yet.
 export default function PitchDiscover() {
   const { getToken } = useAuth();
   const router = useRouter();
@@ -60,7 +61,6 @@ export default function PitchDiscover() {
   const [doorsClosed, setDoorsClosed] = useState(false);
   const [moving, setMoving] = useState(false);
   const [direction, setDirection] = useState(null);
-  const [litNav, setLitNav] = useState(null);
   const [flipped, setFlipped] = useState(false);
 
   const [toast, setToast] = useState(null);
@@ -195,7 +195,7 @@ export default function PitchDiscover() {
   }
 
   // Doors close, the floor changes behind them, doors open. heldOverride
-  // is for Hold, which has just queued a pitch but whose setHeld hasn't
+  // is for hold(), which has just queued a pitch but whose setHeld hasn't
   // been applied yet when it calls this.
   function ride(dir, heldOverride) {
     if (moving || finished || loadingProgress) return;
@@ -203,12 +203,11 @@ export default function PitchDiscover() {
     const queue = heldOverride || held;
 
     setMoving(true);
-    setLitNav(dir > 0 ? 'up' : 'down');
     setDirection(dir > 0 ? 'up' : 'down');
-    setFlipped(false);
     setDoorsClosed(true);
 
     later(() => {
+      setFlipped(false);
       if (dir > 0) {
         if (floor + 1 < deck.length) {
           setFloor(floor + 1);
@@ -226,20 +225,36 @@ export default function PitchDiscover() {
       later(() => {
         setDoorsClosed(false);
         setDirection(null);
-        later(() => {
-          setMoving(false);
-          setLitNav(null);
-        }, DOOR_MS);
+        later(() => setMoving(false), DOOR_MS);
       }, DWELL_MS);
     }, DOOR_MS);
   }
 
+  // Hold for a second look, then ride on. Round 1 only — in the second-
+  // look ride a down-swipe just rides on.
   function hold() {
-    if (moving || finished || !current || round !== 1) return;
+    if (moving || finished || !current) return;
+    if (round !== 1) {
+      ride(1);
+      return;
+    }
     const nextHeld = currentHeld ? held : [...held, current];
     setHeld(nextHeld);
-    setLitNav('hold');
-    later(() => ride(1, nextHeld), 260);
+    ride(1, nextHeld);
+  }
+
+  // What a swipe on the card means — same mapping as the old swipe deck:
+  // right = like (and move on), left = pass, down = hold for a second look.
+  function handleSwipe(swipeDirection) {
+    if (!current || moving) return;
+    if (swipeDirection === 'right') {
+      if (!likedIds.has(current.id)) toggleLike(current);
+      ride(1);
+    } else if (swipeDirection === 'left') {
+      ride(1);
+    } else if (swipeDirection === 'down') {
+      hold();
+    }
   }
 
   function promptSignIn(what) {
@@ -343,104 +358,103 @@ export default function PitchDiscover() {
         </View>
       ) : null}
 
+      {/* The car fills everything between the top nav (and any banner)
+          and the floating tab bar — see styles.stage's paddingBottom. */}
       <View style={styles.stage}>
         {loadingProgress ? (
-          <ActivityIndicator color={colors.brass} />
+          <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
         ) : (
-          <View style={styles.elevator}>
-            {round === 2 && !finished ? (
-              <Text style={styles.roundTag}>SECOND LOOK — ONE MORE RIDE FOR THE ONES YOU HELD</Text>
-            ) : null}
-            <FloorIndicator
-              floor={floor}
-              total={Math.max(deck.length, 1)}
-              direction={direction}
-              secondLook={round === 2 && !finished}
-              lobby={finished}
-            />
-
-            <View style={styles.carWrap}>
-              <ElevatorCab closed={doorsClosed}>
-                {finished || !current ? (
-                  <View style={styles.lobby}>
-                    <Text style={styles.lobbyEyebrow}>LOBBY</Text>
-                    <Text style={styles.lobbyTitle}>That's every floor for now.</Text>
-                    {rideLiked.length > 0 || savedThisRide > 0 ? (
-                      <>
-                        <Text style={styles.lobbyText}>
-                          You liked {rideLiked.length} and saved {savedThisRide} project{savedThisRide === 1 ? '' : 's'}.
-                          {savedThisRide > 0 ? ' Saved ones are in My List.' : ''}
-                        </Text>
-                        {rideLiked.map((p) => (
-                          <Pressable key={p.id} onPress={() => router.push(`/pitches/${p.id}`)}>
-                            <Text style={styles.lobbyLink}>{p.title}</Text>
-                          </Pressable>
-                        ))}
-                      </>
-                    ) : (
-                      <Text style={styles.lobbyText}>Nothing caught you this ride — that's alright, more floors open as creators submit ideas.</Text>
-                    )}
-                    <View style={styles.lobbyActions}>
-                      <Pressable style={styles.primaryBtn} onPress={() => router.push('/pitches')}>
-                        <Text style={styles.primaryBtnText}>Browse Pitch Room</Text>
-                      </Pressable>
-                      <Pressable style={styles.secondaryBtn} onPress={startOver}>
-                        <Text style={styles.secondaryBtnText}>Ride again</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ) : (
-                  <>
-                    {currentHeld && round === 1 ? <Text style={styles.holdLamp}>HELD · 2ND LOOK</Text> : null}
-
-                    <View style={styles.cardSlot} pointerEvents="box-none">
-                      <View style={styles.cardBox}>
-                        <ElevatorCard key={current.id} pitch={current} flipped={flipped} onFlip={(next) => setFlipped(next)} />
-                      </View>
-                    </View>
-
-                    <View style={[styles.plateCol, styles.plateColLeft]} pointerEvents="box-none">
-                    <View style={styles.plate}>
-                      <ElevatorButton icon={(c) => <ArrowUpIcon color={c} />} label="Next" accessibilityLabel="Next pitch" lit={litNav === 'up'} disabled={moving} onPress={() => ride(1)} />
-                      <ElevatorButton icon={(c) => <ArrowDownIcon color={c} />} label="Back" accessibilityLabel="Previous pitch" lit={litNav === 'down'} disabled={moving || floor === 0} onPress={() => ride(-1)} />
-                      <ElevatorButton icon={(c) => <DoorHoldIcon color={c} />} label="Hold" accessibilityLabel="Hold for a second look" lit={litNav === 'hold'} disabled={moving || round === 2} onPress={hold} />
-                    </View>
-                    </View>
-
-                    <View style={[styles.plateCol, styles.plateColRight]} pointerEvents="box-none">
-                    <View style={styles.plate}>
-                      <ElevatorButton
-                        icon={(c) => <BookmarkIcon color={c} active={savedIds.has(current.id)} />}
-                        label="Save"
-                        accessibilityLabel={savedIds.has(current.id) ? 'Remove from My List' : 'Save to My List'}
-                        lit={savedIds.has(current.id)}
-                        variant="save"
-                        onPress={() => toggleSave(current)}
-                      />
-                      <ElevatorButton
-                        icon={(c) => (shareCopiedId === current.id ? <CheckIcon color={c} /> : <ShareIcon color={c} />)}
-                        label="Share"
-                        lit={shareCopiedId === current.id}
-                        onPress={() => share(current)}
-                      />
-                      <ElevatorButton
-                        icon={(c) => <HeartIcon color={c} active={likedIds.has(current.id)} />}
-                        label="Like"
-                        accessibilityLabel={likedIds.has(current.id) ? 'Unlike' : 'Like'}
-                        lit={likedIds.has(current.id)}
-                        variant="heart"
-                        count={likeCounts[current.id] || 0}
-                        onPress={() => toggleLike(current)}
-                      />
-                    </View>
-                    </View>
-                  </>
-                )}
-              </ElevatorCab>
+          <ElevatorCab closed={doorsClosed}>
+            <View style={styles.indicatorWrap} pointerEvents="none">
+              <FloorIndicator
+                floor={floor}
+                total={Math.max(deck.length, 1)}
+                direction={direction}
+                secondLook={round === 2 && !finished}
+                lobby={finished}
+              />
             </View>
+            {round === 2 && !finished ? (
+              <Text style={styles.roundTag} pointerEvents="none">SECOND LOOK — THE ONES YOU HELD</Text>
+            ) : null}
 
-            {toast ? <Text style={styles.toast}>{toast}</Text> : null}
-          </View>
+            {finished || !current ? (
+              <View style={styles.lobby}>
+                <Text style={styles.lobbyEyebrow}>LOBBY</Text>
+                <Text style={styles.lobbyTitle}>That's every floor for now.</Text>
+                {rideLiked.length > 0 || savedThisRide > 0 ? (
+                  <>
+                    <Text style={styles.lobbyText}>
+                      You liked {rideLiked.length} and saved {savedThisRide} project{savedThisRide === 1 ? '' : 's'}.
+                      {savedThisRide > 0 ? ' Saved ones are in My List.' : ''}
+                    </Text>
+                    {rideLiked.map((p) => (
+                      <Pressable key={p.id} onPress={() => router.push(`/pitches/${p.id}`)}>
+                        <Text style={styles.lobbyLink}>{p.title}</Text>
+                      </Pressable>
+                    ))}
+                  </>
+                ) : (
+                  <Text style={styles.lobbyText}>Nothing caught you this ride — that's alright, more floors open as creators submit ideas.</Text>
+                )}
+                <View style={styles.lobbyActions}>
+                  <Pressable style={styles.primaryBtn} onPress={() => router.push('/pitches')}>
+                    <Text style={styles.primaryBtnText}>Browse Pitch Room</Text>
+                  </Pressable>
+                  <Pressable style={styles.secondaryBtn} onPress={startOver}>
+                    <Text style={styles.secondaryBtnText}>Ride again</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ) : (
+              <>
+                {currentHeld && round === 1 ? <Text style={styles.holdLamp}>HELD · 2ND LOOK</Text> : null}
+
+                <View style={styles.cardSlot} pointerEvents="box-none">
+                  <View style={styles.cardBox}>
+                    <ElevatorCard
+                      key={current.id}
+                      pitch={current}
+                      flipped={flipped}
+                      onFlip={(next) => setFlipped(next)}
+                      onSwipe={handleSwipe}
+                      disabled={moving}
+                    />
+                  </View>
+                </View>
+
+                <View style={styles.plateCol} pointerEvents="box-none">
+                  <View style={styles.plate}>
+                    <ElevatorButton
+                      icon={(c) => <BookmarkIcon color={c} active={savedIds.has(current.id)} />}
+                      label="Save"
+                      accessibilityLabel={savedIds.has(current.id) ? 'Remove from My List' : 'Save to My List'}
+                      lit={savedIds.has(current.id)}
+                      variant="save"
+                      onPress={() => toggleSave(current)}
+                    />
+                    <ElevatorButton
+                      icon={(c) => (shareCopiedId === current.id ? <CheckIcon color={c} /> : <ShareIcon color={c} />)}
+                      label="Share"
+                      lit={shareCopiedId === current.id}
+                      onPress={() => share(current)}
+                    />
+                    <ElevatorButton
+                      icon={(c) => <HeartIcon color={c} active={likedIds.has(current.id)} />}
+                      label="Like"
+                      accessibilityLabel={likedIds.has(current.id) ? 'Unlike' : 'Like'}
+                      lit={likedIds.has(current.id)}
+                      variant="heart"
+                      count={likeCounts[current.id] || 0}
+                      onPress={() => toggleLike(current)}
+                    />
+                  </View>
+                </View>
+              </>
+            )}
+
+            {toast ? <Text style={styles.toast} pointerEvents="none">{toast}</Text> : null}
+          </ElevatorCab>
         )}
       </View>
     </SafeAreaView>
@@ -461,30 +475,28 @@ const styles = StyleSheet.create({
     borderColor: colors.hairline
   },
   bannerText: { color: colors.inkDim, fontSize: 13, lineHeight: 18 },
-  // Room under the car for the floating tab bar, same as the website's
-  // .pitch-discover-stage padding below 1180px.
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16, paddingTop: 12, paddingBottom: 110 },
-  elevator: { width: '100%', maxWidth: 400, flex: 1, alignItems: 'center', gap: 10 },
-  roundTag: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.8, color: colors.olive, textAlign: 'center' },
-  carWrap: { width: '100%', flex: 1, alignItems: 'center', justifyContent: 'center' },
+  // paddingBottom clears BottomNav's floating pill (~64px tall, 18px off
+  // the bottom inset, which SafeAreaView already adds) plus a breath.
+  stage: { flex: 1, paddingHorizontal: 8, paddingTop: 8, paddingBottom: 94 },
 
-  // The card sits between the two plates: 76px a side clears a plate
-  // (54px ring + padding + 9px inset), same geometry as the web's
-  // calc(100% - 152px).
-  cardSlot: { ...absoluteFill, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 76, zIndex: 2 },
-  cardBox: { width: '100%', maxWidth: 250, aspectRatio: 3 / 5, maxHeight: '86%' },
+  indicatorWrap: { position: 'absolute', top: 10, left: 0, right: 0, alignItems: 'center', zIndex: 7 },
+  // The round-2 explainer and the held lamp share the strip under the
+  // indicator; they never show at the same time (held is round 1 only).
+  roundTag: { position: 'absolute', top: 58, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.olive, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.4)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
+  holdLamp: { position: 'absolute', top: 58, right: 10, zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.mint, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(147,208,164,0.5)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
 
-  plateCol: { position: 'absolute', top: 0, bottom: 0, justifyContent: 'center', zIndex: 4 },
-  plateColLeft: { left: 9 },
-  plateColRight: { right: 9 },
+  // The card sits in the room left of the plate (84px: ring + plate
+  // padding + inset), clear of the indicator strip above.
+  cardSlot: { ...absoluteFill, paddingLeft: 14, paddingRight: 84, paddingTop: 58, paddingBottom: 22, alignItems: 'center', justifyContent: 'center', zIndex: 2 },
+  cardBox: { width: '100%', maxWidth: 340, aspectRatio: 3 / 4.6, maxHeight: '100%' },
+
+  plateCol: { position: 'absolute', right: 9, top: 0, bottom: 0, justifyContent: 'center', zIndex: 4 },
   plate: {
     alignItems: 'center', gap: 10,
     paddingVertical: 10, paddingHorizontal: 5, borderRadius: 10,
     backgroundColor: '#2b3852', borderWidth: 1, borderColor: '#5a6a8d',
     shadowColor: '#000', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.45, shadowRadius: 20, elevation: 8
   },
-
-  holdLamp: { position: 'absolute', top: 10, left: 10, zIndex: 4, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.mint, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(147,208,164,0.5)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
 
   lobby: { ...absoluteFill, zIndex: 3, justifyContent: 'center', gap: 10, padding: 22, backgroundColor: colors.surface1 },
   lobbyEyebrow: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.8, color: colors.olive, textAlign: 'center' },
@@ -497,5 +509,5 @@ const styles = StyleSheet.create({
   secondaryBtn: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
   secondaryBtnText: { fontFamily: fonts.displaySemi, color: colors.ink, fontSize: 13 },
 
-  toast: { fontFamily: fonts.mono, fontSize: 11, color: colors.ink, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 13, overflow: 'hidden' }
+  toast: { position: 'absolute', bottom: 14, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 11, color: colors.ink, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 13, overflow: 'hidden' }
 });
