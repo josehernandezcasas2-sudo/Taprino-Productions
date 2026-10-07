@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DAY_SECONDS, SHORT_GAP_SECONDS } from '../lib/channelPlan';
 import {
-  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, blockerOf, rerunProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps
+  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, ripple, blockerOf, rerunProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps
 } from '../lib/scheduleLayout';
 
 // One day of the channel scheduler: the hour lane with every block on it.
@@ -10,10 +10,12 @@ import {
 // tab (anything with data-daykey) to move days. All the rules live in
 // lib/scheduleLayout.js; this only draws and reports what the pointer did:
 //   onSelect(id)                      a plain click
-//   onPlace(item, sec)                a library item dropped or placed in a gap
+//   onPlace(item, sec, { ripple })    a library item dropped or placed in a gap
 //   onArrange(slots | null, info)     a finished drag: the new day, or null + info.error
-//   onMoveToDay(id, dayKey)           dropped on another day's tab
-//   onTabHover(dayKey | null)         so the page can light the tab up
+//   onMoveToDay(id, dayKey)           dropped on another day's row
+//   onTabHover(dayKey | null)         so the page can light the row up
+// Ripple (the toggle, or Alt while dragging) moves everything after the
+// block along with it instead of only shuffling ad breaks out of the way.
 
 export const ZOOM = { compact: 40, normal: 64, roomy: 100 };
 export const KIND_ICON = { series_continue: '⟳', series_rerun: '↺', series_pinned: '▣', live: '●' };
@@ -47,6 +49,15 @@ export default function ScheduleTimeline({
   const dragRef = useRef(null);
   const [preview, setPreview] = useState(null);
   const [dropping, setDropping] = useState(false);
+  const [rippleMode, setRippleMode] = useState(false);
+  useEffect(() => {
+    try { setRippleMode(window.localStorage.getItem('sch-ripple') === 'on'); } catch (err) { /* private mode */ }
+  }, []);
+  function setRipple(on) {
+    setRippleMode(on);
+    try { window.localStorage.setItem('sch-ripple', on ? 'on' : 'off'); } catch (err) { /* private mode */ }
+  }
+  const rippleFor = (ev) => rippleMode !== !!(ev && ev.altKey);
 
   // Open on the first thing scheduled (or now, whichever comes first).
   useEffect(() => {
@@ -89,9 +100,17 @@ export default function ScheduleTimeline({
       } else {
         change = { id: s.id, start: s.start, durationSeconds: fitLength(s, snapToGrid(d.orig.durationSeconds + dsec), others, epsFor(s)) };
       }
-      const res = arrange(slots, change);
-      const problem = problemFor(res.slots, s.id);
-      d.result = { slots: res.slots, removed: res.removed, pushed: res.pushed, change, valid: !problem, problem };
+      let res;
+      let problem;
+      if (rippleFor(ev)) {
+        const r = ripple(slots, change, d.orig);
+        res = { slots: r.slots, removed: [], pushed: r.moved };
+        problem = r.problem || rerunProblem(r.slots, s.id);
+      } else {
+        res = arrange(slots, change);
+        problem = problemFor(res.slots, s.id);
+      }
+      d.result = { slots: res.slots, removed: res.removed, pushed: res.pushed, change, valid: !problem, problem, rippled: rippleFor(ev) ? res.pushed.length : 0 };
       const el = document.elementFromPoint(ev.clientX, ev.clientY);
       const tab = d.mode === 'move' && el && el.closest ? el.closest('[data-daykey]') : null;
       d.tab = tab && tab.getAttribute('data-droppable') === 'true' ? tab.getAttribute('data-daykey') : null;
@@ -115,9 +134,10 @@ export default function ScheduleTimeline({
       if (!r) return;
       if (!r.valid) { onArrange(null, { error: r.problem }); return; }
       if (r.change.start === d.orig.start && r.change.durationSeconds === d.orig.durationSeconds) return;
-      const msg = d.mode === 'move'
+      const msg = (d.mode === 'move'
         ? `Moved to ${clock(r.change.start)}`
-        : `Now ${dur(r.change.durationSeconds)}, ends ${clock(r.change.start + r.change.durationSeconds)}`;
+        : `Now ${dur(r.change.durationSeconds)}, ends ${clock(r.change.start + r.change.durationSeconds)}`)
+        + (r.rippled ? `, and the ${r.rippled} block${r.rippled === 1 ? '' : 's'} after it moved along` : '');
       onArrange(r.slots, { removed: r.removed, msg, select: s.id });
     };
     window.addEventListener('pointermove', move);
@@ -133,6 +153,17 @@ export default function ScheduleTimeline({
   return (
     <div className="sch-timeline">
       {isPastDay && <div className="sch-past-note">This day has already aired. Changes here won&rsquo;t show anywhere.</div>}
+      <div className="sch-tl-top">
+        <span className="sch-tl-hint">Drag to move · pull the bottom edge for length · drop on a day row to move days</span>
+        <div className="sch-ripple" role="group" aria-label="Ripple">
+          <span>Ripple</span>
+          <div className="sch-seg sch-seg-xs">
+            <button type="button" aria-selected={!rippleMode} onClick={() => setRipple(false)}>Off</button>
+            <button type="button" aria-selected={rippleMode} onClick={() => setRipple(true)}>On</button>
+          </div>
+          <small>{rippleMode ? 'Moving or stretching a block pushes everything after it along. Alt turns it off for one drag.' : 'Hold Alt while dragging to push everything after the block along.'}</small>
+        </div>
+      </div>
       <div className="sch-scroll" ref={scrollRef}>
         <div className="sch-tl" style={{ height: y(DAY_SECONDS) }}>
           <div className="sch-hours" aria-hidden="true">
@@ -149,7 +180,7 @@ export default function ScheduleTimeline({
               setDropping(false);
               let item = null;
               try { item = JSON.parse(e.dataTransfer.getData('text/plain')); } catch (err) { item = null; }
-              onPlace(item || picked, secAt(e.clientY));
+              onPlace(item || picked, secAt(e.clientY), { ripple: rippleFor(e) });
             }}
           >
             {isToday && nowSec != null && <div className="sch-pastshade" style={{ height: y(nowSec) }} />}
@@ -165,7 +196,7 @@ export default function ScheduleTimeline({
                   type="button"
                   className={`sch-slot gap ${picked ? 'armed' : ''}`}
                   style={{ top: y(g.start) + 1, height: Math.max(y(len) - 2, 6) }}
-                  onClick={(e) => (picked ? onPlace(picked, clamp(secAt(e.clientY), g.start, g.end - SNAP_SECONDS)) : needPick())}
+                  onClick={(e) => (picked ? onPlace(picked, clamp(secAt(e.clientY), g.start, g.end - SNAP_SECONDS), { ripple: rippleFor(e) }) : needPick())}
                   aria-label={`Open ${clock(g.start)} to ${clock(g.end)}${picked ? `, place ${picked.name} here` : ''}`}
                 >
                   {len >= 1200 && <span>{picked ? `Place ${picked.name} here` : gapLabel}</span>}
@@ -244,7 +275,7 @@ export default function ScheduleTimeline({
       <div className="sch-legend">
         <span><i style={{ background: 'repeating-linear-gradient(135deg, rgba(251,232,211,.3) 0 2px, transparent 2px 4px)' }} />Gaps under 5 min play ads and bumpers</span>
         {layer === 'week' && <span><i style={{ border: '1px dashed var(--sky)' }} />Faded = the default schedule, filling what&rsquo;s open</span>}
-        <span>Drag to move · pull the bottom edge to change the length · drop on a day tab to move days</span>
+        <span><i style={{ outline: '1px dashed var(--olive)', outlineOffset: '-1px' }} />Dashed outline = moved along with the block you&rsquo;re dragging</span>
       </div>
     </div>
   );

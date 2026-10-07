@@ -8,9 +8,10 @@ import { schedulableChannels } from '../lib/channelAccess';
 import { channelClock } from '../lib/channelEngine';
 import { addDays, weekStartOf, DAY_SECONDS } from '../lib/channelPlan';
 import {
-  LENGTH_LIMITS, SNAP_SECONDS, snapToGrid, magnetStart, arrange, blockerOf, rerunProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, isSeriesKind, limitFor
+  SNAP_SECONDS, snapToGrid, magnetStart, arrange, ripple, insertWithRipple, blockerOf, rerunProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, limitFor
 } from '../lib/scheduleLayout';
 import ScheduleTimeline, { ZOOM, KIND_ICON, clock, dur } from '../components/ScheduleTimeline';
+import ScheduleWeekStrip from '../components/ScheduleWeekStrip';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
@@ -60,7 +61,6 @@ const KIND_INFO = {
   series_pinned: { name: 'Pinned', help: 'Always starts at the same episode. Never moves forward.' }
 };
 const SERIES_KINDS = Object.keys(KIND_INFO);
-const KIND_COLOR = { series_continue: 'var(--sky)', series_rerun: 'var(--olive)', series_pinned: 'var(--mint)', episode: '#3b5283', media: 'var(--rust)', ad_break: '#6b7a99', live: 'var(--brass)' };
 const SAVE_FIELDS = ['id', 'kind', 'start', 'durationSeconds', 'episodeId', 'mediaId', 'seriesId', 'pinEpisodeId', 'rerunOf', 'title'];
 const sameSlot = (a, b) => !!a && !!b && SAVE_FIELDS.every((k) => (a[k] ?? null) === (b[k] ?? null));
 
@@ -123,12 +123,15 @@ export default function Scheduler(props) {
   const [dirty, setDirty] = useState(() => new Set());
   const [history, setHistory] = useState([]);
   const [saving, setSaving] = useState(false);
+  const [recoverable, setRecoverable] = useState(null); // an unsaved draft left behind in this browser
   const toastTimer = useRef(null);
 
   const channel = channels.find((c) => c.id === channelId);
   const layer = view === 'default' ? 'default' : 'week';
   const px = ZOOM[zoom];
   const isDirty = dirty.size > 0;
+  // Where this view's unsaved draft is kept in the browser, in case the tab closes.
+  const draftKey = `sch-draft:${channelId}:${layer}:${layer === 'week' ? weekStart : 'default'}`;
 
   const flash = useCallback((msg, canUndo = false) => {
     setToast({ msg, canUndo });
@@ -152,6 +155,13 @@ export default function Scheduler(props) {
       setDraft(groupByDay(d.slots, d.layer));
       setDirty(new Set());
       setHistory([]);
+      // A draft left behind earlier (the tab closed with unsaved changes)?
+      let stored = null;
+      try {
+        const raw = window.localStorage.getItem(`sch-draft:${channelId}:${d.layer}:${d.layer === 'week' ? weekStart : 'default'}`);
+        stored = raw ? JSON.parse(raw) : null;
+      } catch (err) { stored = null; }
+      setRecoverable(stored && stored.draft && Array.isArray(stored.dirty) && stored.dirty.length ? stored : null);
       return d;
     } catch (err) {
       setError(err.message);
@@ -191,13 +201,30 @@ export default function Scheduler(props) {
     try { window.localStorage.setItem('sch-zoom', z); } catch (err) { /* private mode */ }
   }
 
-  // Don't lose a draft by accident.
+  // Don't lose a draft by accident: warn before leaving, and keep a copy in
+  // the browser that the page offers back if the tab does close.
   useEffect(() => {
     if (!isDirty) return undefined;
     const warn = (e) => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [isDirty]);
+  useEffect(() => {
+    if (!isDirty) return;
+    try { window.localStorage.setItem(draftKey, JSON.stringify({ draft, dirty: [...dirty], at: Date.now() })); } catch (err) { /* private mode */ }
+  }, [draft, dirty, isDirty, draftKey]);
+  const forgetStoredDraft = useCallback(() => {
+    try { window.localStorage.removeItem(draftKey); } catch (err) { /* private mode */ }
+    setRecoverable(null);
+  }, [draftKey]);
+  function restoreDraft() {
+    if (!recoverable) return;
+    setHistory([{ draft, dirty: new Set(dirty), selectedId }]);
+    setDraft({ ...draft, ...recoverable.draft });
+    setDirty(new Set(recoverable.dirty));
+    setRecoverable(null);
+    flash('Your unsaved changes are back', true);
+  }
   const okToLeave = () => !isDirty || window.confirm('You have unsaved changes. Leave without saving them?');
 
   // Keep the URL shareable (?channel=&view=) without reloading the page.
@@ -284,12 +311,20 @@ export default function Scheduler(props) {
     return null;
   }
 
-  function place(item, sec) {
+  function place(item, sec, opts = {}) {
     if (!item) return flash('Pick something from the library first');
     if (isPastDay) return flash('This day already aired');
     const slot = slotFor(item, 0);
     if (!slot) return null;
     slot.start = magnetStart(Math.max(0, Math.min(DAY_SECONDS - slot.durationSeconds, snapToGrid(sec))), slot.durationSeconds, daySlots);
+    if (opts.ripple) {
+      // Make room: everything from here on moves later by the new block's length.
+      const r = insertWithRipple(daySlots, slot);
+      if (r.problem) return flash(`${item.name} needs ${dur(slot.durationSeconds)}. ${r.problem}`);
+      setPicked(null);
+      edit(withDay(day, r.slots), [day], `Added at ${clock(slot.start)}${r.moved.length ? `, and ${r.moved.length} block${r.moved.length === 1 ? '' : 's'} after it moved along` : ''}`, slot.id);
+      return slot.id;
+    }
     const res = arrange(daySlots.concat([slot]), { id: slot.id, start: slot.start, durationSeconds: slot.durationSeconds });
     const problem = problemFor(res.slots, slot.id);
     if (problem) return flash(`${item.name} needs ${dur(slot.durationSeconds)}. ${problem}`);
@@ -333,12 +368,18 @@ export default function Scheduler(props) {
     return null;
   }
 
-  function nudge(delta) {
+  function nudge(delta, withRipple = false) {
     if (!selected || isPastDay || (selected.kind === 'live' && !canLive)) return;
     const start = Math.max(0, Math.min(DAY_SECONDS - selected.durationSeconds, selected.start + delta));
     if (start === selected.start) return;
+    if (withRipple) {
+      const r = ripple(daySlots, { id: selected.id, start, durationSeconds: selected.durationSeconds }, { start: selected.start, durationSeconds: selected.durationSeconds });
+      const problem = r.problem || rerunProblem(r.slots, selected.id);
+      if (problem) return flash(problem);
+      return edit(withDay(day, r.slots), [day], `Moved to ${clock(start)}${r.moved.length ? `, and the ${r.moved.length} block${r.moved.length === 1 ? '' : 's'} after it moved along` : ''}`);
+    }
     const err = changeSlot(selected.id, { start }, `Moved to ${clock(start)}`);
-    if (err) flash(err);
+    return err ? flash(err) : undefined;
   }
 
   function removeSlot(id) {
@@ -391,6 +432,7 @@ export default function Scheduler(props) {
       const days = Object.fromEntries([...dirty].map((k) => [k, (draft[k] || []).map((s) => Object.fromEntries(SAVE_FIELDS.map((f) => [f, s[f] ?? null])))]));
       const out = await api('/api/schedule/save', 'POST', { channelId, layer, days });
       if (selectedId && out.ids && out.ids[selectedId]) setSelectedId(out.ids[selectedId]);
+      forgetStoredDraft();
       await loadView();
       flash('Schedule saved');
       return true;
@@ -404,6 +446,7 @@ export default function Scheduler(props) {
   function discard() {
     if (!isDirty || !window.confirm('Throw away your unsaved changes?')) return;
     setSelectedId(null);
+    forgetStoredDraft();
     loadView();
   }
   async function togglePublish() {
@@ -444,8 +487,8 @@ export default function Scheduler(props) {
       if (typing || view === 'loop') return;
       if (e.key === 'Escape') { setSelectedId(null); setPicked(null); return; }
       if (!selectedId) return;
-      if (e.key === 'ArrowUp') { e.preventDefault(); nudge(e.shiftKey ? -1800 : -SNAP_SECONDS); }
-      if (e.key === 'ArrowDown') { e.preventDefault(); nudge(e.shiftKey ? 1800 : SNAP_SECONDS); }
+      if (e.key === 'ArrowUp') { e.preventDefault(); nudge(e.shiftKey ? -1800 : -SNAP_SECONDS, e.altKey); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); nudge(e.shiftKey ? 1800 : SNAP_SECONDS, e.altKey); }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); removeSlot(selectedId); }
     };
     window.addEventListener('keydown', onKey);
@@ -544,28 +587,26 @@ export default function Scheduler(props) {
               </div>
             </div>
 
-            <div className="sch-days" role="tablist" aria-label="Day">
-              {dayTabs.map((t) => {
-                const cov = (draft[t.key] || []);
-                return (
-                  <button
-                    key={t.key}
-                    type="button"
-                    role="tab"
-                    aria-selected={day === t.key}
-                    data-daykey={t.key}
-                    data-droppable={!t.past && t.key !== day}
-                    className={`${t.past ? 'past' : ''} ${dirty.has(t.key) ? 'dirty' : ''} ${hoverTab === t.key ? 'over' : ''}`}
-                    onClick={() => { setDay(t.key); setSelectedId(null); }}
-                  >
-                    <span>{t.label}{t.isToday ? ' · today' : ''}{dirty.has(t.key) ? ' •' : ''}</span>
-                    <i className="sch-cov" aria-hidden="true">
-                      {cov.map((s) => <b key={s.id} style={{ left: `${(s.start / DAY_SECONDS) * 100}%`, width: `${Math.max(0.6, (s.durationSeconds / DAY_SECONDS) * 100)}%`, background: KIND_COLOR[s.kind] || 'var(--ink-faint)' }} />)}
-                    </i>
-                  </button>
-                );
-              })}
-            </div>
+            {recoverable && !isDirty && (
+              <div className="sch-recover" role="status">
+                <span>You left unsaved changes here {new Date(recoverable.at).toLocaleString('en-US', { weekday: 'short', hour: 'numeric', minute: '2-digit' })}.</span>
+                <button type="button" className="sch-btn primary" onClick={restoreDraft}>Bring them back</button>
+                <button type="button" className="sch-btn" onClick={forgetStoredDraft}>Throw them away</button>
+              </div>
+            )}
+
+            <ScheduleWeekStrip
+              days={dayTabs}
+              draft={draft}
+              ghostsFor={(key) => (layer === 'week' && data && data.defaults ? (data.defaults[weekdayOfDate(key)] || []) : [])}
+              selectedDay={day}
+              selectedId={selectedId}
+              dirty={dirty}
+              hoverDay={hoverTab}
+              nowSec={nowSec}
+              onPickDay={(k) => { setDay(k); setSelectedId(null); }}
+              onPickSlot={(k, id) => { setDay(k); setSelectedId(id); setPicked(null); }}
+            />
 
             <div className="sch-grid">
               <Library library={library} media={media} reloadMedia={loadMedia} channelId={channelId} setError={setError} layer={layer} canLive={canLive} picked={picked} setPicked={(p) => { setPicked(p); if (p) setSelectedId(null); }} />
@@ -908,6 +949,9 @@ function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty
   const upcoming = preview && unchanged ? Object.entries(preview).slice(0, 4) : [];
   const edges = isSeries && eps.length && slot.kind !== 'series_rerun' ? episodeEdges(eps, Math.max(0, eps.findIndex((e) => e.id === slot.pinEpisodeId))) : [];
   const lim = limitFor(slot);
+  // The block right before this one, to butt up against.
+  const prev = daySlots.filter((s) => s.id !== slot.id && s.start < slot.start).sort((a, b) => b.start - a.start)[0] || null;
+  const prevEnd = prev ? prev.start + prev.durationSeconds : null;
 
   function apply() {
     const changes = {};
@@ -982,6 +1026,11 @@ function SlotEditor({ slot, layer, daySlots, series, preview, unchanged, isDirty
           </div>
         )}
       </div>
+      {prev && prevEnd !== slot.start && !locked && (
+        <button type="button" className="sch-link" disabled={busy} onClick={() => setFormError(onChange({ start: prevEnd }, `Starts right after ${prev.title}`))}>
+          Start right after {prev.title} ({clock(prevEnd)})
+        </button>
+      )}
       {edges.length > 0 && lengthEditable && (
         <div className="sch-field">
           <span>Fit exactly</span>

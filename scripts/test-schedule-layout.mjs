@@ -2,7 +2,7 @@
 // Exercises lib/scheduleLayout.js — how blocks move around a day in the scheduler.
 import assert from 'node:assert/strict';
 import {
-  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary
+  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary, ripple, insertWithRipple
 } from '../lib/scheduleLayout.js';
 
 let passed = 0;
@@ -101,6 +101,35 @@ test('fit summary follows the pin and the leftover is ads', () => {
   const f = fitSummary(blk, eps, []);
   assert.deepEqual(f.items.map((i) => i.episode.id), ['e2', 'e3']);
   assert.equal(f.leftover, H(0, 51) - H(0, 46, 45));
+});
+
+test('ripple: moving a block later pushes everything after it, gaps and ads kept', () => {
+  const day = [show('a', H(15), H(1)), ad('ad1', H(16)), show('b', H(16, 10), H(1)), show('c', H(18), H(1))];
+  const out = ripple(day, { id: 'a', start: H(15, 30), durationSeconds: H(1) }, { start: H(15), durationSeconds: H(1) });
+  assert.equal(out.problem, null);
+  assert.deepEqual(out.moved, ['ad1', 'b', 'c']);
+  assert.deepEqual(out.slots.map((s) => [s.id, s.start]), [['a', H(15, 30)], ['ad1', H(16, 30)], ['b', H(16, 40)], ['c', H(18, 30)]]);
+});
+
+test('ripple: stretching a block pushes the rest; shrinking pulls them in', () => {
+  const day = [show('a', H(15), H(1)), show('b', H(16, 10), H(1))];
+  assert.equal(ripple(day, { id: 'a', start: H(15), durationSeconds: H(1, 30) }, { start: H(15), durationSeconds: H(1) }).slots[1].start, H(16, 40));
+  assert.equal(ripple(day, { id: 'a', start: H(15), durationSeconds: H(0, 30) }, { start: H(15), durationSeconds: H(1) }).slots[1].start, H(15, 40));
+});
+
+test('ripple: refuses to push past midnight or into earlier blocks', () => {
+  const day = [show('x', H(13), H(1)), show('a', H(15), H(1)), show('z', H(22, 30), H(1))];
+  assert.match(ripple(day, { id: 'a', start: H(15, 45), durationSeconds: H(1) }, { start: H(15), durationSeconds: H(1) }).problem, /past midnight/);
+  assert.match(ripple(day, { id: 'a', start: H(13, 30), durationSeconds: H(1) }, { start: H(15), durationSeconds: H(1) }).problem, /would overlap/);
+  assert.equal(ripple(day, { id: 'a', start: H(14), durationSeconds: H(1) }, { start: H(15), durationSeconds: H(1) }).problem, null); // flush after x is fine
+});
+
+test('ripple insert: a new block makes room for itself', () => {
+  const day = [show('a', H(15), H(1)), show('b', H(16), H(1))];
+  const out = insertWithRipple(day, show('n', H(16), H(0, 30)));
+  assert.equal(out.problem, null);
+  assert.deepEqual(out.slots.map((s) => [s.id, s.start]), [['a', H(15)], ['n', H(16)], ['b', H(16, 30)]]);
+  assert.match(insertWithRipple(day, show('n', H(15, 30), H(0, 30))).problem, /would overlap/); // dropped inside a: a doesn't move
 });
 
 console.log(`\n${passed} passed`);
