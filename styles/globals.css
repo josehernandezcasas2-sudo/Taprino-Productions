@@ -7589,6 +7589,12 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .tv-guide-head { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; flex-wrap: wrap; margin-bottom: 0.7rem; }
 .tv-guide-head h2 { font-family: var(--font-display); font-size: 1.05rem; margin: 0; }
 .tv-guide-days { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.tv-zoom { display: flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.tv-zoom button { width: 28px; height: 28px; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); font-family: var(--font-display); font-size: 1rem; line-height: 1; cursor: pointer; }
+.tv-zoom button:hover:not(:disabled) { background: var(--surface-3); }
+.tv-zoom button:disabled { opacity: 0.4; cursor: default; }
+.sch-zoom { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-faint); }
+.sch-zoom .sch-btn { width: 32px; padding: 0.3rem 0; font-size: 1rem; line-height: 1; }
 .tv-day { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink-dim); border-radius: 999px; padding: 0.25rem 0.7rem; font-family: var(--font-mono); font-size: 0.68rem; }
 .tv-day.active { background: var(--ink); color: var(--surface-0); border-color: var(--ink); }
 .tv-guide-scroll { overflow-x: auto; }

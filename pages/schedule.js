@@ -10,7 +10,7 @@ import { addDays, weekStartOf, DAY_SECONDS } from '../lib/channelPlan';
 import {
   SNAP_SECONDS, snapToGrid, magnetStart, arrange, arrangeMany, ripple, insertWithRipple, spaceOut, dayProblem, defaultSeriesLength, episodeEdges, firstRoomAfter, fitSummary, hasFixedLength, isHard, limitFor
 } from '../lib/scheduleLayout';
-import ScheduleTimeline, { ZOOM, KIND_ICON, clock, dur } from '../components/ScheduleTimeline';
+import ScheduleTimeline, { ZOOM, ZOOM_LEVELS, KIND_ICON, clock, dur } from '../components/ScheduleTimeline';
 import ScheduleWeekStrip from '../components/ScheduleWeekStrip';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
@@ -116,7 +116,7 @@ export default function Scheduler(props) {
   const [picked, setPicked] = useState(null); // library item waiting to be placed
   const [selection, setSelection] = useState(() => new Set()); // block ids on the open day
   const [toast, setToast] = useState(null);
-  const [zoom, setZoom] = useState('normal');
+  const [zoomIdx, setZoomIdx] = useState(2);
   const [nowSec, setNowSec] = useState(null);
   const [hoverTab, setHoverTab] = useState(null);
   const [adGap, setAdGap] = useState(120);
@@ -130,7 +130,7 @@ export default function Scheduler(props) {
 
   const channel = channels.find((c) => c.id === channelId);
   const layer = view === 'default' ? 'default' : 'week';
-  const px = ZOOM[zoom];
+  const px = ZOOM_LEVELS[zoomIdx];
   const isDirty = dirty.size > 0;
   const selectedId = selection.size === 1 ? [...selection][0] : null;
   const selectOne = (id) => setSelection(id ? new Set([id]) : new Set());
@@ -198,13 +198,20 @@ export default function Scheduler(props) {
   useEffect(() => {
     setNowSec(nowPacificSec());
     const t = setInterval(() => setNowSec(nowPacificSec()), 30000);
-    try { const z = window.localStorage.getItem('sch-zoom'); if (ZOOM[z]) setZoom(z); } catch (err) { /* private mode */ }
+    try {
+      const z = window.localStorage.getItem('sch-zoom');
+      if (z !== null && z in ZOOM) setZoomIdx(ZOOM[z]); // a preference from before the zoom levels
+      else if (z !== null && ZOOM_LEVELS[Number(z)] !== undefined) setZoomIdx(Number(z));
+    } catch (err) { /* private mode */ }
     return () => clearInterval(t);
   }, []);
-  function pickZoom(z) {
-    setZoom(z);
-    try { window.localStorage.setItem('sch-zoom', z); } catch (err) { /* private mode */ }
-  }
+  const zoomBy = useCallback((dir) => {
+    setZoomIdx((i) => {
+      const next = Math.max(0, Math.min(ZOOM_LEVELS.length - 1, i + dir));
+      try { window.localStorage.setItem('sch-zoom', String(next)); } catch (err) { /* private mode */ }
+      return next;
+    });
+  }, []);
 
   // Don't lose a draft by accident: warn before leaving, and keep a copy in
   // the browser that the page offers back if the tab does close.
@@ -592,10 +599,10 @@ export default function Scheduler(props) {
               ))}
             </div>
             {view !== 'loop' && (
-              <div className="sch-seg" role="group" aria-label="Zoom">
-                {[['compact', 'Compact'], ['normal', 'Normal'], ['roomy', 'Roomy']].map(([k, label]) => (
-                  <button key={k} type="button" aria-selected={zoom === k} onClick={() => pickZoom(k)}>{label}</button>
-                ))}
+              <div className="sch-zoom" role="group" aria-label="Zoom the day" title="Ctrl + scroll over the day also zooms">
+                <button type="button" className="sch-btn" onClick={() => zoomBy(-1)} disabled={zoomIdx === 0} aria-label="Zoom out">−</button>
+                <span>Zoom</span>
+                <button type="button" className="sch-btn" onClick={() => zoomBy(1)} disabled={zoomIdx === ZOOM_LEVELS.length - 1} aria-label="Zoom in">+</button>
               </div>
             )}
             {channel.visibility === 'public' && <Link href={`/live/${channel.slug}`} className="sch-btn">Watch it live ↗</Link>}
@@ -696,6 +703,7 @@ export default function Scheduler(props) {
                   onTabHover={setHoverTab}
                   onAdGapChange={changeAdGap}
                   onSpaceOut={spaceOutDay}
+                  onZoom={zoomBy}
                   needPick={() => flash('Pick something from the library first')}
                 />
               ) : (

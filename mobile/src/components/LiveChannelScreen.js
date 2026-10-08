@@ -10,8 +10,9 @@ import ChannelPlayer from './ChannelPlayer';
 import ReportSheet from './ReportSheet';
 import SmartImage from './SmartImage';
 
-const HALF_HOUR = 110; // guide width of 30 minutes, in px
-const LABEL_EVERY = HALF_HOUR * 4; // two hours
+// Width of 30 minutes in the guide, per zoom level (the − / + buttons).
+const GUIDE_ZOOMS = [55, 82, 110, 146, 200];
+const DEFAULT_ZOOM = 2;
 const DAY = 86400;
 const pad = (n) => String(n).padStart(2, '0');
 
@@ -98,6 +99,18 @@ export default function LiveChannelScreen({ initialSlug }) {
   const clockSec = now && now.channelSec != null ? now.channelSec + (Date.now() - nowAt.current) / 1000 : null;
   const offset = pacificOffset(now);
   const isToday = guide && guide.date === guide.today;
+  const [zoomIdx, setZoomIdx] = useState(DEFAULT_ZOOM);
+  const HALF_HOUR = GUIDE_ZOOMS[zoomIdx];
+  const LABEL_EVERY = HALF_HOUR * 4; // two hours
+  const scrollX = useRef(0);
+  function zoomBy(dir) {
+    const next = Math.max(0, Math.min(GUIDE_ZOOMS.length - 1, zoomIdx + dir));
+    if (next === zoomIdx) return;
+    // Keep the same time under the left edge.
+    const x = (scrollX.current / HALF_HOUR) * GUIDE_ZOOMS[next];
+    setZoomIdx(next);
+    setTimeout(() => guideScroll.current && guideScroll.current.scrollTo({ x: Math.max(0, x), animated: false }), 0);
+  }
 
   // Put "now" near the left edge of the guide.
   useEffect(() => {
@@ -165,7 +178,13 @@ export default function LiveChannelScreen({ initialSlug }) {
 
           {guide && (
             <View style={styles.panel}>
-              <Text style={styles.guideTitle}>{channel ? channel.name : ''} guide</Text>
+              <View style={styles.guideHead}>
+                <Text style={styles.guideTitle}>{channel ? channel.name : ''} guide</Text>
+                <View style={styles.zoom}>
+                  <Pressable onPress={() => zoomBy(-1)} disabled={zoomIdx === 0} style={[styles.zoomBtn, zoomIdx === 0 && styles.zoomOff]} accessibilityRole="button" accessibilityLabel="Zoom out" hitSlop={6}><Text style={styles.zoomText}>−</Text></Pressable>
+                  <Pressable onPress={() => zoomBy(1)} disabled={zoomIdx === GUIDE_ZOOMS.length - 1} style={[styles.zoomBtn, zoomIdx === GUIDE_ZOOMS.length - 1 && styles.zoomOff]} accessibilityRole="button" accessibilityLabel="Zoom in" hitSlop={6}><Text style={styles.zoomText}>+</Text></Pressable>
+                </View>
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dayRow}>
                 {days.map((d) => (
                   <Pressable key={d} onPress={() => loadDay(d)} disabled={guideLoading} style={[styles.day, guide.date === d && styles.dayOn]} accessibilityRole="tab" accessibilityState={{ selected: guide.date === d }}>
@@ -173,7 +192,7 @@ export default function LiveChannelScreen({ initialSlug }) {
                   </Pressable>
                 ))}
               </ScrollView>
-              <ScrollView horizontal ref={guideScroll} showsHorizontalScrollIndicator={false}>
+              <ScrollView horizontal ref={guideScroll} showsHorizontalScrollIndicator={false} onScroll={(e) => { scrollX.current = e.nativeEvent.contentOffset.x; }} scrollEventThrottle={64}>
                 <View style={{ width: 48 * HALF_HOUR }}>
                   <View style={styles.times}>
                     {Array.from({ length: 48 }, (_, i) => <Text key={i} style={[styles.time, { width: HALF_HOUR }]}>{clockLabel(i * 1800)}</Text>)}
@@ -388,6 +407,11 @@ const styles = StyleSheet.create({
 
   guideTitle: { fontFamily: fonts.displaySemi, fontSize: 16, color: colors.ink },
   dayRow: { gap: 6 },
+  guideHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  zoom: { flexDirection: 'row', gap: 6 },
+  zoomBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: colors.oceanInk, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
+  zoomOff: { opacity: 0.4 },
+  zoomText: { fontFamily: fonts.display, fontSize: 16, color: colors.ink, lineHeight: 18 },
   day: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 5, paddingHorizontal: 12 },
   dayOn: { backgroundColor: colors.ink, borderColor: colors.ink },
   dayText: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim },

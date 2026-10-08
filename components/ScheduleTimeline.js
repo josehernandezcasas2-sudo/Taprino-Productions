@@ -22,7 +22,8 @@ import {
 // block along with it instead of only shuffling ad breaks out of the way.
 // It applies to single blocks; a group drag always moves just the group.
 
-export const ZOOM = { compact: 40, normal: 64, roomy: 100 };
+export const ZOOM_LEVELS = [32, 48, 64, 84, 110, 140]; // px per hour, zoomed out to zoomed in
+export const ZOOM = { compact: 1, normal: 2, roomy: 4 }; // the old named sizes, for a preference stored before the levels
 export const KIND_ICON = { series_continue: '⟳', series_rerun: '↺', series_pinned: '▣', live: '●' };
 export const AD_GAP_CHOICES = [[0, 'none, shows butt up'], [60, '1 min'], [120, '2 min'], [180, '3 min'], [240, '4 min']];
 
@@ -48,7 +49,7 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export default function ScheduleTimeline({
   slots, ghosts = [], seriesById = {}, layer, px, picked, selectedIds, canLive, isPastDay, isToday, nowSec, adGap = 0,
-  onSelect, onPlace, onArrange, onMoveToDay, onTabHover, onAdGapChange, onSpaceOut, needPick
+  onSelect, onPlace, onArrange, onMoveToDay, onTabHover, onAdGapChange, onSpaceOut, onZoom, needPick
 }) {
   const laneRef = useRef(null);
   const scrollRef = useRef(null);
@@ -73,6 +74,29 @@ export default function ScheduleTimeline({
     scrollRef.current.scrollTop = Math.max(0, (at / 3600) * px);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  // Zooming keeps whatever was mid-view in view.
+  const prevPx = useRef(px);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const was = prevPx.current;
+    prevPx.current = px;
+    if (!el || was === px) return;
+    const mid = (el.scrollTop + el.clientHeight / 2) / was;
+    el.scrollTop = Math.max(0, mid * px - el.clientHeight / 2);
+  }, [px]);
+  // Ctrl or Alt + scroll over the day zooms it (native and non-passive, so
+  // the browser's page zoom stays out of it).
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !onZoom) return undefined;
+    const onWheel = (e) => {
+      if (!(e.ctrlKey || e.altKey)) return;
+      e.preventDefault();
+      onZoom(e.deltaY < 0 ? 1 : -1);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [onZoom]);
 
   const y = (sec) => (sec / 3600) * px;
   const secAt = (clientY) => ((clientY - laneRef.current.getBoundingClientRect().top) / px) * 3600;

@@ -12,8 +12,10 @@ import { SITE } from '../lib/siteConfig';
 
 // Channel time is Pacific for everyone, like a broadcast schedule.
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
-const HALF_HOUR_PX = 132;
-const LABEL_EVERY = HALF_HOUR_PX * 4; // two hours
+// Width of 30 minutes in the guide, per zoom level: the − / + buttons, or
+// Ctrl / Alt + scroll over the guide.
+const GUIDE_ZOOMS = [66, 99, 132, 176, 240];
+const DEFAULT_ZOOM = 2;
 const DAY = 86400;
 
 function timeLabel(sec) {
@@ -57,6 +59,43 @@ export default function LiveChannelsPage(props) {
   const [selected, setSelected] = useState(null); // a guide segment, or null = what's on now
   const [clockSec, setClockSec] = useState(nowSec);
   const scrollRef = useRef(null);
+  const [zoomIdx, setZoomIdx] = useState(DEFAULT_ZOOM);
+  const HALF_HOUR_PX = GUIDE_ZOOMS[zoomIdx];
+  const LABEL_EVERY = HALF_HOUR_PX * 4; // two hours
+  const prevPx = useRef(HALF_HOUR_PX);
+  function zoomBy(dir) {
+    setZoomIdx((i) => Math.max(0, Math.min(GUIDE_ZOOMS.length - 1, i + dir)));
+  }
+  // Remember the zoom, and keep whatever was mid-view in view when it changes.
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem('tv-guide-zoom');
+      if (raw !== null && GUIDE_ZOOMS[Number(raw)]) setZoomIdx(Number(raw));
+    } catch (err) { /* private mode */ }
+  }, []);
+  useEffect(() => {
+    const el = scrollRef.current;
+    const was = prevPx.current;
+    prevPx.current = HALF_HOUR_PX;
+    try { window.localStorage.setItem('tv-guide-zoom', String(zoomIdx)); } catch (err) { /* private mode */ }
+    if (!el || was === HALF_HOUR_PX) return;
+    const mid = (el.scrollLeft + el.clientWidth / 2) / was;
+    el.scrollLeft = Math.max(0, mid * HALF_HOUR_PX - el.clientWidth / 2);
+  }, [zoomIdx, HALF_HOUR_PX]);
+  // Ctrl or Alt + scroll over the guide zooms it. A native, non-passive
+  // listener, so the browser's own page zoom doesn't fire as well.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      if (!(e.ctrlKey || e.altKey)) return;
+      e.preventDefault();
+      zoomBy(e.deltaY < 0 ? 1 : -1);
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [unavailable, channel && channel.slug]);
 
   // Keep the guide's "now" line moving.
   useEffect(() => {
@@ -199,6 +238,11 @@ export default function LiveChannelsPage(props) {
                       {dayTabLabel(d, guide.today)}
                     </button>
                   ))}
+                </div>
+                <div className="tv-zoom" role="group" aria-label="Zoom the guide" title="Ctrl + scroll over the guide also zooms">
+                  <button type="button" onClick={() => zoomBy(-1)} disabled={zoomIdx === 0} aria-label="Zoom out">−</button>
+                  <span>Zoom</span>
+                  <button type="button" onClick={() => zoomBy(1)} disabled={zoomIdx === GUIDE_ZOOMS.length - 1} aria-label="Zoom in">+</button>
                 </div>
               </div>
               <div className="tv-guide-scroll" ref={scrollRef}>
