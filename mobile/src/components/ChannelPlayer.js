@@ -66,6 +66,11 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [adLeft, setAdLeft] = useState(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [controlsShown, setControlsShown] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [volume, setVolume] = useState(1);
+  const [userPaused, setUserPaused] = useState(false); // paused by the viewer: stays paused until they press play
+  const pausedRef = useRef(false);
+  const pausedKey = useRef(null); // the program that was on when they paused
 
   const player = useVideoPlayer(null, (p) => {
     p.timeUpdateEventInterval = 1;
@@ -131,11 +136,11 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     player.play();
   }
 
-  async function catchUp() {
+  async function catchUp(force = false) {
     const fresh = await fetchNow();
     if (fresh) {
       updateNow(fresh);
-      tune(fresh);
+      if (force || !pausedRef.current) tune(fresh);
       scheduleNextCheck(fresh);
     }
     return fresh;
@@ -151,7 +156,10 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         if (focused.current) player.play();
       }
     });
-    const playSub = player.addListener('playingChange', ({ isPlaying }) => setPlaying(isPlaying));
+    const playSub = player.addListener('playingChange', ({ isPlaying }) => {
+      setPlaying(isPlaying);
+      if (isPlaying) { pausedRef.current = false; setUserPaused(false); }
+    });
     const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
       const p = nowRef.current && nowRef.current.program;
       if (p && p.durationSeconds) {
@@ -174,7 +182,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const prev = nowRef.current || {};
       const changed = !!fresh.live !== !!prev.live || (fresh.program && prev.program ? fresh.program.key !== prev.program.key : !!fresh.program !== !!prev.program);
       updateNow(fresh);
-      if (changed) tune(fresh);
+      // Paused by the viewer: the channel moves on, the player doesn't.
+      if (changed && !pausedRef.current) tune(fresh);
       scheduleNextCheck(fresh);
     }, ms);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -317,20 +326,24 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   }
   useEffect(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (controlsShown && playing && screen === null) {
+    if (controlsShown && playing && screen === null && !menuOpen) {
       hideTimer.current = setTimeout(() => setControlsShown(false), CONTROLS_HIDE_MS);
     }
     return () => hideTimer.current && clearTimeout(hideTimer.current);
-  }, [controlsShown, playing, screen]);
+  }, [controlsShown, playing, screen, menuOpen]);
 
   async function togglePlay() {
     showControls();
     if (playing) {
+      pausedRef.current = true;
+      pausedKey.current = nowRef.current && nowRef.current.program ? nowRef.current.program.key : null;
+      setUserPaused(true);
       player.pause();
       return;
     }
     // Resuming catches back up to where the channel is now.
-    const fresh = await catchUp();
+    pausedRef.current = false;
+    const fresh = await catchUp(true);
     if (!fresh) player.play();
   }
   function toggleMute() {
@@ -338,18 +351,32 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     player.muted = !muted;
     setMuted(!muted);
   }
+  function changeVolume(delta) {
+    showControls();
+    const next = Math.max(0, Math.min(1, Math.round((volume + delta) * 10) / 10));
+    player.volume = next;
+    setVolume(next);
+    if (next > 0 && muted) { player.muted = false; setMuted(false); }
+  }
 
   const channelName = now && now.channel ? now.channel.name : '';
   const offset = pacificOffset(now);
   const program = now && now.program;
   const isLive = !!(now && now.live);
+  const movedOn = userPaused && program && pausedKey.current && program.key !== pausedKey.current;
 
   // One overlay for both the inline player and fullscreen (a render
   // function, not a component, so it isn't remounted on every render).
   function renderOverlay(full) {
     return (
       <>
-        <Pressable style={absoluteFill} onPress={() => setControlsShown((v) => !v)} accessibilityLabel={controlsShown ? 'Hide controls' : 'Show controls'} />
+        <Pressable style={absoluteFill} onPress={() => (menuOpen ? setMenuOpen(false) : setControlsShown((v) => !v))} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
+        {screen === null && userPaused && !playing && (
+          <View style={styles.pausedNote} pointerEvents="none">
+            <Text style={styles.pausedTitle}>Paused</Text>
+            <Text style={styles.pausedSub}>{movedOn ? `${channelName} has moved on to ${program.title}.` : `${channelName} keeps going.`} Play catches up to live.</Text>
+          </View>
+        )}
         {(controlsShown || screen !== null) && (
           <View style={[styles.badge, full && styles.badgeFull]} pointerEvents="none">
             <View style={[styles.dot, isLive && styles.dotLive]} />
@@ -407,6 +434,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               <Text style={styles.timeLeft} numberOfLines={1}>
                 {full && program ? `${program.seriesName || program.title}  ·  ` : ''}{!isLive && remaining != null ? `${formatClock(remaining)} left` : isLive ? 'Live' : ''}
               </Text>
+              <Pressable onPress={() => { showControls(); setMenuOpen((v) => !v); }} style={styles.btn} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Close menu' : 'Menu'} hitSlop={10}>
+                <Svg width={22} height={22} viewBox="0 0 24 24" fill={colors.ink}><Path d="M5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" /></Svg>
+              </Pressable>
               <Pressable onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} style={styles.btn} accessibilityRole="button" accessibilityLabel={full ? 'Exit fullscreen' : 'Fullscreen'} hitSlop={10}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
@@ -414,6 +444,28 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               </Pressable>
             </View>
           </LinearGradient>
+        )}
+
+        {screen === null && menuOpen && (
+          <View style={[styles.menu, full && styles.menuFull]}>
+            <Pressable style={styles.menuRow} onPress={() => { setMenuOpen(false); togglePlay(); }} accessibilityRole="button">
+              <Text style={styles.menuText}>{playing ? 'Pause' : 'Play'}</Text>
+            </Pressable>
+            <View style={styles.menuRow}>
+              <Text style={styles.menuText}>Volume</Text>
+              <View style={styles.volCtl}>
+                <Pressable style={styles.volBtn} onPress={() => changeVolume(-0.1)} accessibilityRole="button" accessibilityLabel="Lower volume" hitSlop={6}><Text style={styles.volBtnText}>−</Text></Pressable>
+                <Text style={styles.volLevel}>{muted ? 'muted' : `${Math.round(volume * 100)}%`}</Text>
+                <Pressable style={styles.volBtn} onPress={() => changeVolume(0.1)} accessibilityRole="button" accessibilityLabel="Raise volume" hitSlop={6}><Text style={styles.volBtnText}>+</Text></Pressable>
+              </View>
+            </View>
+            <Pressable style={styles.menuRow} onPress={toggleMute} accessibilityRole="button">
+              <Text style={styles.menuText}>{muted ? 'Unmute' : 'Mute'}</Text>
+            </Pressable>
+            <Pressable style={styles.menuRow} onPress={() => { setMenuOpen(false); if (full) exitFullscreen(true); else enterFullscreen(true); }} accessibilityRole="button">
+              <Text style={styles.menuText}>{full ? 'Exit fullscreen' : 'Fullscreen'}</Text>
+            </Pressable>
+          </View>
         )}
       </>
     );
@@ -479,5 +531,16 @@ const styles = StyleSheet.create({
   trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },
   buttons: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   btn: { padding: 4 },
-  timeLeft: { flex: 1, textAlign: 'right', fontFamily: fonts.mono, fontSize: 11.5, color: colors.ink }
+  timeLeft: { flex: 1, textAlign: 'right', fontFamily: fonts.mono, fontSize: 11.5, color: colors.ink },
+  pausedNote: { position: 'absolute', alignSelf: 'center', top: '38%', alignItems: 'center', gap: 3, backgroundColor: 'rgba(10,11,15,0.78)', borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, maxWidth: '80%' },
+  pausedTitle: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
+  pausedSub: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkDim, textAlign: 'center' },
+  menu: { position: 'absolute', right: 10, bottom: 54, minWidth: 190, backgroundColor: 'rgba(10,11,15,0.94)', borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 10, paddingVertical: 4 },
+  menuFull: { right: 18, bottom: 64 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 9, paddingHorizontal: 12 },
+  menuText: { fontFamily: fonts.display, fontSize: 13.5, color: colors.ink },
+  volCtl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  volBtn: { width: 28, height: 28, borderRadius: 14, borderWidth: 1, borderColor: 'rgba(251,232,211,0.3)', alignItems: 'center', justifyContent: 'center' },
+  volBtnText: { fontFamily: fonts.display, fontSize: 16, color: colors.ink, lineHeight: 18 },
+  volLevel: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkDim, minWidth: 44, textAlign: 'center' }
 });

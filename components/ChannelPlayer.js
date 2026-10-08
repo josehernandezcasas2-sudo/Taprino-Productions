@@ -49,6 +49,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [bug, setBug] = useState(null); // { key, code }: the rating bug, shown as a program starts
   const [bugFade, setBugFade] = useState(false);
   const [userPaused, setUserPaused] = useState(false); // paused by the viewer: show them the channel keeps going
+  const pausedRef = useRef(false);   // same, readable from timers
+  const pausedKey = useRef(null);    // the program that was on when they paused
   const hideTimer = useRef(null);
   const lastBreakAt = useRef(Date.now());
   const ratings = useContentRatings();
@@ -244,6 +246,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const prev = nowRef.current || {};
       const changed = !fresh.program || !prev.program || fresh.program.key !== prev.program.key || !!fresh.live !== !!prev.live;
       updateNow(fresh);
+      // Paused by the viewer: the channel moves on, the player doesn't.
+      // The card says what's on now; play catches up.
+      if (pausedRef.current && !fresh.live) { scheduleNextCheck(fresh); return; }
       // A short ad break between two programs, like TV — but not right
       // after a scheduled ad break, not into one, and not more often than
       // every MIN_BREAK_GAP_MS (a short loop clip would otherwise get an ad
@@ -293,7 +298,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onPlay = () => { setPlaying(true); setUserPaused(false); };
+    const onPlay = () => { setPlaying(true); setUserPaused(false); pausedRef.current = false; };
     const onPause = () => setPlaying(false);
     const onVol = () => { setVolume(v.volume); setMuted(v.muted); };
     const onTime = () => {
@@ -345,6 +350,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     if (!v) return;
     if (v.paused) {
       // Resuming catches back up to where the channel is now.
+      pausedRef.current = false;
       const fresh = await fetchNow();
       if (fresh) {
         updateNow(fresh);
@@ -355,6 +361,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       }
     } else {
       v.pause();
+      pausedRef.current = true;
+      pausedKey.current = nowRef.current && nowRef.current.program ? nowRef.current.program.key : null;
       setUserPaused(true);
     }
   }
@@ -384,6 +392,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const program = now && now.program;
   const channelName = now && now.channel ? now.channel.name : '';
   const bugRating = bug ? ratings.find((r) => r.code === bug.code) : null;
+  const movedOn = userPaused && program && pausedKey.current && program.key !== pausedKey.current;
 
   return (
     <div
@@ -400,7 +409,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         playsInline
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
-        onClick={() => screen === null && togglePlay()}
+        onClick={wake}
         onContextMenu={(e) => e.preventDefault()}
       />
       <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: screen === 'ad' ? 'auto' : 'none' }} />
@@ -459,7 +468,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       {userPaused && screen === null && !playing && !errored && (
         <div className="channel-pause-card" role="status">
           <strong>Paused</strong>
-          <span>{channelName} keeps going. Play catches up to live.</span>
+          <span>{movedOn ? `${channelName} has moved on to ${program.title}.` : `${channelName} keeps going.`} Play catches up to live.</span>
         </div>
       )}
 
