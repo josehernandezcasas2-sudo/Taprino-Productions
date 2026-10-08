@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -53,8 +52,8 @@ const CAN_ROTATE = Platform.OS === 'ios' || Platform.OS === 'android';
 // aren't on mobile yet, and nothing plays in the gap. The short break the
 // website runs between programs is skipped here for the same reason.
 //
-// Controls sit on the video and fade out while it plays (tap to bring them
-// back). Fullscreen is this component's own sideways view with an exit
+// Controls sit on the video as separate bubbles and fade out while it
+// plays (tap to bring them back); in fullscreen the ✕ goes with them. Fullscreen is this component's own sideways view with an exit
 // button, not the system player: turning the phone sideways on the Live
 // screen goes fullscreen, turning it back comes out. The rest of the app
 // stays locked to portrait (src/app/_layout.js).
@@ -409,7 +408,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
             <Text style={styles.badgeText}>{screen === 'ad' ? 'Ad break' : isLive ? `Live · ${channelName}` : `On air · ${channelName}`}</Text>
           </View>
         )}
-        {full && (
+        {full && (controlsShown || screen !== null) && (
           <Pressable style={styles.exit} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Exit fullscreen" hitSlop={12}>
             <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
           </Pressable>
@@ -450,7 +449,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         )}
 
         {screen === null && controlsShown && (
-          <LinearGradient colors={['transparent', 'rgba(8,12,20,0.88)']} style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
+          <View style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
             {!isLive && <View style={styles.track}><View style={[styles.trackFill, { width: `${progress * 100}%` }]} /></View>}
             <View style={styles.buttons}>
               <Pressable onPress={togglePlay} style={styles.btn} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={10}>
@@ -466,9 +465,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
                   {muted ? <Path d="M22 9l-6 6M16 9l6 6" /> : <Path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
                 </Svg>
               </Pressable>
-              <Text style={styles.timeLeft} numberOfLines={1}>
-                {full && program ? `${program.seriesName || program.title}  ·  ` : ''}{!isLive && remaining != null ? `${formatClock(remaining)} left` : isLive ? 'Live' : ''}
-              </Text>
+              <View style={styles.pillWrap}>
+                <View style={styles.pill}>
+                  <Text style={styles.timeLeft} numberOfLines={1}>
+                    {full && program ? `${program.seriesName || program.title}  ·  ` : ''}{!isLive && remaining != null ? `${formatClock(remaining)} left` : isLive ? 'Live' : ''}
+                  </Text>
+                </View>
+              </View>
               <Pressable onPress={() => { showControls(); setMenuOpen((v) => !v); }} style={styles.btn} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Close menu' : 'Menu'} hitSlop={10}>
                 <Svg width={22} height={22} viewBox="0 0 24 24" fill={colors.ink}><Path d="M5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" /></Svg>
               </Pressable>
@@ -478,7 +481,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
                 </Svg>
               </Pressable>
             </View>
-          </LinearGradient>
+          </View>
         )}
 
         {screen === null && menuOpen && (
@@ -561,13 +564,17 @@ const styles = StyleSheet.create({
   cardBtnText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.oliveShadow },
   cardExit: { marginTop: 10, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 16 },
   cardExitText: { fontFamily: fonts.display, fontSize: 13, color: colors.ink },
-  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 26, paddingHorizontal: 10, paddingBottom: 8 },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 6, paddingHorizontal: 10, paddingBottom: 8 },
   barFull: { paddingHorizontal: 18, paddingBottom: 14 },
-  track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.22)', marginBottom: 8, marginHorizontal: 4 },
+  track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.28)', marginBottom: 8, marginHorizontal: 4 },
   trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },
-  buttons: { flexDirection: 'row', alignItems: 'center', gap: 14 },
-  btn: { padding: 4 },
-  timeLeft: { flex: 1, textAlign: 'right', fontFamily: fonts.mono, fontSize: 11.5, color: colors.ink },
+  buttons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  // Each control is its own bubble, like the on-air badge, so nothing
+  // darkens the picture behind it.
+  btn: { width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(10,11,15,0.7)', alignItems: 'center', justifyContent: 'center' },
+  pillWrap: { flex: 1, minWidth: 0, alignItems: 'flex-end' },
+  pill: { maxWidth: '100%', backgroundColor: 'rgba(10,11,15,0.7)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 12 },
+  timeLeft: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.ink },
   pausedNote: { position: 'absolute', alignSelf: 'center', top: '38%', alignItems: 'center', gap: 3, backgroundColor: 'rgba(10,11,15,0.78)', borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', borderRadius: 10, paddingVertical: 10, paddingHorizontal: 14, maxWidth: '80%' },
   pausedTitle: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
   pausedSub: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkDim, textAlign: 'center' },
