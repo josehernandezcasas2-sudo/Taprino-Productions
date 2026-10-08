@@ -48,6 +48,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [controlsOn, setControlsOn] = useState(true);
   const [bug, setBug] = useState(null); // { key, code }: the rating bug, shown as a program starts
   const [bugFade, setBugFade] = useState(false);
+  const [userPaused, setUserPaused] = useState(false); // paused by the viewer: show them the channel keeps going
   const hideTimer = useRef(null);
   const lastBreakAt = useRef(Date.now());
   const ratings = useContentRatings();
@@ -292,7 +293,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => { setPlaying(true); setUserPaused(false); };
     const onPause = () => setPlaying(false);
     const onVol = () => { setVolume(v.volume); setMuted(v.muted); };
     const onTime = () => {
@@ -354,6 +355,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       }
     } else {
       v.pause();
+      setUserPaused(true);
     }
   }
   function toggleMute() {
@@ -451,6 +453,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               {program && program.endsAt && <span className="channel-card-sub">The channel moves on at {ptTime(program.endsAt)}.</span>}
             </>
           )}
+        </div>
+      )}
+
+      {userPaused && screen === null && !playing && !errored && (
+        <div className="channel-pause-card" role="status">
+          <strong>Paused</strong>
+          <span>{channelName} keeps going. Play catches up to live.</span>
         </div>
       )}
 
