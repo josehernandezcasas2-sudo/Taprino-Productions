@@ -5,7 +5,7 @@ import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
 import { parseAdBreaksInput } from '../lib/adBreaks';
 import { SITE } from '../lib/siteConfig';
-import { CONTENT_RATINGS } from '../lib/contentRatings';
+import RatingOptions from './RatingOptions';
 
 // Uppy touches browser-only APIs during its own setup — rendering it
 // during a server-side render pass throws before the page/modal ever
@@ -395,7 +395,7 @@ export default function CreatorSubmissionForm({ allSeries, initialContentType, i
             <label>Content rating <span style={{ fontWeight: 'normal', color: 'var(--ink-dim)' }}>optional</span></label>
             <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
               <option value="">Not set</option>
-              {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+              <RatingOptions />
             </select>
             {!form.rating && (
               <p style={{ fontSize: '0.78rem', color: 'var(--signal-amber)', marginTop: '-0.4rem', marginBottom: '1rem' }}>

@@ -3870,7 +3870,22 @@ button { font-family: inherit; cursor: pointer; }
 .channel-banner .live-now-arrow { color: var(--signal-amber); }
 .channel-banner .live-dot { background: var(--signal-amber); }
 
-.channel-player .channel-badge { background: rgba(10, 11, 15, 0.7); }
+.channel-player .channel-badge { background: rgba(10, 11, 15, 0.7); transition: opacity 0.3s ease; }
+
+/* The channel player's controls and badge hide while something plays; any
+   mouse, touch or key brings them back (ChannelPlayer.js). The
+   focus-within rule that keeps the VOD player's controls up is overridden
+   here so a clicked button doesn't pin them. */
+.channel-player.controls-off { cursor: none; }
+.channel-player.controls-off .channel-badge { opacity: 0; }
+.tp-player.channel-player.controls-off:focus-within .tp-controls { opacity: 0; transform: translateY(6px); pointer-events: none; }
+
+/* The rating bug: top-left under the badge as a program starts, then fades. */
+.tp-rating-bug { position: absolute; top: 44px; left: 12px; z-index: 5; height: max(34px, 9%); display: flex; align-items: center; pointer-events: none; opacity: 1; transition: opacity 1s ease; }
+.tp-rating-bug.fade { opacity: 0; }
+.tp-rating-bug img { height: 100%; width: auto; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+.tp-rating-bug span { font-family: var(--font-mono); font-size: 0.82rem; letter-spacing: 0.08em; background: rgba(10, 11, 15, 0.75); color: var(--ink); border: 1px solid rgba(251, 232, 211, 0.55); border-radius: 4px; padding: 0.25rem 0.6rem; }
+@media (prefers-reduced-motion: reduce) { .tp-rating-bug, .channel-player .channel-badge { transition: none; } }
 
 /* Read-only progress — no thumb, not draggable, so it doesn't invite a
    seek gesture the channel can't actually honor. */

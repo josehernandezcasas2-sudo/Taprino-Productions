@@ -4,6 +4,7 @@ import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { SITE } from '../../lib/siteConfig';
 import { getOwnProfile } from '../../lib/userProfiles';
 import { meetsAgeRequirement } from '../../lib/ageGate';
+import { getRatings } from '../../lib/ratings';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.
 //
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
   if (!account.isAdmin) {
     const profile = account.isSignedIn ? await getOwnProfile(account.userId) : null;
     const viewerAge = profile && profile.age != null ? profile.age : null;
-    if (!meetsAgeRequirement(viewerAge, episode.rating)) {
+    if (!meetsAgeRequirement(viewerAge, episode.rating, await getRatings())) {
       return res.status(403).json({ error: 'This title is age-restricted.', ageRestricted: true, rating: episode.rating || 'Not Rated' });
     }
   }

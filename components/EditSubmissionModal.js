@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { SITE } from '../lib/siteConfig';
-import { CONTENT_RATINGS } from '../lib/contentRatings';
+import RatingOptions from './RatingOptions';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 const CONTENT_TYPES = [
@@ -99,7 +99,7 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
           <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
           <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
             <option value="">Not set</option>
-            {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+            <RatingOptions />
           </select>
 
           {/* Podcasts group into a "show" exactly the way series episodes

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { SITE } from '../lib/siteConfig';
-import { CONTENT_RATINGS } from '../lib/contentRatings';
+import RatingOptions from './RatingOptions';
 import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
@@ -226,7 +226,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
             <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
               <option value="">Not set</option>
-              {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+              <RatingOptions />
             </select>
           </div>
 

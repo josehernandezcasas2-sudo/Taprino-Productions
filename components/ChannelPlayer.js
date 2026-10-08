@@ -2,10 +2,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 import LiveVideoPlayer from './LiveVideoPlayer';
+import { useContentRatings } from './RatingOptions';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
 const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throttled (e.g. a backgrounded tab)
+const MIN_BREAK_GAP_MS = 10 * 60 * 1000; // no between-program ad break sooner than this after the last one (or tuning in)
+const BUG_SHOW_MS = 6000; // the rating bug holds this long, then fades out over a second
+const CONTROLS_HIDE_MS = 2500; // the controls get out of the way this long after the mouse stops
 
 function formatClock(seconds) {
   const s = Math.max(0, Math.floor(seconds));
@@ -41,6 +45,12 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [progressPct, setProgressPct] = useState(0);
   const [timeRemaining, setTimeRemaining] = useState(null);
   const [adCountdown, setAdCountdown] = useState(null);
+  const [controlsOn, setControlsOn] = useState(true);
+  const [bug, setBug] = useState(null); // { key, code }: the rating bug, shown as a program starts
+  const [bugFade, setBugFade] = useState(false);
+  const hideTimer = useRef(null);
+  const lastBreakAt = useRef(Date.now());
+  const ratings = useContentRatings();
 
   const nowUrl = `/api/channel/now?channel=${encodeURIComponent(channelSlug)}`;
 
@@ -179,10 +189,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     }
     if (program.kind === 'ad_break') {
       tunedKey.current = program.key;
+      lastBreakAt.current = Date.now();
+      setBug(null);
       runAds(new Date(program.endsAt).getTime(), () => {});
       return;
     }
     setScreen('loading');
+    const fetchedAt = Date.now();
     let play;
     try {
       const res = await fetch('/api/channel/play', {
@@ -207,10 +220,17 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     }
     const go = () => {
       setScreen(null);
-      attachSrc(play.src, play.offsetSeconds);
+      // The offset was right when /play answered; the request itself and the
+      // ad break (if any) have moved the channel on since.
+      attachSrc(play.src, play.offsetSeconds + (Date.now() - fetchedAt) / 1000);
+      setBug(program.rating ? { key: program.key, code: program.rating } : null);
     };
-    if (withBreak) runAds(null, go);
-    else go();
+    if (withBreak) {
+      lastBreakAt.current = Date.now();
+      runAds(null, go);
+    } else {
+      go();
+    }
   }
 
   const scheduleNextCheck = useCallback((state) => {
@@ -224,8 +244,11 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const changed = !fresh.program || !prev.program || fresh.program.key !== prev.program.key || !!fresh.live !== !!prev.live;
       updateNow(fresh);
       // A short ad break between two programs, like TV — but not right
-      // after a scheduled ad break, and not into one.
-      const withBreak = !!(fresh.program && fresh.program.kind !== 'ad_break' && prev.program && prev.program.kind !== 'ad_break');
+      // after a scheduled ad break, not into one, and not more often than
+      // every MIN_BREAK_GAP_MS (a short loop clip would otherwise get an ad
+      // every few minutes).
+      const withBreak = !!(fresh.program && fresh.program.kind !== 'ad_break' && prev.program && prev.program.kind !== 'ad_break')
+        && Date.now() - lastBreakAt.current >= MIN_BREAK_GAP_MS;
       if (changed) tune(fresh, { withBreak });
       scheduleNextCheck(fresh);
     }, ms);
@@ -291,6 +314,31 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     };
   });
 
+  // The controls and the on-air badge get out of the way while something
+  // plays. They come back on any mouse or touch movement or a key, and stay
+  // put while paused or while a card is up.
+  const wake = useCallback(() => {
+    setControlsOn(true);
+    clearTimeout(hideTimer.current);
+    const v = videoRef.current;
+    if (v && !v.paused && screen === null) {
+      hideTimer.current = setTimeout(() => setControlsOn(false), CONTROLS_HIDE_MS);
+    }
+  }, [screen]);
+  useEffect(() => {
+    wake();
+    return () => clearTimeout(hideTimer.current);
+  }, [wake, playing]);
+
+  // The rating bug: shows as a program starts, holds, then fades out.
+  useEffect(() => {
+    if (!bug) return undefined;
+    setBugFade(false);
+    const fade = setTimeout(() => setBugFade(true), BUG_SHOW_MS);
+    const gone = setTimeout(() => setBug(null), BUG_SHOW_MS + 1200);
+    return () => { clearTimeout(fade); clearTimeout(gone); };
+  }, [bug]);
+
   async function togglePlay() {
     const v = videoRef.current;
     if (!v) return;
@@ -333,9 +381,17 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
 
   const program = now && now.program;
   const channelName = now && now.channel ? now.channel.name : '';
+  const bugRating = bug ? ratings.find((r) => r.code === bug.code) : null;
 
   return (
-    <div ref={shellRef} className="tp-player channel-player controls-on" onContextMenu={(e) => e.preventDefault()}>
+    <div
+      ref={shellRef}
+      className={`tp-player channel-player ${controlsOn || screen !== null ? 'controls-on' : 'controls-off'}`}
+      onContextMenu={(e) => e.preventDefault()}
+      onPointerMove={wake}
+      onPointerDown={wake}
+      onKeyDown={wake}
+    >
       <video
         ref={videoRef}
         className="tp-video"
@@ -351,6 +407,14 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         <i className="live-dot" aria-hidden="true" />
         {screen === 'ad' ? 'Ad break' : `On air · ${channelName}`}
       </div>
+      {bug && screen === null && (
+        <div className={`tp-rating-bug ${bugFade ? 'fade' : ''}`} aria-label={`Rated ${bug.code}`}>
+          {bugRating && bugRating.imageUrl
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={bugRating.imageUrl} alt={`Rated ${bug.code}`} />
+            : <span>{bug.code}</span>}
+        </div>
+      )}
 
       {screen === 'ad' && (
         <div className="tp-adbar">

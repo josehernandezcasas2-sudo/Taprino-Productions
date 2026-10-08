@@ -4,6 +4,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { getAccountContext } from '../../../lib/accountContext';
 import { getOwnProfile } from '../../../lib/userProfiles';
 import { meetsAgeRequirement } from '../../../lib/ageGate';
+import { getRatings } from '../../../lib/ratings';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 
 // Hands one viewer a playable URL for whatever is airing on a channel right
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
     if (!account.isAdmin) {
       const profile = account.isSignedIn ? await getOwnProfile(account.userId) : null;
       const age = profile && profile.age != null ? profile.age : null;
-      if (!meetsAgeRequirement(age, program.rating)) {
+      if (!meetsAgeRequirement(age, program.rating, await getRatings())) {
         return res.status(200).json({ kind: 'age_restricted', key: program.key, rating: program.rating || 'Not Rated', signedIn: account.isSignedIn });
       }
     }

@@ -5,7 +5,7 @@ import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
 import { parseAdBreaksInput } from '../lib/adBreaks';
 import { useDraftAutosave } from '../lib/useDraftAutosave';
 import { SITE } from '../lib/siteConfig';
-import { CONTENT_RATINGS } from '../lib/contentRatings';
+import RatingOptions from './RatingOptions';
 import { VIDEO_PROVIDERS } from '../lib/videoProviders';
 
 // Same reasoning as CreatorSubmissionForm's own use of this — Uppy touches
@@ -532,7 +532,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
         <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
         <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
           <option value="">Not set</option>
-          {CONTENT_RATINGS.map((r) => <option key={r} value={r}>{r}</option>)}
+          <RatingOptions />
         </select>
         {!form.rating && (
           <p style={{ fontSize: '0.78rem', color: 'var(--signal-amber)', marginTop: '-0.4rem', marginBottom: '1rem' }}>
