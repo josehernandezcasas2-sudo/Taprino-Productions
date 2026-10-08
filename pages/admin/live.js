@@ -1,42 +1,18 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { listChannels } from '../../lib/channelEngine';
-import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
-import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 
-import Footer from '../../components/Footer';
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const [episodes, channels] = await Promise.all([
-    getPublicEpisodes(),
-    // drafts included: you might go live on a channel before it launches
-    listChannels({ includeDrafts: true }).catch(() => [])
-  ]);
-  return {
-    props: {
-      channels: channels.map((c) => ({ id: c.id, name: c.name, number: c.number, visibility: c.visibility })),
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { caps: ['manage_live'], extra: async () => ({ channels: (await listChannels({ includeDrafts: true }).catch(() => [])).map((c) => ({ id: c.id, name: c.name, number: c.number, visibility: c.visibility })) }) });
 }
 
 const EMPTY = { title: '', description: '', genre: '', adsEnabled: true, adBreakMinutes: '10', channelId: '' };
 
-export default function LiveAdmin({ channels, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function LiveAdmin({ account, mainGenres, channels }) {
   const [form, setForm] = useState(EMPTY);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState(null);
@@ -132,23 +108,7 @@ export default function LiveAdmin({ channels, mainGenres, isSignedIn, isSubscrib
 
   return (
     <>
-      <Head>
-        <title>Go live — {SITE.name}</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-      <div className="install-row"><InstallButton /></div>
-
-      <main className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Go live" crumbs={['Channels & Live']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -274,9 +234,7 @@ export default function LiveAdmin({ channels, mainGenres, isSignedIn, isSubscrib
             )}
           </div>
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

@@ -1,19 +1,10 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
 
-export async function getServerSideProps({ req, res }) {
-  // Same unconditional private header every other pages/admin/*.js file
-  // sets — this one and admin/theme.js were the two outliers with none.
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    res.statusCode = 404;
-    return { props: { notFound: true } };
-  }
-  return { props: {} };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 function formatMinutes(mins) {
@@ -26,7 +17,7 @@ function formatMinutes(mins) {
 
 const TYPE_LABEL = { series: 'Series', movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast' };
 
-export default function WatchAnalytics() {
+export default function WatchAnalytics({ account, mainGenres }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
 
@@ -56,8 +47,7 @@ export default function WatchAnalytics() {
 
   return (
     <>
-      <Head><title>Watch analytics — Admin</title></Head>
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '2rem 1.5rem 4rem', fontFamily: 'var(--font-body)', color: 'var(--ink)' }}>
+      <AdminShell account={account} mainGenres={mainGenres} title="Analytics" crumbs={['Site']}>
         <Link href="/admin" style={{ color: 'var(--ink-dim)', fontSize: '0.85rem', textDecoration: 'none' }}>← Back to admin</Link>
         <h1 style={{ fontFamily: 'var(--font-display)', marginTop: '0.6rem' }}>Watch analytics</h1>
         <p style={{ color: 'var(--ink-dim)', fontSize: '0.88rem', marginBottom: '1rem' }}>
@@ -158,7 +148,7 @@ export default function WatchAnalytics() {
             )}
           </>
         )}
-      </main>
+      </AdminShell>
     </>
   );
 }

@@ -1,31 +1,14 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
 
 // Content ratings: the standard MPAA / TV Parental Guidelines list plus any
 // custom rating. Each one can carry a PNG bug, which the channel player
 // shows top-left as a program starts; custom ratings also set the minimum
 // viewer age the age gate uses.
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) return { redirect: { destination: '/stream', permanent: false } };
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 function readAsDataUrl(f) {
@@ -44,7 +27,7 @@ async function call(method, body) {
   return data;
 }
 
-export default function RatingsAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function RatingsAdmin({ account, mainGenres }) {
   const [ratings, setRatings] = useState(null);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
@@ -93,13 +76,7 @@ export default function RatingsAdmin({ mainGenres, isSignedIn, isSubscriber, ema
 
   return (
     <>
-      <Head>
-        <title>Ratings — Admin</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-      <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-
-      <main id="main-content" className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Ratings" crumbs={['Content']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -140,10 +117,7 @@ export default function RatingsAdmin({ mainGenres, isSignedIn, isSubscriber, ema
             <button type="submit" className="sch-btn primary" disabled={busy === 'new' || !draft.code.trim()}>{busy === 'new' ? 'Adding…' : 'Add rating'}</button>
           </form>
         </section>
-      </main>
-
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

@@ -55,3 +55,13 @@ export function CaretUpIcon({ size = 8, color = '#fbe8d3' }) {
     </Svg>
   );
 }
+
+// Admin tab (shield) — only shown to admins/sub-admins, see BottomNav.
+export function ShieldIcon({ size = 20, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 3l7 3v5c0 4.5-3 8.3-7 9.5C8 19.3 5 15.5 5 11V6l7-3z" />
+      <Path d="M9.5 12l1.8 1.8L14.8 10" />
+    </Svg>
+  );
+}

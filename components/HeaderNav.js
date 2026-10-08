@@ -30,6 +30,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [siteSettings, setShopSettings] = useState(null);
   const [ownProfile, setOwnProfile] = useState(null);
   const [isScheduler, setIsScheduler] = useState(false);
+  const [isSubAdmin, setIsSubAdmin] = useState(false);
   const rootRef = useRef(null);
   const searchInputRef = useRef(null);
 
@@ -56,13 +57,15 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
   // Content Schedulers are creators too, so only creators need to ask
   // whether they also get the channel scheduler link.
+  // Also whether a signed-in non-admin is a sub-admin (gets the Admin
+  // Portal link), since pages only pass isAdmin down.
   useEffect(() => {
-    if (!isCreator || isAdmin) return;
+    if (!isSignedIn || isAdmin) return;
     fetch('/api/my-role')
       .then((r) => r.json())
-      .then((d) => setIsScheduler(!!d.isContentScheduler))
+      .then((d) => { setIsScheduler(!!d.isContentScheduler); setIsSubAdmin(!!d.canAccessAdmin); })
       .catch(() => {});
-  }, [isCreator, isAdmin]);
+  }, [isSignedIn, isCreator, isAdmin]);
 
   // Same self-fetch reasoning as siteSettings above — HeaderNav renders on
   // every page, so this is cheaper than threading userId/avatarUrl/
@@ -435,7 +438,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {ownProfileHref && (
                   <Link href={ownProfileHref} className="dropdown-item"><AccountIcon size={15} /> View public profile</Link>
                 )}
-                {isAdmin && <Link href="/admin" className="dropdown-item"><LockIcon size={15} src={iconOverrides.admin_lock} /> Admin Portal</Link>}
+                {(isAdmin || isSubAdmin) && <Link href="/admin" className="dropdown-item"><LockIcon size={15} src={iconOverrides.admin_lock} /> Admin Portal</Link>}
                 <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
                 {siteSettings && siteSettings.elevatorPitchEnabled && (

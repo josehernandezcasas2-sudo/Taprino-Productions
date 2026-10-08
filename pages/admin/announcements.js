@@ -1,30 +1,11 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Image from 'next/image';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
 
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 function readAsDataUrl(file) {
@@ -36,7 +17,7 @@ function readAsDataUrl(file) {
   });
 }
 
-export default function AnnouncementsAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AnnouncementsAdmin({ account, mainGenres }) {
   const [announcements, setAnnouncements] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -243,22 +224,7 @@ export default function AnnouncementsAdmin({ mainGenres, isSignedIn, isSubscribe
 
   return (
     <>
-      <Head>
-        <title>Announcements — Admin</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-
-      <main id="main-content" className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Announcements" crumbs={['Site']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -363,10 +329,7 @@ export default function AnnouncementsAdmin({ mainGenres, isSignedIn, isSubscribe
             </div>
           ))
         )}
-      </main>
-
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

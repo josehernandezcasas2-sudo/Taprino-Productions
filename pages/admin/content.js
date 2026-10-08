@@ -1,38 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { hasCapability } from '../../lib/capabilities';
 import { FLAG_REASONS } from '../../lib/reportReasons';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 
 // Every title from every user, plus flags, viewer reports and reporters.
 // Admins, and sub-admins with "See everyone's content" (read) or "Flag
 // content & handle reports" (read + act).
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  const canView = account.isAdmin || (account.canAccessAdmin && (hasCapability(account, 'view_all_content') || hasCapability(account, 'handle_flags')));
-  if (!canView) return { redirect: { destination: '/stream', permanent: false } };
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { caps: ['view_all_content', 'handle_flags'] });
 }
 
 const STATUS_LABEL = { approved: 'Published', pending: 'In review', rejected: 'Rejected', deletion_requested: 'Deletion requested' };
 const TIER_LABEL = { red: 'Red', yellow: 'Yellow', minor: 'Minor' };
 const RANK = { red: 0, flag: 1, yellow: 2, minor: 3 };
 
-export default function AdminContent({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminContent({ account, mainGenres }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -129,11 +113,7 @@ export default function AdminContent({ isSignedIn, isSubscriber, email, isAdmin,
 
   return (
     <>
-      <Head>
-        <title>{`All content — Admin — ${SITE.name}`}</title>
-      </Head>
-      <HeaderNav activeType="All" isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-      <main className="stage stage-single stage-wide">
+      <AdminShell account={account} mainGenres={mainGenres} title="All content &amp; flags" crumbs={['Content']} wide>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -341,9 +321,7 @@ export default function AdminContent({ isSignedIn, isSubscriber, email, isAdmin,
             </form>
           )}
         </dialog>
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

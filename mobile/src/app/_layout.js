@@ -77,6 +77,8 @@ export default function RootLayout() {
           <Stack.Screen name="account/wishlist" options={{ headerShown: false }} />
           <Stack.Screen name="account/my-work" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
+          <Stack.Screen name="admin/index" options={{ headerShown: false }} />
+          <Stack.Screen name="admin/review" options={{ headerShown: false }} />
         </Stack>
         <BottomNav />
       </SafeAreaProvider>

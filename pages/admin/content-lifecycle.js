@@ -1,30 +1,10 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import { SITE } from '../../lib/siteConfig';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
 
-import Footer from '../../components/Footer';
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { caps: ['manage_content_lifecycle'] });
 }
 
 // Presets matching what was actually asked for — "like 2 weeks a month
@@ -41,7 +21,7 @@ const LEAVING_SOON_PRESETS = [
   { label: '2 weeks', days: 14 }
 ];
 
-export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function ContentLifecycleAdmin({ account, mainGenres }) {
   const [settings, setSettings] = useState(null);
   const [leavingSoon, setLeavingSoon] = useState([]);
   const [expiredNotYetFlagged, setExpiredNotYetFlagged] = useState([]);
@@ -104,22 +84,7 @@ export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscr
 
   return (
     <>
-      <Head>
-        <title>Content lifecycle — Admin</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-
-      <main id="main-content" className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Lifecycle windows" crumbs={['Content']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -233,9 +198,7 @@ export default function ContentLifecycleAdmin({ mainGenres, isSignedIn, isSubscr
             </button>
           </>
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

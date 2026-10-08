@@ -1,32 +1,12 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
-import MobileTabBar from '../../components/MobileTabBar';
 import HouseAdForm from '../../components/HouseAdForm';
-import { SITE } from '../../lib/siteConfig';
 
-import Footer from '../../components/Footer';
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { caps: ['manage_house_ads'] });
 }
 
 function ctr(ad) {
@@ -34,7 +14,7 @@ function ctr(ad) {
   return ((ad.clicks / ad.impressions) * 100).toFixed(1);
 }
 
-export default function HouseAdsAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function HouseAdsAdmin({ account, mainGenres }) {
   const [ads, setAds] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -98,23 +78,7 @@ export default function HouseAdsAdmin({ mainGenres, isSignedIn, isSubscriber, em
 
   return (
     <>
-      <Head>
-        <title>House ads — {SITE.name}</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-      <div className="install-row"><InstallButton /></div>
-
-      <main className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="House ads" crumbs={['Ads']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -218,9 +182,7 @@ export default function HouseAdsAdmin({ mainGenres, isSignedIn, isSubscriber, em
             ))}
           </div>
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

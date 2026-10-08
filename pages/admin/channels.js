@@ -1,26 +1,11 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
-import { SITE } from '../../lib/siteConfig';
 
 // Admin-only: you create channels and decide who maintains them.
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) return { redirect: { destination: '/stream', permanent: false } };
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 // Shrinks an image in the browser before upload, so big camera files fit
@@ -60,7 +45,7 @@ function slugify(name) {
 
 const pad = (n) => String(n).padStart(2, '0');
 
-export default function AdminChannels({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminChannels({ account, mainGenres }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -104,12 +89,7 @@ export default function AdminChannels({ isSignedIn, isSubscriber, email, isAdmin
 
   return (
     <>
-      <Head>
-        <title>{`Channels — Admin — ${SITE.name}`}</title>
-      </Head>
-      <HeaderNav activeType="All" isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-
-      <main className="stage stage-single stage-wide">
+      <AdminShell account={account} mainGenres={mainGenres} title="Channels" crumbs={['Channels & Live']} wide>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -163,9 +143,7 @@ export default function AdminChannels({ isSignedIn, isSubscriber, email, isAdmin
             }}
           />
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

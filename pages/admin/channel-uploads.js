@@ -1,30 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import { hasCapability } from '../../lib/capabilities';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
-import { SITE } from '../../lib/siteConfig';
 
 // Review queue for channel-only uploads (bumpers, station IDs, promos,
 // shows). Same permission as reviewing creator submissions.
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.canAccessAdmin || !hasCapability(account, 'review_submissions')) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { caps: ['review_submissions'] });
 }
 
 function dur(sec) {
@@ -66,7 +48,7 @@ function Preview({ id }) {
   return <video ref={ref} controls playsInline className="cu-video" />;
 }
 
-export default function ChannelUploads({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function ChannelUploads({ account, mainGenres }) {
   const [media, setMedia] = useState(null);
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -109,11 +91,7 @@ export default function ChannelUploads({ isSignedIn, isSubscriber, email, isAdmi
 
   return (
     <>
-      <Head>
-        <title>{`Channel uploads — Admin — ${SITE.name}`}</title>
-      </Head>
-      <HeaderNav activeType="All" isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-      <main className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Channel uploads" crumbs={['Channels & Live']}>
         <div className="ca-head">
           <div>
             <div className="eyebrow">Admin</div>
@@ -158,9 +136,7 @@ export default function ChannelUploads({ isSignedIn, isSubscriber, email, isAdmi
             </div>
           ))}
         </div>
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

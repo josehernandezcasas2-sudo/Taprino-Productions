@@ -3,7 +3,8 @@ import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-nativ
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../lib/theme';
-import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon } from './TabBarIcons';
+import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
+import { useAdminRole } from '../lib/adminRole';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
@@ -54,6 +55,19 @@ const GROUPS = {
   }
 };
 
+// Fifth tab, admins and sub-admins only (2026-10-08). Review on the go:
+// the admin home with the queues, the card-by-card review screen, and
+// flags on the web.
+const ADMIN_GROUP = {
+  label: 'Admin',
+  Icon: ShieldIcon,
+  items: [
+    { href: '/admin', label: 'Admin home' },
+    { href: '/admin/review', label: 'Review queue' }
+  ],
+  match: (p) => p.startsWith('/admin')
+};
+
 export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
@@ -65,6 +79,8 @@ export default function BottomNav() {
   const [itemLayouts, setItemLayouts] = useState({});
   const [dropupWidth, setDropupWidth] = useState(0);
   const anim = useRef(new Animated.Value(0)).current;
+  const role = useAdminRole();
+  const groups = role.canAccessAdmin ? { ...GROUPS, admin: ADMIN_GROUP } : GROUPS;
 
   useEffect(() => { setOpenKey(null); }, [pathname]);
 
@@ -79,7 +95,7 @@ export default function BottomNav() {
     router.push(href);
   }
 
-  const openGroup = openKey ? GROUPS[openKey] : null;
+  const openGroup = openKey ? groups[openKey] : null;
 
   let dropupLeft = 0;
   const item = openKey ? itemLayouts[openKey] : null;
@@ -134,7 +150,7 @@ export default function BottomNav() {
           </Animated.View>
         )}
         <View style={styles.bar} onLayout={(e) => setBarLayout(e.nativeEvent.layout)}>
-          {Object.entries(GROUPS).map(([key, group]) => {
+          {Object.entries(groups).map(([key, group]) => {
             const active = group.match(pathname);
             const isDiscover = key === 'discover';
             const tint = active ? colors.onBrass : isDiscover ? colors.sky : colors.inkDim;

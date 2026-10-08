@@ -1,29 +1,9 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
-import { SITE } from '../../lib/siteConfig';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 // A handful of common amounts, plus a genuinely custom option — same
@@ -40,7 +20,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-export default function AdCreditCodesAdmin({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdCreditCodesAdmin({ account, mainGenres }) {
   const [codes, setCodes] = useState(null);
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
@@ -129,22 +109,7 @@ export default function AdCreditCodesAdmin({ mainGenres, isSignedIn, isSubscribe
 
   return (
     <>
-      <Head>
-        <title>Ad credit codes — {SITE.name}</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-
-      <main id="main-content" className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Credit codes" crumbs={['Ads']}>
         <div className="eyebrow">Admin</div>
         <h1>Ad credit codes</h1>
         <p className="ca-sub">
@@ -277,9 +242,7 @@ export default function AdCreditCodesAdmin({ mainGenres, isSignedIn, isSubscribe
             ))}
           </div>
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

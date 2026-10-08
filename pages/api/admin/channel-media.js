@@ -10,6 +10,9 @@ import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 // GET ?preview=<id>           a short-lived playable URL for one upload
 // POST { id, action: approve | reject, reason? }
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   const roleContext = await getRoleContext(req);
   if (!roleContext.isAdmin && !hasCapability(roleContext, 'review_submissions')) {
     return res.status(403).json({ error: 'Admin access required.' });

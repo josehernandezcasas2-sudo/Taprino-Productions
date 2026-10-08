@@ -1,36 +1,16 @@
 import { useState, useEffect } from 'react';
-import Head from 'next/head';
-import { getAccountContext } from '../../lib/accountContext';
-import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
-import { SITE } from '../../lib/siteConfig';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 function centsToDollars(cents) {
   return `$${((cents || 0) / 100).toFixed(2)}`;
 }
 
-export default function AdminAdAccounts({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminAdAccounts({ account, mainGenres }) {
   const [accounts, setAccounts] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -84,12 +64,7 @@ export default function AdminAdAccounts({ mainGenres, isSignedIn, isSubscriber, 
 
   return (
     <>
-      <Head>
-        <title>Ad Accounts — Admin — {SITE.name}</title>
-      </Head>
-      <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-
-      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '900px' }}>
+      <AdminShell account={account} mainGenres={mainGenres} title="Advertiser accounts" crumbs={['Ads']}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Ad Accounts</div>
         <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1.2rem' }}>
           Every advertiser account on the site, with their current credit balance and ad history.
@@ -166,10 +141,7 @@ export default function AdminAdAccounts({ mainGenres, isSignedIn, isSubscriber, 
             )}
           </>
         )}
-      </main>
-
-      <MobileTabBar isSignedIn={isSignedIn} isCreator={isCreator} isAdmin={isAdmin} />
-      <Footer />
+      </AdminShell>
     </>
   );
 }

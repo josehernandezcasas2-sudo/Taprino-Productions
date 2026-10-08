@@ -16,3 +16,6 @@ signals.local.json
 # OS/editor cruft
 .DS_Store
 *.log
+
+# impeccable design-hook cache (config.json is committed)
+.impeccable/hook.cache.json

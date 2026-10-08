@@ -1,30 +1,10 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
-import { getAccountContext } from '../../lib/accountContext';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
-import HeaderNav from '../../components/HeaderNav';
-import MobileTabBar from '../../components/MobileTabBar';
-import Footer from '../../components/Footer';
-import { SITE } from '../../lib/siteConfig';
 
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  const episodes = await getPublicEpisodes();
-  return {
-    props: {
-      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      episodes,
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx, { extra: async () => ({ episodes: await getPublicEpisodes() }) });
 }
 
 // Matches TYPE_LABELS in pages/type/[type].js — scope naming follows the
@@ -37,7 +17,7 @@ const TYPES = [
   { value: 'podcast', label: 'Podcasts' }
 ];
 
-export default function CuratedRowsAdmin({ mainGenres, episodes, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function CuratedRowsAdmin({ account, mainGenres, episodes }) {
   const [type, setType] = useState('movie');
   const scope = `type:${type}`;
 
@@ -193,22 +173,7 @@ export default function CuratedRowsAdmin({ mainGenres, episodes, isSignedIn, isS
 
   return (
     <>
-      <Head>
-        <title>Curated rows — {SITE.name}</title>
-        <meta name="robots" content="noindex" />
-      </Head>
-
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-
-      <main id="main-content" className="stage stage-single">
+      <AdminShell account={account} mainGenres={mainGenres} title="Curated rows" crumbs={['Content']}>
         <div className="eyebrow">Admin</div>
         <h1>Curated rows</h1>
         <p className="ca-sub">
@@ -357,9 +322,7 @@ export default function CuratedRowsAdmin({ mainGenres, episodes, isSignedIn, isS
             </div>
           </div>
         )}
-      </main>
-      <Footer />
-      <MobileTabBar />
+      </AdminShell>
     </>
   );
 }

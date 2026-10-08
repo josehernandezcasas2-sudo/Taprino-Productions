@@ -1,10 +1,8 @@
 import { useEffect, useState } from 'react';
-import Head from 'next/head';
+import AdminShell from '../../components/AdminShell';
+import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import { getAccountContext } from '../../lib/accountContext';
-import HeaderNav from '../../components/HeaderNav';
 import InstallButton from '../../components/InstallButton';
-import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 import { ADMIN_CAPABILITIES } from '../../lib/capabilities';
 
@@ -13,27 +11,14 @@ import { ADMIN_CAPABILITIES } from '../../lib/capabilities';
 // must never be delegable to a sub-admin themselves (see the note in
 // lib/capabilities.js). A sub-admin visiting /admin/team gets bounced the
 // same as any other non-admin visitor would.
-export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const account = await getAccountContext(req);
-  if (!account.isAdmin) {
-    return { redirect: { destination: '/stream', permanent: false } };
-  }
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator
-    }
-  };
+export async function getServerSideProps(ctx) {
+  return adminPageProps(ctx);
 }
 
 const REVOKE_VALUE = '__revoke__';
 const ROLE_LABELS = { creator: 'Creator', content_scheduler: 'Content Scheduler', sub_admin: 'Sub-admin' };
 
-export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+export default function AdminTeam({ account, mainGenres }) {
   const [roster, setRoster] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -249,12 +234,7 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
 
   return (
     <div>
-      <Head>
-        <title>Team &amp; Permissions — {SITE.name} Admin</title>
-      </Head>
-      <HeaderNav isSignedIn={isSignedIn} isSubscriber={isSubscriber} email={email} isAdmin={isAdmin} isCreator={isCreator} />
-
-      <main style={{ maxWidth: 900, margin: '0 auto', padding: '32px 20px 80px' }}>
+      <AdminShell account={account} mainGenres={mainGenres} title="Team &amp; roles" crumbs={['People']}>
         <p><Link href="/admin">&larr; Back to admin</Link></p>
         <h1>Team &amp; Permissions</h1>
         <p style={{ opacity: 0.75, maxWidth: 640 }}>
@@ -414,10 +394,9 @@ export default function AdminTeam({ isSignedIn, isSubscriber, email, isAdmin, is
             </div>
           ))}
         </section>
-      </main>
+      </AdminShell>
 
       <InstallButton />
-      <MobileTabBar isSignedIn={isSignedIn} isAdmin={isAdmin} />
     </div>
   );
 }
