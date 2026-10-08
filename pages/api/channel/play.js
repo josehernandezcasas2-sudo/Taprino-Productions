@@ -41,8 +41,18 @@ export default async function handler(req, res) {
     if (!account.isAdmin) {
       const profile = account.isSignedIn ? await getOwnProfile(account.userId) : null;
       const age = profile && profile.age != null ? profile.age : null;
-      if (!meetsAgeRequirement(age, program.rating, await getRatings())) {
-        return res.status(200).json({ kind: 'age_restricted', key: program.key, rating: program.rating || 'Not Rated', signedIn: account.isSignedIn });
+      const ratings = await getRatings();
+      if (age != null) {
+        // An age on file is checked for real.
+        if (!meetsAgeRequirement(age, program.rating, ratings)) {
+          return res.status(200).json({ kind: 'age_restricted', key: program.key, rating: program.rating || 'Not Rated', signedIn: account.isSignedIn });
+        }
+      } else if (!meetsAgeRequirement(null, program.rating, ratings) && !(req.body || {}).liveTerms) {
+        // No age on file (signed out, or never set): live TV is open to
+        // everyone, ads included, once they take the live TV terms, which
+        // say the ratings shown are theirs to honour. The player remembers
+        // the acceptance and sends it as liveTerms.
+        return res.status(200).json({ kind: 'terms_required', key: program.key, rating: program.rating || 'Not Rated', signedIn: account.isSignedIn });
       }
     }
     const { data } = await supabase.from('episodes').select('src').eq('id', program.episodeId).maybeSingle();

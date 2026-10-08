@@ -183,13 +183,27 @@ export default function Terms({ account }) {
         These terms are governed by the laws of {SITE.jurisdiction}, and disputes go to the courts there.
       </p>
 
-      <h2>12. Changes</h2>
+      <h2 id="live-tv">12. Live TV</h2>
+      <p>
+        Live channels play like television: everyone watching sees the same program at the same time, with the
+        same ad breaks, whether or not they have an account or a membership. Programs carry the rating their
+        creators gave them, up to TV-MA or R, and the rating is shown as each program starts.
+      </p>
+      <p>
+        If you watch without an account, or without an age on your account, rated programs play only after you
+        confirm that you are old enough for the ratings shown. That confirmation is yours to make, and you are
+        responsible for who watches on your device; add your age on your account page and the channel applies it
+        for you instead. Live channels can include live broadcasts, ads and bumpers, and work from other
+        creators, and what airs can change at any time.
+      </p>
+
+      <h2>13. Changes</h2>
       <p>
         We&rsquo;ll update the date at the top. Material changes get 30 days&rsquo; notice by email to
         account holders. Continuing to use the service after that means you accept the new terms.
       </p>
 
-      <h2>13. Contact</h2>
+      <h2>14. Contact</h2>
       <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );

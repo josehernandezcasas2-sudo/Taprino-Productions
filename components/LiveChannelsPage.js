@@ -214,7 +214,7 @@ export default function LiveChannelsPage(props) {
                       const width = Math.max(4, ((s.end - s.start) / 1800) * HALF_HOUR_PX - 3);
                       const past = isToday && s.end <= clockSec;
                       const onNow = isToday && s.start <= clockSec && clockSec < s.end;
-                      const cls = ['tv-blk', `k-${s.kind}`, past ? 'past' : '', onNow ? 'now' : '', selected && selected.start === s.start ? 'selected' : ''].join(' ');
+                      const cls = ['tv-blk', `k-${s.kind}`, s.layer === 'loop' && s.kind === 'episode' ? 'loopitem' : '', past ? 'past' : '', onNow ? 'now' : '', selected && selected.start === s.start ? 'selected' : ''].join(' ');
                       return (
                         <button
                           key={`${s.start}-${s.kind}`}
@@ -250,7 +250,7 @@ export default function LiveChannelsPage(props) {
                 <span><i className="lg-show" />Show</span>
                 <span><i className="lg-live" />Live broadcast</span>
                 <span><i className="lg-ads" />Ads &amp; bumpers</span>
-                <span><i className="lg-loop" />Channel loop</span>
+                <span><i className="lg-loop" />Channel loop (faded titles are what it plays)</span>
                 <span className="tv-legend-tz">All times Pacific</span>
               </div>
             </section>
@@ -337,6 +337,7 @@ function SegmentInfo({ seg, state, channel, date, today, onBack }) {
   const eyebrow = state === 'now' ? 'On now' : state === 'earlier' ? 'Aired earlier' : 'Coming up';
   let body = null;
   if (seg.kind === 'loop') body = <p>Nothing is booked here, so the channel loop fills the time.</p>;
+  else if (seg.layer === 'loop') body = <p>Nothing is booked here, so the channel loop fills the time, and this is what it plays then.</p>;
   else if (seg.kind === 'ad_break') body = <p>{seg.filler ? 'Ads and bumpers fill out the rest of this block.' : 'A scheduled ad break.'}</p>;
   else if (seg.kind === 'off_air') body = <p>Nothing is on {channel.name} at this time.</p>;
   else if (seg.kind === 'live_slot') body = <p>A live broadcast is planned here. If it doesn&rsquo;t start, the channel loop plays instead.</p>;

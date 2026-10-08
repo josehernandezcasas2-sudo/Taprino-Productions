@@ -7560,6 +7560,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .channel-card-screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.4rem; text-align: center; padding: 1.5rem; background: radial-gradient(120% 90% at 20% 15%, var(--surface-3), transparent 60%), var(--surface-0); color: var(--ink-dim); font-size: 0.92rem; z-index: 2; }
 .channel-card-screen strong { font-family: var(--font-display); color: var(--ink); font-size: 1.15rem; }
 .channel-card-screen a { color: var(--olive-bright); }
+.channel-card-screen .channel-card-btn { margin-top: 0.4rem; }
+.channel-card-screen > span { max-width: 48ch; }
 .channel-card-sub { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); }
 /* Paused by the viewer: a note that the channel keeps going. Clicks pass through to the video. */
 .channel-pause-card { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 0.3rem; text-align: center; background: rgba(10, 11, 15, 0.78); border: 1px solid rgba(251, 232, 211, 0.18); border-radius: 10px; padding: 0.8rem 1.1rem; max-width: min(32ch, 80%); pointer-events: none; }
@@ -7605,6 +7607,11 @@ body:has(.mini-player) { padding-bottom: 72px; }
 .tv-blk.k-ad_break { background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--surface-1) 6px 12px); }
 .tv-blk.k-loop, .tv-blk.k-off_air { background: repeating-linear-gradient(135deg, rgba(231, 162, 85, 0.1) 0 6px, transparent 6px 12px); border-style: dashed; border-color: var(--olive-deep); }
 .tv-blk.k-loop b { color: var(--olive); }
+/* A real title playing from the loop: loop colours, faded, with its name. */
+.tv-blk.loopitem { background: repeating-linear-gradient(135deg, rgba(231, 162, 85, 0.1) 0 6px, transparent 6px 12px); border-style: dashed; border-color: var(--olive-deep); }
+.tv-blk.loopitem b { color: var(--olive); opacity: 0.8; }
+.tv-blk.loopitem small { color: var(--olive-deep); }
+.tv-blk.loopitem:hover { background: repeating-linear-gradient(135deg, rgba(231, 162, 85, 0.18) 0 6px, transparent 6px 12px); }
 .tv-nowline { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--brass); pointer-events: none; z-index: 2; }
 .tv-legend { display: flex; gap: 1rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); margin-top: 0.7rem; align-items: center; }
 .tv-legend i { display: inline-block; width: 18px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 0.35rem; border: 1px solid var(--ocean-ink); }

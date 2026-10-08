@@ -10,6 +10,8 @@ const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throt
 const MIN_BREAK_GAP_MS = 10 * 60 * 1000; // no between-program ad break sooner than this after the last one (or tuning in)
 const BUG_SHOW_MS = 6000; // the rating bug holds this long, then fades out over a second
 const CONTROLS_HIDE_MS = 2500; // the controls get out of the way this long after the mouse stops
+const LIVE_TERMS_KEY = 'live-tv-terms-accepted'; // this browser took the live TV terms (viewers without an age on file)
+const liveTermsTaken = () => { try { return window.localStorage.getItem(LIVE_TERMS_KEY) === '1'; } catch (err) { return false; } };
 
 function formatClock(seconds) {
   const s = Math.max(0, Math.floor(seconds));
@@ -36,7 +38,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const nowRef = useRef(initialNow);
 
   const [now, setNow] = useState(initialNow);
-  const [screen, setScreen] = useState(null); // null | 'ad' | 'age' | 'off_air' | 'unavailable' | 'loading'
+  const [screen, setScreen] = useState(null); // null | 'ad' | 'age' | 'terms' | 'off_air' | 'unavailable' | 'loading'
   const [ageInfo, setAgeInfo] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -204,7 +206,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const res = await fetch('/api/channel/play', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ channel: channelSlug })
+        body: JSON.stringify({ channel: channelSlug, liveTerms: liveTermsTaken() })
       });
       play = await res.json();
     } catch (err) {
@@ -216,6 +218,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       if (play && play.kind === 'age_restricted') {
         setAgeInfo({ rating: play.rating, signedIn: play.signedIn });
         setScreen('age');
+      } else if (play && play.kind === 'terms_required') {
+        setAgeInfo({ rating: play.rating, signedIn: play.signedIn });
+        setScreen('terms');
       } else {
         setScreen('unavailable');
       }
@@ -370,6 +375,10 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     const v = videoRef.current;
     if (v) v.muted = !v.muted;
   }
+  function acceptLiveTerms() {
+    try { window.localStorage.setItem(LIVE_TERMS_KEY, '1'); } catch (err) { /* private mode: the gate shows again next time */ }
+    tune(nowRef.current);
+  }
   function changeVolume(val) {
     const v = videoRef.current;
     if (!v) return;
@@ -449,6 +458,17 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
             <>
               <strong>{program ? program.title : 'This program'} can&rsquo;t play right now</strong>
               <span>The channel moves on to the next program on schedule.</span>
+            </>
+          )}
+          {screen === 'terms' && ageInfo && (
+            <>
+              <strong>Rated {ageInfo.rating} · live TV terms</strong>
+              <span>
+                {channelName} plays like TV: everyone sees the same thing at the same time, ads included, and programs can be rated up to TV-MA or R.
+                By continuing you confirm you&rsquo;re old enough for the ratings shown and accept the <Link href="/terms#live-tv" target="_blank" rel="noopener">live TV terms</Link>.
+              </span>
+              <button type="button" className="account-btn-primary channel-card-btn" onClick={acceptLiveTerms}>Accept and watch</button>
+              <span className="channel-card-sub">{ageInfo.signedIn ? <>Or add your age on your <Link href="/account">account page</Link> and skip this.</> : <>Signed-in viewers with an age on their account skip this.</>}</span>
             </>
           )}
           {screen === 'age' && ageInfo && (

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, AppState, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -13,6 +14,24 @@ import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 
 const SAFETY_POLL_MS = 45000;
+// Viewers without an age on file take the live TV terms once; the player
+// remembers it on the device and sends it with every play request.
+const LIVE_TERMS_KEY = 'live_tv_terms_accepted';
+const TERMS_URL = 'https://www.studiotapatv.site/terms#live-tv';
+async function readLiveTerms() {
+  try {
+    if (Platform.OS === 'web') return window.localStorage.getItem(LIVE_TERMS_KEY) === '1';
+    return (await SecureStore.getItemAsync(LIVE_TERMS_KEY)) === '1';
+  } catch (err) {
+    return false;
+  }
+}
+async function saveLiveTerms() {
+  try {
+    if (Platform.OS === 'web') window.localStorage.setItem(LIVE_TERMS_KEY, '1');
+    else await SecureStore.setItemAsync(LIVE_TERMS_KEY, '1');
+  } catch (err) { /* the gate shows again next time */ }
+}
 const CONTROLS_HIDE_MS = 3000;
 const { OrientationLock, Orientation } = ScreenOrientation;
 
@@ -57,7 +76,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const fullscreenRef = useRef(false);
 
   const [now, setNow] = useState(initialNow);
-  const [screen, setScreen] = useState('loading'); // null | loading | ad | age | off_air | unavailable
+  const [screen, setScreen] = useState('loading'); // null | loading | ad | age | terms | off_air | unavailable
   const [ageInfo, setAgeInfo] = useState(null);
   const [playing, setPlaying] = useState(false);
   const [muted, setMuted] = useState(false);
@@ -107,7 +126,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     let play = null;
     try {
       const token = await withTimeout(getToken().catch(() => null), 4000);
-      play = await apiPost('/api/channel/play', { channel: channelSlug }, token);
+      play = await apiPost('/api/channel/play', { channel: channelSlug, liveTerms: await readLiveTerms() }, token);
     } catch (err) {
       play = null;
     }
@@ -117,6 +136,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       if (play && play.kind === 'age_restricted') {
         setAgeInfo({ rating: play.rating, signedIn: play.signedIn });
         setScreen('age');
+      } else if (play && play.kind === 'terms_required') {
+        setAgeInfo({ rating: play.rating, signedIn: play.signedIn });
+        setScreen('terms');
       } else if (play && play.kind === 'off_air') {
         setScreen('off_air');
       } else {
@@ -351,6 +373,10 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     player.muted = !muted;
     setMuted(!muted);
   }
+  async function acceptLiveTerms() {
+    await saveLiveTerms();
+    tune(nowRef.current);
+  }
   function changeVolume(delta) {
     showControls();
     const next = Math.max(0, Math.min(1, Math.round((volume + delta) * 10) / 10));
@@ -398,6 +424,15 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               <>
                 <Text style={styles.cardTitle}>Ad break</Text>
                 <Text style={styles.cardSub}>{adLeft != null ? `Back to ${channelName} in ${formatClock(adLeft)}` : `Back to ${channelName} soon`}</Text>
+              </>
+            )}
+            {screen === 'terms' && ageInfo && (
+              <>
+                <Text style={styles.cardTitle}>Rated {ageInfo.rating} · live TV terms</Text>
+                <Text style={styles.cardSub}>{channelName} plays like TV: everyone sees the same thing at the same time, ads included, and programs can be rated up to TV-MA or R. By continuing you confirm you&rsquo;re old enough for the ratings shown and accept the live TV terms.</Text>
+                <Pressable style={styles.cardBtn} onPress={acceptLiveTerms}><Text style={styles.cardBtnText}>Accept and watch</Text></Pressable>
+                <Pressable onPress={() => Linking.openURL(TERMS_URL).catch(() => {})} hitSlop={8}><Text style={styles.cardLink}>Read the live TV terms</Text></Pressable>
+                <Text style={styles.cardMono}>{ageInfo.signedIn ? 'Or add your age on your account and skip this.' : 'Signed-in viewers with an age on their account skip this.'}</Text>
               </>
             )}
             {screen === 'age' && ageInfo && (
@@ -521,6 +556,7 @@ const styles = StyleSheet.create({
   cardTitle: { fontFamily: fonts.displaySemi, fontSize: 17, color: colors.ink, textAlign: 'center' },
   cardSub: { fontFamily: fonts.body, fontSize: 14, color: colors.inkDim, textAlign: 'center' },
   cardMono: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint, marginTop: 4 },
+  cardLink: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.oliveBright, textDecorationLine: 'underline', marginTop: 6 },
   cardBtn: { marginTop: 6, backgroundColor: colors.olive, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 18 },
   cardBtnText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.oliveShadow },
   cardExit: { marginTop: 10, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 16 },

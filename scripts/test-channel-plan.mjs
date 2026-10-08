@@ -153,15 +153,26 @@ test('slotsForDay sorts and tags layers', () => {
   assert.deepEqual(slotsForDay({ weekPublished: true, weekSlots: [a], defaultSlots: [b] }).map((c) => c.layer + c.slot.id), ['defaultb', 'weeka']);
 });
 
-test("guide merges loop pieces into one block without any one episode's details", () => {
+test('guide keeps real loop items, merges only the slivers', () => {
   const m = mergeForGuide([
     { start: 0, end: 600, kind: 'episode', layer: 'loop', episodeId: 'a', description: 'only about a' },
     { start: 600, end: 1200, kind: 'episode', layer: 'loop', episodeId: 'b' },
     { start: 1200, end: 1800, kind: 'episode', layer: 'default', episodeId: 'c' }
   ]);
-  assert.equal(m.length, 2);
-  assert.deepEqual([m[0].kind, m[0].start, m[0].end, m[0].episodeId, m[0].description], ['loop', 0, 1200, undefined, undefined]);
-  assert.equal(m[1].episodeId, 'c');
+  assert.equal(m.length, 3);
+  assert.deepEqual([m[0].kind, m[0].layer, m[0].episodeId, m[0].description], ['episode', 'loop', 'a', 'only about a']);
+  assert.equal(m[1].episodeId, 'b');
+  assert.equal(m[2].episodeId, 'c');
+  const small = mergeForGuide([
+    { start: 0, end: 100, kind: 'episode', layer: 'loop', episodeId: 'id1', description: 'x' },
+    { start: 100, end: 200, kind: 'episode', layer: 'loop', episodeId: 'id2' },
+    { start: 200, end: 1000, kind: 'episode', layer: 'loop', episodeId: 'film' },
+    { start: 1000, end: 1060, kind: 'ad_break', layer: 'week' },
+    { start: 1060, end: 1120, kind: 'ad_break', layer: 'week' }
+  ]);
+  assert.deepEqual(small.map((s) => [s.kind, s.start, s.end, s.episodeId]), [['loop', 0, 200, undefined], ['episode', 200, 1000, 'film'], ['ad_break', 1000, 1120, undefined]]);
+  assert.equal(small[0].title, 'Channel loop');
+  assert.equal(small[0].description, undefined);
 });
 
 test('a gap shorter than 5 minutes is ads and bumpers, not the loop', () => {

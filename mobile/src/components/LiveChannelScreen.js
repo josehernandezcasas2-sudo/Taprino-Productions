@@ -189,7 +189,7 @@ export default function LiveChannelScreen({ initialSlug }) {
                         <Pressable
                           key={`${s.start}-${s.kind}`}
                           onPress={() => setSelected(s)}
-                          style={[styles.blk, kindStyle(s.kind), { left, width }, past && styles.blkPast, onNow && styles.blkNow, isSel && styles.blkSel]}
+                          style={[styles.blk, kindStyle(s.kind, s.layer), { left, width }, past && styles.blkPast, onNow && styles.blkNow, isSel && styles.blkSel]}
                           accessibilityLabel={`${s.seriesName ? `${s.seriesName}, ` : ''}${s.title}, ${clockLabel(s.start)}`}
                         >
                           {(s.kind === 'loop' || s.kind === 'off_air') && width > LABEL_EVERY * 2 ? (
@@ -203,7 +203,7 @@ export default function LiveChannelScreen({ initialSlug }) {
                             ))
                           ) : width > 44 ? (
                             <>
-                              <Text style={[styles.blkTitle, s.kind === 'loop' && { color: colors.olive }]} numberOfLines={1}>{s.kind === 'live_slot' ? '● ' : ''}{s.seriesName || s.title}</Text>
+                              <Text style={[styles.blkTitle, (s.kind === 'loop' || s.layer === 'loop') && { color: colors.olive, opacity: 0.85 }]} numberOfLines={1}>{s.kind === 'live_slot' ? '● ' : ''}{s.seriesName || s.title}</Text>
                               <Text style={styles.blkSub} numberOfLines={1}>{clockLabel(s.start)}{s.label ? ` · ${s.label}` : ''}</Text>
                             </>
                           ) : null}
@@ -214,7 +214,7 @@ export default function LiveChannelScreen({ initialSlug }) {
                   </View>
                 </View>
               </ScrollView>
-              <Text style={styles.legend}>Shows · ● Live · striped = ads & bumpers or the channel loop · all times Pacific</Text>
+              <Text style={styles.legend}>Shows · ● Live · striped = ads & bumpers or the channel loop (faded titles are what it plays) · all times Pacific</Text>
             </View>
           )}
 
@@ -227,10 +227,11 @@ export default function LiveChannelScreen({ initialSlug }) {
   );
 }
 
-function kindStyle(kind) {
+// A real title playing from the loop (layer 'loop') looks like the loop.
+function kindStyle(kind, layer) {
   if (kind === 'live_slot') return styles.blkLive;
   if (kind === 'ad_break') return styles.blkAds;
-  if (kind === 'loop' || kind === 'off_air') return styles.blkLoop;
+  if (kind === 'loop' || kind === 'off_air' || layer === 'loop') return styles.blkLoop;
   return null;
 }
 
@@ -308,6 +309,7 @@ function SegmentInfo({ seg, channel, isToday, clockSec, date, today, onBack, onG
   const page = titlePageFor(seg);
   let body = null;
   if (seg.kind === 'loop') body = 'Nothing is booked here, so the channel loop fills the time.';
+  else if (seg.layer === 'loop') body = 'Nothing is booked here, so the channel loop fills the time, and this is what it plays then.';
   else if (seg.kind === 'ad_break') body = seg.filler ? 'Ads and bumpers fill out the rest of this block.' : 'A scheduled ad break.';
   else if (seg.kind === 'off_air') body = `Nothing is on ${channel ? channel.name : 'the channel'} at this time.`;
   else if (seg.kind === 'live_slot') body = "A live broadcast is planned here. If it doesn't start, the channel loop plays instead.";
