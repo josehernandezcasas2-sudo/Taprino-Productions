@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Film University mobile</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1100px; margin:0 auto 24px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 14px; font-size:1rem; line-height:1.55; max-width:820px; }
+  .sec { max-width:1100px; margin:0 auto 56px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 12px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .phones { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; }
+  .phone { width:340px; height:720px; background:var(--surface-0); border:1px solid var(--hair); border-radius:36px; padding:14px 14px 0; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .scr { flex:1; overflow:hidden; padding:4px 2px 110px; }
+  .top { display:flex; align-items:center; justify-content:space-between; padding:6px 4px 12px; }
+  .top .brand { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .top .brand small { display:block; font-family:var(--font-mono); font-size:.76rem; color:var(--brass); letter-spacing:.1em; text-transform:uppercase; }
+  .top .ic { width:30px; height:30px; border-radius:50%; background:var(--surface-2); }
+  .ptabs { position:absolute; left:14px; right:14px; bottom:18px; display:flex; justify-content:space-around; background:rgba(41,39,25,.96); border:1px solid var(--hair); border-radius:999px; padding:12px 6px; }
+  .ptabs span { font-family:var(--font-mono); font-size:.76rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .ptabs span.on { color:var(--brass); }
+  .eyebrow { font-family:var(--font-mono); font-size:.78rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:1.7rem; line-height:1.05; margin:4px 0 8px; }
+  .lead { font-size:.95rem; line-height:1.5; color:var(--ink-dim); margin:0 0 14px; }
+  .btn { font-family:var(--font-mono); font-size:.82rem; padding:11px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); display:inline-block; text-align:center; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.block { display:block; }
+  .label { font-family:var(--font-mono); font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); margin:18px 0 10px; display:flex; justify-content:space-between; }
+  .label small { color:var(--ink-faint); text-transform:none; letter-spacing:0; }
+  .chips { display:flex; gap:6px; overflow:hidden; margin-bottom:12px; }
+  .chip { font-family:var(--font-mono); font-size:.76rem; padding:6px 11px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); white-space:nowrap; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .v { aspect-ratio:16/9; border-radius:10px; background:linear-gradient(160deg,#3a2a4f,#1b2740); position:relative; }
+  .v .k { position:absolute; left:8px; bottom:8px; font-family:var(--font-mono); font-size:.76rem; background:rgba(12,19,31,.8); padding:4px 9px; border-radius:999px; }
+  .v .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:48px; height:48px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; }
+
+  /* A */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .topic { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; min-height:96px; position:relative; overflow:hidden; }
+  .topic::after { content:""; position:absolute; right:-24px; bottom:-30px; width:90px; height:90px; border-radius:50%; opacity:.25; }
+  .topic.a::after { background:var(--brass); } .topic.b::after { background:var(--olive); } .topic.c::after { background:var(--sky); } .topic.d::after { background:var(--mint); } .topic.e::after { background:var(--brass-deep); } .topic.f::after { background:var(--ocean-ink); }
+  .topic h3 { font-family:var(--font-display); font-size:1rem; margin:0 0 4px; }
+  .topic .m { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); }
+  .lrow { display:flex; gap:12px; align-items:center; background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:10px; margin-bottom:8px; }
+  .lrow .th { width:96px; flex:none; aspect-ratio:16/9; border-radius:6px; background:linear-gradient(160deg,#3a2a4f,#1b2740); position:relative; }
+  .lrow .th.doc { background:linear-gradient(160deg,#1f3b3a,#0f1f2f); display:flex; align-items:center; justify-content:center; color:var(--mint); font-family:var(--font-display); font-size:1.4rem; }
+  .lrow .t { font-weight:600; font-size:.95rem; line-height:1.3; }
+  .lrow .m { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); margin-top:3px; }
+  .num { display:grid; grid-template-columns:28px 1fr auto; gap:10px; align-items:center; padding:12px 4px; border-top:1px solid var(--hair); }
+  .num .n { font-family:var(--font-mono); font-size:.9rem; color:var(--ink-faint); }
+  .num .t { font-weight:600; font-size:.95rem; }
+  .num .m { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); margin-top:2px; }
+  .num .k { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); }
+  .box { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .box h4 { font-family:var(--font-display); font-size:1rem; margin:4px 0 6px; }
+  .box p { font-size:.92rem; line-height:1.5; margin:0; color:var(--ink-dim); }
+  .box.ex { border-left:3px solid var(--olive); background:rgba(231,162,85,.08); }
+  .box.ex p { color:var(--ink); }
+
+  /* B */
+  .prog { height:6px; border-radius:999px; background:var(--surface-2); margin:8px 0 4px; overflow:hidden; }
+  .prog i { display:block; height:100%; width:38%; background:var(--brass); }
+  .termtabs { display:flex; gap:6px; overflow:hidden; margin:12px 0 14px; }
+  .week { border-left:2px solid var(--hair); padding:0 0 16px 16px; position:relative; }
+  .week::before { content:""; position:absolute; left:-7px; top:4px; width:12px; height:12px; border-radius:50%; background:var(--surface-3); border:2px solid var(--surface-0); }
+  .week.done::before { background:var(--ok); } .week.now::before { background:var(--brass); }
+  .week h3 { font-family:var(--font-display); font-size:1.02rem; margin:0 0 8px; }
+  .item { display:grid; grid-template-columns:20px 1fr auto; gap:8px; align-items:center; padding:9px 10px; background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; margin-bottom:6px; font-size:.9rem; }
+  .item .cb { width:16px; height:16px; border-radius:4px; border:1.5px solid var(--ink-faint); }
+  .item .cb.on { background:var(--ok); border-color:var(--ok); }
+  .item .k { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); }
+  .item.ex { border-left:3px solid var(--olive); }
+  .sticky { position:absolute; left:14px; right:14px; bottom:86px; background:var(--surface-1); border:1px solid var(--brass); border-radius:14px; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+  .sticky .t { font-weight:600; font-size:.9rem; flex:1; }
+
+  /* C */
+  .search { background:var(--surface-1); border:1px solid var(--hair); border-radius:999px; padding:12px 16px; color:var(--ink-faint); font-size:.95rem; margin:10px 0 10px; }
+  .shelf-head { display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid var(--hair); padding-bottom:6px; margin:16px 0 10px; }
+  .shelf-head h3 { font-family:var(--font-display); font-size:1rem; margin:0; }
+  .spines { display:flex; gap:8px; overflow:hidden; }
+  .spine { flex:0 0 122px; height:160px; border-radius:6px 10px 10px 6px; padding:12px 10px; display:flex; flex-direction:column; justify-content:space-between; border:1px solid var(--hair); position:relative; }
+  .spine::before { content:""; position:absolute; left:7px; top:0; bottom:0; width:1px; background:rgba(251,232,211,.18); }
+  .spine .t { font-family:var(--font-display); font-weight:700; font-size:.92rem; line-height:1.2; }
+  .spine .m { font-family:var(--font-mono); font-size:.76rem; color:rgba(251,232,211,.75); }
+  .spine.vid { background:linear-gradient(170deg,#3a2a4f,#1b2740); } .spine.doc { background:linear-gradient(170deg,#1f3b3a,#0f1f2f); } .spine.tpl { background:linear-gradient(170deg,#4a3418,#1b1a12); }
+  .spine .kind { position:absolute; top:8px; right:8px; font-family:var(--font-mono); font-size:.76rem; background:rgba(12,19,31,.7); padding:3px 7px; border-radius:999px; }
+  .page { background:var(--paper); color:#1a1408; border-radius:10px; padding:18px 18px; font-size:.86rem; line-height:1.55; margin:8px 0 10px; }
+  .page h3 { font-family:var(--font-display); margin:0 0 8px; font-size:1rem; }
+  .page p { margin:0 0 8px; }
+
+  /* D */
+  .today { background:var(--surface-1); border:1px solid var(--olive); border-radius:14px; padding:16px; }
+  .today h3 { font-family:var(--font-display); font-size:1.35rem; margin:4px 0 8px; }
+  .today p { color:var(--ink-dim); line-height:1.5; margin:0 0 10px; font-size:.92rem; }
+  .steps { counter-reset:s; margin-bottom:12px; }
+  .step { display:grid; grid-template-columns:24px 1fr; gap:8px; margin-bottom:8px; font-size:.9rem; }
+  .step::before { counter-increment:s; content:counter(s); font-family:var(--font-mono); font-size:.76rem; color:var(--olive); border:1px solid var(--olive); border-radius:50%; width:22px; height:22px; display:flex; align-items:center; justify-content:center; }
+  .excard { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; margin-bottom:8px; }
+  .excard .t { font-family:var(--font-display); font-weight:700; font-size:1rem; margin:4px 0 4px; }
+  .excard p { font-size:.9rem; color:var(--ink-dim); line-height:1.45; margin:0 0 8px; }
+  .teach { display:grid; grid-template-columns:40px 1fr; gap:8px; align-items:center; background:var(--surface-2); border-radius:8px; padding:6px 8px; font-size:.8rem; }
+  .teach i { display:block; aspect-ratio:16/9; border-radius:4px; background:linear-gradient(160deg,#3a2a4f,#1b2740); }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:120px; background:linear-gradient(180deg,rgba(12,19,31,0),var(--surface-0) 70%); pointer-events:none; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Film University — mobile versions of A, B, C, D</h1>
+  <p class="note">Each direction as it would look in the app, two screens each: the entry screen and the screen you land on next. Same bottom nav as the rest of the app; Film University sits in the Home group. The one constant across all four is the lesson screen itself (player, exercise box, attached document), shown under A.</p>
+</div>
+
+<!-- A -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">A</span><h2>Catalog — topics → lesson list → lesson</h2></div>
+  <p class="note">Topics as a two-up grid you can thumb through, then a numbered path per topic, then the lesson. Three taps to any lesson, nothing to learn about the layout.</p>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow pink">Free</div>
+      <div class="h1">Film University</div>
+      <p class="lead">Short lessons and working documents. Free to watch, download and practice with.</p>
+      <span class="btn primary block">Start here</span>
+      <div class="label">Topics <small>6 · 38 lessons</small></div>
+      <div class="grid2">
+        <div class="topic a"><h3>Directing</h3><div class="m">8 lessons</div></div>
+        <div class="topic b"><h3>Writing</h3><div class="m">9 lessons</div></div>
+        <div class="topic c"><h3>Editing</h3><div class="m">6 lessons</div></div>
+        <div class="topic d"><h3>Sound</h3><div class="m">5 lessons</div></div>
+        <div class="topic e"><h3>Producing</h3><div class="m">6 lessons</div></div>
+        <div class="topic f"><h3>Getting seen</h3><div class="m">4 lessons</div></div>
+      </div>
+      <div class="label">Newest</div>
+      <div class="lrow"><div class="th"></div><div><div class="t">Dialogue people actually say</div><div class="m">Writing · ▶ 8:45</div></div></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow">‹ Film University</div>
+      <div class="h1">Writing</div>
+      <p class="lead">From a sentence to a shooting script. Nine lessons.</p>
+      <div class="chips"><span class="chip on">All 9</span><span class="chip">Videos 4</span><span class="chip">Documents 5</span></div>
+      <div class="num" style="border-top:0"><div class="n">01</div><div><div class="t">The logline</div><div class="m">▶ 5:30 · exercise</div></div><div class="k">›</div></div>
+      <div class="num"><div class="n">02</div><div><div class="t">The one-page outline</div><div class="m">¶ 2 pages · template</div></div><div class="k">›</div></div>
+      <div class="num"><div class="n">03</div><div><div class="t">Scenes that turn</div><div class="m">▶ 11:20 · exercise</div></div><div class="k">›</div></div>
+      <div class="num"><div class="n">04</div><div><div class="t">Short film script format</div><div class="m">¶ 6 pages · template</div></div><div class="k">›</div></div>
+      <div class="num"><div class="n">05</div><div><div class="t">Dialogue people actually say</div><div class="m">▶ 8:45</div></div><div class="k">›</div></div>
+      <div class="num"><div class="n">06</div><div><div class="t">Rewriting: the second pass</div><div class="m">▶ 12:00</div></div><div class="k">›</div></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="eyebrow" style="padding:8px 4px 10px">‹ Writing · 3 of 9</div>
+      <div class="v"><div class="play">▶</div><span class="k">11:20</span></div>
+      <div class="h1" style="font-size:1.35rem;margin-top:12px">Scenes that turn</div>
+      <p class="lead" style="margin-bottom:12px">Every scene is a small argument: someone wants something, and by the end the situation has changed.</p>
+      <div class="box ex"><div class="eyebrow olive">Exercise · 20 min</div><h4>Find the turn</h4><p>Write one sentence for the start state and one for the end state. If they're the same, rewrite.</p></div>
+      <div class="box"><div class="eyebrow">Attached document</div><h4>Scene beat worksheet</h4><div style="margin-top:8px"><span class="btn" style="padding:8px 14px;font-size:.78rem">Open PDF</span></div></div>
+      <div class="box"><div class="eyebrow">Up next</div><h4 style="font-size:.95rem">Short film script format · ¶ 6 pages</h4></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- B -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">B</span><h2>Syllabus — term → week → lesson</h2></div>
+  <p class="note">Terms become a scrollable chip row instead of a sidebar. The week timeline is the whole screen, with a sticky "Continue" card above the tab bar so the next thing is always one tap away. Checkboxes sync when signed in.</p>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow pink">Film University · Free</div>
+      <div class="h1">Term 1 — Make a short</div>
+      <div class="prog"><i></i></div>
+      <div class="eyebrow">Week 3 of 8 · 9 of 24 done</div>
+      <div class="termtabs"><span class="chip on">Term 1</span><span class="chip">Term 2</span><span class="chip">Term 3</span><span class="chip">Open shelf</span></div>
+      <div class="week done"><h3>Week 1 — What a shot is for</h3>
+        <div class="item"><span class="cb on"></span><span>What a shot is for</span><span class="k">▶ 6:12</span></div>
+        <div class="item ex"><span class="cb on"></span><span>Outline a kitchen film</span><span class="k">20 min</span></div>
+      </div>
+      <div class="week done"><h3>Week 2 — Sound before picture</h3>
+        <div class="item"><span class="cb on"></span><span>Clean dialogue on a phone</span><span class="k">▶ 9:40</span></div>
+      </div>
+      <div class="week now"><h3>Week 3 — Scenes that turn</h3>
+        <div class="item"><span class="cb on"></span><span>Scenes that turn</span><span class="k">▶ 11:20</span></div>
+        <div class="item"><span class="cb"></span><span>Scene beat worksheet</span><span class="k">¶</span></div>
+        <div class="item ex"><span class="cb"></span><span>Find the turn</span><span class="k">20 min</span></div>
+      </div>
+    </div><div class="fade"></div>
+    <div class="sticky"><div><div class="eyebrow">Continue</div><div class="t">Scene beat worksheet</div></div><span class="btn primary" style="padding:8px 14px;font-size:.78rem">Open</span></div>
+    <div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow">‹ Term 1</div>
+      <div class="h1" style="font-size:1.4rem">Week 3 — Scenes that turn</div>
+      <p class="lead">The week most people get stuck. Two videos, one worksheet, one rewrite. About 50 minutes.</p>
+      <div class="item"><span class="cb on"></span><div><div>Scenes that turn</div><div class="k">Video · 11:20</div></div><span class="k">✓</span></div>
+      <div class="item"><span class="cb"></span><div><div>Scene beat worksheet</div><div class="k">Document · 1 page</div></div><span class="k">›</span></div>
+      <div class="item"><span class="cb"></span><div><div>Dialogue people actually say</div><div class="k">Video · 8:45</div></div><span class="k">›</span></div>
+      <div class="item ex"><span class="cb"></span><div><div>Exercise: find the turn</div><div class="k">20 min · needs a scene</div></div><span class="k">›</span></div>
+      <div class="box" style="margin-top:14px"><div class="eyebrow">When you're done</div><h4>Week 4 — Shot list and call sheet</h4><p>Planning the day, and the two templates you'll use on every shoot.</p></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- C -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">C</span><h2>Library — search → shelves → reading room</h2></div>
+  <p class="note">Search bar up top, filter chips, shelves that scroll sideways. A document opens as a paper page with the tools under it; on the phone "Open PDF" hands it to the system viewer so people can save it to Files or share it.</p>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow pink">Film University · Free</div>
+      <div class="h1">The stacks</div>
+      <div class="search">Search lessons, documents, templates</div>
+      <div class="chips"><span class="chip on">Everything</span><span class="chip">Videos</span><span class="chip">Documents</span><span class="chip">Templates</span></div>
+      <div class="shelf-head"><h3>Producing</h3><span class="eyebrow">6</span></div>
+      <div class="spines">
+        <div class="spine tpl"><span class="kind">Tpl</span><div class="t">Call sheet</div><div class="m">PDF · 1 page</div></div>
+        <div class="spine vid"><span class="kind">▶</span><div class="t">Planning the day</div><div class="m">7:30</div></div>
+        <div class="spine doc"><span class="kind">¶</span><div class="t">Releases, plainly</div><div class="m">3 pages</div></div>
+      </div>
+      <div class="shelf-head"><h3>Writing</h3><span class="eyebrow">9</span></div>
+      <div class="spines">
+        <div class="spine vid"><span class="kind">▶</span><div class="t">The logline</div><div class="m">5:30</div></div>
+        <div class="spine doc"><span class="kind">¶</span><div class="t">One-page outline</div><div class="m">2 pages</div></div>
+        <div class="spine tpl"><span class="kind">Tpl</span><div class="t">Script format</div><div class="m">PDF</div></div>
+      </div>
+      <div class="shelf-head"><h3>Directing</h3><span class="eyebrow">8</span></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow">‹ Producing</div>
+      <div class="h1" style="font-size:1.4rem">Call sheet</div>
+      <div class="page">
+        <h3>CALL SHEET — DAY __ OF __</h3>
+        <p><b>General call:</b> ____ · <b>Shooting call:</b> ____</p>
+        <p><b>Location:</b> ______________ · <b>Parking:</b> ______</p>
+        <p><b>Scenes today</b> Sc. __ / __ · INT/EXT · Day/Night</p>
+        <p><b>Cast</b> Name · Role · Call · On set<br>__________________________</p>
+        <p style="margin:0;font-size:.8rem;color:#5a4a30">Nearest hospital · Emergency contact</p>
+      </div>
+      <span class="btn primary block">Open PDF</span>
+      <div style="height:8px"></div>
+      <span class="btn block">Open in Google Sheets</span>
+      <div class="box" style="margin-top:12px"><div class="eyebrow">Learn to use it</div><div class="teach" style="margin-top:8px"><i></i><span>Planning the day · ▶ 7:30</span></div></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- D -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">D</span><h2>Workshop — today's exercise → exercise</h2></div>
+  <p class="note">The phone is where this one shines: open the app, there's one thing to try today, with the video to watch right under it. The exercise list below filters by time and what you need (a camera, a scene, nothing).</p>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <div class="eyebrow pink">Film University · Free</div>
+      <div class="h1">Workshop</div>
+      <div class="today">
+        <div class="eyebrow olive">Today · Writing · 20 min</div>
+        <h3>Find the turn</h3>
+        <p>Take any scene you've written. One sentence for where it starts, one for where it ends. If they match, it isn't done.</p>
+        <span class="btn primary block">Start →</span>
+      </div>
+      <div class="label">All exercises <small>14</small></div>
+      <div class="chips"><span class="chip on">All</span><span class="chip">15 min</span><span class="chip">Needs a camera</span><span class="chip">Needs a scene</span></div>
+      <div class="excard"><div class="eyebrow olive">Sound · 15 min</div><div class="t">Same line, three rooms</div><p>Record one line in a kitchen, a hallway and outside.</p><div class="teach"><i></i><span>Clean dialogue on a phone · 9:40</span></div></div>
+      <div class="excard"><div class="eyebrow olive">Directing · 30 min</div><div class="t">Six shots, one action</div><p>Film someone making coffee in exactly six shots.</p></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="eyebrow" style="padding:8px 4px 10px">‹ Workshop</div>
+      <div class="eyebrow olive">Writing · 20 min</div>
+      <div class="h1" style="font-size:1.5rem">Find the turn</div>
+      <div class="steps">
+        <div class="step">Pick a scene, any length.</div>
+        <div class="step">Write the start state in one sentence.</div>
+        <div class="step">Write the end state in one sentence.</div>
+        <div class="step">Rewrite until they differ. Keep the old version.</div>
+      </div>
+      <div class="label" style="margin-top:6px">Watch to do it</div>
+      <div class="v"><div class="play">▶</div><span class="k">11:20 · Scenes that turn</span></div>
+      <div class="box" style="margin-top:10px"><div class="eyebrow">Use with</div><h4 style="font-size:.95rem">Scene beat worksheet · ¶ 1 page</h4><div style="margin-top:6px"><span class="btn" style="padding:8px 14px;font-size:.78rem">Open PDF</span></div></div>
+      <span class="btn primary block">I did it ✓</span>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+</body>
+</html>

@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Film University mockup</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1040px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:800px; }
+  .sec { max-width:1040px; margin:0 auto 60px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:28px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.76rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .eyebrow.pink { color:var(--brass); }
+  .btn { font-family:var(--font-mono); font-size:.82rem; padding:10px 18px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .chip { font-family:var(--font-mono); font-size:.76rem; padding:6px 12px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2.2rem; line-height:1.05; margin:6px 0 10px; }
+  .lead { font-size:1.05rem; line-height:1.55; color:var(--ink-dim); max-width:620px; margin:0 0 18px; }
+  .label { font-family:var(--font-mono); font-size:.78rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); margin:26px 0 12px; display:flex; align-items:center; gap:10px; }
+  .label small { color:var(--ink-faint); text-transform:none; letter-spacing:0; font-weight:400; }
+
+  /* topics */
+  .topics { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .topic { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:18px; position:relative; overflow:hidden; min-height:150px; }
+  .topic::after { content:""; position:absolute; right:-30px; bottom:-40px; width:140px; height:140px; border-radius:50%; opacity:.25; }
+  .topic.a::after { background:var(--brass); } .topic.b::after { background:var(--olive); } .topic.c::after { background:var(--sky); }
+  .topic.d::after { background:var(--mint); } .topic.e::after { background:var(--brass-deep); } .topic.f::after { background:var(--ocean-ink); }
+  .topic h3 { font-family:var(--font-display); font-size:1.2rem; margin:8px 0 6px; }
+  .topic p { font-size:.92rem; color:var(--ink-dim); margin:0 0 12px; line-height:1.45; }
+  .topic .m { font-family:var(--font-mono); font-size:.78rem; color:var(--ink-faint); }
+
+  /* lesson rows / cards */
+  .lessons { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .lesson { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; overflow:hidden; }
+  .lesson .v { aspect-ratio:16/9; background:linear-gradient(160deg,#3a2a4f,#1b2740); position:relative; }
+  .lesson .v.doc { background:linear-gradient(160deg,#1f3b3a,#0f1f2f); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-size:2rem; color:var(--mint); }
+  .lesson .k { position:absolute; left:8px; bottom:8px; font-family:var(--font-mono); font-size:.72rem; background:rgba(12,19,31,.8); padding:4px 9px; border-radius:999px; }
+  .lesson .b { padding:12px; }
+  .lesson .t { font-weight:600; font-size:.95rem; line-height:1.3; }
+  .lesson .m { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); margin-top:4px; }
+  .list { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; }
+  .row { display:grid; grid-template-columns:36px 1fr auto; gap:14px; align-items:center; padding:14px 16px; border-top:1px solid var(--hair); }
+  .row:first-child { border-top:0; }
+  .row .n { font-family:var(--font-mono); font-size:.9rem; color:var(--ink-faint); }
+  .row .t { font-weight:600; font-size:.98rem; }
+  .row .m { font-family:var(--font-mono); font-size:.78rem; color:var(--ink-faint); margin-top:3px; }
+  .row .k { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); }
+
+  /* lesson page */
+  .lp { display:grid; grid-template-columns:1.6fr 1fr; gap:24px; }
+  .player { aspect-ratio:16/9; border-radius:12px; background:linear-gradient(160deg,#3a2a4f,#1b2740); display:flex; align-items:center; justify-content:center; }
+  .player span { width:64px; height:64px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+  .side .box { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .side .box h4 { font-family:var(--font-display); margin:4px 0 8px; font-size:1.05rem; }
+  .side p { font-size:.95rem; line-height:1.5; margin:0; color:var(--ink-dim); }
+  .ex { border-left:3px solid var(--olive); background:rgba(231,162,85,.08); }
+  .ex p { color:var(--ink); }
+  .next { display:flex; gap:12px; align-items:center; }
+  .next .th { width:72px; aspect-ratio:16/9; border-radius:6px; background:linear-gradient(160deg,#2b3a5a,#101a2c); }
+
+  /* templates */
+  .tpl { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .tpl .d { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:16px; }
+  .tpl .ic { width:40px; height:50px; border-radius:4px; background:var(--surface-2); border:1px solid var(--hair); margin-bottom:10px; position:relative; }
+  .tpl .ic::after { content:"PDF"; position:absolute; left:0; right:0; bottom:6px; text-align:center; font-family:var(--font-mono); font-size:.72rem; color:var(--mint); }
+  .tpl .t { font-weight:600; font-size:.95rem; }
+  .tpl .m { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); margin:4px 0 10px; }
+
+  /* phones */
+  .phones { display:flex; gap:22px; flex-wrap:wrap; align-items:flex-start; }
+  .phone { width:330px; background:var(--surface-0); border:1px solid var(--hair); border-radius:34px; padding:16px 14px 90px; position:relative; }
+  .phone .h1 { font-size:1.6rem; }
+  .phone .topics { grid-template-columns:1fr 1fr; gap:8px; }
+  .phone .topic { min-height:110px; padding:14px; }
+  .phone .topic h3 { font-size:1rem; }
+  .phone .topic p { display:none; }
+  .phone .lessons { grid-template-columns:1fr; }
+  .phone .player { border-radius:10px; }
+  .ptabs { position:absolute; left:12px; right:12px; bottom:16px; display:flex; justify-content:space-around; background:rgba(41,39,25,.96); border-radius:999px; padding:10px 6px; }
+  .ptabs span { font-family:var(--font-mono); font-size:.78rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .ptabs span.on { color:var(--brass); }
+
+  @media (max-width:760px) { .topics,.lessons,.tpl,.lp { grid-template-columns:1fr 1fr; } .lp { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Film University — mockups</h1>
+  <p class="note">Free learning hub on the Connect side at <span style="font-family:var(--font-mono)">/university</span>. Topics hold ordered lessons; a lesson is a video or a document, and can carry a short exercise. Templates are documents you download and use. Admins add everything from the admin area. Same screens on mobile.</p>
+</div>
+
+<!-- 1 LANDING -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">1</span><h2>Landing — /university</h2></div>
+  <p class="note">Big, plain promise up top. Topics as a grid you can scan in one glance, then "Start here" for first-timers, newest lessons, and the templates shelf. No sign-in needed for any of it.</p>
+  <div class="frame">
+    <div class="eyebrow pink">Studio Tapa · Free</div>
+    <div class="h1">Film University</div>
+    <p class="lead">Short lessons and working documents on making films, writing them, and getting them seen. Free to watch, free to download, free to practice with.</p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><span class="btn primary">Start here</span><span class="btn">Browse templates</span></div>
+
+    <div class="label">Topics <small>6 topics · 38 lessons</small></div>
+    <div class="topics">
+      <div class="topic a"><div class="eyebrow">Directing</div><h3>Directing</h3><p>Blocking, working with actors, shot choice.</p><div class="m">8 lessons · 5 videos · 3 docs</div></div>
+      <div class="topic b"><div class="eyebrow">Writing</div><h3>Writing</h3><p>Loglines to shooting scripts, and the formats that go with them.</p><div class="m">9 lessons · 4 videos · 5 docs</div></div>
+      <div class="topic c"><div class="eyebrow">Editing</div><h3>Editing</h3><p>Rhythm, coverage, cutting dialogue, finishing.</p><div class="m">6 lessons</div></div>
+      <div class="topic d"><div class="eyebrow">Sound</div><h3>Sound</h3><p>Recording on set, dialogue clean-up, mixing for phones.</p><div class="m">5 lessons</div></div>
+      <div class="topic e"><div class="eyebrow">Producing</div><h3>Producing</h3><p>Budgets, call sheets, releases, getting it done.</p><div class="m">6 lessons · mostly docs</div></div>
+      <div class="topic f"><div class="eyebrow">Getting seen</div><h3>Getting seen</h3><p>Festivals, pitching, Pitch Room, posting short-form.</p><div class="m">4 lessons</div></div>
+    </div>
+
+    <div class="label">Start here <small>four lessons if you've never made anything</small></div>
+    <div class="lessons">
+      <div class="lesson"><div class="v"><span class="k">▶ 6:12</span></div><div class="b"><div class="t">What a shot is for</div><div class="m">Directing · lesson 1</div></div></div>
+      <div class="lesson"><div class="v doc">¶</div><div class="b"><div class="t">The one-page outline</div><div class="m">Writing · document · 2 pages</div></div></div>
+      <div class="lesson"><div class="v"><span class="k">▶ 9:40</span></div><div class="b"><div class="t">Recording clean dialogue on a phone</div><div class="m">Sound · lesson 1</div></div></div>
+      <div class="lesson"><div class="v"><span class="k">▶ 7:05</span></div><div class="b"><div class="t">Cutting your first scene</div><div class="m">Editing · lesson 1</div></div></div>
+    </div>
+
+    <div class="label">Templates <small>download, fill in, shoot</small></div>
+    <div class="tpl">
+      <div class="d"><div class="ic"></div><div class="t">Shot list</div><div class="m">PDF + Sheets · Producing</div><span class="btn" style="padding:7px 14px;font-size:.76rem">Download</span></div>
+      <div class="d"><div class="ic"></div><div class="t">Call sheet</div><div class="m">PDF · Producing</div><span class="btn" style="padding:7px 14px;font-size:.76rem">Download</span></div>
+      <div class="d"><div class="ic"></div><div class="t">Short film script format</div><div class="m">PDF · Writing</div><span class="btn" style="padding:7px 14px;font-size:.76rem">Download</span></div>
+      <div class="d"><div class="ic"></div><div class="t">Micro-budget worksheet</div><div class="m">Sheets · Producing</div><span class="btn" style="padding:7px 14px;font-size:.76rem">Download</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2 TOPIC -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">2</span><h2>Topic — /university/writing</h2></div>
+  <p class="note">An ordered list, numbered, so it reads like a path. Videos and documents mixed in the order that makes sense. Filter chips to show just one kind.</p>
+  <div class="frame">
+    <div class="eyebrow">Film University / Writing</div>
+    <div class="h1">Writing</div>
+    <p class="lead">From a sentence to a shooting script. Nine lessons, about two hours of video and five documents you'll keep using.</p>
+    <div style="display:flex;gap:6px;margin-bottom:14px"><span class="chip on">All 9</span><span class="chip">Videos 4</span><span class="chip">Documents 5</span></div>
+    <div class="list">
+      <div class="row"><div class="n">01</div><div><div class="t">The logline</div><div class="m">Video · 5:30 · exercise included</div></div><div class="k">▶ Watch</div></div>
+      <div class="row"><div class="n">02</div><div><div class="t">The one-page outline</div><div class="m">Document · 2 pages · template</div></div><div class="k">¶ Read</div></div>
+      <div class="row"><div class="n">03</div><div><div class="t">Scenes that turn</div><div class="m">Video · 11:20 · exercise included</div></div><div class="k">▶ Watch</div></div>
+      <div class="row"><div class="n">04</div><div><div class="t">Short film script format</div><div class="m">Document · 6 pages · template</div></div><div class="k">¶ Read</div></div>
+      <div class="row"><div class="n">05</div><div><div class="t">Dialogue people actually say</div><div class="m">Video · 8:45</div></div><div class="k">▶ Watch</div></div>
+      <div class="row" style="opacity:.6"><div class="n">06</div><div><div class="t">Rewriting: the second pass</div><div class="m">Video · 12:00</div></div><div class="k">▶ Watch</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 LESSON -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">3</span><h2>Lesson — /university/writing/scenes-that-turn</h2></div>
+  <p class="note">The player (same signed Cloudflare playback as episodes) or the document viewer on the left. On the right: what it covers, the exercise in its own amber box, the attached document if any, and what's next. A document lesson shows the PDF inline with a Download button in the same spot.</p>
+  <div class="frame">
+    <div class="lp">
+      <div>
+        <div class="player"><span>▶</span></div>
+        <div class="eyebrow" style="margin-top:14px">Writing · lesson 3 of 9 · 11:20</div>
+        <div class="h1" style="font-size:1.7rem">Scenes that turn</div>
+        <p class="lead" style="margin:0">Every scene is a small argument: someone wants something, and by the end the situation has changed. We look at three scenes from Studio Tapa shorts and mark the turn in each.</p>
+      </div>
+      <div class="side">
+        <div class="box ex"><div class="eyebrow" style="color:var(--olive)">Exercise · 20 min</div><h4>Find the turn</h4><p>Take any scene you've written. Write one sentence for the start state and one for the end state. If they're the same, the scene isn't done. Rewrite until they differ.</p></div>
+        <div class="box"><div class="eyebrow">Attached document</div><h4>Scene beat worksheet</h4><p>One page you fill in per scene.</p><div style="margin-top:10px"><span class="btn" style="padding:7px 14px;font-size:.76rem">Download PDF</span></div></div>
+        <div class="box"><div class="eyebrow">Up next</div><div class="next" style="margin-top:8px"><div class="th"></div><div><div style="font-weight:600;font-size:.92rem">Short film script format</div><div class="eyebrow" style="margin-top:2px">Document · 6 pages</div></div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 MOBILE -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">4</span><h2>Mobile — Home group → Film University</h2></div>
+  <p class="note">Same content through the app's API. Topics as a two-up grid, lesson as a full-width player with the exercise right under it. Documents open in the system PDF viewer with a share/save option.</p>
+  <div class="phones">
+    <div class="phone">
+      <div class="eyebrow pink">Free</div>
+      <div class="h1">Film University</div>
+      <p class="lead" style="font-size:.95rem">Short lessons and working documents. Free to use and practice with.</p>
+      <div class="label" style="margin-top:14px">Topics</div>
+      <div class="topics">
+        <div class="topic a"><h3>Directing</h3><div class="m">8 lessons</div></div>
+        <div class="topic b"><h3>Writing</h3><div class="m">9 lessons</div></div>
+        <div class="topic c"><h3>Editing</h3><div class="m">6 lessons</div></div>
+        <div class="topic d"><h3>Sound</h3><div class="m">5 lessons</div></div>
+      </div>
+      <div class="label">Start here</div>
+      <div class="lessons"><div class="lesson"><div class="v"><span class="k">▶ 6:12</span></div><div class="b"><div class="t">What a shot is for</div><div class="m">Directing · lesson 1</div></div></div></div>
+      <div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div>
+    </div>
+    <div class="phone">
+      <div class="eyebrow">‹ Writing · 3 of 9</div>
+      <div class="player" style="margin-top:10px"><span>▶</span></div>
+      <div class="h1" style="font-size:1.35rem;margin-top:12px">Scenes that turn</div>
+      <p class="lead" style="font-size:.92rem;margin-bottom:12px">Every scene is a small argument: someone wants something, and by the end the situation has changed.</p>
+      <div class="side">
+        <div class="box ex"><div class="eyebrow" style="color:var(--olive)">Exercise · 20 min</div><h4 style="font-size:1rem">Find the turn</h4><p style="font-size:.9rem">Write one sentence for the start state and one for the end state. If they're the same, rewrite.</p></div>
+        <div class="box"><div class="eyebrow">Attached document</div><h4 style="font-size:1rem">Scene beat worksheet</h4><div style="margin-top:8px"><span class="btn" style="padding:7px 14px;font-size:.76rem">Open PDF</span></div></div>
+      </div>
+      <div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 ADMIN -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">5</span><h2>Admin — /admin/university</h2></div>
+  <p class="note">One page in the new admin shell under Content: topics on the left (add, rename, reorder), lessons for the selected topic on the right (add video via the same Cloudflare upload as episodes, or upload a PDF; title, description, exercise text, attached document, order, published toggle). Templates are documents with a "template" tag so the landing shelf picks them up.</p>
+  <div class="frame" style="padding:18px">
+    <div style="display:grid;grid-template-columns:220px 1fr;gap:16px">
+      <div class="list"><div class="row" style="grid-template-columns:1fr"><div class="t">Directing <span class="eyebrow">8</span></div></div><div class="row" style="grid-template-columns:1fr;background:var(--surface-2)"><div class="t">Writing <span class="eyebrow">9</span></div></div><div class="row" style="grid-template-columns:1fr"><div class="t">Editing <span class="eyebrow">6</span></div></div><div class="row" style="grid-template-columns:1fr"><div class="eyebrow pink">+ Add topic</div></div></div>
+      <div class="list">
+        <div class="row"><div class="n">01</div><div><div class="t">The logline</div><div class="m">Video · 5:30 · published</div></div><div class="k">Edit</div></div>
+        <div class="row"><div class="n">02</div><div><div class="t">The one-page outline</div><div class="m">PDF · template · published</div></div><div class="k">Edit</div></div>
+        <div class="row"><div class="n">03</div><div><div class="t">Scenes that turn</div><div class="m">Video · 11:20 · exercise · published</div></div><div class="k">Edit</div></div>
+        <div class="row" style="opacity:.6"><div class="n">07</div><div><div class="t">Rewriting: the second pass</div><div class="m">Video · draft</div></div><div class="k">Edit</div></div>
+        <div class="row" style="grid-template-columns:1fr"><div class="eyebrow pink">+ Add lesson · video or document</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
