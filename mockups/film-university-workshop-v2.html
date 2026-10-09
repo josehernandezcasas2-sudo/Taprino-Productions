@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Workshop v2 — three redesign directions</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1120px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:860px; }
+  .sec { max-width:1120px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:28px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2.3rem; line-height:1.05; margin:6px 0 8px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:620px; margin:0 0 18px; }
+  .label { font-family:var(--font-mono); font-size:.74rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); margin:26px 0 12px; display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .label small { color:var(--ink-faint); text-transform:none; letter-spacing:0; font-weight:400; }
+  .label a { color:var(--brass); text-decoration:none; text-transform:none; letter-spacing:0; font-size:.74rem; }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.72rem; padding:6px 12px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .steps { list-style:none; counter-reset:s; padding:0; margin:0 0 14px; }
+  .steps li { position:relative; padding-left:34px; margin-bottom:8px; font-size:.95rem; line-height:1.45; counter-increment:s; }
+  .steps li::before { content:counter(s); position:absolute; left:0; top:0; width:22px; height:22px; border:1px solid var(--olive); border-radius:50%; color:var(--olive); font-family:var(--font-mono); font-size:.7rem; display:flex; align-items:center; justify-content:center; }
+  .th { display:block; aspect-ratio:16/9; border-radius:10px; background:linear-gradient(160deg,#3a2a4f,#1b2740); position:relative; overflow:hidden; }
+  .th.b { background:linear-gradient(160deg,#4a3418,#1b1a12); } .th.c { background:linear-gradient(160deg,#1f3b3a,#0f1f2f); } .th.d { background:linear-gradient(160deg,#5a2430,#1b1020); } .th.e { background:linear-gradient(160deg,#243c5a,#101a2c); }
+  .th.paper { background:var(--paper); }
+  .th.paper::before { content:""; position:absolute; left:12%; right:12%; top:16%; height:6px; background:#1a1408; border-radius:3px; }
+  .th.paper::after { content:""; position:absolute; left:12%; right:30%; top:34%; height:40%; background:repeating-linear-gradient(180deg,#cab59e 0 5px,transparent 5px 14px); }
+  .th .k { position:absolute; left:8px; bottom:8px; font-family:var(--font-mono); font-size:.7rem; background:rgba(12,19,31,.82); padding:3px 8px; border-radius:999px; }
+  .th .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:44px; height:44px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:1rem; }
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; }
+  .card .t { font-family:var(--font-display); font-weight:700; font-size:1rem; line-height:1.25; margin:4px 0 4px; display:block; }
+  .card p { font-size:.88rem; color:var(--ink-dim); line-height:1.45; margin:0 0 6px; }
+  .rail { display:flex; gap:10px; overflow:hidden; }
+  .rail > * { flex:0 0 232px; }
+  .done { color:var(--ok); }
+
+  /* phones */
+  .phones { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top:14px; }
+  .phone { width:340px; height:720px; background:var(--surface-0); border:1px solid var(--hair); border-radius:36px; padding:14px 14px 0; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .scr { flex:1; overflow:hidden; padding:4px 2px 110px; }
+  .top { display:flex; align-items:center; justify-content:space-between; padding:6px 4px 12px; }
+  .top .brand { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .top .brand small { display:block; font-family:var(--font-mono); font-size:.72rem; color:var(--brass); letter-spacing:.1em; text-transform:uppercase; }
+  .top .ic { width:30px; height:30px; border-radius:50%; background:var(--surface-2); }
+  .ptabs { position:absolute; left:14px; right:14px; bottom:18px; display:flex; justify-content:space-around; background:rgba(41,39,25,.96); border:1px solid var(--hair); border-radius:999px; padding:12px 6px; }
+  .ptabs span { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .ptabs span.on { color:var(--brass); }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:120px; background:linear-gradient(180deg,rgba(12,19,31,0),var(--surface-0) 70%); pointer-events:none; }
+  .phone .h1 { font-size:1.6rem; }
+  .phone .label { margin:18px 0 10px; }
+  .phone .rail > * { flex:0 0 200px; }
+
+  /* ---- A: hero + shelves ---- */
+  .hero { position:relative; display:grid; grid-template-columns:1.1fr 1fr; gap:0; border:1px solid var(--olive); border-radius:18px; overflow:hidden; background:var(--surface-1); }
+  .hero > div:first-child { padding:26px; }
+  .hero .art { background:linear-gradient(160deg,#4a3418,#1b1a12); position:relative; min-height:280px; }
+  .hero .art .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:64px; height:64px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:1.4rem; }
+  .hero .art .k { position:absolute; left:14px; bottom:14px; font-family:var(--font-mono); font-size:.74rem; background:rgba(12,19,31,.82); padding:5px 10px; border-radius:999px; }
+  .hero .art .use { position:absolute; right:14px; bottom:14px; font-family:var(--font-mono); font-size:.74rem; color:var(--mint); background:rgba(12,19,31,.82); padding:5px 10px; border-radius:999px; }
+  .hero h2 { font-family:var(--font-display); font-size:2rem; line-height:1.05; margin:6px 0 10px; }
+  .hero p { color:var(--ink-dim); line-height:1.55; margin:0 0 12px; }
+  .topicstrip { display:flex; gap:8px; flex-wrap:wrap; }
+  .topicpill { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; font-size:.9rem; padding:8px 14px 8px 10px; border-radius:999px; background:var(--surface-1); border:1px solid var(--hair); }
+  .topicpill i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .topicpill small { font-family:var(--font-mono); font-weight:400; font-size:.7rem; color:var(--ink-faint); }
+  .shelf-head { display:flex; justify-content:space-between; align-items:baseline; margin:22px 0 10px; }
+  .shelf-head h3 { font-family:var(--font-display); font-size:1.05rem; margin:0; display:flex; align-items:center; gap:8px; }
+  .shelf-head h3 i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .shelf-head a { font-family:var(--font-mono); font-size:.72rem; color:var(--brass); text-decoration:none; }
+
+  /* ---- B: desk ---- */
+  .desk { display:grid; grid-template-columns:320px 1fr; gap:24px; align-items:start; }
+  .desk-side { display:flex; flex-direction:column; gap:12px; }
+  .today { background:var(--surface-1); border:1px solid var(--olive); border-radius:14px; padding:18px; }
+  .today h3 { font-family:var(--font-display); font-size:1.35rem; margin:4px 0 8px; }
+  .today p { color:var(--ink-dim); line-height:1.5; margin:0 0 10px; font-size:.92rem; }
+  .side-list { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; overflow:hidden; }
+  .side-row { display:flex; align-items:center; gap:10px; padding:10px 14px; border-top:1px solid var(--hair); font-size:.92rem; }
+  .side-row:first-child { border-top:0; }
+  .side-row i { width:10px; height:10px; border-radius:50%; flex:none; }
+  .side-row small { margin-left:auto; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); }
+  .group { margin-bottom:22px; }
+  .group h3 { font-family:var(--font-display); font-size:1rem; margin:0 0 8px; display:flex; align-items:center; gap:8px; }
+  .group h3 i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .exrow { display:grid; grid-template-columns:96px 1fr auto; gap:14px; align-items:center; background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:10px 12px; margin-bottom:8px; }
+  .exrow .th { border-radius:6px; }
+  .exrow .t { font-family:var(--font-display); font-weight:700; font-size:.98rem; display:block; }
+  .exrow p { font-size:.86rem; color:var(--ink-dim); line-height:1.4; margin:2px 0 0; }
+  .exrow .k { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); text-align:right; white-space:nowrap; }
+  .exrow .k b { display:block; color:var(--ink); font-weight:600; }
+
+  /* ---- C: path ---- */
+  .week { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin:0 0 18px; }
+  .day { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:10px 8px; text-align:center; }
+  .day .d { font-family:var(--font-mono); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); }
+  .day .m { font-family:var(--font-display); font-weight:700; font-size:1.1rem; margin:3px 0; }
+  .day .s { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); }
+  .day.done { border-color:rgba(132,205,152,.5); } .day.done .s { color:var(--ok); }
+  .day.now { border-color:var(--olive); background:rgba(231,162,85,.08); } .day.now .s { color:var(--olive); }
+  .streak { font-family:var(--font-mono); font-size:.74rem; color:var(--ink-dim); margin:-8px 0 18px; }
+  .streak b { color:var(--ok); font-weight:600; }
+  .path { border-left:2px solid var(--hair); margin-left:10px; padding-left:22px; }
+  .pathitem { position:relative; margin-bottom:12px; }
+  .pathitem::before { content:""; position:absolute; left:-30px; top:14px; width:12px; height:12px; border-radius:50%; background:var(--surface-3); border:2px solid var(--surface-0); }
+  .pathitem.done::before { background:var(--ok); } .pathitem.now::before { background:var(--olive); }
+  .pathitem .card { display:grid; grid-template-columns:1fr 150px; gap:14px; align-items:center; }
+  .pathitem .card .th { border-radius:8px; }
+  .pathitem.done .card { opacity:.65; }
+  .pathitem.now .card { border-color:var(--olive); }
+  .next3 { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+
+  @media (max-width:760px) { .hero, .desk, .next3 { grid-template-columns:1fr; } .desk-side { position:static; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Workshop — three ways to make the home page better</h1>
+  <p class="note">Same data as the version that just shipped (today's exercise, exercises with the lessons that teach them, topics, templates). Each direction changes what the page emphasises and how far you scroll. Shown with the full sample catalogue (10 exercises, 20 lessons, 6 templates), desktop then phone.</p>
+</div>
+
+<!-- ============ A ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">A</span><h2>Hero + shelves — one big thing, then rails by topic</h2></div>
+  <p class="note">Today's exercise becomes a full-width hero with the lesson video as its right half. Topics turn into a pill strip (not six cards). Exercises are horizontal shelves per topic, so the page is wide instead of tall, and the templates shelf gets real covers in a rail. Roughly half the scroll of today's page.</p>
+  <div class="frame">
+    <span class="eyebrow pink">Film University · Free</span>
+    <div class="h1">Workshop</div>
+    <p class="lead">Pick an exercise, do it today, watch what you need along the way.</p>
+
+    <div class="hero">
+      <div>
+        <span class="eyebrow olive">Today's exercise · Writing · 20 min</span>
+        <h2>Find the turn</h2>
+        <p>Take any scene you've written. Write one sentence for where it starts and one for where it ends. If they're the same sentence, the scene isn't done yet.</p>
+        <ol class="steps"><li>Pick a scene, any length.</li><li>Write the start state in one sentence.</li><li>Write the end state in one sentence.</li><li>Rewrite until they differ. Keep the old version.</li></ol>
+        <span class="btn primary">Start →</span> <span class="btn">I did it ✓</span> <span class="btn ghost">Show me another</span>
+      </div>
+      <div class="art"><span class="play">▶</span><span class="k">▶ 11:20 · Scenes that turn</span><span class="use">¶ Scene beat worksheet</span></div>
+    </div>
+
+    <div class="label">Topics <small>6 · 20 lessons</small></div>
+    <div class="topicstrip">
+      <span class="topicpill"><i style="background:#f85f73"></i>Directing <small>3</small></span>
+      <span class="topicpill"><i style="background:#e7a255"></i>Writing <small>6</small></span>
+      <span class="topicpill"><i style="background:#8499dc"></i>Editing <small>2</small></span>
+      <span class="topicpill"><i style="background:#93d0a4"></i>Sound <small>2</small></span>
+      <span class="topicpill"><i style="background:#811826"></i>Producing <small>5</small></span>
+      <span class="topicpill"><i style="background:#283c63"></i>Getting seen <small>2</small></span>
+    </div>
+
+    <div class="shelf-head"><h3><i style="background:#e7a255"></i>Writing exercises</h3><a href="#">All 2 →</a></div>
+    <div class="rail">
+      <div class="card"><span class="th b"><span class="k">▶ 11:20</span></span><span class="eyebrow olive" style="margin-top:8px">20 min · needs a scene</span><span class="t">Find the turn</span><p>One sentence for the start, one for the end.</p></div>
+      <div class="card"><span class="th"><span class="k">▶ 5:30</span></span><span class="eyebrow olive" style="margin-top:8px">15 min · needs nothing</span><span class="t">Ten loglines, one film</span><p>Write it ten ways, keep the one you'd pay for.</p></div>
+    </div>
+    <div class="shelf-head"><h3><i style="background:#f85f73"></i>Directing exercises</h3><a href="#">All 2 →</a></div>
+    <div class="rail">
+      <div class="card"><span class="th d"><span class="k">▶ 6:12</span></span><span class="eyebrow olive" style="margin-top:8px">30 min · camera + person</span><span class="t">Six shots, one action</span><p>Coffee, in exactly six shots.</p></div>
+      <div class="card"><span class="th e"><span class="k">▶ 9:00</span></span><span class="eyebrow olive" style="margin-top:8px">25 min · camera + person</span><span class="t">Block it in the kitchen</span><p>Three positions on the floor, then shoot.</p></div>
+    </div>
+    <div class="shelf-head"><h3><i style="background:#93d0a4"></i>Sound exercises</h3><a href="#">All 2 →</a></div>
+    <div class="rail">
+      <div class="card"><span class="th c"><span class="k">▶ 9:40</span></span><span class="eyebrow olive" style="margin-top:8px">15 min · a phone</span><span class="t">Same line, three rooms</span><p>Kitchen, hallway, outside.</p></div>
+      <div class="card"><span class="th"><span class="k">▶ 10:30</span></span><span class="eyebrow olive" style="margin-top:8px">20 min · footage</span><span class="t">Listen on the worst speaker</span><p>Fix only what you can't hear.</p></div>
+      <div class="card" style="opacity:.45"><span class="th b"></span><span class="eyebrow olive" style="margin-top:8px">…</span><span class="t">Producing, Editing, Getting seen shelves follow</span></div>
+    </div>
+
+    <div class="label">Templates <small>download, fill in, shoot</small><a href="#">All 6 →</a></div>
+    <div class="rail">
+      <div class="card" style="padding:0;overflow:hidden"><span class="th paper" style="border-radius:0"></span><div style="padding:10px 12px"><span class="t">Call sheet</span><span class="meta">PDF · 1 page · Producing</span></div></div>
+      <div class="card" style="padding:0;overflow:hidden"><span class="th paper" style="border-radius:0"></span><div style="padding:10px 12px"><span class="t">Shot list</span><span class="meta">PDF · 1 page · Producing</span></div></div>
+      <div class="card" style="padding:0;overflow:hidden"><span class="th paper" style="border-radius:0"></span><div style="padding:10px 12px"><span class="t">Scene beat worksheet</span><span class="meta">PDF · 1 page · Writing</span></div></div>
+      <div class="card" style="padding:0;overflow:hidden"><span class="th paper" style="border-radius:0"></span><div style="padding:10px 12px"><span class="t">Short film script format</span><span class="meta">PDF · 6 pages · Writing</span></div></div>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Film University · Free</span>
+      <div class="h1">Workshop</div>
+      <div class="hero" style="grid-template-columns:1fr">
+        <div class="art" style="min-height:150px"><span class="play">▶</span><span class="k">▶ 11:20 · Scenes that turn</span></div>
+        <div style="padding:14px">
+          <span class="eyebrow olive">Today · Writing · 20 min</span>
+          <h2 style="font-size:1.4rem">Find the turn</h2>
+          <p style="font-size:.9rem">One sentence for the start, one for the end. If they match, it isn't done.</p>
+          <span class="btn primary" style="display:block;text-align:center">Start →</span>
+        </div>
+      </div>
+      <div class="label">Topics</div>
+      <div class="topicstrip" style="flex-wrap:nowrap;overflow:hidden">
+        <span class="topicpill"><i style="background:#f85f73"></i>Directing</span><span class="topicpill"><i style="background:#e7a255"></i>Writing</span><span class="topicpill"><i style="background:#8499dc"></i>Editing</span><span class="topicpill"><i style="background:#93d0a4"></i>Sound</span>
+      </div>
+      <div class="shelf-head"><h3><i style="background:#e7a255"></i>Writing</h3><a href="#">All →</a></div>
+      <div class="rail"><div class="card"><span class="th b"><span class="k">▶ 11:20</span></span><span class="t" style="margin-top:8px">Find the turn</span><span class="meta">20 min</span></div><div class="card"><span class="th"><span class="k">▶ 5:30</span></span><span class="t" style="margin-top:8px">Ten loglines</span><span class="meta">15 min</span></div></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- ============ B ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">B</span><h2>The desk — today pinned on the left, the catalogue as a list on the right</h2></div>
+  <p class="note">Two columns. Left stays put while you scroll: today's exercise (compact) and the topic list with counts, which doubles as the filter. Right is every exercise as a row with its lesson thumbnail, grouped under topic headings, so 20 or 40 exercises stay scannable. Templates become a row list too. Densest of the three; reads like a workbook index.</p>
+  <div class="frame">
+    <span class="eyebrow pink">Film University · Free</span>
+    <div class="h1">Workshop</div>
+    <p class="lead">Pick an exercise, do it today, watch what you need along the way.</p>
+    <div class="desk">
+      <aside class="desk-side">
+        <div class="today">
+          <span class="eyebrow olive">Today · Writing · 20 min</span>
+          <h3>Find the turn</h3>
+          <p>One sentence for where the scene starts, one for where it ends. If they match, it isn't done.</p>
+          <span class="th b" style="margin-bottom:10px"><span class="play">▶</span><span class="k">▶ 11:20 · Scenes that turn</span></span>
+          <span class="btn primary sm">Start →</span> <span class="btn sm">I did it ✓</span>
+        </div>
+        <div class="side-list">
+          <div class="side-row" style="background:var(--surface-2)"><span style="font-family:var(--font-mono);font-size:.72rem;color:var(--brass)">ALL</span>Every exercise<small>10</small></div>
+          <div class="side-row"><i style="background:#f85f73"></i>Directing<small>2 · 3 lessons</small></div>
+          <div class="side-row"><i style="background:#e7a255"></i>Writing<small>2 · 6 lessons</small></div>
+          <div class="side-row"><i style="background:#8499dc"></i>Editing<small>1 · 2 lessons</small></div>
+          <div class="side-row"><i style="background:#93d0a4"></i>Sound<small>2 · 2 lessons</small></div>
+          <div class="side-row"><i style="background:#811826"></i>Producing<small>2 · 5 lessons</small></div>
+          <div class="side-row"><i style="background:#283c63"></i>Getting seen<small>1 · 2 lessons</small></div>
+          <div class="side-row"><span style="color:var(--mint)">¶</span>Templates<small>6</small></div>
+        </div>
+      </aside>
+      <div>
+        <div class="group"><h3><i style="background:#e7a255"></i>Writing</h3>
+          <div class="exrow"><span class="th b"></span><div><span class="t">Find the turn <span class="done">· done ✓</span></span><p>One sentence for the start, one for the end.</p></div><div class="k"><b>20 min</b>needs a scene</div></div>
+          <div class="exrow"><span class="th"></span><div><span class="t">Ten loglines, one film</span><p>Write it ten ways, keep the one you'd pay for.</p></div><div class="k"><b>15 min</b>needs nothing</div></div>
+        </div>
+        <div class="group"><h3><i style="background:#f85f73"></i>Directing</h3>
+          <div class="exrow"><span class="th d"></span><div><span class="t">Six shots, one action</span><p>Film someone making coffee in exactly six shots.</p></div><div class="k"><b>30 min</b>camera + person</div></div>
+          <div class="exrow"><span class="th e"></span><div><span class="t">Block it in the kitchen</span><p>Three positions on the floor, then shoot it wide and close.</p></div><div class="k"><b>25 min</b>camera + person</div></div>
+        </div>
+        <div class="group"><h3><i style="background:#93d0a4"></i>Sound</h3>
+          <div class="exrow"><span class="th c"></span><div><span class="t">Same line, three rooms</span><p>Kitchen, hallway, outside. Listen for what the room adds.</p></div><div class="k"><b>15 min</b>a phone</div></div>
+          <div class="exrow"><span class="th"></span><div><span class="t">Listen on the worst speaker</span><p>Mix on headphones, check on a phone, fix only what you lost.</p></div><div class="k"><b>20 min</b>footage</div></div>
+        </div>
+        <div class="group" style="opacity:.45"><h3><i style="background:#811826"></i>Producing · Editing · Getting seen</h3><div class="exrow"><span class="th b"></span><div><span class="t">… four more rows</span></div><div class="k"></div></div></div>
+        <div class="group"><h3><span style="color:var(--mint)">¶</span> Templates</h3>
+          <div class="exrow"><span class="th paper"></span><div><span class="t">Call sheet</span><p>PDF · 1 page · Producing</p></div><div class="k"><span class="btn sm">Download</span></div></div>
+          <div class="exrow"><span class="th paper"></span><div><span class="t">Scene beat worksheet</span><p>PDF · 1 page · Writing</p></div><div class="k"><span class="btn sm">Download</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Film University · Free</span>
+      <div class="h1">Workshop</div>
+      <div class="today">
+        <span class="eyebrow olive">Today · Writing · 20 min</span>
+        <h3>Find the turn</h3>
+        <p>One sentence for the start, one for the end. If they match, it isn't done.</p>
+        <span class="btn primary sm">Start →</span> <span class="btn sm">I did it ✓</span>
+      </div>
+      <div class="chips" style="margin:14px 0 10px;flex-wrap:nowrap;overflow:hidden"><span class="chip on">All 10</span><span class="chip">Directing</span><span class="chip">Writing</span><span class="chip">Editing</span><span class="chip">Sound</span></div>
+      <div class="group"><h3><i style="background:#e7a255"></i>Writing</h3>
+        <div class="exrow" style="grid-template-columns:72px 1fr"><span class="th b"></span><div><span class="t" style="font-size:.9rem">Find the turn</span><span class="meta">20 min · needs a scene · done ✓</span></div></div>
+        <div class="exrow" style="grid-template-columns:72px 1fr"><span class="th"></span><div><span class="t" style="font-size:.9rem">Ten loglines, one film</span><span class="meta">15 min · needs nothing</span></div></div>
+      </div>
+      <div class="group"><h3><i style="background:#f85f73"></i>Directing</h3>
+        <div class="exrow" style="grid-template-columns:72px 1fr"><span class="th d"></span><div><span class="t" style="font-size:.9rem">Six shots, one action</span><span class="meta">30 min · camera + person</span></div></div>
+      </div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- ============ C ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">C</span><h2>The week — your seven days, then what's next for you</h2></div>
+  <p class="note">Leans on the "I did it" state that's already stored on the device. A seven-day strip shows what you did and today's slot; below it, "Up next for you" is three exercises you haven't done, then the full catalogue as a path with done items faded. No sign-in needed; it just reads the device's done list. Strongest habit pull, and the only one that changes when you come back tomorrow.</p>
+  <div class="frame">
+    <span class="eyebrow pink">Film University · Free</span>
+    <div class="h1">Workshop</div>
+    <p class="lead">One exercise a day. Here's your week.</p>
+    <div class="week">
+      <div class="day done"><div class="d">Fri</div><div class="m">3</div><div class="s">✓ done</div></div>
+      <div class="day done"><div class="d">Sat</div><div class="m">4</div><div class="s">✓ done</div></div>
+      <div class="day"><div class="d">Sun</div><div class="m">5</div><div class="s">—</div></div>
+      <div class="day done"><div class="d">Mon</div><div class="m">6</div><div class="s">✓ done</div></div>
+      <div class="day done"><div class="d">Tue</div><div class="m">7</div><div class="s">✓ done</div></div>
+      <div class="day done"><div class="d">Wed</div><div class="m">8</div><div class="s">✓ done</div></div>
+      <div class="day now"><div class="d">Thu</div><div class="m">9</div><div class="s">today</div></div>
+    </div>
+    <div class="streak"><b>5 of the last 7 days</b> · 11 exercises done on this device</div>
+
+    <div class="today" style="display:grid;grid-template-columns:1.2fr 1fr;gap:18px">
+      <div>
+        <span class="eyebrow olive">Today · Writing · 20 min</span>
+        <h3 style="font-size:1.6rem">Find the turn</h3>
+        <p>Take any scene you've written. One sentence for where it starts, one for where it ends. If they match, it isn't done.</p>
+        <span class="btn primary">Start →</span> <span class="btn">I did it ✓</span> <span class="btn ghost">Swap it</span>
+      </div>
+      <div><span class="th b"><span class="play">▶</span><span class="k">▶ 11:20 · Scenes that turn</span></span><span class="meta" style="margin-top:8px">Use with · ¶ Scene beat worksheet</span></div>
+    </div>
+
+    <div class="label">Up next for you <small>three you haven't done</small></div>
+    <div class="next3">
+      <div class="card"><span class="th d"><span class="k">▶ 6:12</span></span><span class="eyebrow olive" style="margin-top:8px">Directing · 30 min</span><span class="t">Six shots, one action</span><p>Coffee, in exactly six shots.</p></div>
+      <div class="card"><span class="th c"><span class="k">▶ 9:40</span></span><span class="eyebrow olive" style="margin-top:8px">Sound · 15 min</span><span class="t">Same line, three rooms</span><p>Kitchen, hallway, outside.</p></div>
+      <div class="card"><span class="th e"><span class="k">▶ 8:20</span></span><span class="eyebrow olive" style="margin-top:8px">Getting seen · 30 min</span><span class="t">Pick three festivals</span><p>Three deadlines in your calendar.</p></div>
+    </div>
+
+    <div class="label">All exercises <small>10 · 5 done</small><a href="#">Lessons by topic →</a></div>
+    <div class="path">
+      <div class="pathitem done"><div class="card"><div><span class="eyebrow olive">Writing · 15 min · done Tue</span><span class="t">Ten loglines, one film</span><p>Write it ten ways, keep the one you'd pay for.</p></div><span class="th"></span></div></div>
+      <div class="pathitem done"><div class="card"><div><span class="eyebrow olive">Producing · 20 min · done Mon</span><span class="t">Call sheet for tomorrow</span><p>Every blank. Notice what you don't know.</p></div><span class="th b"></span></div></div>
+      <div class="pathitem now"><div class="card"><div><span class="eyebrow olive">Writing · 20 min · today</span><span class="t">Find the turn</span><p>One sentence for the start, one for the end.</p></div><span class="th b"></span></div></div>
+      <div class="pathitem"><div class="card"><div><span class="eyebrow olive">Directing · 30 min</span><span class="t">Six shots, one action</span><p>Coffee, in exactly six shots.</p></div><span class="th d"></span></div></div>
+      <div class="pathitem"><div class="card"><div><span class="eyebrow olive">Editing · 45 min</span><span class="t">Cut it three ways</span><p>Fast, slow, and so the quiet person wins.</p></div><span class="th e"></span></div></div>
+      <div class="pathitem" style="opacity:.45"><div class="card"><div><span class="t">… five more, then the templates shelf</span></div><span class="th"></span></div></div>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Film University · Free</span>
+      <div class="h1">Workshop</div>
+      <div class="week" style="gap:4px">
+        <div class="day done"><div class="d">F</div><div class="s">✓</div></div><div class="day done"><div class="d">S</div><div class="s">✓</div></div><div class="day"><div class="d">S</div><div class="s">—</div></div><div class="day done"><div class="d">M</div><div class="s">✓</div></div><div class="day done"><div class="d">T</div><div class="s">✓</div></div><div class="day done"><div class="d">W</div><div class="s">✓</div></div><div class="day now"><div class="d">T</div><div class="s">●</div></div>
+      </div>
+      <div class="streak"><b>5 of 7 days</b></div>
+      <div class="today">
+        <span class="eyebrow olive">Today · Writing · 20 min</span>
+        <h3>Find the turn</h3>
+        <p>One sentence for the start, one for the end. If they match, it isn't done.</p>
+        <span class="btn primary" style="display:block;text-align:center">Start →</span>
+      </div>
+      <div class="label">Up next for you</div>
+      <div class="exrow" style="grid-template-columns:72px 1fr"><span class="th d"></span><div><span class="t" style="font-size:.9rem">Six shots, one action</span><span class="meta">Directing · 30 min</span></div></div>
+      <div class="exrow" style="grid-template-columns:72px 1fr"><span class="th c"></span><div><span class="t" style="font-size:.9rem">Same line, three rooms</span><span class="meta">Sound · 15 min</span></div></div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+</body>
+</html>
