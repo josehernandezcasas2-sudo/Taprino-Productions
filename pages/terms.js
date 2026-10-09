@@ -100,7 +100,7 @@ export default function Terms({ account }) {
         was the main reason you subscribed without telling you first.
       </p>
 
-      <h2>5. If you submit work</h2>
+      <h2 id="submit-work">5. If you submit work</h2>
       <p>
         This is the section that matters most, so it&rsquo;s in plain language.
       </p>
