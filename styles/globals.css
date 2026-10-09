@@ -8339,6 +8339,10 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .uni-label { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink); margin: 2rem 0 0.8rem; display: flex; align-items: baseline; gap: 0.7rem; }
 .uni-label small { color: var(--ink-faint); text-transform: none; letter-spacing: 0; font-size: 0.72rem; }
 .uni-crumbs { display: flex; gap: 0.5rem; align-items: center; font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); margin: 0 0 0.8rem; flex-wrap: wrap; }
+/* Back pill + breadcrumb on one line, centred on the pill; the negative margin eats most of .stage's 2.4rem grid gap so the content sits right under the bar. */
+.uni-topbar { display: flex; align-items: center; gap: 1rem; margin: 0 0 -1.3rem; flex-wrap: wrap; }
+.uni-topbar .back-button { margin-bottom: 0; }
+.uni-topbar .uni-crumbs { margin: 0; line-height: 1; }
 .uni-crumbs a { color: var(--ink-dim); text-decoration: none; }
 .uni-crumbs a:hover { color: var(--ink); }
 .uni-empty { background: var(--surface-1); border: 1px dashed rgba(251,232,211,0.18); border-radius: 12px; padding: 1.4rem; color: var(--ink-dim); font-size: 0.95rem; margin: 0.8rem 0 1.4rem; }

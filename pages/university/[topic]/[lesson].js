@@ -5,6 +5,7 @@ import { getLessonPage } from '../../../lib/university';
 import UniversityShell, { accountFromProps } from '../../../components/university/UniversityShell';
 import { LessonRow, DoneButton, useDoneMap, needsLabel } from '../../../components/university/LessonBits';
 import VideoPlayer from '../../../components/VideoPlayer';
+import BackButton from '../../../components/BackButton';
 
 // One lesson. Left: the player (same signed Cloudflare playback as
 // episodes, no ads) or the PDF inline with a Download button. Right: the
@@ -38,9 +39,12 @@ export default function LessonPage(props) {
 
   return (
     <UniversityShell title={lesson.title} description={lesson.description} account={accountFromProps(props)} mainGenres={props.mainGenres} wide>
-      <nav className="uni-crumbs" aria-label="Breadcrumb">
-        <Link href="/university">Film University</Link><span>/</span><Link href={`/university/${topic.slug}`}>{topic.name}</Link>
-      </nav>
+      <div className="uni-topbar">
+        <BackButton fallbackHref={`/university/${topic.slug}`} />
+        <nav className="uni-crumbs" aria-label="Breadcrumb">
+          <Link href="/university">Film University</Link><span>/</span><Link href={`/university/${topic.slug}`}>{topic.name}</Link>
+        </nav>
+      </div>
 
       <div className="uni-lesson-layout">
         <div>

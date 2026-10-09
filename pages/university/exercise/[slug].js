@@ -5,6 +5,7 @@ import { getExercisePage } from '../../../lib/university';
 import UniversityShell, { accountFromProps } from '../../../components/university/UniversityShell';
 import { LessonRow, DoneButton, useDoneMap, needsLabel, ExerciseCard } from '../../../components/university/LessonBits';
 import VideoPlayer from '../../../components/VideoPlayer';
+import BackButton from '../../../components/BackButton';
 
 // One exercise: the steps, the lesson that teaches it played right here,
 // the template to use with it, and "I did it".
@@ -36,10 +37,13 @@ export default function ExercisePage(props) {
 
   return (
     <UniversityShell title={exercise.title} description={exercise.summary} account={accountFromProps(props)} mainGenres={props.mainGenres}>
-      <nav className="uni-crumbs" aria-label="Breadcrumb">
-        <Link href="/university">Workshop</Link>
-        {exercise.topicSlug && (<><span>/</span><Link href={`/university/${exercise.topicSlug}`}>{exercise.topicName}</Link></>)}
-      </nav>
+      <div className="uni-topbar">
+        <BackButton fallbackHref="/university" />
+        <nav className="uni-crumbs" aria-label="Breadcrumb">
+          <Link href="/university">Workshop</Link>
+          {exercise.topicSlug && (<><span>/</span><Link href={`/university/${exercise.topicSlug}`}>{exercise.topicName}</Link></>)}
+        </nav>
+      </div>
 
       <div className="uni-lesson-layout">
         <div>

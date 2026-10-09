@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { universityPageProps } from '../../../lib/universityPage';
 import { getTopicPage, formatDuration } from '../../../lib/university';
 import UniversityShell, { accountFromProps } from '../../../components/university/UniversityShell';
+import BackButton from '../../../components/BackButton';
 
 // A topic: its lessons as a numbered path, videos and documents mixed in
 // the order the admin set, with chips to show just one kind.
@@ -24,9 +25,12 @@ export default function TopicPage(props) {
 
   return (
     <UniversityShell title={topic.name} description={topic.description} account={accountFromProps(props)} mainGenres={props.mainGenres}>
-      <nav className="uni-crumbs" aria-label="Breadcrumb">
-        <Link href="/university">Film University</Link><span>/</span><span>{topic.name}</span>
-      </nav>
+      <div className="uni-topbar">
+        <BackButton fallbackHref="/university" />
+        <nav className="uni-crumbs" aria-label="Breadcrumb">
+          <Link href="/university">Film University</Link><span>/</span><span>{topic.name}</span>
+        </nav>
+      </div>
       <h1 className="uni-h1" style={{ '--uni-accent': topic.accentColor }}>{topic.name}</h1>
       <p className="uni-lead">{topic.description ? `${topic.description} ` : ''}{summary}.</p>
 
