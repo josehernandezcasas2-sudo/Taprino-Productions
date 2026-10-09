@@ -287,6 +287,8 @@ export default function SiteSettingsPanel() {
           <Link href="/pitches/discover" className="account-quicklink">Pitch Discover</Link>
           <Link href="/vertical/discover" className="account-quicklink">Vertical Discover</Link>
           <Link href="/live" className="account-quicklink">Live TV{!siteSettings.liveTvEnabled ? ' (off)' : ''}</Link>
+          <Link href="/university" className="account-quicklink">Film University</Link>
+          <Link href="/admin/university" className="account-quicklink">Edit Film University</Link>
           <Link href="/apply" className="account-quicklink">Apply (creator)</Link>
           <Link href="/creator" className="account-quicklink">Creator Studio</Link>
           <Link href="/creator/my-work" className="account-quicklink">Your work</Link>
