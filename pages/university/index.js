@@ -13,24 +13,14 @@ export async function getServerSideProps(ctx) {
   return universityPageProps(ctx, async () => ({ feed: await getUniversityFeed() }));
 }
 
-const TIME_FILTERS = [
-  { key: 'short', label: 'Under 15 min', test: (m) => m != null && m < 15 },
-  { key: 'mid', label: '15–30 min', test: (m) => m != null && m >= 15 && m <= 30 },
-  { key: 'long', label: '30+ min', test: (m) => m != null && m > 30 }
-];
-const NEED_FILTERS = [
-  { key: 'nothing', label: 'Needs nothing' },
-  { key: 'phone', label: 'A phone' },
-  { key: 'camera', label: 'A camera' },
-  { key: 'scene', label: 'A scene' },
-  { key: 'person', label: 'Another person' },
-  { key: 'footage', label: 'Footage' }
-];
+// The exercise grid shows two rows first; "See more" opens the rest.
+const INITIAL_EXERCISES = 6;
 
 export default function UniversityHome(props) {
   const feed = props.feed || { today: null, exercises: [], topics: [], templates: [] };
   const [done, toggleDone] = useDoneMap();
-  const [filter, setFilter] = useState({ kind: 'all', value: null });
+  const [topicFilter, setTopicFilter] = useState(null); // topic id, or null for all
+  const [showAll, setShowAll] = useState(false);
   // "Show me another" walks the other exercises, starting somewhere
   // random so two visits on the same day don't always show the same pair.
   const [todayIndex, setTodayIndex] = useState(-1);
@@ -47,24 +37,17 @@ export default function UniversityHome(props) {
   }
 
   const topicsInUse = feed.topics.filter((t) => feed.exercises.some((e) => e.topicId === t.id));
-  const needsInUse = NEED_FILTERS.filter((n) => feed.exercises.some((e) => e.needs.includes(n.key)));
-  const timesInUse = TIME_FILTERS.filter((t) => feed.exercises.some((e) => t.test(e.minutes)));
+  const matching = topicFilter ? feed.exercises.filter((e) => e.topicId === topicFilter) : feed.exercises;
+  const visible = showAll ? matching : matching.slice(0, INITIAL_EXERCISES);
+  const hidden = matching.length - visible.length;
 
-  const visible = feed.exercises.filter((e) => {
-    if (filter.kind === 'all') return true;
-    if (filter.kind === 'time') return TIME_FILTERS.find((t) => t.key === filter.value).test(e.minutes);
-    if (filter.kind === 'need') return e.needs.includes(filter.value);
-    if (filter.kind === 'topic') return e.topicId === filter.value;
-    return true;
-  });
+  function pickTopic(id) {
+    setTopicFilter(id);
+    setShowAll(false);
+  }
 
-  const chip = (kind, value, label) => (
-    <button
-      key={`${kind}-${value}`}
-      type="button"
-      className={`uni-chip${filter.kind === kind && filter.value === value ? ' on' : ''}`}
-      onClick={() => setFilter({ kind, value })}
-    >
+  const chip = (id, label) => (
+    <button key={id || 'all'} type="button" className={`uni-chip${topicFilter === id ? ' on' : ''}`} onClick={() => pickTopic(id)}>
       {label}
     </button>
   );
@@ -142,15 +125,23 @@ export default function UniversityHome(props) {
         <section>
           <div className="uni-label">All exercises <small>{feed.exercises.length}</small></div>
           <div className="uni-chips">
-            {chip('all', null, `All ${feed.exercises.length}`)}
-            {timesInUse.map((t) => chip('time', t.key, t.label))}
-            {needsInUse.map((n) => chip('need', n.key, n.label))}
-            {topicsInUse.map((t) => chip('topic', t.id, t.name))}
+            {chip(null, `All ${feed.exercises.length}`)}
+            {topicsInUse.map((t) => chip(t.id, t.name))}
           </div>
           <div className="uni-exgrid">
             {visible.map((e) => <ExerciseCard key={e.id} exercise={e} done={Boolean(done[e.slug])} />)}
           </div>
-          {visible.length === 0 && <div className="uni-empty">No exercises match that filter yet.</div>}
+          {visible.length === 0 && <div className="uni-empty">No exercises in this topic yet.</div>}
+          {hidden > 0 && (
+            <div className="uni-more">
+              <button type="button" className="uni-btn" onClick={() => setShowAll(true)}>See {hidden} more</button>
+            </div>
+          )}
+          {showAll && matching.length > INITIAL_EXERCISES && (
+            <div className="uni-more">
+              <button type="button" className="uni-btn ghost sm" onClick={() => setShowAll(false)}>Show fewer</button>
+            </div>
+          )}
         </section>
       )}
 

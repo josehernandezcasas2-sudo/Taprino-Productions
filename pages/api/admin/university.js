@@ -19,6 +19,9 @@ import {
 // Videos and PDFs don't pass through here — they go straight to Cloudflare
 // / Supabase Storage via the two upload-url routes beside this one, and
 // only the resulting uid / URL is saved on the lesson.
+// Cover images arrive as base64 in the body (same as episode artwork).
+export const config = { api: { bodyParser: { sizeLimit: '10mb' } } };
+
 export default async function handler(req, res) {
   const roleContext = await requireCapability(req, res, 'manage_university');
   if (!roleContext) return;

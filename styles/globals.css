@@ -8377,7 +8377,7 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 
 /* Thumbnails */
 .uni-thumb { position: relative; display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 10px; background: linear-gradient(160deg, #3a2a4f, #1b2740) center / cover no-repeat; overflow: hidden; flex: none; }
-.uni-thumb-doc { background: linear-gradient(160deg, #1f3b3a, #0f1f2f); }
+.uni-thumb-doc { background: linear-gradient(160deg, #1f3b3a, #0f1f2f) center / cover no-repeat; }
 .uni-thumb-sm { width: 84px; border-radius: 6px; }
 .uni-thumb-glyph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 1.6rem; color: var(--mint); opacity: 0.9; }
 .uni-thumb-sm .uni-thumb-glyph { font-size: 1rem; }
@@ -8407,6 +8407,7 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 /* Exercise cards */
 .uni-exgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.8rem; }
 .uni-stack { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.5rem; }
+.uni-more { display: flex; justify-content: center; margin-top: 1rem; }
 .uni-excard { display: flex; flex-direction: column; gap: 0.3rem; background: var(--surface-1); border: 1px solid rgba(251,232,211,0.1); border-radius: 12px; padding: 1rem; text-decoration: none; color: var(--ink); }
 .uni-excard:hover { border-color: rgba(231,162,85,0.5); }
 .uni-excard.is-done { opacity: 0.75; }
@@ -8486,5 +8487,8 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .uadm-check { display: flex; align-items: center; gap: 0.45rem; font-size: 0.88rem; color: var(--ink-dim); cursor: pointer; }
 .uadm-check input, .sch-field .uadm-check input { width: auto; flex: none; margin: 0; accent-color: var(--brass); }
 .uadm-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.3rem 0.8rem; }
+.uadm-cover { display: flex; gap: 0.9rem; align-items: center; }
+.uadm-cover-img { width: 160px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 8px; background: var(--surface-2); border: 1px solid rgba(251,232,211,0.12); flex: none; }
+.uadm-cover-empty { display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 1.4rem; color: var(--mint); }
 .sch-field textarea { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 8px; padding: 0.5rem 0.6rem; font: inherit; font-size: 0.88rem; width: 100%; resize: vertical; }
 @media (max-width: 760px) { .uadm-split { grid-template-columns: 1fr; } }

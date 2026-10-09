@@ -23,14 +23,17 @@ export function LessonThumb({ lesson, style, badge = true }) {
   const doc = lesson.kind === 'document';
   return (
     <View style={[styles.thumb, style]}>
-      {lesson.kind === 'video' && lesson.thumbnailUrl ? (
+      {lesson.thumbnailUrl ? (
         <SmartImage uri={lesson.thumbnailUrl} style={absoluteFill} resizeMode="cover" />
       ) : (
         <LinearGradient colors={doc ? ['#1f3b3a', '#0f1f2f'] : ['#3a2a4f', '#1b2740']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={absoluteFill} />
       )}
-      {(!lesson.thumbnailUrl || doc) && <Text style={[styles.glyph, doc && { color: colors.mint }]}>{doc ? '¶' : '▶'}</Text>}
+      {!lesson.thumbnailUrl && <Text style={[styles.glyph, doc && { color: colors.mint }]}>{doc ? '¶' : '▶'}</Text>}
       {badge && lesson.kind === 'video' && lesson.duration ? (
         <View style={styles.badge}><Text style={styles.badgeText}>▶ {lesson.duration}</Text></View>
+      ) : null}
+      {badge && doc && lesson.thumbnailUrl ? (
+        <View style={styles.badge}><Text style={styles.badgeText}>¶ PDF{lesson.documentPages ? ` · ${lesson.documentPages} p` : ''}</Text></View>
       ) : null}
     </View>
   );

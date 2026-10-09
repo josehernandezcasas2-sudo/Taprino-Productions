@@ -23,7 +23,16 @@ async function call(method, body) {
   return data;
 }
 
-const EMPTY_LESSON = { title: '', kind: 'video', description: '', cloudflareUid: '', durationSeconds: '', documentUrl: '', documentPages: '', isTemplate: false, attachmentLessonId: '', published: false };
+const EMPTY_LESSON = { title: '', kind: 'video', description: '', cloudflareUid: '', durationSeconds: '', documentUrl: '', documentPages: '', isTemplate: false, attachmentLessonId: '', published: false, thumbnailUrl: '', coverBase64: null, coverFileName: null, removeCover: false };
+
+function readAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(new Error('Could not read that file.'));
+    reader.readAsDataURL(file);
+  });
+}
 const EMPTY_EXERCISE = { title: '', topicId: '', summary: '', steps: '', minutes: '', needs: [], lessonId: '', extraLessonIds: [], templateLessonId: '', pinnedOn: '', published: false };
 
 export default function UniversityEditor() {
@@ -270,8 +279,19 @@ function LessonForm({ lesson, topicId, documents, busy, onCancel, onSave, onDele
     documentPages: lesson.documentPages || '',
     isTemplate: lesson.isTemplate,
     attachmentLessonId: lesson.attachmentLessonId || '',
-    published: lesson.published
+    published: lesson.published,
+    thumbnailUrl: lesson.thumbnailUrl || '',
+    coverBase64: null,
+    coverFileName: null,
+    removeCover: false
   } : EMPTY_LESSON);
+  const coverPreview = f.coverBase64 || (!f.removeCover && f.thumbnailUrl) || null;
+  async function pickCover(file) {
+    if (!file) return;
+    if (file.size > 6 * 1024 * 1024) { window.alert('Please use an image under 6MB.'); return; }
+    const dataUrl = await readAsDataUrl(file);
+    setF((s) => ({ ...s, coverBase64: dataUrl, coverFileName: file.name, removeCover: false }));
+  }
   const set = (k, v) => setF((s) => ({ ...s, [k]: v }));
   const hasMedia = f.kind === 'video' ? Boolean(f.cloudflareUid || (lesson && lesson.hasVideo)) : Boolean(f.documentUrl);
 
@@ -307,6 +327,24 @@ function LessonForm({ lesson, topicId, documents, busy, onCancel, onSave, onDele
       )}
 
       <label className="sch-field"><span>What it covers</span><textarea rows={4} value={f.description} maxLength={2000} onChange={(e) => set('description', e.target.value)} /></label>
+
+      <div className="sch-field">
+        <span>{f.kind === 'document' ? 'Cover image (shows on the Templates shelf and in lists)' : 'Cover image (optional — replaces Cloudflare’s auto still)'}</span>
+        <div className="uadm-cover">
+          {coverPreview
+            // eslint-disable-next-line @next/next/no-img-element
+            ? <img src={coverPreview} alt="" className="uadm-cover-img" />
+            : <div className="uadm-cover-img uadm-cover-empty">{f.kind === 'document' ? '¶' : '▶'}</div>}
+          <div className="uni-actions">
+            <label className="admin-media-action">
+              {coverPreview ? 'Replace image…' : 'Upload JPG/PNG…'}
+              <input type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => pickCover(e.target.files[0])} />
+            </label>
+            {coverPreview && <button type="button" className="admin-media-undo" onClick={() => setF((s) => ({ ...s, coverBase64: null, coverFileName: null, removeCover: true }))}>Remove</button>}
+          </div>
+        </div>
+        {f.kind === 'document' && <small className="uni-meta">Tip: export the PDF’s first page as a JPG, landscape crops best (16:9).</small>}
+      </div>
 
       {f.kind === 'video' && (
         <label className="sch-field"><span>Attached document (shows beside the player)</span>

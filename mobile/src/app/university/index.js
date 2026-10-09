@@ -7,31 +7,22 @@ import { apiGet } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { useDoneMap } from '../../lib/universityDone';
 import TopNav from '../../components/TopNav';
+import SmartImage from '../../components/SmartImage';
 import { ExerciseCard, TopicCard, LessonThumb, LessonRow, DoneButton, Btn, Steps, needsLabel, lessonRoute, uni } from '../../components/UniversityBits';
 
 // Film University — the Workshop (pages/university/index.js on the web,
 // fed by /api/university/feed): one exercise to try today with the video
 // to watch right under it, every exercise with filters, then the lessons
 // by topic and the templates shelf. Free, no sign-in.
-const TIME_FILTERS = [
-  { key: 'short', label: 'Under 15 min', test: (m) => m != null && m < 15 },
-  { key: 'mid', label: '15–30 min', test: (m) => m != null && m >= 15 && m <= 30 },
-  { key: 'long', label: '30+ min', test: (m) => m != null && m > 30 }
-];
-const NEED_FILTERS = [
-  { key: 'nothing', label: 'Needs nothing' },
-  { key: 'phone', label: 'A phone' },
-  { key: 'camera', label: 'A camera' },
-  { key: 'scene', label: 'A scene' },
-  { key: 'person', label: 'Another person' },
-  { key: 'footage', label: 'Footage' }
-];
+// Two rows' worth first; "See more" opens the rest.
+const INITIAL_EXERCISES = 6;
 
 export default function University() {
   const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
   const [refreshing, setRefreshing] = useState(false);
-  const [filter, setFilter] = useState({ kind: 'all', value: null });
+  const [topicFilter, setTopicFilter] = useState(null);
+  const [showAll, setShowAll] = useState(false);
   const [todayIndex, setTodayIndex] = useState(-1);
   const [done, toggleDone] = useDoneMap();
 
@@ -60,20 +51,14 @@ export default function University() {
   }, [feed, todayIndex]);
 
   const topicsInUse = feed.topics.filter((t) => feed.exercises.some((e) => e.topicId === t.id));
-  const needsInUse = NEED_FILTERS.filter((n) => feed.exercises.some((e) => e.needs.includes(n.key)));
-  const timesInUse = TIME_FILTERS.filter((t) => feed.exercises.some((e) => t.test(e.minutes)));
-  const visible = feed.exercises.filter((e) => {
-    if (filter.kind === 'all') return true;
-    if (filter.kind === 'time') return TIME_FILTERS.find((t) => t.key === filter.value).test(e.minutes);
-    if (filter.kind === 'need') return e.needs.includes(filter.value);
-    if (filter.kind === 'topic') return e.topicId === filter.value;
-    return true;
-  });
+  const matching = topicFilter ? feed.exercises.filter((e) => e.topicId === topicFilter) : feed.exercises;
+  const visible = showAll ? matching : matching.slice(0, INITIAL_EXERCISES);
+  const hidden = matching.length - visible.length;
 
-  const chip = (kind, value, label) => {
-    const on = filter.kind === kind && filter.value === value;
+  const chip = (id, label) => {
+    const on = topicFilter === id;
     return (
-      <Pressable key={`${kind}-${value}`} onPress={() => setFilter({ kind, value })}>
+      <Pressable key={id || 'all'} onPress={() => { setTopicFilter(id); setShowAll(false); }}>
         <Text style={[uni.chip, on && uni.chipOn]}>{label}</Text>
       </Pressable>
     );
@@ -130,13 +115,13 @@ export default function University() {
           <>
             <Text style={uni.label}>All exercises <Text style={uni.labelSmall}>{feed.exercises.length}</Text></Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={uni.chips}>
-              {chip('all', null, `All ${feed.exercises.length}`)}
-              {timesInUse.map((t) => chip('time', t.key, t.label))}
-              {needsInUse.map((n) => chip('need', n.key, n.label))}
-              {topicsInUse.map((t) => chip('topic', t.id, t.name))}
+              {chip(null, `All ${feed.exercises.length}`)}
+              {topicsInUse.map((t) => chip(t.id, t.name))}
             </ScrollView>
             {visible.map((e) => <ExerciseCard key={e.id} exercise={e} done={Boolean(done[e.slug])} />)}
-            {visible.length === 0 && <Text style={uni.empty}>No exercises match that filter yet.</Text>}
+            {visible.length === 0 && <Text style={uni.empty}>No exercises in this topic yet.</Text>}
+            {hidden > 0 && <Btn label={`See ${hidden} more`} block style={{ marginTop: 6 }} onPress={() => setShowAll(true)} />}
+            {showAll && matching.length > INITIAL_EXERCISES && <Btn label="Show fewer" block style={{ marginTop: 6 }} onPress={() => setShowAll(false)} />}
           </>
         )}
 
@@ -154,7 +139,9 @@ export default function University() {
             <Text style={uni.label}>Templates <Text style={uni.labelSmall}>download, fill in, shoot</Text></Text>
             {feed.templates.map((l) => (
               <Pressable key={l.id} style={styles.tpl} onPress={() => WebBrowser.openBrowserAsync(l.documentUrl)}>
-                <View style={styles.tplIcon}><Text style={styles.tplIconText}>PDF</Text></View>
+                {l.thumbnailUrl
+                  ? <SmartImage uri={l.thumbnailUrl} style={styles.tplCover} resizeMode="cover" />
+                  : <View style={styles.tplIcon}><Text style={styles.tplIconText}>PDF</Text></View>}
                 <View style={{ flex: 1 }}>
                   <Text style={styles.tplTitle}>{l.title}</Text>
                   <Text style={uni.meta}>{l.topicName ? `${l.topicName} · ` : ''}{l.meta}</Text>
@@ -176,6 +163,7 @@ const styles = StyleSheet.create({
   tpl: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.hairline, borderRadius: 12, padding: 12, marginBottom: 8 },
   tplIcon: { width: 36, height: 46, borderRadius: 4, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.hairline, alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 4 },
   tplIconText: { fontFamily: fonts.mono, fontSize: 9, color: colors.mint },
+  tplCover: { width: 72, aspectRatio: 16 / 9, borderRadius: 6, backgroundColor: colors.surface2 },
   tplTitle: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
   tplOpen: { fontFamily: fonts.mono, fontSize: 12, color: colors.brass }
 });

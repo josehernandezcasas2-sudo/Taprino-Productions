@@ -21,10 +21,11 @@ export function LessonRow({ lesson, label }) {
 
 export function LessonThumb({ lesson, small = false }) {
   const cls = `uni-thumb${small ? ' uni-thumb-sm' : ''}${lesson.kind === 'document' ? ' uni-thumb-doc' : ''}`;
-  if (lesson.kind === 'video' && lesson.thumbnailUrl) {
+  if (lesson.thumbnailUrl) {
     return (
       <span className={cls} style={{ backgroundImage: `url(${lesson.thumbnailUrl})` }}>
-        {lesson.duration && <span className="uni-thumb-badge">▶ {lesson.duration}</span>}
+        {lesson.kind === 'video' && lesson.duration && <span className="uni-thumb-badge">▶ {lesson.duration}</span>}
+        {lesson.kind === 'document' && <span className="uni-thumb-badge">¶ PDF{lesson.documentPages ? ` · ${lesson.documentPages} p` : ''}</span>}
       </span>
     );
   }
