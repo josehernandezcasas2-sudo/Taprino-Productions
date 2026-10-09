@@ -78,6 +78,7 @@
   --paper: #fbe8d3;
   --signal-tint: #fbe8d3;
   --signal-amber: var(--olive);
+  --admin-section: #f6d65d; /* admin nav section titles — bright yellow, deliberately louder than --olive-bright */
   --oxide: var(--danger);
   --static-grey: var(--ink-faint);
   --font-display: 'Space Grotesk', sans-serif;
@@ -8202,8 +8203,9 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .adm-nav { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 1.2rem 0.8rem 2rem; border-right: 1px solid rgba(251,232,211,0.1); background: var(--surface-1); }
 .adm-brand { font-family: var(--font-display); font-weight: 700; font-size: 1rem; padding: 0.3rem 0.7rem 0.9rem; display: flex; align-items: baseline; gap: 0.5rem; }
 .adm-brand small { font-family: var(--font-mono); font-weight: 400; font-size: 0.7rem; color: var(--brass); letter-spacing: 0.08em; text-transform: uppercase; }
-.adm-group { margin-top: 0.9rem; }
-.adm-group-label { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); padding: 0 0.7rem 0.35rem; }
+.adm-group { margin-top: 1.2rem; }
+/* Section titles: bright yellow and a size up from the links, so the groups read as sections at a glance (Jose, 2026-10-09). */
+.adm-group-label { font-family: var(--font-mono); font-weight: 600; font-size: 0.86rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--admin-section); padding: 0 0.7rem 0.45rem; }
 .adm-link { display: flex; align-items: center; gap: 0.5rem; font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-dim); padding: 0.55rem 0.7rem; border-radius: 8px; text-decoration: none; transition: background 0.15s, color 0.15s; }
 .adm-link:hover { background: var(--surface-2); color: var(--ink); }
 .adm-link.is-active { background: var(--surface-2); color: var(--ink); box-shadow: inset 2px 0 0 var(--brass); }
