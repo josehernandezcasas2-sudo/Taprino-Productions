@@ -38,9 +38,10 @@ const GROUPS = {
       { href: '/', label: 'Connect' },
       { href: '/stream', label: 'Stream' },
       ...(settings && settings.elevatorPitchEnabled ? [{ href: '/pitches', label: 'Pitch Room' }] : []),
+      { href: '/university', label: 'Film University' },
       { href: '/about', label: 'About' }
     ],
-    match: (p) => p === '/' || p === '/stream' || p === '/about' || p === '/pitches' || p === '/pitches/[id]'
+    match: (p) => p === '/' || p === '/stream' || p === '/about' || p === '/pitches' || p === '/pitches/[id]' || p.startsWith('/university')
   },
   discover: {
     label: 'Discover',

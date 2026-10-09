@@ -68,6 +68,7 @@ export default function RootLayout() {
           <Stack.Screen name="about" options={{ headerShown: false }} />
           <Stack.Screen name="pitches/index" options={{ headerShown: false }} />
           <Stack.Screen name="pitches/discover" options={{ headerShown: false }} />
+          <Stack.Screen name="university/index" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />
           <Stack.Screen name="watch/series" options={{ headerShown: false }} />
           <Stack.Screen name="watch/movies" options={{ headerShown: false }} />

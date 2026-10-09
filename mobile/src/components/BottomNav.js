@@ -18,9 +18,10 @@ const GROUPS = {
       { href: '/', label: 'Connect' },
       { href: '/stream', label: 'Stream' },
       { href: '/pitches', label: 'Pitch Room' },
+      { href: '/university', label: 'Film University' },
       { href: '/about', label: 'About' }
     ],
-    match: (p) => p === '/' || p === '/stream' || p === '/about' || p === '/pitches'
+    match: (p) => p === '/' || p === '/stream' || p === '/about' || p === '/pitches' || p.startsWith('/university')
   },
   discover: {
     label: 'Discover',

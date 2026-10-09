@@ -195,7 +195,8 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           : []),
         ...(siteSettings && siteSettings.elevatorPitchEnabled
           ? [{ href: '/pitches', label: 'Pitch Room', match: isPitchesPage }]
-          : [])
+          : []),
+        { href: '/university', label: 'University', match: currentPath.startsWith('/university') }
       ];
 
   return (

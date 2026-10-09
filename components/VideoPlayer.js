@@ -42,7 +42,11 @@ export default function VideoPlayer({
   // True when this episode's src is a short-lived Cloudflare signed URL. The
   // player then knows a mid-playback network failure is probably an expired
   // token rather than a dead video, and quietly swaps in a fresh one.
-  signedPlayback = false
+  signedPlayback = false,
+  // Where that fresh token comes from. Defaults to /api/stream-token (an
+  // episode); anything that isn't an episode — a Film University lesson —
+  // passes its own async () => src-or-null.
+  refreshSrc = null
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -218,6 +222,7 @@ export default function VideoPlayer({
     if (!signedPlayback || refreshingRef.current) return null;
     refreshingRef.current = true;
     try {
+      if (refreshSrc) return await refreshSrc();
       const res = await fetch('/api/stream-token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -230,7 +235,7 @@ export default function VideoPlayer({
     } finally {
       refreshingRef.current = false;
     }
-  }, [episode.id, signedPlayback]);
+  }, [episode.id, signedPlayback, refreshSrc]);
 
   /* ------------------------------------------------------------------ *
    * Source attachment. Cloudflare Stream serves HLS, which only Safari
