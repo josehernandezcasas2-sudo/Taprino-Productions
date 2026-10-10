@@ -8763,3 +8763,47 @@ a.crew-credit:hover { background: var(--surface-3); }
   .crew-row2 { grid-template-columns: 1fr; }
   .crew-savebar { bottom: 64px; }
 }
+
+/* ---- Messages (/messages, Crew Call step 2) ---- */
+.dm-inbox { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0.9rem; align-items: start; min-height: 520px; }
+.dm-threads { display: grid; gap: 0.3rem; align-content: start; }
+.dm-thread { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; background: var(--surface-2); border: 1px solid transparent; border-radius: 9px; padding: 0.5rem 0.6rem; text-decoration: none; color: var(--ink); }
+.dm-thread:hover { background: var(--surface-3); }
+.dm-thread.sel { border-color: var(--ink); }
+.dm-thread-body { min-width: 0; display: grid; }
+.dm-thread-body b { font-family: var(--font-display); font-size: 0.88rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-thread-body small { font-size: 0.8rem; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dm-muted { color: var(--ink-faint); font-weight: 400; font-family: var(--font-mono); font-size: 0.62rem; }
+.dm-thread-time { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-faint); display: grid; gap: 4px; justify-items: end; }
+.dm-unread { width: 8px; height: 8px; border-radius: 50%; background: var(--brass); display: block; }
+.dm-convo-wrap { min-width: 0; }
+.dm-pick { min-height: 300px; display: grid; place-items: center; }
+.dm-convo { display: grid; grid-template-rows: auto auto auto 1fr auto; min-height: 520px; gap: 0.6rem; }
+.dm-chead { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--ocean-ink); padding-bottom: 0.6rem; }
+.dm-cacts { margin-left: auto; flex-wrap: nowrap; }
+.dm-back { display: none; }
+.dm-ctx { display: flex; gap: 0.5rem; align-items: center; background: var(--surface-2); border-radius: 8px; padding: 0.45rem 0.7rem; font-size: 0.84rem; color: var(--ink-dim); }
+.dm-ctx b { font-family: var(--font-display); color: var(--ink); }
+.dm-report { display: grid; gap: 0.4rem; background: rgba(214, 124, 81, 0.08); border: 1px solid rgba(214, 124, 81, 0.4); border-radius: 8px; padding: 0.6rem; }
+.dm-msgs { display: grid; gap: 0.45rem; align-content: start; overflow: auto; max-height: 420px; min-height: 160px; padding-right: 4px; }
+.dm-msg { max-width: 72%; background: var(--surface-2); border-radius: 12px 12px 12px 4px; padding: 0.5rem 0.75rem; font-size: 0.92rem; justify-self: start; white-space: pre-wrap; overflow-wrap: anywhere; }
+.dm-msg.me { background: rgba(248, 95, 115, 0.16); border-radius: 12px 12px 4px 12px; justify-self: end; }
+.dm-msg small { display: block; font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); margin-top: 0.2rem; }
+.dm-composer { display: grid; grid-template-columns: 1fr auto; gap: 0.4rem; }
+.dm-composer .crew-input { border-radius: 999px; padding: 0.55rem 0.9rem; }
+.dm-blocked { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; padding: 0.4rem 0; }
+.dm-menu { position: relative; }
+.dm-menu-pop { position: absolute; right: 0; top: 110%; background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 8px; padding: 0.3rem; display: grid; min-width: 150px; z-index: 5; }
+.dm-menu-pop button { background: none; border: 0; color: var(--ink); text-align: left; padding: 0.4rem 0.6rem; border-radius: 6px; font-size: 0.86rem; cursor: pointer; }
+.dm-menu-pop button:hover { background: var(--surface-2); }
+.dm-menu-pop button.danger { color: var(--danger); }
+.dm-toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 1.4rem); transform: translateX(-50%); background: var(--ink); color: var(--surface-0); font-family: var(--font-display); font-weight: 600; padding: 0.55rem 1rem; border-radius: 8px; font-size: 0.85rem; z-index: 60; max-width: calc(100vw - 32px); }
+.nav-badge { display: inline-block; margin-left: 0.35rem; background: var(--brass); color: #1b0a0e; font-family: var(--font-mono); font-size: 0.6rem; font-weight: 600; border-radius: 999px; padding: 0 0.4rem; line-height: 1.4; vertical-align: middle; }
+@media (max-width: 900px) {
+  .dm-inbox { grid-template-columns: 1fr; min-height: 0; }
+  .dm-inbox.has-convo .dm-threads { display: none; }
+  .dm-back { display: inline-flex; }
+  .dm-convo { min-height: 60vh; }
+  .dm-msgs { max-height: none; }
+  .dm-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); }
+}

@@ -150,7 +150,7 @@ export function PlaceBox({ value, onChange, placeholder = 'City or neighborhood'
   );
 }
 
-export function PersonCard({ p, onOpen }) {
+export function PersonCard({ p, onOpen, onMessage }) {
   const where = [p.place, p.miles != null ? `${p.miles} mi` : null].filter(Boolean).join(' · ');
   const gearTop = p.gear.slice(0, 3).map((g) => g.name).join(' · ');
   return (
@@ -175,11 +175,15 @@ export function PersonCard({ p, onOpen }) {
       {p.roles.length ? <View style={crew.chips}>{p.roles.map((r) => <Chip key={r} label={r} tone="role" />)}</View> : null}
       {gearTop ? <Text style={crew.gearline}><Text style={crew.gearlineB}>Gear </Text>{gearTop}{p.gear.length > 3 ? ` +${p.gear.length - 3}` : ''}</Text> : null}
       {p.bio ? <Text style={crew.bio} numberOfLines={3}>{p.bio}</Text> : null}
+      <View style={[crew.row, { marginTop: 2 }]}>
+        <Pressable style={crew.btnSm} onPress={onOpen}><Text style={crew.btnSmText}>View profile</Text></Pressable>
+        {onMessage ? <Pressable style={[crew.btnSm, crew.btnPrimary]} onPress={onMessage}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Message</Text></Pressable> : null}
+      </View>
     </Pressable>
   );
 }
 
-export function GearCard({ g, onOpen }) {
+export function GearCard({ g, onOpen, onAsk }) {
   const o = g.owner;
   return (
     <Pressable style={crew.panel} onPress={onOpen}>
@@ -192,6 +196,12 @@ export function GearCard({ g, onOpen }) {
         <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} size={28} />
         <Text style={crew.meta}>{o.displayName}{o.miles != null ? ` · ${o.miles} mi` : o.place ? ` · ${o.place}` : ''}{o.verified ? ' · ✓' : ''}</Text>
       </View>
+      {onAsk ? (
+        <View style={crew.row}>
+          <Pressable style={[crew.btnSm, crew.btnPrimary]} onPress={onAsk}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Ask about it</Text></Pressable>
+          <Pressable style={crew.btnSm} onPress={onOpen}><Text style={crew.btnSmText}>View profile</Text></Pressable>
+        </View>
+      ) : null}
     </Pressable>
   );
 }

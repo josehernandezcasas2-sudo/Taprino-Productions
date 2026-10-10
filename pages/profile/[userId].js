@@ -371,6 +371,11 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                   {following ? 'Following' : 'Follow'}
                 </button>
               )}
+              {!isOwnProfile && (
+                isSignedIn
+                  ? <Link href={`/messages?to=${encodeURIComponent(profile.userId)}&kind=profile&label=${encodeURIComponent(profile.displayName)}`} className="profile-action-btn">Message</Link>
+                  : <SignInButton mode="modal"><button type="button" className="profile-action-btn">Message</button></SignInButton>
+              )}
               <div className="pitch-share-wrap">
                 <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
                   {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}

@@ -87,6 +87,12 @@ export default function CrewCall() {
   }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, verifiedOnly]);
 
   const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || verifiedOnly);
+  // "Message" / "Ask about it": the conversation screen, with what it's
+  // about attached; signed out goes to the Account tab to sign in.
+  const message = (userId, kind, label) => {
+    if (!isSignedIn) { router.push('/account'); return; }
+    router.push({ pathname: '/messages/new', params: { to: userId, kind, label } });
+  };
   const toggleRole = (r) => setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
   const sortNote = near ? `nearest to ${near.label}` : 'newest first';
   const list = tab === 'gear' ? gear : people;
@@ -172,7 +178,7 @@ export default function CrewCall() {
               {hasFilters || near ? 'Nobody matches yet. Widen the distance or clear a filter.' : isSignedIn ? 'No cards yet — be the first. Set up your working card and you’ll show up here.' : 'No cards yet. Sign in to set up yours and be the first on the board.'}
             </Text>
           ) : (
-            people.people.map((p) => <PersonCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} />)
+            people.people.map((p) => <PersonCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} onMessage={() => message(p.userId, 'card', `${p.displayName}’s card`)} />)
           )
         ) : null}
 
@@ -180,7 +186,7 @@ export default function CrewCall() {
           gear.items.length === 0 && !error ? (
             <Text style={crew.empty}>{hasFilters || near ? 'No gear matches. Try another category or widen the distance.' : 'No gear listed yet. Add yours on your working card.'}</Text>
           ) : (
-            gear.items.map((g) => <GearCard key={g.id} g={g} onOpen={() => router.push(g.owner.profilePath)} />)
+            gear.items.map((g) => <GearCard key={g.id} g={g} onOpen={() => router.push(g.owner.profilePath)} onAsk={() => message(g.owner.userId, 'gear', g.name)} />)
           )
         ) : null}
 

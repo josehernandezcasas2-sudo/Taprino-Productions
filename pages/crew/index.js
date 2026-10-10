@@ -37,7 +37,7 @@ export async function getServerSideProps({ req, res }) {
   try {
     initial = await searchCards(
       { lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 },
-      { showRates: account.isSignedIn }
+      { showRates: account.isSignedIn, viewerId: account.userId || null }
     );
   } catch (err) {
     console.error('crew directory:', err.message);
@@ -220,7 +220,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
                         : 'No cards yet. Sign in to set up yours and be the first on the board.'}
                   </div>
                 )}
-                {people.people.map((p) => <PersonCard key={p.userId} p={p} />)}
+                {people.people.map((p) => <PersonCard key={p.userId} p={p} signedIn={isSignedIn} />)}
               </>
             ) : (
               <>
@@ -233,7 +233,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
                 )}
                 {gear && gear.items.length > 0 && (
                   <div className="crew-gear-grid">
-                    {gear.items.map((g) => <GearItem key={g.id} g={g} />)}
+                    {gear.items.map((g) => <GearItem key={g.id} g={g} signedIn={isSignedIn} />)}
                   </div>
                 )}
               </>
@@ -248,7 +248,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
   );
 }
 
-function PersonCard({ p }) {
+function PersonCard({ p, signedIn }) {
   const gearTop = p.gear.slice(0, 3).map((g) => g.name).join(' · ');
   const where = [p.place, p.miles != null ? `${p.miles} mi` : null].filter(Boolean).join(' · ');
   return (
@@ -273,12 +273,20 @@ function PersonCard({ p }) {
       </div>
       <div className="crew-pacts">
         <Link href={p.profilePath} className="crew-btn sm">View profile</Link>
+        <MessageLink signedIn={signedIn} userId={p.userId} kind="card" label={`${p.displayName}’s card`} className="crew-btn sm primary">Message</MessageLink>
       </div>
     </article>
   );
 }
 
-function GearItem({ g }) {
+// "Message" / "Ask about it": opens (or starts) the conversation with the
+// person, with what it's about attached. Signed out → the sign-in modal.
+function MessageLink({ signedIn, userId, kind, label, className, children }) {
+  if (!signedIn) return <SignInButton mode="modal"><button type="button" className={className}>{children}</button></SignInButton>;
+  return <Link href={`/messages?to=${encodeURIComponent(userId)}&kind=${kind}&label=${encodeURIComponent(label)}`} className={className}>{children}</Link>;
+}
+
+function GearItem({ g, signedIn }) {
   const o = g.owner;
   return (
     <article className="crew-panel crew-gitem">
@@ -288,7 +296,10 @@ function GearItem({ g }) {
         <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} size="sm" />
         <span>{o.displayName}{o.miles != null ? ` · ${o.miles} mi` : o.place ? ` · ${o.place}` : ''}{o.verified ? ' · ✓' : ''}</span>
       </div>
-      <div className="crew-actions"><Link href={o.profilePath} className="crew-btn sm">View profile</Link></div>
+      <div className="crew-actions">
+        <MessageLink signedIn={signedIn} userId={o.userId} kind="gear" label={g.name} className="crew-btn sm primary">Ask about it</MessageLink>
+        <Link href={o.profilePath} className="crew-btn sm">View profile</Link>
+      </div>
     </article>
   );
 }

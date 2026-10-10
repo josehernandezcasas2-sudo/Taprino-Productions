@@ -37,9 +37,9 @@ export default async function handler(req, res) {
     verifiedOnly: verified === '1' || verified === 'true'
   };
   try {
-    if (view === 'gear') return res.status(200).json(await searchGear(filters));
     const { userId } = getAuth(req);
-    return res.status(200).json(await searchCards(filters, { showRates: Boolean(userId) }));
+    if (view === 'gear') return res.status(200).json(await searchGear(filters, { viewerId: userId }));
+    return res.status(200).json(await searchCards(filters, { showRates: Boolean(userId), viewerId: userId }));
   } catch (err) {
     console.error('crew/people:', err.message);
     return res.status(500).json({ error: 'Could not load Crew Call right now.' });

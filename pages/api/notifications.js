@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../lib/roles';
 import { getSupabase } from '../../lib/supabase';
+import { countUnread } from '../../lib/messages';
 
 // Was /api/creator/notifications, restricted to isCreator — but this
 // table already carries notifications for anyone, not just creators
@@ -43,8 +44,18 @@ export default async function handler(req, res) {
     createdAt: n.created_at
   }));
 
+  // Conversations with something new, for the Messages badge — rides
+  // the same 60s poll the header already runs.
+  let messagesUnread = 0;
+  try {
+    messagesUnread = await countUnread(userId);
+  } catch (err) {
+    console.error('notifications messagesUnread:', err.message);
+  }
+
   return res.status(200).json({
     notifications,
-    unreadCount: notifications.filter((n) => !n.read).length
+    unreadCount: notifications.filter((n) => !n.read).length,
+    messagesUnread
   });
 }

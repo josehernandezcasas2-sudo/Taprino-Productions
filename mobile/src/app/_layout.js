@@ -71,6 +71,8 @@ export default function RootLayout() {
           <Stack.Screen name="university/index" options={{ headerShown: false }} />
           <Stack.Screen name="crew/index" options={{ headerShown: false }} />
           <Stack.Screen name="crew/card" options={{ headerShown: false }} />
+          <Stack.Screen name="messages/index" options={{ headerShown: false }} />
+          <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />
           <Stack.Screen name="watch/series" options={{ headerShown: false }} />
           <Stack.Screen name="watch/movies" options={{ headerShown: false }} />

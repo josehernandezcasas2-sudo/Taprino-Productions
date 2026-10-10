@@ -223,6 +223,16 @@ export default function PublicProfile() {
                   </Text>
                 </Pressable>
               )}
+              {!isOwnProfile ? (
+                <Pressable
+                  style={styles.actionBtn}
+                  onPress={isSignedIn
+                    ? () => router.push({ pathname: '/messages/new', params: { to: profile.userId, kind: 'profile', label: profile.displayName } })
+                    : () => router.push('/account')}
+                >
+                  <Text style={styles.actionBtnText}>Message</Text>
+                </Pressable>
+              ) : null}
               <Pressable style={styles.shareBtn} onPress={() => share(profile, canonicalPath)} accessibilityLabel="Share profile">
                 <ShareIconSvg size={16} />
               </Pressable>
