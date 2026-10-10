@@ -10,6 +10,8 @@ import { Avatar, Availability, RoleChips, rateLabel, flagClass, flagLabel } from
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard, searchCards } from '../../lib/crewCards';
+import { getTrackRecords } from '../../lib/crewCalls';
+import TierChip from '../../components/crew/TierChip';
 import { CREW_ROLES, GEAR_CATEGORIES, WITHIN_CHOICES } from '../../lib/crewOptions';
 import { SITE } from '../../lib/siteConfig';
 
@@ -39,6 +41,7 @@ export async function getServerSideProps({ req, res }) {
       { lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 },
       { showRates: account.isSignedIn, viewerId: account.userId || null }
     );
+    initial = { ...initial, people: await withRecords(initial.people) };
   } catch (err) {
     console.error('crew directory:', err.message);
     loadError = true;
@@ -60,10 +63,17 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+// The track-record tier for each person on the page (also done by
+// /api/crew/people for the client refetch).
+async function withRecords(people) {
+  const records = await getTrackRecords(people.map((p) => p.userId)).catch(() => ({}));
+  return people.map((p) => ({ ...p, ...(records[p.userId] ? { tier: records[p.userId].tier, done: records[p.userId].done, jobs: records[p.userId].jobs, titles: records[p.userId].titles } : {}) }));
+}
+
 const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} miles`);
 
 export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, near: initialNear, hasCard, initial, loadError }) {
-  const [tab, setTab] = useState('people');
+  const [tab, setTab] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'gear' ? 'gear' : 'people'));
   const [q, setQ] = useState('');
   const [roles, setRoles] = useState([]);
   const [gearCat, setGearCat] = useState('');
@@ -149,6 +159,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
         <div className="crew-subnav" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}>Find people{people.total ? ` · ${people.total}` : ''}</button>
           <button type="button" role="tab" aria-selected={tab === 'gear'} onClick={() => setTab('gear')}>Gear{gear && gear.total ? ` · ${gear.total}` : ''}</button>
+          <Link href="/crew/calls" className="crew-tab">Calls</Link>
         </div>
 
         <div className="crew-find">
@@ -258,6 +269,7 @@ function PersonCard({ p, signedIn }) {
         <div className="crew-pname">
           <Link href={p.profilePath}>{p.displayName}</Link>
           {p.verified && <span className="crew-ver">✓ creator</span>}
+          {p.tier && <TierChip person={p} />}
           {p.handle && <span className="crew-handle">@{p.handle}</span>}
         </div>
         <div className="crew-pmeta">

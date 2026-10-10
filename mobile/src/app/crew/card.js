@@ -13,7 +13,7 @@ import { crew, Chip, PlaceBox, GearRows, CreditRows, GEAR_FLAGS } from '../../co
 // credits, rate. Loads and saves through /api/crew/card.
 const EMPTY = {
   roles: [], place: null, travelMiles: '25', remoteOk: false, availability: 'open', bookedUntil: '',
-  rateMin: '', rateMax: '', languages: [], listed: true, gear: [], credits: []
+  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: []
 };
 const FALLBACK_OPTIONS = { roles: [], gearCategories: [], maxRoles: 6, maxTravelMiles: 500 };
 
@@ -30,6 +30,7 @@ function fromCard(card) {
     rateMax: card.rateMax == null ? '' : String(card.rateMax),
     languages: card.languages,
     listed: card.listed,
+    callEmails: card.callEmails !== false,
     gear: card.gear.map((g) => ({ category: g.category, name: g.name, flag: g.flag })),
     credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year ? String(c.year) : '' }))
   };
@@ -241,6 +242,11 @@ export default function CrewCardScreen() {
             <Text style={[crew.rowText, { flex: 1 }]}>Show my card in the Crew Call directory</Text>
           </View>
           <Text style={crew.mono}>Off keeps the card on your profile only. A card needs at least one role or gear item to be listed.</Text>
+          <View style={[crew.row, { marginTop: 6 }]}>
+            <Switch value={form.callEmails} onValueChange={(v) => set({ callEmails: v })} trackColor={{ true: colors.brass }} />
+            <Text style={[crew.rowText, { flex: 1 }]}>Email me calls that match my card</Text>
+          </View>
+          <Text style={crew.mono}>Calls for your roles within your travel radius (and remote ones). The in-app notification always comes.</Text>
         </View>
 
         <View style={styles.savebar}>

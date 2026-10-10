@@ -45,7 +45,7 @@ export async function getServerSideProps({ req, params, res }) {
   return { props: data };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [] }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
 
@@ -189,6 +189,18 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
           </div>
         )}
 
+        {/* Crew Call posts linked to this series (migration 082). */}
+        {activeTab === 'about' && crewCalls.length > 0 && (
+          <div className="cl-list" style={{ maxWidth: 760, marginBottom: '1.4rem' }}>
+            <div className="crew-eyebrow">Crew needed</div>
+            {crewCalls.map((c) => (
+              <Link key={c.id} href={`/crew/calls/${c.id}`} className="crew-panel cl-call">
+                <div className="cl-title">{c.title}<span className={`cl-pay ${c.payType === 'paid' || c.payType === 'union' ? 'paid' : c.payType === 'deferred' ? 'deferred' : 'unpaid'}`}>{c.payLabel}</span></div>
+                <div className="cl-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{c.remote ? 'Remote' : c.place}</span><span>{c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
+              </Link>
+            ))}
+          </div>
+        )}
         {activeTab === 'about' && (
           <div className="series-about-grid">
             <div className="series-about-box">

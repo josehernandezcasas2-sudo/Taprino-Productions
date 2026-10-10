@@ -42,6 +42,7 @@ export default async function handler(req, res) {
     pitches: data.pitches,
     backedPitches: data.backedPitches,
     crewCard: data.crewCard,
+    crewRecord: data.crewRecord,
     totalViews: data.totalViews,
     knownForGenres: data.knownForGenres,
     roleBadge: data.roleBadge,

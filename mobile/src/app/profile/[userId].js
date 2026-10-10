@@ -9,7 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
 import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
-import { CrewCardView } from '../../components/CrewBits';
+import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -157,7 +157,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -201,6 +201,7 @@ export default function PublicProfile() {
             <View style={styles.nameRow}>
               <Text style={styles.name}>{profile.displayName}</Text>
               {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
+              {crewRecord ? <TierChip person={crewRecord} /> : null}
             </View>
             {profile.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}
             {joinedLabel ? <Text style={styles.joined}>On Studio Tapa TV since {joinedLabel}</Text> : null}
@@ -300,6 +301,50 @@ export default function PublicProfile() {
                 <Text style={styles.emptyText}>Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Text style={{ color: colors.olive }}>Set up your card →</Text></Text>
               </Pressable>
             )}
+          </>
+        ) : null}
+
+        {/* Track record (migration 082): confirmed Crew Call jobs, released
+            titles, the lines people left. The tier chip in the header
+            comes from this. */}
+        {crewRecord ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>Track record</Text>
+            <View style={{ gap: 10 }}>
+              <View style={crew.metaRow}>
+                <TierChip person={crewRecord} />
+                <Text style={crew.meta}>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</Text>
+              </View>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                {[[crewRecord.jobs, 'jobs confirmed on Crew Call'], [crewRecord.titles, 'released titles'], [crewRecord.posted, `calls posted · ${crewRecord.filled} filled`], [crewRecord.wouldAgain, '“would work again”']].map(([n, l]) => (
+                  <View key={l} style={{ width: '47%', backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 8, paddingHorizontal: 10 }}>
+                    <Text style={{ fontFamily: 'SpaceGrotesk_700Bold', fontSize: 18, color: colors.ink }}>{n}</Text>
+                    <Text style={crew.cat}>{l}</Text>
+                  </View>
+                ))}
+              </View>
+              {crewRecord.recentJobs.length > 0 ? (
+                <>
+                  <Text style={crew.h4}>Recent jobs</Text>
+                  {crewRecord.recentJobs.map((j) => (
+                    <Pressable key={j.id} style={crew.gearRow} onPress={() => router.push(`/crew/calls/${j.callId}`)}>
+                      <Text style={[crew.rowText, { flex: 1 }]}>{j.role} · {j.title}{j.projectTitle ? ` (${j.projectTitle})` : ''} <Text style={crew.cat}>· for {j.forName}</Text></Text>
+                      <View style={[crew.chip, crew.chipOk]}><Text style={[crew.chipText, crew.chipOk]}>confirmed</Text></View>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+              {crewRecord.endorsements.length > 0 ? (
+                <>
+                  <Text style={crew.h4}>What people said</Text>
+                  {crewRecord.endorsements.map((e, i) => (
+                    <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>
+                  ))}
+                </>
+              ) : null}
+              <Text style={crew.mono}>Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</Text>
+            </View>
           </>
         ) : null}
 

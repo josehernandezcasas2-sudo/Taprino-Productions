@@ -379,7 +379,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                     <div
                       key={n.id}
                       className={`notification-item ${n.read ? '' : 'unread'}`}
-                      onClick={() => { if (!n.read) markRead(n.id); if (n.type === 'message') { setOpenMenu(null); router.push('/messages'); } }}
+                      onClick={() => { if (!n.read) markRead(n.id); if (n.href) { setOpenMenu(null); router.push(n.href); } }}
                     >
                       <div className="notification-message">{n.message}</div>
                       <div className="notification-time">{new Date(n.createdAt).toLocaleString()}</div>

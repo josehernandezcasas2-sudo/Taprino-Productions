@@ -40,6 +40,7 @@ export default async function handler(req, res) {
     message: n.message,
     episodeId: n.episode_id,
     pitchId: n.pitch_id,
+    href: n.href || (n.type === 'message' ? '/messages' : null),
     read: n.read,
     createdAt: n.created_at
   }));

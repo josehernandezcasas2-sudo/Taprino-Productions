@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { searchCards, searchGear } from '../../../lib/crewCards';
+import { getTrackRecords } from '../../../lib/crewCalls';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 
 // Crew Call directory, for the website's /crew page and the app's
@@ -39,7 +40,14 @@ export default async function handler(req, res) {
   try {
     const { userId } = getAuth(req);
     if (view === 'gear') return res.status(200).json(await searchGear(filters, { viewerId: userId }));
-    return res.status(200).json(await searchCards(filters, { showRates: Boolean(userId), viewerId: userId }));
+    const result = await searchCards(filters, { showRates: Boolean(userId), viewerId: userId });
+    // The track-record tier next to each name (migration 082).
+    const records = await getTrackRecords(result.people.map((p) => p.userId)).catch(() => ({}));
+    result.people = result.people.map((p) => {
+      const r = records[p.userId];
+      return r ? { ...p, tier: r.tier, tierLabel: r.tierLabel, done: r.done, jobs: r.jobs, titles: r.titles } : p;
+    });
+    return res.status(200).json(result);
   } catch (err) {
     console.error('crew/people:', err.message);
     return res.status(500).json({ error: 'Could not load Crew Call right now.' });

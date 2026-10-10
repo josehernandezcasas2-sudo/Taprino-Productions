@@ -54,7 +54,7 @@ function countComments(list) {
   return list.reduce((sum, c) => sum + 1 + (c.replies ? c.replies.length : 0), 0);
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
@@ -534,6 +534,24 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                   </div>
                 </div>
               ))}
+            </div>
+          </>
+        )}
+
+        {/* Crew Call posts linked to this project (migration 082). Backing
+            and joining live side by side; only the creator can post one. */}
+        {(crewCalls.length > 0 || isPitchOwner) && (
+          <>
+            <div className="pitch-section-label">Crew needed</div>
+            <div className="cl-list" style={{ maxWidth: 760, marginBottom: '1.6rem' }}>
+              {crewCalls.map((c) => (
+                <Link key={c.id} href={`/crew/calls/${c.id}`} className="crew-panel cl-call">
+                  <div className="cl-title">{c.title}<span className={`cl-pay ${c.payType === 'paid' || c.payType === 'union' ? 'paid' : c.payType === 'deferred' ? 'deferred' : 'unpaid'}`}>{c.payLabel}</span></div>
+                  <div className="cl-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{c.remote ? 'Remote' : c.place}</span><span>{c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
+                </Link>
+              ))}
+              {crewCalls.length === 0 && <p className="crew-muted" style={{ margin: 0 }}>No open calls for this project yet.</p>}
+              {isPitchOwner && <div><Link href={`/crew/calls/new?project=pitch:${pitch.id}`} className="crew-btn sm">+ Post a call for this project</Link></div>}
             </div>
           </>
         )}

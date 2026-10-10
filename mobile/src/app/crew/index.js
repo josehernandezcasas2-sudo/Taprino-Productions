@@ -111,6 +111,7 @@ export default function CrewCall() {
         <View style={[crew.chips, { marginBottom: 12 }]}>
           <Chip label={`Find people${people && people.total ? ` · ${people.total}` : ''}`} on={tab === 'people'} onPress={() => setTab('people')} />
           <Chip label={`Gear${gear && gear.total ? ` · ${gear.total}` : ''}`} on={tab === 'gear'} onPress={() => setTab('gear')} />
+          <Chip label="Calls →" onPress={() => router.push('/crew/calls')} />
         </View>
 
         <TextInput

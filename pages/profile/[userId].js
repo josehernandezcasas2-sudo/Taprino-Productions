@@ -15,6 +15,7 @@ import { SITE } from '../../lib/siteConfig';
 import { bannerStyle } from '../../lib/profileBanner';
 import ReportButton from '../../components/ReportButton';
 import { CrewCardView } from '../../components/crew/CrewBits';
+import TierChip from '../../components/crew/TierChip';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -60,7 +61,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -85,6 +86,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
   const sections = [
     { id: 'profile-about', label: 'About' },
     (crewCard || isOwnProfile) && { id: 'profile-crew', label: 'Working card' },
+    crewRecord && { id: 'profile-record', label: 'Track record' },
     latestPost && { id: 'profile-latest', label: 'Latest post' },
     olderPosts.length > 0 && { id: 'profile-posts', label: 'Posts' },
     isOwnProfile && savedSnippets.length > 0 && { id: 'profile-saved', label: 'Saved' },
@@ -332,6 +334,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
               <div className="profile-name-row">
                 <h1 className="profile-name">{profile.displayName}</h1>
                 {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+                {crewRecord && <TierChip person={crewRecord} />}
               </div>
               {profile.handle && <div className="profile-handle">@{profile.handle}</div>}
               {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
@@ -438,6 +441,48 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                     Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Link href="/crew/card">Set up your card</Link>.
                   </p>
                 )}
+              </section>
+            )}
+
+            {/* Track record (migration 082): what this person has actually
+                done — confirmed Crew Call jobs, released titles, the lines
+                people left. The tier chip in the hero comes from this. */}
+            {crewRecord && (
+              <section id="profile-record" className="profile-section">
+                <div className="profile-section-label">Track record</div>
+                <div className="crew-cardview">
+                  <div className="crew-pmeta"><TierChip person={crewRecord} /><span>{crewRecord.tier === 'new' ? 'First month on Studio Tapa' : crewRecord.tier === 'veteran' ? `${crewRecord.done} jobs and titles confirmed` : 'Building a record'}</span></div>
+                  <div className="crew-record">
+                    <div className="n"><b>{crewRecord.jobs}</b><small>jobs confirmed on Crew Call</small></div>
+                    <div className="n"><b>{crewRecord.titles}</b><small>released titles</small></div>
+                    <div className="n"><b>{crewRecord.posted}</b><small>calls posted · {crewRecord.filled} filled</small></div>
+                    <div className="n"><b>{crewRecord.wouldAgain}</b><small>“would work again”</small></div>
+                  </div>
+                  {crewRecord.recentJobs.length > 0 && (
+                    <div className="crew-cardview-block">
+                      <h4>Recent jobs</h4>
+                      <div className="crew-jobs">
+                        {crewRecord.recentJobs.map((j) => (
+                          <div key={j.id} className="crew-job">
+                            <span>{j.role} · <Link href={`/crew/calls/${j.callId}`}>{j.title}</Link>{j.projectTitle ? ` (${j.projectTitle})` : ''} <small>· {j.when ? new Date(`${j.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''} · for <Link href={j.forPath}>{j.forName}</Link></small></span>
+                            <span className="crew-chip ok">confirmed</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {crewRecord.endorsements.length > 0 && (
+                    <div className="crew-cardview-block">
+                      <h4>What people said</h4>
+                      <div className="crew-lines">
+                        {crewRecord.endorsements.map((e, i) => (
+                          <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <span className="crew-mono">Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</span>
+                </div>
               </section>
             )}
 
