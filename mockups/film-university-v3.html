@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Film University v3 — courses, materials, library</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1120px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:860px; }
+  .sec { max-width:1120px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:28px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2.3rem; line-height:1.05; margin:6px 0 8px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:640px; margin:0 0 18px; }
+  .label { font-family:var(--font-mono); font-size:.74rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); margin:26px 0 12px; display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .label small { color:var(--ink-faint); text-transform:none; letter-spacing:0; font-weight:400; }
+  .label a { color:var(--brass); text-decoration:none; text-transform:none; letter-spacing:0; font-size:.74rem; }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.72rem; padding:6px 12px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .th { display:block; aspect-ratio:16/9; border-radius:10px; background:linear-gradient(160deg,#3a2a4f,#1b2740); position:relative; overflow:hidden; }
+  .th.b { background:linear-gradient(160deg,#4a3418,#1b1a12); } .th.c { background:linear-gradient(160deg,#1f3b3a,#0f1f2f); } .th.d { background:linear-gradient(160deg,#5a2430,#1b1020); } .th.e { background:linear-gradient(160deg,#243c5a,#101a2c); } .th.f { background:linear-gradient(160deg,#2d4a2a,#0f1f12); }
+  .th .k { position:absolute; left:8px; bottom:8px; font-family:var(--font-mono); font-size:.7rem; background:rgba(12,19,31,.82); padding:3px 8px; border-radius:999px; }
+  .th .play { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:48px; height:48px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:1rem; }
+  .prog { height:4px; border-radius:999px; background:var(--surface-3); overflow:hidden; }
+  .prog i { display:block; height:100%; background:var(--ok); }
+  .top-in { display:flex; gap:14px; align-items:center; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); margin-bottom:12px; }
+  .back { font-family:var(--font-mono); font-size:.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border:1.4px solid var(--olive); color:var(--olive); border-radius:999px; padding:8px 13px; }
+
+  /* dept header */
+  .depts { display:flex; gap:8px; flex-wrap:wrap; }
+  .dept { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; font-size:.9rem; padding:8px 14px 8px 10px; border-radius:999px; background:var(--surface-1); border:1px solid var(--hair); }
+  .dept i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+  .dept small { font-family:var(--font-mono); font-weight:400; font-size:.7rem; color:var(--ink-faint); }
+  .dept.on { border-color:var(--brass); }
+
+  /* course cards */
+  .courses { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .course { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .course .th { border-radius:0; }
+  .course .body { padding:14px; display:flex; flex-direction:column; gap:6px; flex:1; }
+  .course .t { font-family:var(--font-display); font-weight:700; font-size:1.08rem; line-height:1.2; }
+  .course p { font-size:.88rem; color:var(--ink-dim); line-height:1.45; margin:0; }
+  .course .foot { margin-top:auto; padding-top:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .course .facts { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); display:flex; gap:10px; flex-wrap:wrap; }
+  .course.started .prog { margin-top:6px; }
+  .lvl { font-family:var(--font-mono); font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); }
+  .lvl.start { color:var(--mint); background:rgba(147,208,164,.14); }
+
+  /* continue strip */
+  .cont { display:grid; grid-template-columns:180px 1fr auto; gap:18px; align-items:center; background:var(--surface-1); border:1px solid var(--olive); border-radius:14px; padding:14px 18px 14px 14px; }
+  .cont .th { border-radius:8px; }
+  .cont h3 { font-family:var(--font-display); font-size:1.25rem; margin:4px 0 4px; }
+  .cont p { color:var(--ink-dim); margin:0 0 8px; font-size:.92rem; }
+
+  /* library rows / file rows */
+  .files { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+  .file { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px; display:flex; gap:12px; align-items:center; }
+  .file .ic { width:40px; height:52px; border-radius:4px; background:var(--paper); position:relative; flex:none; }
+  .file .ic::after { content:attr(data-k); position:absolute; left:0; right:0; bottom:5px; text-align:center; font-family:var(--font-mono); font-size:.6rem; font-weight:600; color:#1a1408; }
+  .file .ic.sheet { background:#d7efe0; } .file .ic.doc { background:#dfe6f7; } .file .ic.zip { background:#e9dcc9; }
+  .file .t { font-weight:600; font-size:.92rem; line-height:1.25; display:block; }
+  .filelist .file { margin-bottom:8px; }
+
+  /* course page */
+  .cp { display:grid; grid-template-columns:1.5fr 1fr; gap:24px; align-items:start; }
+  .syl { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; overflow:hidden; }
+  .mod { padding:12px 16px 6px; font-family:var(--font-mono); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); border-top:1px solid var(--hair); background:var(--surface-2); }
+  .mod:first-child { border-top:0; }
+  .row { display:grid; grid-template-columns:28px 1fr auto; gap:12px; align-items:center; padding:12px 16px; border-top:1px solid var(--hair); }
+  .row .n { font-family:var(--font-mono); font-size:.8rem; color:var(--ink-faint); }
+  .row .cb { width:18px; height:18px; border-radius:50%; border:1.5px solid var(--ink-faint); display:inline-flex; align-items:center; justify-content:center; font-size:.7rem; }
+  .row .cb.on { background:var(--ok); border-color:var(--ok); color:#0f1f12; }
+  .row .cb.now { border-color:var(--olive); color:var(--olive); }
+  .row .t { font-weight:600; font-size:.96rem; }
+  .row .k { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-dim); text-align:right; }
+  .row.now { background:rgba(231,162,85,.07); }
+  .row.done .t { color:var(--ink-dim); }
+  .box { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; margin-bottom:12px; }
+  .box h4 { font-family:var(--font-display); margin:4px 0 6px; font-size:1.02rem; }
+  .box p { font-size:.9rem; line-height:1.5; margin:0; color:var(--ink-dim); }
+  .box.assign { border-left:3px solid var(--olive); background:rgba(231,162,85,.08); }
+  .box.assign p { color:var(--ink); }
+  .fact { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:.74rem; padding:6px 0; border-top:1px solid var(--hair); color:var(--ink-dim); }
+  .fact:first-of-type { border-top:0; }
+  .fact b { color:var(--ink); font-weight:600; }
+
+  /* lesson page */
+  .lp { display:grid; grid-template-columns:1.6fr 1fr; gap:24px; align-items:start; }
+  .player { aspect-ratio:16/9; border-radius:12px; background:linear-gradient(160deg,#3a2a4f,#1b2740); display:flex; align-items:center; justify-content:center; }
+  .player span { width:64px; height:64px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:1.5rem; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--hair); margin:16px 0 12px; }
+  .tabs span { font-family:var(--font-mono); font-size:.74rem; padding:8px 12px; color:var(--ink-dim); border-bottom:2px solid transparent; }
+  .tabs span.on { color:var(--ink); border-color:var(--brass); }
+
+  /* admin */
+  .adm { display:grid; grid-template-columns:200px 1fr; gap:14px; }
+  .adm .list { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; overflow:hidden; }
+  .adm .r { padding:10px 14px; border-top:1px solid var(--hair); font-size:.92rem; display:flex; justify-content:space-between; gap:8px; }
+  .adm .r:first-child { border-top:0; }
+  .adm .r.on { background:var(--surface-2); }
+  .adm .r small { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); }
+  .adm .add { color:var(--brass); font-family:var(--font-mono); font-size:.7rem; letter-spacing:.06em; text-transform:uppercase; }
+
+  /* phones */
+  .phones { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top:14px; }
+  .phone { width:340px; height:720px; background:var(--surface-0); border:1px solid var(--hair); border-radius:36px; padding:14px 14px 0; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .scr { flex:1; overflow:hidden; padding:4px 2px 110px; }
+  .top { display:flex; align-items:center; justify-content:space-between; padding:6px 4px 12px; }
+  .top .brand { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .top .brand small { display:block; font-family:var(--font-mono); font-size:.72rem; color:var(--brass); letter-spacing:.1em; text-transform:uppercase; }
+  .top .ic { width:30px; height:30px; border-radius:50%; background:var(--surface-2); }
+  .ptabs { position:absolute; left:14px; right:14px; bottom:18px; display:flex; justify-content:space-around; background:rgba(41,39,25,.96); border:1px solid var(--hair); border-radius:999px; padding:12px 6px; }
+  .ptabs span { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .ptabs span.on { color:var(--brass); }
+  .fade { position:absolute; left:0; right:0; bottom:0; height:120px; background:linear-gradient(180deg,rgba(12,19,31,0),var(--surface-0) 70%); pointer-events:none; }
+  .phone .h1 { font-size:1.6rem; }
+  .phone .courses { grid-template-columns:1fr; }
+  .phone .label { margin:18px 0 10px; }
+  .phone .files { grid-template-columns:1fr; }
+  @media (max-width:760px) { .courses, .files { grid-template-columns:1fr 1fr; } .cp, .lp, .cont, .adm { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Film University — as a university</h1>
+  <p class="note">Rethought from the Workshop. The unit people enrol in is a <b>course</b>: a short, ordered programme inside a <b>department</b> (Directing, Writing, …). Each course has a syllabus of lessons (video or reading), <b>course materials</b> to download (templates, worksheets, sample files), and optional <b>assignments</b>. A <b>Library</b> page collects every downloadable file across courses. Progress is per device until sign-in sync exists. Four screens below plus the admin.</p>
+</div>
+
+<!-- ============ 1 HOME ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">1</span><h2>Home — /university · the course catalogue</h2></div>
+  <p class="note">"Continue where you left off" first (only when you've started something), then the catalogue: departments as a filter strip, courses as cards with level, length and how many files come with them. A short Library shelf at the bottom links to the full one.</p>
+  <div class="frame">
+    <span class="eyebrow pink">Studio Tapa · Free</span>
+    <div class="h1">Film University</div>
+    <p class="lead">Short courses on making films, writing them, and getting them seen. Each one comes with the files you'll use on a real shoot. Free to take, free to keep.</p>
+
+    <div class="cont">
+      <span class="th b"><span class="play">▶</span><span class="k">Lesson 3 of 6</span></span>
+      <div>
+        <span class="eyebrow olive">Continue · Writing 101</span>
+        <h3>Scenes that turn</h3>
+        <p>You're 2 of 6 lessons in. About 40 minutes left.</p>
+        <div class="prog" style="max-width:320px"><i style="width:33%"></i></div>
+      </div>
+      <span class="btn primary">Continue →</span>
+    </div>
+
+    <div class="label">Departments <small>6 · 9 courses</small></div>
+    <div class="depts">
+      <span class="dept on"><i style="background:var(--brass)"></i>All</span>
+      <span class="dept"><i style="background:#f85f73"></i>Directing <small>2</small></span>
+      <span class="dept"><i style="background:#e7a255"></i>Writing <small>2</small></span>
+      <span class="dept"><i style="background:#8499dc"></i>Editing <small>1</small></span>
+      <span class="dept"><i style="background:#93d0a4"></i>Sound <small>1</small></span>
+      <span class="dept"><i style="background:#811826"></i>Producing <small>2</small></span>
+      <span class="dept"><i style="background:#283c63"></i>Getting seen <small>1</small></span>
+    </div>
+
+    <div class="label">Courses <small>start anywhere, finish at your pace</small></div>
+    <div class="courses">
+      <div class="course started"><span class="th b"></span><div class="body"><span class="eyebrow olive">Writing · <span class="lvl start">Start here</span></span><span class="t">Writing 101: from a sentence to a script</span><p>Loglines, the one-page outline, scenes that turn, and the format readers expect.</p><div class="prog"><i style="width:33%"></i></div><div class="foot"><span class="facts"><span>6 lessons</span><span>48 min</span><span>¶ 4 files</span></span><span class="btn sm primary">Continue</span></div></div></div>
+      <div class="course"><span class="th d"></span><div class="body"><span class="eyebrow olive">Directing · <span class="lvl start">Start here</span></span><span class="t">Directing 101: what a shot is for</span><p>Why you point the camera where you point it, blocking two people, talking to actors.</p><div class="foot"><span class="facts"><span>5 lessons</span><span>41 min</span><span>¶ 2 files</span></span><span class="btn sm">Start</span></div></div></div>
+      <div class="course"><span class="th c"></span><div class="body"><span class="eyebrow olive">Sound · <span class="lvl start">Start here</span></span><span class="t">Clean dialogue on a phone</span><p>Where to stand, what to turn off, what the room does, and mixing for phone speakers.</p><div class="foot"><span class="facts"><span>4 lessons</span><span>32 min</span><span>¶ 1 file</span></span><span class="btn sm">Start</span></div></div></div>
+      <div class="course"><span class="th e"></span><div class="body"><span class="eyebrow olive">Producing · <span class="lvl">Level 2</span></span><span class="t">Planning a shoot day</span><p>Call sheets, shot lists, releases and a micro-budget, with the templates to fill in.</p><div class="foot"><span class="facts"><span>5 lessons</span><span>36 min</span><span>¶ 5 files</span></span><span class="btn sm">Start</span></div></div></div>
+      <div class="course"><span class="th"></span><div class="body"><span class="eyebrow olive">Editing · <span class="lvl">Level 2</span></span><span class="t">Cutting your first scene</span><p>Coverage you'll actually use, rhythm, cutting dialogue, finishing.</p><div class="foot"><span class="facts"><span>4 lessons</span><span>29 min</span><span>¶ 1 file</span></span><span class="btn sm">Start</span></div></div></div>
+      <div class="course"><span class="th f"></span><div class="body"><span class="eyebrow olive">Getting seen · <span class="lvl">Level 2</span></span><span class="t">Festivals and the Pitch Room</span><p>Which festivals are worth the fee, how to pitch, posting short-form that lands.</p><div class="foot"><span class="facts"><span>4 lessons</span><span>31 min</span><span>¶ 2 files</span></span><span class="btn sm">Start</span></div></div></div>
+    </div>
+    <div style="text-align:center;margin-top:12px"><span class="btn">See 3 more courses</span></div>
+
+    <div class="label">Library <small>every file from every course</small><a href="#">Open the library →</a></div>
+    <div class="files">
+      <div class="file"><div class="ic" data-k="PDF"></div><div><span class="t">Call sheet</span><span class="meta">Producing · 1 page</span></div></div>
+      <div class="file"><div class="ic sheet" data-k="XLSX"></div><div><span class="t">Shot list</span><span class="meta">Producing · spreadsheet</span></div></div>
+      <div class="file"><div class="ic" data-k="PDF"></div><div><span class="t">Scene beat worksheet</span><span class="meta">Writing · 1 page</span></div></div>
+      <div class="file"><div class="ic doc" data-k="DOCX"></div><div><span class="t">Short film script template</span><span class="meta">Writing · editable</span></div></div>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Studio Tapa · Free</span>
+      <div class="h1">Film University</div>
+      <div class="cont" style="grid-template-columns:1fr;gap:10px">
+        <div><span class="eyebrow olive">Continue · Writing 101</span><h3 style="font-size:1.1rem">Scenes that turn</h3><div class="prog"><i style="width:33%"></i></div><span class="meta">Lesson 3 of 6 · 40 min left</span></div>
+        <span class="btn primary" style="text-align:center">Continue →</span>
+      </div>
+      <div class="label">Departments</div>
+      <div class="depts" style="flex-wrap:nowrap;overflow:hidden"><span class="dept on"><i style="background:var(--brass)"></i>All</span><span class="dept"><i style="background:#f85f73"></i>Directing</span><span class="dept"><i style="background:#e7a255"></i>Writing</span><span class="dept"><i style="background:#8499dc"></i>Editing</span></div>
+      <div class="label">Courses</div>
+      <div class="courses">
+        <div class="course"><span class="th d"></span><div class="body"><span class="eyebrow olive">Directing · Start here</span><span class="t">Directing 101: what a shot is for</span><div class="foot"><span class="facts"><span>5 lessons</span><span>41 min</span><span>¶ 2 files</span></span><span class="btn sm">Start</span></div></div></div>
+      </div>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- ============ 2 COURSE ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">2</span><h2>Course — /university/writing-101</h2></div>
+  <p class="note">The syllabus on the left, grouped into modules if the course has them, each lesson with a tick (done), an amber ring (where you are), length and type. Right: course materials (the downloads that belong to this course), your progress, and what you'll need. One Continue button that knows where you are.</p>
+  <div class="frame">
+    <div class="top-in"><span class="back">← Back</span><span>Film University / Writing / Writing 101</span></div>
+    <div class="cp">
+      <div>
+        <span class="eyebrow olive">Writing · Start here · 6 lessons · 48 min</span>
+        <div class="h1" style="font-size:1.9rem">Writing 101: from a sentence to a script</div>
+        <p class="lead">Loglines, the one-page outline, scenes that turn, dialogue people say, and the format readers expect. Four files you'll keep using.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px"><span class="btn primary">Continue · lesson 3 →</span><span class="meta" style="margin:0">2 of 6 done</span></div>
+        <div class="syl">
+          <div class="mod">Module 1 · The idea</div>
+          <div class="row done"><span class="cb on">✓</span><div><span class="t">The logline</span><span class="meta">Video · 5:30</span></div><span class="k">done</span></div>
+          <div class="row done"><span class="cb on">✓</span><div><span class="t">The one-page outline</span><span class="meta">Reading · 2 pages · ¶ worksheet</span></div><span class="k">done</span></div>
+          <div class="mod">Module 2 · The scene</div>
+          <div class="row now"><span class="cb now">●</span><div><span class="t">Scenes that turn</span><span class="meta">Video · 11:20 · assignment · ¶ beat worksheet</span></div><span class="k">up next</span></div>
+          <div class="row"><span class="cb"></span><div><span class="t">Dialogue people actually say</span><span class="meta">Video · 8:45</span></div><span class="k">▶</span></div>
+          <div class="mod">Module 3 · The script</div>
+          <div class="row"><span class="cb"></span><div><span class="t">Short film script format</span><span class="meta">Reading · 6 pages · ¶ template</span></div><span class="k">¶</span></div>
+          <div class="row"><span class="cb"></span><div><span class="t">Rewriting: the second pass</span><span class="meta">Video · 12:00 · assignment</span></div><span class="k">▶</span></div>
+        </div>
+      </div>
+      <aside>
+        <div class="box">
+          <span class="eyebrow mint">Course materials · 4 files</span>
+          <div class="filelist" style="margin-top:8px">
+            <div class="file" style="padding:8px"><div class="ic" data-k="PDF"></div><div><span class="t">One-page outline worksheet</span><span class="meta">1 page · lesson 2</span></div></div>
+            <div class="file" style="padding:8px"><div class="ic" data-k="PDF"></div><div><span class="t">Scene beat worksheet</span><span class="meta">1 page · lesson 3</span></div></div>
+            <div class="file" style="padding:8px"><div class="ic doc" data-k="DOCX"></div><div><span class="t">Short film script template</span><span class="meta">editable · lesson 5</span></div></div>
+            <div class="file" style="padding:8px"><div class="ic zip" data-k="ZIP"></div><div><span class="t">Sample scripts (3)</span><span class="meta">2.1 MB · course</span></div></div>
+          </div>
+          <span class="btn sm" style="margin-top:8px">Download all</span>
+        </div>
+        <div class="box">
+          <span class="eyebrow">About this course</span>
+          <div class="fact"><span>Level</span><b>Start here</b></div>
+          <div class="fact"><span>Length</span><b>48 min of video · 8 pages</b></div>
+          <div class="fact"><span>You'll need</span><b>Nothing to start · a scene by lesson 3</b></div>
+          <div class="fact"><span>Assignments</span><b>2</b></div>
+          <div class="fact"><span>Taught by</span><b>Studio Tapa</b></div>
+        </div>
+        <div class="box" style="border-style:dashed;background:transparent">
+          <span class="eyebrow">After this</span>
+          <h4 style="font-size:.95rem">Directing 101: what a shot is for</h4>
+          <p>Take your script onto a set.</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3 LESSON ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">3</span><h2>Lesson — /university/writing-101/scenes-that-turn</h2></div>
+  <p class="note">Same player and reader as now. Under it, tabs: Overview, Files (the downloads for this lesson), Assignment. Right: the course syllabus in miniature so you always see where you are, and "Mark done · next lesson".</p>
+  <div class="frame">
+    <div class="top-in"><span class="back">← Back</span><span>Film University / Writing 101 / Lesson 3 of 6</span></div>
+    <div class="lp">
+      <div>
+        <div class="player"><span>▶</span></div>
+        <span class="eyebrow" style="margin-top:14px">Writing 101 · Module 2 · lesson 3 of 6 · 11:20</span>
+        <div class="h1" style="font-size:1.7rem">Scenes that turn</div>
+        <div class="tabs"><span class="on">Overview</span><span>Files · 1</span><span>Assignment</span></div>
+        <p class="lead" style="margin:0 0 12px">Every scene is a small argument: someone wants something, and by the end the situation has changed. We look at three scenes from Studio Tapa shorts and mark the turn in each.</p>
+        <div class="box assign"><span class="eyebrow olive">Assignment · 20 min</span><h4>Find the turn</h4><p>Take any scene you've written. One sentence for where it starts, one for where it ends. If they match, rewrite until they differ. Use the beat worksheet.</p><div style="margin-top:10px"><span class="btn sm primary">Mark done ✓</span></div></div>
+        <div class="file" style="margin-top:10px"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t">Scene beat worksheet</span><span class="meta">1 page · fill in one per scene</span></div><span class="btn sm">Download</span></div>
+      </div>
+      <aside>
+        <div class="box" style="padding:0;overflow:hidden">
+          <div class="mod" style="background:transparent">Writing 101 · 2 of 6 done</div>
+          <div class="row done" style="padding:9px 14px"><span class="cb on">✓</span><div><span class="t" style="font-size:.88rem">The logline</span></div><span class="k">5:30</span></div>
+          <div class="row done" style="padding:9px 14px"><span class="cb on">✓</span><div><span class="t" style="font-size:.88rem">The one-page outline</span></div><span class="k">¶</span></div>
+          <div class="row now" style="padding:9px 14px"><span class="cb now">●</span><div><span class="t" style="font-size:.88rem">Scenes that turn</span></div><span class="k">11:20</span></div>
+          <div class="row" style="padding:9px 14px"><span class="cb"></span><div><span class="t" style="font-size:.88rem">Dialogue people actually say</span></div><span class="k">8:45</span></div>
+          <div class="row" style="padding:9px 14px"><span class="cb"></span><div><span class="t" style="font-size:.88rem">Short film script format</span></div><span class="k">¶</span></div>
+          <div class="row" style="padding:9px 14px"><span class="cb"></span><div><span class="t" style="font-size:.88rem">Rewriting: the second pass</span></div><span class="k">12:00</span></div>
+        </div>
+        <span class="btn primary" style="display:block;text-align:center">Mark done · next lesson →</span>
+      </aside>
+    </div>
+  </div>
+
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <span class="eyebrow" style="padding:8px 4px 10px">‹ Writing 101 · 3 of 6</span>
+      <div class="player" style="border-radius:10px"><span>▶</span></div>
+      <div class="h1" style="font-size:1.35rem;margin-top:12px">Scenes that turn</div>
+      <div class="tabs"><span class="on">Overview</span><span>Files · 1</span><span>Assignment</span></div>
+      <p class="lead" style="font-size:.92rem;margin-bottom:12px">Every scene is a small argument: someone wants something, and by the end the situation has changed.</p>
+      <div class="file"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t" style="font-size:.9rem">Scene beat worksheet</span><span class="meta">1 page</span></div><span class="btn sm">Open</span></div>
+      <span class="btn primary" style="display:block;text-align:center;margin-top:12px">Mark done · next →</span>
+    </div><div class="fade"></div><div class="ptabs"><span class="on">Home</span><span>Discover</span><span>Watch</span><span>Account</span></div></div>
+  </div>
+</section>
+
+<!-- ============ 4 LIBRARY ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">4</span><h2>Library — /university/library</h2></div>
+  <p class="note">Every downloadable file across every course, in one place, filterable by department and file type. Files can be PDFs, spreadsheets, editable documents, or zips (sample footage, fonts, LUTs). Each one says which lesson teaches how to use it.</p>
+  <div class="frame">
+    <div class="top-in"><span class="back">← Back</span><span>Film University / Library</span></div>
+    <div class="h1" style="font-size:1.9rem">Library</div>
+    <p class="lead">Templates, worksheets and sample files from every course. Download, fill in, shoot.</p>
+    <div class="chips" style="margin-bottom:14px"><span class="chip on">All 14</span><span class="chip">PDF 8</span><span class="chip">Spreadsheet 3</span><span class="chip">Editable doc 2</span><span class="chip">Zip 1</span><span class="chip" style="margin-left:8px">Directing</span><span class="chip">Writing</span><span class="chip">Producing</span><span class="chip">Sound</span></div>
+    <div class="files">
+      <div class="file"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t">Call sheet</span><span class="meta">Producing · 1 page · taught in "Planning the day"</span></div></div>
+      <div class="file"><div class="ic sheet" data-k="XLSX"></div><div style="flex:1"><span class="t">Shot list</span><span class="meta">Producing · spreadsheet · "Planning the day"</span></div></div>
+      <div class="file"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t">Scene beat worksheet</span><span class="meta">Writing · 1 page · "Scenes that turn"</span></div></div>
+      <div class="file"><div class="ic doc" data-k="DOCX"></div><div style="flex:1"><span class="t">Short film script template</span><span class="meta">Writing · editable · "Script format"</span></div></div>
+      <div class="file"><div class="ic sheet" data-k="XLSX"></div><div style="flex:1"><span class="t">Micro-budget worksheet</span><span class="meta">Producing · spreadsheet</span></div></div>
+      <div class="file"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t">Talent release</span><span class="meta">Producing · 1 page</span></div></div>
+      <div class="file"><div class="ic zip" data-k="ZIP"></div><div style="flex:1"><span class="t">Sample scripts (3)</span><span class="meta">Writing · 2.1 MB</span></div></div>
+      <div class="file"><div class="ic" data-k="PDF"></div><div style="flex:1"><span class="t">Room tone checklist</span><span class="meta">Sound · 1 page</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5 ADMIN ============ -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">5</span><h2>Admin — /admin/university</h2></div>
+  <p class="note">Three levels instead of two: departments → courses → lessons. A course has a cover, a level, modules (optional headings), and a files drawer. Files attach to a lesson or to the course as a whole; any file type up to 50MB, not just PDF. Assignments live on a lesson. Same upload paths as now.</p>
+  <div class="frame" style="padding:18px">
+    <div class="adm">
+      <div class="list">
+        <div class="r"><span>Directing</span><small>2</small></div>
+        <div class="r on"><span>Writing</span><small>2</small></div>
+        <div class="r"><span>Editing</span><small>1</small></div>
+        <div class="r"><span>Sound</span><small>1</small></div>
+        <div class="r"><span>Producing</span><small>2</small></div>
+        <div class="r"><span>Getting seen</span><small>1</small></div>
+        <div class="r"><span class="add">+ Department</span></div>
+      </div>
+      <div>
+        <div class="list" style="margin-bottom:12px">
+          <div class="r on"><span><b>Writing 101: from a sentence to a script</b> <small>· Start here · 6 lessons · 4 files · published</small></span><small>Edit</small></div>
+          <div class="r"><span>Writing 201: the second draft <small>· Level 2 · 3 lessons · draft</small></span><small>Edit</small></div>
+          <div class="r"><span class="add">+ Course</span></div>
+        </div>
+        <div class="list">
+          <div class="mod">Module 1 · The idea</div>
+          <div class="r"><span>01 The logline <small>· video · 5:30 · published</small></span><small>↑ ↓ Edit</small></div>
+          <div class="r"><span>02 The one-page outline <small>· reading · ¶ 1 file · published</small></span><small>↑ ↓ Edit</small></div>
+          <div class="mod">Module 2 · The scene</div>
+          <div class="r"><span>03 Scenes that turn <small>· video · 11:20 · assignment · ¶ 1 file</small></span><small>↑ ↓ Edit</small></div>
+          <div class="r"><span>04 Dialogue people actually say <small>· video · 8:45</small></span><small>↑ ↓ Edit</small></div>
+          <div class="r"><span class="add">+ Lesson · video or reading &nbsp;&nbsp; + Module heading</span></div>
+        </div>
+        <div class="list" style="margin-top:12px">
+          <div class="mod">Course files · 4</div>
+          <div class="r"><span>¶ Sample scripts (3).zip <small>· 2.1 MB · course-wide</small></span><small>Edit</small></div>
+          <div class="r"><span>¶ Scene beat worksheet.pdf <small>· lesson 3</small></span><small>Edit</small></div>
+          <div class="r"><span class="add">+ Add file · PDF, XLSX, DOCX, ZIP…</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
