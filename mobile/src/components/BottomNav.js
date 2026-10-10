@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, fonts } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
+import { useUnreadMessages } from '../lib/useUnread';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
@@ -28,9 +29,10 @@ const GROUPS = {
     Icon: CompassIcon,
     items: [
       { href: '/pitches/discover', label: 'Pitch Discover' },
-      { href: '/vertical/discover', label: 'Vertical Discover' }
+      { href: '/vertical/discover', label: 'Vertical Discover' },
+      { href: '/crew', label: 'Crew Call' }
     ],
-    match: (p) => p === '/pitches/discover' || p === '/vertical/discover'
+    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew')
   },
   watch: {
     label: 'Watch',
@@ -49,10 +51,11 @@ const GROUPS = {
     Icon: AccountIcon,
     items: [
       { href: '/account', label: 'Settings / Account' },
+      { href: '/messages', label: 'Messages', badge: 'messages' },
       { href: '/account/wishlist', label: 'My List' },
       { href: '/account/my-work', label: 'My Work' }
     ],
-    match: (p) => p.startsWith('/account')
+    match: (p) => p.startsWith('/account') || p.startsWith('/messages')
   }
 };
 
@@ -82,6 +85,9 @@ export default function BottomNav() {
   const anim = useRef(new Animated.Value(0)).current;
   const role = useAdminRole();
   const groups = role.canAccessAdmin ? { ...GROUPS, admin: ADMIN_GROUP } : GROUPS;
+  // Unread conversations: a dot on the Account tab and a count on the
+  // Messages row (the website's header badge).
+  const unreadMessages = useUnreadMessages();
 
   useEffect(() => { setOpenKey(null); }, [pathname]);
 
@@ -144,7 +150,7 @@ export default function BottomNav() {
                 style={({ pressed }) => [styles.dropupItem, pressed && styles.dropupItemPressed]}
                 onPress={() => go(entry.href)}
               >
-                <Text style={styles.dropupItemText}>{entry.label}</Text>
+                <Text style={styles.dropupItemText}>{entry.label}{entry.badge === 'messages' && unreadMessages > 0 ? ` · ${unreadMessages}` : ''}</Text>
               </Pressable>
             ))}
             </View>
@@ -166,7 +172,10 @@ export default function BottomNav() {
                 }}
               >
                 <Pressable style={[styles.item, active && styles.itemActive]} onPress={() => toggle(key)}>
-                  <Icon size={20} color={tint} />
+                  <View>
+                    <Icon size={20} color={tint} />
+                    {key === 'account' && unreadMessages > 0 ? <View style={styles.badgeDot} /> : null}
+                  </View>
                   <View style={styles.labelRow}>
                     <Text style={[styles.label, { color: tint }]}>{group.label}</Text>
                     {isDiscover ? null : <CaretUpIcon size={7} color={tint} />}
@@ -202,6 +211,7 @@ const styles = StyleSheet.create({
   item: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 999, paddingVertical: 4 },
   itemActive: { backgroundColor: colors.brass },
   labelRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  badgeDot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brass, borderWidth: 1, borderColor: colors.barBackground },
   label: { fontFamily: fonts.mono, fontSize: 8.3, letterSpacing: 0.8, textTransform: 'uppercase' },
   dropup: {
     position: 'absolute',

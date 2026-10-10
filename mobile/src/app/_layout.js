@@ -69,6 +69,10 @@ export default function RootLayout() {
           <Stack.Screen name="pitches/index" options={{ headerShown: false }} />
           <Stack.Screen name="pitches/discover" options={{ headerShown: false }} />
           <Stack.Screen name="university/index" options={{ headerShown: false }} />
+          <Stack.Screen name="crew/index" options={{ headerShown: false }} />
+          <Stack.Screen name="crew/card" options={{ headerShown: false }} />
+          <Stack.Screen name="messages/index" options={{ headerShown: false }} />
+          <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />
           <Stack.Screen name="watch/series" options={{ headerShown: false }} />
           <Stack.Screen name="watch/movies" options={{ headerShown: false }} />
@@ -78,6 +82,7 @@ export default function RootLayout() {
           <Stack.Screen name="account/wishlist" options={{ headerShown: false }} />
           <Stack.Screen name="account/my-work" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
+          <Stack.Screen name="apply" options={{ title: 'Become a creator' }} />
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen name="admin/review" options={{ headerShown: false }} />
         </Stack>

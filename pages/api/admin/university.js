@@ -72,7 +72,7 @@ export default async function handler(req, res) {
     console.error('admin/university error:', err.message);
     const missingTable = /uni_(topics|courses|modules|lessons|files|progress)/.test(err.message || '') && /not find|does not exist|schema cache/i.test(err.message || '');
     return res.status(missingTable ? 500 : 400).json({
-      error: missingTable ? 'Run migrations 078 and 079 (supabase/migrations) in the Supabase SQL Editor first.' : err.message || 'Something went wrong.'
+      error: missingTable ? 'Run migrations 078 and 081 (supabase/migrations) in the Supabase SQL Editor first.' : err.message || 'Something went wrong.'
     });
   }
 }

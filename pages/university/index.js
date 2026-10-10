@@ -46,7 +46,7 @@ export default function UniversityHome(props) {
         <p className="uni-lead">Short courses on making films, writing them, and getting them seen. Each one comes with the files you&rsquo;ll use on a real shoot. Free to take, free to keep.</p>
       </div>
 
-      {props.loadError && <div className="uni-empty">Film University isn&rsquo;t set up yet — the admin needs to run migrations 078 and 079.</div>}
+      {props.loadError && <div className="uni-empty">Film University isn&rsquo;t set up yet — the admin needs to run migrations 078 and 081.</div>}
       {!props.loadError && feed.courses.length === 0 && <div className="uni-empty">No courses published yet — the first ones are on their way.</div>}
 
       {cont && (
