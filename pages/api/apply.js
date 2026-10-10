@@ -3,7 +3,7 @@ import { getSupabase } from '../../lib/supabase';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 import { sendEmail } from '../../lib/notify';
 import {
-  RIGHTS_QUESTIONS, ONBOARDING, APPLICATION_TYPES, APPLICATION_RATINGS, APPLICATION_STATUSES,
+  RIGHTS_QUESTIONS, ONBOARDING, APPLICATION_TYPES, APPLICATION_RATINGS, APPLICATION_STATUSES, APPLICATION_GENRES,
   normalizeRightsAnswers, rightsVerdict, getOwnApplication, toApplicantView, applicationEmails
 } from '../../lib/creatorApplications';
 
@@ -35,7 +35,9 @@ export default async function handler(req, res) {
       questions: RIGHTS_QUESTIONS,
       onboarding: ONBOARDING,
       types: APPLICATION_TYPES,
-      ratings: APPLICATION_RATINGS
+      ratings: APPLICATION_RATINGS,
+      statuses: APPLICATION_STATUSES,
+      genres: APPLICATION_GENRES
     });
   }
 

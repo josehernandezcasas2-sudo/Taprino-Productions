@@ -1,5 +1,6 @@
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { colors } from '../lib/theme';
 import TopNav from '../components/TopNav';
 
@@ -9,6 +10,7 @@ import TopNav from '../components/TopNav';
 const CONTACT_EMAIL = 'info@studiotapa.com';
 
 export default function About() {
+  const router = useRouter();
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
@@ -59,6 +61,9 @@ export default function About() {
               is, we work with creators so their work can be shown not just on our platform but others too — we
               handle the encoding, captioning, and publishing ourselves.
             </Text>
+            <Pressable style={[styles.ctaBtn, { marginTop: 12, marginBottom: 0 }]} onPress={() => router.push('/apply')}>
+              <Text style={styles.ctaBtnText}>Become a creator →</Text>
+            </Pressable>
           </View>
         </Section>
 
