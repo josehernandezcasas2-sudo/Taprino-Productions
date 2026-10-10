@@ -4,22 +4,23 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiPost } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 
-// Plays one Film University video lesson: signed Cloudflare HLS (the
-// same expo-video setup as app/episode/[id].js), no ads, no tier or age
-// gate — lessons are free. Takes the signed src the page response already
-// carries, or asks /api/university/stream-token for one.
-export default function LessonVideo({ lessonId, initialPlayback, thumbnailUrl }) {
+// Plays one Film University video — a lesson ({ lessonId }) or an example
+// clip ({ fileId }) — over signed Cloudflare HLS, the same expo-video
+// setup as app/episode/[id].js, no ads, no tier or age gate. Takes the
+// signed src the page response already carries, or asks
+// /api/university/stream-token for one.
+export default function LessonVideo({ lessonId, fileId, initialPlayback }) {
   const [playback, setPlayback] = useState(initialPlayback && initialPlayback.src ? initialPlayback : null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (playback || !lessonId) return undefined;
+    if (playback || (!lessonId && !fileId)) return undefined;
     let cancelled = false;
-    apiPost('/api/university/stream-token', { lessonId })
+    apiPost('/api/university/stream-token', lessonId ? { lessonId } : { fileId })
       .then((res) => { if (!cancelled) setPlayback(res); })
       .catch((err) => { if (!cancelled) setError(err.message); });
     return () => { cancelled = true; };
-  }, [lessonId, playback]);
+  }, [lessonId, fileId, playback]);
 
   const src = playback ? playback.src : null;
   const player = useVideoPlayer(src || null);

@@ -1,164 +1,93 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { universityPageProps } from '../../lib/universityPage';
-import { getUniversityFeed } from '../../lib/university';
+import { getUniversityFeed, continueFrom } from '../../lib/university';
+import { useProgress } from '../../lib/universityProgress';
 import UniversityShell, { accountFromProps } from '../../components/university/UniversityShell';
-import { ExerciseCard, LessonRow, LessonCard, TopicCard, DoneButton, useDoneMap, needsLabel } from '../../components/university/LessonBits';
+import { CourseCard, DepartmentChips, FileRow } from '../../components/university/LessonBits';
 
-// Film University — the Workshop (direction D, signed off 2026-10-09).
-// The exercise is the front door: one thing to try today, the lessons
-// that teach it beside it, then every exercise with filters, then the
-// lessons by topic and the templates shelf. Free, no sign-in.
+// Film University — the course catalogue (mockups/film-university-v3.html,
+// signed off 2026-10-10). "Continue" first when something's been started,
+// then departments as a filter, courses as cards, a short Library shelf.
 export async function getServerSideProps(ctx) {
-  return universityPageProps(ctx, async () => ({ feed: await getUniversityFeed() }));
+  return universityPageProps(ctx, async (account) => ({ feed: await getUniversityFeed({ userId: account.userId || null }) }));
 }
 
-// The exercise grid shows two rows first; "See more" opens the rest.
-const INITIAL_EXERCISES = 6;
+const INITIAL_COURSES = 6;
 
 export default function UniversityHome(props) {
-  const feed = props.feed || { today: null, exercises: [], topics: [], templates: [] };
-  const [done, toggleDone] = useDoneMap();
-  const [topicFilter, setTopicFilter] = useState(null); // topic id, or null for all
+  const feed = props.feed || { departments: [], courses: [], library: [], lessonIndex: [], doneIds: null, continue: null, libraryCount: 0 };
+  const { doneIds, isDone } = useProgress({ isSignedIn: props.isSignedIn, serverIds: feed.doneIds });
+  const [dept, setDept] = useState(null);
   const [showAll, setShowAll] = useState(false);
-  // "Show me another" walks the other exercises, starting somewhere
-  // random so two visits on the same day don't always show the same pair.
-  const [todayIndex, setTodayIndex] = useState(-1);
 
-  const today = useMemo(() => {
-    if (!feed.today) return null;
-    if (todayIndex < 0) return feed.today;
-    const others = feed.exercises.filter((e) => e.id !== feed.today.id);
-    return others.length ? others[todayIndex % others.length] : feed.today;
-  }, [feed, todayIndex]);
+  // Signed in: the server already worked out where to continue. Signed
+  // out: the device's ticks decide, once the hook has read them.
+  const cont = useMemo(() => {
+    if (props.isSignedIn) return feed.continue;
+    if (!doneIds.length) return null;
+    const lessons = feed.lessonIndex.map((l) => ({ ...l, courseId: l.courseId }));
+    const c = continueFrom(feed.courses, lessons, doneIds);
+    if (!c) return null;
+    const course = feed.courses.find((x) => x.id === c.course.id);
+    return { ...c, lesson: { ...c.lesson, href: `/university/${course.slug}/${c.lesson.slug}` } };
+  }, [props.isSignedIn, feed, doneIds]);
 
-  function showAnother() {
-    setTodayIndex((i) => (i < 0 ? Math.floor(Math.random() * Math.max(1, feed.exercises.length - 1)) : i + 1));
-  }
-
-  const topicsInUse = feed.topics.filter((t) => feed.exercises.some((e) => e.topicId === t.id));
-  const matching = topicFilter ? feed.exercises.filter((e) => e.topicId === topicFilter) : feed.exercises;
-  const visible = showAll ? matching : matching.slice(0, INITIAL_EXERCISES);
+  const doneCountFor = (course) => feed.lessonIndex.filter((l) => l.courseId === course.id && isDone(l.id)).length;
+  const matching = dept ? feed.courses.filter((c) => c.topicId === dept) : feed.courses;
+  const visible = showAll ? matching : matching.slice(0, INITIAL_COURSES);
   const hidden = matching.length - visible.length;
 
-  function pickTopic(id) {
-    setTopicFilter(id);
-    setShowAll(false);
-  }
-
-  const chip = (id, label) => (
-    <button key={id || 'all'} type="button" className={`uni-chip${topicFilter === id ? ' on' : ''}`} onClick={() => pickTopic(id)}>
-      {label}
-    </button>
-  );
-
-  const empty = feed.exercises.length === 0 && feed.topics.length === 0;
-
   return (
-    <UniversityShell title="Workshop" account={accountFromProps(props)} mainGenres={props.mainGenres} wide>
+    <UniversityShell title={null} account={accountFromProps(props)} mainGenres={props.mainGenres} wide>
       <div className="uni-hero">
-        <span className="uni-eyebrow uni-eyebrow-pink">Film University · Free</span>
-        <h1>Workshop</h1>
-        <p className="uni-lead">Pick an exercise, do it today, watch what you need along the way. Free to watch, free to download, free to practice with.</p>
+        <span className="uni-eyebrow uni-eyebrow-pink">Studio Tapa · Free</span>
+        <h1>Film University</h1>
+        <p className="uni-lead">Short courses on making films, writing them, and getting them seen. Each one comes with the files you&rsquo;ll use on a real shoot. Free to take, free to keep.</p>
       </div>
 
-      {props.loadError && <div className="uni-empty">Film University isn&rsquo;t set up yet — the admin needs to run migration 078.</div>}
-      {!props.loadError && empty && <div className="uni-empty">Nothing here yet — the first lessons and exercises are on their way.</div>}
+      {props.loadError && <div className="uni-empty">Film University isn&rsquo;t set up yet — the admin needs to run migrations 078 and 079.</div>}
+      {!props.loadError && feed.courses.length === 0 && <div className="uni-empty">No courses published yet — the first ones are on their way.</div>}
 
-      {today && (
-        <section className="uni-today" aria-label="Today's exercise">
+      {cont && (
+        <section className="uni-cont" aria-label="Continue">
+          <Link href={cont.lesson.href || `/university/${cont.course.slug}/${cont.lesson.slug}`} className="uni-cont-thumb" style={cont.course.coverUrl ? { backgroundImage: `url(${cont.course.coverUrl})` } : undefined}>
+            <span className="uni-thumb-badge">Lesson {cont.index} of {cont.total}</span>
+          </Link>
           <div>
-            <span className="uni-eyebrow uni-eyebrow-olive">
-              {todayIndex < 0 ? "Today's exercise" : 'Another exercise'}
-              {today.topicName ? ` · ${today.topicName}` : ''}
-              {today.minutes ? ` · ${today.minutes} min` : ''}
-            </span>
-            <h2><Link href={today.href}>{today.title}</Link></h2>
-            {today.summary && <p>{today.summary}</p>}
-            {today.steps.length > 0 && (
-              <ol className="uni-steps">
-                {today.steps.map((s, i) => <li key={i}>{s}</li>)}
-              </ol>
-            )}
-            {needsLabel(today.needs) && <div className="uni-meta" style={{ marginBottom: '0.9rem' }}>{needsLabel(today.needs)}</div>}
-            <div className="uni-actions">
-              <DoneButton slug={today.slug} done={Boolean(done[today.slug])} onToggle={toggleDone} />
-              {feed.exercises.length > 1 && <button type="button" className="uni-btn" onClick={showAnother}>Show me another</button>}
-              <Link href={today.href} className="uni-btn ghost">Open →</Link>
-            </div>
+            <span className="uni-eyebrow uni-eyebrow-olive">Continue · {cont.course.title}</span>
+            <h2>{cont.lesson.title}</h2>
+            <p>You&rsquo;re {cont.doneCount} of {cont.total} lessons in{cont.remaining ? `. About ${cont.remaining} left.` : '.'}</p>
+            <span className="uni-prog" style={{ maxWidth: 320 }}><i style={{ width: `${Math.round((cont.doneCount / cont.total) * 100)}%` }} /></span>
           </div>
-          <div className="uni-today-side">
-            {(today.lesson || today.extraLessons.length > 0) && (
-              <>
-                <span className="uni-eyebrow">Watch to do it</span>
-                {today.lesson && (
-                  <Link href={today.lesson.href} className="uni-today-video">
-                    <span
-                      className={`uni-thumb${today.lesson.kind === 'document' ? ' uni-thumb-doc' : ''}`}
-                      style={today.lesson.thumbnailUrl ? { backgroundImage: `url(${today.lesson.thumbnailUrl})` } : undefined}
-                    >
-                      <span className="uni-thumb-badge">
-                        {today.lesson.kind === 'video' ? `▶ ${today.lesson.duration || 'Watch'}` : '¶ Read'} · {today.lesson.title}
-                      </span>
-                    </span>
-                  </Link>
-                )}
-                {today.extraLessons.map((l) => <LessonRow key={l.id} lesson={l} />)}
-              </>
-            )}
-            {today.template && (
-              <>
-                <span className="uni-eyebrow" style={{ marginTop: '0.8rem' }}>Use with</span>
-                <a href={today.template.documentUrl} className="uni-use-with" target="_blank" rel="noopener">
-                  ¶ {today.template.title} · download PDF
-                </a>
-              </>
-            )}
-            {!today.lesson && today.extraLessons.length === 0 && !today.template && (
-              <p className="uni-meta">No lesson attached yet — this one stands on its own.</p>
-            )}
-          </div>
+          <Link href={cont.lesson.href || `/university/${cont.course.slug}/${cont.lesson.slug}`} className="uni-btn primary">Continue →</Link>
         </section>
       )}
 
-      {feed.exercises.length > 0 && (
+      {feed.departments.length > 0 && (
+        <>
+          <div className="uni-label">Departments <small>{feed.departments.length} · {feed.courses.length} course{feed.courses.length === 1 ? '' : 's'}</small></div>
+          <DepartmentChips departments={feed.departments} active={dept} onPick={(id) => { setDept(id); setShowAll(false); }} />
+        </>
+      )}
+
+      {feed.courses.length > 0 && (
         <section>
-          <div className="uni-label">All exercises <small>{feed.exercises.length}</small></div>
-          <div className="uni-chips">
-            {chip(null, `All ${feed.exercises.length}`)}
-            {topicsInUse.map((t) => chip(t.id, t.name))}
+          <div className="uni-label">Courses <small>start anywhere, finish at your pace</small></div>
+          <div className="uni-courses">
+            {visible.map((c) => <CourseCard key={c.id} course={c} doneCount={doneCountFor(c)} />)}
           </div>
-          <div className="uni-exgrid">
-            {visible.map((e) => <ExerciseCard key={e.id} exercise={e} done={Boolean(done[e.slug])} />)}
-          </div>
-          {visible.length === 0 && <div className="uni-empty">No exercises in this topic yet.</div>}
-          {hidden > 0 && (
-            <div className="uni-more">
-              <button type="button" className="uni-btn" onClick={() => setShowAll(true)}>See {hidden} more</button>
-            </div>
-          )}
-          {showAll && matching.length > INITIAL_EXERCISES && (
-            <div className="uni-more">
-              <button type="button" className="uni-btn ghost sm" onClick={() => setShowAll(false)}>Show fewer</button>
-            </div>
-          )}
+          {visible.length === 0 && <div className="uni-empty">No courses in this department yet.</div>}
+          {hidden > 0 && <div className="uni-more"><button type="button" className="uni-btn" onClick={() => setShowAll(true)}>See {hidden} more course{hidden === 1 ? '' : 's'}</button></div>}
+          {showAll && matching.length > INITIAL_COURSES && <div className="uni-more"><button type="button" className="uni-btn ghost sm" onClick={() => setShowAll(false)}>Show fewer</button></div>}
         </section>
       )}
 
-      {feed.topics.length > 0 && (
+      {feed.library.length > 0 && (
         <section>
-          <div className="uni-label">Lessons by topic <small>{feed.topics.length} topics · {feed.lessonCount} lessons</small></div>
-          <div className="uni-topics">
-            {feed.topics.map((t) => <TopicCard key={t.id} topic={t} />)}
-          </div>
-        </section>
-      )}
-
-      {feed.templates.length > 0 && (
-        <section>
-          <div className="uni-label">Templates <small>download, fill in, shoot</small></div>
-          <div className="uni-lesson-grid">
-            {feed.templates.map((l) => <LessonCard key={l.id} lesson={l} />)}
+          <div className="uni-label">Library <small>every file from every course</small><Link href="/university/library">Open the library →</Link></div>
+          <div className="uni-files">
+            {feed.library.map((f) => <FileRow key={f.id} file={f} showCourse compact />)}
           </div>
         </section>
       )}

@@ -17,9 +17,10 @@ export default function UniversityAdmin({ account, mainGenres }) {
           <div className="eyebrow">Admin</div>
           <h1>Film University</h1>
           <p className="ca-sub">
-            Topics hold lessons (a video on Cloudflare Stream or a PDF). Exercises are the Workshop&rsquo;s front door at{' '}
-            <Link href="/university" target="_blank">/university</Link>: each one links the lessons that teach it and a template to use with it.
-            Only published items show on the site; a topic hides all its lessons when it&rsquo;s hidden.
+            Departments hold courses; a course is an ordered syllabus of lessons (video or reading, optionally under module
+            headings) plus its files. <strong>Materials</strong> are downloads (templates, worksheets); <strong>examples</strong>{' '}
+            are things to look at (sample scripts, example clips) and get their own tab on the site. Only published items show at{' '}
+            <Link href="/university" target="_blank">/university</Link>; a hidden department hides everything in it.
           </p>
         </div>
         <Link href="/admin" className="library-back">← Back to admin</Link>
