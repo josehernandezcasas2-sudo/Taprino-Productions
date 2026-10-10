@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
 import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
+import { CrewCardView } from '../../components/CrewBits';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -156,7 +157,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -268,6 +269,29 @@ export default function PublicProfile() {
             </View>
           ) : null}
         </View>
+
+        {/* Crew Call working card — hidden on other people's profiles
+            until they set one up; the owner sees the prompt. */}
+        {crewCard || isOwnProfile ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>Working card</Text>
+            {crewCard ? (
+              <CrewCardView
+                card={crewCard}
+                creditedWork={creditedWork}
+                isOwn={isOwnProfile}
+                onEdit={() => router.push('/crew/card')}
+                onFind={() => router.push('/crew')}
+                onOpenWork={(w) => router.push(workHref(w))}
+              />
+            ) : (
+              <Pressable onPress={() => router.push('/crew/card')}>
+                <Text style={styles.emptyText}>Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Text style={{ color: colors.olive }}>Set up your card →</Text></Text>
+              </Pressable>
+            )}
+          </>
+        ) : null}
 
         {posts.length > 0 ? (
           <>

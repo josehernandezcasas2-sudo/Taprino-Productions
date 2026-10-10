@@ -14,6 +14,7 @@ import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 import { bannerStyle } from '../../lib/profileBanner';
 import ReportButton from '../../components/ReportButton';
+import { CrewCardView } from '../../components/crew/CrewBits';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -59,7 +60,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -83,6 +84,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
   const olderPosts = posts.slice(1);
   const sections = [
     { id: 'profile-about', label: 'About' },
+    (crewCard || isOwnProfile) && { id: 'profile-crew', label: 'Working card' },
     latestPost && { id: 'profile-latest', label: 'Latest post' },
     olderPosts.length > 0 && { id: 'profile-posts', label: 'Posts' },
     isOwnProfile && savedSnippets.length > 0 && { id: 'profile-saved', label: 'Saved' },
@@ -417,6 +419,22 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 </div>
               )}
             </section>
+
+            {/* Crew Call working card (migration 079). Hidden on other
+                people's profiles until they set one up; the owner sees
+                the prompt. */}
+            {(crewCard || isOwnProfile) && (
+              <section id="profile-crew" className="profile-section">
+                <div className="profile-section-label">Working card</div>
+                {crewCard ? (
+                  <CrewCardView card={crewCard} creditedWork={creditedWork} isOwn={isOwnProfile} />
+                ) : (
+                  <p className="profile-bio profile-bio-empty">
+                    Roles, gear, where you’re based, whether you’re free — so people can find you on Crew Call. <Link href="/crew/card">Set up your card</Link>.
+                  </p>
+                )}
+              </section>
+            )}
 
             {latestPost && (
               <section id="profile-latest" className="profile-section">

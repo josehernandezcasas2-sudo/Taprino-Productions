@@ -39,7 +39,13 @@
           "photosPermission": "Studio Tapa TV needs access to your photos to set a profile avatar."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Studio Tapa TV uses your location to find crew and gear near you on Crew Call."
+        }
+      ]
     ]
   }
 }

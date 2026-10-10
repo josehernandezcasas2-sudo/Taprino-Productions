@@ -28,9 +28,10 @@ const GROUPS = {
     Icon: CompassIcon,
     items: [
       { href: '/pitches/discover', label: 'Pitch Discover' },
-      { href: '/vertical/discover', label: 'Vertical Discover' }
+      { href: '/vertical/discover', label: 'Vertical Discover' },
+      { href: '/crew', label: 'Crew Call' }
     ],
-    match: (p) => p === '/pitches/discover' || p === '/vertical/discover'
+    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew')
   },
   watch: {
     label: 'Watch',
