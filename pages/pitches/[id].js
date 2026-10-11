@@ -55,7 +55,17 @@ function countComments(list) {
   return list.reduce((sum, c) => sum + 1 + (c.replies ? c.replies.length : 0), 0);
 }
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false }) {
+// Same wording as the admin Pitch Room list (components/admin/PitchRoomPanel.js).
+const PAYOUT_STATE_LABELS = {
+  ready: 'Creator payouts ready',
+  review: 'Creator’s Stripe account under review',
+  incomplete: 'Creator hasn’t finished Stripe setup',
+  none: 'Creator hasn’t connected Stripe',
+  'no-creator': 'No creator account to pay',
+  unavailable: 'Payouts aren’t set up on this site yet (migration 083)'
+};
+
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false, creatorPayoutState = null }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
@@ -479,8 +489,24 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             {backed === 'cancelled' && (
               <div className="fund-banner" role="status">No charge was made. You can back the project any time.</div>
             )}
-            {!pitch.funding_enabled && isPitchOwner && (
-              <p className="fund-owner-note">Backing is switched off for this project. Finish <Link href="/creator/pitch/dashboard">Get paid</Link> on your dashboard and the admin can turn it on.</p>
+            {!pitch.funding_enabled && (
+              <div className="fund-closed" id="fund">
+                <span className="fund-closed-kicker">Backing</span>
+                {isPitchOwner ? (
+                  <p>
+                    {creatorPayoutState === 'ready'
+                      ? 'Your payouts are ready — backing opens as soon as the admin switches it on.'
+                      : <>Not open yet. Finish <Link href="/creator/pitch/dashboard">Get paid</Link> on your dashboard and the admin can switch it on.</>}
+                  </p>
+                ) : pitch.project_url ? (
+                  <p>This project is raising funds on an outside site — use the Fund button above.</p>
+                ) : (
+                  <p>Not open yet — the creator is still setting up payouts.{isSignedIn ? ' Save it to your list to find it again.' : ''}</p>
+                )}
+                {isAdmin && (
+                  <p className="fund-closed-admin">Admin · {PAYOUT_STATE_LABELS[creatorPayoutState] || 'Creator payouts unknown'} · <Link href="/admin/pitch-room">Switch backing on</Link></p>
+                )}
+              </div>
             )}
             {pitch.funding_enabled && (
               <div style={{ marginTop: 14 }} id="fund">

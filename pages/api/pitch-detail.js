@@ -32,6 +32,8 @@ export default async function handler(req, res) {
     isSignedIn: data.isSignedIn,
     bypassingDisabled: data.bypassingDisabled,
     userId: data.userId,
+    isPitchOwner: data.isPitchOwner,
+    creatorPayoutState: data.creatorPayoutState,
     pitch: data.pitch,
     similar: data.similar,
     updates: data.updates,

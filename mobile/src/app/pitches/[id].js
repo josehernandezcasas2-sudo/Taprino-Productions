@@ -268,7 +268,7 @@ export default function PitchDetail() {
     );
   }
 
-  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorDisplayName } = state.data;
+  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null } = state.data;
   const creatorName = pitch.creator_name || creatorDisplayName;
 
   const raisedForPct = pitch.funding_enabled ? (currentTotalRaisedCents || 0) / 100 : (pitch.funding_raised || 0);
@@ -296,7 +296,9 @@ export default function PitchDetail() {
   }
 
   const heroArt = pitch.hero_image || pitch.thumbnail;
-  const hasFundingCard = pct !== null || pitch.funding_enabled || Boolean(pitch.project_url) || remaining !== null;
+  // Every pitch gets the card: the bar when there's a goal, the backing
+  // form when it's on, otherwise a note on why it isn't open yet.
+  const hasFundingCard = true;
 
   function renderComment(c, isReply = false) {
     const isOwn = Boolean(userId) && c.user_id === userId;
@@ -521,7 +523,7 @@ export default function PitchDetail() {
                         </View>
                       </View>
                       <Pressable style={styles.primaryBtn} disabled={donating} onPress={() => donate(pitch.id)}>
-                        <Text style={styles.primaryBtnText}>{donating ? 'Opening Stripe…' : `◆ Back this project${donationAmount ? ` · ${donationAmount}` : ''}`}</Text>
+                        <Text style={styles.primaryBtnText}>{donating ? 'Opening Stripe…' : `◆ Back this project${donationAmount ? ` · $${donationAmount}` : ''}`}</Text>
                       </Pressable>
                       {donationSuccess ? <Text style={styles.okText}>If you completed the payment, thank you — it shows in the total as soon as Stripe confirms.</Text> : null}
                     </>
@@ -533,7 +535,20 @@ export default function PitchDetail() {
                   {donationError ? <Text style={styles.errorTextSm}>{donationError}</Text> : null}
                   <Text style={styles.finePrint}>You pay the pledge plus Stripe’s card fee (2.9% + 30¢); the creator receives the pledge minus Studio Tapa’s cut. Payments go through Stripe. Backing isn’t a purchase or an investment.</Text>
                 </View>
-              ) : null}
+              ) : (
+                <View style={styles.fundClosed}>
+                  <Text style={styles.fundClosedKicker}>Backing</Text>
+                  <Text style={styles.fundClosedText}>
+                    {isPitchOwner
+                      ? (creatorPayoutState === 'ready'
+                        ? 'Your payouts are ready — backing opens as soon as the admin switches it on.'
+                        : 'Not open yet. Finish Get paid on your pitch dashboard on the website and the admin can switch it on.')
+                      : pitch.project_url
+                        ? 'This project is raising funds on an outside site — use the Fund button above.'
+                        : `Not open yet — the creator is still setting up payouts.${isSignedIn ? ' Save it to find it again.' : ''}`}
+                  </Text>
+                </View>
+              )}
             </View>
           ) : null}
 
@@ -734,6 +749,9 @@ const styles = StyleSheet.create({
   primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   primaryBtnText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },
   donation: { marginTop: 4 },
+  fundClosed: { marginTop: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairline },
+  fundClosedKicker: { fontFamily: fonts.monoMedium, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: colors.olive, marginBottom: 4 },
+  fundClosedText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.inkDim },
   presetRow: { flexDirection: 'row', gap: 8, marginTop: 16 },
   presetBtn: { flex: 1, alignItems: 'center', borderRadius: 12, paddingVertical: 11, borderWidth: 1, borderColor: colors.hairline, backgroundColor: colors.surface2 },
   presetBtnActive: { backgroundColor: colors.brass, borderColor: colors.brass },
