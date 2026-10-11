@@ -8845,3 +8845,69 @@ a.crew-credit:hover { background: var(--surface-3); }
   .dm-msgs { max-height: none; }
   .dm-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 80px); }
 }
+
+/* ---- Crew Call board (/crew/calls) + track record tier ---- */
+.crew-tier { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 999px; padding: 0.1rem 0.5rem 0.1rem 0.35rem; border: 1px solid; white-space: nowrap; vertical-align: middle; }
+.crew-tier i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.crew-tier.t-new { color: var(--ink-faint); border-color: rgba(179, 161, 140, 0.4); }
+.crew-tier.t-crew { color: var(--sky); border-color: rgba(132, 153, 220, 0.5); }
+.crew-tier.t-veteran { color: var(--brass); border-color: rgba(248, 95, 115, 0.5); }
+.crew-tab { font-family: var(--font-mono); font-size: 0.72rem; padding: 0.35rem 0.85rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink-dim); text-decoration: none; }
+.crew-tab.on { background: var(--ink); color: var(--surface-0); border-color: var(--ink); }
+.cl-board { grid-template-columns: 250px minmax(0, 1fr) 400px; }
+.cl-list { display: grid; gap: 0.5rem; align-content: start; }
+.cl-call { display: grid; gap: 0.35rem; text-decoration: none; color: var(--ink); }
+.cl-call:hover { background: var(--surface-2); }
+.cl-call.sel { outline: 2px solid var(--ink); outline-offset: 1px; }
+.cl-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.cl-when { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.cl-owner { display: flex; align-items: center; gap: 0.45rem; font-size: 0.84rem; color: var(--ink-dim); flex-wrap: wrap; }
+.cl-pay { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.04em; padding: 0.12rem 0.45rem; border-radius: 4px; text-transform: lowercase; }
+.cl-pay.paid { background: rgba(132, 205, 152, 0.16); color: var(--ok); }
+.cl-pay.deferred { background: rgba(231, 162, 85, 0.16); color: var(--olive); }
+.cl-pay.unpaid { background: var(--surface-3); color: var(--ink-dim); }
+.cl-detail { position: sticky; top: 92px; min-width: 0; }
+.cl-detail-panel { display: grid; gap: 0.7rem; }
+.cl-detail-top { display: flex; align-items: center; gap: 0.5rem; }
+.cl-back { display: none; }
+.cl-h2 { font-family: var(--font-display); font-size: 1.2rem; margin: 0; }
+.cl-h4 { font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-faint); margin: 0.4rem 0 0; }
+.cl-kv { display: grid; grid-template-columns: auto 1fr; gap: 0.3rem 0.8rem; font-size: 0.86rem; align-items: start; }
+.cl-kv > span:nth-child(odd) { font-family: var(--font-mono); font-size: 0.62rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); padding-top: 0.2rem; }
+.cl-kv a { color: var(--ink); }
+.cl-person { display: inline-flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.cl-person a { color: var(--ink); text-decoration: none; font-weight: 600; }
+.cl-details { margin: 0; color: var(--ink-dim); font-size: 0.92rem; white-space: pre-wrap; }
+.cl-form { display: grid; gap: 0.5rem; }
+.cl-form textarea.crew-input { resize: vertical; }
+.cl-resp { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 0.7rem; align-items: start; background: var(--surface-2); border-radius: 10px; padding: 0.6rem 0.7rem; }
+.cl-resp.booked { outline: 1px solid rgba(132, 205, 152, 0.5); }
+.cl-resp .crew-pname a { color: var(--ink); text-decoration: none; }
+.cl-resp-msg { margin: 0.3rem 0; font-size: 0.9rem; color: var(--ink-dim); }
+.cl-resp-acts { display: grid; gap: 0.3rem; justify-items: stretch; }
+.cl-outcome { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; margin-top: 0.4rem; padding: 0.5rem 0.6rem; background: rgba(231, 162, 85, 0.1); border: 1px solid rgba(231, 162, 85, 0.35); border-radius: 8px; }
+.cl-endorse { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.4rem; margin-top: 0.4rem; }
+.cl-foot { margin-top: 0.3rem; }
+.cl-pick { min-height: 200px; display: grid; place-items: center; }
+.cl-postform { display: grid; gap: 0.7rem; }
+.cl-rules { margin: 0; padding-left: 1.1rem; color: var(--ink-dim); font-size: 0.88rem; line-height: 1.6; }
+.crew-chip.warn { background: rgba(224, 134, 60, 0.16); color: var(--warn); }
+/* profile track record */
+.crew-record { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 0.6rem; }
+.crew-record .n { display: grid; gap: 0.1rem; background: var(--surface-2); border-radius: 8px; padding: 0.5rem 0.7rem; }
+.crew-record b { font-family: var(--font-display); font-size: 1.15rem; }
+.crew-record small { font-family: var(--font-mono); font-size: 0.6rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); }
+.crew-jobs { display: grid; gap: 0.3rem; font-size: 0.88rem; }
+.crew-job { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; background: var(--surface-2); border-radius: 8px; padding: 0.4rem 0.6rem; }
+.crew-job small { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
+.crew-lines { display: grid; gap: 0.3rem; color: var(--ink-dim); font-size: 0.9rem; }
+.crew-lines a { color: var(--ink-dim); }
+@media (max-width: 1100px) { .cl-board { grid-template-columns: 220px minmax(0, 1fr); } .cl-board .cl-detail { grid-column: 1 / -1; position: static; } }
+@media (max-width: 900px) {
+  .cl-board { grid-template-columns: 1fr; }
+  .cl-board.has-detail .crew-filters, .cl-board.has-detail .cl-list { display: none; }
+  .cl-back { display: inline-flex; }
+  .cl-resp { grid-template-columns: 36px minmax(0, 1fr); }
+  .cl-resp-acts { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; }
+  .cl-endorse { grid-template-columns: 1fr; }
+}

@@ -62,6 +62,22 @@ export function Chip({ label, on = false, tone, onPress, style }) {
   );
 }
 
+// The track-record tier next to a name (lib/crewCallRules.js on the web):
+// New crew / Crew / Veteran, with confirmed jobs + released titles behind it.
+const TIER_LABEL = { new: 'New crew', crew: 'Crew', veteran: 'Veteran' };
+const TIER_COLOR = { new: colors.inkFaint, crew: colors.sky, veteran: colors.brass };
+export function TierChip({ person }) {
+  if (!person || !person.tier) return null;
+  const tier = TIER_LABEL[person.tier] ? person.tier : 'new';
+  const c = TIER_COLOR[tier];
+  return (
+    <View style={[crew.tier, { borderColor: c }]}>
+      <View style={[crew.tierDot, { backgroundColor: c }]} />
+      <Text style={[crew.tierText, { color: c }]}>{TIER_LABEL[tier].toUpperCase()}{person.done > 0 ? ` · ${person.done}` : ''}</Text>
+    </View>
+  );
+}
+
 export function Avail({ card }) {
   const open = card.availability === 'open';
   return (
@@ -161,6 +177,7 @@ export function PersonCard({ p, onOpen, onMessage }) {
           <View style={crew.nameRow}>
             <Text style={crew.name}>{p.displayName}</Text>
             {p.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}
+            <TierChip person={p} />
             {p.handle ? <Text style={crew.handle}>@{p.handle}</Text> : null}
           </View>
           <View style={crew.metaRow}>
@@ -327,5 +344,47 @@ export const crew = StyleSheet.create({
   toggleBtn: { borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
   toggleOn: { backgroundColor: colors.surface3 },
   toggleText: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim },
-  toggleTextOn: { color: colors.ink }
+  toggleTextOn: { color: colors.ink },
+  tier: { flexDirection: 'row', alignItems: 'center', gap: 4, borderWidth: 1, borderRadius: 999, paddingVertical: 1, paddingHorizontal: 7 },
+  tierDot: { width: 6, height: 6, borderRadius: 3 },
+  tierText: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.6 },
+  payPaid: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
+  payDeferred: { backgroundColor: 'rgba(231,162,85,0.16)', color: colors.olive },
+  payUnpaid: { backgroundColor: colors.surface3, color: colors.inkDim }
 });
+
+export const payStyle = (t) => (t === 'paid' || t === 'union' ? crew.payPaid : t === 'deferred' ? crew.payDeferred : crew.payUnpaid);
+export function fmtRange(a, b) {
+  const f = (d) => new Date(`${d}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (!a) return 'Dates to confirm';
+  return !b || b === a ? f(a) : `${f(a)}–${f(b)}`;
+}
+
+// One call on the board or a project page.
+export function CallCard({ c, onOpen }) {
+  return (
+    <Pressable style={crew.panel} onPress={onOpen}>
+      <View style={[crew.nameRow, { gap: 6 }]}>
+        <Text style={crew.name}>{c.title}</Text>
+        <View style={[crew.chip, payStyle(c.payType)]}><Text style={[crew.chipText, { color: payStyle(c.payType).color }]}>{c.payLabel.toLowerCase()}</Text></View>
+        {c.projectTitle ? <Chip label={`${c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${c.projectTitle}`} tone="ok" /> : null}
+        {c.matches ? <Chip label="matches your card" tone="ok" /> : null}
+        {c.mine ? <Chip label="yours" tone="role" /> : null}
+      </View>
+      <View style={crew.metaRow}>
+        <Text style={crew.meta}>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</Text>
+        <Text style={crew.meta}>{fmtRange(c.startsOn, c.endsOn)}</Text>
+        <Text style={crew.meta}>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</Text>
+        {c.payNote ? <Text style={crew.meta}>{c.payNote}</Text> : null}
+      </View>
+      {c.poster ? (
+        <View style={crew.row}>
+          <Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} size={26} />
+          <Text style={crew.meta}>{c.poster.displayName}</Text>
+          <TierChip person={c.poster} />
+          <Text style={crew.meta}>· {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
+}

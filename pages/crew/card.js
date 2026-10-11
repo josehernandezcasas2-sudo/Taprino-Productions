@@ -56,7 +56,7 @@ export async function getServerSideProps({ req, res }) {
 
 const EMPTY = {
   roles: [], place: null, travelMiles: DEFAULT_TRAVEL_MILES, remoteOk: false, availability: 'open', bookedUntil: '',
-  rateMin: '', rateMax: '', languages: [], listed: true, gear: [], credits: []
+  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: []
 };
 
 function fromCard(card) {
@@ -72,6 +72,7 @@ function fromCard(card) {
     rateMax: card.rateMax == null ? '' : String(card.rateMax),
     languages: card.languages,
     listed: card.listed,
+    callEmails: card.callEmails !== false,
     gear: card.gear.map((g) => ({ category: g.category, name: g.name, flag: g.flag })),
     credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year || '' }))
   };
@@ -300,6 +301,11 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
                     <span>Show my card in the Crew Call directory</span>
                   </label>
                   <span className="crew-mono">Off keeps the card on your profile only. A card needs at least one role or gear item to be listed.</span>
+                  <label className="crew-check">
+                    <input type="checkbox" checked={form.callEmails} onChange={(e) => set({ callEmails: e.target.checked })} />
+                    <span>Email me calls that match my card</span>
+                  </label>
+                  <span className="crew-mono">Calls for your roles within your travel radius (and remote ones). The in-app notification always comes.</span>
                 </section>
               </aside>
             </div>
