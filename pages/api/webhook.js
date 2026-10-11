@@ -1,7 +1,7 @@
 import { SITE } from '../../lib/siteConfig';
 import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
-import { completeDonationFromSession, failDonationFromSession } from '../../lib/pitchDonations';
+import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -112,6 +112,17 @@ export default async function handler(req, res) {
         } catch (err) {
           console.error('failDonationFromSession from webhook failed:', err.message);
         }
+      }
+      break;
+    }
+    case 'charge.refunded': {
+      // A full refund issued from the Stripe dashboard. The admin page's
+      // own refunds are marked before Stripe confirms them, so this is
+      // a no-op for those.
+      try {
+        await refundDonationFromCharge(event.data.object);
+      } catch (err) {
+        console.error('refundDonationFromCharge from webhook failed:', err.message);
       }
       break;
     }

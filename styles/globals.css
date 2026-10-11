@@ -8965,3 +8965,29 @@ a.crew-credit:hover { background: var(--surface-3); }
 .fund-closed p a { color: var(--olive); }
 .fund-closed p.fund-closed-admin { margin-top: 0.45rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--brass); }
 .pitch-back-cta { display: inline-block; margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; color: var(--brass); border: 1px solid rgba(248, 95, 115, 0.5); border-radius: 999px; padding: 0.12rem 0.55rem; }
+
+/* ---- Pitch Room backings (admin, components/admin/PitchBackings.js) and creator earnings (components/creator/PitchEarnings.js) ---- */
+.bk { margin-top: 0.6rem; }
+.bk-summary { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.78rem; color: var(--ink-dim); margin-bottom: 0.4rem; }
+.bk-summary b { color: var(--ink); }
+.bk-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.bk-table th { text-align: left; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; padding: 0.3rem 0.5rem 0.3rem 0; border-bottom: 1px solid var(--ocean-ink); }
+.bk-table td { padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid rgba(251, 232, 211, 0.06); vertical-align: top; }
+.bk-table tr.refunded td { color: var(--ink-dim); }
+.bk-email { display: block; font-size: 0.7rem; color: var(--ink-dim); word-break: break-all; }
+.earn { margin-top: 0.8rem; padding-top: 0.8rem; border-top: 1px solid rgba(251, 232, 211, 0.08); }
+.earn-stats { display: flex; flex-wrap: wrap; gap: 0.6rem 1.6rem; margin-bottom: 0.6rem; }
+.earn-stats > div { display: flex; flex-direction: column; }
+.earn-num { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; color: var(--ink); line-height: 1.1; }
+.earn-num.earn-you { color: var(--brass); }
+.earn-label { font-size: 0.72rem; color: var(--ink-dim); margin-top: 0.15rem; }
+.earn-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.1rem; font-size: 0.8rem; }
+.earn-list li { display: grid; grid-template-columns: 1fr auto auto; gap: 0.8rem; padding: 0.3rem 0; border-bottom: 1px solid rgba(251, 232, 211, 0.06); }
+.earn-list li.refunded { color: var(--ink-dim); }
+.earn-list li span:nth-child(2) { color: var(--ink-dim); }
+.earn-empty { font-size: 0.82rem; color: var(--ink-dim); margin: 0; }
+.earn-note { font-size: 0.72rem; color: var(--ink-dim); margin: 0.6rem 0 0; max-width: 70ch; line-height: 1.45; }
+@media (max-width: 600px) {
+  .earn-list li { grid-template-columns: 1fr; gap: 0.1rem; }
+  .bk-table th:nth-child(4), .bk-table td:nth-child(4), .bk-table th:nth-child(6), .bk-table td:nth-child(6) { display: none; }
+}

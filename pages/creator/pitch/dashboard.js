@@ -8,6 +8,8 @@ import { getAuth } from '@clerk/nextjs/server';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
 import GetPaidCard from '../../../components/creator/GetPaidCard';
+import PitchEarnings from '../../../components/creator/PitchEarnings';
+import { getEarningsForCreator } from '../../../lib/pitchDonations';
 import { SITE } from '../../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
@@ -19,6 +21,8 @@ export async function getServerSideProps({ req, res }) {
   const { userId } = getAuth(req);
   const [episodes, pitches] = await Promise.all([getPublicEpisodes(), getPitchesForCreator(userId)]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  // Paid backings per project (lib/pitchDonations.js) — empty before any.
+  const earnings = await getEarningsForCreator(userId, pitches);
 
   return {
     props: {
@@ -28,7 +32,8 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       mainGenres,
-      pitches
+      pitches,
+      earnings
     }
   };
 }
@@ -73,7 +78,7 @@ function PitchUpdateForm({ pitchId, onPosted }) {
   );
 }
 
-export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches }) {
+export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, pitches, earnings = {} }) {
   const [openUpdateFor, setOpenUpdateFor] = useState(null);
   const [postedFlash, setPostedFlash] = useState(null);
 
@@ -119,6 +124,7 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
                 )}
               </div>
               <p style={{ fontSize: '0.86rem', opacity: 0.8, marginTop: '0.6rem' }}>{p.logline}</p>
+              {p.status === 'approved' && (p.funding_enabled || earnings[p.id]) && <PitchEarnings pitch={p} earnings={earnings[p.id]} />}
 
               {p.status === 'approved' && (
                 <>

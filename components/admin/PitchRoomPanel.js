@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import PitchBackings from './PitchBackings';
 
 // Pitch Room admin: reported comments, add a pitch by hand, approve /
 // reject / delete, and in-platform funding toggles. Moved out of the old
@@ -13,6 +14,7 @@ export default function PitchRoomPanel() {
   const [cutPercentInputs, setCutPercentInputs] = useState({});
   const [defaultCutPercent, setDefaultCutPercent] = useState(5);
   const [fundingBusyId, setFundingBusyId] = useState(null);
+  const [backingsOpenId, setBackingsOpenId] = useState(null);
 
   async function loadReportedComments() {
     try {
@@ -218,16 +220,24 @@ export default function PitchRoomPanel() {
               {p.status === 'approved' && (
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(251,232,211,0.1)' }}>
                   {p.funding_enabled ? (
+                    <>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
                       <span style={{ fontSize: 12, color: p.creator_payout_state === 'ready' ? 'var(--ok)' : 'var(--danger)' }}>
                         In-platform funding on — {p.platform_cut_percent}% platform cut
                         {p.total_raised_cents != null && ` · $${(p.total_raised_cents / 100).toFixed(2)} raised`}
                         {p.creator_payout_state !== 'ready' && ' · creator’s Stripe account isn’t ready, donations are paused'}
                       </span>
-                      <button className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} onClick={() => disablePitchFunding(p.id)} disabled={fundingBusyId === p.id}>
-                        Disable funding
-                      </button>
+                      <div style={{ display: 'flex', gap: 6 }}>
+                        <button type="button" className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} onClick={() => setBackingsOpenId(backingsOpenId === p.id ? null : p.id)}>
+                          {backingsOpenId === p.id ? 'Hide backings' : 'Backings'}
+                        </button>
+                        <button className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} onClick={() => disablePitchFunding(p.id)} disabled={fundingBusyId === p.id}>
+                          Disable funding
+                        </button>
+                      </div>
                     </div>
+                    {backingsOpenId === p.id && <PitchBackings pitchId={p.id} onChanged={loadPitches} />}
+                    </>
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, opacity: 0.65 }}>In-platform funding off</span>
