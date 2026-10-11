@@ -23,6 +23,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
+  try {
   const channel = await resolvePublicChannel((req.body || {}).channel);
   if (!channel) return res.status(404).json({ error: 'No such channel.' });
 
@@ -73,4 +74,8 @@ export default async function handler(req, res) {
     durationSeconds: program.durationSeconds,
     serverTime: now.serverTime
   });
+  } catch (err) {
+    console.error('channel/play:', err.message);
+    return res.status(500).json({ error: 'Could not start playback right now. Try again in a moment.' });
+  }
 }

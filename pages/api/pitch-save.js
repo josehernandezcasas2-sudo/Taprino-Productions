@@ -1,6 +1,8 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { togglePitchSave } from '../../lib/pitches';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -17,7 +19,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Sign in to save projects.' });
   }
   const { pitchId } = req.body || {};
-  if (!pitchId) return res.status(400).json({ error: 'pitchId is required.' });
+  if (!UUID_RE.test(String(pitchId || ''))) return res.status(400).json({ error: 'pitchId is required.' });
 
   const result = await togglePitchSave(userId, pitchId);
   return res.status(200).json(result);

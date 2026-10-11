@@ -19,14 +19,14 @@ export default async function handler(req, res) {
     }
 
     const { companyName, contactEmail } = req.body || {};
-    if (!companyName || !companyName.trim()) {
+    if (typeof companyName !== 'string' || !companyName.trim()) {
       return res.status(400).json({ error: 'A company name is required.' });
     }
 
     // Falls back to the signed-in user's own account email when they
     // don't provide a separate contact address — one less required field
     // for the common case where the account holder is the contact.
-    let finalContactEmail = contactEmail && contactEmail.trim();
+    let finalContactEmail = typeof contactEmail === 'string' ? contactEmail.trim() : '';
     if (!finalContactEmail) {
       const client = await clerkClient();
       const user = await client.users.getUser(userId);

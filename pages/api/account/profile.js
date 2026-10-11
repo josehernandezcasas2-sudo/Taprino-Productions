@@ -89,7 +89,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: `You can add up to ${MAX_SOCIAL_LINKS} links.` });
       }
       for (const link of socialLinks) {
-        if (!link.url || !link.url.trim()) {
+        if (!link || typeof link.url !== 'string' || !link.url.trim()) {
           return res.status(400).json({ error: 'Every link needs a URL.' });
         }
         if (!/^https?:\/\//i.test(link.url.trim())) {

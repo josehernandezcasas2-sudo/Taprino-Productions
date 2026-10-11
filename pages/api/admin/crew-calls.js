@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       const [pending, open, reports] = await Promise.all([
         listPendingOutcomes(),
-        listCalls({ includeClosed: false }, { viewerId: account.userId }),
+        listCalls({ includeClosed: false }, { viewerId: account.userId, includeHeld: true }),
         getSupabase().from('content_reports').select('target_id, reason').eq('target_type', 'call').eq('status', 'open')
       ]);
       const counts = {};

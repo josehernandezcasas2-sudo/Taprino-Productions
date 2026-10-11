@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
@@ -18,10 +19,16 @@ import { recordAudit } from '../../../lib/auditLog';
 // in the same /admin pending-deletions queue, reviewed the same way,
 // confirm-or-deny, by a person. This is a scheduling trigger, not a
 // scheduled deletion.
+function sameSecret(a, b) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && timingSafeEqual(x, y);
+}
+
 export default async function handler(req, res) {
   const cronSecret = process.env.CRON_SECRET;
   const authHeader = req.headers.authorization;
-  const isCronRequest = cronSecret && authHeader === `Bearer ${cronSecret}`;
+  const isCronRequest = Boolean(cronSecret) && typeof authHeader === 'string' && sameSecret(authHeader, `Bearer ${cronSecret}`);
 
   let adminEmail = null;
   let adminId = null;

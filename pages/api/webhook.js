@@ -86,6 +86,10 @@ export default async function handler(req, res) {
           await addAdCredits({ adAccountId: session.metadata.adAccountId, additionalCents: session.amount_total });
         } catch (err) {
           console.error('addAdCredits from webhook failed:', err.message);
+          // Same as the donation branch: let Stripe retry, and let the
+          // retry through firstDelivery.
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'credits not applied' });
         }
       } else if (session.metadata?.type === 'pitch_donation') {
         // A Pitch Room backing was paid: the pending row becomes the

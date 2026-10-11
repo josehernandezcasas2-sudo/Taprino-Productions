@@ -63,12 +63,13 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'You’ve sent a few applications already. Give it an hour before sending another.' });
   }
 
-  const {
-    name, portfolioUrl,
-    title, logline, description, contentType, mainGenre, runtime, rating, completionStatus,
-    mediaLink, mediaNotes,
-    rightsAnswers, rightsAttested
-  } = req.body || {};
+  const raw = req.body || {};
+  // Free-text fields must be strings: a number or an object here used to
+  // throw on .trim() and 500 the whole application.
+  const s = (v) => (typeof v === 'string' ? v : '');
+  const name = s(raw.name), portfolioUrl = s(raw.portfolioUrl), title = s(raw.title), logline = s(raw.logline);
+  const description = s(raw.description), runtime = s(raw.runtime), mediaLink = s(raw.mediaLink), mediaNotes = s(raw.mediaNotes);
+  const { contentType, mainGenre, rating, completionStatus, rightsAnswers, rightsAttested } = raw;
 
   if (!name || !name.trim()) return res.status(400).json({ error: 'Please tell us your name.' });
   if (!title || !title.trim()) return res.status(400).json({ error: 'What’s the work called?' });

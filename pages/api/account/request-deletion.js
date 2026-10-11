@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../../lib/accountContext';
 import { sendEmail } from '../../../lib/notify';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 // Deliberately a request, not an instant delete — deleting a signed-in
 // user's row(s) directly from an API route triggered by that same user
@@ -21,6 +22,10 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ error: 'Not signed in.' });
+  }
+  // Each request emails the admin by hand; three a day is plenty.
+  if (!(await checkRateLimit(`account-deletion:${userId}`, 3, 86400))) {
+    return res.status(429).json({ error: 'Your request is already in — we’ll be in touch.' });
   }
 
   const account = await getAccountContext(req);

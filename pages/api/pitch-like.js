@@ -1,6 +1,8 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { togglePitchLike } from '../../lib/pitches';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // Mirrors pages/api/pitch-save.js: POST toggles, 401 when signed out. The
 // signed-out case is handled client-side (a like still counts locally for
 // that session's own summary, it just isn't stored anywhere), so the page
@@ -21,7 +23,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Sign in to like projects.' });
   }
   const { pitchId } = req.body || {};
-  if (!pitchId) return res.status(400).json({ error: 'pitchId is required.' });
+  if (!UUID_RE.test(String(pitchId || ''))) return res.status(400).json({ error: 'pitchId is required.' });
 
   const result = await togglePitchLike(userId, pitchId);
   if (result.error) return res.status(500).json({ error: result.error });

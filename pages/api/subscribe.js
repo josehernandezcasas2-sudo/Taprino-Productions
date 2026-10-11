@@ -63,7 +63,7 @@ export default async function handler(req, res) {
   }
 
   const { email, interest } = req.body || {};
-  if (!email || !email.includes('@')) {
+  if (typeof email !== 'string' || !email.includes('@')) {
     return res.status(400).json({ error: 'A real email address is required.' });
   }
 
