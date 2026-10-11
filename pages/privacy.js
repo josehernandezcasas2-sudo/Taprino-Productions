@@ -1,7 +1,7 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
-import { SITE } from '../lib/siteConfig';
+import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // Written to match what this codebase actually does, so it is accurate rather
@@ -65,7 +65,7 @@ export default function Privacy({ account }) {
     >
       <h2>Who we are</h2>
       <p>
-        {SITE.name} is a streaming service operated by {SITE.studio} ({SITE.mailingAddress}).
+        {SITE.name} is a streaming service operated by {SITE.studio}{SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}.
         For anything in this policy, reach us at {SITE.contactEmail}.
       </p>
 

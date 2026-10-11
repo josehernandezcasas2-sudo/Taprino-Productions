@@ -60,10 +60,10 @@ export default function Footer() {
 
         <div className="footer-col">
           <h4>Browse</h4>
-          <Link href="/?type=series">Series</Link>
-          <Link href="/?type=movie">Films</Link>
-          <Link href="/?type=vertical">Vertical</Link>
-          <Link href="/?type=podcast">Podcasts</Link>
+          <Link href="/type/series">Series</Link>
+          <Link href="/type/movie">Films</Link>
+          <Link href="/type/vertical">Vertical</Link>
+          <Link href="/podcasts">Podcasts</Link>
         </div>
 
         <div className="footer-col">

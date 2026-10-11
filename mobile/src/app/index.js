@@ -8,6 +8,7 @@ import { colors, fonts, absoluteFill } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import SmartImage from '../components/SmartImage';
 import HomeOnNow from '../components/HomeOnNow';
+import { Avatar, Chip, TierChip } from '../components/CrewBits';
 
 const PAPER_INK = '#241a05';
 const PAPER_MUTED = '#6b6248';
@@ -75,7 +76,8 @@ export default function Home() {
 
   const {
     heroItem, trending, announcements, featuredCreators,
-    filmsAndShorts, seriesRows, podcasts, pitches, liveStream
+    filmsAndShorts, seriesRows, podcasts, pitches, liveStream,
+    openToWork = [], newCalls = [], crewNearLabel = null
   } = state.feed;
 
   return (
@@ -237,6 +239,47 @@ export default function Home() {
           </Dept>
         )}
 
+        {/* Crew Call (step 4): the newest calls, and people open to work —
+            nearest to the viewer's own card when they have one. */}
+        {newCalls.length > 0 && (
+          <Dept label={`NEW CALLS${crewNearLabel ? ` · NEAR ${crewNearLabel.toUpperCase()}` : ''}`} color={colors.brass}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.flyerRow}>
+              {newCalls.map((c, i) => (
+                <Pressable key={c.id} style={[styles.flyer, { transform: [{ rotate: i % 2 ? '-1deg' : '0.8deg' }] }]} onPress={() => router.push(`/crew/calls/${c.id}`)}>
+                  <Text style={styles.flyerTitle}>{c.title}</Text>
+                  <Text style={styles.flyerLogline}>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''} · {c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}{c.startsOn ? ` · ${new Date(`${c.startsOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{c.projectTitle ? ` · ${c.projectTitle}` : ''}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                    <Text style={[styles.flyerBy, { marginBottom: 0 }]}>by {c.posterName}</Text>
+                    {c.posterTier ? <TierChip person={{ tier: c.posterTier, done: c.posterDone }} /> : null}
+                  </View>
+                  <Text style={styles.flyerRaised}>{c.payLabel}{c.payNote ? ` · ${c.payNote}` : ''} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <SeeAll label="All calls →" onPress={() => router.push('/crew/calls')} />
+          </Dept>
+        )}
+
+        {openToWork.length > 0 && (
+          <Dept label={crewNearLabel ? 'OPEN TO WORK NEAR YOU' : 'OPEN TO WORK'} color={colors.sky}>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.flyerRow}>
+              {openToWork.map((p, i) => (
+                <Pressable key={p.userId} style={[styles.crewCard, { transform: [{ rotate: i % 2 ? '0.7deg' : '-0.6deg' }] }]} onPress={() => router.push(p.profilePath)}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} size={32} />
+                    <Text style={styles.crewName} numberOfLines={1}>{p.displayName}</Text>
+                  </View>
+                  {p.tier ? <TierChip person={p} /> : null}
+                  <Text style={styles.crewRoles}>{p.roles.join(' · ')}</Text>
+                  <Text style={styles.crewMeta}>{[p.place ? `${p.place}${p.miles != null ? ` · ${p.miles} mi` : ''}` : null, p.remoteOk ? 'Remote OK' : null].filter(Boolean).join(' · ')}</Text>
+                  {p.gear.length > 0 ? <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 4 }}>{p.gear.map((g) => <Chip key={g} label={g} tone="gear" />)}</View> : null}
+                </Pressable>
+              ))}
+            </ScrollView>
+            <SeeAll label="All of Crew Call →" onPress={() => router.push('/crew')} />
+          </Dept>
+        )}
+
         {!isSubscriber && (
           <View style={styles.dept}>
             <Pressable style={styles.classified} onPress={() => router.push('/account')}>
@@ -378,6 +421,11 @@ const styles = StyleSheet.create({
   flyerLogline: { fontFamily: fonts.body, fontSize: 11.5, lineHeight: 17, color: PAPER_INK, opacity: 0.75, marginBottom: 9.6 },
   flyerBy: { fontFamily: fonts.body, fontSize: 10.6, fontStyle: 'italic', color: PAPER_MUTED, marginBottom: 8, alignSelf: 'flex-start' },
   flyerRaised: { fontFamily: fonts.monoBold, fontSize: 11.2, color: colors.rust },
+  // Crew Call "Open to work" cards (.zine-crew-card)
+  crewCard: { width: 210, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 12, padding: 12, gap: 6 },
+  crewName: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink, flex: 1 },
+  crewRoles: { fontFamily: fonts.body, fontSize: 12.5, color: colors.inkDim },
+  crewMeta: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkFaint },
 
   // .zine-classified
   classified: { marginHorizontal: GUTTER, maxWidth: 420, backgroundColor: colors.ink, paddingVertical: 17.6, paddingHorizontal: 20.8, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(36,26,5,0.35)', borderRadius: 2, transform: [{ rotate: '0.7deg' }] },
