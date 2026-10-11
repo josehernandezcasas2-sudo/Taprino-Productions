@@ -30,6 +30,7 @@ Clerk (auth; **live/production keys**, same account works across web and mobile 
 ```bash
 npm run dev              # web on :3000
 npm run build            # web production build
+npm run check:refs       # before every commit: missing imports, undefined JSX tags/hooks (web + app)
 cd mobile && npx expo start
 cd mobile && npx expo install <pkg>   # never plain npm add in mobile
 ```
