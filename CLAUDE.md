@@ -46,13 +46,13 @@ Mobile: Expo APIs change every SDK. Check `mobile/AGENTS.md` and the versioned d
 
 ## Known open items
 
-- Real payments unbuilt: ad budget Stripe Checkout, Pitch Room donations need Stripe Connect (donations record as "pending").
-- Legal pages: `SITE.mailingAddress` placeholder, revenue-share clause needs numbers from Jose, Pitch Room missing from Terms.
-- Some test/placeholder content still live; a tablet-breakpoint layout bug is flagged but unfixed.
-- PWA install button shows instructions instead of using `beforeinstallprompt` on Chrome/Android.
+- Pitch Room donations have no real charge: they record as "pending" in `lib/pitchDonations.js` and nothing completes them. Needs Stripe Connect for creator payouts. (Ad credits are real: `/api/ads/buy-credits` → Stripe Checkout → `pages/api/webhook.js` → `add_ad_credits`, migration 061. There is no per-ad budget increase; the account-level credit balance replaced it.)
+- Legal pages: `SITE.mailingAddress` placeholder, the Terms revenue-share clause is a bracketed "to be finalised" block, Pitch Room missing from Terms. All need words from Jose.
+- Some test/placeholder content still live. A "tablet-breakpoint layout bug" has been carried in notes since early sessions with no page or repro recorded; treat it as unverified until Jose reproduces it.
 - Shopify (studiotapa.com) integration blocked on a billing/plan issue on the Shopify side.
 - Live channels on mobile (`mobile/src/app/live/`, Watch → Live TV) play without ads: scheduled ad breaks show a countdown card and the between-program break is skipped, until the mobile IMA ads work lands.
-- Mobile app: most `BottomNav` destinations are still `ComingSoon` placeholders (Stream, Watch Series/Movies/Podcasts/Vertical, Pitch/Vertical Discover, My List, My Work) — only Home, Pitch Room, Account, About, and single-episode playback are real. Ad breaks (house-ads VAST feed is ready; needs a mobile Google IMA SDK integration, deliberately paused), captions, and watch-progress saving aren't built for mobile playback yet. Mobile still uses the system default font everywhere, not the site's real Space Grotesk/Fraunces/IBM Plex Mono.
+- Mobile playback: ad breaks (house-ads VAST feed is ready; needs a mobile Google IMA SDK integration, deliberately paused), captions, and watch-progress saving aren't built yet. Every `BottomNav` destination is a real screen now (no `ComingSoon` left), and the app loads Space Grotesk / Fraunces through expo-font.
+- Orphaned API routes with no caller in web or mobile (kept, not deleted, as of 2026-10-11): `/api/admin/{bulk-review,pending-series,pending-submissions,repair-playback-urls,review-submission,sync-stream-protection}`, `/api/creator/{edit-pitch,my-pitches}`, `/api/episode-info`, `/api/track-view`. Check before building on them.
 
 ## Memory
 
