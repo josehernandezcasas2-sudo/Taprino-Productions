@@ -1,3 +1,4 @@
+import { useImaSdk } from '../lib/imaSdk';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
@@ -11,6 +12,7 @@ const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 // risk destabilizing something that works today, for a feature that's
 // genuinely a different shape.
 export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
+  useImaSdk(Boolean(stream.adsEnabled) && !isSubscriber && !isAdmin);
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const shellRef = useRef(null);

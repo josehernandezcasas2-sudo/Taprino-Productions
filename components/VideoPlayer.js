@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { useImaSdk } from '../lib/imaSdk';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
 // the fallback needs `window.location.origin`, which doesn't exist during
@@ -51,6 +52,9 @@ export default function VideoPlayer({
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const iconOverrides = usePlayerIconOverrides();
+  // Google's IMA SDK, fetched only when this viewer can get ads (it used
+  // to load on every page of the site).
+  useImaSdk(Boolean(adsEnabled));
   const adContainerRef = useRef(null);
   const adsManagerRef = useRef(null);
   const adsLoaderRef = useRef(null);

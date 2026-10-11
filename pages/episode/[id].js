@@ -7,7 +7,6 @@ import { PlayIcon, HeartIcon, usePlayerIconOverrides } from '../../components/Pl
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
-import { getBonusContentFor } from '../../lib/bonusContent';
 import { MIN_AGE_BY_RATING } from '../../lib/ageGate';
 import { episodeHref } from '../../lib/episodeLinks';
 import { getEpisodePageData } from '../../lib/episodePage';
@@ -91,7 +90,10 @@ export async function getServerSideProps({ req, params, query, res }) {
       wishlist: account.wishlist,
       email: account.email,
       watchProgress: account.watchProgress,
-      publicEpisodes: data.publicEpisodes,
+      // Only what the page renders — the whole public catalogue used to
+      // ride along in __NEXT_DATA__ on every episode view.
+      mainGenres: [...new Set(data.publicEpisodes.map((e) => e.mainGenre).filter(Boolean))],
+      bonusContent: data.bonusContent,
       parentSeriesName: data.parentSeriesName,
       nextEpisode: data.nextEpisode,
       previousEpisode: data.previousEpisode,
@@ -104,7 +106,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -192,11 +194,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
     ? { ...episode, src: episode.audioDescriptionSrc }
     : episode;
 
-  const mainGenres = [...new Set(publicEpisodes.map((e) => e.mainGenre).filter(Boolean))];
-
-  const bonusContent = episode.contentType === 'series' && episode.seriesId
-    ? getBonusContentFor(publicEpisodes, 'series', episode.seriesId)
-    : getBonusContentFor(publicEpisodes, 'episode', episode.id);
 
   function goToType(t) {
     router.push(t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`);
@@ -217,17 +214,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
     if (episode.contentType !== 'series' || !episode.seriesId) {
       return;
     }
-    const seriesEpisodes = publicEpisodes
-      .filter((e) => e.contentType === 'series' && e.seriesId === episode.seriesId)
-      .sort((a, b) => {
-        const seasonDiff = (a.season || 0) - (b.season || 0);
-        if (seasonDiff !== 0) return seasonDiff;
-        return (a.seriesOrder || 0) - (b.seriesOrder || 0);
-      });
-    const idx = seriesEpisodes.findIndex((e) => e.id === episode.id);
-    const next = idx !== -1 ? seriesEpisodes[idx + 1] : null;
-    if (next) {
-      router.push(`/episode/${next.id}`);
+    // The server already worked out the next episode in this series.
+    if (nextEpisode) {
+      router.push(`/episode/${nextEpisode.id}`);
     }
     // No next episode in this series — just stop. Nothing to autoplay into.
   }

@@ -1,3 +1,4 @@
+import { useImaSdk } from '../lib/imaSdk';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -28,6 +29,8 @@ function formatClock(seconds) {
 // airing at that moment. A live broadcast on the channel takes over the
 // whole player.
 export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) {
+  // Ad breaks between programs run on Google's IMA SDK; fetch it with the player.
+  useImaSdk(true);
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const shellRef = useRef(null);

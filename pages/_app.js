@@ -1,7 +1,6 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { ClerkProvider } from '@clerk/nextjs';
-import Script from 'next/script';
 import Head from 'next/head';
 import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
 import { PodcastPlayerProvider } from '../contexts/PodcastPlayerContext';
@@ -107,12 +106,10 @@ export default function App({ Component, pageProps }) {
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
       </Head>
-      {/* Google's IMA SDK — free, this is what actually serves the pre-roll ads */}
       {/* Lets keyboard and screen-reader users jump past the nav on every page
           instead of tabbing through the whole header each time. Visually hidden
           until it receives focus. */}
       <a href="#main-content" className="skip-link">Skip to content</a>
-      <Script src="https://imasdk.googleapis.com/js/sdkloader/ima3.js" strategy="beforeInteractive" />
       <UploadProvider>
         <PodcastPlayerProvider>
           <Component {...pageProps} />
