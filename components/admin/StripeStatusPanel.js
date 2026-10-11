@@ -24,7 +24,18 @@ export default function StripeStatusPanel() {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const missingEvents = status ? (status.checks.find((c) => c.key === 'webhook') || {}).missing || [] : [];
+  // One block of events per endpoint that's short of them.
+  const eventBlocks = status
+    ? status.checks
+      .filter((c) => Array.isArray(c.missing) && c.missing.length > 0)
+      .map((c) => ({
+        key: c.key,
+        caption: c.key === 'webhook-connect'
+          ? 'Events for the Connect endpoint (Developers → Webhooks → “Events on Connected accounts”):'
+          : 'Events to add to the account endpoint (Developers → Webhooks → the endpoint → Add events):',
+        events: c.missing
+      }))
+    : [];
 
   return (
     <div className="account-card" style={{ marginBottom: '1rem' }}>
@@ -57,12 +68,12 @@ export default function StripeStatusPanel() {
               </li>
             ))}
           </ul>
-          {missingEvents.length > 0 && (
-            <div className="stripe-events">
-              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>Events to add to the endpoint (Developers → Webhooks → the endpoint → Add events):</div>
-              <code>{missingEvents.join('\n')}</code>
+          {eventBlocks.map((b) => (
+            <div className="stripe-events" key={b.key}>
+              <div style={{ fontSize: 12, opacity: 0.75, marginBottom: 4 }}>{b.caption}</div>
+              <code>{b.events.join('\n')}</code>
             </div>
-          )}
+          ))}
           {status.mode === 'live' && (
             <p style={{ fontSize: 12, opacity: 0.75, marginTop: 8 }}>
               Live keys: a donation here charges a real card. Test the full flow with test keys on a preview deploy first.

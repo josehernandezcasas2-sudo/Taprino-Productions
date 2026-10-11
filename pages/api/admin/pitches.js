@@ -2,7 +2,8 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getAllPitches, PITCH_TAGS } from '../../../lib/pitches';
 import { getTotalRaisedForPitch } from '../../../lib/pitchDonations';
-import { getPayoutAccounts, getPayoutAccount, payoutState, isPayoutReady } from '../../../lib/creatorPayouts';
+import { getPayoutAccounts, getPayoutAccount, refreshPayoutAccount, payoutState, isPayoutReady } from '../../../lib/creatorPayouts';
+import { isStripeConfigured } from '../../../lib/stripe';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
@@ -131,9 +132,14 @@ export default async function handler(req, res) {
         if (!pitchRow.created_by) {
           return res.status(400).json({ error: 'This pitch has no creator account attached (it was added by hand), so there is nobody to pay out to.' });
         }
+        // Ask Stripe for the account's current flags rather than trusting
+        // the mirror: if the Connect webhook isn't wired up yet (or ran
+        // late), the switch still sees a creator who just finished.
         let payoutAccount;
         try {
-          payoutAccount = await getPayoutAccount(pitchRow.created_by);
+          payoutAccount = isStripeConfigured()
+            ? await refreshPayoutAccount(pitchRow.created_by).catch(() => getPayoutAccount(pitchRow.created_by))
+            : await getPayoutAccount(pitchRow.created_by);
         } catch (err) {
           return res.status(400).json({ error: err.message });
         }

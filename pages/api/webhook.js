@@ -1,11 +1,9 @@
-import Stripe from 'stripe';
 import { SITE } from '../../lib/siteConfig';
 import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession } from '../../lib/pitchDonations';
 import { getSupabase } from '../../lib/supabase';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
 // Stripe retries any delivery it didn't get a 2xx for, and a creator's
 // payout or a donation must never be applied twice. Each event id is
@@ -44,9 +42,11 @@ export default async function handler(req, res) {
   const sig = req.headers['stripe-signature'];
   const buf = await buffer(req);
 
+  // Account and Connect endpoints both land here, each with its own
+  // signing secret (lib/stripeWebhook.js).
   let event;
   try {
-    event = stripe.webhooks.constructEvent(buf, sig, process.env.STRIPE_WEBHOOK_SECRET || '');
+    event = verifyStripeEvent(buf, sig);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
