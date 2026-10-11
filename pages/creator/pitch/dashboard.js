@@ -7,6 +7,7 @@ import { getPitchesForCreator } from '../../../lib/pitches';
 import { getAuth } from '@clerk/nextjs/server';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
+import GetPaidCard from '../../../components/creator/GetPaidCard';
 import { SITE } from '../../../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
@@ -94,6 +95,8 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
             + Submit a project
           </Link>
         </div>
+
+        <GetPaidCard />
 
         {pitches.length === 0 ? (
           <p>Nothing submitted yet.</p>

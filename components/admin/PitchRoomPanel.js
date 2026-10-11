@@ -11,6 +11,7 @@ export default function PitchRoomPanel() {
   const [pitchError, setPitchError] = useState(null);
   const [reportedComments, setReportedComments] = useState(null);
   const [cutPercentInputs, setCutPercentInputs] = useState({});
+  const [defaultCutPercent, setDefaultCutPercent] = useState(5);
   const [fundingBusyId, setFundingBusyId] = useState(null);
 
   async function loadReportedComments() {
@@ -41,6 +42,7 @@ export default function PitchRoomPanel() {
       const res = await fetch('/api/admin/pitches');
       const data = await res.json();
       setPitches(data.pitches || []);
+      if (data.defaultCutPercent != null) setDefaultCutPercent(data.defaultCutPercent);
     } catch (err) {
       setPitchError('Could not load pitches.');
     }
@@ -97,7 +99,7 @@ export default function PitchRoomPanel() {
   }
 
   async function enablePitchFunding(pitchId) {
-    const cutPercent = cutPercentInputs[pitchId];
+    const cutPercent = cutPercentInputs[pitchId] != null && cutPercentInputs[pitchId] !== '' ? cutPercentInputs[pitchId] : String(defaultCutPercent);
     if (cutPercent == null || cutPercent === '' || Number(cutPercent) < 0 || Number(cutPercent) > 100) {
       setPitchError('Enter a cut percentage between 0 and 100.');
       return;
@@ -217,10 +219,10 @@ export default function PitchRoomPanel() {
                 <div style={{ marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(251,232,211,0.1)' }}>
                   {p.funding_enabled ? (
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
-                      <span style={{ fontSize: 12, color: 'var(--ok)' }}>
+                      <span style={{ fontSize: 12, color: p.creator_payout_state === 'ready' ? 'var(--ok)' : 'var(--danger)' }}>
                         In-platform funding on — {p.platform_cut_percent}% platform cut
                         {p.total_raised_cents != null && ` · $${(p.total_raised_cents / 100).toFixed(2)} raised`}
-                        {!p.creator_stripe_account_id && ' (no Stripe account connected yet — donations can’t actually be charged)'}
+                        {p.creator_payout_state !== 'ready' && ' · creator’s Stripe account isn’t ready, donations are paused'}
                       </span>
                       <button className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} onClick={() => disablePitchFunding(p.id)} disabled={fundingBusyId === p.id}>
                         Disable funding
@@ -229,13 +231,24 @@ export default function PitchRoomPanel() {
                   ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 12, opacity: 0.65 }}>In-platform funding off</span>
+                      <span className={`payout-chip payout-${p.creator_payout_state || 'none'}`}>
+                        {p.creator_payout_state === 'ready' && 'Creator payouts ready'}
+                        {p.creator_payout_state === 'review' && 'Creator’s Stripe account under review'}
+                        {p.creator_payout_state === 'incomplete' && 'Creator hasn’t finished Stripe setup'}
+                        {(!p.creator_payout_state || p.creator_payout_state === 'none') && (p.created_by ? 'Creator hasn’t connected Stripe' : 'No creator account to pay')}
+                      </span>
                       <input
-                        type="number" min="0" max="100" step="0.5" placeholder="Cut %"
+                        type="number" min="0" max="100" step="0.5" placeholder={`Cut % (${defaultCutPercent})`}
                         value={cutPercentInputs[p.id] || ''}
                         onChange={(e) => setCutPercentInputs((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                        style={{ width: '70px', fontSize: 12 }}
+                        style={{ width: '90px', fontSize: 12 }}
                       />
-                      <button className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} onClick={() => enablePitchFunding(p.id)} disabled={fundingBusyId === p.id}>
+                      <button
+                        className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }}
+                        onClick={() => enablePitchFunding(p.id)}
+                        disabled={fundingBusyId === p.id || p.creator_payout_state !== 'ready'}
+                        title={p.creator_payout_state !== 'ready' ? 'The creator needs a ready Stripe account first (Your pitches → Get paid).' : undefined}
+                      >
                         {fundingBusyId === p.id ? 'Enabling…' : 'Enable funding'}
                       </button>
                     </div>

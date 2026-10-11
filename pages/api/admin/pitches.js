@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getAllPitches, PITCH_TAGS } from '../../../lib/pitches';
 import { getTotalRaisedForPitch } from '../../../lib/pitchDonations';
+import { getPayoutAccounts, getPayoutAccount, payoutState, isPayoutReady } from '../../../lib/creatorPayouts';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { recordAudit } from '../../../lib/auditLog';
@@ -25,17 +26,28 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const pitches = await getAllPitches();
+    // Each creator's Stripe Connect state rides along so the funding
+    // switch can say whether a pitch could actually take money, and the
+    // site-wide default cut pre-fills the field (migration 083; both
+    // degrade to "unknown" / 5 before it's run).
+    const [payoutAccounts, settingsRow] = await Promise.all([
+      getPayoutAccounts(pitches.map((p) => p.created_by)).catch(() => ({})),
+      supabase.from('site_settings').select('pitch_platform_cut_percent').eq('id', 1).maybeSingle().then((r) => r.data).catch(() => null)
+    ]);
+    const defaultCutPercent = settingsRow && settingsRow.pitch_platform_cut_percent != null ? Number(settingsRow.pitch_platform_cut_percent) : 5;
     // Only worth the extra query for pitches that actually use in-platform
     // funding — everything else (the large majority, still using the
     // original external-link model) has nothing to sum here at all.
     const withTotals = await Promise.all(
       pitches.map(async (p) => {
-        if (!p.funding_enabled) return p;
+        const account = p.created_by ? payoutAccounts[p.created_by] : null;
+        const base = { ...p, creator_payout_state: p.created_by ? payoutState(account) : 'none' };
+        if (!p.funding_enabled) return base;
         const totalRaisedCents = await getTotalRaisedForPitch(p.id);
-        return { ...p, total_raised_cents: totalRaisedCents };
+        return { ...base, total_raised_cents: totalRaisedCents };
       })
     );
-    return res.status(200).json({ pitches: withTotals });
+    return res.status(200).json({ pitches: withTotals, defaultCutPercent });
   }
 
   if (req.method === 'POST') {
@@ -104,16 +116,40 @@ export default async function handler(req, res) {
         if (!Number.isFinite(numericCut) || numericCut < 0 || numericCut > 100) {
           return res.status(400).json({ error: 'cutPercent must be a number between 0 and 100.' });
         }
-        const { data: pitchRow, error: fetchError } = await supabase.from('pitches').select('status').eq('id', pitchId).maybeSingle();
+        const { data: pitchRow, error: fetchError } = await supabase.from('pitches').select('status, created_by').eq('id', pitchId).maybeSingle();
         if (fetchError || !pitchRow) {
           return res.status(404).json({ error: 'Pitch not found.' });
         }
         if (pitchRow.status !== 'approved') {
           return res.status(400).json({ error: 'Only an approved pitch can have funding enabled.' });
         }
+        // Real money needs somewhere to go: the creator's Stripe Connect
+        // account must be able to take charges. The account id is copied
+        // onto the pitch so a donation can be built from the pitch row
+        // alone, and so a creator who later disconnects doesn't silently
+        // change where past pitches pay out.
+        if (!pitchRow.created_by) {
+          return res.status(400).json({ error: 'This pitch has no creator account attached (it was added by hand), so there is nobody to pay out to.' });
+        }
+        let payoutAccount;
+        try {
+          payoutAccount = await getPayoutAccount(pitchRow.created_by);
+        } catch (err) {
+          return res.status(400).json({ error: err.message });
+        }
+        if (!isPayoutReady(payoutAccount)) {
+          const state = payoutState(payoutAccount);
+          return res.status(400).json({
+            error: state === 'none'
+              ? 'The creator hasn’t connected a Stripe account yet. They do that from Your pitches → Get paid.'
+              : state === 'incomplete'
+                ? 'The creator started Stripe onboarding but hasn’t finished it.'
+                : 'Stripe is still verifying the creator’s account. Try again once it clears.'
+          });
+        }
         const { error } = await supabase
           .from('pitches')
-          .update({ funding_enabled: true, platform_cut_percent: numericCut, reviewed_by: email, reviewed_at: new Date().toISOString() })
+          .update({ funding_enabled: true, platform_cut_percent: numericCut, creator_stripe_account_id: payoutAccount.stripeAccountId, reviewed_by: email, reviewed_at: new Date().toISOString() })
           .eq('id', pitchId);
         if (error) {
           console.error('pitches enable-funding error:', error.message);

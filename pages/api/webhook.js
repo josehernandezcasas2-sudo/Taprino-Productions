@@ -1,8 +1,24 @@
 import Stripe from 'stripe';
 import { SITE } from '../../lib/siteConfig';
 import { addAdCredits } from '../../lib/adAccounts';
+import { syncAccountFromStripe } from '../../lib/creatorPayouts';
+import { getSupabase } from '../../lib/supabase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+
+// Stripe retries any delivery it didn't get a 2xx for, and a creator's
+// payout or a donation must never be applied twice. Each event id is
+// written once (stripe_events, migration 083); a repeat is acknowledged
+// and skipped. Before the migration is run the table is missing and
+// every event is treated as new, which is what happened before anyway.
+async function firstDelivery(event) {
+  const { error } = await getSupabase().from('stripe_events').insert({ id: event.id, type: event.type });
+  if (!error) return true;
+  if (error.code === '23505') return false;
+  if (error.code === 'PGRST205' || error.code === '42P01') return true;
+  console.error('stripe_events insert failed:', error.message);
+  return true;
+}
 
 // Stripe needs the raw request body to verify the webhook signature,
 // so we turn off Next's automatic JSON body parsing for this route.
@@ -35,11 +51,25 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
-  // There's no database to update here — subscription status is read live from
-  // Stripe on every page load (see pages/index.js). These handlers are where
-  // you'd hook in side effects: a welcome email, a Notion Artist Hub row,
-  // a Discord ping, etc.
+  if (!(await firstDelivery(event))) {
+    return res.json({ received: true, duplicate: true });
+  }
+
+  // Subscription status is read live from Stripe on every page load (see
+  // pages/index.js), so those cases only log. Ad credits and creator
+  // payout accounts do get written here.
   switch (event.type) {
+    case 'account.updated': {
+      // A creator's Connect onboarding moved: details submitted, charges
+      // enabled, or Stripe asking for more. Mirror it so the Get paid
+      // card and the admin funding switch see the same thing Stripe does.
+      try {
+        await syncAccountFromStripe(event.data.object);
+      } catch (err) {
+        console.error('syncAccountFromStripe from webhook failed:', err.message);
+      }
+      break;
+    }
     case 'checkout.session.completed': {
       const session = event.data.object;
       // Two entirely different kinds of checkout land here — the
