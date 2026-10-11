@@ -6,7 +6,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
 import { isStreamPath } from '../lib/streamSection';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
