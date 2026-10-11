@@ -1,5 +1,8 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../lib/supabase';
+import { checkRateLimit } from '../../lib/rateLimit';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -18,9 +21,15 @@ export default async function handler(req, res) {
   }
 
   const { commentId, reason } = req.body || {};
-  if (!commentId) return res.status(400).json({ error: 'commentId is required.' });
+  if (!UUID_RE.test(String(commentId || ''))) return res.status(400).json({ error: 'commentId is required.' });
+  if (!(await checkRateLimit(`comment-report:${userId}`, 20, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of reports for one hour — try again later.' });
+  }
 
   const supabase = getSupabase();
+  const { data: comment } = await supabase.from('pitch_comments').select('id, status').eq('id', commentId).maybeSingle();
+  if (!comment || comment.status !== 'visible') return res.status(404).json({ error: 'That comment isn’t here.' });
+  const cleanReason = typeof reason === 'string' ? reason.trim().slice(0, 300) : '';
   // A report flags for review — it does NOT hide the comment itself. A
   // single report shouldn't be able to silently take down someone's
   // comment before a person looks at it; that's what the admin queue is
@@ -28,7 +37,7 @@ export default async function handler(req, res) {
   // the reason rather than doing anything more drastic.
   const { error } = await supabase
     .from('pitch_comments')
-    .update({ reported: true, report_reason: reason || null })
+    .update({ reported: true, report_reason: cleanReason || null })
     .eq('id', commentId);
 
   if (error) {

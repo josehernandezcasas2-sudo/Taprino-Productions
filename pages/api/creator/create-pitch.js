@@ -1,4 +1,5 @@
-import { getAuth } from '@clerk/nextjs/server';
+import { getRoleContext } from '../../../lib/roles';
+import { checkRateLimit } from '../../../lib/rateLimit';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
@@ -19,9 +20,16 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId } = getAuth(req);
+  const { userId, isCreator } = await getRoleContext(req);
   if (!userId) {
     return res.status(401).json({ error: 'Sign in to submit a project.' });
+  }
+  // /creator/pitch/new is creator-only; the route has to be too.
+  if (!isCreator) {
+    return res.status(403).json({ error: 'Creator access required.' });
+  }
+  if (!(await checkRateLimit(`create-pitch:${userId}`, 5, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of projects in one hour — try again later.' });
   }
 
   const body = req.body || {};

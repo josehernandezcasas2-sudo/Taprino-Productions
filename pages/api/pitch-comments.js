@@ -1,4 +1,4 @@
-import { getPitchComments } from '../../lib/pitches';
+import { getPitchComments, getPitchById } from '../../lib/pitches';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,6 +15,10 @@ export default async function handler(req, res) {
   if (!pitchId) {
     return res.status(400).json({ error: 'pitchId is required.' });
   }
+  // Same gate as the pitch page: a pending or rejected project has no
+  // public discussion.
+  const pitch = await getPitchById(String(pitchId));
+  if (!pitch || pitch.status !== 'approved') return res.status(404).json({ error: 'Project not found.' });
   const comments = await getPitchComments(pitchId);
   return res.status(200).json({ comments });
 }

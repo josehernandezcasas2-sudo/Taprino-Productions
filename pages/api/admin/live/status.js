@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../../lib/roles';
+import { requireCapability } from '../../../../lib/adminAuth';
 import { getSupabase } from '../../../../lib/supabase';
 import { getLiveInputStatus } from '../../../../lib/cloudflareLive';
 
@@ -11,10 +11,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_live');
+  if (!roleContext) return;
+  const { isAdmin } = roleContext;
 
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'id is required.' });

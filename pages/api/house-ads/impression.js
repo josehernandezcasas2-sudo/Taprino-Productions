@@ -1,6 +1,9 @@
 import { getSupabase } from '../../../lib/supabase';
 import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 import { recordDailyAdImpression } from '../../../lib/redis';
+import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // Fired by the IMA SDK as a plain GET the moment a house ad actually starts
 // playing — this is the <Impression> URL embedded in the VAST response
@@ -28,11 +31,18 @@ export default async function handler(req, res) {
   res.setHeader('Vary', 'Origin');
 
   const { ad } = req.query;
-  if (ad && typeof ad === 'string') {
+  if (ad && typeof ad === 'string' && UUID_RE.test(ad)) {
     try {
-      const supabase = getSupabase();
-      await supabase.rpc('increment_house_ad_impression', { target_id: ad });
-      await recordDailyAdImpression(ad);
+      // This pixel spends the advertiser's paid credit, and ad ids are
+      // public, so a replay has to be worthless: one impression per
+      // viewer per ad per 10 minutes, and a ceiling per viewer overall.
+      const viewer = rateLimitKeyForRequest(req, 'ad-impression');
+      const fresh = await firstInWindow(`${viewer}:${ad}`, 600);
+      if (fresh && await checkRateLimit(viewer, 30, 600)) {
+        const supabase = getSupabase();
+        await supabase.rpc('increment_house_ad_impression', { target_id: ad });
+        await recordDailyAdImpression(ad);
+      }
     } catch (err) {
       // A missed count is not worth breaking playback over — this must
       // never be the reason an ad (or the content after it) fails to load.

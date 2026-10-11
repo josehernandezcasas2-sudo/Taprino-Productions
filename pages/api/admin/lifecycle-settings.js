@@ -1,13 +1,14 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { getLifecycleSettings, updateLifecycleSettings, isLeavingSoon, isExpired } from '../../../lib/contentLifecycle';
 import { recordAudit } from '../../../lib/auditLog';
 
 export default async function handler(req, res) {
-  const { userId, email, isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_content_lifecycle');
+  if (!roleContext) return;
+  const { userId, email, isAdmin } = roleContext;
 
   if (req.method === 'GET') {
     const settings = await getLifecycleSettings();

@@ -6,7 +6,7 @@ import { getAllSeriesForCreator } from '../../lib/series';
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, {
     caps: ['manage_episodes', 'manage_artwork', 'manage_deletions'],
-    extra: async () => ({ allSeries: await getAllSeriesForCreator() })
+    extra: async () => ({ allSeries: await getAllSeriesForCreator(null, { isAdmin: true }) })
   });
 }
 

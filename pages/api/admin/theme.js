@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { getSiteSettings } from '../../../lib/siteSettings';
 import { ALL_THEME_KEYS } from '../../../lib/themeColors';
@@ -6,10 +6,11 @@ import { ALL_THEME_KEYS } from '../../../lib/themeColors';
 const HEX_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 export default async function handler(req, res) {
-  const { isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_genre_icons');
+  if (!roleContext) return;
+  const { isAdmin } = roleContext;
 
   if (req.method === 'GET') {
     const settings = await getSiteSettings();

@@ -1,9 +1,9 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 
-// Same shape as request-episode-deletion.js. No ownership check on series
-// (see series-media.js for why — any creator can manage series here,
-// matching how the small trusted roster actually works), but this still
+// Same shape as request-episode-deletion.js. Owner (series.creator_id) or
+// admin only — /apply now grants the creator role to anyone accepted, so
+// the old "small trusted roster" assumption no longer holds. This still
 // never actually deletes anything itself — an admin has to confirm it in
 // pages/api/admin/resolve-deletion.js, since removing a whole series can
 // orphan episodes still pointing at it.
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -30,9 +30,12 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
-  const { data: existing, error: fetchError } = await supabase.from('series').select('id').eq('id', seriesId).maybeSingle();
+  const { data: existing, error: fetchError } = await supabase.from('series').select('id, creator_id').eq('id', seriesId).maybeSingle();
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Series not found.' });
+  }
+  if (!isAdmin && existing.creator_id !== userId) {
+    return res.status(403).json({ error: 'Only the creator of this series can do that.' });
   }
 
   const dbUpdates = action === 'request'

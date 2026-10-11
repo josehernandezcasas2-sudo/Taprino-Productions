@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { toggleFollow } from '../../lib/follows';
+import { looksLikeUserId } from '../../lib/userProfiles';
 
 // Toggle following a person (migration 075's user_follows). Same CORS/
 // OPTIONS shape as pitch-save.js so the mobile app can call it with a
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Sign in to follow people.' });
   }
   const { followedId } = req.body || {};
-  if (!followedId) return res.status(400).json({ error: 'followedId is required.' });
+  if (!looksLikeUserId(followedId)) return res.status(400).json({ error: 'followedId is required.' });
   if (followedId === userId) return res.status(400).json({ error: "You can't follow yourself." });
 
   try {

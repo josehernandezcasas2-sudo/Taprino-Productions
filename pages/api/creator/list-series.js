@@ -7,11 +7,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const series = await getAllSeriesForCreator();
+  const series = await getAllSeriesForCreator(userId, { isAdmin });
   return res.status(200).json({ series });
 }

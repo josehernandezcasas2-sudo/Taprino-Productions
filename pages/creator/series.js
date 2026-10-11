@@ -19,7 +19,7 @@ export async function getServerSideProps({ req, res }) {
   if (!account.isCreator) {
     return { redirect: { destination: '/stream', permanent: false } };
   }
-  const [allSeries, episodes] = await Promise.all([getAllSeriesForCreator(), getPublicEpisodes()]);
+  const [allSeries, episodes] = await Promise.all([getAllSeriesForCreator(account.userId, { isAdmin: account.isAdmin }), getPublicEpisodes()]);
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
   // Episode counts per series — a lightweight, separate query (id +

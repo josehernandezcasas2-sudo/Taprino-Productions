@@ -1,5 +1,8 @@
 import { getSupabase } from '../../../lib/supabase';
 import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
+import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // This is a COUNT-ONLY tracker, not a redirect. VAST deliberately separates
 // two things: <ClickThrough> (the real destination the IMA SDK sends the
@@ -30,10 +33,16 @@ export default async function handler(req, res) {
   res.setHeader('Vary', 'Origin');
 
   const { ad } = req.query;
-  if (ad && typeof ad === 'string') {
+  if (ad && typeof ad === 'string' && UUID_RE.test(ad)) {
     try {
-      const supabase = getSupabase();
-      await supabase.rpc('increment_house_ad_click', { target_id: ad });
+      // Count-only, but the same replay guard as the impression pixel so
+      // click-through rates can't be inflated from a loop.
+      const viewer = rateLimitKeyForRequest(req, 'ad-click');
+      const fresh = await firstInWindow(`${viewer}:${ad}`, 600);
+      if (fresh && await checkRateLimit(viewer, 30, 600)) {
+        const supabase = getSupabase();
+        await supabase.rpc('increment_house_ad_click', { target_id: ad });
+      }
     } catch (err) {
       console.error('house-ads/click error:', err.message);
     }

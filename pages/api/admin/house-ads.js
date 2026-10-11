@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadHouseAdVideo } from '../../../lib/houseAdUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
@@ -10,10 +10,11 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  const { userId, email, isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_house_ads');
+  if (!roleContext) return;
+  const { userId, email, isAdmin } = roleContext;
 
   const supabase = getSupabase();
 

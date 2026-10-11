@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
@@ -30,10 +30,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, email, isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_episodes');
+  if (!roleContext) return;
+  const { userId, email, isAdmin } = roleContext;
 
   const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, titleImageBase64, titleImageFileName, removeTitleImage, cloudflareVideoUid, ...fields } = req.body || {};
   if (!episodeId) {

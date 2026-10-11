@@ -1,14 +1,15 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { generatePromoCodes, listPromoCodes, setPromoCodeNoted } from '../../../lib/promoCodes';
 
 const MAX_QUANTITY = 100;
 const MAX_DURATION_DAYS = 3650; // 10 years — generous ceiling, not a real-world expectation
 
 export default async function handler(req, res) {
-  const { isAdmin, email } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the same capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_comped_access');
+  if (!roleContext) return;
+  const { isAdmin, email } = roleContext;
 
   if (req.method === 'GET') {
     const codes = await listPromoCodes();

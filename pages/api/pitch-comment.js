@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../lib/supabase';
+import { getPitchById } from '../../lib/pitches';
 
 const MAX_LENGTH = 1000;
 
@@ -21,8 +22,12 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { pitchId, body, parentCommentId } = req.body || {};
-    if (!pitchId || !body || !body.trim()) {
+    if (!pitchId || typeof body !== 'string' || !body.trim()) {
       return res.status(400).json({ error: 'A comment body is required.' });
+    }
+    const pitch = await getPitchById(String(pitchId));
+    if (!pitch || pitch.status !== 'approved') {
+      return res.status(404).json({ error: 'Project not found.' });
     }
     if (body.length > MAX_LENGTH) {
       return res.status(400).json({ error: `Comments are limited to ${MAX_LENGTH} characters.` });

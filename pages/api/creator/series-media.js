@@ -3,12 +3,9 @@ import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 
-// Series don't have an "owner" concept the way an episode has
-// submitted_by — any creator can set or update a series' shared media.
-// That matches how the roster actually works here: a small group of
-// trusted revenue-share collaborators, not strangers competing over the
-// same show. If that ever needs tightening, this is the one place to add
-// an ownership check.
+// Owner (series.creator_id) or admin only. It used to be any creator —
+// fine for a small trusted roster, not once /apply hands the creator role
+// to anyone accepted. Media still lands in the admin review queue.
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
 };
@@ -19,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -35,12 +32,15 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const { data: existing, error: fetchError } = await supabase
     .from('series')
-    .select('id, name, poster, thumbnail, hero_image, trailer_src')
+    .select('id, name, poster, thumbnail, hero_image, trailer_src, creator_id')
     .eq('id', seriesId)
     .maybeSingle();
 
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Series not found.' });
+  }
+  if (!isAdmin && existing.creator_id !== userId) {
+    return res.status(403).json({ error: 'Only the creator of this series can change its media.' });
   }
 
   let poster;
