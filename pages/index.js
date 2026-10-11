@@ -9,6 +9,9 @@ import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import HomeOnNow from '../components/HomeOnNow';
+import TierChip from '../components/crew/TierChip';
+import { Avatar } from '../components/crew/CrewBits';
+import { getOwnCard } from '../lib/crewCards';
 import { SITE } from '../lib/siteConfig';
 
 // The zine-style homepage — built from the approved mockup (Variant C:
@@ -32,7 +35,16 @@ export async function getServerSideProps({ req, res }) {
   }
 
   const account = await getAccountContext(req);
-  const feed = await getHomeFeedData();
+  // The Crew Call rows are personal when the viewer has a place on their
+  // working card ("Open to work near you"); otherwise newest first.
+  let near = null;
+  if (account.isSignedIn) {
+    try {
+      const card = await getOwnCard(account.userId);
+      if (card && card.place) near = { label: card.place.label, lat: card.place.lat, lng: card.place.lng };
+    } catch (err) { /* no card */ }
+  }
+  const feed = await getHomeFeedData({ userId: account.userId || null, near });
 
   return {
     props: {
@@ -53,7 +65,7 @@ function isExternalUrl(url) {
 export default function Home({
   isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres,
   announcements, featuredCreators, filmsAndShorts, podcasts, heroItem, pitches,
-  seriesRows, trending, liveStream
+  seriesRows, trending, liveStream, openToWork = [], newCalls = [], crewNearLabel = null
 }) {
   const cassetteColors = ['mint', 'sky', 'rust', 'brass'];
   const router = useRouter();
@@ -259,6 +271,50 @@ export default function Home({
             </div>
             <div style={{ marginTop: '1rem' }}>
               <Link href="/pitches" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>See all projects →</Link>
+            </div>
+          </div>
+        )}
+
+        {/* Crew Call (step 4): the newest calls, and people open to work —
+            nearest to the viewer's own card when they have one. */}
+        {newCalls.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker brass">NEW CALLS{crewNearLabel ? ` · NEAR ${crewNearLabel.toUpperCase()}` : ''}</span></div>
+            <div className="zine-flyer-row">
+              {newCalls.map((c) => (
+                <Link key={c.id} href={`/crew/calls/${c.id}`} className="zine-flyer">
+                  <h4>{c.title}</h4>
+                  <p>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''} · {c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}{c.startsOn ? ` · ${new Date(`${c.startsOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{c.projectTitle ? ` · ${c.projectTitle}` : ''}</p>
+                  <div className="zine-flyer-tier">by {c.posterName} {c.posterTier && <TierChip person={{ tier: c.posterTier, done: c.posterDone }} />}</div>
+                  <div className="zine-flyer-pay">{c.payLabel}{c.payNote ? ` · ${c.payNote}` : ''} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</div>
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/crew/calls" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>All calls →</Link>
+            </div>
+          </div>
+        )}
+
+        {openToWork.length > 0 && (
+          <div className="zine-dept">
+            <div className="zine-dept-label"><span className="zine-sticker sky">{crewNearLabel ? 'OPEN TO WORK NEAR YOU' : 'OPEN TO WORK'}</span></div>
+            <div className="zine-crew-row">
+              {openToWork.map((p) => (
+                <Link key={p.userId} href={p.profilePath} className="zine-crew-card">
+                  <div className="zine-crew-head">
+                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} size="sm" />
+                    <b>{p.displayName}</b>
+                  </div>
+                  {p.tier && <TierChip person={p} />}
+                  <div className="zine-crew-roles">{p.roles.join(' · ')}</div>
+                  <div className="zine-crew-meta">{p.place && <span>{p.place}{p.miles != null ? ` · ${p.miles} mi` : ''}</span>}{p.remoteOk && <span>Remote OK</span>}</div>
+                  {p.gear.length > 0 && <div className="zine-crew-gear">{p.gear.map((g) => <span key={g} className="crew-chip gear">{g}</span>)}</div>}
+                </Link>
+              ))}
+            </div>
+            <div style={{ marginTop: '1rem' }}>
+              <Link href="/crew" className="account-btn-secondary" style={{ width: 'auto', display: 'inline-block' }}>All of Crew Call →</Link>
             </div>
           </div>
         )}

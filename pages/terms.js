@@ -1,7 +1,7 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
-import { SITE } from '../lib/siteConfig';
+import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -51,7 +51,7 @@ export default function Terms({ account }) {
   return (
     <LegalLayout
       title="Terms of Service"
-      updated="August 11, 2026"
+      updated="October 10, 2026"
       account={account}
       summary={
         <>
@@ -64,7 +64,7 @@ export default function Terms({ account }) {
     >
       <h2>1. Who these terms are between</h2>
       <p>
-        These terms are between you and {SITE.studio} ({SITE.mailingAddress}), which operates {SITE.name}
+        These terms are between you and {SITE.studio}{SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}, which operates {SITE.name}
         Transmission. Using the site means you accept them. If you don&rsquo;t, please don&rsquo;t use
         it.
       </p>
@@ -197,13 +197,54 @@ export default function Terms({ account }) {
         creators, and what airs can change at any time.
       </p>
 
-      <h2>13. Changes</h2>
+      <h2 id="pitch-room">13. Pitch Room</h2>
+      <p>
+        Pitch Room lets creators present a project and lets you back it. Backing is a contribution to the
+        creator&rsquo;s project, not a purchase, an investment, or a pre-order: you don&rsquo;t receive
+        ownership, a share of revenue, or a guarantee that the project gets made, finished, or released on{' '}
+        {SITE.name}. Any rewards or updates a creator describes are the creator&rsquo;s own promises.
+      </p>
+      <p>
+        {SITE.name} keeps a platform fee from each contribution; the current fee is shown on the project page
+        before you back it, and the rest goes to the creator. Contributions are final once charged. Until
+        card payments are switched on, a contribution is recorded as a pledge and no money is taken.
+      </p>
+      <p>
+        Creators must describe their projects honestly, hold the rights to what they show, and use what they
+        raise on the project. We can remove a project, refund contributions where we can, and end a
+        creator&rsquo;s access if those rules are broken.
+      </p>
+
+      <h2 id="crew-call">14. Crew Call and Messages</h2>
+      <p>
+        Crew Call is a way for people on {SITE.name} to find each other: working cards (what you do, what gear
+        you have, where you are), a board of calls (who&rsquo;s needed, when, where, how it pays), and private
+        messages. We only connect people. Any job, loan of gear, payment, or agreement that comes out of it is
+        between you and the other person; {SITE.name} is not a party to it, doesn&rsquo;t process the money,
+        and doesn&rsquo;t vouch for either side. Check the person, the pay, and the paperwork yourself.
+      </p>
+      <p>
+        What you put on your card and in a call must be true. A call&rsquo;s pay label (paid, union, deferred,
+        unpaid, other) is the poster&rsquo;s word, and it&rsquo;s on the poster to honor it and to follow the
+        labor and union rules that apply to them. A person&rsquo;s track record on {SITE.name} is built only
+        from jobs the poster confirmed and titles released here; it&rsquo;s a record of activity, not an
+        endorsement by us.
+      </p>
+      <p>
+        Messages are private between the two people in the conversation. We don&rsquo;t read them, except that
+        when someone reports a conversation the most recent messages are sent to us with the report so we can
+        act on it. You can mute or block anyone. Harassment, spam, scams, and soliciting anything illegal get
+        the account removed. Only your city or neighborhood is shown on your card and calls; your exact
+        location is used for distance and never shown.
+      </p>
+
+      <h2>15. Changes</h2>
       <p>
         We&rsquo;ll update the date at the top. Material changes get 30 days&rsquo; notice by email to
         account holders. Continuing to use the service after that means you accept the new terms.
       </p>
 
-      <h2>14. Contact</h2>
+      <h2>16. Contact</h2>
       <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );

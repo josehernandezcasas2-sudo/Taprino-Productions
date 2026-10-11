@@ -8911,3 +8911,20 @@ a.crew-credit:hover { background: var(--surface-3); }
   .cl-resp-acts { grid-column: 1 / -1; grid-auto-flow: column; justify-content: start; }
   .cl-endorse { grid-template-columns: 1fr; }
 }
+
+/* ---- Home: Crew Call rows ("Open to work near you", "New calls") ---- */
+.zine-crew-row { display: flex; gap: 0.9rem; overflow-x: auto; padding: 0.6rem 1.6rem 0.7rem; scrollbar-width: none; }
+.zine-crew-row::-webkit-scrollbar { display: none; }
+.zine-crew-card { flex: 0 0 220px; display: grid; gap: 0.4rem; background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 0.8rem; text-decoration: none; color: var(--ink); transform: rotate(-0.6deg); }
+.zine-crew-card:nth-child(2n) { transform: rotate(0.7deg); }
+.zine-crew-card:hover { background: var(--surface-2); }
+.zine-crew-head { display: flex; gap: 0.5rem; align-items: center; min-width: 0; }
+.zine-crew-head b { font-family: var(--font-display); font-size: 0.92rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.zine-crew-meta { font-family: var(--font-mono); font-size: 0.64rem; color: var(--ink-faint); display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.zine-crew-roles { font-size: 0.8rem; color: var(--ink-dim); }
+.zine-crew-gear { display: flex; gap: 0.3rem; flex-wrap: wrap; }
+.zine-crew-card .crew-tier { align-self: flex-start; }
+.zine-flyer-tier { display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; font-size: 0.66rem; font-style: italic; color: #6b6248; margin-bottom: 0.4rem; }
+.zine-flyer-tier .crew-tier { font-style: normal; }
+.zine-flyer-pay { display: flex; gap: 0.4rem; align-items: center; font-family: var(--font-mono); font-size: 0.68rem; color: var(--rust); font-weight: bold; }
+@media (max-width: 640px) { .zine-crew-card { flex-basis: 200px; } }

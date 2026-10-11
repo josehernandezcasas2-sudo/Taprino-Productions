@@ -48,7 +48,7 @@ Mobile: Expo APIs change every SDK. Check `mobile/AGENTS.md` and the versioned d
 ## Known open items
 
 - Pitch Room donations have no real charge: they record as "pending" in `lib/pitchDonations.js` and nothing completes them. Needs Stripe Connect for creator payouts. (Ad credits are real: `/api/ads/buy-credits` → Stripe Checkout → `pages/api/webhook.js` → `add_ad_credits`, migration 061. There is no per-ad budget increase; the account-level credit balance replaced it.)
-- Legal pages: `SITE.mailingAddress` placeholder, the Terms revenue-share clause is a bracketed "to be finalised" block, Pitch Room missing from Terms. All need words from Jose.
+- Legal pages: `SITE.mailingAddress` is still the placeholder (`SITE_ADDRESS` in lib/siteConfig.js is null until a real one is set, and about/privacy/terms/contact leave it out), the Terms revenue-share clause is a bracketed "to be finalised" block — both need words from Jose. Terms cover Live TV, Pitch Room, Crew Call and Messages (sections 12–14).
 - Some test/placeholder content still live. A "tablet-breakpoint layout bug" has been carried in notes since early sessions with no page or repro recorded; treat it as unverified until Jose reproduces it.
 - Shopify (studiotapa.com) integration blocked on a billing/plan issue on the Shopify side.
 - Live channels on mobile (`mobile/src/app/live/`, Watch → Live TV) play without ads: scheduled ad breaks show a countdown card and the between-program break is skipped, until the mobile IMA ads work lands.

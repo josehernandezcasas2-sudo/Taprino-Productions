@@ -5,7 +5,7 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
-import { SITE } from '../lib/siteConfig';
+import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 
 // AdSense reviewers specifically look for an About page as a legitimacy
 // signal — "is a real organisation behind this, or is it a content farm."
@@ -133,7 +133,7 @@ export default function About({ mainGenres, isSignedIn, isSubscriber, email, isA
           <div className="about-section-label">04 — Who runs it</div>
           <div>
             <p className="about-masthead-line">
-              Operated by <strong>{SITE.studio}</strong>, {SITE.mailingAddress}.
+              Operated by <strong>{SITE.studio}</strong>{SITE_ADDRESS ? `, ${SITE_ADDRESS}` : ''}.
             </p>
             <p className="about-masthead-sub">
               It&rsquo;s a small operation, which is why the catalogue grows deliberately rather than all at

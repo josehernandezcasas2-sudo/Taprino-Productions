@@ -1,7 +1,7 @@
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
-import { SITE } from '../lib/siteConfig';
+import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 
 // Also an AdSense requirement — reviewers want a working way to reach the
 // site owner. A plain email address satisfies this and is more honest than
@@ -94,8 +94,14 @@ export default function Contact({ account }) {
         <a href="/terms">Terms of Service</a> so we can act on it properly.
       </p>
 
-      <h2>Postal</h2>
-      <p>{SITE.studio}<br />{SITE.mailingAddress}</p>
+      {/* Only once a real address is in lib/siteConfig.js — the
+          placeholder used to print as "[MAILING ADDRESS]". */}
+      {SITE_ADDRESS && (
+        <>
+          <h2>Postal</h2>
+          <p>{SITE.studio}<br />{SITE_ADDRESS}</p>
+        </>
+      )}
     </LegalLayout>
   );
 }
