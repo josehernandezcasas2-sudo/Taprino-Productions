@@ -2,6 +2,7 @@ import Stripe from 'stripe';
 import { SITE } from '../../lib/siteConfig';
 import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
+import { completeDonationFromSession, failDonationFromSession } from '../../lib/pitchDonations';
 import { getSupabase } from '../../lib/supabase';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
@@ -86,8 +87,31 @@ export default async function handler(req, res) {
         } catch (err) {
           console.error('addAdCredits from webhook failed:', err.message);
         }
+      } else if (session.metadata?.type === 'pitch_donation') {
+        // A Pitch Room backing was paid: the pending row becomes the
+        // completed donation that counts toward the project's total.
+        try {
+          await completeDonationFromSession(session);
+        } catch (err) {
+          console.error('completeDonationFromSession from webhook failed:', err.message);
+          // A 500 makes Stripe retry — the event row is already written,
+          // so remove it to let the retry through firstDelivery.
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'donation not recorded' });
+        }
       } else {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
+      }
+      break;
+    }
+    case 'checkout.session.expired': {
+      const session = event.data.object;
+      if (session.metadata?.type === 'pitch_donation') {
+        try {
+          await failDonationFromSession(session, 'checkout expired');
+        } catch (err) {
+          console.error('failDonationFromSession from webhook failed:', err.message);
+        }
       }
       break;
     }

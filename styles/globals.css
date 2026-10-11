@@ -8953,3 +8953,12 @@ a.crew-credit:hover { background: var(--surface-3); }
 .payout-chip { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid rgba(251,232,211,0.2); color: var(--ink-dim); }
 .payout-chip.payout-ready { color: var(--ok); border-color: rgba(147,208,164,0.5); }
 .payout-chip.payout-review, .payout-chip.payout-incomplete { color: var(--olive); border-color: rgba(231,162,85,0.5); }
+
+/* ---- Pitch Room: backing through Stripe (migration 083) ---- */
+.fund-math { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); line-height: 1.55; margin-top: 0.5rem; max-width: 60ch; }
+.fund-math b { color: var(--ink); }
+.fund-banner { margin-top: 0.9rem; padding: 0.6rem 0.9rem; border-radius: 10px; background: var(--surface-2); border: 1px solid var(--ocean-ink); font-size: 0.9rem; color: var(--ink-dim); max-width: 64ch; }
+.fund-banner.ok { border-color: rgba(132, 205, 152, 0.45); color: var(--ok); }
+.fund-owner-note { margin: 0.9rem 0 0; font-size: 0.86rem; color: var(--ink-dim); max-width: 60ch; }
+.fund-owner-note a { color: var(--olive); }
+.pitch-back-cta { display: inline-block; margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; color: var(--brass); border: 1px solid rgba(248, 95, 115, 0.5); border-radius: 999px; padding: 0.12rem 0.55rem; }

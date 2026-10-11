@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
@@ -85,6 +86,7 @@ export default function PitchDetail() {
   const [editError, setEditError] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [donationAmount, setDonationAmount] = useState('');
+  const [reloadKey, setReloadKey] = useState(0);
   const [donating, setDonating] = useState(false);
   const [donationError, setDonationError] = useState(null);
   const [donationSuccess, setDonationSuccess] = useState(false);
@@ -109,7 +111,7 @@ export default function PitchDetail() {
     }
     load();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, reloadKey]);
 
   async function toggleSave() {
     if (!state.data?.isSignedIn) return;
@@ -127,10 +129,13 @@ export default function PitchDetail() {
     setDonating(true);
     try {
       const data = await apiPost('/api/pitches/donate', { pitchId, amountDollars: amount }, tokenRef.current);
-      setCurrentTotalRaisedCents((prev) => (prev || 0) + data.donation.amountCents);
+      // Stripe Checkout in the in-app browser; when it closes, re-read the
+      // pitch so a paid backing shows in the total.
+      await WebBrowser.openBrowserAsync(data.url);
       setDonationAmount('');
       setDonationSuccess(true);
-      setTimeout(() => setDonationSuccess(false), 4000);
+      setReloadKey((k) => k + 1);
+      setTimeout(() => setDonationSuccess(false), 6000);
     } catch (err) {
       setDonationError(err.message);
     } finally {
@@ -516,9 +521,9 @@ export default function PitchDetail() {
                         </View>
                       </View>
                       <Pressable style={styles.primaryBtn} disabled={donating} onPress={() => donate(pitch.id)}>
-                        <Text style={styles.primaryBtnText}>{donating ? 'Sending…' : `◆ Support this project${donationAmount ? ` · $${donationAmount}` : ''}`}</Text>
+                        <Text style={styles.primaryBtnText}>{donating ? 'Opening Stripe…' : `◆ Back this project${donationAmount ? ` · ${donationAmount}` : ''}`}</Text>
                       </Pressable>
-                      {donationSuccess ? <Text style={styles.okText}>Thank you for your support!</Text> : null}
+                      {donationSuccess ? <Text style={styles.okText}>If you completed the payment, thank you — it shows in the total as soon as Stripe confirms.</Text> : null}
                     </>
                   ) : (
                     <Pressable style={styles.primaryBtn} onPress={() => router.push('/account')}>
@@ -526,7 +531,7 @@ export default function PitchDetail() {
                     </Pressable>
                   )}
                   {donationError ? <Text style={styles.errorTextSm}>{donationError}</Text> : null}
-                  <Text style={styles.finePrint}>Support is recorded now — real payment processing for this project is coming soon.</Text>
+                  <Text style={styles.finePrint}>You pay the pledge plus Stripe’s card fee (2.9% + 30¢); the creator receives the pledge minus Studio Tapa’s cut. Payments go through Stripe. Backing isn’t a purchase or an investment.</Text>
                 </View>
               ) : null}
             </View>

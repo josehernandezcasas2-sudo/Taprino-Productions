@@ -265,6 +265,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                         </div>
                       </>
                     )}
+                    {p.funding_enabled && <div className="pitch-back-cta">&#9670; Back it</div>}
                     {remaining !== null && (
                       <div className="pitch-deadline">
                         {remaining === 1 ? 'Last day' : `${remaining} days left`}

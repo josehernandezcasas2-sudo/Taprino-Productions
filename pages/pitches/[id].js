@@ -2,8 +2,9 @@ import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
 import BackButton from '../../components/BackButton';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { splitDonation, dollars } from '../../lib/donationMath';
 import { SignInButton } from '@clerk/nextjs';
 import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import WishlistButton from '../../components/WishlistButton';
@@ -77,6 +78,17 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
   const [donating, setDonating] = useState(false);
   const [donationError, setDonationError] = useState(null);
   const [donationSuccess, setDonationSuccess] = useState(false);
+  // Back from Stripe Checkout: ?backed=1 (paid) or ?backed=cancelled.
+  const [backed, setBacked] = useState(null);
+  useEffect(() => {
+    if (!router.isReady || !router.query.backed) return;
+    setBacked(router.query.backed === '1' ? 'done' : 'cancelled');
+    router.replace(`/pitches/${pitch.id}`, undefined, { shallow: true, scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady]);
+  const preview = Number.isFinite(Number(donationAmount)) && Number(donationAmount) >= 1
+    ? splitDonation(Math.round(Number(donationAmount) * 100), pitch.platform_cut_percent || 0)
+    : null;
   const [currentTotalRaisedCents, setCurrentTotalRaisedCents] = useState(totalRaisedCents);
 
   // funding_enabled pitches are tracked for real via pitch_donations
@@ -126,11 +138,11 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
         body: JSON.stringify({ pitchId: pitch.id, amountDollars: amount })
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not process that donation.');
-      setCurrentTotalRaisedCents((prev) => (prev || 0) + data.donation.amountCents);
-      setDonationAmount('');
-      setDonationSuccess(true);
-      setTimeout(() => setDonationSuccess(false), 4000);
+      if (!res.ok) throw new Error(data.error || 'Could not start the payment.');
+      // Stripe Checkout takes it from here; the webhook records the paid
+      // donation and the return URL brings them back with ?backed=1.
+      window.location.href = data.url;
+      return;
     } catch (err) {
       setDonationError(err.message);
     } finally {
@@ -447,6 +459,9 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             </div>
             <p>{pitch.logline}</p>
             <div className="hero-actions">
+              {pitch.funding_enabled && (
+                <a href="#fund" className="fund-btn">&#9670; Back this project</a>
+              )}
               {!pitch.funding_enabled && pitch.project_url && (
                 <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
               )}
@@ -458,8 +473,17 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 {shareCopied && <span className="pitch-share-toast" role="status">Link copied!</span>}
               </div>
             </div>
+            {backed === 'done' && (
+              <div className="fund-banner ok" role="status">Thank you for backing this project. It shows in the total as soon as Stripe confirms the payment — usually within a few seconds; refresh if it hasn’t.</div>
+            )}
+            {backed === 'cancelled' && (
+              <div className="fund-banner" role="status">No charge was made. You can back the project any time.</div>
+            )}
+            {!pitch.funding_enabled && isPitchOwner && (
+              <p className="fund-owner-note">Backing is switched off for this project. Finish <Link href="/creator/pitch/dashboard">Get paid</Link> on your dashboard and the admin can turn it on.</p>
+            )}
             {pitch.funding_enabled && (
-              <div style={{ marginTop: 14 }}>
+              <div style={{ marginTop: 14 }} id="fund">
                 {isSignedIn ? (
                   <form onSubmit={donate}>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -488,11 +512,15 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                       style={{ width: '100px' }}
                       disabled={donating}
                     />
-                    <button type="submit" className="fund-btn" disabled={donating}>
-                      {donating ? 'Sending…' : '\u25C6 Support this project'}
+                    <button type="submit" className="fund-btn" disabled={donating || !preview}>
+                      {donating ? 'Opening Stripe…' : preview ? `\u25C6 Back with ${dollars(preview.amountCents)}` : '\u25C6 Back this project'}
                     </button>
-                    {donationSuccess && <span style={{ color: 'var(--ok)', fontSize: 13 }}>Thank you for your support!</span>}
                     </div>
+                    {preview && (
+                      <div className="fund-math">
+                        You pay <b>{dollars(preview.totalChargedCents)}</b> — {dollars(preview.amountCents)} to the project + {dollars(preview.feeCoverCents)} card processing. The creator receives {dollars(preview.creatorPayoutCents)} after {SITE.studio}’s {Number(pitch.platform_cut_percent || 0)}% cut.
+                      </div>
+                    )}
                   </form>
                 ) : (
                   <p style={{ fontSize: 13, opacity: 0.75 }}>
@@ -504,7 +532,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                 )}
                 {donationError && <p style={{ color: 'var(--signal-red, #c55)', fontSize: 13, marginTop: 6 }}>{donationError}</p>}
                 <p style={{ fontSize: 12, opacity: 0.55, marginTop: 6 }}>
-                  Support is recorded now — real payment processing for this project is coming soon.
+                  Payments go through Stripe straight to the creator’s account. Backing isn’t a purchase or an investment — see the <Link href="/terms#pitch-room">terms</Link>.
                 </p>
               </div>
             )}
