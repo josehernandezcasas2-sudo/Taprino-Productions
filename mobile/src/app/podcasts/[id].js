@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Path, Rect } from 'react-native-svg';
+import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
@@ -82,19 +83,31 @@ export default function PodcastShow() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, data: null });
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [playingId, setPlayingId] = useState(null);
   const [audioSrc, setAudioSrc] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const player = useVideoPlayer(audioSrc, () => {});
 
+  // With the sign-in token the server knows the viewer's membership and
+  // age; without it every premium episode showed as locked, even for a
+  // subscriber.
   useEffect(() => {
     if (!id) return undefined;
     let cancelled = false;
-    apiGet(`/api/podcast-show?id=${encodeURIComponent(id)}`)
-      .then((data) => { if (!cancelled) setState({ loading: false, error: null, data }); })
-      .catch((err) => { if (!cancelled) setState({ loading: false, error: err.message, data: null }); });
+    (async () => {
+      const token = isLoaded && isSignedIn
+        ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))])
+        : null;
+      try {
+        const data = await apiGet(`/api/podcast-show?id=${encodeURIComponent(id)}`, token);
+        if (!cancelled) setState({ loading: false, error: null, data });
+      } catch (err) {
+        if (!cancelled) setState({ loading: false, error: err.message, data: null });
+      }
+    })();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!player) return;

@@ -5,8 +5,18 @@ import { getEpisodePageData } from '../../lib/episodePage';
 // which re-checks entitlement (and the age gate) on every call.
 function stripPlayable(e) {
   if (!e) return e;
-  const { src, audioDescriptionSrc, ...rest } = e;
+  const { src, audioDescriptionSrc, audioUrl, ...rest } = e;
   return rest;
+}
+
+// The episode being viewed keeps its podcast audio URL only when the
+// viewer is entitled to it (same rule as pages/episode/[id].js) — the
+// audio lives in a public bucket, so the link is permanent once seen.
+function stripForViewer(e, entitled) {
+  if (!e) return e;
+  const out = stripPlayable(e);
+  if (entitled && e.audioUrl) out.audioUrl = e.audioUrl;
+  return out;
 }
 
 // The mobile app's equivalent of pages/episode/[id].js's getServerSideProps
@@ -29,11 +39,12 @@ export default async function handler(req, res) {
   const data = await getEpisodePageData(id, req);
   if (data.notFound) return res.status(404).json({ error: 'Not found' });
   if (data.ageRestricted) {
-    return res.status(200).json({ ageRestricted: true, requiredRating: data.requiredRating, isSignedIn: data.isSignedIn });
+    return res.status(200).json({ ageRestricted: true, requiredRating: data.requiredRating, requiredAge: data.requiredAge ?? null, isSignedIn: data.isSignedIn });
   }
 
+  const entitled = data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin;
   return res.status(200).json({
-    episode: stripPlayable(data.episode),
+    episode: stripForViewer(data.episode, entitled),
     isSignedIn: data.account.isSignedIn,
     isSubscriber: data.account.isSubscriber,
     parentSeriesName: data.parentSeriesName,

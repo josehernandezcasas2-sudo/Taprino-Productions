@@ -20,6 +20,7 @@ import PostMenu from '../../components/PostMenu';
 import ReelAuthor from '../../components/ReelAuthor';
 import { HeartIcon, ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { getViewerAgeContext } from '../../lib/viewerAge';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -33,7 +34,9 @@ export async function getServerSideProps({ req, res }) {
   ]);
 
   const entitled = account.isSubscriber || account.isAdmin;
-  const catalogVertical = filterEntitledVertical(episodes, entitled);
+  // Rating filter for the viewer (the feed used to skip the age gate).
+  const age = await getViewerAgeContext(account);
+  const catalogVertical = age.filter(filterEntitledVertical(episodes, entitled));
 
   // User-posted videos (lib/posts.js) — admin test feature — are woven
   // into the same deck as curated episodes, normalized to the same
@@ -88,7 +91,10 @@ export async function getServerSideProps({ req, res }) {
       isSignedIn: account.isSignedIn,
       viewerId: account.userId,
       wishlist: account.wishlist,
-      personalUnitKeys
+      personalUnitKeys,
+      // Tapa+ members and admins get no ad slides (the feed used to insert
+      // them for everyone).
+      adsOn: !(account.isSubscriber || account.isAdmin)
     }
   };
 }
@@ -109,7 +115,7 @@ async function fetchAdSlide() {
   }
 }
 
-export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, viewerId, wishlist, personalUnitKeys }) {
+export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isSignedIn, viewerId, wishlist, personalUnitKeys, adsOn = true }) {
   const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -153,7 +159,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     const firstSlides = expandUnitToSlides(first);
     setDeck(firstSlides);
     contentSlideCountRef.current += firstSlides.filter((s) => s.kind === 'episode').length;
-    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+    if (adsOn && contentSlideCountRef.current >= AD_FREQUENCY) {
       contentSlideCountRef.current = 0;
       fetchAdSlide().then((adSlide) => {
         if (adSlide) setDeck((d) => [...d, adSlide]);
@@ -169,7 +175,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
     const nextSlides = expandUnitToSlides(next);
     setDeck((d) => [...d, ...nextSlides]);
     contentSlideCountRef.current += nextSlides.filter((s) => s.kind === 'episode').length;
-    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+    if (adsOn && contentSlideCountRef.current >= AD_FREQUENCY) {
       contentSlideCountRef.current = 0;
       fetchAdSlide().then((adSlide) => {
         if (adSlide) setDeck((d) => [...d, adSlide]);

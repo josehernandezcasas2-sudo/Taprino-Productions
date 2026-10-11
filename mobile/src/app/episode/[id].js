@@ -162,7 +162,7 @@ export default function Episode() {
   const page = state.page;
 
   if (page.ageRestricted) {
-    const requiredAge = MIN_AGE_BY_RATING[page.requiredRating] ?? 17;
+    const requiredAge = page.requiredAge ?? MIN_AGE_BY_RATING[page.requiredRating] ?? 17;
     return (
       <SafeAreaView style={styles.screen} edges={['bottom']}>
         <Stack.Screen options={{ title: 'Content restricted' }} />
@@ -209,7 +209,7 @@ export default function Episode() {
           <HeroSpotlight
             pool={[episode]}
             preferTrailer
-            eyebrow={episode.contentType === 'movie' ? 'Movie' : 'Short'}
+            eyebrow={{ movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', series: 'Series' }[episode.contentType] || 'Short'}
             onPlay={() => {}}
             onTrailer={() => {}}
             renderActions={() => (

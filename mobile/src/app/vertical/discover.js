@@ -141,7 +141,7 @@ export default function VerticalDiscover() {
     const toFetch = [deck[activeIndex], deck[activeIndex + 1]]
       .filter((s) => s && s.kind === 'episode' && !srcByEpisodeId[s.episode.id]);
     toFetch.forEach((slide) => {
-      apiGet(`/api/vertical/playback?episodeId=${slide.episode.id}`, tokenRef.current)
+      getToken().catch(() => tokenRef.current).then((t) => apiGet(`/api/vertical/playback?episodeId=${slide.episode.id}`, t))
         .then((data) => {
           if (data.src) setSrcByEpisodeId((m) => ({ ...m, [slide.episode.id]: data.src }));
         })
@@ -159,7 +159,7 @@ export default function VerticalDiscover() {
       return next;
     });
     try {
-      await apiPost('/api/wishlist', { episodeId, action: wasWishlisted ? 'remove' : 'add' }, tokenRef.current);
+      await apiPost('/api/wishlist', { episodeId, action: wasWishlisted ? 'remove' : 'add' }, await getToken().catch(() => tokenRef.current));
     } catch {
       setWishlistSet((prev) => {
         const next = new Set(prev);

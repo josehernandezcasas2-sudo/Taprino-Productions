@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import { episodeHref } from '../lib/episodeLinks';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
@@ -187,7 +188,7 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
               {visibleRecs.map((ep) => (
                 <div key={ep.id} className="card-wrap">
                   <WishlistButton isActive={isWishlisted(ep.id)} onToggle={() => toggle(ep.id)} />
-                  <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : `/episode/${ep.id}`} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+                  <Link href={ep.contentType === 'series' ? `/series/${ep.seriesId}` : episodeHref(ep)} className={`poster-card ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
                     <div className="poster-art">
                       <span className="poster-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
                       {ep.poster && <Image src={ep.poster} alt="" fill sizes="(max-width: 640px) 45vw, 220px" className="poster-art-img" />}

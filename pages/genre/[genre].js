@@ -38,7 +38,10 @@ export async function getServerSideProps({ req, params, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const genre = decodeURIComponent(params.genre);
+  // Next has already decoded the segment; a second decode threw on any
+  // genre containing "%". Decode defensively for old links only.
+  let genre = params.genre;
+  try { genre = decodeURIComponent(genre); } catch (err) { /* keep as is */ }
   const needsViewCounts = isRedisConfigured();
   const [episodesWithBonus, allSeries, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
@@ -60,6 +63,8 @@ export async function getServerSideProps({ req, params, res }) {
   // the one row a genre used to get on the old flat-grid version of this
   // page.
   const episodes = episodesNoBonus.filter((e) => e.mainGenre === genre);
+  // An unknown genre is a 404, not an empty page.
+  if (episodes.length === 0 && !mainGenres.includes(genre)) return { notFound: true };
 
   const viewCounts = viewCountsResult || {};
   let heroPool;

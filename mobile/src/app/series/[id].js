@@ -121,7 +121,7 @@ export default function SeriesHub() {
     const next = !wishlisted;
     setWishlisted(next);
     try {
-      await apiPost('/api/wishlist', { episodeId: seriesId, action: next ? 'add' : 'remove' }, tokenRef.current);
+      await apiPost('/api/wishlist', { episodeId: seriesId, action: next ? 'add' : 'remove' }, await getToken().catch(() => tokenRef.current));
     } catch {
       setWishlisted(!next);
     }

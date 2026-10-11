@@ -114,11 +114,11 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, image
           <p>{desc}</p>
           <div className="series-hero-meta">
             {tierLabel && <span className={`series-hero-meta-pill ${tierKey || ''}`}>{tierLabel}</span>}
-            {(seasonCount || episodeCount) && (
+            {(seasonCount || episodeCount) ? (
               <span>
                 {seasonCount > 1 ? `${seasonCount} seasons · ` : ''}{episodeCount} episode{episodeCount === 1 ? '' : 's'}
               </span>
-            )}
+            ) : null}
             {artist && <span>Made by {artist}</span>}
           </div>
           <div className="hero-actions">

@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
+import { getViewerAgeContext } from '../../lib/viewerAge';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getSiteSettings } from '../../lib/siteSettings';
@@ -44,7 +45,9 @@ export default async function handler(req, res) {
   ]);
 
   const entitled = account.isSubscriber || account.isAdmin;
-  const verticalEpisodes = filterEntitledVertical(episodes, entitled);
+  // Rating filter for the viewer (the feed used to skip the age gate).
+  const age = await getViewerAgeContext(account);
+  const verticalEpisodes = age.filter(filterEntitledVertical(episodes, entitled));
 
   const seriesNameById = {};
   for (const s of allSeries) seriesNameById[s.id] = s.name;

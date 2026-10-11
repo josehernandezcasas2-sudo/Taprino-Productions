@@ -177,7 +177,7 @@ export default function Wishlist() {
                   item={ep}
                   subtitle={ep.runtime}
                   removing={removingId === ep.id}
-                  onPress={() => router.push(`/episode/${ep.id}`)}
+                  onPress={() => router.push(ep.contentType === 'podcast' && ep.seriesId ? `/podcasts/${ep.seriesId}` : `/episode/${ep.id}`)}
                   onRemove={() => removeContinueWatching(ep.id)}
                 />
               ))}
@@ -194,7 +194,7 @@ export default function Wishlist() {
                   item={ep}
                   subtitle={ep.runtime}
                   removing={removingId === ep.id}
-                  onPress={() => router.push(`/episode/${ep.id}`)}
+                  onPress={() => router.push(ep.contentType === 'podcast' && ep.seriesId ? `/podcasts/${ep.seriesId}` : `/episode/${ep.id}`)}
                   onRemove={() => removeWatchHistory(ep.id)}
                 />
               ))}
@@ -249,7 +249,7 @@ export default function Wishlist() {
                 item={ep}
                 subtitle={ep.runtime}
                 removing={removingId === ep.id}
-                onPress={() => router.push(`/episode/${ep.id}`)}
+                onPress={() => router.push(ep.contentType === 'podcast' && ep.seriesId ? `/podcasts/${ep.seriesId}` : `/episode/${ep.id}`)}
                 onRemove={() => removeFromWishlist(ep.id, false)}
                 heart
               />

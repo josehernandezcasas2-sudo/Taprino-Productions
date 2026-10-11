@@ -106,7 +106,7 @@ export default function Collection() {
       return next;
     });
     try {
-      await apiPost('/api/wishlist', { episodeId, action: was ? 'remove' : 'add' }, tokenRef.current);
+      await apiPost('/api/wishlist', { episodeId, action: was ? 'remove' : 'add' }, await getToken().catch(() => tokenRef.current));
     } catch {
       setWishlistSet((prev) => {
         const next = new Set(prev);

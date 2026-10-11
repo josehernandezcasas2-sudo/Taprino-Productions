@@ -11,7 +11,16 @@ import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 
 export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  // Same split as /stream, /type and the rest: this page renders the
+  // viewer's email and admin flag, so a signed-in response must never
+  // land in the shared CDN cache (it used to be public for everyone).
+  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  if (hasSession) {
+    res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  } else {
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+    res.setHeader('Vary', 'Cookie');
+  }
   const account = await getAccountContext(req);
   const [shows, episodesRaw] = await Promise.all([getPodcastShows(), getPublicEpisodes()]);
   const episodes = episodesRaw;

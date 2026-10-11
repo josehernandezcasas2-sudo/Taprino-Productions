@@ -25,9 +25,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   const timerRef = useRef(null);
   const hlsRef = useRef(null);
 
-  if (pool.length === 0) return null;
-
-  const ep = pool[index % pool.length];
+  // No early return here: three hooks follow, and returning before them
+  // crashed React ("Rendered more hooks") when a page went from an empty
+  // pool to a full one. The bail-out is just before the JSX instead.
+  const ep = pool.length > 0 ? pool[index % pool.length] : null;
   // Priority: a purpose-built hero image, then an autoplaying trailer, then
   // falling back to whatever regular poster/thumbnail the card already has
   // rather than showing nothing. Before this fallback existed, any title
@@ -36,10 +37,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   // <video> tag had nothing to play and there was no image to show
   // instead, so .hero-carousel's own CSS background (#000, meant only as
   // a brief loading-state color) was all that was ever visible.
-  const fallbackImage = !ep.trailerSrc ? (ep.poster || ep.thumbnail) : null;
-  const imageSrc = ep.heroImage || fallbackImage;
+  const fallbackImage = ep && !ep.trailerSrc ? (ep.poster || ep.thumbnail) : null;
+  const imageSrc = ep ? (ep.heroImage || fallbackImage) : null;
   const isImageMode = !!imageSrc;
-  const bgSrc = ep.trailerSrc; // candidates never carry the real `src` — see lib/heroCandidates.js
+  const bgSrc = ep ? ep.trailerSrc : null; // candidates never carry the real `src` — see lib/heroCandidates.js
 
   useEffect(() => {
     if (paused || pool.length <= 1) return;
@@ -91,6 +92,8 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
   useEffect(() => {
     if (videoRef.current) videoRef.current.muted = muted;
   }, [muted]);
+
+  if (!ep) return null;
 
   function goTo(i) {
     setIndex(((i % pool.length) + pool.length) % pool.length);

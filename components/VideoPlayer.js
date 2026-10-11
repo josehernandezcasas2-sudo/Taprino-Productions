@@ -110,6 +110,10 @@ export default function VideoPlayer({
   /* ------------------------------------------------------------------ *
    * Watch progress — unchanged behaviour, still throttled to ~15s.
    * ------------------------------------------------------------------ */
+  // Kept in a ref so a new inline callback from the page doesn't re-run
+  // this effect (whose cleanup saves) — every save used to go out twice.
+  const onProgressRef = useRef(onProgress);
+  onProgressRef.current = onProgress;
   useEffect(() => {
     if (isYouTube || !onProgress) return;
     const videoElement = videoRef.current;
@@ -124,7 +128,7 @@ export default function VideoPlayer({
       const now = videoElement.currentTime;
       if (now - lastSavedRef.current >= 15) {
         lastSavedRef.current = now;
-        onProgress(now, videoElement.duration);
+        onProgressRef.current(now, videoElement.duration);
       }
     }
     // The 15s throttle above is exactly right for normal playback — it's
@@ -141,7 +145,7 @@ export default function VideoPlayer({
       const now = Date.now();
       if (now - lastSaveTimeRef.current < 3000) return;
       lastSaveTimeRef.current = now;
-      onProgress(position, duration);
+      onProgressRef.current(position, duration);
     }
     function handlePause() {
       guardedImmediateSave(videoElement.currentTime, videoElement.duration);
@@ -158,7 +162,8 @@ export default function VideoPlayer({
         guardedImmediateSave(videoElement.currentTime, videoElement.duration);
       }
     };
-  }, [episode.id, isYouTube, initialPosition, onProgress]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episode.id, isYouTube, initialPosition, Boolean(onProgress)]);
 
   /* ------------------------------------------------------------------ *
    * UI state is driven off the media element's own events, so it stays
@@ -484,8 +489,24 @@ export default function VideoPlayer({
     const midRolls = breaks.filter((s) => s > 0);
     if (midRolls.length === 0) return;
 
+    // A break plays when playback crosses it. Jumping past breaks — a
+    // seek, or resuming at a saved position — skips them rather than
+    // playing every missed break back to back (resuming a film at 30:00
+    // used to queue the 10:00 and 20:00 breaks on top of each other).
+    let lastTime = videoElement.currentTime;
+    function skipBreaksBefore(t) {
+      for (const breakSeconds of midRolls) if (breakSeconds <= t) consumedBreaksRef.current.add(breakSeconds);
+    }
+    skipBreaksBefore(lastTime);
+    function handleSeeked() {
+      skipBreaksBefore(videoElement.currentTime);
+      lastTime = videoElement.currentTime;
+    }
     function handleMidRollCheck() {
       const now = videoElement.currentTime;
+      const jumped = Math.abs(now - lastTime) > 2;
+      lastTime = now;
+      if (jumped) { skipBreaksBefore(now); return; }
       for (const breakSeconds of midRolls) {
         if (now >= breakSeconds && !consumedBreaksRef.current.has(breakSeconds)) {
           consumedBreaksRef.current.add(breakSeconds);
@@ -496,7 +517,11 @@ export default function VideoPlayer({
     }
 
     videoElement.addEventListener('timeupdate', handleMidRollCheck);
-    return () => videoElement.removeEventListener('timeupdate', handleMidRollCheck);
+    videoElement.addEventListener('seeked', handleSeeked);
+    return () => {
+      videoElement.removeEventListener('timeupdate', handleMidRollCheck);
+      videoElement.removeEventListener('seeked', handleSeeked);
+    };
   }, [episode.id, episode.adBreakSeconds, isYouTube, adsEnabled, startAds]);
 
   useEffect(() => {
@@ -765,6 +790,12 @@ export default function VideoPlayer({
         // before this. A real poster shows immediately and never has
         // that failure mode.
         poster={episode.poster || episode.thumbnail || undefined}
+        // Caption files live on another origin (Supabase Storage), and
+        // browsers refuse a cross-origin <track> unless the media element
+        // itself is CORS-enabled — the CC button showed but nothing ever
+        // rendered. Only set when there are captions, so episodes without
+        // them don't take on a CORS dependency for the video itself.
+        crossOrigin={episode.captionsUrl ? 'anonymous' : undefined}
         playsInline
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture

@@ -7,6 +7,7 @@ import { recordAudit } from '../../../lib/auditLog';
 import { invalidateCache } from '../../../lib/redis';
 import { notifyCreator } from '../../../lib/notify';
 import { cloudflarePlaybackUrl, cloudflareUidFromUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
+import { syncStreamProtection } from '../../../lib/streamProtection';
 
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
 // check and no "must still be pending" restriction — an admin can fix or
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
-  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, title_image_url, src, status, submitted_by').eq('id', episodeId).maybeSingle();
+  const { data: existing, error: fetchError } = await supabase.from('episodes').select('id, title, poster, thumbnail, title_image_url, src, status, submitted_by, tier').eq('id', episodeId).maybeSingle();
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Episode not found.' });
   }
@@ -160,6 +161,12 @@ export default async function handler(req, res) {
   if (error) {
     console.error('admin edit-episode db error:', error.message);
     return res.status(500).json({ error: 'Could not save changes.' });
+  }
+  // Keep Cloudflare's signed-URL requirement in step with the tier — a
+  // premium→free switch used to leave free viewers a black box, and
+  // free→premium left the video unprotected until the manual sync.
+  if (dbUpdates.tier !== undefined || newSrc) {
+    await syncStreamProtection({ src: newSrc || existing.src, tier: dbUpdates.tier || existing.tier });
   }
   await invalidateCache('public_episodes_v1');
 

@@ -32,6 +32,11 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
   const [expandedVideoId, setExpandedVideoId] = useState(null);
 
   function playAudio(ep) {
+    // Same episode already loaded: this is the pause/resume button.
+    if (player.currentEpisode && player.currentEpisode.id === ep.id) {
+      player.togglePlayPause();
+      return;
+    }
     if (!player || !ep.audioUrl) return;
     // Stop any inline video before starting audio — otherwise clicking
     // Play on a different episode's audio while a video is expanded would
@@ -137,6 +142,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
               <div className="podcast-inline-video">
                 <VideoPlayer
                   episode={ep}
+                  signedPlayback={Boolean(ep.signedPlayback)}
                   adsEnabled={!isSubscriber && !isAdmin && ep.tier === 'free' && ep.adsEnabled !== false}
                   onEnded={() => setExpandedVideoId(null)}
                 />

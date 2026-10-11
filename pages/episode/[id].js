@@ -9,6 +9,7 @@ import Link from 'next/link';
 import BackButton from '../../components/BackButton';
 import { getBonusContentFor } from '../../lib/bonusContent';
 import { MIN_AGE_BY_RATING } from '../../lib/ageGate';
+import { episodeHref } from '../../lib/episodeLinks';
 import { getEpisodePageData } from '../../lib/episodePage';
 import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadata';
@@ -41,6 +42,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       props: {
         ageRestricted: true,
         requiredRating: data.requiredRating,
+        requiredAge: data.requiredAge ?? null,
         isSignedIn: data.isSignedIn
       }
     };
@@ -75,7 +77,9 @@ export async function getServerSideProps({ req, params, query, res }) {
     }
   }
 
-  const safeEpisode = { ...episode, src: playbackSrc, audioDescriptionSrc: describedSrc };
+  // audioUrl (podcast audio, in a public bucket) used to pass through
+  // untouched, so anyone could lift a premium episode's audio link.
+  const safeEpisode = { ...episode, src: playbackSrc, audioDescriptionSrc: describedSrc, audioUrl: entitled ? episode.audioUrl || null : null };
 
   return {
     props: {
@@ -100,7 +104,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, publicEpisodes, parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -133,7 +137,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
   // so branching on ageRestricted from here on doesn't violate the Rules
   // of Hooks the way returning before those calls would have.
   if (ageRestricted) {
-    const requiredAge = MIN_AGE_BY_RATING[requiredRating] ?? 17;
+    // The live ratings list decides the number (custom ratings carry their own).
+    const requiredAge = requiredAgeProp ?? MIN_AGE_BY_RATING[requiredRating] ?? 17;
     return (
       <>
         <Head><title>Content restricted — {SITE.name}</title></Head>
@@ -293,7 +298,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
           <div className="hero-scrim" />
           <div className="hero-inner">
             <div className="hero-content">
-              <div className="hero-eyebrow">{episode.contentType === 'movie' ? 'Movie' : 'Short'}</div>
+              <div className="hero-eyebrow">{{ movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', series: 'Series' }[episode.contentType] || 'Short'}</div>
               <h2>
                 {episode.titleImageUrl ? (
                   <Image
@@ -543,7 +548,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
             <div className="episode-nav-sidebar">
               <div className="side-heading">Watch next</div>
               {watchNext.map((item) => (
-                <Link key={item.id} href={`/episode/${item.id}?autoplay=1`} className="side-ep-card">
+                <Link key={item.id} href={item.contentType === 'podcast' ? episodeHref(item) : `/episode/${item.id}?autoplay=1`} className="side-ep-card">
                   <div className="side-ep-thumb" style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}}>
                     <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
                     {item.runtime && <span className="dur-badge">{formatRuntimeLong(item.runtime) || item.runtime}</span>}
