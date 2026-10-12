@@ -33,6 +33,12 @@ export default async function handler(req, res) {
   let adminEmail = null;
   let adminId = null;
   if (!isCronRequest) {
+    // Vercel's cron calls GET with the secret; a person's manual run writes
+    // flags, so it has to be a POST (a link click can't trigger it).
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', 'POST');
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
     const { isAdmin, email, userId } = await getRoleContext(req);
     if (!isAdmin) {
       return res.status(401).json({ error: 'Unauthorized.' });

@@ -33,7 +33,11 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
-  if (!body.title || !body.logline) {
+  const str = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const num = (v) => { const n = Number(v); return v !== '' && v != null && Number.isFinite(n) && n >= 0 ? n : null; };
+  const title = str(body.title, 200);
+  const logline = str(body.logline, 500);
+  if (!title || !logline) {
     return res.status(400).json({ error: 'Title and logline are required.' });
   }
   if (body.tag && !PITCH_TAGS.includes(body.tag)) {
@@ -60,17 +64,20 @@ export default async function handler(req, res) {
   const { data, error } = await supabase
     .from('pitches')
     .insert({
-      title: body.title,
-      logline: body.logline,
-      description: body.description || null,
+      title,
+      logline,
+      description: str(body.description, 5000) || null,
       project_url: normalizeUrl(body.projectUrl),
       tag: body.tag || null,
       thumbnail,
       hero_image: heroImage,
-      funding_goal: body.fundingGoal ? Number(body.fundingGoal) : null,
-      funding_raised: body.fundingRaised ? Number(body.fundingRaised) : null,
-      funding_deadline: body.fundingDeadline || null,
-      team: Array.isArray(body.team) ? body.team : [],
+      funding_goal: num(body.fundingGoal),
+      funding_raised: num(body.fundingRaised),
+      funding_deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(body.fundingDeadline || '')) ? body.fundingDeadline : null,
+      // Team members are plain objects of short strings (name, role…).
+      team: Array.isArray(body.team)
+        ? body.team.slice(0, 20).filter((m) => m && typeof m === 'object').map((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'string').map(([k, v]) => [k.slice(0, 40), v.slice(0, 200)])))
+        : [],
       status: 'pending',
       created_by: userId,
       submitted_by: userId
@@ -80,7 +87,7 @@ export default async function handler(req, res) {
 
   if (error) {
     console.error('create-pitch error:', error.message);
-    return res.status(500).json({ error: `Could not submit your project: ${error.message}` });
+    return res.status(500).json({ error: 'Could not submit your project right now. Try again in a moment.' });
   }
 
   return res.status(200).json({ ok: true, pitchId: data.id });

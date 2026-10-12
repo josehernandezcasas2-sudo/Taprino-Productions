@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 
 export default async function handler(req, res) {
@@ -7,10 +7,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_episodes');
+  if (!roleContext) return;
+  const { isAdmin } = roleContext;
 
   const supabase = getSupabase();
   const [episodesResult, seriesResult] = await Promise.all([

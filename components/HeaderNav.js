@@ -25,6 +25,17 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const { signOut } = useClerk();
   const { notifications, unreadCount, messagesUnread, markRead, markAllRead } = useNotifications(isSignedIn);
   const [openMenu, setOpenMenu] = useState(null); // 'ham' | 'account' | 'search' | 'notifications' | null
+  // Escape closes whichever menu is open.
+  useEffect(() => {
+    if (!openMenu) return undefined;
+    const onKey = (e) => { if (e.key === 'Escape') setOpenMenu(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [openMenu]);
+  function openNotification(n) {
+    if (!n.read) markRead(n.id);
+    if (n.href) { setOpenMenu(null); router.push(n.href); }
+  }
   const [searchValue, setSearchValue] = useState('');
   const [portalLoading, setPortalLoading] = useState(false);
   const [siteSettings, setShopSettings] = useState(null);
@@ -256,6 +267,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         <button
           className={`icon-btn nav-hamburger ${openMenu === 'ham' ? 'active' : ''}`}
           aria-label="Browse by type and genre"
+          aria-expanded={openMenu === 'ham'}
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
         >
           {/* Was a plain "☰" character — .icon-btn's font-family stack is
@@ -320,6 +332,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         <button
           className={`icon-btn ${openMenu === 'search' ? 'active' : ''}`}
           aria-label="Search"
+          aria-expanded={openMenu === 'search'}
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'search' ? null : 'search')); }}
         >
           {iconOverrides.search || (siteSettings && siteSettings.searchIconUrl) ? (
@@ -341,6 +354,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
               <input
                 ref={searchInputRef}
                 type="search"
+                aria-label="Search"
                 className="header-search-input"
                 placeholder="Search episodes, artists, genres…"
                 value={searchValue}
@@ -379,7 +393,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                     <div
                       key={n.id}
                       className={`notification-item ${n.read ? '' : 'unread'}`}
-                      onClick={() => { if (!n.read) markRead(n.id); if (n.href) { setOpenMenu(null); router.push(n.href); } }}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => openNotification(n)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openNotification(n); } }}
                     >
                       <div className="notification-message">{n.message}</div>
                       <div className="notification-time">{new Date(n.createdAt).toLocaleString()}</div>
@@ -400,6 +417,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         <button
           className={`avatar-btn ${openMenu === 'account' ? 'active' : ''}`}
           aria-label="Account menu"
+          aria-expanded={openMenu === 'account'}
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
         >
           {ownAvatarUrl ? (

@@ -65,7 +65,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PATCH') {
     const { commentId, body } = req.body || {};
-    if (!commentId || !body || !body.trim()) {
+    if (!commentId || typeof body !== 'string' || !body.trim()) {
       return res.status(400).json({ error: 'A comment body is required.' });
     }
     if (body.length > MAX_LENGTH) {

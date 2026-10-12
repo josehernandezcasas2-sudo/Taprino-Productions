@@ -1,6 +1,8 @@
 import { getRoleContext } from '../../lib/roles';
 import { getSupabase } from '../../lib/supabase';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -43,12 +45,14 @@ export default async function handler(req, res) {
     if (!Array.isArray(deckIds) || !Array.isArray(secondChanceIds) || !Array.isArray(likedIds)) {
       return res.status(400).json({ error: 'deckIds, secondChanceIds, and likedIds must be arrays.' });
     }
+    // Only real pitch ids, and no more than the whole room could hold.
+    const clean = (list) => list.filter((x) => typeof x === 'string' && UUID_RE.test(x)).slice(0, 500);
     const row = {
       user_id: userId,
-      deck_ids: deckIds,
-      second_chance_ids: secondChanceIds,
+      deck_ids: clean(deckIds),
+      second_chance_ids: clean(secondChanceIds),
       round: round === 2 ? 2 : 1,
-      liked_ids: likedIds,
+      liked_ids: clean(likedIds),
       updated_at: new Date().toISOString()
     };
     // Only the website's elevator sends floorIndex (it keeps the whole

@@ -29,6 +29,7 @@ export async function getServerSideProps({ req, res, params }) {
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
   }
+  res.setHeader('Vary', 'Cookie');
 
   const data = await getProfileHubData(params.userId, req);
   if (!data) return { notFound: true };

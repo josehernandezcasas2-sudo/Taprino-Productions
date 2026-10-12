@@ -1,4 +1,4 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 
 export default async function handler(req, res) {
@@ -7,10 +7,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // Full admins pass; a sub-admin needs the capability the page that
+  // calls this route is gated on (lib/adminAuth.js).
+  const roleContext = await requireCapability(req, res, 'manage_episodes');
+  if (!roleContext) return;
+  const { isAdmin } = roleContext;
 
   const { q } = req.query || {};
 
@@ -25,7 +26,9 @@ export default async function handler(req, res) {
   // of one studio's library; worth a real search index if this ever grows
   // into the thousands of episodes.
   if (q && String(q).trim() !== '') {
-    const term = String(q).trim();
+    // The term goes into a PostgREST filter string: commas and parens would
+    // rewrite it, and LIKE wildcards would match everything.
+    const term = String(q).trim().slice(0, 80).replace(/[,()]/g, ' ').replace(/[\\%_]/g, (c) => `\\${c}`);
     query = query.or(`title.ilike.%${term}%,artist.ilike.%${term}%`);
   }
 

@@ -11,7 +11,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { listThreads, getConversation, getBlocksBetween } from '../../lib/messages';
 import { MAX_MESSAGE_CHARS, CONTEXT_KINDS, CONTEXT_LABELS } from '../../lib/messageRules';
-import { getPublicProfile, placeholderProfile, profilePath } from '../../lib/userProfiles';
+import { getPublicProfile, placeholderProfile, profilePath, looksLikeUserId } from '../../lib/userProfiles';
 import { REPORT_REASONS } from '../../lib/reportReasons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -53,6 +53,9 @@ export async function getServerSideProps({ req, res, params, query }) {
       } catch (err) {
         if (err.status === 404) notFound = true; else throw err;
       }
+    } else if (to && to !== account.userId && !looksLikeUserId(to)) {
+      // A made-up id would break the block lookup's filter string.
+      notFound = true;
     } else if (to && to !== account.userId) {
       // Starting a conversation: if one exists already, open it instead.
       const existing = inbox.threads.find((t) => t.other.userId === to);

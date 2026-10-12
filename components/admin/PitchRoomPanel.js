@@ -28,14 +28,15 @@ export default function PitchRoomPanel() {
 
   async function moderateComment(commentId, action) {
     try {
-      await fetch('/api/admin/pitch-comments', {
+      const res = await fetch('/api/admin/pitch-comments', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ commentId, action })
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not update that comment.');
       await loadReportedComments();
     } catch (err) {
-      setPitchError('Could not update that comment.');
+      setPitchError(err.message || 'Could not update that comment.');
     }
   }
 
@@ -75,28 +76,30 @@ export default function PitchRoomPanel() {
 
   async function setPitchStatus(pitchId, status) {
     try {
-      await fetch('/api/admin/pitches', {
+      const res = await fetch('/api/admin/pitches', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pitchId, status })
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not update that pitch.');
       await loadPitches();
     } catch (err) {
-      setPitchError('Could not update that pitch.');
+      setPitchError(err.message || 'Could not update that pitch.');
     }
   }
 
   async function deletePitch(pitchId) {
     if (!confirm('Delete this pitch permanently?')) return;
     try {
-      await fetch('/api/admin/pitches', {
+      const res = await fetch('/api/admin/pitches', {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pitchId })
       });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Could not delete that pitch.');
       await loadPitches();
     } catch (err) {
-      setPitchError('Could not delete that pitch.');
+      setPitchError(err.message || 'Could not delete that pitch.');
     }
   }
 

@@ -47,7 +47,7 @@ export default async function handler(req, res) {
       genre: genre || null,
       cloudflare_uid: liveInput.uid,
       ads_enabled: adsEnabled !== false,
-      ad_break_seconds: adBreakSeconds ? Math.max(120, Number(adBreakSeconds)) : 600,
+      ad_break_seconds: Number.isFinite(Number(adBreakSeconds)) && Number(adBreakSeconds) > 0 ? Math.max(120, Math.round(Number(adBreakSeconds))) : 600,
       created_by: userId,
       channel_id: targetChannelId
     })

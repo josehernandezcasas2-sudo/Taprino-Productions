@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
     const update = { reviewed_by: userId, reviewed_at: new Date().toISOString() };
     if (status) update.status = status;
-    if (adminNotes !== undefined) update.admin_notes = adminNotes;
+    if (adminNotes !== undefined) update.admin_notes = adminNotes ? String(adminNotes).slice(0, 5000) : null;
     if (decisionNote !== undefined) update.decision_note = decisionNote ? String(decisionNote).trim().slice(0, 2000) || null : null;
 
     // Accepting gives the applicant Creator Studio right away. Someone

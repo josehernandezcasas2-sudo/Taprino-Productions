@@ -130,6 +130,8 @@ export default function LiveChannelsPage(props) {
         setSelected(null);
         if (scrollRef.current) scrollRef.current.scrollLeft = date === data.today ? Math.max(0, (clockSec / 1800) * HALF_HOUR_PX - HALF_HOUR_PX) : (19 * 2 - 1) * HALF_HOUR_PX;
       }
+    } catch (err) {
+      // Keep the day that's showing; the tab can be tapped again.
     } finally {
       setGuideLoading(false);
     }
