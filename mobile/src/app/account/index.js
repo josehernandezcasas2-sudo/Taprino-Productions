@@ -666,9 +666,9 @@ export default function Account() {
           ) : null}
           <View style={styles.quicklinks}>
             <Quicklink icon={<HeartGlyph />} label="My Wishlist" onPress={() => router.push('/account/wishlist')} />
-            <Quicklink icon={<SparkleGlyph />} label="My Recs" external onPress={() => Linking.openURL(`${API_BASE_URL}/recs`)} />
+            <Quicklink icon={<SparkleGlyph />} label="My Recs" onPress={() => router.push('/recs')} />
             <Quicklink icon={<PlayGlyph />} label="Continue Watching" onPress={() => router.push('/account/wishlist')} />
-            {canSeeNumbers ? <Quicklink icon={<BarsGlyph />} label="Your Numbers" external onPress={() => Linking.openURL(`${API_BASE_URL}/creator/analytics`)} /> : null}
+            {canSeeNumbers ? <Quicklink icon={<BarsGlyph />} label="Your Numbers" onPress={() => router.push('/creator/numbers')} /> : null}
             {!canSeeNumbers ? <Quicklink icon={<SparkleGlyph />} label="Become a creator" onPress={() => router.push('/apply')} /> : null}
           </View>
         </View>
