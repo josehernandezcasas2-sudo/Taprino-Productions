@@ -114,7 +114,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
             <Fragment key={ep.id}>
             <div className="podcast-episode-row">
               {ep.locked ? (
-                <button className="ep-play-btn" disabled title={`${SITE.premiumTier} required`}><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
+                <button className="ep-play-btn" disabled title={ep.ageRestricted ? 'Age-restricted — set your age on your account' : `${SITE.premiumTier} required`}><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
               ) : hasAudio ? (
                 <button className={`ep-play-btn ${playing ? 'playing' : ''}`} onClick={() => playAudio(ep)} aria-label={playing ? 'Pause' : 'Play'}>
                   {playing ? <PauseIcon size={15} src={iconOverrides.pause} /> : <PlayIcon size={15} src={iconOverrides.play} />}

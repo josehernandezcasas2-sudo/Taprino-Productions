@@ -1,11 +1,13 @@
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
+import { episodeHref } from '../lib/episodeLinks';
 
 // Generated at request time rather than kept as a static file, so newly
 // published episodes appear without anyone remembering to regenerate
 // anything. Only genuinely public, crawlable pages go in — admin, creator
 // tooling, and the account page are excluded here and in robots.txt.
 function buildSitemap(origin, episodes, series, genres) {
+  const podcastShowIds = new Set(episodes.filter((e) => e.contentType === 'podcast' && e.seriesId).map((e) => e.seriesId));
   const staticPages = [
     { path: '/', priority: '0.5', freq: 'monthly' },
     { path: '/stream', priority: '1.0', freq: 'daily' },
@@ -26,13 +28,16 @@ function buildSitemap(origin, episodes, series, genres) {
       priority: '0.6',
       freq: 'weekly'
     })),
+    // Podcast shows live at /podcasts/<id>, not /series/<id>; podcast
+    // episodes link to their show (the video page can't play audio) and
+    // bonus clips aren't pages of their own.
     ...series.map((s) => ({
-      loc: `${origin}/series/${encodeURIComponent(s.id)}`,
+      loc: `${origin}${podcastShowIds.has(s.id) ? '/podcasts/' : '/series/'}${encodeURIComponent(s.id)}`,
       priority: '0.8',
       freq: 'weekly'
     })),
-    ...episodes.map((e) => ({
-      loc: `${origin}/episode/${encodeURIComponent(e.id)}`,
+    ...episodes.filter((e) => e.contentType !== 'bonus' && e.contentType !== 'podcast').map((e) => ({
+      loc: `${origin}${episodeHref(e)}`,
       priority: '0.8',
       freq: 'weekly'
     }))

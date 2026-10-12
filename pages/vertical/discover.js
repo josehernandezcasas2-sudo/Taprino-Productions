@@ -123,6 +123,7 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
   const containerRef = useRef(null);
   const slideRefs = useRef({});
   const [deck, setDeck] = useState([]);
+  const [deckReady, setDeckReady] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
   const [srcByEpisodeId, setSrcByEpisodeId] = useState({});
@@ -154,10 +155,11 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
       ? unitsRef.current.find((u) => u.type === 'series' && u.seriesId === requestedSeriesId)
       : null;
     const first = requested || pickerRef.current.next(seenSeriesIds.current);
-    if (!first) return;
+    if (!first) { setDeckReady(true); return; }
     seenSeriesIds.current.add(unitKey(first));
     const firstSlides = expandUnitToSlides(first);
     setDeck(firstSlides);
+    setDeckReady(true);
     contentSlideCountRef.current += firstSlides.filter((s) => s.kind === 'episode').length;
     if (adsOn && contentSlideCountRef.current >= AD_FREQUENCY) {
       contentSlideCountRef.current = 0;
@@ -320,6 +322,15 @@ export default function VerticalDiscover({ verticalEpisodes, seriesNameById, isS
       </Head>
 
       <div className="reel-feed" ref={containerRef}>
+        {deckReady && deck.length === 0 && (
+          <div className="reel-feed-empty">
+            <button className="reel-close" onClick={goBack}>&times;</button>
+            <div className="reel-end-icon">&#9635;</div>
+            <div className="reel-end-title">Nothing to watch here yet</div>
+            <div className="reel-end-sub">Vertical titles you can play will show up here as they're released.</div>
+            <Link href="/stream" className="reel-end-home">Back to Home</Link>
+          </div>
+        )}
         {deck.map((slide, i) => (
           <div
             key={slide.key}

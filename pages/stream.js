@@ -367,7 +367,7 @@ export default function Home({ liveStream, isSubscriber, isSignedIn, showNewslet
                 ).length;
                 if (visibleCount === 0) {
                   const label = [
-                    activeType !== 'All' ? ({ series: 'Series', movie: 'Movies', short: 'Shorts' }[activeType]) : null,
+                    activeType !== 'All' ? ({ series: 'Series', movie: 'Movies', short: 'Shorts', podcast: 'Podcasts', vertical: 'Vertical' }[activeType] || activeType) : null,
                     activeGenre !== 'All' ? activeGenre : null
                   ].filter(Boolean).join(' · ');
                   return <div className="poster-empty">Nothing in {label || 'this filter'} yet — check back soon.</div>;

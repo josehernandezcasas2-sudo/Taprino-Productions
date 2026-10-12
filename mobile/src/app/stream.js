@@ -99,7 +99,7 @@ export default function Stream() {
         {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToInfo} />}
 
         <View style={styles.stage}>
-          <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(`/episode/${ep.id}?autoplay=1`)} />
+          <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(ep.contentType === 'podcast' && ep.seriesId ? `/podcasts/${ep.seriesId}` : `/episode/${ep.id}?autoplay=1`)} />
           <CardRow title="New Releases" cards={newReleases} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/new-releases')} />
           <CardRow title="Leaving Soon" cards={leavingSoon} onPressCard={goToInfo} isWishlisted={isWishlisted} onToggleWishlist={toggleWishlist} onSeeAll={() => router.push('/collection/leaving-soon')} />
 

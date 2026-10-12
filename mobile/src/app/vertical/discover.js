@@ -214,6 +214,18 @@ export default function VerticalDiscover() {
     );
   }
 
+  if (deck.length === 0) {
+    return (
+      <View style={styles.center}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <Text style={styles.errorText}>Nothing to watch here yet — vertical titles you can play will show up as they're released.</Text>
+        <Pressable style={styles.closeBtnInline} onPress={goBack}>
+          <Text style={styles.closeBtnInlineText}>Go back</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
   const { seriesNameById, viewerId } = feedState.feed;
 
   return (

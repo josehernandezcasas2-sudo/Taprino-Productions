@@ -60,6 +60,9 @@ export default async function handler(req, res) {
     }
   }
 
+  // Every answer below is a credential or per-viewer; never let a shared
+  // cache keep one.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const entitled = episode.tier === 'free' || account.isSubscriber;
   if (!entitled) {
     return res.status(403).json({ error: `This episode is for ${SITE.premiumTier} members.` });

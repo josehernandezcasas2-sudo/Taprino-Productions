@@ -833,7 +833,7 @@ button { font-family: inherit; cursor: pointer; }
      jank issues in Safari, which svh's fixed-to-smallest approach
      avoids entirely.) */
   height: clamp(300px, 75svh, 900px);
-  background: #000;
+  background: linear-gradient(160deg, var(--surface-2), var(--ocean-ink) 55%, #000); /* a hero with no trailer or artwork shows this, not a black box */
   border: 1px solid rgba(251, 232, 211, 0.08);
 }
 .hero-carousel.full-bleed {

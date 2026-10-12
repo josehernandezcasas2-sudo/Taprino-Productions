@@ -335,7 +335,7 @@ export default function Episode() {
             <View style={styles.sidebar}>
               <Text style={styles.sideHeading}>Watch next</Text>
               {watchNext.map((item) => (
-                <SideCard key={item.id} item={item} onPress={() => router.push(`/episode/${item.id}?autoplay=1`)} />
+                <SideCard key={item.id} item={item} onPress={() => router.push(item.contentType === 'podcast' && item.seriesId ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`)} />
               ))}
             </View>
           ) : null}

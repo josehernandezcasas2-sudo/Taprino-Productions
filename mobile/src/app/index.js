@@ -115,7 +115,7 @@ export default function Home() {
             <View style={styles.heroText}>
               <View style={{ transform: [{ rotate: '1deg' }] }}><Text style={styles.heroTitle}>{heroItem.title}</Text></View>
               {heroItem.desc ? <Text style={styles.heroDesc}>{heroItem.desc}</Text> : null}
-              <Pressable onPress={() => router.push(`/episode/${heroItem.id}`)} style={{ alignSelf: 'flex-start' }}>
+              <Pressable onPress={() => router.push(heroItem.contentType === 'podcast' && heroItem.seriesId ? `/podcasts/${heroItem.seriesId}` : `/episode/${heroItem.id}`)} style={{ alignSelf: 'flex-start' }}>
                 <Sticker color={colors.brass} underline>{'▶ WATCH'}</Sticker>
               </Pressable>
             </View>
@@ -130,7 +130,7 @@ export default function Home() {
               items={trending}
               showRank
               meta={(item) => item.tag}
-              onPressItem={(item) => router.push(item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`)}
+              onPressItem={(item) => router.push(item.isSeries ? `/series/${item.id}` : item.contentType === 'podcast' && item.seriesId ? `/podcasts/${item.seriesId}` : `/episode/${item.id}`)}
             />
           </Dept>
         )}

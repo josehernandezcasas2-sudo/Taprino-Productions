@@ -118,20 +118,32 @@ export default function VideoPlayer({
   // this effect (whose cleanup saves) — every save used to go out twice.
   const onProgressRef = useRef(onProgress);
   onProgressRef.current = onProgress;
+  // The resume position is read once per episode, when its metadata first
+  // loads. It used to live in the effect's deps, so every saved tick
+  // re-ran the effect (a save on cleanup, then the throttled one) and a
+  // metadata reload (token refresh, described audio) snapped back to the
+  // last saved position.
+  const initialPositionRef = useRef(initialPosition);
+  initialPositionRef.current = initialPosition;
+  const seekedForRef = useRef(null);
   useEffect(() => {
     if (isYouTube || !onProgress) return;
     const videoElement = videoRef.current;
     if (!videoElement) return;
 
     function handleLoadedMetadata() {
-      if (initialPosition && initialPosition > 0 && initialPosition < videoElement.duration - 5) {
-        videoElement.currentTime = initialPosition;
+      if (seekedForRef.current === episode.id) return;
+      seekedForRef.current = episode.id;
+      const startAt = initialPositionRef.current;
+      if (startAt && startAt > 0 && startAt < videoElement.duration - 5) {
+        videoElement.currentTime = startAt;
       }
     }
     function handleTimeUpdate() {
       const now = videoElement.currentTime;
       if (now - lastSavedRef.current >= 15) {
         lastSavedRef.current = now;
+        lastSaveTimeRef.current = Date.now();
         onProgressRef.current(now, videoElement.duration);
       }
     }
@@ -152,6 +164,8 @@ export default function VideoPlayer({
       onProgressRef.current(position, duration);
     }
     function handlePause() {
+      // `pause` fires just before `ended`; onEnded records the finish.
+      if (videoElement.ended) return;
       guardedImmediateSave(videoElement.currentTime, videoElement.duration);
     }
 
@@ -167,7 +181,7 @@ export default function VideoPlayer({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episode.id, isYouTube, initialPosition, Boolean(onProgress)]);
+  }, [episode.id, isYouTube, Boolean(onProgress)]);
 
   /* ------------------------------------------------------------------ *
    * UI state is driven off the media element's own events, so it stays
@@ -265,6 +279,27 @@ export default function VideoPlayer({
 
     const isHls = episode.src.includes('.m3u8');
 
+    // Native HLS (Safari) and plain files have no hls.js error hook, so an
+    // expired signed URL used to just stop. Try one fresh URL, then say so.
+    const onNativeError = async () => {
+      if (cancelled || hlsRef.current) return;
+      const resumeAt = v.currentTime;
+      const fresh = await refreshSignedSrc();
+      if (cancelled) return;
+      if (fresh && fresh !== v.src) {
+        const restore = () => {
+          if (resumeAt > 0) v.currentTime = resumeAt;
+          v.play().catch(() => {});
+          v.removeEventListener('loadedmetadata', restore);
+        };
+        v.addEventListener('loadedmetadata', restore);
+        v.src = fresh;
+      } else {
+        setSrcError(true);
+      }
+    };
+    v.addEventListener('error', onNativeError);
+
     if (isHls) {
       import('hls.js').then(({ default: Hls }) => {
         if (cancelled) return;
@@ -331,6 +366,7 @@ export default function VideoPlayer({
 
     return () => {
       cancelled = true;
+      v.removeEventListener('error', onNativeError);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;

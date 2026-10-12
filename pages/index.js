@@ -13,6 +13,7 @@ import TierChip from '../components/crew/TierChip';
 import { Avatar } from '../components/crew/CrewBits';
 import { getOwnCard } from '../lib/crewCards';
 import { SITE } from '../lib/siteConfig';
+import { episodeHref } from '../lib/episodeLinks';
 
 // The zine-style homepage — built from the approved mockup (Variant C:
 // collage layout, rotated stickers, polaroid people cards). Replaced the
@@ -33,6 +34,7 @@ export async function getServerSideProps({ req, res }) {
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   }
+  res.setHeader('Vary', 'Cookie');
 
   const account = await getAccountContext(req);
   // The Crew Call rows are personal when the viewer has a place on their
@@ -114,7 +116,7 @@ export default function Home({
               <div className="zine-hero-text">
                 <h2>{heroItem.title}</h2>
                 {heroItem.desc && <p>{heroItem.desc}</p>}
-                <Link href={`/episode/${heroItem.id}`} className="zine-sticker brass">▶ WATCH</Link>
+                <Link href={episodeHref(heroItem)} className="zine-sticker brass">▶ WATCH</Link>
               </div>
             </div>
           </div>
@@ -127,7 +129,7 @@ export default function Home({
             <div className="zine-dept-label"><span className="zine-sticker brass">TRENDING NOW</span></div>
             <div className="zine-filmstrip">
               {trending.map((item, i) => (
-                <Link key={`${item.isSeries ? 'series' : 'ep'}-${item.id}`} href={item.isSeries ? `/series/${item.id}` : `/episode/${item.id}`} className="zine-filmstrip-item">
+                <Link key={`${item.isSeries ? 'series' : 'ep'}-${item.id}`} href={item.isSeries ? `/series/${item.id}` : episodeHref(item)} className="zine-filmstrip-item">
                   <div className="zine-filmstrip-poster">
                     {item.poster && <Image src={item.poster} alt="" fill sizes="150px" className="zine-fill-img" />}
                     <span className="zine-trending-rank">#{i + 1}</span>
@@ -224,7 +226,7 @@ export default function Home({
             <div className="zine-dept-label"><span className="zine-sticker brass">ON AIR</span></div>
             <div className="zine-cassette-row">
               {podcasts.map((p, i) => (
-                <Link key={p.id} href={`/episode/${p.id}`} className={`zine-cassette ${cassetteColors[i % cassetteColors.length]}`}>
+                <Link key={p.id} href={episodeHref(p)} className={`zine-cassette ${cassetteColors[i % cassetteColors.length]}`}>
                   <span className="zine-cassette-label">{p.title}</span>
                 </Link>
               ))}

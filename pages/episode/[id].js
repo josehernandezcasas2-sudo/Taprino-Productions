@@ -275,7 +275,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
           {episode.trailerSrc ? (
             <video className="hero-video" src={episode.trailerSrc} autoPlay muted loop playsInline onContextMenu={(e) => e.preventDefault()} />
           ) : (
-            <Image
+            (episode.heroImage || episode.poster || episode.thumbnail) && <Image
               src={episode.heroImage || episode.poster || episode.thumbnail}
               alt=""
               fill

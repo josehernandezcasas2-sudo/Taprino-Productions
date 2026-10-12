@@ -87,9 +87,14 @@ export function PodcastPlayerProvider({ children }) {
           src={currentEpisode.audioUrl}
           onLoadedMetadata={(e) => {
             setDuration(e.target.duration || 0);
+            // load() resets the element's rate to 1; keep the chosen speed.
+            e.target.playbackRate = playbackRate;
             e.target.play();
           }}
           onTimeUpdate={(e) => setPosition(e.target.currentTime)}
+          // Media keys, headphones and other tabs pause/resume without us.
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
           onEnded={() => setIsPlaying(false)}
           style={{ display: 'none' }}
         />
