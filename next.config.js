@@ -1,5 +1,27 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Don't advertise the framework in every response.
+  poweredByHeader: false,
+  // Baseline browser protections the site was serving none of (only
+  // Vercel's HSTS): no MIME sniffing, no framing by other sites, referrers
+  // trimmed on cross-origin requests, and the powerful device APIs this
+  // site doesn't use switched off — geolocation stays on for the working
+  // card's "use my location" (components/crew/PlaceSearch.js). No CSP yet:
+  // the inline theme <style>, Clerk, Stripe, Cloudflare and the ad SDK
+  // would each need allow-listing, and a wrong CSP breaks playback.
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          { key: 'X-Content-Type-Options', value: 'nosniff' },
+          { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+          { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' }
+        ]
+      }
+    ];
+  },
   images: {
     // The only external image host used anywhere in this app — every
     // poster, thumbnail, avatar, and title-card image is uploaded via

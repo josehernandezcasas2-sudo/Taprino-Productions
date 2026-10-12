@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { universityPageProps } from '../../lib/universityPage';
-import { getUniversityFeed, continueFrom } from '../../lib/university';
+import { getUniversityFeed } from '../../lib/university';
+import { continueFrom } from '../../lib/universityRules';
 import { useProgress } from '../../lib/universityProgress';
 import UniversityShell, { accountFromProps } from '../../components/university/UniversityShell';
 import { CourseCard, DepartmentChips, FileRow } from '../../components/university/LessonBits';
