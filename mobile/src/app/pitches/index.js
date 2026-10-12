@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -12,7 +12,6 @@ import SmartImage from '../../components/SmartImage';
 import WishlistHeart from '../../components/WishlistHeart';
 import { SearchIcon } from '../../components/TabBarIcons';
 
-const SITE_ORIGIN = 'https://www.studiotapatv.site';
 // lib/pitches.js PITCH_TAGS order, so the pills read the same as the site.
 const PITCH_TAGS = ['Documentary', 'Narrative Film', 'Short Film', 'Series', 'Animation', 'Vertical', 'Podcast', 'Music Video', 'Other'];
 const SORTS = [
@@ -194,10 +193,10 @@ export default function PitchRoom() {
 
       {state.data.isCreator ? (
         <View style={styles.creatorRow}>
-          <Pressable style={styles.ghostBtn} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/pitch/new`)}>
+          <Pressable style={styles.ghostBtn} onPress={() => router.push('/creator/pitch-new')}>
             <Text style={styles.ghostBtnText}>+ Submit your project</Text>
           </Pressable>
-          <Pressable style={styles.ghostBtn} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/pitch/dashboard`)}>
+          <Pressable style={styles.ghostBtn} onPress={() => router.push('/creator/pitches')}>
             <Text style={styles.ghostBtnText}>Your pitches</Text>
           </Pressable>
         </View>

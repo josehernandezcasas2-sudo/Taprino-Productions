@@ -3,6 +3,12 @@ import { getSupabase } from '../../../lib/supabase';
 import { postPitchUpdate } from '../../../lib/pitches';
 
 export default async function handler(req, res) {
+  // The app's Your pitches screen posts here too (its web preview sends a
+  // pre-check first).
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
