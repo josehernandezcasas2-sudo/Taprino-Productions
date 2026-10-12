@@ -10,6 +10,7 @@ import { SITE } from '../lib/siteConfig';
 import { BANNER_COLORS } from '../lib/profileBanner';
 import { HeartIcon, SparkleIcon, PlayIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
+import PayoutsCard from '../components/creator/PayoutsCard';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -650,6 +651,8 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                   )}
                 </div>
               </div>
+
+              {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}
 
               <div className="account-card">
                 <div className="account-subheading">Security</div>

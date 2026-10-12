@@ -8929,15 +8929,41 @@ a.crew-credit:hover { background: var(--surface-3); }
 .zine-flyer-pay { display: flex; gap: 0.4rem; align-items: center; font-family: var(--font-mono); font-size: 0.68rem; color: var(--rust); font-weight: bold; }
 @media (max-width: 640px) { .zine-crew-card { flex-basis: 200px; } }
 
-/* Creator "Get paid" card (components/creator/GetPaidCard.js) and the
-   admin Stripe checklist (components/admin/StripeStatusPanel.js) */
-.getpaid-row { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
-.getpaid-row > div:first-child { flex: 1 1 320px; min-width: 0; }
-.getpaid-actions { flex: none; }
-.getpaid h3 { margin: 0.2rem 0 0.3rem; }
-.getpaid p { margin: 0; max-width: 60ch; }
-.getpaid-ready { border-color: rgba(147,208,164,0.45); }
-.getpaid-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: var(--ok); margin-right: 0.4rem; vertical-align: 1px; box-shadow: 0 0 0 3px rgba(147,208,164,0.2); }
+/* Creator Payouts card (components/creator/PayoutsCard.js, on /account
+   and /creator/pitch/dashboard) and the admin Stripe checklist
+   (components/admin/StripeStatusPanel.js) */
+.payouts-ready { border-color: rgba(147,208,164,0.35); }
+.payouts-status { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.03em; text-align: right; }
+.payouts-status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex: none; }
+.payouts-status.on { color: var(--ok); }
+.payouts-status.wait { color: var(--warn); }
+.payouts-status.off { color: var(--ink-faint); }
+.payouts-copy { font-size: 0.86rem; line-height: 1.55; color: var(--ink-dim); margin: 0 0 1rem; max-width: 70ch; }
+.payouts-copy strong { color: var(--ink); font-weight: 600; }
+.payouts-money { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+.payouts-tile { background: var(--void); border: 1px solid rgba(251,232,211,0.1); border-radius: 6px; padding: 0.9rem 1rem; }
+.payouts-tile-label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.payouts-tile-amount { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; margin: 0.3rem 0 0.2rem; font-variant-numeric: tabular-nums; color: var(--ink); }
+.payouts-tile-detail { font-size: 0.78rem; color: var(--ink-dim); line-height: 1.4; }
+.payouts-tile-detail strong { color: var(--ink); font-weight: 600; }
+.payouts-tile.next { border-color: rgba(231,162,85,0.45); }
+.payouts-tile.next .payouts-tile-amount { color: var(--olive-bright); }
+.payouts-list-head { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 1.3rem 0 0.2rem; }
+.payouts-row { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; padding: 0.6rem 0; font-size: 0.86rem; }
+.payouts-row + .payouts-row { border-top: 1px solid rgba(251,232,211,0.08); }
+.payouts-row-date { color: var(--ink); }
+.payouts-row-date small { display: block; color: var(--ink-faint); font-size: 0.74rem; margin-top: 0.1rem; }
+.payouts-row-amt { font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+.payouts-pill { font-family: var(--font-mono); font-size: 0.72rem; padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid; }
+.payouts-pill.paid { color: var(--ok); border-color: rgba(132,205,152,0.4); }
+.payouts-pill.transit { color: var(--olive); border-color: rgba(231,162,85,0.45); }
+.payouts-pill.failed { color: var(--danger); border-color: rgba(214,124,81,0.45); }
+.payouts-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid rgba(251,232,211,0.08); }
+.payouts-fineprint { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); line-height: 1.6; max-width: 62ch; }
+.payouts-actions { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+.payouts-link { font-family: var(--font-display); font-size: 0.8rem; color: var(--olive); text-decoration: none; white-space: nowrap; }
+.payouts-link:hover { color: var(--olive-bright); }
+@media (max-width: 640px) { .payouts-money { grid-template-columns: 1fr; } }
 .stripe-mode { display: inline-block; margin-left: 0.6rem; font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid currentColor; }
 .stripe-mode-test { color: var(--olive); }
 .stripe-mode-live { color: var(--brass); }

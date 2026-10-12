@@ -7,7 +7,7 @@ import { getPitchesForCreator } from '../../../lib/pitches';
 import { getAuth } from '@clerk/nextjs/server';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
-import GetPaidCard from '../../../components/creator/GetPaidCard';
+import PayoutsCard from '../../../components/creator/PayoutsCard';
 import PitchEarnings from '../../../components/creator/PitchEarnings';
 import { getEarningsForCreator } from '../../../lib/pitchDonations';
 import { SITE } from '../../../lib/siteConfig';
@@ -101,7 +101,7 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
           </Link>
         </div>
 
-        <GetPaidCard />
+        <div style={{ marginBottom: '1rem' }}><PayoutsCard returnTo="/creator/pitch/dashboard" /></div>
 
         {pitches.length === 0 ? (
           <p>Nothing submitted yet.</p>

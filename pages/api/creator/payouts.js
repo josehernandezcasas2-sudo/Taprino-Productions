@@ -1,10 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { isStripeConfigured, requestOrigin } from '../../../lib/stripe';
-import { getPayoutAccount, refreshPayoutAccount, createOnboardingLink, createDashboardLink, payoutState } from '../../../lib/creatorPayouts';
+import { getPayoutAccount, refreshPayoutAccount, createOnboardingLink, createDashboardLink, payoutState, getPayoutSummary } from '../../../lib/creatorPayouts';
 
-// The creator's "Get paid" card (components/creator/GetPaidCard.js).
-//   GET  [?sync=1]                 → { configured, state, account }; sync re-reads Stripe
-//   POST { action: 'onboard' }     → { url } Stripe-hosted onboarding
+// The creator's Payouts card (components/creator/PayoutsCard.js, on
+// /account and /creator/pitch/dashboard; the app's
+// mobile/src/components/PayoutsCard.js).
+//   GET  [?sync=1]                 → { configured, state, account, summary }; sync re-reads Stripe
+//                                    summary (balance, next/recent payouts) is only there once ready
+//   POST { action: 'onboard', returnTo } → { url } Stripe-hosted onboarding, back to returnTo
 //   POST { action: 'dashboard' }   → { url } Stripe Express dashboard
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -20,13 +23,26 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       res.setHeader('Cache-Control', 'private, no-store');
       const account = req.query.sync === '1' && isStripeConfigured() ? await refreshPayoutAccount(userId) : await getPayoutAccount(userId);
-      return res.status(200).json({ configured: isStripeConfigured(), state: payoutState(account), account });
+      const state = payoutState(account);
+      // The money side is three more Stripe calls; a hiccup there
+      // shouldn't take the setup state down with it.
+      let summary = null;
+      let summaryError = null;
+      if (state === 'ready' && isStripeConfigured()) {
+        try {
+          summary = await getPayoutSummary(userId);
+        } catch (err) {
+          console.error('getPayoutSummary failed:', err.message);
+          summaryError = 'Stripe didn’t answer with your balance just now.';
+        }
+      }
+      return res.status(200).json({ configured: isStripeConfigured(), state, account, summary, summaryError });
     }
     if (req.method === 'POST') {
       if (!isStripeConfigured()) return res.status(503).json({ error: 'Payments aren’t switched on for this site yet.' });
-      const { action } = req.body || {};
+      const { action, returnTo } = req.body || {};
       if (action === 'onboard') {
-        const url = await createOnboardingLink({ userId, email, origin: requestOrigin(req) });
+        const url = await createOnboardingLink({ userId, email, origin: requestOrigin(req), returnTo });
         return res.status(200).json({ url });
       }
       if (action === 'dashboard') {

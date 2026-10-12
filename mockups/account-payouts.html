@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Account Payouts Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Real values from styles/globals.css :root and the .account-* rules. */
+  :root {
+    --surface-0: #0c131f; --surface-1: #121c2d; --surface-2: #18243c; --surface-3: #202f4e;
+    --olive: #e7a255; --olive-bright: #f2bf88; --olive-shadow: #342514;
+    --brass: #f85f73; --ink: #fbe8d3; --ink-dim: #cab59e; --ink-faint: #b3a18c;
+    --ok: #84cd98; --warn: #e0863c; --mint: #93d0a4;
+    --font-display: 'Space Grotesk', sans-serif; --font-body: 'Fraunces', serif; --font-mono: 'IBM Plex Mono', monospace;
+    --line: rgba(251, 232, 211, 0.1);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--surface-0); color: var(--ink); font-family: var(--font-body); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 16px 80px; }
+
+  /* Mockup chrome (not part of the design) */
+  .note { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); letter-spacing: 0.04em; margin: 0 0 0.4rem; }
+  .section-title { font-family: var(--font-display); font-size: 1.5rem; margin: 3rem 0 0.3rem; color: var(--ink); }
+  .section-title:first-of-type { margin-top: 0; }
+  .section-sub { color: var(--ink-dim); font-size: 0.92rem; margin: 0 0 1.4rem; max-width: 70ch; line-height: 1.5; }
+  .ghost { opacity: 0.35; pointer-events: none; }
+  .ghost-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: 4px; padding: 1.2rem 1.5rem; }
+  .ghost-line { height: 10px; border-radius: 4px; background: rgba(251,232,211,0.12); margin: 0.5rem 0; }
+
+  /* Account page layout */
+  .account-shell { display: flex; align-items: flex-start; gap: 1.6rem; }
+  .account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1.2rem; }
+  .account-rail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 1.2rem; }
+  @media (max-width: 900px) { .account-shell { flex-direction: column; } .account-rail { width: 100%; } }
+
+  .account-card { background: var(--surface-1); border: 1px solid var(--line); border-radius: 4px; padding: 1.6rem 1.5rem; }
+  .account-subheading { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--brass); }
+  .account-card-head { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1.1rem; }
+  .account-row { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 0; }
+  .account-row + .account-row { border-top: 1px solid rgba(251,232,211,0.08); }
+  .account-row-label { font-size: 0.88rem; font-weight: 600; color: var(--ink); }
+  .account-row-detail { font-size: 0.8rem; color: var(--ink-dim); margin-top: 0.15rem; line-height: 1.45; }
+  .btn-primary { background: var(--olive); color: var(--olive-shadow); border: none; border-radius: 999px; padding: 0.6rem 1.1rem; font-family: var(--font-display); font-weight: 600; font-size: 0.82rem; white-space: nowrap; cursor: pointer; }
+  .btn-secondary { background: transparent; border: 1px solid rgba(251,232,211,0.2); color: var(--ink); border-radius: 999px; padding: 0.55rem 1rem; font-family: var(--font-display); font-size: 0.78rem; white-space: nowrap; cursor: pointer; text-decoration: none; display: inline-block; }
+  .btn-secondary:hover { border-color: var(--olive); }
+  .text-link { font-family: var(--font-display); font-size: 0.8rem; color: var(--olive); text-decoration: none; white-space: nowrap; }
+
+  /* ---- New: Payouts card ---- */
+  .status { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.03em; }
+  .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+  .status.on { color: var(--ok); }
+  .status.wait { color: var(--warn); }
+  .status.off { color: var(--ink-faint); }
+  .payouts-ready { border-color: rgba(147,208,164,0.35); }
+
+  .money { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.7rem; }
+  @media (max-width: 640px) { .money { grid-template-columns: 1fr; } }
+  .tile { background: var(--surface-0); border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; }
+  .tile-label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+  .tile-amount { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; margin: 0.3rem 0 0.2rem; font-variant-numeric: tabular-nums; }
+  .tile-detail { font-size: 0.78rem; color: var(--ink-dim); line-height: 1.4; }
+  .tile.next { border-color: rgba(231,162,85,0.45); }
+  .tile.next .tile-amount { color: var(--olive-bright); }
+
+  .list-head { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); margin: 1.3rem 0 0.2rem; }
+  .payout { display: grid; grid-template-columns: 1fr auto auto; gap: 1rem; align-items: center; padding: 0.6rem 0; font-size: 0.86rem; }
+  .payout + .payout { border-top: 1px solid rgba(251,232,211,0.08); }
+  .payout-date { color: var(--ink); }
+  .payout-date small { display: block; color: var(--ink-faint); font-size: 0.74rem; margin-top: 0.1rem; }
+  .payout-amt { font-family: var(--font-display); font-weight: 600; font-variant-numeric: tabular-nums; }
+  .pill { font-family: var(--font-mono); font-size: 0.72rem; padding: 0.2rem 0.5rem; border-radius: 999px; border: 1px solid; }
+  .pill.paid { color: var(--ok); border-color: rgba(132,205,152,0.4); }
+  .pill.transit { color: var(--olive); border-color: rgba(231,162,85,0.45); }
+  .pill.failed { color: #d67c51; border-color: rgba(214,124,81,0.45); }
+
+  .card-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.2rem; padding-top: 1rem; border-top: 1px solid rgba(251,232,211,0.08); }
+  .fineprint { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); line-height: 1.6; max-width: 62ch; }
+  .actions { display: flex; gap: 0.8rem; align-items: center; flex-wrap: wrap; }
+
+  .states { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.2rem; }
+  @media (max-width: 1000px) { .states { grid-template-columns: 1fr; } }
+  .state-tag { font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-faint); margin-bottom: 0.5rem; }
+  .card-copy { font-size: 0.86rem; line-height: 1.55; color: var(--ink-dim); margin: 0 0 1rem; }
+  .card-copy strong { color: var(--ink); font-weight: 600; }
+
+  /* Phone frame for the app version */
+  .phones { display: flex; gap: 2rem; flex-wrap: wrap; }
+  .phone { width: 360px; max-width: 100%; border: 1px solid rgba(251,232,211,0.15); border-radius: 36px; padding: 18px 14px 24px; background: var(--surface-0); }
+  .phone-bar { font-family: var(--font-display); font-weight: 700; font-size: 1.15rem; margin: 6px 6px 14px; }
+  .phone .account-card { padding: 1.1rem 1rem; }
+  .phone .money { grid-template-columns: 1fr 1fr; }
+  .phone .tile.next { grid-column: 1 / -1; }
+  .phone .tile-amount { font-size: 1.3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <p class="note">MOCKUP · /account · sample numbers · not built</p>
+  <h2 class="section-title">1. Where it sits on /account</h2>
+  <p class="section-sub">A new <strong>Payouts</strong> card in the main column, between Preferences and Security. Only creators and admins see it. Everyone else's account page is unchanged.</p>
+
+  <div class="account-shell">
+    <div class="account-main">
+      <div class="ghost ghost-card"><div class="account-subheading">Preferences</div><div class="ghost-line" style="width:70%"></div><div class="ghost-line" style="width:45%"></div></div>
+
+      <!-- READY STATE -->
+      <div class="account-card payouts-ready">
+        <div class="account-card-head">
+          <div class="account-subheading">Payouts</div>
+          <span class="status on">Payments on · paying out daily</span>
+        </div>
+
+        <div class="money">
+          <div class="tile">
+            <div class="tile-label">On the way</div>
+            <div class="tile-amount">$86.40</div>
+            <div class="tile-detail">From 3 recent backings. Clears around <strong style="color:var(--ink)">Oct 15</strong>.</div>
+          </div>
+          <div class="tile">
+            <div class="tile-label">Available</div>
+            <div class="tile-amount">$142.18</div>
+            <div class="tile-detail">Cleared and waiting for the next payout.</div>
+          </div>
+          <div class="tile next">
+            <div class="tile-label">Next payout · estimate</div>
+            <div class="tile-amount">$142.18</div>
+            <div class="tile-detail">Lands around <strong style="color:var(--ink)">Oct 14</strong> in Chase ••4421.</div>
+          </div>
+        </div>
+
+        <div class="list-head">Recent payouts</div>
+        <div class="payout">
+          <div class="payout-date">Oct 13 <small>Chase ••4421</small></div>
+          <div class="payout-amt">$58.20</div>
+          <span class="pill transit">In transit</span>
+        </div>
+        <div class="payout">
+          <div class="payout-date">Oct 9 <small>Chase ••4421</small></div>
+          <div class="payout-amt">$210.00</div>
+          <span class="pill paid">Paid</span>
+        </div>
+        <div class="payout">
+          <div class="payout-date">Oct 2 <small>Chase ••4421</small></div>
+          <div class="payout-amt">$34.75</div>
+          <span class="pill paid">Paid</span>
+        </div>
+
+        <div class="card-foot">
+          <div class="fineprint">Estimates from Stripe. A backing usually clears in about 2 business days, then pays out on your schedule. Bank details, tax forms and full history are in Stripe.</div>
+          <div class="actions">
+            <a class="text-link" href="#">Your earnings →</a>
+            <a class="btn-secondary" href="#">Open Stripe dashboard →</a>
+          </div>
+        </div>
+      </div>
+
+      <div class="ghost ghost-card"><div class="account-subheading">Security</div><div class="ghost-line" style="width:60%"></div></div>
+      <div class="ghost ghost-card"><div class="account-subheading" style="color:#d67c51">Danger zone</div><div class="ghost-line" style="width:40%"></div></div>
+    </div>
+    <div class="account-rail ghost">
+      <div class="ghost-card" style="min-height:220px"><div class="account-subheading">Membership</div><div class="ghost-line" style="width:80%"></div><div class="ghost-line" style="width:55%"></div></div>
+      <div class="ghost-card"><div class="account-subheading">Redeem a code</div><div class="ghost-line"></div></div>
+    </div>
+  </div>
+
+  <h2 class="section-title">2. Before it's ready</h2>
+  <p class="section-sub">Same card, smaller. One line on where things stand and one button. The button opens Stripe's own pages and brings them back to /account afterwards (today it always returns to the pitch dashboard).</p>
+
+  <div class="states">
+    <div>
+      <div class="state-tag">Not set up</div>
+      <div class="account-card">
+        <div class="account-card-head"><div class="account-subheading">Payouts</div><span class="status off">Not set up</span></div>
+        <p class="card-copy">Connect a bank account so your projects can take backing. Money goes to your own Stripe account, minus the platform's cut, and pays out to your bank. <strong>About five minutes</strong>: have your ID and bank details ready.</p>
+        <button class="btn-primary">Set up payouts with Stripe →</button>
+      </div>
+    </div>
+    <div>
+      <div class="state-tag">Started, details missing</div>
+      <div class="account-card">
+        <div class="account-card-head"><div class="account-subheading">Payouts</div><span class="status wait">Needs details</span></div>
+        <p class="card-copy">Stripe still needs <strong>a bank account and a photo ID</strong> before your projects can take backing.</p>
+        <button class="btn-primary">Finish setting up →</button>
+      </div>
+    </div>
+    <div>
+      <div class="state-tag">Stripe checking</div>
+      <div class="account-card">
+        <div class="account-card-head"><div class="account-subheading">Payouts</div><span class="status wait">Being verified</span></div>
+        <p class="card-copy">Stripe is checking your details. This usually takes a day or two. Backing opens on your approved projects as soon as it clears.</p>
+        <button class="btn-secondary">Review my details →</button>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">3. The app (Account screen)</h2>
+  <p class="section-sub">Same card in the app's Account tab. The three amounts stack two-and-one, and buttons open Stripe in the in-app browser like Checkout already does.</p>
+
+  <div class="phones">
+    <div class="phone">
+      <div class="phone-bar">Account</div>
+      <div class="account-card payouts-ready">
+        <div class="account-card-head"><div class="account-subheading">Payouts</div><span class="status on">Payments on</span></div>
+        <div class="money">
+          <div class="tile"><div class="tile-label">On the way</div><div class="tile-amount">$86.40</div><div class="tile-detail">Clears ~Oct 15</div></div>
+          <div class="tile"><div class="tile-label">Available</div><div class="tile-amount">$142.18</div><div class="tile-detail">Waiting to pay out</div></div>
+          <div class="tile next"><div class="tile-label">Next payout · estimate</div><div class="tile-amount">$142.18</div><div class="tile-detail">Around Oct 14 · Chase ••4421</div></div>
+        </div>
+        <div class="list-head">Recent payouts</div>
+        <div class="payout"><div class="payout-date">Oct 13</div><div class="payout-amt">$58.20</div><span class="pill transit">In transit</span></div>
+        <div class="payout"><div class="payout-date">Oct 9</div><div class="payout-amt">$210.00</div><span class="pill paid">Paid</span></div>
+        <div class="card-foot" style="flex-direction:column;align-items:stretch">
+          <a class="btn-secondary" href="#" style="text-align:center">Open Stripe dashboard →</a>
+          <a class="text-link" href="#" style="text-align:center">Your earnings →</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="section-title">Notes</h2>
+  <ul class="section-sub" style="padding-left:1.2rem">
+    <li>Every number comes from Stripe when the page opens: the creator's balance, their payout schedule, upcoming and recent payouts, and the last four digits of their bank account. Nothing new is stored on our side.</li>
+    <li>"Next payout" is Stripe's own upcoming payout when one exists. Otherwise it's the available balance plus the date their schedule says it goes out, so it's labelled an estimate.</li>
+    <li>A failed payout (bank rejected it) shows a red <span class="pill failed">Failed</span> pill and a line telling them to fix their bank in Stripe.</li>
+    <li>The "Get paid" card on /creator/pitch/dashboard stays and gets the same amounts, so the two places never disagree.</li>
+  </ul>
+
+</div>
+</body>
+</html>

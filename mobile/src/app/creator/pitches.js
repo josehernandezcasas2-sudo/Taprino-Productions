@@ -3,71 +3,20 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import PayoutsCard from '../../components/PayoutsCard';
 
-// Your pitches (pages/creator/pitch/dashboard.js on the web): the Get paid
-// card, every project you've submitted with its status, what each has
-// earned, and a quick "post an update". Data from /api/creator/pitches;
-// payouts through /api/creator/payouts (Stripe's hosted pages open in the
-// in-app browser and we re-read the state when they close).
+// Your pitches (pages/creator/pitch/dashboard.js on the web): the Payouts
+// card (components/PayoutsCard.js), every project you've submitted with
+// its status, what each has earned, and a quick "post an update". Data
+// from /api/creator/pitches.
 const PAPER = '#241a05';
 
 const money = (cents) => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 const STATUS = { pending: '⏳ Pending review', approved: '● Live', rejected: '✕ Not approved' };
-
-function GetPaid({ payout, onChanged, token }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState(null);
-  const state = payout ? (payout.configured ? payout.state : 'off') : 'loading';
-
-  async function go(action) {
-    setBusy(true);
-    setError(null);
-    try {
-      const d = await apiPost('/api/creator/payouts', { action }, token);
-      await WebBrowser.openBrowserAsync(d.url);
-      onChanged();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const copy = {
-    loading: ['Checking your payout setup…', ''],
-    off: ['Payments aren’t switched on for this site yet', 'Once they are, this is where you’ll connect a bank account to take donations.'],
-    none: ['Connect a bank account to take donations', 'Backers pay through Stripe. Each donation goes to your own Stripe account, minus Studio Tapa’s cut. Takes about five minutes — have your ID and bank details ready.'],
-    incomplete: ['You started setting up payouts', 'Stripe still needs a few details before your projects can take donations.'],
-    review: ['Stripe is checking your details', 'This usually takes a day or two. Donations switch on for your approved projects as soon as it clears.'],
-    ready: ['Payments on', 'Donations to your approved projects land in your Stripe account and pay out to your bank on Stripe’s schedule.']
-  }[state] || ['', ''];
-
-  return (
-    <View style={[styles.card, state === 'ready' && styles.cardReady]}>
-      <Text style={styles.eyebrow}>Get paid</Text>
-      <Text style={styles.cardTitle}>{state === 'ready' ? '● ' : ''}{copy[0]}</Text>
-      {copy[1] ? <Text style={styles.cardBody}>{copy[1]}</Text> : null}
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <View style={styles.btnRow}>
-        {state === 'none' || state === 'incomplete' || state === 'review' ? (
-          <Pressable style={[styles.btnPrimary, busy && styles.btnDisabled]} disabled={busy} onPress={() => go('onboard')}>
-            <Text style={styles.btnPrimaryText}>{busy ? 'Opening Stripe…' : state === 'none' ? 'Set up payouts with Stripe →' : state === 'incomplete' ? 'Finish setting up →' : 'Review my details →'}</Text>
-          </Pressable>
-        ) : null}
-        {state === 'ready' ? (
-          <Pressable style={[styles.btnSecondary, busy && styles.btnDisabled]} disabled={busy} onPress={() => go('dashboard')}>
-            <Text style={styles.btnSecondaryText}>{busy ? 'Opening Stripe…' : 'Open Stripe dashboard →'}</Text>
-          </Pressable>
-        ) : null}
-      </View>
-    </View>
-  );
-}
 
 function Earnings({ pitch, earnings }) {
   const e = earnings || { raisedCents: 0, yourShareCents: 0, backers: 0, refundedCents: 0, refundedCount: 0, recent: [] };
@@ -170,7 +119,7 @@ export default function YourPitches() {
     );
   }
 
-  const { pitches, earnings, payout } = state.data;
+  const { pitches, earnings } = state.data;
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
@@ -182,7 +131,7 @@ export default function YourPitches() {
           <Text style={styles.btnPrimaryText}>+ Submit a project</Text>
         </Pressable>
 
-        <GetPaid payout={payout} token={tokenRef.current} onChanged={load} />
+        <View style={{ marginTop: 14 }}><PayoutsCard showEarningsLink={false} /></View>
 
         {pitches.length === 0 ? (
           <Text style={[styles.p, { marginTop: 18 }]}>Nothing submitted yet.</Text>
@@ -241,7 +190,6 @@ const styles = StyleSheet.create({
   btnSmallText: { fontFamily: fonts.displaySemi, fontSize: 12.5, color: colors.ink },
   btnDisabled: { opacity: 0.45 },
   card: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 4, padding: 18, marginTop: 14 },
-  cardReady: { borderColor: 'rgba(147,208,164,0.45)' },
   cardHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
   cardTitle: { fontFamily: fonts.displayBold, fontSize: 17, color: colors.ink, marginBottom: 4 },
   cardBody: { fontFamily: fonts.body, fontSize: 14, lineHeight: 21, color: colors.inkDim },

@@ -54,8 +54,8 @@ export default function StripeStatusPanel() {
         <>
           <p style={{ fontSize: 13, marginTop: 6 }}>
             {status.ready
-              ? 'Everything Pitch Room donations need is in place.'
-              : 'Donations stay off until every line below is green.'}
+              ? 'Everything Pitch Room backing needs is in place.'
+              : 'Something below still needs attention. This list only reports; a pitch takes backing once its creator’s Stripe account can take charges.'}
           </p>
           <ul className="stripe-checks">
             {status.checks.map((c) => (

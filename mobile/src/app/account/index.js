@@ -15,6 +15,7 @@ import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
+import PayoutsCard from '../../components/PayoutsCard';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to answer' },
@@ -672,6 +673,9 @@ export default function Account() {
             {!canSeeNumbers ? <Quicklink icon={<SparkleGlyph />} label="Become a creator" onPress={() => router.push('/apply')} /> : null}
           </View>
         </View>
+
+        {/* Payouts — creators and admins only; same card as the web /account */}
+        {(dashboard.isCreator || dashboard.isAdmin) ? <PayoutsCard /> : null}
 
         {/* Security */}
         <View style={styles.card}>
