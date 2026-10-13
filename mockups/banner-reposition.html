@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banner Reposition</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --ocean-ink:#283c63; --olive:#e7a255; --olive-shadow:#342514; --brass:#f85f73; --brass-deep:#811826;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --ok:#84cd98;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--surface-0); color:var(--ink); font-family:var(--font-body); padding:32px 16px 80px; }
+  .wrap { max-width:1100px; margin:0 auto; }
+  .note { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); letter-spacing:0.04em; margin:0 0 0.4rem; }
+  h2 { font-family:var(--font-display); font-size:1.4rem; margin:2.6rem 0 0.3rem; }
+  h2:first-of-type { margin-top:0; }
+  .sub { color:var(--ink-dim); font-size:0.92rem; line-height:1.5; max-width:74ch; margin:0 0 1.2rem; }
+  .card { background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:4px; padding:1.6rem 1.5rem; max-width:760px; }
+  label.f { display:block; font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-dim); margin:0 0 0.5rem; }
+  label.f span { text-transform:none; letter-spacing:0; opacity:0.65; }
+
+  /* A sample "photo": a gradient scene taller than the frame so there's something to pan */
+  .scene { background:
+      radial-gradient(circle at 70% 30%, rgba(248,95,115,0.55), transparent 35%),
+      radial-gradient(circle at 25% 70%, rgba(231,162,85,0.5), transparent 40%),
+      linear-gradient(180deg, #0f2a4a 0%, #283c63 40%, #5a2a3a 70%, #1a1424 100%);
+  }
+  .preview { position:relative; height:160px; border-radius:10px; overflow:hidden; border:1px solid rgba(251,232,211,0.1); margin-bottom:0.7rem; }
+  .photo { position:absolute; left:0; width:100%; height:260px; }
+  .avatar { position:absolute; left:1rem; bottom:-18px; width:52px; height:52px; border-radius:50%; background:var(--brass); border:3px solid var(--surface-1); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-weight:700; color:#241a05; z-index:2; }
+  .grip { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:none; }
+  .grip span { font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.08em; text-transform:uppercase; background:rgba(12,19,31,0.72); border:1px solid rgba(251,232,211,0.25); color:var(--ink); padding:0.4rem 0.8rem; border-radius:999px; backdrop-filter:blur(4px); }
+  .guide { position:absolute; left:0; right:0; border-top:1px dashed rgba(251,232,211,0.25); }
+  .controls { display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; margin:1.4rem 0 0.7rem; }
+  .btn { border:1px solid rgba(251,232,211,0.2); border-radius:999px; padding:0.6rem 1rem; font-family:var(--font-display); font-size:0.82rem; color:var(--ink); background:transparent; cursor:pointer; }
+  .btn.primary { background:var(--olive); color:var(--olive-shadow); border-color:var(--olive); font-weight:600; }
+  .btn.on { border-color:var(--olive); color:var(--olive); }
+  .hint { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); margin:0 0 0.9rem; }
+  .swatches { display:flex; gap:0.5rem; align-items:center; margin-bottom:0.9rem; }
+  .sw { width:28px; height:28px; border-radius:50%; border:2px solid transparent; }
+  .sw.on { border-color:var(--ink); box-shadow:0 0 0 2px var(--surface-1), 0 0 0 3px var(--ink); }
+  .slider { display:flex; align-items:center; gap:0.6rem; margin:0.4rem 0 0.9rem; font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); }
+  .slider input { flex:1; accent-color:var(--olive); }
+
+  /* Public profile result */
+  .hero { position:relative; height:200px; border-radius:14px; overflow:hidden; border:1px solid rgba(251,232,211,0.1); }
+  .hero .photo { height:330px; }
+  .hero-row { display:flex; gap:14px; align-items:flex-end; margin-top:-34px; padding:0 14px; }
+  .hero-row .av { width:72px; height:72px; border-radius:50%; background:var(--brass); border:3px solid var(--surface-0); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:1.6rem; color:#241a05; }
+  .name { font-family:var(--font-display); font-weight:700; font-size:1.3rem; }
+  .handle { font-family:var(--font-mono); font-size:0.76rem; color:var(--olive); }
+
+  .phone { width:360px; max-width:100%; border:1px solid rgba(251,232,211,0.15); border-radius:36px; padding:52px 14px 24px; background:var(--surface-0); }
+  .phone .card { padding:1.1rem 1rem; }
+  .phone .preview { height:120px; }
+  .phone .photo { height:200px; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  .cap { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); margin:0.5rem 0 0; }
+  .pros { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; max-width:900px; }
+  .pros div { background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:6px; padding:1rem 1.2rem; font-size:0.9rem; line-height:1.55; color:var(--ink-dim); }
+  .pros b { color:var(--ink); font-family:var(--font-display); display:block; margin-bottom:0.3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">MOCKUP · account › banner · upload + reposition</p>
+
+  <h2>1. Banner editor, at rest</h2>
+  <p class="sub">The upload control becomes two plain pills, Upload photo and Remove photo, with no file-picker box. A new Reposition pill appears once there's a photo. Colour swatches stay as they are. (The visible "Choose File" box in your screenshot was a bug and is fixed separately.)</p>
+  <div class="card">
+    <label class="f">Banner <span>the backdrop at the top of your profile — a photo or a solid color</span></label>
+    <div class="preview"><div class="photo scene" style="top:-40px"></div><div class="avatar">J</div></div>
+    <div class="controls">
+      <button class="btn">Change photo</button>
+      <button class="btn">Reposition</button>
+      <button class="btn">Remove photo</button>
+    </div>
+    <div class="swatches"><span class="sw" style="background:#283c63"></span><span class="sw" style="background:#f85f73"></span><span class="sw" style="background:#e7a255"></span><span class="sw" style="background:#93d0a4"></span><span class="sw" style="background:#8499dc"></span><span class="sw" style="background:conic-gradient(red,yellow,lime,cyan,blue,magenta,red)"></span></div>
+    <p class="hint">A colour shows when there's no photo, and behind a photo while it loads.</p>
+  </div>
+
+  <h2>2. Repositioning</h2>
+  <p class="sub">Tap Reposition and the preview becomes draggable: pull the photo up or down (and sideways if it's wider than the frame) until the part you want is in view. A dashed line marks where the avatar overlaps, so you don't hide a face under it. Done keeps it; Save profile stores it. On touch screens it's a one-finger drag. Below the preview a slider does the same thing for keyboards and screen readers.</p>
+  <div class="card">
+    <label class="f">Banner</label>
+    <div class="preview" style="border-color:var(--olive); cursor:grab">
+      <div class="photo scene" style="top:-90px"></div>
+      <div class="guide" style="bottom:34px"></div>
+      <div class="grip"><span>↕ Drag to reposition</span></div>
+      <div class="avatar" style="opacity:0.6">J</div>
+    </div>
+    <div class="slider"><span>Top</span><input type="range" min="0" max="100" value="62"><span>Bottom</span></div>
+    <div class="controls" style="margin-top:0.4rem">
+      <button class="btn primary">Done</button>
+      <button class="btn">Cancel</button>
+    </div>
+  </div>
+
+  <h2>3. What visitors see</h2>
+  <p class="sub">The public profile hero uses the saved position, on the website and in the app, so the same slice of the photo shows everywhere. Nothing is re-cropped or re-uploaded; the position is just a pair of percentages stored with the profile.</p>
+  <div class="hero" style="max-width:760px"><div class="photo scene" style="top:-110px"></div></div>
+  <div class="hero-row" style="max-width:760px"><div class="av">J</div><div><div class="name">Jose Hernandez-Casas</div><div class="handle">@josetapa</div></div></div>
+
+  <h2>4. App</h2>
+  <p class="sub">Same editor on the Account screen: Upload, Reposition and Remove under the preview; in Reposition the preview is draggable with one finger, Done saves straight away (the app saves the banner on its own, as it does now).</p>
+  <div class="row">
+    <div>
+      <div class="phone"><div class="card">
+        <label class="f">Banner</label>
+        <div class="preview" style="border-color:var(--olive)"><div class="photo scene" style="top:-60px"></div><div class="guide" style="bottom:30px"></div><div class="grip"><span>↕ Drag</span></div><div class="avatar" style="opacity:0.6">J</div></div>
+        <div class="controls" style="margin-top:0.9rem"><button class="btn primary">Done</button><button class="btn">Cancel</button></div>
+      </div></div>
+      <p class="cap">App · Account › Banner › Reposition</p>
+    </div>
+  </div>
+
+  <h2>How it's stored</h2>
+  <div class="pros">
+    <div><b>One new column</b><code>user_profiles.banner_position</code>, e.g. <code>50% 62%</code> (migration 084). Blank means centred, which is what every existing banner gets, so nothing moves until someone adjusts it.</div>
+    <div><b>No new images</b>The photo stays exactly as uploaded. The website applies the position as <code>background-position</code>; the app offsets the image inside its frame the same way.</div>
+  </div>
+</div>
+</body>
+</html>

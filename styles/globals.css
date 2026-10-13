@@ -8337,7 +8337,9 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 }
 .account-banner-controls { display: flex; gap: 0.6rem; align-items: center; margin: 1.4rem 0 0.7rem; flex-wrap: wrap; }
 .account-banner-upload { width: auto; cursor: pointer; margin: 0; font-weight: normal; }
-.account-banner-upload input { display: none; }
+/* Outranks .account-card input[type=file] (display: block), which was
+   showing the raw file picker inside the button. */
+.account-card .account-banner-upload input[type=file], .account-banner-upload input { display: none; }
 .account-banner-swatches { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; margin-bottom: 0.9rem; }
 .account-banner-swatch {
   width: 30px; height: 30px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; padding: 0;
