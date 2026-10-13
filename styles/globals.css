@@ -6889,6 +6889,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
   transition: background-color 0.12s ease, color 0.12s ease;
 }
 .back-button:hover { background: rgba(231,162,85,0.12); }
+/* A pill, not a bar: as a direct grid child (.stage) it would otherwise
+   stretch to the full column width. */
+.stage > .back-button, .back-button { justify-self: start; align-self: start; }
 .back-button svg { flex-shrink: 0; }
 
 /* ============================================================

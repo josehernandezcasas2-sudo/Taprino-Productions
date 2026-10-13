@@ -334,6 +334,9 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   // several that all describe the same person.
   const roleBadge = isAdmin ? 'Admin' : isSubAdmin ? 'Sub-admin' : isCreator ? 'Creator' : null;
 
+  // Single column since the Membership card joined it (the old 320px
+  // rail is gone), so the standard 1180px stage — full width stretched
+  // every field across a wide monitor.
   return (
     <>
       <HeaderNav
@@ -346,7 +349,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
       />
 
       {isSignedIn ? (
-        <main id="main-content" className="stage stage-single stage-wide">
+        <main id="main-content" className="stage stage-single">
           <BackButton fallbackHref="/stream" />
 
           <div className="account-identity">
