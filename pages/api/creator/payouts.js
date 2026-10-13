@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { isStripeConfigured, requestOrigin } from '../../../lib/stripe';
 import { getPayoutAccount, refreshPayoutAccount, createOnboardingLink, createDashboardLink, payoutState, getPayoutSummary } from '../../../lib/creatorPayouts';
+import { getOwnListings } from '../../../lib/locations';
 
 // The creator's Payouts card (components/creator/PayoutsCard.js, on
 // /account and /creator/pitch/dashboard; the app's
@@ -17,7 +18,12 @@ export default async function handler(req, res) {
 
   const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
-  if (!isCreator && !isAdmin) return res.status(403).json({ error: 'Creator access required.' });
+  // Creators get paid for backing; a host (anyone with a place listed)
+  // gets paid for bookings through the same account.
+  if (!isCreator && !isAdmin) {
+    const listings = await getOwnListings(userId).catch(() => []);
+    if (listings.length === 0) return res.status(403).json({ error: 'Creator access required.' });
+  }
 
   try {
     if (req.method === 'GET') {

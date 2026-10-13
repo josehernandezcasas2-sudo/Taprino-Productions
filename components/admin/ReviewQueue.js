@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminReviewAdModal from '../AdminReviewAdModal';
 
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place' };
 
 // The merged "needs your review" list, fed by /api/admin/review-queue.
 // Used in two places: the dashboard (compact, `limit` rows, link to see
@@ -85,7 +85,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     <div>
       {!compact && (
         <div className="rq-filters">
-          {[['all', 'All', counts.total], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['series', 'Series', counts.series], ['channel', 'Channel uploads', counts.channel]].map(([k, label, n]) => (
+          {[['all', 'All', counts.total], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['series', 'Series', counts.series], ['channel', 'Channel uploads', counts.channel], ['location', 'Places', counts.location]].map(([k, label, n]) => (
             <button key={k} type="button" className={`rq-chip ${filter === k ? 'is-active' : ''}`} onClick={() => setFilter(k)}>
               {label}{n ? ` ${n}` : ''}
             </button>
@@ -165,11 +165,15 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
 }
 
 function FragmentRow({ k, v }) {
-  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
   let value = v;
   if (k === 'hasCaptions') value = v ? 'Yes' : 'No';
   if (k === 'durationSeconds') value = `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
   if (k === 'budgetTotalCents') value = `$${(v / 100).toFixed(2)}`;
+  // A proof document or the listing itself opens in a new tab.
+  if (typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) && (k === 'proofUrl' || k === 'listingUrl' || k === 'clickUrl')) {
+    return (<><span>{label}</span><div><a href={v} target="_blank" rel="noreferrer">{k === 'proofUrl' ? 'Open the proof ↗' : k === 'listingUrl' ? 'Open the listing ↗' : v}</a></div></>);
+  }
   return (<><span>{label}</span><div>{String(value)}</div></>);
 }
 

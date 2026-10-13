@@ -4857,6 +4857,13 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    MobileTabBar takes over primary navigation at this exact same 1180px
    breakpoint, so there's a clean handoff with no width range where
    neither one is the intended nav. */
+/* Eleven links when signed in (Locations joined Crew Call, 2026-10-13):
+   tighten the row on laptop widths so "My Recs" stops sliding under the
+   search button at 1280px. */
+@media (max-width: 1440px) {
+  .nav-links { gap: 0.85rem; }
+  .nav-link { font-size: 0.84rem; }
+}
 @media (max-width: 1180px) {
   .nav-links { display: none; }
   .nav-hamburger { display: flex; }
@@ -9002,6 +9009,86 @@ a.crew-credit:hover { background: var(--surface-3); }
 @media (max-width: 640px) {
   .crew-row2 { grid-template-columns: 1fr; }
   .crew-savebar { bottom: 64px; }
+}
+
+/* ---- Locations (/locations, mockups/locations-v1.html, 2026-10-13) ----
+   Reuses the crew-* panels/buttons/fields; loc-* is what's new here. */
+.loc-topstatus { margin-bottom: 0.9rem; display: block; }
+.loc-steps { display: flex; gap: 0.3rem; flex-wrap: wrap; margin-bottom: 0.9rem; }
+.loc-steps a { font-family: var(--font-mono); font-size: 0.66rem; padding: 0.3rem 0.65rem; border-radius: 999px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink-dim); text-decoration: none; }
+.loc-steps a:hover { color: var(--ink); background: var(--surface-3); }
+.loc-form section { scroll-margin-top: 92px; }
+.loc-row4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; align-items: start; }
+.loc-checks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.35rem 0.8rem; }
+.loc-checks .crew-check { font-size: 0.86rem; }
+.loc-money { background: var(--surface-2); border: 1px dashed var(--ocean-ink); border-radius: 8px; padding: 0.6rem 0.75rem; font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); line-height: 1.55; }
+.loc-money b { color: var(--ink); }
+.loc-radios { display: grid; gap: 0.4rem; }
+.loc-radio { display: grid; grid-template-columns: auto auto 1fr; gap: 0.4rem 0.6rem; align-items: baseline; background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 8px; padding: 0.5rem 0.7rem; cursor: pointer; font-size: 0.88rem; }
+.loc-radio.on { border-color: var(--olive); }
+.loc-radio input { accent-color: var(--brass); }
+.loc-radio b { color: var(--ink); font-weight: 600; }
+.loc-radio span { color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.68rem; }
+.loc-proof { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.loc-proof img { width: 96px; height: 72px; object-fit: cover; border-radius: 6px; border: 1px solid var(--ocean-ink); }
+.loc-checklist { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.3rem; font-size: 0.86rem; color: var(--ink-dim); }
+.loc-checklist li::before { content: '\2610  '; color: var(--ink-faint); }
+.loc-checklist li.on { color: var(--ink); }
+.loc-checklist li.on::before { content: '\2611  '; color: var(--ok); }
+.loc-savebar { position: sticky; top: 92px; bottom: auto; margin-top: 0; }
+
+/* photos on the form */
+.loc-photos { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.6rem; }
+.loc-photos.drag { outline: 2px dashed var(--brass); outline-offset: 4px; border-radius: 8px; }
+.loc-photo { position: relative; display: grid; gap: 0.3rem; }
+.loc-photo img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 8px; border: 1px solid var(--ocean-ink); display: block; }
+.loc-photo .crew-input { padding: 0.3rem 0.5rem; font-size: 0.76rem; }
+.loc-photo-cover { position: absolute; top: 6px; left: 6px; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(12, 19, 31, 0.85); color: var(--ink); padding: 0.15rem 0.45rem; border-radius: 999px; }
+.loc-photo-acts { display: flex; justify-content: space-between; gap: 0.3rem; }
+.loc-photo-add { display: grid; place-content: center; gap: 0.2rem; text-align: center; aspect-ratio: 4 / 3; border: 1px dashed rgba(248, 95, 115, 0.6); border-radius: 8px; color: var(--brass); font-family: var(--font-mono); font-size: 0.74rem; cursor: pointer; }
+.loc-photo-add small { color: var(--ink-faint); font-size: 0.64rem; }
+
+/* month calendar */
+.loc-cal { display: grid; gap: 0.4rem; }
+.loc-cal-head { display: flex; justify-content: space-between; align-items: center; font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; }
+.loc-cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.loc-cal-grid .h { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); text-align: center; padding: 0.2rem 0; }
+.loc-cal-grid .e { min-height: 30px; }
+.loc-cal-grid .d { font-family: var(--font-mono); font-size: 0.7rem; min-height: 30px; border-radius: 6px; border: 1px solid transparent; background: var(--surface-2); color: var(--ink-dim); cursor: pointer; padding: 0; }
+.loc-cal-grid .d.open:hover { border-color: var(--olive); color: var(--ink); }
+.loc-cal-grid .d.past { opacity: 0.35; cursor: default; }
+.loc-cal-grid .d.booked { background: rgba(248, 95, 115, 0.16); color: var(--brass); text-decoration: line-through; cursor: default; }
+.loc-cal-grid .d.blocked { background: var(--surface-3); color: var(--ink-faint); }
+.loc-cal-grid .d.sel { background: var(--olive); color: #241a05; font-weight: 600; }
+.loc-cal-grid .d.req { background: rgba(231, 162, 85, 0.25); color: var(--olive); }
+.loc-cal-grid .d:disabled { cursor: default; }
+.loc-cal-legend { display: flex; gap: 0.8rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-faint); }
+.loc-cal-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 0.3rem; vertical-align: -1px; background: var(--surface-2); }
+.loc-cal-legend i.booked { background: rgba(248, 95, 115, 0.5); }
+.loc-cal-legend i.blocked { background: var(--surface-3); }
+.loc-cal-legend i.sel { background: var(--olive); }
+
+/* your places */
+.loc-row { display: grid; grid-template-columns: 104px minmax(0, 1fr); gap: 0.8rem; padding: 0.7rem 0; border-top: 1px solid rgba(251, 232, 211, 0.1); }
+.loc-row:first-of-type { border-top: 0; padding-top: 0; }
+.loc-row-thumb { display: block; width: 104px; aspect-ratio: 4 / 3; border-radius: 8px; background: var(--surface-2) center / cover; border: 1px solid var(--ocean-ink); }
+.loc-row-title { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; font-family: var(--font-display); font-weight: 700; font-size: 1rem; }
+.loc-row-title a { color: var(--ink); text-decoration: none; }
+.loc-row-title a:hover { color: var(--olive); }
+.loc-block { display: grid; gap: 0.5rem; margin-top: 0.6rem; padding: 0.7rem; background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 10px; max-width: 420px; }
+.crew-chip.olive { background: rgba(231, 162, 85, 0.16); color: var(--olive); }
+
+@media (max-width: 900px) {
+  .loc-row4, .loc-checks { grid-template-columns: 1fr 1fr; }
+  .loc-photos { grid-template-columns: repeat(3, 1fr); }
+  .loc-savebar { position: sticky; top: auto; bottom: 64px; }
+}
+@media (max-width: 640px) {
+  .loc-row4 { grid-template-columns: 1fr 1fr; }
+  .loc-checks { grid-template-columns: 1fr; }
+  .loc-photos { grid-template-columns: 1fr 1fr; }
+  .loc-row { grid-template-columns: 72px minmax(0, 1fr); }
+  .loc-row-thumb { width: 72px; }
 }
 
 /* ---- Messages (/messages, Crew Call step 2) ---- */
