@@ -2285,6 +2285,103 @@ button { font-family: inherit; cursor: pointer; }
   .upload-status-widget { bottom: calc(100px + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* Wide screens: the same bar as a docked rail down the left edge, under
+   the header (mockups/desktop-side-rail.html, option B — Jose,
+   2026-10-12). MobileTabBar.js adds `has-rail` to <html> while it's
+   mounted (not every page renders the bar) and keeps --header-h current;
+   the menus fly out to the right of their button instead of upward. */
+@media (min-width: 1181px) {
+  html.has-rail body { padding-left: var(--rail-w, 76px); }
+  /* The header keeps the full width: the rail starts below it. */
+  html.has-rail .channel-bar { margin-left: calc(-1 * var(--rail-w, 76px)); }
+  html.has-rail .mini-player { left: var(--rail-w, 76px); }
+  .tabbar {
+    position: fixed;
+    left: 0;
+    top: var(--header-h, 0px);
+    bottom: 0;
+    width: var(--rail-w, 76px);
+    z-index: 19; /* under the sticky header (20), over page content */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 0.8rem 0;
+    background: rgba(20, 21, 28, 0.92);
+    backdrop-filter: blur(6px);
+    border-right: 1px solid rgba(251, 232, 211, 0.1);
+  }
+  .tabbar-item {
+    width: 56px;
+    min-height: 56px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    text-decoration: none;
+    color: var(--ink-dim);
+    border-radius: 14px;
+    position: relative;
+    background: none;
+    border: none;
+    font: inherit;
+    cursor: pointer;
+    transition: color 0.12s ease, background-color 0.12s ease;
+  }
+  .tabbar-item:hover { background: rgba(251, 232, 211, 0.06); color: var(--ink); }
+  .tabbar-item.open { background: rgba(251, 232, 211, 0.08); color: var(--ink); }
+  .tabbar-item.active, .tabbar-item.active:hover { color: #241a05; background: var(--brass); }
+  .tabbar-item.tabbar-discover { color: var(--sky); }
+  .tabbar-item.tabbar-discover.active { color: #241a05; }
+  .tabbar-item.tabbar-add {
+    width: 46px;
+    height: 46px;
+    min-height: 0;
+    margin: 6px 0;
+    border-radius: 50%;
+    background: var(--brass);
+    color: #241a05;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  }
+  .tabbar-add-glyph { display: flex; align-items: center; justify-content: center; }
+  .tabbar-glyph { display: flex; align-items: center; justify-content: center; line-height: 1; }
+  .tabbar-label {
+    font-family: var(--font-mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+  }
+  /* The caret points at the fly-out: right, and down when open. */
+  .tabbar-caret { display: inline-flex; align-items: center; margin-left: 3px; transform: rotate(90deg); transition: transform 0.15s ease; }
+  .tabbar-item.open .tabbar-caret { transform: rotate(180deg); }
+  .tabbar-dropup {
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 0; /* set per open menu by MobileTabBar.js, beside its button */
+    background: rgba(41, 39, 25, 0.97);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(251, 232, 211, 0.1);
+    border-radius: 14px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    padding: 0.4rem 0;
+    min-width: 190px;
+    display: flex;
+    flex-direction: column;
+    animation: tabbar-flyout-in 0.14s ease forwards;
+  }
+  @keyframes tabbar-flyout-in {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .tabbar-dropup-item { padding: 0.6rem 1rem; color: var(--ink); text-decoration: none; font-size: 0.88rem; white-space: nowrap; }
+  .tabbar-dropup-item:hover { background: rgba(251, 232, 211, 0.06); }
+  .tabbar-dropup-item:active { background: rgba(248, 95, 115, 0.15); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .tabbar-item, .tabbar-glyph { transition: none; }
   .tabbar-item:active .tabbar-glyph { transform: none; }

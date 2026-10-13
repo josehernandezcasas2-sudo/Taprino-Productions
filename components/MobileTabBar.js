@@ -163,6 +163,36 @@ export default function MobileTabBar() {
     setOpenMenu(null);
   }, [path]);
 
+  // Wide screens: the bar is a docked rail down the left edge (see the
+  // min-width: 1181px block in globals.css). While mounted it tags <html>
+  // so the page makes room, and keeps --header-h at the sticky header's
+  // real height so the rail starts right under it.
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1181px)');
+    const update = () => setWide(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.add('has-rail');
+    const header = document.querySelector('.channel-bar');
+    let ro = null;
+    const setHeaderHeight = () => root.style.setProperty('--header-h', `${header ? header.offsetHeight : 0}px`);
+    setHeaderHeight();
+    if (header && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(setHeaderHeight);
+      ro.observe(header);
+    }
+    return () => {
+      root.classList.remove('has-rail');
+      root.style.removeProperty('--header-h');
+      if (ro) ro.disconnect();
+    };
+  }, []);
+
   // Close on a tap anywhere outside the bar itself.
   useEffect(() => {
     if (!openMenu) return undefined;
@@ -197,13 +227,24 @@ export default function MobileTabBar() {
     if (!btn) return;
     const barRect = barRef.current.getBoundingClientRect();
     const btnRect = btn.getBoundingClientRect();
-    const dropdownWidth = dropdownRef.current.offsetWidth;
     const margin = 6;
+    if (wide) {
+      // Rail: the fly-out sits beside its button, top-aligned with it,
+      // nudged up if it would run past the bottom of the rail.
+      const dropdownHeight = dropdownRef.current.offsetHeight;
+      let top = btnRect.top - barRect.top;
+      top = Math.max(margin, Math.min(top, barRect.height - dropdownHeight - margin));
+      dropdownRef.current.style.left = '';
+      dropdownRef.current.style.top = `${top}px`;
+      return;
+    }
+    const dropdownWidth = dropdownRef.current.offsetWidth;
     const btnCenter = btnRect.left + btnRect.width / 2 - barRect.left;
     let left = btnCenter - dropdownWidth / 2;
     left = Math.max(margin, Math.min(left, barRect.width - dropdownWidth - margin));
+    dropdownRef.current.style.top = '';
     dropdownRef.current.style.left = `${left}px`;
-  }, [openMenu]);
+  }, [openMenu, wide]);
 
   return (
     <nav className="tabbar" aria-label="Primary" ref={barRef}>

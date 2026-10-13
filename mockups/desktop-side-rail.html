@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Desktop Side Rail</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --olive:#e7a255; --brass:#f85f73; --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --ok:#84cd98; --sky:#8499dc;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+    --bar: rgba(41,39,25,0.94);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--surface-0); color:var(--ink); font-family:var(--font-body); padding:32px 16px 80px; }
+  .wrap { max-width:1280px; margin:0 auto; }
+  .note { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); letter-spacing:0.04em; margin:0 0 0.4rem; }
+  h2 { font-family:var(--font-display); font-size:1.4rem; margin:2.6rem 0 0.3rem; }
+  h2:first-of-type { margin-top:0; }
+  .sub { color:var(--ink-dim); font-size:0.92rem; line-height:1.5; max-width:78ch; margin:0 0 1.2rem; }
+
+  /* Desktop frame */
+  .frame { position:relative; width:100%; height:620px; border:1px solid rgba(251,232,211,0.15); border-radius:10px; overflow:hidden; background:var(--surface-0); }
+  .hdr { position:absolute; top:0; left:0; right:0; height:58px; display:flex; align-items:center; gap:1.4rem; padding:0 1.6rem; background:rgba(20,21,28,0.92); border-bottom:1px solid rgba(251,232,211,0.1); z-index:5; }
+  .brand { font-family:var(--font-display); font-weight:700; }
+  .brand span { color:var(--brass); }
+  .kick { font-family:var(--font-mono); font-size:0.7rem; letter-spacing:0.14em; color:var(--ok); }
+  .hdr nav { display:flex; gap:1.1rem; font-family:var(--font-display); font-size:0.9rem; color:var(--ink); }
+  .hdr .right { margin-left:auto; display:flex; gap:0.7rem; align-items:center; }
+  .pill { background:var(--brass); color:#241a05; font-family:var(--font-display); font-weight:600; font-size:0.8rem; padding:0.35rem 0.9rem; border-radius:999px; }
+  .avatar { width:28px; height:28px; border-radius:50%; background:var(--olive); }
+
+  /* Page content stand-in */
+  .content { position:absolute; top:58px; bottom:0; right:0; padding:1.6rem 2rem; overflow:hidden; }
+  .eyebrow { font-family:var(--font-mono); font-size:0.72rem; letter-spacing:0.14em; color:var(--brass); text-transform:uppercase; }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; margin:0.2rem 0 0.4rem; }
+  .lede { color:var(--ink-dim); max-width:60ch; margin:0 0 1.2rem; line-height:1.5; }
+  .cards { display:grid; grid-template-columns:repeat(5,1fr); gap:12px; }
+  .card { background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:6px; aspect-ratio:2/3; }
+  .rowh { font-family:var(--font-mono); font-size:0.74rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--ink-faint); margin:1.3rem 0 0.6rem; }
+
+  /* ---- Rail, shared ---- */
+  .rail { position:absolute; z-index:6; display:flex; flex-direction:column; align-items:center; background:var(--bar); backdrop-filter:blur(10px); border:1px solid rgba(251,232,211,0.08); box-shadow:0 12px 32px rgba(0,0,0,0.5); }
+  .ritem { width:56px; min-height:56px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; color:var(--ink-dim); border-radius:14px; text-decoration:none; position:relative; }
+  .ritem svg { width:22px; height:22px; }
+  .ritem .lbl { font-family:var(--font-mono); font-size:0.72rem; letter-spacing:0.08em; text-transform:uppercase; }
+  .ritem.active { background:var(--brass); color:#241a05; }
+  .ritem.discover { color:var(--sky); }
+  .ritem.open:not(.active) { background:rgba(251,232,211,0.08); color:var(--ink); }
+  .caret { position:absolute; right:5px; top:50%; transform:translateY(-50%); width:0; height:0; border-top:4px solid transparent; border-bottom:4px solid transparent; border-left:4px solid currentColor; opacity:0.7; }
+  .add { width:46px; height:46px; border-radius:50%; background:var(--brass); color:#241a05; display:flex; align-items:center; justify-content:center; box-shadow:0 6px 16px rgba(0,0,0,0.4); border:3px solid var(--bar); margin:6px 0; }
+  .add svg { width:20px; height:20px; }
+  .sep { width:32px; height:1px; background:rgba(251,232,211,0.12); margin:6px 0; }
+
+  /* A: floating pill rail, docked left-middle (the phone pill, turned) */
+  .rail.pillrail { left:16px; top:50%; transform:translateY(-50%); border-radius:999px; padding:0.6rem 0.5rem; gap:4px; }
+  .rail.pillrail .ritem { border-radius:999px; }
+
+  /* B: full-height docked rail under the header */
+  .rail.dock { left:0; top:58px; bottom:0; width:76px; border-radius:0; border-width:0 1px 0 0; box-shadow:none; padding:0.8rem 0; gap:4px; background:rgba(20,21,28,0.92); }
+
+  /* Fly-out menu (the drop-up, turned sideways) */
+  .fly { position:absolute; z-index:7; background:rgba(30,28,18,0.98); border:1px solid rgba(251,232,211,0.1); border-radius:12px; padding:0.35rem; min-width:190px; box-shadow:0 12px 32px rgba(0,0,0,0.5); display:grid; }
+  .fly a { display:block; padding:0.55rem 0.8rem; border-radius:8px; color:var(--ink); text-decoration:none; font-family:var(--font-display); font-size:0.9rem; }
+  .fly a.hl { background:rgba(251,232,211,0.08); }
+  .fly a.active { color:var(--brass); }
+  .fly:before { content:""; position:absolute; left:-6px; width:10px; height:10px; background:rgba(30,28,18,0.98); border-left:1px solid rgba(251,232,211,0.1); border-bottom:1px solid rgba(251,232,211,0.1); transform:rotate(45deg); }
+
+  .cap { font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-faint); margin:0.5rem 0 0; }
+  .pros { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; }
+  .pros div { background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:6px; padding:1rem 1.2rem; font-size:0.9rem; line-height:1.55; color:var(--ink-dim); }
+  .pros b { color:var(--ink); font-family:var(--font-display); display:block; margin-bottom:0.3rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">MOCKUP · website · the phone tab bar as a vertical rail on screens wider than 1180px (where it's hidden today)</p>
+
+  <h2>A. Floating pill rail (the phone bar, turned on its side)</h2>
+  <p class="sub">Same pill, same five buttons (Home · Discover · + · Watch · Account, plus Admin for the team), docked to the left edge and vertically centred. Content keeps its current width and just gets a left gutter. Each group's menu opens as a fly-out to the right, where the phone's opens upward. Here the Watch menu is open.</p>
+  <div class="frame">
+    <div class="hdr"><span class="brand">Studio <span>Tapa</span></span><span class="kick">STREAM</span><nav><span>Home</span><span>Series</span><span>Films</span><span>Podcasts</span><span>Live TV</span><span>Vertical</span></nav><div class="right"><span class="pill">Tapa +</span><span class="avatar"></span></div></div>
+
+    <div class="rail pillrail">
+      <a class="ritem" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">Home</span><span class="caret"></span></a>
+      <a class="ritem discover" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-4 2 2-6z"/></svg><span class="lbl">Discover</span></a>
+      <a class="add" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></a>
+      <a class="ritem active open" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M10 10l5 2.5-5 2.5z"/></svg><span class="lbl">Watch</span><span class="caret"></span></a>
+      <a class="ritem" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span class="lbl">Account</span><span class="caret"></span></a>
+      <span class="sep"></span>
+      <a class="ritem" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span class="lbl">Admin</span><span class="caret"></span></a>
+    </div>
+    <div class="fly" style="left:104px; top:286px;">
+      <a href="#">Live TV</a><a href="#" class="active hl">Watch Series</a><a href="#">Watch Movies</a><a href="#">Podcasts</a><a href="#">Vertical</a>
+    </div>
+
+    <div class="content" style="left:104px;">
+      <div class="eyebrow">Stream</div>
+      <div class="h1">Series</div>
+      <p class="lede">Everything episodic on Studio Tapa, from one-season experiments to the long-runners.</p>
+      <div class="rowh">New this week</div>
+      <div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div></div>
+      <div class="rowh">Most viewed</div>
+      <div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div></div>
+    </div>
+  </div>
+  <p class="cap">A · floating, 72px wide, 16px off the left edge; content gets a 104px left gutter</p>
+
+  <h2>B. Docked rail under the header</h2>
+  <p class="sub">The same buttons, but the rail is a fixed column that runs from the header to the bottom of the window, flush with the left edge, in the header's own dark tone. Reads more like an app's sidebar than a floating remote. Here the Account menu is open.</p>
+  <div class="frame">
+    <div class="hdr"><span class="brand">Studio <span>Tapa</span></span><span class="kick">STREAM</span><nav><span>Home</span><span>Series</span><span>Films</span><span>Podcasts</span><span>Live TV</span><span>Vertical</span></nav><div class="right"><span class="pill">Tapa +</span><span class="avatar"></span></div></div>
+
+    <div class="rail dock">
+      <a class="ritem" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l9-8 9 8v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1z"/></svg><span class="lbl">Home</span><span class="caret"></span></a>
+      <a class="ritem discover" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M15 9l-2 6-4 2 2-6z"/></svg><span class="lbl">Discover</span></a>
+      <a class="add" href="#" style="border-color:rgba(20,21,28,0.92)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg></a>
+      <a class="ritem active" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8M10 10l5 2.5-5 2.5z"/></svg><span class="lbl">Watch</span><span class="caret"></span></a>
+      <a class="ritem open" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg><span class="lbl">Account</span><span class="caret"></span></a>
+      <span class="sep"></span>
+      <a class="ritem" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg><span class="lbl">Admin</span><span class="caret"></span></a>
+    </div>
+    <div class="fly" style="left:88px; top:300px;">
+      <a href="#">Settings / Account</a><a href="#">View profile</a><a href="#">Membership</a><a href="#">My List</a><a href="#">My Work</a>
+    </div>
+
+    <div class="content" style="left:76px;">
+      <div class="eyebrow">Stream</div>
+      <div class="h1">Series</div>
+      <p class="lede">Everything episodic on Studio Tapa, from one-season experiments to the long-runners.</p>
+      <div class="rowh">New this week</div>
+      <div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div></div>
+      <div class="rowh">Most viewed</div>
+      <div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div><div class="card"></div></div>
+    </div>
+  </div>
+  <p class="cap">B · docked, 76px wide, flush left; content starts at 76px</p>
+
+  <h2>How it'd work</h2>
+  <div class="pros">
+    <div><b>Same component, two layouts</b>The rail is the existing tab bar (<code>MobileTabBar</code>) with a wide-screen layout, so the groups, the admin tab, the unread dot and the "+" button stay in one place in the code. Below 1180px it's the bottom pill as today.</div>
+    <div><b>Menus fly out to the right</b>Click a group and its menu opens beside the button, anchored to it, and closes on a click elsewhere or on navigation, the same rules as the drop-ups.</div>
+    <div><b>Header stays</b>The top header keeps doing what it does: logo, Connect/Stream links, search, Tapa +, account menu. The rail is the quick-jump between the four groups, so there's some overlap. That's the trade-off to decide on.</div>
+    <div><b>Players get out of the way</b>On the episode, live and vertical pages the rail should hide when the player goes fullscreen, and the vertical Discover page (its own full-screen takeover) wouldn't show it at all, matching the phone.</div>
+  </div>
+</div>
+</body>
+</html>
