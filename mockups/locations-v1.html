@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Locations v1 — hosts, listings, requests</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3; --danger:#d67c51;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1120px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:860px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1120px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:28px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .btn.danger { color:var(--danger); border-color:rgba(214,124,81,.5); }
+  .btn.block { display:block; text-align:center; }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2.3rem; line-height:1.05; margin:6px 0 8px; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.4rem; line-height:1.15; margin:4px 0 6px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:640px; margin:0 0 18px; }
+  .label { font-family:var(--font-mono); font-size:.74rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink); margin:26px 0 12px; display:flex; align-items:baseline; justify-content:space-between; gap:10px; }
+  .label small { color:var(--ink-faint); text-transform:none; letter-spacing:0; font-weight:400; }
+  .label a { color:var(--brass); text-decoration:none; text-transform:none; letter-spacing:0; font-size:.74rem; }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.72rem; padding:6px 12px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .top-in { display:flex; gap:14px; align-items:center; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); margin-bottom:12px; }
+  .back { font-family:var(--font-mono); font-size:.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border:1.4px solid var(--olive); color:var(--olive); border-radius:999px; padding:8px 13px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--hair); margin:16px 0 12px; }
+  .tabs span { font-family:var(--font-mono); font-size:.74rem; padding:8px 12px; color:var(--ink-dim); border-bottom:2px solid transparent; }
+  .tabs span.on { color:var(--ink); border-color:var(--brass); }
+  .av { width:34px; height:34px; border-radius:50%; background:linear-gradient(140deg,#e7a255,#c85924); display:inline-block; flex:none; }
+  .av.b { background:linear-gradient(140deg,#8499dc,#283c63); } .av.c { background:linear-gradient(140deg,#93d0a4,#1f3b3a); } .av.sm { width:24px; height:24px; }
+  .record { font-family:var(--font-mono); font-size:.64rem; letter-spacing:.06em; text-transform:uppercase; padding:3px 8px; border-radius:999px; border:1px solid rgba(251,232,211,.2); color:var(--ink-dim); }
+  .record.vet { color:var(--olive); border-color:rgba(231,162,85,.5); } .record.new { color:var(--sky); border-color:rgba(132,153,220,.5); }
+
+  /* photos */
+  .ph { display:block; aspect-ratio:4/3; border-radius:10px; position:relative; overflow:hidden; background:linear-gradient(160deg,#3a2a4f,#1b2740); }
+  .ph.b { background:linear-gradient(160deg,#4a3418,#1b1a12); } .ph.c { background:linear-gradient(160deg,#1f3b3a,#0f1f2f); } .ph.d { background:linear-gradient(160deg,#5a2430,#1b1020); } .ph.e { background:linear-gradient(160deg,#243c5a,#101a2c); } .ph.f { background:linear-gradient(160deg,#2d4a2a,#0f1f12); } .ph.g { background:linear-gradient(160deg,#5c4a1c,#2a1f0d); }
+  .ph .k { position:absolute; left:8px; bottom:8px; font-family:var(--font-mono); font-size:.68rem; background:rgba(12,19,31,.82); padding:3px 8px; border-radius:999px; }
+  .ph .heart { position:absolute; right:8px; top:8px; width:28px; height:28px; border-radius:50%; background:rgba(12,19,31,.75); display:flex; align-items:center; justify-content:center; font-size:.8rem; }
+  .ph .pin { position:absolute; right:8px; bottom:8px; font-family:var(--font-mono); font-size:.64rem; letter-spacing:.06em; text-transform:uppercase; background:rgba(132,205,152,.9); color:#0f1f12; padding:3px 8px; border-radius:999px; font-weight:600; }
+
+  /* search + filters */
+  .find { display:grid; grid-template-columns:1.6fr 1fr auto; gap:10px; margin:14px 0 10px; }
+  .field { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:10px 12px; font-family:var(--font-mono); font-size:.8rem; color:var(--ink-dim); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .field b { color:var(--ink); font-weight:500; }
+  .types { display:flex; gap:8px; flex-wrap:wrap; margin:10px 0; }
+  .type { display:inline-flex; align-items:center; gap:8px; font-family:var(--font-display); font-weight:700; font-size:.86rem; padding:7px 12px 7px 9px; border-radius:999px; background:var(--surface-1); border:1px solid var(--hair); }
+  .type small { font-family:var(--font-mono); font-weight:400; font-size:.68rem; color:var(--ink-faint); }
+  .type.on { border-color:var(--brass); }
+
+  /* cards */
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; overflow:hidden; display:flex; flex-direction:column; }
+  .card .ph { border-radius:0; }
+  .card .body { padding:12px 14px 14px; display:flex; flex-direction:column; gap:5px; flex:1; }
+  .card .t { font-family:var(--font-display); font-weight:700; font-size:1.05rem; line-height:1.2; }
+  .card .facts { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); }
+  .card .rate { font-family:var(--font-mono); font-size:.8rem; color:var(--ink); margin-top:4px; }
+  .card .rate b { color:var(--olive); font-weight:600; }
+  .card .foot { margin-top:auto; padding-top:8px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .host { display:flex; align-items:center; gap:8px; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-dim); }
+
+  /* listing page */
+  .lp { display:grid; grid-template-columns:1.55fr 1fr; gap:24px; align-items:start; }
+  .gallery { display:grid; grid-template-columns:2fr 1fr; grid-template-rows:1fr 1fr; gap:8px; }
+  .gallery .ph:first-child { grid-row:1 / 3; aspect-ratio:auto; }
+  .gallery .ph { aspect-ratio:auto; min-height:120px; }
+  .factgrid { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0; }
+  .fact { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:10px 12px; }
+  .fact b { display:block; font-family:var(--font-display); font-size:1rem; }
+  .fact span { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; }
+  .kv { display:grid; grid-template-columns:1fr 1fr; gap:6px 24px; font-size:.9rem; }
+  .kv div { display:flex; justify-content:space-between; gap:10px; padding:7px 0; border-bottom:1px solid var(--hair); }
+  .kv div span:first-child { color:var(--ink-dim); } .kv div span:last-child { font-family:var(--font-mono); font-size:.78rem; text-align:right; }
+  .box { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:16px; margin-bottom:12px; }
+  .box.deal { border-color:rgba(231,162,85,.5); }
+  .rates div { display:flex; justify-content:space-between; gap:10px; padding:8px 0; border-top:1px solid var(--hair); font-size:.92rem; }
+  .rates div:first-of-type { border-top:0; }
+  .rates b { font-family:var(--font-mono); font-weight:600; }
+  .rates small { color:var(--ink-faint); font-family:var(--font-mono); font-size:.68rem; }
+  .form .f { background:var(--surface-2); border:1px solid var(--hair); border-radius:8px; padding:9px 11px; font-family:var(--font-mono); font-size:.78rem; color:var(--ink-dim); margin:6px 0; display:flex; justify-content:space-between; gap:10px; }
+  .form .f b { color:var(--ink); font-weight:500; }
+  .form .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .est { font-family:var(--font-mono); font-size:.74rem; color:var(--ink-dim); margin:10px 0 0; line-height:1.5; }
+  .est b { color:var(--ink); }
+  .cal { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; font-family:var(--font-mono); font-size:.7rem; text-align:center; }
+  .cal span { padding:7px 0; border-radius:6px; background:var(--surface-2); color:var(--ink-dim); }
+  .cal span.h { background:transparent; color:var(--ink-faint); font-size:.6rem; letter-spacing:.08em; }
+  .cal span.ok { background:rgba(132,205,152,.16); color:var(--ok); } .cal span.bk { background:rgba(248,95,115,.14); color:var(--brass); text-decoration:line-through; } .cal span.bl { background:var(--surface-3); color:var(--ink-faint); } .cal span.sel { background:var(--olive); color:#241a05; font-weight:600; }
+  .legend { display:flex; gap:12px; font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); margin-top:8px; }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:5px; vertical-align:-1px; }
+
+  /* host dashboard */
+  .dash { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .req { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; margin-bottom:10px; }
+  .req.hot { border-color:var(--olive); }
+  .req .head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+  .req .t { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .req .acts { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .listing-row { display:grid; grid-template-columns:96px 1fr auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); }
+  .listing-row:first-child { border-top:0; }
+  .listing-row .ph { aspect-ratio:4/3; border-radius:8px; }
+  .status { font-family:var(--font-mono); font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; padding:3px 8px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); }
+  .status.live { color:var(--ok); background:rgba(132,205,152,.14); } .status.rev { color:var(--olive); background:rgba(231,162,85,.14); } .status.off { color:var(--ink-faint); }
+  .nums { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-bottom:12px; }
+  .num { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:10px 12px; }
+  .num b { font-family:var(--font-display); font-size:1.3rem; display:block; }
+  .num span { font-family:var(--font-mono); font-size:.64rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; }
+
+  /* flow */
+  .flow { display:grid; grid-template-columns:repeat(6,1fr); gap:8px; }
+  .step { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px; font-size:.84rem; line-height:1.4; position:relative; }
+  .step b { display:block; font-family:var(--font-display); font-size:.95rem; margin-bottom:4px; }
+  .step .who { font-family:var(--font-mono); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--brass); display:block; margin-bottom:6px; }
+  .step.alt { border-style:dashed; color:var(--ink-dim); }
+
+  /* add-location steps */
+  .steps { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px; }
+  .steps span { font-family:var(--font-mono); font-size:.68rem; padding:6px 10px; border-radius:999px; background:var(--surface-2); color:var(--ink-faint); }
+  .steps span.on { color:var(--ink); background:var(--surface-3); } .steps span.done { color:var(--ok); }
+  .adm { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .check { display:grid; grid-template-columns:repeat(3,1fr); gap:6px 14px; font-size:.88rem; }
+  .check div::before { content:"☐ "; color:var(--ink-faint); } .check div.on::before { content:"☑ "; color:var(--ok); }
+  .thumbs { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; }
+  .thumbs .ph { aspect-ratio:1; }
+  .thumbs .ph.add { background:transparent; border:1px dashed rgba(248,95,115,.5); display:flex; align-items:center; justify-content:center; font-family:var(--font-mono); font-size:.68rem; color:var(--brass); }
+
+  /* phones */
+  .phones { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; margin-top:14px; }
+  .phone { width:340px; height:720px; background:var(--surface-0); border:1px solid var(--hair); border-radius:36px; padding:14px 14px 0; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .scr { flex:1; overflow:hidden; padding:4px 2px 110px; }
+  .top { display:flex; align-items:center; justify-content:space-between; padding:6px 4px 12px; }
+  .top .brand { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .top .brand small { display:block; font-family:var(--font-mono); font-size:.72rem; color:var(--brass); letter-spacing:.1em; text-transform:uppercase; }
+  .top .ic { width:30px; height:30px; border-radius:50%; background:var(--surface-2); }
+  .ptabs { position:absolute; left:14px; right:14px; bottom:18px; display:flex; justify-content:space-around; background:rgba(41,39,25,.96); border:1px solid var(--hair); border-radius:999px; padding:12px 6px; }
+  .ptabs span { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-dim); }
+  .ptabs span.on { color:var(--brass); }
+  .sticky { position:absolute; left:14px; right:14px; bottom:84px; background:var(--surface-1); border:1px solid var(--olive); border-radius:14px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .phone .h1 { font-size:1.5rem; }
+  .phone .cards { grid-template-columns:1fr; }
+  .phone .label { margin:16px 0 10px; }
+  .phone .factgrid { grid-template-columns:1fr 1fr; }
+  .phone .find { grid-template-columns:1fr; }
+  .sheet { position:absolute; left:0; right:0; bottom:0; background:var(--surface-1); border-top:1px solid var(--hair); border-radius:28px 28px 0 0; padding:14px 18px 24px; }
+  .sheet .grab { width:40px; height:4px; border-radius:999px; background:var(--surface-3); margin:0 auto 12px; }
+
+  .ideas { columns:2; column-gap:28px; font-size:.95rem; line-height:1.5; color:var(--ink-dim); }
+  .ideas li { break-inside:avoid; margin-bottom:8px; } .ideas b { color:var(--ink); }
+  @media (max-width:760px) { .cards { grid-template-columns:1fr 1fr; } .lp, .dash, .adm, .find { grid-template-columns:1fr; } .flow { grid-template-columns:1fr 1fr; } .factgrid { grid-template-columns:1fr 1fr; } .ideas { columns:1; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Locations — v1 mockups</h1>
+  <p class="note">A new kind of account on the Connect side: a <b>host</b> lists a place to shoot in. It sits beside Crew Call: same account, same Messages, same track record idea, same admin review before anything goes live. Anyone signed in can host (like a working card); a listing is approved by admin before it's public (like a pitch). Six screens below, then the phone, then the list of things to decide.</p>
+  <p class="note"><b>Money.</b> A host sets an hourly rate, a day rate, or "make a deal" (the producer proposes a number). Where Crew Call moves no money, locations can: the request becomes a Stripe Checkout once the host accepts, paid through the same Connect setup creators already use for backing, with the platform cut and the deposit on top. That's a decision, not a given — see the questions at the bottom.</p>
+</div>
+
+<!-- 1. Directory -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">1 · Directory</span><h2>/locations — find a place to shoot</h2></div>
+  <div class="frame">
+    <div class="top-in"><span class="back">‹ Back</span><span>Connect / Locations</span></div>
+    <span class="eyebrow pink">Connect · Locations</span>
+    <div class="h1">Find a place to shoot</div>
+    <p class="lead">Homes, warehouses, cafés, studios and odd corners of the city, listed by the people who hold the keys. Ask about a date, make an offer, or book at the posted rate.</p>
+    <div class="find">
+      <div class="field">Near <b>Los Angeles, CA</b> · within <b>25 mi</b> <span>▾</span></div>
+      <div class="field">Dates <b>Oct 24–25</b> · <b>8 hrs</b> <span>▾</span></div>
+      <span class="btn primary">Search</span>
+    </div>
+    <div class="types">
+      <span class="type on">All <small>38</small></span>
+      <span class="type">Home <small>14</small></span>
+      <span class="type">Apartment <small>6</small></span>
+      <span class="type">Warehouse <small>4</small></span>
+      <span class="type">Café / bar <small>5</small></span>
+      <span class="type">Office <small>3</small></span>
+      <span class="type">Studio <small>2</small></span>
+      <span class="type">Outdoors / land <small>3</small></span>
+      <span class="type">Vehicle <small>1</small></span>
+    </div>
+    <div class="chips" style="margin-bottom:16px">
+      <span class="chip on">Under $100/hr</span><span class="chip">$100–250/hr</span><span class="chip">Make a deal</span>
+      <span class="chip">Parking</span><span class="chip on">Quiet</span><span class="chip">Natural light</span><span class="chip">Power 50A+</span><span class="chip">Overnight OK</span><span class="chip">Kitchen</span><span class="chip">Permits handled</span>
+      <span class="chip ok">● Open on your dates</span><span class="chip">Verified host</span><span class="chip">Map ▸</span>
+    </div>
+    <div class="label">38 places <small>closest first · <a href="#">most booked</a> · <a href="#">cheapest</a></small></div>
+    <div class="cards">
+      <div class="card"><span class="ph"><span class="k">8 photos · walkthrough</span><span class="heart">♡</span><span class="pin">Open Oct 24</span></span>
+        <div class="body"><span class="eyebrow">Home · Highland Park · 3.2 mi</span><span class="t">Mid-century bungalow with a big back yard</span><span class="facts">1,400 sq ft · 3 rooms · driveway for 4 · quiet street</span>
+          <span class="rate"><b>$85/hr</b> · $600/day · 4 hr min</span>
+          <div class="foot"><span class="host"><i class="av sm"></i>Dana R. <span class="record vet">Hosted 6</span></span><span class="btn sm">View</span></div></div></div>
+      <div class="card"><span class="ph b"><span class="k">12 photos · floor plan</span><span class="heart">♥</span><span class="pin">Open Oct 24</span></span>
+        <div class="body"><span class="eyebrow">Warehouse · Vernon · 6.1 mi</span><span class="t">Empty 4,000 sq ft warehouse, roll-up door, 100A</span><span class="facts">4,000 sq ft · 24 ft ceilings · load-in dock · loud outside</span>
+          <span class="rate"><b>Make a deal</b> · hosts say ~$900/day</span>
+          <div class="foot"><span class="host"><i class="av sm b"></i>Marisol Co. <span class="record">Hosted 2</span></span><span class="btn sm">View</span></div></div></div>
+      <div class="card"><span class="ph c"><span class="k">6 photos</span><span class="heart">♡</span></span>
+        <div class="body"><span class="eyebrow">Café / bar · Echo Park · 2.4 mi</span><span class="t">Corner café, closed Mondays, booth seating</span><span class="facts">900 sq ft · 1 bathroom · street parking · kitchen use OK</span>
+          <span class="rate"><b>$120/hr</b> · Mondays only · 3 hr min</span>
+          <div class="foot"><span class="host"><i class="av sm c"></i>Café Lupe <span class="record new">New host</span></span><span class="btn sm">View</span></div></div></div>
+      <div class="card"><span class="ph d"><span class="k">9 photos · walkthrough</span><span class="heart">♡</span><span class="pin">Open Oct 25</span></span>
+        <div class="body"><span class="eyebrow">Apartment · Koreatown · 4.0 mi</span><span class="t">4th-floor one-bedroom, east windows, elevator</span><span class="facts">720 sq ft · 2 rooms · elevator · crew max 8</span>
+          <span class="rate"><b>$55/hr</b> · $380/day</span>
+          <div class="foot"><span class="host"><i class="av sm"></i>Theo K. <span class="record">Hosted 1</span></span><span class="btn sm">View</span></div></div></div>
+      <div class="card"><span class="ph f"><span class="k">5 photos</span><span class="heart">♡</span></span>
+        <div class="body"><span class="eyebrow">Outdoors / land · Topanga · 19 mi</span><span class="t">Two acres of oaks and a dry creek bed</span><span class="facts">Private road · generator needed · permit: host handles</span>
+          <span class="rate"><b>$450/day</b> · sunrise to sunset</span>
+          <div class="foot"><span class="host"><i class="av sm c"></i>The Alvarez family <span class="record vet">Hosted 9</span></span><span class="btn sm">View</span></div></div></div>
+      <div class="card"><span class="ph e"><span class="k">7 photos · floor plan</span><span class="heart">♡</span><span class="pin">Open Oct 24</span></span>
+        <div class="body"><span class="eyebrow">Office · DTLA · 5.5 mi</span><span class="t">Open-plan office after hours, 12 desks, glass meeting room</span><span class="facts">2,200 sq ft · weeknights 7pm–2am · freight elevator</span>
+          <span class="rate"><b>$95/hr</b> · $650/night</span>
+          <div class="foot"><span class="host"><i class="av sm b"></i>Northwind Studio <span class="record">Hosted 3</span></span><span class="btn sm">View</span></div></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Listing -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">2 · Listing</span><h2>/locations/&lt;id&gt; — one place, the facts a scout wants, and the request panel</h2></div>
+  <div class="frame">
+    <div class="top-in"><span class="back">‹ Back</span><span>Locations / Home / Mid-century bungalow</span></div>
+    <div class="lp">
+      <div>
+        <div class="gallery">
+          <span class="ph"><span class="k">▶ Walkthrough · 1:40</span></span>
+          <span class="ph b"><span class="k">Living room</span></span>
+          <span class="ph c"><span class="k">Back yard · golden hour</span></span>
+          <span class="ph d"><span class="k">Kitchen</span></span>
+          <span class="ph e"><span class="k">+5 · Floor plan</span></span>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-top:14px">
+          <div><span class="eyebrow olive">Home · Highland Park · exact address after booking</span><div class="h1" style="font-size:1.9rem">Mid-century bungalow with a big back yard</div></div>
+          <div class="chips"><span class="chip">♡ Save</span><span class="chip">Share</span><span class="chip">⚑</span></div>
+        </div>
+        <div class="factgrid">
+          <div class="fact"><b>1,400 sq ft</b><span>Inside</span></div>
+          <div class="fact"><b>3 rooms + yard</b><span>Spaces</span></div>
+          <div class="fact"><b>Crew up to 15</b><span>People</span></div>
+          <div class="fact"><b>7am – 10pm</b><span>Hours</span></div>
+        </div>
+        <p style="font-size:.98rem;line-height:1.6;color:var(--ink-dim);margin:0 0 10px">1958 post-and-beam with the original wood ceilings, a long wall of west-facing glass, terrazzo floors, and a yard with a lemon tree and a concrete patio. The owner (that’s me) lives here and will be around but out of the way. Has hosted student shorts, a Snippets series and two music videos.</p>
+        <div class="tabs"><span class="on">The space</span><span>Light, power, sound</span><span>Logistics</span><span>Rules</span><span>Permits &amp; insurance</span><span>Shot here · 4</span></div>
+        <div class="kv">
+          <div><span>Rooms</span><span>Living · kitchen · bedroom · yard</span></div>
+          <div><span>Ceilings</span><span>9 ft (living 11 ft)</span></div>
+          <div><span>Windows face</span><span>West (afternoon sun)</span></div>
+          <div><span>Best light</span><span>3–6 pm</span></div>
+          <div><span>Power</span><span>Household 20A circuits · no tie-in</span></div>
+          <div><span>Sound</span><span>Quiet street · no flight path</span></div>
+          <div><span>Parking</span><span>Driveway 4 · street OK</span></div>
+          <div><span>Load-in</span><span>Ground level · side gate 36"</span></div>
+          <div><span>Bathrooms</span><span>2 · crew may use both</span></div>
+          <div><span>Kitchen</span><span>Usable · no open flame on camera</span></div>
+          <div><span>Wifi / cell</span><span>Fast wifi · good signal</span></div>
+          <div><span>Green room</span><span>Garage, 2 tables</span></div>
+          <div><span>Furniture</span><span>May move; photograph first</span></div>
+          <div><span>Pets / smoking</span><span>One dog (will be out) · no smoking</span></div>
+        </div>
+        <div class="label">Availability <small>next 5 weeks · tap a day to start a request</small></div>
+        <div class="cal">
+          <span class="h">Mon</span><span class="h">Tue</span><span class="h">Wed</span><span class="h">Thu</span><span class="h">Fri</span><span class="h">Sat</span><span class="h">Sun</span>
+          <span class="bl">13</span><span class="ok">14</span><span class="ok">15</span><span class="bk">16</span><span class="ok">17</span><span class="ok">18</span><span class="bl">19</span>
+          <span class="ok">20</span><span class="ok">21</span><span class="ok">22</span><span class="ok">23</span><span class="sel">24</span><span class="sel">25</span><span class="bl">26</span>
+          <span class="ok">27</span><span class="bk">28</span><span class="bk">29</span><span class="ok">30</span><span class="ok">31</span><span class="ok">1</span><span class="bl">2</span>
+        </div>
+        <div class="legend"><span><i style="background:rgba(132,205,152,.5)"></i>Open</span><span><i style="background:rgba(248,95,115,.5)"></i>Booked</span><span><i style="background:var(--surface-3)"></i>Host blocked</span><span><i style="background:var(--olive)"></i>Your dates</span></div>
+        <div class="label">Shot here <small>credits added by the productions, confirmed by the host</small></div>
+        <div class="chips"><span class="chip sky">Snippets · “Lemon Tree” (6 eps)</span><span class="chip sky">Pitch · “Backyard Astronomers”</span><span class="chip">Music video · The Fawns</span><span class="chip">Student short · UCLA</span></div>
+      </div>
+      <div>
+        <div class="box">
+          <span class="eyebrow olive">Rates</span>
+          <div class="rates">
+            <div><span>Hourly <small>4 hr minimum</small></span><b>$85</b></div>
+            <div><span>Half day <small>5 hrs</small></span><b>$380</b></div>
+            <div><span>Full day <small>10 hrs</small></span><b>$600</b></div>
+            <div><span>Overtime <small>past booked hours</small></span><b>$120/hr</b></div>
+            <div><span>Cleaning</span><b>$75</b></div>
+            <div><span>Deposit <small>held, returned after the shoot</small></span><b>$300</b></div>
+          </div>
+          <span class="meta" style="margin-top:8px">Also open to a deal for student and no-budget projects — say so in the request.</span>
+        </div>
+        <div class="box form">
+          <span class="eyebrow pink">Request to book</span>
+          <div class="two"><div class="f">Dates <b>Oct 24–25</b></div><div class="f">Hours <b>8am–6pm</b></div></div>
+          <div class="two"><div class="f">Crew size <b>9</b></div><div class="f">Vehicles <b>3</b></div></div>
+          <div class="f">Project <b>Pitch · “Backyard Astronomers”</b> ▾</div>
+          <div class="f">Shooting <b>Narrative short, dialogue scenes in living room + yard, one night exterior</b></div>
+          <div class="f">Pay <b>Posted rate ($600/day)</b> ▾ <span>or make an offer</span></div>
+          <p class="est">Est. <b>$1,275</b> for 2 days: $1,200 + $75 cleaning. $300 deposit held separately. Nothing is charged until Dana accepts; the address is shared then.</p>
+          <span class="btn primary block">Send request</span>
+          <span class="btn ghost block" style="margin-top:6px">Ask about a date first →</span>
+        </div>
+        <div class="box">
+          <div style="display:flex;gap:12px;align-items:center"><i class="av" style="width:44px;height:44px"></i><div><b style="font-family:var(--font-display)">Dana R.</b><span class="meta">Replies in about 2 hours · <span class="record vet">Hosted 6 shoots</span></span></div></div>
+          <p style="font-size:.88rem;color:var(--ink-dim);margin:10px 0 0;line-height:1.5">“Easy to work with, let us run cable through the kitchen window.” — Priya N., producer</p>
+          <div class="chips" style="margin-top:10px"><span class="chip">Message Dana</span><span class="chip">Profile</span></div>
+        </div>
+        <div class="box" style="border-style:dashed;background:transparent">
+          <span class="eyebrow">House rules · the short version</span>
+          <p style="font-size:.88rem;color:var(--ink-dim);margin:6px 0 0;line-height:1.5">Shoes off on the terrazzo. Quiet outside after 9pm. Nothing taped to the wood. Generator in the driveway only. Leave it the way you found it — photos are taken at load-in and wrap.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Request flow -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">3 · The request</span><h2>what happens between “Send request” and “Done”</h2></div>
+  <div class="frame">
+    <div class="flow">
+      <div class="step"><span class="who">Producer</span><b>Requested</b>Dates, hours, crew size, project, posted rate or an offer. Host gets a notification + email. Both can message from the request.</div>
+      <div class="step"><span class="who">Host</span><b>Accept · Counter · Decline</b>Accept as is, counter with a different price or hours, or decline with a reason. 48 h to answer or it expires.</div>
+      <div class="step"><span class="who">Producer</span><b>Pay to confirm</b>Checkout for the total; deposit held. Address, gate code and host phone unlock. Calendar day turns Booked.</div>
+      <div class="step"><span class="who">Both</span><b>Shoot day</b>Load-in and wrap photos from both sides in the thread. Overtime is added by the host, approved by the producer.</div>
+      <div class="step"><span class="who">Host</span><b>Did it go OK?</b>After the last day: as agreed / damage / no-show. Deposit returns or is claimed (admin decides a dispute).</div>
+      <div class="step"><span class="who">Both</span><b>Done</b>One-line endorsements each way. The production adds a “Shot here” credit; the host’s track record ticks up.</div>
+    </div>
+    <div class="flow" style="margin-top:8px">
+      <div class="step alt"><span class="who">Either</span><b>Cancelled</b>Free until paid. After paying: full refund 7+ days out, 50% inside 7 days, none inside 48 h (host sets one of three policies).</div>
+      <div class="step alt"><span class="who">Host</span><b>Expired</b>No answer in 48 h: producer is told, host gets a nudge; three expiries in a row hide the listing until the host checks in.</div>
+      <div class="step alt"><span class="who">Producer</span><b>Deal, not a rate</b>“Make a deal” listings skip the rate: the producer’s number is the offer, the host counters, payment is whatever they land on.</div>
+      <div class="step alt"><span class="who">Admin</span><b>Review</b>New listings and reported ones sit in the review queue beside pitches and ads. Verified host = ID + proof they can let a crew in.</div>
+    </div>
+  </div>
+</section>
+
+<!-- 4. Host dashboard -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">4 · Host side</span><h2>/locations/mine — your places, the requests, the calendar</h2></div>
+  <div class="frame">
+    <div class="top-in"><span class="back">‹ Back</span><span>Account / Your locations</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap"><div><span class="eyebrow pink">Locations</span><div class="h1" style="font-size:1.9rem">Your locations</div></div><span class="btn primary">+ List a place</span></div>
+    <div class="nums" style="margin-top:14px">
+      <div class="num"><b>2</b><span>Requests waiting</span></div>
+      <div class="num"><b>3</b><span>Booked days this month</span></div>
+      <div class="num"><b>$1,850</b><span>Earned · Oct</span></div>
+      <div class="num"><b>~2 h</b><span>Your reply time</span></div>
+    </div>
+    <div class="dash">
+      <div>
+        <div class="label">Requests <small>newest first</small></div>
+        <div class="req hot">
+          <div class="head"><div><span class="t">“Backyard Astronomers” · Oct 24–25, 8am–6pm</span><span class="meta">Mid-century bungalow · crew 9 · 3 vehicles · narrative short</span></div><span class="status rev">Waiting · 31 h left</span></div>
+          <div class="host" style="margin-top:8px"><i class="av sm b"></i>Priya N. <span class="record vet">3 shoots</span> · pitch has 42 backers</div>
+          <p style="font-size:.88rem;color:var(--ink-dim);margin:8px 0 0;line-height:1.5">Offering the posted day rate. One night exterior in the yard until 9:30pm — fine with your curfew? We’ll bring our own generator.</p>
+          <div class="acts"><span class="btn ok sm">Accept $1,275</span><span class="btn sm">Counter</span><span class="btn danger sm">Decline</span><span class="btn ghost sm">Message</span></div>
+        </div>
+        <div class="req hot">
+          <div class="head"><div><span class="t">Student short · Nov 2, 10am–4pm</span><span class="meta">Mid-century bungalow · crew 5 · 1 vehicle</span></div><span class="status rev">Offer · 44 h left</span></div>
+          <div class="host" style="margin-top:8px"><i class="av sm c"></i>Marcus T. <span class="record new">New</span></div>
+          <p style="font-size:.88rem;color:var(--ink-dim);margin:8px 0 0;line-height:1.5">Offer: <b style="color:var(--olive)">$250 for the day</b> (your rate is $600). UCLA thesis, no budget, we’ll credit you and leave it spotless.</p>
+          <div class="acts"><span class="btn ok sm">Accept $250</span><span class="btn sm">Counter $400</span><span class="btn danger sm">Decline</span><span class="btn ghost sm">Message</span></div>
+        </div>
+        <div class="req">
+          <div class="head"><div><span class="t">The Fawns music video · Oct 16</span><span class="meta">Mid-century bungalow · crew 12</span></div><span class="status live">Confirmed · paid</span></div>
+          <div class="acts"><span class="btn sm">Open the day</span><span class="btn ghost sm">Add overtime</span></div>
+        </div>
+        <div class="req">
+          <div class="head"><div><span class="t">Snippets · “Lemon Tree” ep 6 · Oct 9</span><span class="meta">Done · deposit returned</span></div><span class="status">Done</span></div>
+          <div class="acts"><span class="btn sm">Say how it went →</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="label">Your places <small>2 listed · 1 in review</small></div>
+        <div class="box" style="padding:4px 16px">
+          <div class="listing-row"><span class="ph"></span><div><b style="font-family:var(--font-display)">Mid-century bungalow with a big back yard</b><span class="meta">$85/hr · $600/day · 6 shoots · 4.9 from producers</span></div><span class="status live">Listed</span></div>
+          <div class="listing-row"><span class="ph b"></span><div><b style="font-family:var(--font-display)">Garage workshop (same house)</b><span class="meta">$40/hr · 2 shoots</span></div><span class="status off">Paused</span></div>
+          <div class="listing-row"><span class="ph g"></span><div><b style="font-family:var(--font-display)">Mom’s diner in Glendale</b><span class="meta">Make a deal · submitted Oct 12</span></div><span class="status rev">In review</span></div>
+        </div>
+        <div class="label">This month <small>tap a day to block it</small></div>
+        <div class="cal">
+          <span class="h">Mon</span><span class="h">Tue</span><span class="h">Wed</span><span class="h">Thu</span><span class="h">Fri</span><span class="h">Sat</span><span class="h">Sun</span>
+          <span class="bl">13</span><span class="ok">14</span><span class="ok">15</span><span class="bk">16</span><span class="ok">17</span><span class="ok">18</span><span class="bl">19</span>
+          <span class="ok">20</span><span class="ok">21</span><span class="ok">22</span><span class="ok">23</span><span class="sel">24</span><span class="sel">25</span><span class="bl">26</span>
+        </div>
+        <div class="legend"><span><i style="background:rgba(132,205,152,.5)"></i>Open</span><span><i style="background:rgba(248,95,115,.5)"></i>Booked</span><span><i style="background:var(--surface-3)"></i>Blocked</span><span><i style="background:var(--olive)"></i>Requested</span></div>
+        <div class="label">Payouts <small>the same card creators have</small></div>
+        <div class="box"><div style="display:flex;justify-content:space-between;align-items:center"><div><b style="font-family:var(--font-display)">● Payments on</b><span class="meta">$1,275 arrives Oct 27 · bank ••42</span></div><span class="btn sm">Open Stripe</span></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. List a place -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">5 · List a place</span><h2>/locations/new — seven short steps, saved as you go</h2></div>
+  <div class="frame">
+    <div class="steps"><span class="done">1 Basics</span><span class="done">2 Photos</span><span class="on">3 The space</span><span>4 Rates</span><span>5 Availability</span><span>6 Rules</span><span>7 Permits &amp; insurance</span><span>Review</span></div>
+    <div class="adm">
+      <div>
+        <div class="h2">What’s in the space</div>
+        <p class="lead" style="font-size:.9rem">Tick what applies. Scouts filter on these, so the more you tick honestly the more requests you get that fit.</p>
+        <div class="label" style="margin-top:10px">Rooms &amp; size</div>
+        <div class="form"><div class="two"><div class="f">Inside <b>1,400 sq ft</b></div><div class="f">Outside <b>Yard · 2,000 sq ft</b></div></div><div class="f">Rooms crews may use <b>Living · kitchen · bedroom · yard · garage (green room)</b></div><div class="two"><div class="f">Ceilings <b>9 ft</b></div><div class="f">Crew max <b>15</b></div></div></div>
+        <div class="label">Light, power, sound</div>
+        <div class="check"><div class="on">Natural light</div><div class="on">West windows</div><div>Blackout possible</div><div>Power tie-in</div><div class="on">Household circuits</div><div>50A+ outlet</div><div class="on">Quiet street</div><div>Near flight path</div><div>Soundproofed</div></div>
+        <div class="label">Logistics</div>
+        <div class="check"><div class="on">Driveway parking</div><div class="on">Street parking</div><div>Truck access</div><div class="on">Ground-level load-in</div><div>Elevator</div><div>Loading dock</div><div class="on">2 bathrooms</div><div class="on">Kitchen use</div><div class="on">Wifi</div><div>Overnight OK</div><div class="on">Green room</div><div>Makeup area</div></div>
+        <div style="display:flex;gap:8px;margin-top:18px"><span class="btn">‹ Photos</span><span class="btn primary">Save · next: Rates →</span></div>
+      </div>
+      <div>
+        <div class="box">
+          <span class="eyebrow olive">Photos · step 2 (done)</span>
+          <div class="thumbs" style="margin-top:10px"><span class="ph"><span class="k">Cover</span></span><span class="ph b"></span><span class="ph c"></span><span class="ph d"></span><span class="ph add">+ add</span></div>
+          <span class="meta" style="margin-top:8px">8 photos · walkthrough video uploaded (Cloudflare, like an episode) · floor plan PDF. Tip: shoot one frame per room at the time of day the light is best, and say the time.</span>
+        </div>
+        <div class="box">
+          <span class="eyebrow olive">Rates · step 4 (preview)</span>
+          <div class="form" style="margin-top:8px">
+            <div class="f">How you charge <b>Hourly + day rate</b> <span>· Day only · Make a deal</span></div>
+            <div class="two"><div class="f">Hourly <b>$85</b></div><div class="f">Minimum <b>4 hrs</b></div></div>
+            <div class="two"><div class="f">Half day (5h) <b>$380</b></div><div class="f">Full day (10h) <b>$600</b></div></div>
+            <div class="two"><div class="f">Overtime <b>$120/hr</b></div><div class="f">Cleaning <b>$75</b></div></div>
+            <div class="two"><div class="f">Deposit <b>$300</b></div><div class="f">Weekend / night <b>+15%</b></div></div>
+            <div class="f">Open to deals <b>Yes — students and no-budget</b></div>
+          </div>
+          <span class="meta" style="margin-top:8px">A 10-hour Saturday shows producers <b style="color:var(--ink)">$690 + $75 cleaning</b>. You receive $650 after Studio Tapa’s 10% cut (number to decide). Deposit is held, not charged.</span>
+        </div>
+        <div class="box" style="border-style:dashed;background:transparent">
+          <span class="eyebrow">Permits &amp; insurance · step 7 (preview)</span>
+          <div class="check" style="grid-template-columns:1fr;margin-top:8px"><div class="on">Crews must carry a certificate of insurance (COI) naming me</div><div>I can help with the city film permit</div><div class="on">I’m the owner / I have the owner’s written OK</div><div>Shoots over 20 people need my landlord’s approval</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Phone -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">6 · The app</span><h2>Discover → Locations; a listing with a sticky request bar; the host answering an offer</h2></div>
+  <div class="phones">
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Locations</span>
+      <div class="h1">Find a place to shoot</div>
+      <div class="find"><div class="field">Los Angeles · 25 mi · Oct 24–25 <span>▾</span></div></div>
+      <div class="chips" style="margin:6px 0 12px"><span class="chip on">All</span><span class="chip">Home</span><span class="chip">Warehouse</span><span class="chip">Café</span><span class="chip">Outdoors</span></div>
+      <div class="cards">
+        <div class="card"><span class="ph"><span class="k">8 photos</span><span class="pin">Open Oct 24</span></span><div class="body"><span class="eyebrow">Home · Highland Park · 3.2 mi</span><span class="t">Mid-century bungalow with a big back yard</span><span class="rate"><b>$85/hr</b> · $600/day</span></div></div>
+        <div class="card"><span class="ph b"><span class="k">12 photos</span></span><div class="body"><span class="eyebrow">Warehouse · Vernon · 6.1 mi</span><span class="t">Empty 4,000 sq ft warehouse</span><span class="rate"><b>Make a deal</b></span></div></div>
+      </div>
+    </div><div class="ptabs"><span>Home</span><span class="on">Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="top-in" style="margin-top:4px"><span class="back">‹ Back</span><span>Locations</span></div>
+      <span class="ph"><span class="k">1 / 8 · ▶ walkthrough</span></span>
+      <span class="eyebrow olive" style="margin-top:12px">Home · Highland Park</span>
+      <div class="h1" style="font-size:1.3rem">Mid-century bungalow with a big back yard</div>
+      <div class="factgrid"><div class="fact"><b>1,400 sq ft</b><span>Inside</span></div><div class="fact"><b>Crew ≤ 15</b><span>People</span></div><div class="fact"><b>West light</b><span>3–6 pm</span></div><div class="fact"><b>Quiet</b><span>Sound</span></div></div>
+      <div class="tabs" style="margin-top:4px"><span class="on">Space</span><span>Logistics</span><span>Rules</span><span>Shot here</span></div>
+    </div><div class="sticky"><div><b style="font-family:var(--font-mono)">$85/hr · $600/day</b><span class="meta">Open Oct 24–25</span></div><span class="btn primary sm">Request</span></div><div class="ptabs"><span>Home</span><span class="on">Discover</span><span>Watch</span><span>Account</span></div></div>
+
+    <div class="phone"><div class="scr">
+      <div class="top"><div class="brand">Studio Tapa<small>Connect</small></div><div class="ic"></div></div>
+      <span class="eyebrow pink">Your locations</span>
+      <div class="h1">Requests</div>
+      <div class="req hot"><div class="head"><div><span class="t">Student short · Nov 2</span><span class="meta">10am–4pm · crew 5</span></div><span class="status rev">44 h</span></div><p style="font-size:.86rem;color:var(--ink-dim);margin:8px 0 0">Offer <b style="color:var(--olive)">$250</b> for the day (your rate $600). UCLA thesis, no budget.</p></div>
+      <div class="req"><div class="head"><div><span class="t">The Fawns music video · Oct 16</span><span class="meta">crew 12</span></div><span class="status live">Paid</span></div></div>
+    </div>
+      <div class="sheet"><div class="grab"></div><b style="font-family:var(--font-display);font-size:1.05rem">Marcus T. offers $250</b><span class="meta">Your day rate is $600 · he’s a new member, no shoots yet</span>
+        <div class="form" style="margin-top:10px"><div class="f">Counter with <b>$400</b> <span>▾</span></div></div>
+        <span class="btn ok block" style="margin-top:8px">Accept $250</span>
+        <span class="btn block" style="margin-top:6px">Send counter · $400</span>
+        <span class="btn ghost block" style="margin-top:6px;color:var(--danger)">Decline</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Ideas -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">7 · Things you may not have thought of</span><h2>in the mockups above, or easy to add</h2></div>
+  <div class="frame">
+    <ul class="ideas">
+      <li><b>Address stays private</b> until the host accepts — the listing shows the neighbourhood and distance, the map pin is fuzzy, the exact address, gate code and host phone unlock on confirmation.</li>
+      <li><b>Deposit held, not charged.</b> Stripe can authorise the deposit and release it after “did it go OK?”, so the host is covered without the producer losing the money for weeks.</li>
+      <li><b>Overtime added by the host, approved by the producer</b> in the thread, charged to the card on file. No awkward wrap-time negotiation.</li>
+      <li><b>Counter-offers.</b> “Make a deal” needs a counter, and a rate listing benefits from one too (a student asking $250 on a $600 day gets a $400 counter instead of a no).</li>
+      <li><b>48-hour answer window</b> and a reply-time number on the host card, so producers know who actually responds. Three expiries hide the listing until the host checks in.</li>
+      <li><b>“Shot here” credits</b> link a listing to the Snippets series, pitch or series that used it. That’s the host’s track record (Hosted 6), and it’s free marketing for both.</li>
+      <li><b>Light and sound facts scouts actually ask:</b> which way the windows face, best hour, power tie-in or household circuits, flight path / street noise, ceiling height, load-in width.</li>
+      <li><b>Walkthrough video and floor plan</b> through the uploads that already exist (Cloudflare for video, Storage for the PDF, like Film University files).</li>
+      <li><b>Load-in and wrap photos</b> from both sides in the request thread: the simplest damage dispute prevention there is.</li>
+      <li><b>Host sets one of three cancellation policies</b> (flexible / moderate / strict) instead of free text, so refunds are automatic.</li>
+      <li><b>Saved places and a scout board</b>: save listings per project, share the shortlist with the crew (reuses the My List / wishlist pattern).</li>
+      <li><b>Attach a location to a Crew Call post</b> (“shooting at the bungalow, Oct 24”) and to a pitch’s “Crew needed” block, so a project’s shoot days hang together.</li>
+      <li><b>Verified host</b> = ID plus proof they can let a crew in (deed, lease, or a letter) — reviewed in the admin queue beside pitches and ads. Unverified hosts can still list, but the badge is what producers filter on.</li>
+      <li><b>Date alerts</b>: “tell me when something like this opens Oct 24” for producers; “someone searched your area for Oct 24” for hosts with a blocked day.</li>
+      <li><b>Permit help as a listing fact</b> (host handles / host can help / you handle), since in LA the permit is often the hard part, not the house.</li>
+      <li><b>House rules as structured fields</b> (hours, curfew, crew max, pets, smoking, furniture) plus one free-text paragraph, so the rules show on the request and the day sheet.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><span class="tag">8 · Decisions for you</span><h2>before building</h2></div>
+  <div class="frame">
+    <ul class="ideas">
+      <li><b>Money through the site or not?</b> Crew Call moves no money. The mockups assume locations do, through Stripe Connect like backing (platform cut + deposit hold). The alternative is “arrange it yourselves” with no cut and no deposit protection.</li>
+      <li><b>Platform cut.</b> Peerspace takes 15% from hosts + a 5% service fee from the booker; Giggster is similar. The mock shows 10% from the host, nothing from the producer.</li>
+      <li><b>Who can host?</b> Anyone signed in (like a working card), or only after admin verification? The mock: anyone can create, admin approves before it’s public.</li>
+      <li><b>Name.</b> “Locations” under Connect with a “host” is what the mocks use; “Location Manager” reads as a job title (the crew role) rather than the owner of a place. Your call.</li>
+      <li><b>Hours vs days.</b> Keep both plus “make a deal” (as mocked), or simplify to day rate + deal?</li>
+      <li><b>Instant book?</b> Some hosts will want “book at my rate without asking”. Easy to add later as a per-listing toggle; left out of v1.</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>
