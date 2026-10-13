@@ -505,15 +505,19 @@ export default function Account() {
               </View>
               <View style={styles.swatchRow}>
                 {bannerColors.map((c) => {
-                  const active = (profile.bannerColor || '').toLowerCase() === c.value;
+                  // Read off the loop variable first: Reanimated's Babel
+                  // plugin warns about any `.value` inside a style prop,
+                  // even plain data like this.
+                  const hex = c.value;
+                  const active = (profile.bannerColor || '').toLowerCase() === hex;
                   return (
                     <Pressable
-                      key={c.value}
+                      key={hex}
                       accessibilityRole="radio"
                       accessibilityLabel={c.label}
                       accessibilityState={{ checked: active }}
-                      style={[styles.swatch, { backgroundColor: c.value }, active && styles.swatchActive]}
-                      onPress={() => setBannerColor(c.value)}
+                      style={[styles.swatch, { backgroundColor: hex }, active && styles.swatchActive]}
+                      onPress={() => setBannerColor(hex)}
                     />
                   );
                 })}
@@ -607,11 +611,15 @@ export default function Account() {
             <CardHead title="Privacy" visibility="Never shown publicly — for our own understanding of who uses Studio Tapa TV" color={colors.warn} />
             <Label>Gender</Label>
             <View style={styles.pillRow}>
-              {GENDERS.map((g) => (
-                <Pressable key={g.value} style={[styles.pill, (profile.gender || '') === g.value && styles.pillActive]} onPress={() => setProfile((p) => ({ ...p, gender: g.value }))}>
-                  <Text style={[styles.pillText, (profile.gender || '') === g.value && styles.pillTextActive]}>{g.label}</Text>
-                </Pressable>
-              ))}
+              {GENDERS.map((g) => {
+                // Same `.value`-in-style note as the banner swatches above.
+                const on = (profile.gender || '') === g.value;
+                return (
+                  <Pressable key={g.value} style={[styles.pill, on && styles.pillActive]} onPress={() => setProfile((p) => ({ ...p, gender: g.value }))}>
+                    <Text style={[styles.pillText, on && styles.pillTextActive]}>{g.label}</Text>
+                  </Pressable>
+                );
+              })}
             </View>
             <Label>Age</Label>
             <TextInput
