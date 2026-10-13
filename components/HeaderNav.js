@@ -37,7 +37,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     if (n.href) { setOpenMenu(null); router.push(n.href); }
   }
   const [searchValue, setSearchValue] = useState('');
-  const [portalLoading, setPortalLoading] = useState(false);
   const [siteSettings, setShopSettings] = useState(null);
   const [ownProfile, setOwnProfile] = useState(null);
   const [isScheduler, setIsScheduler] = useState(false);
@@ -121,24 +120,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     if (!term) return;
     router.push({ pathname: '/stream', query: { q: term } });
     setOpenMenu(null);
-  }
-
-  async function openPortal(e) {
-    e.preventDefault();
-    setPortalLoading(true);
-    try {
-      const res = await fetch('/api/create-portal-session', { method: 'POST' });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || 'Could not open subscription settings.');
-        setPortalLoading(false);
-      }
-    } catch (err) {
-      alert('Could not open subscription settings.');
-      setPortalLoading(false);
-    }
   }
 
   const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
@@ -467,13 +448,15 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {siteSettings && siteSettings.elevatorPitchEnabled && (
                   <Link href="/pitches" className="dropdown-item"><TargetIcon size={15} src={iconOverrides.target} /> Pitch Room</Link>
                 )}
-                {isSubscriber ? (
-                  <button className="dropdown-item" onClick={openPortal} disabled={portalLoading}>
-                    <CardIcon size={15} src={iconOverrides.card} /> {portalLoading ? 'Opening…' : 'Manage Subscription'}
-                  </button>
-                ) : (
-                  <Link href="/account" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> Join {SITE.premiumTier}</Link>
-                )}
+                {/* The Membership card on /account does the right thing for
+                    everyone: plan picker, Manage subscription for a paying
+                    member, the free-access note for the team. Opening
+                    Stripe's portal from here showed an empty page to
+                    accounts with no subscription (admins, comped). */}
+                <Link href="/account#membership" className="dropdown-item">
+                  {isSubscriber ? <CardIcon size={15} src={iconOverrides.card} /> : <SparkleIcon size={15} src={iconOverrides.sparkle} />}
+                  {' '}{isSubscriber ? 'Membership' : `Join ${SITE.premiumTier}`}
+                </Link>
                 {isCreator && <div className="dropdown-divider" />}
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item"><BarChartIcon size={15} src={iconOverrides.bar_chart} /> Your numbers</Link>}
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}
