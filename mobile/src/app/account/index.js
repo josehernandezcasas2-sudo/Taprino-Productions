@@ -17,7 +17,8 @@ import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../..
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import MembershipPlans from '../../components/MembershipPlans';
 import SmartImage from '../../components/SmartImage';
-import PositionedImage, { RepositionFrame } from '../../components/PositionedImage';
+import PositionedImage from '../../components/PositionedImage';
+import CropWindow from '../../components/CropWindow';
 import PayoutsCard from '../../components/PayoutsCard';
 
 const GENDERS = [
@@ -80,11 +81,13 @@ export default function Account() {
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [joiningTier, setJoiningTier] = useState(null);
-  // Reposition mode for the banner / avatar photo (components/PositionedImage.js
-  // RepositionFrame): which one is being dragged, and where it was so
-  // Cancel can put it back. Done saves straight away, like the photos.
+  // Reposition mode for the banner / avatar photo (components/CropWindow.js):
+  // which one is being adjusted, and where it was so Cancel can put it
+  // back. Done saves straight away, like the photos.
   const [reposition, setReposition] = useState(null);
   const [positionBackup, setPositionBackup] = useState(null);
+  // The banner preview's width/height, so the crop window shows the right slice.
+  const [bannerAspect, setBannerAspect] = useState(3);
   function startReposition(which) {
     setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
     setReposition(which);
@@ -553,18 +556,18 @@ export default function Account() {
 
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
+                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={[styles.avatar, reposition === 'avatar' && styles.avatarLarge]}>
+                  {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
+                </PositionedImage>
                 {reposition === 'avatar' ? (
-                  <RepositionFrame uri={avatarSrc} position={profile.avatarPosition} active style={[styles.avatar, styles.avatarLarge]} label="Drag" onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))} />
-                ) : (
-                  <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={styles.avatar}>
-                    {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
-                  </PositionedImage>
-                )}
-                {reposition === 'avatar' ? (
-                  <>
-                    <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
-                    <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
-                  </>
+                  <View style={{ flexBasis: '100%' }}>
+                    <CropWindow uri={avatarSrc} position={profile.avatarPosition} frameAspect={1} round height={220} onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))} />
+                    <View style={styles.avatarRow}>
+                      <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
+                      <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
+                      <Text style={styles.fineprintInline}>Drag the bright window over the part you want in the circle.</Text>
+                    </View>
+                  </View>
                 ) : (
                   <>
                     <Pressable style={styles.btnSmall} onPress={pickAvatar} disabled={avatarStatus === 'saving'}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
@@ -584,15 +587,12 @@ export default function Account() {
               ) : null}
 
               <Label>Banner <Text style={styles.labelNote}>the backdrop at the top of your profile — a photo or a solid color</Text></Label>
-              <RepositionFrame
-                uri={profile.bannerBase64 || profile.bannerUrl}
-                position={profile.bannerPosition}
-                active={reposition === 'banner'}
-                style={styles.bannerPreview}
-                onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
-              >
+              <View style={styles.bannerPreview} onLayout={(e) => { const { width, height } = e.nativeEvent.layout; if (height > 0) setBannerAspect(width / height); }}>
                 {(profile.bannerBase64 || profile.bannerUrl) ? (
-                  reposition === 'banner' ? <View style={styles.bannerGuide} pointerEvents="none" /> : null
+                  <>
+                    <PositionedImage uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} style={[absoluteFill, { borderRadius: 8 }]} />
+                    {reposition === 'banner' ? <View style={styles.bannerGuide} pointerEvents="none" /> : null}
+                  </>
                 ) : profile.bannerColor ? (
                   <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
                 ) : (
@@ -601,13 +601,18 @@ export default function Account() {
                 <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={[styles.bannerPreviewAvatar, reposition === 'banner' && { opacity: 0.55 }]}>
                   {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
                 </PositionedImage>
-              </RepositionFrame>
-              <View style={[styles.avatarRow, { marginTop: 22 }]}>
+              </View>
+              {reposition === 'banner' ? (
+                <View style={{ marginTop: 22 }}>
+                  <CropWindow uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} frameAspect={bannerAspect} height={240} onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))} />
+                </View>
+              ) : null}
+              <View style={[styles.avatarRow, reposition === 'banner' ? null : { marginTop: 22 }]}>
                 {reposition === 'banner' ? (
                   <>
                     <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
                     <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
-                    <Text style={styles.fineprintInline}>Drag the photo. The dashed line is where your avatar sits.</Text>
+                    <Text style={styles.fineprintInline}>The bright window is what shows on your profile; the dashed line is where your avatar sits.</Text>
                   </>
                 ) : (
                   <>

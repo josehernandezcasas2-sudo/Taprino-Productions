@@ -13,7 +13,7 @@ import PayoutsCard from '../components/creator/PayoutsCard';
 import MembershipPlans from '../components/MembershipPlans';
 import { memberBadge } from '../lib/membershipTiers';
 import { avatarStyle } from '../lib/profileBanner';
-import RepositionFrame, { parsePosition, formatPosition } from '../components/RepositionFrame';
+import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -112,6 +112,8 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   // which one is being dragged, and where it was so Cancel can put it back.
   const [reposition, setReposition] = useState(null);
   const [positionBackup, setPositionBackup] = useState(null);
+  // The banner preview's width/height, so the crop window shows the right slice.
+  const [bannerAspect, setBannerAspect] = useState(3);
   function startReposition(which) {
     setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
     setReposition(which);
@@ -493,17 +495,25 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         className={`account-avatar ${reposition === 'avatar' ? 'account-avatar-large' : ''}`}
                         url={profile.avatarBase64 || profile.avatarUrl}
                         position={profile.avatarPosition}
-                        active={reposition === 'avatar'}
-                        label="Drag the photo"
                         onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
                       >
                         {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
                       </RepositionFrame>
                       {reposition === 'avatar' ? (
-                        <div className="account-reposition-actions">
-                          <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
-                          <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
-                          <span className="account-fineprint">Drag until the part you want is in the circle, then Save profile below.</span>
+                        <div className="account-reposition-panel" style={{ flex: '1 1 320px', margin: 0 }}>
+                          <CropWindow
+                            url={profile.avatarBase64 || profile.avatarUrl}
+                            position={profile.avatarPosition}
+                            frameAspect={1}
+                            round
+                            height={220}
+                            onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
+                          />
+                          <div className="account-reposition-actions">
+                            <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
+                            <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
+                            <span className="account-fineprint">Drag the bright window over the part you want in the circle, then Save profile below.</span>
+                          </div>
                         </div>
                       ) : (
                       <>
@@ -547,8 +557,8 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                       className="account-banner-preview"
                       url={profile.bannerBase64 || profile.bannerUrl}
                       position={profile.bannerPosition}
-                      active={reposition === 'banner'}
                       onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+                      onMeasure={setBannerAspect}
                       style={!(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor ? { background: profile.bannerColor } : undefined}
                     >
                       {reposition === 'banner' && <div className="account-banner-guide" aria-hidden="true" />}
@@ -558,22 +568,17 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                     </RepositionFrame>
                     {reposition === 'banner' ? (
                       <div className="account-reposition-panel">
-                        <label className="account-banner-slider">
-                          <span>Top</span>
-                          <input
-                            type="range"
-                            min="0"
-                            max="100"
-                            value={parsePosition(profile.bannerPosition).y}
-                            onChange={(e) => setProfile((p) => ({ ...p, bannerPosition: formatPosition({ x: parsePosition(p.bannerPosition).x, y: Number(e.target.value) }) }))}
-                            aria-label="Banner vertical position"
-                          />
-                          <span>Bottom</span>
-                        </label>
+                        <CropWindow
+                          url={profile.bannerBase64 || profile.bannerUrl}
+                          position={profile.bannerPosition}
+                          frameAspect={bannerAspect}
+                          height={260}
+                          onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+                        />
                         <div className="account-reposition-actions">
                           <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
                           <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
-                          <span className="account-fineprint">The dashed line is where your avatar sits. Save profile below to keep it.</span>
+                          <span className="account-fineprint">The bright window is what shows on your profile; the dashed line above is where your avatar sits. Save profile below to keep it.</span>
                         </div>
                       </div>
                     ) : (
