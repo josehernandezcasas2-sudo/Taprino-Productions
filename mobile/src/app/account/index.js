@@ -15,6 +15,7 @@ import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
+import MembershipPlans from '../../components/MembershipPlans';
 import SmartImage from '../../components/SmartImage';
 import PayoutsCard from '../../components/PayoutsCard';
 
@@ -26,14 +27,6 @@ const GENDERS = [
   { value: 'prefer_not_to_say', label: 'Prefer not to say' }
 ];
 
-function formatMoney(amountInCents, currency) {
-  if (amountInCents == null || !currency) return null;
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(amountInCents / 100);
-  } catch {
-    return `$${(amountInCents / 100).toFixed(2)}`;
-  }
-}
 function formatDate(ms) {
   if (!ms) return null;
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -85,7 +78,7 @@ export default function Account() {
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [joiningTier, setJoiningTier] = useState(null);
 
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -290,11 +283,11 @@ export default function Account() {
 
   // Join Tapa +: Stripe Checkout in the in-app browser (same as backing a
   // pitch), then re-read the account so the Membership card flips.
-  async function startCheckout() {
-    setCheckoutLoading(true);
+  async function startCheckout(tier) {
+    setJoiningTier(tier);
     try {
       const token = await withToken();
-      const data = await apiPost('/api/create-checkout-session', { returnTo: '/account' }, token);
+      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account' }, token);
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
         await loadAll();
@@ -302,7 +295,7 @@ export default function Account() {
     } catch (err) {
       Alert.alert('Could not start checkout', err.message);
     } finally {
-      setCheckoutLoading(false);
+      setJoiningTier(null);
     }
   }
 
@@ -431,7 +424,14 @@ export default function Account() {
   const canSeeNumbers = dashboard.isCreator || dashboard.isAdmin || dashboard.isSubAdmin;
   const avatarSrc = profile && (profile.avatarBase64 || profile.avatarUrl);
   const sub = dashboard.subscriptionDetails;
-  const priceLabel = sub ? formatMoney(sub.amount, sub.currency) : null;
+  // Team / comped / promo-code access = Premium without a subscription:
+  // a note instead of the plan picker (same as the website).
+  const freeAccessNote = dashboard.isAdmin ? 'You have Tapa + as part of the Studio Tapa team — no payment needed, ever.'
+    : dashboard.isSubAdmin ? 'You have Tapa + as a sub-admin on the team — no payment needed, ever.'
+    : dashboard.isComped ? "Your access was given to you by the team — it's free, and no payment is needed."
+    : dashboard.promoAccessExpiresAt ? `You have Tapa + from a redeemed code, through ${formatDate(dashboard.promoAccessExpiresAt)}. Redeeming another code before then adds to this instead of replacing it.`
+    : null;
+  const memberBadgeLabel = dashboard.tier === 'sponsor' ? 'Sponsor' : dashboard.isSubscriber ? 'Tapa + member' : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -451,7 +451,7 @@ export default function Account() {
               <View style={styles.nameRow}>
                 <Text style={styles.identityName}>{(profile && profile.displayName) || dashboard.email || 'Your account'}</Text>
                 {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
-                {dashboard.isSubscriber ? <View style={styles.tierBadge}><Text style={styles.tierBadgeText}>Tapa + member</Text></View> : null}
+                {memberBadgeLabel ? <View style={styles.tierBadge}><Text style={styles.tierBadgeText}>{memberBadgeLabel}</Text></View> : null}
               </View>
               <Text style={styles.identitySub}>{dashboard.email ? `Signed in as ${dashboard.email}` : 'Signed in'}</Text>
             </View>
@@ -779,53 +779,21 @@ export default function Account() {
         {/* Membership (the website's right rail, stacked below on phones) */}
         <View style={styles.card} onLayout={(e) => { membershipY.current = e.nativeEvent.layout.y; scrollToMembership(); }}>
           <Text style={styles.subheading}>Membership</Text>
-          {dashboard.isSubscriber ? (
-            (dashboard.isAdmin || dashboard.isSubAdmin || dashboard.isComped) ? (
-              <View style={styles.freeNote}>
-                <View style={styles.freeBadge}><Text style={styles.freeBadgeText}>Free access</Text></View>
-                <Text style={styles.freeNoteText}>
-                  {dashboard.isAdmin ? 'You have Tapa + as part of the Studio Tapa team — no payment needed, ever.'
-                    : dashboard.isSubAdmin ? 'You have Tapa + as a sub-admin on the team — no payment needed, ever.'
-                    : "Your access was given to you by the team — it's free, and no payment is needed."}
-                </Text>
-              </View>
-            ) : dashboard.promoAccessExpiresAt ? (
-              <View style={styles.freeNote}>
-                <View style={styles.freeBadge}><Text style={styles.freeBadgeText}>Free access</Text></View>
-                <Text style={styles.freeNoteText}>
-                  You have Tapa + from a redeemed code, through {formatDate(dashboard.promoAccessExpiresAt)}. Redeeming another code before then adds to this instead of replacing it.
-                </Text>
-              </View>
-            ) : (
-              <>
-                {sub ? (
-                  <View style={styles.subDetails}>
-                    {sub.productName ? <DetailRow label="Plan" value={sub.productName} /> : null}
-                    {priceLabel ? <DetailRow label="Price" value={`${priceLabel}${sub.interval ? ` / ${sub.interval}` : ''}`} /> : null}
-                    <DetailRow label={sub.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'} value={formatDate(sub.renewsAt)} />
-                    {sub.cancelsAtPeriodEnd ? (
-                      <Text style={styles.cancelNote}>Your subscription is set to cancel — you'll keep Tapa + access until then.</Text>
-                    ) : null}
-                  </View>
-                ) : null}
-                <Pressable style={styles.btnPrimary} onPress={openPortal} disabled={portalLoading}>
-                  {portalLoading ? <ActivityIndicator color={colors.oliveShadow} /> : <Text style={styles.btnPrimaryText}>Manage subscription</Text>}
-                </Pressable>
-                <Text style={styles.fineprint}>"Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.</Text>
-              </>
-            )
+          {freeAccessNote ? (
+            <View style={styles.freeNote}>
+              <View style={styles.freeBadge}><Text style={styles.freeBadgeText}>Free access</Text></View>
+              <Text style={styles.freeNoteText}>{freeAccessNote}</Text>
+            </View>
           ) : (
-            <>
-              {['Ad-free viewing across the whole library', 'Early access to new episodes before free release', 'Gated series only Tapa + members can watch', 'Back the creators you watch, directly'].map((t) => (
-                <View key={t} style={styles.upsellItem}>
-                  <Text style={styles.upsellCheck}>{'✓'}</Text>
-                  <Text style={styles.upsellText}>{t}</Text>
-                </View>
-              ))}
-              <Pressable style={[styles.btnPrimary, { marginTop: 6 }]} onPress={startCheckout} disabled={checkoutLoading}>
-                {checkoutLoading ? <ActivityIndicator color={colors.oliveShadow} /> : <Text style={styles.btnPrimaryText}>Join Tapa +</Text>}
-              </Pressable>
-            </>
+            <MembershipPlans
+              plans={dashboard.plans || []}
+              tier={dashboard.tier || 'basic'}
+              subscriptionDetails={sub}
+              onJoin={startCheckout}
+              onPortal={openPortal}
+              joiningTier={joiningTier}
+              portalLoading={portalLoading}
+            />
           )}
 
           <View style={styles.divider} />
@@ -896,14 +864,6 @@ function Quicklink({ icon, label, onPress, external }) {
       <Text style={styles.quicklinkText}>{label}</Text>
       {external ? <Text style={styles.quicklinkExternal}>opens website {'↗'}</Text> : null}
     </Pressable>
-  );
-}
-function DetailRow({ label, value }) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
-    </View>
   );
 }
 
@@ -1048,18 +1008,10 @@ const styles = StyleSheet.create({
   okText: { fontFamily: fonts.body, fontSize: 13.6, color: colors.ok, marginTop: 10 },
 
   // membership (.account-sub-*, .account-free-access-*, .account-upsell-list)
-  subDetails: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)', borderRadius: 6, paddingVertical: 13, paddingHorizontal: 14, marginBottom: 14 },
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 },
-  detailLabel: { fontFamily: fonts.body, fontSize: 13.6, color: colors.inkDim },
-  detailValue: { fontFamily: fonts.bodyBold, fontSize: 13.6, color: colors.ink },
-  cancelNote: { marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: 'rgba(251,232,211,0.08)', fontFamily: fonts.body, fontSize: 12.5, color: colors.warn },
   fineprint: { fontFamily: fonts.mono, fontSize: 10.6, lineHeight: 17, color: colors.inkFaint },
   freeNote: { backgroundColor: colors.oliveShadow, borderWidth: 1, borderColor: colors.oliveDeep, borderRadius: 6, paddingVertical: 14, paddingHorizontal: 16, alignItems: 'flex-start' },
   freeBadge: { backgroundColor: colors.olive, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8 },
   freeBadgeText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.5, textTransform: 'uppercase', color: '#1a1408' },
   freeNoteText: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 20, color: colors.inkDim },
-  upsellItem: { flexDirection: 'row', gap: 10, marginBottom: 8 },
-  upsellCheck: { fontFamily: fonts.monoBold, fontSize: 13.6, color: colors.brass, width: 14 },
-  upsellText: { flex: 1, fontFamily: fonts.body, fontSize: 13.6, lineHeight: 19, color: colors.inkDim },
   divider: { height: 1, backgroundColor: 'rgba(251,232,211,0.12)', marginTop: 16, marginBottom: 18 }
 });

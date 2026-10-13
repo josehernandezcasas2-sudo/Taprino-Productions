@@ -5004,6 +5004,40 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .account-rail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 1.2rem; }
 /* /account#membership from the tab bar: clear the sticky header. */
 #membership { scroll-margin-top: 92px; }
+
+/* Membership plan picker (components/MembershipPlans.js), from
+   mockups/membership-tiers.html. */
+.account-card-lede { font-size: 0.9rem; line-height: 1.55; color: var(--ink-dim); margin: 0 0 1.1rem; }
+.mp-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.8rem; margin-top: 1.3rem; }
+.account-card-lede + .mp-grid { margin-top: 0.4rem; }
+.mp-plan { position: relative; background: var(--void); border: 1px solid rgba(251,232,211,0.1); border-radius: 8px; padding: 1.1rem 1rem 1rem; display: flex; flex-direction: column; }
+.mp-plan.current { border-color: rgba(132,205,152,0.5); }
+.mp-plan.featured { border-color: var(--olive); box-shadow: 0 0 0 1px rgba(231,162,85,0.25) inset; }
+.mp-plan.sponsor { border-color: var(--brass); background: linear-gradient(180deg, rgba(248,95,115,0.08), rgba(12,19,31,0)); }
+.mp-flag { position: absolute; top: -10px; left: 12px; font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 0.15rem 0.55rem; border-radius: 999px; background: var(--void-2); border: 1px solid currentColor; white-space: nowrap; }
+.mp-flag.pop { color: var(--olive); }
+.mp-flag.now { color: var(--ok); }
+.mp-flag.ltd { color: var(--brass); }
+.mp-flag + .mp-name { margin-top: 0.55rem; }
+.mp-name { font-family: var(--font-display); font-weight: 700; font-size: 1.05rem; color: var(--ink); }
+.mp-price { font-family: var(--font-display); font-weight: 700; font-size: 1.6rem; margin: 0.35rem 0 0; font-variant-numeric: tabular-nums; color: var(--ink); }
+.mp-price small { font-family: var(--font-mono); font-weight: 400; font-size: 0.74rem; color: var(--ink-faint); margin-left: 0.2rem; }
+.mp-tag { font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); margin: 0.15rem 0 0.8rem; min-height: 1.1em; }
+.mp-perks { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: 0.4rem; font-size: 0.86rem; line-height: 1.4; color: var(--ink-dim); flex: 1; }
+.mp-perks li { padding-left: 1.3rem; position: relative; }
+.mp-perks li::before { content: "✓"; position: absolute; left: 0; color: var(--ok); font-family: var(--font-mono); }
+.mp-perks li.no { color: var(--ink-faint); }
+.mp-perks li.no::before { content: "–"; color: var(--ink-faint); }
+.mp-btn { display: block; width: 100%; text-align: center; border-radius: 999px; padding: 0.65rem; font-family: var(--font-display); font-weight: 600; font-size: 0.84rem; text-decoration: none; border: 1px solid rgba(251,232,211,0.2); background: transparent; color: var(--ink); cursor: pointer; }
+.mp-btn:hover { border-color: var(--olive); }
+.mp-btn.primary { background: var(--olive); color: var(--olive-shadow); border-color: var(--olive); }
+.mp-btn.primary:hover { background: var(--olive-bright); }
+.mp-btn.brass { background: var(--brass); color: #241a05; border-color: var(--brass); }
+.mp-btn.ghost { color: var(--ink-faint); border-style: dashed; cursor: default; }
+.mp-btn.ghost:hover { border-color: rgba(251,232,211,0.2); }
+.mp-btn:disabled { opacity: 0.6; cursor: wait; }
+@media (max-width: 1000px) { .mp-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 560px) { .mp-grid { grid-template-columns: 1fr; gap: 1.1rem; } .mp-plan { padding: 1.25rem 1rem 1.1rem; } }
 @media (max-width: 900px) {
   .account-shell { flex-direction: column; }
   .account-rail { width: 100%; }

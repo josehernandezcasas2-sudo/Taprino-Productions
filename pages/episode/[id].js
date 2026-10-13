@@ -84,6 +84,7 @@ export async function getServerSideProps({ req, params, query, res }) {
     props: {
       episode: safeEpisode,
       isSubscriber: account.isSubscriber,
+      adFree: account.adFree,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       isSignedIn: account.isSignedIn,
@@ -106,7 +107,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -229,20 +230,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
       openSignIn({ redirectUrl: router.asPath });
       return;
     }
+    // There's more than one plan now, so the paywall sends them to the
+    // picker on the account page rather than guessing a tier.
     setCheckoutLoading(true);
-    try {
-      const res = await fetch('/api/create-checkout-session', { method: 'POST' });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || 'Checkout is not configured yet — add your Stripe keys to .env.local.');
-        setCheckoutLoading(false);
-      }
-    } catch (err) {
-      alert('Could not start checkout.');
-      setCheckoutLoading(false);
-    }
+    router.push('/account#membership');
   }
 
   return (
@@ -359,13 +350,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, isSign
                 drops, deleted scenes, and creator updates before anyone else.
               </p>
               <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
-                {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
+                {checkoutLoading ? 'Opening…' : 'See plans'}
               </button>
             </div>
           ) : (
             <VideoPlayer
               episode={playingEpisode}
-              adsEnabled={!showingTrailer && !isSubscriber && !isAdmin && episode.tier === 'free' && episode.adsEnabled !== false}
+              // Ads follow the membership tier, not "any member": Standard
+              // still gets them (lib/membershipTiers.js adFree).
+              adsEnabled={!showingTrailer && !adFree && !isAdmin && episode.tier === 'free' && episode.adsEnabled !== false}
               onEnded={handleEnded}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}

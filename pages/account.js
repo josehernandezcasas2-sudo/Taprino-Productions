@@ -11,10 +11,12 @@ import { BANNER_COLORS } from '../lib/profileBanner';
 import { HeartIcon, SparkleIcon, PlayIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
+import MembershipPlans from '../components/MembershipPlans';
+import { memberBadge } from '../lib/membershipTiers';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt } = await getAccountDashboardData(req);
+  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, plans } = await getAccountDashboardData(req);
 
   const episodes = await getPublicEpisodes();
   const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
@@ -23,6 +25,8 @@ export async function getServerSideProps({ req, res }) {
     props: {
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
+      tier: account.tier,
+      plans,
       email: account.email,
       isAdmin: account.isAdmin,
       isSubAdmin: account.isSubAdmin,
@@ -85,27 +89,19 @@ function shrinkAvatar(file) {
   });
 }
 
-function formatMoney(amountInCents, currency) {
-  if (amountInCents == null || !currency) return null;
-  try {
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency.toUpperCase() }).format(amountInCents / 100);
-  } catch (err) {
-    return `$${(amountInCents / 100).toFixed(2)}`;
-  }
-}
-
 function formatDate(ms) {
   if (!ms) return null;
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId }) {
+export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId }) {
   const iconOverrides = usePlayerIconOverrides();
   const { signOut, openUserProfile } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  // Which plan's Join button is opening Checkout (null = none).
+  const [joiningTier, setJoiningTier] = useState(null);
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState(null);
@@ -198,26 +194,38 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
 
   // Join: straight into Stripe Checkout (this page only renders signed
   // in, so no sign-in detour like the episode paywall needs).
-  async function startCheckout() {
-    setCheckoutLoading(true);
+  async function startCheckout(planTier) {
+    setJoiningTier(planTier);
     try {
       const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ returnTo: '/account' })
+        body: JSON.stringify({ tier: planTier, returnTo: '/account' })
       });
       const data = await res.json();
       if (data.url) {
         window.location.href = data.url;
       } else {
         alert(data.error || 'Checkout isn’t available right now.');
-        setCheckoutLoading(false);
+        setJoiningTier(null);
       }
     } catch (err) {
       alert('Could not start checkout.');
-      setCheckoutLoading(false);
+      setJoiningTier(null);
     }
   }
+
+  // Team, comped and promo-code accounts have Premium without a
+  // subscription — the picker gives way to a note saying so.
+  const freeAccessNote = isAdmin
+    ? `You have ${SITE.premiumTier} as part of the Studio Tapa team — no payment needed, ever.`
+    : isSubAdmin
+      ? `You have ${SITE.premiumTier} as a sub-admin on the team — no payment needed, ever.`
+      : isComped
+        ? 'Your access was given to you by the team — it’s free, and no payment is needed.'
+        : promoAccessExpiresAt
+          ? `You have ${SITE.premiumTier} from a redeemed code, through ${formatDate(promoAccessExpiresAt)}. Redeeming another code before then adds to this instead of replacing it.`
+          : null;
 
   async function openPortal() {
     setPortalLoading(true);
@@ -326,10 +334,6 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
   // several that all describe the same person.
   const roleBadge = isAdmin ? 'Admin' : isSubAdmin ? 'Sub-admin' : isCreator ? 'Creator' : null;
 
-  const priceLabel = subscriptionDetails
-    ? formatMoney(subscriptionDetails.amount, subscriptionDetails.currency)
-    : null;
-
   return (
     <>
       <HeaderNav
@@ -354,7 +358,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                 <div className="account-identity-name-row">
                   <h3>{profile && profile.displayName ? profile.displayName : (email || 'Your account')}</h3>
                   {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
-                  {isSubscriber && <span className="account-tier-badge">{SITE.premiumTier} member</span>}
+                  {memberBadge(tier, SITE.premiumTier) && <span className="account-tier-badge">{memberBadge(tier, SITE.premiumTier)}</span>}
                 </div>
                 <div className="account-identity-sub">{email ? <>Signed in as {email}</> : 'Signed in'}</div>
               </div>
@@ -369,6 +373,43 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
           <div className="account-shell">
             {/* MAIN COLUMN — identity-facing settings */}
             <div className="account-main">
+              {/* Membership: the plan picker (components/MembershipPlans.js);
+                  id = where the tab bar's Membership row lands. */}
+              <div className="account-card" id="membership">
+                <div className="account-subheading">Membership</div>
+                <MembershipPlans
+                  plans={plans}
+                  tier={tier}
+                  subscriptionDetails={subscriptionDetails}
+                  freeAccessNote={freeAccessNote}
+                  onJoin={startCheckout}
+                  onPortal={openPortal}
+                  joiningTier={joiningTier}
+                  portalLoading={portalLoading}
+                />
+                <div className="account-divider" />
+                <div className="account-subheading" style={{ fontSize: '0.72rem' }}>Have a code?</div>
+                <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input
+                    type="text"
+                    value={redeemInput}
+                    onChange={(e) => setRedeemInput(e.target.value)}
+                    placeholder="XXXX-XXXX-XXXX"
+                    style={{ flex: 1 }}
+                    disabled={redeeming}
+                  />
+                  <button className="account-btn-secondary" type="submit" style={{ width: 'auto' }} disabled={redeeming || !redeemInput.trim()}>
+                    {redeeming ? 'Checking…' : 'Redeem'}
+                  </button>
+                </form>
+                {redeemError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{redeemError}</p>}
+                {redeemSuccess && (
+                  <p style={{ color: 'var(--ok)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
+                    Code accepted — you now have {SITE.premiumTier} through {formatDate(redeemSuccess)}. Refreshing…
+                  </p>
+                )}
+              </div>
+
 
               <div className="account-card">
                 <div className="account-card-head">
@@ -744,104 +785,6 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
 
             </div>
 
-            {/* RIGHT RAIL — membership status + redeem code */}
-            <div className="account-rail">
-              {/* id: the tab bar's Membership row lands here (/account#membership). */}
-              <div className="account-card" id="membership">
-                <div className="account-subheading">Membership</div>
-
-                {isSubscriber ? (
-                  <>
-                    {(isAdmin || isSubAdmin || isComped) ? (
-                      <div className="account-free-access-note">
-                        <span className="account-free-access-badge">Free access</span>
-                        <p>
-                          {isAdmin && `You have ${SITE.premiumTier} as part of the Studio Tapa team — no payment needed, ever.`}
-                          {!isAdmin && isSubAdmin && `You have ${SITE.premiumTier} as a sub-admin on the team — no payment needed, ever.`}
-                          {!isAdmin && !isSubAdmin && isComped && `Your access was given to you by the team — it's free, and no payment is needed.`}
-                        </p>
-                      </div>
-                    ) : promoAccessExpiresAt ? (
-                      <div className="account-free-access-note">
-                        <span className="account-free-access-badge">Free access</span>
-                        <p>
-                          You have {SITE.premiumTier} from a redeemed code, through {formatDate(promoAccessExpiresAt)}.
-                          Redeeming another code before then adds to this instead of replacing it.
-                        </p>
-                      </div>
-                    ) : (
-                      <>
-                        {subscriptionDetails && (
-                          <div className="account-sub-details">
-                            {subscriptionDetails.productName && (
-                              <div className="account-sub-detail-row">
-                                <span>Plan</span>
-                                <span>{subscriptionDetails.productName}</span>
-                              </div>
-                            )}
-                            {priceLabel && (
-                              <div className="account-sub-detail-row">
-                                <span>Price</span>
-                                <span>{priceLabel}{subscriptionDetails.interval ? ` / ${subscriptionDetails.interval}` : ''}</span>
-                              </div>
-                            )}
-                            <div className="account-sub-detail-row">
-                              <span>{subscriptionDetails.cancelsAtPeriodEnd ? 'Access ends' : 'Renews'}</span>
-                              <span>{formatDate(subscriptionDetails.renewsAt)}</span>
-                            </div>
-                            {subscriptionDetails.cancelsAtPeriodEnd && (
-                              <div className="account-sub-cancel-note">
-                                Your subscription is set to cancel — you'll keep {SITE.premiumTier} access until then.
-                              </div>
-                            )}
-                          </div>
-                        )}
-                        <button className="account-btn-primary" onClick={openPortal} disabled={portalLoading}>
-                          {portalLoading ? 'Opening…' : 'Manage subscription'}
-                        </button>
-                        <div className="account-fineprint">
-                          "Manage subscription" opens Stripe's own secure page — cancel, update your card, or view invoices there.
-                        </div>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <ul className="account-upsell-list">
-                      <li>Ad-free on-demand viewing across the whole library (live channels run ads for everyone)</li>
-                      <li>Early access to new episodes before free release</li>
-                      <li>Gated series only {SITE.premiumTier} members can watch</li>
-                      <li>Back the creators you watch, directly</li>
-                    </ul>
-                    <button className="account-btn-primary" onClick={startCheckout} disabled={checkoutLoading}>
-                      {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
-                    </button>
-                  </>
-                )}
-
-                <div className="account-divider" />
-                <div className="account-subheading" style={{ fontSize: '0.72rem' }}>Have a code?</div>
-                <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    value={redeemInput}
-                    onChange={(e) => setRedeemInput(e.target.value)}
-                    placeholder="XXXX-XXXX-XXXX"
-                    style={{ flex: 1 }}
-                    disabled={redeeming}
-                  />
-                  <button className="account-btn-secondary" type="submit" style={{ width: 'auto' }} disabled={redeeming || !redeemInput.trim()}>
-                    {redeeming ? 'Checking…' : 'Redeem'}
-                  </button>
-                </form>
-                {redeemError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{redeemError}</p>}
-                {redeemSuccess && (
-                  <p style={{ color: 'var(--ok)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
-                    Code accepted — you now have {SITE.premiumTier} through {formatDate(redeemSuccess)}. Refreshing…
-                  </p>
-                )}
-              </div>
-            </div>
           </div>
         </main>
       ) : (

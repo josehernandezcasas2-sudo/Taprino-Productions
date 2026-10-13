@@ -157,7 +157,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, totalViews, knownForGenres, roleBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -201,6 +201,7 @@ export default function PublicProfile() {
             <View style={styles.nameRow}>
               <Text style={styles.name}>{profile.displayName}</Text>
               {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
+              {memberBadge ? <View style={[styles.roleBadge, { backgroundColor: colors.brassDeep }]}><Text style={[styles.roleBadgeText, { color: colors.ink }]}>{memberBadge}</Text></View> : null}
               {crewRecord ? <TierChip person={crewRecord} /> : null}
             </View>
             {profile.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}

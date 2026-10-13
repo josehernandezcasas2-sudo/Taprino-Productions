@@ -17,11 +17,14 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
-  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt } = await getAccountDashboardData(req);
+  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, plans } = await getAccountDashboardData(req);
 
   return res.status(200).json({
     isSignedIn: account.isSignedIn,
     isSubscriber: account.isSubscriber,
+    tier: account.tier,
+    adFree: account.adFree,
+    plans,
     email: account.email,
     userId: account.userId,
     isAdmin: account.isAdmin,

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Membership Tiers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --olive:#e7a255; --olive-bright:#f2bf88; --olive-shadow:#342514;
+    --brass:#f85f73; --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --ok:#84cd98; --warn:#e0863c; --sky:#8499dc;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+    --line: rgba(251,232,211,0.1);
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--surface-0); color:var(--ink); font-family:var(--font-body); padding:32px 16px 80px; }
+  .wrap { max-width:1180px; margin:0 auto; }
+  .note { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); letter-spacing:0.04em; margin:0 0 0.4rem; }
+  h2 { font-family:var(--font-display); font-size:1.4rem; margin:2.6rem 0 0.3rem; }
+  h2:first-of-type { margin-top:0; }
+  .sub { color:var(--ink-dim); font-size:0.92rem; line-height:1.5; max-width:74ch; margin:0 0 1.2rem; }
+  .sub code { font-family:var(--font-mono); font-size:0.8rem; color:var(--olive); }
+
+  /* Account card chrome (styles/globals.css .account-card) */
+  .card { background:var(--surface-1); border:1px solid var(--line); border-radius:4px; padding:1.6rem 1.5rem; }
+  .subheading { font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--brass); margin-bottom:0.5rem; }
+  .lede { font-size:0.9rem; line-height:1.55; color:var(--ink-dim); margin:0 0 1.1rem; }
+
+  /* Plan picker */
+  .plans { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:0.8rem; }
+  .subheading + .plans { margin-top:1.3rem; }
+  .lede + .plans { margin-top:0.4rem; }
+  .plan { position:relative; background:var(--surface-0); border:1px solid var(--line); border-radius:8px; padding:1.1rem 1rem 1rem; display:flex; flex-direction:column; }
+  .plan.current { border-color:rgba(132,205,152,0.5); }
+  .plan.featured { border-color:var(--olive); box-shadow:0 0 0 1px rgba(231,162,85,0.25) inset; }
+  .plan.sponsor { border-color:var(--brass); background:linear-gradient(180deg, rgba(248,95,115,0.08), rgba(12,19,31,0)); }
+  .flag { position:absolute; top:-10px; left:12px; font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.08em; text-transform:uppercase; padding:0.15rem 0.55rem; border-radius:999px; background:var(--surface-1); border:1px solid currentColor; }
+  .flag + .plan-name { margin-top:0.55rem; }
+  .flag.pop { color:var(--olive); }
+  .flag.now { color:var(--ok); }
+  .flag.ltd { color:var(--brass); }
+  .plan-name { font-family:var(--font-display); font-weight:700; font-size:1.05rem; }
+  .plan-price { font-family:var(--font-display); font-weight:700; font-size:1.6rem; margin:0.35rem 0 0; font-variant-numeric:tabular-nums; }
+  .plan-price small { font-family:var(--font-mono); font-weight:400; font-size:0.76rem; color:var(--ink-faint); margin-left:0.2rem; }
+  .plan-tag { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); margin:0.15rem 0 0.8rem; min-height:1.1em; }
+  .perks { list-style:none; margin:0 0 1rem; padding:0; display:grid; gap:0.4rem; font-size:0.86rem; line-height:1.4; color:var(--ink-dim); flex:1; }
+  .perks li { padding-left:1.3rem; position:relative; }
+  .perks li::before { content:"✓"; position:absolute; left:0; color:var(--ok); font-family:var(--font-mono); }
+  .perks li.no { color:var(--ink-faint); }
+  .perks li.no::before { content:"–"; color:var(--ink-faint); }
+  .btn { display:block; text-align:center; border-radius:999px; padding:0.65rem; font-family:var(--font-display); font-weight:600; font-size:0.84rem; text-decoration:none; border:1px solid rgba(251,232,211,0.2); color:var(--ink); }
+  .btn.primary { background:var(--olive); color:var(--olive-shadow); border-color:var(--olive); }
+  .btn.brass { background:var(--brass); color:#241a05; border-color:var(--brass); }
+  .btn.ghost { color:var(--ink-faint); border-style:dashed; }
+  .fine { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); line-height:1.6; margin-top:1rem; }
+
+  /* Comparison table */
+  table { width:100%; border-collapse:collapse; font-size:0.88rem; }
+  th, td { padding:0.6rem 0.7rem; border-bottom:1px solid var(--line); text-align:left; vertical-align:top; }
+  th { font-family:var(--font-mono); font-size:0.76rem; letter-spacing:0.1em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; }
+  td.y { color:var(--ok); } td.n { color:var(--ink-faint); } td.m { color:var(--warn); }
+  td.later { color:var(--ink-faint); font-style:italic; }
+
+  /* Phone */
+  .phone { width:360px; max-width:100%; border:1px solid rgba(251,232,211,0.15); border-radius:36px; padding:52px 14px 24px; background:var(--surface-0); }
+  .phone .card { padding:1.1rem 1rem; }
+  .phone .plans { grid-template-columns:1fr; gap:1.1rem; }
+  .phone .plan { padding:1.25rem 1rem 1.1rem; }
+  .phone .perks { gap:0.3rem; font-size:0.84rem; }
+  .cap { font-family:var(--font-mono); font-size:0.76rem; color:var(--ink-faint); margin:0.5rem 0 0; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+  @media (max-width: 900px) { .plans { grid-template-columns:1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">MOCKUP · membership tiers · prices from Jose 2026-10-12, "review later"</p>
+
+  <h2>1. Membership card on /account — free account, picking a plan</h2>
+  <p class="sub">Replaces the single benefits list + "Join Tapa +" button. Four plans side by side; names, prices and the Sponsor flag come from Stripe, so changing a price or ending the Sponsor offer needs no code change. The plan you're on is marked, and Join opens Stripe Checkout for that plan.</p>
+
+  <div class="card">
+    <div class="subheading">Membership</div>
+    <p class="lede">Pick how you want to watch. Switch or cancel any time from Manage subscription.</p>
+    <div class="plans">
+      <div class="plan current">
+        <span class="flag now">Your plan</span>
+        <div class="plan-name">Basic</div>
+        <div class="plan-price">Free</div>
+        <div class="plan-tag">with ads</div>
+        <ul class="perks">
+          <li>The free library, with ads</li>
+          <li>Live TV</li>
+          <li class="no">Premium titles</li>
+          <li class="no">Early screenings</li>
+        </ul>
+        <span class="btn ghost">Current plan</span>
+      </div>
+
+      <div class="plan">
+        <div class="plan-name">Standard</div>
+        <div class="plan-price">$7.99<small>/ month</small></div>
+        <div class="plan-tag">with ads</div>
+        <ul class="perks">
+          <li>Everything in Basic</li>
+          <li>Premium titles and gated films</li>
+          <li>Early screenings, one day after Premium</li>
+          <li class="no">Ad-free</li>
+        </ul>
+        <a class="btn" href="#">Join Standard</a>
+      </div>
+
+      <div class="plan featured">
+        <span class="flag pop">Most complete</span>
+        <div class="plan-name">Premium</div>
+        <div class="plan-price">$12.99<small>/ month</small></div>
+        <div class="plan-tag">no ads</div>
+        <ul class="perks">
+          <li>Everything in Standard</li>
+          <li>Ad-free on-demand viewing</li>
+          <li>Same-day early screenings</li>
+          <li>5% off the Studio Tapa shop <em style="color:var(--ink-faint)">(soon)</em></li>
+        </ul>
+        <a class="btn primary" href="#">Join Premium</a>
+      </div>
+
+      <div class="plan sponsor">
+        <span class="flag ltd">Launch offer · limited time</span>
+        <div class="plan-name">Sponsor</div>
+        <div class="plan-price">$6.99<small>/ month</small></div>
+        <div class="plan-tag">no ads · everything in Premium</div>
+        <ul class="perks">
+          <li>Everything in Premium</li>
+          <li>Keep this price for as long as you stay</li>
+          <li>Sponsor badge on your profile</li>
+          <li>5% off the Studio Tapa shop <em style="color:var(--ink-faint)">(soon)</em></li>
+        </ul>
+        <a class="btn brass" href="#">Become a Sponsor</a>
+      </div>
+    </div>
+    <div class="fine">Live channels run ads on every plan. Prices in USD; payment and cancellation are handled by Stripe. Have a code? Redeem it below.</div>
+  </div>
+
+  <h2>2. Same card for a member</h2>
+  <p class="sub">A paying member sees their plan first (price, renewal, Manage subscription — as today), then the other plans as "Switch to…". Upgrades and downgrades go through Stripe's portal, which prorates them.</p>
+  <div class="card">
+    <div class="subheading">Membership</div>
+    <div class="plans">
+      <div class="plan current">
+        <span class="flag now">Your plan</span>
+        <div class="plan-name">Standard</div>
+        <div class="plan-price">$7.99<small>/ month</small></div>
+        <div class="plan-tag">Renews Nov 12 · Visa ••4421</div>
+        <ul class="perks">
+          <li>Premium titles and gated films</li>
+          <li>Early screenings, one day after Premium</li>
+          <li class="no">Ad-free</li>
+        </ul>
+        <a class="btn" href="#">Manage subscription</a>
+      </div>
+      <div class="plan featured">
+        <div class="plan-name">Premium</div>
+        <div class="plan-price">$12.99<small>/ month</small></div>
+        <div class="plan-tag">no ads · same-day screenings</div>
+        <ul class="perks"><li>Everything in Standard</li><li>Ad-free on-demand viewing</li><li>Same-day early screenings</li></ul>
+        <a class="btn primary" href="#">Switch to Premium</a>
+      </div>
+      <div class="plan sponsor">
+        <span class="flag ltd">Launch offer</span>
+        <div class="plan-name">Sponsor</div>
+        <div class="plan-price">$6.99<small>/ month</small></div>
+        <div class="plan-tag">everything in Premium</div>
+        <ul class="perks"><li>Everything in Premium</li><li>Keep this price for as long as you stay</li><li>Sponsor badge</li></ul>
+        <a class="btn brass" href="#">Switch to Sponsor</a>
+      </div>
+      <div class="plan">
+        <div class="plan-name">Basic</div>
+        <div class="plan-price">Free</div>
+        <div class="plan-tag">with ads</div>
+        <ul class="perks"><li>The free library, with ads</li><li class="no">Premium titles</li></ul>
+        <span class="btn ghost">Cancel in Manage subscription</span>
+      </div>
+    </div>
+  </div>
+
+  <h2>3. App — Account screen, stacked</h2>
+  <p class="sub">Same cards, one per row. Join opens Stripe Checkout in the in-app browser (as it does now).</p>
+  <div class="row">
+    <div>
+      <div class="phone"><div class="card">
+        <div class="subheading">Membership</div>
+        <p class="lede" style="font-size:0.86rem">Pick how you want to watch.</p>
+        <div class="plans">
+          <div class="plan current"><span class="flag now">Your plan</span><div class="plan-name">Basic</div><div class="plan-price">Free</div><div class="plan-tag">with ads</div><ul class="perks"><li>The free library, with ads</li><li class="no">Premium titles</li></ul><span class="btn ghost">Current plan</span></div>
+          <div class="plan"><div class="plan-name">Standard</div><div class="plan-price">$7.99<small>/ month</small></div><div class="plan-tag">with ads</div><ul class="perks"><li>Premium titles and gated films</li><li>Early screenings, one day after Premium</li></ul><a class="btn" href="#">Join Standard</a></div>
+          <div class="plan featured"><span class="flag pop">Most complete</span><div class="plan-name">Premium</div><div class="plan-price">$12.99<small>/ month</small></div><div class="plan-tag">no ads</div><ul class="perks"><li>Everything in Standard</li><li>Ad-free</li><li>Same-day early screenings</li></ul><a class="btn primary" href="#">Join Premium</a></div>
+          <div class="plan sponsor"><span class="flag ltd">Launch offer</span><div class="plan-name">Sponsor</div><div class="plan-price">$6.99<small>/ month</small></div><div class="plan-tag">everything in Premium</div><ul class="perks"><li>Everything in Premium</li><li>Keep this price for as long as you stay</li><li>Sponsor badge</li></ul><a class="btn brass" href="#">Become a Sponsor</a></div>
+        </div>
+      </div></div>
+      <p class="cap">App · Account → Membership</p>
+    </div>
+  </div>
+
+  <h2>4. What each plan unlocks (what the code will enforce)</h2>
+  <p class="sub">From your message. "Later" rows are written down but not built in the first pass.</p>
+  <div class="card" style="padding:0.6rem 1rem">
+    <table>
+      <tr><th></th><th>Basic</th><th>Standard</th><th>Premium</th><th>Sponsor</th></tr>
+      <tr><td>Price</td><td>Free</td><td>$7.99 / mo</td><td>$12.99 / mo</td><td>$6.99 / mo · launch only</td></tr>
+      <tr><td>Ads on on-demand video</td><td class="m">yes</td><td class="m">yes</td><td class="y">none</td><td class="y">none</td></tr>
+      <tr><td>Ads on live channels</td><td class="m">yes</td><td class="m">yes</td><td class="m">yes</td><td class="m">yes</td></tr>
+      <tr><td>Premium titles and gated films</td><td class="n">no</td><td class="y">yes</td><td class="y">yes</td><td class="y">yes</td></tr>
+      <tr><td>Early screenings</td><td class="n">no</td><td class="m">one day after Premium</td><td class="y">same day</td><td class="y">same day</td></tr>
+      <tr><td>Studio Tapa shop discount</td><td class="n">—</td><td class="n">—</td><td class="later">5% · later</td><td class="later">5% · later</td></tr>
+      <tr><td>Profile badge</td><td class="n">—</td><td>Tapa +</td><td>Tapa +</td><td>Sponsor</td></tr>
+      <tr><td>On sale</td><td>always</td><td>always</td><td>always</td><td>a month or two after launch, then closed to new sign-ups</td></tr>
+    </table>
+  </div>
+</div>
+</body>
+</html>

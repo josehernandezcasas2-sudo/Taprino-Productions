@@ -62,7 +62,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -335,6 +335,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
               <div className="profile-name-row">
                 <h1 className="profile-name">{profile.displayName}</h1>
                 {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+                {memberBadgeLabel && <span className="account-tier-badge">{memberBadgeLabel}</span>}
                 {crewRecord && <TierChip person={crewRecord} />}
               </div>
               {profile.handle && <div className="profile-handle">@{profile.handle}</div>}

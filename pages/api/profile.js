@@ -46,6 +46,7 @@ export default async function handler(req, res) {
     totalViews: data.totalViews,
     knownForGenres: data.knownForGenres,
     roleBadge: data.roleBadge,
+    memberBadge: data.memberBadge,
     posts: data.posts,
     savedSnippets: data.savedSnippets,
     isSignedIn: data.isSignedIn,

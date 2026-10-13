@@ -47,6 +47,7 @@ export default async function handler(req, res) {
     episode: stripForViewer(data.episode, entitled),
     isSignedIn: data.account.isSignedIn,
     isSubscriber: data.account.isSubscriber,
+    adFree: data.account.adFree,
     parentSeriesName: data.parentSeriesName,
     nextEpisode: stripPlayable(data.nextEpisode),
     previousEpisode: stripPlayable(data.previousEpisode),
