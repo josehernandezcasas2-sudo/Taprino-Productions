@@ -5,6 +5,13 @@ import { SITE } from '../../lib/siteConfig';
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
+  // The app calls this too (Join Tapa + on its Account screen, with a
+  // Bearer token), so it answers preflights like the other app-facing
+  // routes.
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
@@ -36,7 +43,9 @@ export default async function handler(req, res) {
       payment_method_types: ['card'],
       line_items: [{ price: process.env.STRIPE_PRICE_ID, quantity: 1 }],
       success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${origin}/?checkout=cancelled`,
+      // From the account page (web or app) land back on it; the in-app
+      // browser then closes and the screen re-reads membership.
+      cancel_url: `${origin}${req.body && req.body.returnTo === '/account' ? '/account' : '/'}?checkout=cancelled`,
       allow_promotion_codes: true,
       customer: existingCustomerId
     });

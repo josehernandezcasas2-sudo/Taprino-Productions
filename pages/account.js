@@ -105,6 +105,7 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState(null);
@@ -192,6 +193,29 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
       setProfileError(err.message);
     } finally {
       setProfileSaving(false);
+    }
+  }
+
+  // Join: straight into Stripe Checkout (this page only renders signed
+  // in, so no sign-in detour like the episode paywall needs).
+  async function startCheckout() {
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch('/api/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ returnTo: '/account' })
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert(data.error || 'Checkout isn’t available right now.');
+        setCheckoutLoading(false);
+      }
+    } catch (err) {
+      alert('Could not start checkout.');
+      setCheckoutLoading(false);
     }
   }
 
@@ -789,9 +813,9 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
                       <li>Gated series only {SITE.premiumTier} members can watch</li>
                       <li>Back the creators you watch, directly</li>
                     </ul>
-                    <Link href="/stream" className="account-btn-primary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', boxSizing: 'border-box' }}>
-                      Join {SITE.premiumTier}
-                    </Link>
+                    <button className="account-btn-primary" onClick={startCheckout} disabled={checkoutLoading}>
+                      {checkoutLoading ? 'Opening checkout…' : `Join ${SITE.premiumTier}`}
+                    </button>
                   </>
                 )}
 

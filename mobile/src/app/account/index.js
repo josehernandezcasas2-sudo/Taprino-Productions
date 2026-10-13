@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
+import * as WebBrowser from 'expo-web-browser';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
@@ -84,6 +85,7 @@ export default function Account() {
 
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
 
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -284,6 +286,24 @@ export default function Account() {
 
   function setBannerColor(color) {
     saveBanner({ bannerColor: color }, { bannerColor: color });
+  }
+
+  // Join Tapa +: Stripe Checkout in the in-app browser (same as backing a
+  // pitch), then re-read the account so the Membership card flips.
+  async function startCheckout() {
+    setCheckoutLoading(true);
+    try {
+      const token = await withToken();
+      const data = await apiPost('/api/create-checkout-session', { returnTo: '/account' }, token);
+      if (data.url) {
+        await WebBrowser.openBrowserAsync(data.url);
+        await loadAll();
+      }
+    } catch (err) {
+      Alert.alert('Could not start checkout', err.message);
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   async function openPortal() {
@@ -802,8 +822,8 @@ export default function Account() {
                   <Text style={styles.upsellText}>{t}</Text>
                 </View>
               ))}
-              <Pressable style={[styles.btnPrimary, { marginTop: 6 }]} onPress={() => router.push('/stream')}>
-                <Text style={styles.btnPrimaryText}>Join Tapa +</Text>
+              <Pressable style={[styles.btnPrimary, { marginTop: 6 }]} onPress={startCheckout} disabled={checkoutLoading}>
+                {checkoutLoading ? <ActivityIndicator color={colors.oliveShadow} /> : <Text style={styles.btnPrimaryText}>Join Tapa +</Text>}
               </Pressable>
             </>
           )}

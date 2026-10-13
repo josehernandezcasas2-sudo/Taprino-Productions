@@ -111,7 +111,7 @@ export default function Stream() {
                   <Text style={styles.promoTitle}>Go on demand and back the creators directly.</Text>
                   <Text style={styles.promoBody}>Members get early episodes, gated series, and a direct line to what they fund.</Text>
                 </View>
-                <Pressable style={styles.promoCta} onPress={() => router.push('/account')}>
+                <Pressable style={styles.promoCta} onPress={() => router.push('/account?section=membership')}>
                   <Text style={styles.promoCtaText}>Join Tapa +</Text>
                 </Pressable>
               </View>
