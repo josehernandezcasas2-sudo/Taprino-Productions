@@ -1510,6 +1510,17 @@ button { font-family: inherit; cursor: pointer; }
   box-sizing: border-box;
   display: block;
 }
+/* The browser's own chevron sits flush against the edge; draw ours with
+   the same inset as the text. */
+.account-card select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 2.4rem;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23cab59e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0.85rem center;
+  cursor: pointer;
+}
 .account-card input:focus,
 .account-card select:focus,
 .account-card textarea:focus {
