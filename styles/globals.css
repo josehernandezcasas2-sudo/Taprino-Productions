@@ -2312,8 +2312,11 @@ button { font-family: inherit; cursor: pointer; }
     border-right: 1px solid rgba(251, 232, 211, 0.1);
   }
   .tabbar-item {
-    width: 56px;
+    /* The rail is 76px; the pill fills it bar 4px each side so a long
+       label + caret (ACCOUNT ▸) stays inside its own highlight. */
+    width: 68px;
     min-height: 56px;
+    padding: 0 2px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -2348,15 +2351,16 @@ button { font-family: inherit; cursor: pointer; }
   .tabbar-glyph { display: flex; align-items: center; justify-content: center; line-height: 1; }
   .tabbar-label {
     font-family: var(--font-mono);
-    font-size: 0.62rem;
-    letter-spacing: 0.08em;
+    font-size: 0.58rem;
+    letter-spacing: 0.04em;
     text-transform: uppercase;
     line-height: 1;
     display: inline-flex;
     align-items: center;
+    white-space: nowrap;
   }
   /* The caret points at the fly-out: right, and down when open. */
-  .tabbar-caret { display: inline-flex; align-items: center; margin-left: 3px; transform: rotate(90deg); transition: transform 0.15s ease; }
+  .tabbar-caret { display: inline-flex; align-items: center; margin-left: 2px; transform: rotate(90deg); transition: transform 0.15s ease; }
   .tabbar-item.open .tabbar-caret { transform: rotate(180deg); }
   .tabbar-dropup {
     position: absolute;
