@@ -1,4 +1,5 @@
 import { getRoleContext } from '../../lib/roles';
+import { getOwnProfile } from '../../lib/userProfiles';
 
 // Self-fetched by MobileTabBar so it can gate "My Work" to creators/admins
 // without requiring every single page that renders <MobileTabBar /> to
@@ -16,12 +17,20 @@ export default async function handler(req, res) {
   }
   res.setHeader('Cache-Control', 'private, no-store');
   const { userId, isAdmin, isCreator, isContentScheduler, canAccessAdmin } = await getRoleContext(req);
+  // The tab bar's "View profile" row needs the public URL, which is the
+  // @handle when one is set. Same rule as HeaderNav's ownProfileHref.
+  let profileHref = null;
+  if (userId) {
+    const profile = await getOwnProfile(userId).catch(() => null);
+    profileHref = `/profile/${(profile && profile.handle) || userId}`;
+  }
   return res.status(200).json({
     isSignedIn: !!userId,
     isCreator: !!isCreator,
     isAdmin: !!isAdmin,
     isContentScheduler: !!isContentScheduler,
     // Sub-admins too — HeaderNav shows the Admin Portal link on this.
-    canAccessAdmin: !!canAccessAdmin
+    canAccessAdmin: !!canAccessAdmin,
+    profileHref
   });
 }

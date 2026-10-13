@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sticky Back Button</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --olive:#e7a255; --olive-bright:#f2bf88;
+    --brass:#f85f73; --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --ok:#84cd98;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--surface-0); color:var(--ink); font-family:var(--font-body); padding: 32px 16px 80px; }
+  .wrap { max-width: 1200px; margin: 0 auto; }
+  .note { font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-faint); letter-spacing:0.04em; margin:0 0 0.4rem; }
+  h2 { font-family:var(--font-display); font-size:1.4rem; margin:2.6rem 0 0.3rem; }
+  h2:first-of-type { margin-top:0; }
+  .sub { color:var(--ink-dim); font-size:0.92rem; line-height:1.5; max-width:72ch; margin:0 0 1.2rem; }
+  .row { display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start; }
+
+  /* Fake devices, each a real scroll container so the pill's stickiness is visible. */
+  .device { border:1px solid rgba(251,232,211,0.15); background:var(--surface-0); overflow:hidden; position:relative; }
+  .desktop { width:720px; max-width:100%; height:460px; border-radius:10px; }
+  .phone { width:360px; max-width:100%; height:640px; border-radius:36px; }
+  .screen { height:100%; overflow-y:auto; scroll-behavior:smooth; }
+  .cap { font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-faint); margin:0.5rem 0 0; }
+
+  /* Site header (components/HeaderNav.js .channel-bar) */
+  .hdr { position:sticky; top:0; z-index:20; display:flex; align-items:center; gap:1rem; padding:0.9rem 1.6rem; background:rgba(20,21,28,0.92); backdrop-filter:blur(6px); border-bottom:1px solid rgba(251,232,211,0.1); }
+  .brand { font-family:var(--font-display); font-weight:700; font-size:1rem; }
+  .kick { font-family:var(--font-mono); font-size:0.72rem; letter-spacing:0.14em; color:var(--ok); }
+  .hdr .links { margin-left:auto; display:flex; gap:1rem; font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-dim); }
+
+  /* The pill, exactly today's .back-button, plus the sticky bit */
+  .back { display:inline-flex; align-items:center; gap:7px; padding:9px 14px; border-radius:999px; border:1.4px solid var(--olive); color:var(--olive); text-decoration:none; font-family:var(--font-mono); font-size:0.72rem; font-weight:bold; letter-spacing:0.04em; text-transform:uppercase; line-height:1; background:rgba(12,19,31,0.85); backdrop-filter:blur(6px); }
+  .back svg { flex-shrink:0; }
+  .back-wrap { position:sticky; top:62px; z-index:15; margin:0 0 1.2rem; }
+  .phone .back-wrap { top:58px; }
+  .stage { padding:1.6rem 1.5rem 3rem; max-width:1080px; margin:0 auto; }
+  .phone .stage { padding:1rem 1rem 6rem; }
+
+  /* Profile content stand-ins */
+  .banner { height:140px; border-radius:8px; background:linear-gradient(120deg,#283c63,#811826); }
+  .hero { display:flex; gap:14px; align-items:flex-end; margin-top:-34px; padding:0 14px; }
+  .avatar { width:72px; height:72px; border-radius:50%; background:var(--brass); border:3px solid var(--surface-0); display:flex; align-items:center; justify-content:center; font-family:var(--font-display); font-weight:700; font-size:1.6rem; color:#241a05; }
+  .name { font-family:var(--font-display); font-weight:700; font-size:1.3rem; }
+  .handle { font-family:var(--font-mono); font-size:0.74rem; color:var(--ink-faint); }
+  .acts { margin-left:auto; display:flex; gap:8px; }
+  .btn { border:1px solid rgba(251,232,211,0.2); border-radius:999px; padding:0.45rem 0.9rem; font-family:var(--font-display); font-size:0.78rem; color:var(--ink); }
+  .btn.primary { background:var(--olive); color:#342514; border-color:var(--olive); }
+  .sec { margin-top:1.4rem; }
+  .sec h3 { font-family:var(--font-mono); font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:var(--brass); margin:0 0 0.6rem; }
+  .cards { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .phone .cards { grid-template-columns:1fr 1fr; }
+  .card { background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:6px; height:120px; }
+  .card.tall { height:150px; }
+  p.body { color:var(--ink-dim); font-size:0.9rem; line-height:1.55; margin:0; }
+
+  /* Phone bits */
+  .status-bar { height:44px; }
+  .tabbar { position:absolute; left:16px; right:16px; bottom:18px; height:58px; border-radius:999px; background:rgba(41,39,25,0.96); border:1px solid rgba(251,232,211,0.12); display:flex; align-items:center; justify-content:space-around; font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-dim); z-index:60; }
+  .tabbar b { color:var(--olive); font-weight:500; }
+
+  /* App version: no native header; pill floats over the scroll */
+  .app-back { position:absolute; top:52px; left:16px; z-index:15; }
+  .app .stage { padding-top:100px; }
+
+  /* Admin card */
+  .admin { display:flex; gap:14px; align-items:center; background:var(--surface-1); border:1px solid rgba(251,232,211,0.1); border-radius:6px; padding:14px 16px; max-width:460px; }
+  .admin .swatch { width:52px; height:52px; border-radius:6px; background:var(--surface-0); display:flex; align-items:center; justify-content:center; color:var(--olive); }
+  .admin .lbl { font-family:var(--font-display); font-weight:600; font-size:0.9rem; }
+  .admin .meta { font-family:var(--font-mono); font-size:0.72rem; color:var(--ink-faint); margin-top:2px; }
+  .admin .up { margin-left:auto; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="note">MOCKUP · profile page back button · scroll inside each device</p>
+
+  <h2>1. Website — the pill stays put while you scroll</h2>
+  <p class="sub">Same pill as today (olive outline, icon, BACK). It now sticks just under the site header, so it's always one click away no matter how far down the profile you are. It gets a faint dark backing so it reads over banners and cards. Behaviour is unchanged: previous page if you came from somewhere on the site, otherwise <code>/stream</code>.</p>
+  <div class="row">
+    <div>
+      <div class="device desktop"><div class="screen">
+        <div class="hdr"><span class="brand">Studio Tapa</span><span class="kick">CONNECT</span><div class="links"><span>STREAM</span><span>LIVE</span><span>PITCH ROOM</span><span>CREW CALL</span><span>ACCOUNT</span></div></div>
+        <div class="stage">
+          <div class="back-wrap"><a class="back" href="#">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M13.5 8.5L10 12l3.5 3.5"/></svg><span>Back</span></a></div>
+          <div class="banner"></div>
+          <div class="hero"><div class="avatar">J</div><div><div class="name">Jose Hernandez-Casas</div><div class="handle">@josetapa · ✓ creator · Veteran</div></div><div class="acts"><span class="btn primary">Follow</span><span class="btn">Share</span><span class="btn">Report</span></div></div>
+          <div class="sec"><p class="body">Filmmaker and founder of Studio Tapa. Shorts, series, and the occasional podcast about making things with no money.</p></div>
+          <div class="sec"><h3>Released titles</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div><div class="card tall"></div></div></div>
+          <div class="sec"><h3>Working card</h3><div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Track record</h3><div class="cards"><div class="card"></div><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Pitches</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div><div class="card tall"></div></div></div>
+        </div>
+      </div></div>
+      <p class="cap">Desktop · scroll this to see the pill hold under the header</p>
+    </div>
+
+    <div>
+      <div class="device phone"><div class="screen">
+        <div class="status-bar"></div>
+        <div class="hdr" style="padding:0.7rem 1rem"><span class="brand">Studio Tapa</span><span class="kick">CONNECT</span><div class="links"><span>☰</span></div></div>
+        <div class="stage">
+          <div class="back-wrap"><a class="back" href="#">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M13.5 8.5L10 12l3.5 3.5"/></svg><span>Back</span></a></div>
+          <div class="banner" style="height:110px"></div>
+          <div class="hero" style="padding:0 6px"><div class="avatar">J</div><div><div class="name" style="font-size:1.1rem">Jose Hernandez-Casas</div><div class="handle">@josetapa · Veteran</div></div></div>
+          <div class="sec" style="display:flex;gap:8px"><span class="btn primary">Follow</span><span class="btn">Share</span><span class="btn">Report</span></div>
+          <div class="sec"><p class="body">Filmmaker and founder of Studio Tapa. Shorts, series, and the occasional podcast.</p></div>
+          <div class="sec"><h3>Released titles</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div></div></div>
+          <div class="sec"><h3>Working card</h3><div class="cards"><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Track record</h3><div class="cards"><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Pitches</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div></div></div>
+        </div>
+        </div>
+        <div class="tabbar"><span>HOME</span><span>DISCOVER</span><span>WATCH</span><b>ACCOUNT</b></div>
+      </div>
+      <p class="cap">Phone web · header and tab bar unchanged</p>
+    </div>
+  </div>
+
+  <h2>2. App — same pill, replacing the stock header arrow</h2>
+  <p class="sub">The profile screen drops Expo Router's grey header (title + arrow) and gets the website's pill instead, floating at the top-left over the content so it never scrolls away. Tap: back to the screen you came from, or Stream if you opened a profile link cold.</p>
+  <div class="row">
+    <div>
+      <div class="device phone app"><div class="screen">
+        <div class="status-bar"></div>
+        <div class="app-back"><a class="back" href="#">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M13.5 8.5L10 12l3.5 3.5"/></svg><span>Back</span></a></div>
+        <div class="stage">
+          <div class="banner" style="height:110px"></div>
+          <div class="hero" style="padding:0 6px"><div class="avatar">J</div><div><div class="name" style="font-size:1.1rem">Jose Hernandez-Casas</div><div class="handle">@josetapa · Veteran</div></div></div>
+          <div class="sec" style="display:flex;gap:8px"><span class="btn primary">Follow</span><span class="btn">Share</span><span class="btn">Report</span></div>
+          <div class="sec"><p class="body">Filmmaker and founder of Studio Tapa. Shorts, series, and the occasional podcast.</p></div>
+          <div class="sec"><h3>Released titles</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div></div></div>
+          <div class="sec"><h3>Working card</h3><div class="cards"><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Track record</h3><div class="cards"><div class="card"></div><div class="card"></div></div></div>
+          <div class="sec"><h3>Pitches</h3><div class="cards"><div class="card tall"></div><div class="card tall"></div></div></div>
+        </div>
+        </div>
+        <div class="tabbar"><span>HOME</span><span>DISCOVER</span><span>WATCH</span><b>ACCOUNT</b></div>
+      </div>
+      <p class="cap">App · pill floats over the scroll, no grey header bar</p>
+    </div>
+  </div>
+
+  <h2>3. Swappable icon on /admin/styles</h2>
+  <p class="sub">One new card in Styles &amp; Guides → Icons → "Header, tab bar &amp; account menu". Upload a PNG/SVG and every Back pill on the site and in the app uses it; remove it and the built-in chevron comes back.</p>
+  <div class="admin">
+    <div class="swatch"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9.5"/><path d="M13.5 8.5L10 12l3.5 3.5"/></svg></div>
+    <div><div class="lbl">Back button</div><div class="meta">built-in · no upload yet</div></div>
+    <span class="btn up">Upload image</span>
+  </div>
+</div>
+</body>
+</html>

@@ -6,6 +6,7 @@ import { colors, fonts } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
 import { useUnreadMessages } from '../lib/useUnread';
+import { useOwnProfile, ownProfileHref } from './TopNav';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
@@ -49,8 +50,11 @@ const GROUPS = {
   account: {
     label: 'Account',
     Icon: AccountIcon,
-    items: [
+    // A function, like MobileTabBar.js's: "View profile" only exists once
+    // the signed-in viewer's own profile is known (TopNav's cache).
+    items: (profileHref) => [
       { href: '/account', label: 'Settings / Account' },
+      ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
       { href: '/messages', label: 'Messages', badge: 'messages' },
       { href: '/account/wishlist', label: 'My List' },
       { href: '/account/my-work', label: 'My Work' }
@@ -88,6 +92,7 @@ export default function BottomNav() {
   // Unread conversations: a dot on the Account tab and a count on the
   // Messages row (the website's header badge).
   const unreadMessages = useUnreadMessages();
+  const profileHref = ownProfileHref(useOwnProfile());
 
   useEffect(() => { setOpenKey(null); }, [pathname]);
 
@@ -144,7 +149,7 @@ export default function BottomNav() {
             ]}
           >
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
-            {openGroup.items.map((entry) => (
+            {(typeof openGroup.items === 'function' ? openGroup.items(profileHref) : openGroup.items).map((entry) => (
               <Pressable
                 key={entry.href}
                 style={({ pressed }) => [styles.dropupItem, pressed && styles.dropupItemPressed]}

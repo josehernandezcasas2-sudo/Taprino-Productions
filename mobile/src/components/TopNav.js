@@ -54,6 +54,23 @@ export function updateOwnProfileCache(patch) {
   ownProfileCache = { ...(ownProfileCache || {}), ...patch };
   ownProfileListeners.forEach((fn) => fn(ownProfileCache));
 }
+// The same cache for anything outside the header (BottomNav's "View
+// profile" row). TopNav fills it; this only follows along.
+export function useOwnProfile() {
+  const [ownProfile, setOwnProfile] = useState(ownProfileCache);
+  useEffect(() => {
+    ownProfileListeners.add(setOwnProfile);
+    return () => { ownProfileListeners.delete(setOwnProfile); };
+  }, []);
+  return ownProfile;
+}
+// Public profile route for the signed-in viewer: /profile/<@handle>, or
+// the user id until they pick a handle (pages/profile/[userId].js takes
+// either). Null until the cache has loaded.
+export function ownProfileHref(ownProfile) {
+  if (!ownProfile || !ownProfile.userId) return null;
+  return `/profile/${ownProfile.handle || ownProfile.userId}`;
+}
 
 // The branded header on every screen that's a direct bottom-nav
 // destination (detail screens keep Expo Router's back-button header).
@@ -92,7 +109,7 @@ export default function TopNav() {
       if (!token) return;
       const profile = await apiGet('/api/account/profile', token).catch(() => null);
       if (!cancelled && profile) {
-        updateOwnProfileCache({ avatarUrl: profile.avatarUrl || null, stayInStream: !!profile.stayInStream });
+        updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, avatarUrl: profile.avatarUrl || null, stayInStream: !!profile.stayInStream });
       }
     })();
     return () => { cancelled = true; };

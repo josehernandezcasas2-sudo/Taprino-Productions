@@ -114,7 +114,7 @@ export default function Account() {
     }
     setDashboard(dash);
     setProfile(profileData);
-    if (profileData) updateOwnProfileCache({ avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
+    if (profileData) updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
     setOriginalAge(profileData ? profileData.age ?? null : null);
   }
 
@@ -162,7 +162,9 @@ export default function Account() {
       const token = await withToken();
       const data = await apiPost('/api/account/profile', profile, token);
       setProfile((p) => ({ ...p, avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl, avatarBase64: undefined, removeAvatar: false }));
-      if ('avatarUrl' in data) updateOwnProfileCache({ avatarUrl: data.avatarUrl });
+      // Handle too, so BottomNav's "View profile" row points at the new
+      // @handle straight away.
+      updateOwnProfileCache({ handle: profile.handle || null, ...('avatarUrl' in data ? { avatarUrl: data.avatarUrl } : {}) });
       setProfileSaved(true);
       setOriginalAge(profile.age ?? null);
       setAgeChangeConfirmed(false);

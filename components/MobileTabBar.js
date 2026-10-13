@@ -83,6 +83,9 @@ const GROUPS = {
     // header nav already uses for its own "Your work" link.
     items: (roles) => [
       { href: '/account', label: 'Settings / Account' },
+      // Their public page, as anyone else sees it (/api/my-role sends
+      // the @handle URL once signed in).
+      ...(roles.profileHref ? [{ href: roles.profileHref, label: 'View profile' }] : []),
       { href: '/wishlist', label: 'My List' },
       ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
