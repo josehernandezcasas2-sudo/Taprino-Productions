@@ -12,6 +12,8 @@ import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
 import MembershipPlans from '../components/MembershipPlans';
 import { memberBadge } from '../lib/membershipTiers';
+import { avatarStyle } from '../lib/profileBanner';
+import RepositionFrame, { parsePosition, formatPosition } from '../components/RepositionFrame';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -106,6 +108,18 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  // Reposition mode for the banner / avatar photo (components/RepositionFrame.js):
+  // which one is being dragged, and where it was so Cancel can put it back.
+  const [reposition, setReposition] = useState(null);
+  const [positionBackup, setPositionBackup] = useState(null);
+  function startReposition(which) {
+    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
+    setReposition(which);
+  }
+  function cancelReposition() {
+    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar }));
+    setReposition(null);
+  }
   // Live availability for the handle field: { handle, ok, reason }. ok is
   // null while nothing has been checked (empty, or unchanged from what's
   // saved). The save still re-checks; the DB's unique index is final.
@@ -369,7 +383,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
 
           <div className="account-identity">
             <div className="account-identity-top">
-              <div className="account-avatar" style={{ backgroundImage: profile && profile.avatarUrl ? `url(${profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+              <div className="account-avatar" style={avatarStyle(profile && profile.avatarUrl, profile && profile.avatarPosition)}>
                 {!(profile && profile.avatarUrl) && avatarLetter}
               </div>
               <div className="account-identity-meta">
@@ -474,10 +488,25 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                     </div>
 
                     <label style={{ marginTop: '1rem' }}>Avatar</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem' }}>
-                      <div className="account-avatar" style={{ backgroundImage: (profile.avatarBase64 || profile.avatarUrl) ? `url(${profile.avatarBase64 || profile.avatarUrl})` : undefined, backgroundSize: 'cover', backgroundPosition: 'center' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
+                      <RepositionFrame
+                        className={`account-avatar ${reposition === 'avatar' ? 'account-avatar-large' : ''}`}
+                        url={profile.avatarBase64 || profile.avatarUrl}
+                        position={profile.avatarPosition}
+                        active={reposition === 'avatar'}
+                        label="Drag the photo"
+                        onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
+                      >
                         {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
-                      </div>
+                      </RepositionFrame>
+                      {reposition === 'avatar' ? (
+                        <div className="account-reposition-actions">
+                          <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
+                          <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
+                          <span className="account-fineprint">Drag until the part you want is in the circle, then Save profile below.</span>
+                        </div>
+                      ) : (
+                      <>
                       <input
                         type="file"
                         accept="image/png,image/jpeg,image/webp"
@@ -490,14 +519,21 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         }}
                       />
                       {(profile.avatarBase64 || profile.avatarUrl) && (
+                        <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => startReposition('avatar')}>
+                          Reposition
+                        </button>
+                      )}
+                      {(profile.avatarBase64 || profile.avatarUrl) && (
                         <button
                           type="button"
                           className="account-btn-secondary"
                           style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true }))}
+                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true, avatarPosition: null }))}
                         >
                           Remove
                         </button>
+                      )}
+                      </>
                       )}
                     </div>
                     {profile.avatarBase64 && (
@@ -507,18 +543,40 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                     )}
 
                     <label>Banner <span style={{ fontWeight: 'normal', opacity: 0.65 }}>the backdrop at the top of your profile — a photo or a solid color</span></label>
-                    <div
+                    <RepositionFrame
                       className="account-banner-preview"
-                      style={
-                        (profile.bannerBase64 || profile.bannerUrl)
-                          ? { backgroundImage: `url(${profile.bannerBase64 || profile.bannerUrl})` }
-                          : profile.bannerColor ? { background: profile.bannerColor } : undefined
-                      }
+                      url={profile.bannerBase64 || profile.bannerUrl}
+                      position={profile.bannerPosition}
+                      active={reposition === 'banner'}
+                      onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+                      style={!(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor ? { background: profile.bannerColor } : undefined}
                     >
-                      <div className="account-banner-preview-avatar" style={{ backgroundImage: (profile.avatarBase64 || profile.avatarUrl) ? `url(${profile.avatarBase64 || profile.avatarUrl})` : undefined }}>
+                      {reposition === 'banner' && <div className="account-banner-guide" aria-hidden="true" />}
+                      <div className={`account-banner-preview-avatar ${reposition === 'banner' ? 'dim' : ''}`} style={avatarStyle(profile.avatarBase64 || profile.avatarUrl, profile.avatarPosition)}>
                         {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
                       </div>
-                    </div>
+                    </RepositionFrame>
+                    {reposition === 'banner' ? (
+                      <div className="account-reposition-panel">
+                        <label className="account-banner-slider">
+                          <span>Top</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="100"
+                            value={parsePosition(profile.bannerPosition).y}
+                            onChange={(e) => setProfile((p) => ({ ...p, bannerPosition: formatPosition({ x: parsePosition(p.bannerPosition).x, y: Number(e.target.value) }) }))}
+                            aria-label="Banner vertical position"
+                          />
+                          <span>Bottom</span>
+                        </label>
+                        <div className="account-reposition-actions">
+                          <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
+                          <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
+                          <span className="account-fineprint">The dashed line is where your avatar sits. Save profile below to keep it.</span>
+                        </div>
+                      </div>
+                    ) : (
                     <div className="account-banner-controls">
                       <label className="account-btn-secondary account-banner-upload">
                         {(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}
@@ -535,16 +593,22 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         />
                       </label>
                       {(profile.bannerBase64 || profile.bannerUrl) && (
+                        <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => startReposition('banner')}>
+                          Reposition
+                        </button>
+                      )}
+                      {(profile.bannerBase64 || profile.bannerUrl) && (
                         <button
                           type="button"
                           className="account-btn-secondary"
                           style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true }))}
+                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true, bannerPosition: null }))}
                         >
                           Remove photo
                         </button>
                       )}
                     </div>
+                    )}
                     <div className="account-banner-swatches" role="radiogroup" aria-label="Banner color">
                       {BANNER_COLORS.map((c) => (
                         <button

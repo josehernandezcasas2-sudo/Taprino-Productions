@@ -9,6 +9,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
 import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
+import PositionedImage from '../../components/PositionedImage';
 import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -185,7 +186,7 @@ export default function PublicProfile() {
         <View style={styles.hero}>
           <View style={styles.banner}>
             {profile.bannerUrl ? (
-              <SmartImage uri={profile.bannerUrl} style={absoluteFill} resizeMode="cover" />
+              <PositionedImage uri={profile.bannerUrl} position={profile.bannerPosition} style={absoluteFill} />
             ) : profile.bannerColor ? (
               <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
             ) : (
@@ -194,7 +195,7 @@ export default function PublicProfile() {
           </View>
           <View style={styles.header}>
             {profile.avatarUrl ? (
-              <SmartImage uri={profile.avatarUrl} style={styles.avatar} />
+              <PositionedImage uri={profile.avatarUrl} position={profile.avatarPosition} style={styles.avatar} />
             ) : (
               <View style={styles.avatar}><Text style={styles.avatarInitial}>{initial}</Text></View>
             )}

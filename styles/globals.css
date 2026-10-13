@@ -8353,6 +8353,23 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .account-banner-swatch-custom input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
 .account-banner-swatch-clear { background: none; border: 0; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-decoration: underline; }
 .account-banner-note { font-size: 0.78rem; color: var(--ink-dim); margin: -0.3rem 0 0.9rem; }
+/* Reposition mode (components/RepositionFrame.js, mockups/banner-reposition.html) */
+.reposition-frame { touch-action: none; }
+.reposition-frame.active { cursor: grab; outline: 2px solid var(--olive); outline-offset: 0; user-select: none; }
+.reposition-frame.active:active { cursor: grabbing; }
+.reposition-grip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
+.reposition-grip span { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(12,19,31,0.72); border: 1px solid rgba(251,232,211,0.25); color: var(--ink); padding: 0.4rem 0.8rem; border-radius: 999px; backdrop-filter: blur(4px); }
+.account-avatar.reposition-frame { position: relative; overflow: hidden; flex: none; }
+.account-avatar.account-avatar-large { width: 140px; height: 140px; font-size: 2.6rem; }
+.account-avatar.account-avatar-large .reposition-grip span { font-size: 0.66rem; padding: 0.3rem 0.5rem; }
+.account-banner-preview.reposition-frame.active { overflow: hidden; }
+.account-banner-preview-avatar.dim { opacity: 0.55; }
+.account-banner-guide { position: absolute; left: 0; right: 0; bottom: 34px; border-top: 1px dashed rgba(251,232,211,0.35); pointer-events: none; }
+.account-reposition-panel { margin: 1.4rem 0 0.7rem; }
+.account-banner-slider { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.8rem; font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-faint); }
+.account-banner-slider input[type=range] { flex: 1; accent-color: var(--olive); margin: 0; }
+.account-reposition-actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.account-reposition-actions .account-fineprint { flex-basis: 100%; }
 
 /* ============================================================
    Admin shell v2 (components/AdminShell.js) — grouped left nav,

@@ -12,7 +12,7 @@ import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
-import { bannerStyle } from '../../lib/profileBanner';
+import { bannerStyle, avatarStyle } from '../../lib/profileBanner';
 import ReportButton from '../../components/ReportButton';
 import { CrewCardView } from '../../components/crew/CrewBits';
 import TierChip from '../../components/crew/TierChip';
@@ -327,7 +327,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
           <div className="profile-hero-row">
             <div
               className="profile-avatar"
-              style={profile.avatarUrl ? { backgroundImage: `url(${profile.avatarUrl})` } : undefined}
+              style={avatarStyle(profile.avatarUrl, profile.avatarPosition)}
             >
               {!profile.avatarUrl && initial}
             </div>

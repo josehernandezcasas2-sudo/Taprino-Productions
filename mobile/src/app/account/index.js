@@ -17,6 +17,7 @@ import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../..
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
 import MembershipPlans from '../../components/MembershipPlans';
 import SmartImage from '../../components/SmartImage';
+import PositionedImage, { RepositionFrame } from '../../components/PositionedImage';
 import PayoutsCard from '../../components/PayoutsCard';
 
 const GENDERS = [
@@ -79,6 +80,34 @@ export default function Account() {
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [joiningTier, setJoiningTier] = useState(null);
+  // Reposition mode for the banner / avatar photo (components/PositionedImage.js
+  // RepositionFrame): which one is being dragged, and where it was so
+  // Cancel can put it back. Done saves straight away, like the photos.
+  const [reposition, setReposition] = useState(null);
+  const [positionBackup, setPositionBackup] = useState(null);
+  function startReposition(which) {
+    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
+    setReposition(which);
+  }
+  function cancelReposition() {
+    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar }));
+    setReposition(null);
+  }
+  async function doneReposition() {
+    const which = reposition;
+    setReposition(null);
+    const body = which === 'banner' ? { bannerPosition: profile.bannerPosition || null } : { avatarPosition: profile.avatarPosition || null };
+    const setStatus = which === 'banner' ? setBannerStatus : setAvatarStatus;
+    setStatus('saving');
+    try {
+      const token = await withToken();
+      await apiPost('/api/account/profile', body, token);
+      setStatus('saved');
+      setTimeout(() => setStatus((st) => (st === 'saved' ? null : st)), 2500);
+    } catch (err) {
+      setStatus(`Couldn’t save the position: ${err.message}`);
+    }
+  }
   // Live "@name is available / taken" under the handle field (same as
   // the website): checked 350 ms after typing stops, only when the draft
   // differs from what's saved. Saving re-checks; the DB index is final.
@@ -524,15 +553,29 @@ export default function Account() {
 
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
-                <View style={styles.avatar}>
-                  {avatarSrc ? <SmartImage uri={avatarSrc} style={absoluteFill} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
-                </View>
-                <Pressable style={styles.btnSmall} onPress={pickAvatar} disabled={avatarStatus === 'saving'}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
-                {avatarSrc ? (
-                  <Pressable style={styles.btnSmall} onPress={removeAvatar} disabled={avatarStatus === 'saving'}>
-                    <Text style={styles.btnSmallText}>Remove</Text>
-                  </Pressable>
-                ) : null}
+                {reposition === 'avatar' ? (
+                  <RepositionFrame uri={avatarSrc} position={profile.avatarPosition} active style={[styles.avatar, styles.avatarLarge]} label="Drag" onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))} />
+                ) : (
+                  <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={styles.avatar}>
+                    {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
+                  </PositionedImage>
+                )}
+                {reposition === 'avatar' ? (
+                  <>
+                    <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
+                    <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
+                  </>
+                ) : (
+                  <>
+                    <Pressable style={styles.btnSmall} onPress={pickAvatar} disabled={avatarStatus === 'saving'}><Text style={styles.btnSmallText}>Choose photo</Text></Pressable>
+                    {avatarSrc ? <Pressable style={styles.btnSmall} onPress={() => startReposition('avatar')}><Text style={styles.btnSmallText}>Reposition</Text></Pressable> : null}
+                    {avatarSrc ? (
+                      <Pressable style={styles.btnSmall} onPress={removeAvatar} disabled={avatarStatus === 'saving'}>
+                        <Text style={styles.btnSmallText}>Remove</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                )}
               </View>
               {avatarStatus ? (
                 <Text style={[styles.avatarStatus, avatarStatus !== 'saving' && avatarStatus !== 'saved' && { color: colors.danger }]}>
@@ -541,27 +584,44 @@ export default function Account() {
               ) : null}
 
               <Label>Banner <Text style={styles.labelNote}>the backdrop at the top of your profile — a photo or a solid color</Text></Label>
-              <View style={styles.bannerPreview}>
+              <RepositionFrame
+                uri={profile.bannerBase64 || profile.bannerUrl}
+                position={profile.bannerPosition}
+                active={reposition === 'banner'}
+                style={styles.bannerPreview}
+                onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+              >
                 {(profile.bannerBase64 || profile.bannerUrl) ? (
-                  <SmartImage uri={profile.bannerBase64 || profile.bannerUrl} style={absoluteFill} resizeMode="cover" />
+                  reposition === 'banner' ? <View style={styles.bannerGuide} pointerEvents="none" /> : null
                 ) : profile.bannerColor ? (
                   <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
                 ) : (
                   <LinearGradient colors={bannerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={absoluteFill} />
                 )}
-                <View style={styles.bannerPreviewAvatar}>
-                  {avatarSrc ? <SmartImage uri={avatarSrc} style={absoluteFill} /> : <Text style={styles.avatarLetter}>{avatarLetter}</Text>}
-                </View>
-              </View>
+                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={[styles.bannerPreviewAvatar, reposition === 'banner' && { opacity: 0.55 }]}>
+                  {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
+                </PositionedImage>
+              </RepositionFrame>
               <View style={[styles.avatarRow, { marginTop: 22 }]}>
-                <Pressable style={styles.btnSmall} onPress={pickBanner} disabled={bannerStatus === 'saving'}>
-                  <Text style={styles.btnSmallText}>{(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}</Text>
-                </Pressable>
-                {(profile.bannerBase64 || profile.bannerUrl) ? (
-                  <Pressable style={styles.btnSmall} onPress={removeBanner} disabled={bannerStatus === 'saving'}>
-                    <Text style={styles.btnSmallText}>Remove photo</Text>
-                  </Pressable>
-                ) : null}
+                {reposition === 'banner' ? (
+                  <>
+                    <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
+                    <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
+                    <Text style={styles.fineprintInline}>Drag the photo. The dashed line is where your avatar sits.</Text>
+                  </>
+                ) : (
+                  <>
+                    <Pressable style={styles.btnSmall} onPress={pickBanner} disabled={bannerStatus === 'saving'}>
+                      <Text style={styles.btnSmallText}>{(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}</Text>
+                    </Pressable>
+                    {(profile.bannerBase64 || profile.bannerUrl) ? <Pressable style={styles.btnSmall} onPress={() => startReposition('banner')}><Text style={styles.btnSmallText}>Reposition</Text></Pressable> : null}
+                    {(profile.bannerBase64 || profile.bannerUrl) ? (
+                      <Pressable style={styles.btnSmall} onPress={removeBanner} disabled={bannerStatus === 'saving'}>
+                        <Text style={styles.btnSmallText}>Remove photo</Text>
+                      </Pressable>
+                    ) : null}
+                  </>
+                )}
               </View>
               <View style={styles.swatchRow}>
                 {bannerColors.map((c) => {
@@ -941,6 +1001,11 @@ const styles = StyleSheet.create({
   handleAt: { color: colors.inkDim, fontSize: 14.4, paddingHorizontal: 10, borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(251,232,211,0.18)', borderTopLeftRadius: 4, borderBottomLeftRadius: 4, textAlignVertical: 'center', lineHeight: 40 },
   handleInput: { flex: 1, marginBottom: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' },
+  avatarLarge: { width: 140, height: 140, borderRadius: 70 },
+  bannerGuide: { position: 'absolute', left: 0, right: 0, bottom: 30, borderTopWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(251,232,211,0.35)' },
+  btnPrimarySmall: { backgroundColor: colors.olive, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 16, alignSelf: 'flex-start' },
+  btnPrimarySmallText: { fontFamily: fonts.displaySemi, fontSize: 12.5, color: colors.oliveShadow },
+  fineprintInline: { flexBasis: '100%', fontFamily: fonts.mono, fontSize: 11.5, lineHeight: 16, color: colors.inkFaint },
   avatar: { width: 52, height: 52, borderRadius: 26, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
   avatarLetter: { fontFamily: fonts.monoBold, fontSize: 20.8, color: '#241a05' },
   avatarStatus: { fontFamily: fonts.mono, fontSize: 12, color: colors.ok, marginTop: -6, marginBottom: 14 },
