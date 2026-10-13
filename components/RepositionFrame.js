@@ -99,15 +99,38 @@ export function CropWindow({ url, position, zoom = 1, onChange, onZoomChange, fr
       onZoomChange(clampZoom((Number(zoom) || 1) - 0.1));
     }
   }
-  function onWheel(e) {
-    if (!onZoomChange || !layout) return;
-    e.preventDefault();
-    onZoomChange(clampZoom((Number(zoom) || 1) + (e.deltaY < 0 ? 0.1 : -0.1)));
-  }
+  // Wheel zoom. React's onWheel is a passive listener, so preventDefault
+  // there is ignored and the page scrolled along with the zoom; a native
+  // non-passive listener can actually stop it.
+  const wheelState = useRef({ zoom, onZoomChange });
+  wheelState.current = { zoom, onZoomChange };
+  useEffect(() => {
+    const el = areaRef.current;
+    if (!el) return undefined;
+    const onWheel = (e) => {
+      const { zoom: z, onZoomChange: set } = wheelState.current;
+      if (!set) return;
+      e.preventDefault();
+      set(clampZoom((Number(z) || 1) + (e.deltaY < 0 ? 0.1 : -0.1)));
+    };
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, []);
 
+  // The whole photo area is the handle (grabbing outside the window still
+  // moves it), and touch-action: none on it keeps a finger drag from
+  // scrolling the page.
   return (
     <>
-      <div className="crop-area" ref={areaRef} style={{ height }} onWheel={onWheel}>
+      <div
+        className="crop-area"
+        ref={areaRef}
+        style={{ height }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
         {layout && (
           <>
             <img className="crop-image" src={url} alt="" draggable={false} style={layout.image} />
@@ -118,10 +141,6 @@ export function CropWindow({ url, position, zoom = 1, onChange, onZoomChange, fr
               role="slider"
               aria-label="Visible part of the photo — drag or use the arrow keys; + and − zoom"
               aria-valuetext={`${position || '50% 50%'}, zoom ${Number(zoom) || 1}`}
-              onPointerDown={onPointerDown}
-              onPointerMove={onPointerMove}
-              onPointerUp={onPointerUp}
-              onPointerCancel={onPointerUp}
               onKeyDown={onKeyDown}
             >
               {round && <div className="crop-window-ring" />}
