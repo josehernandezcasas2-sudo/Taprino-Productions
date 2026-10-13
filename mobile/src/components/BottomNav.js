@@ -55,6 +55,8 @@ const GROUPS = {
     items: (profileHref) => [
       { href: '/account', label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
+      // The Account screen scrolls itself to its Membership card.
+      { href: '/account?section=membership', label: 'Membership' },
       { href: '/messages', label: 'Messages', badge: 'messages' },
       { href: '/account/wishlist', label: 'My List' },
       { href: '/account/my-work', label: 'My Work' }

@@ -5002,6 +5002,8 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .account-shell { display: flex; align-items: flex-start; gap: 1.6rem; }
 .account-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1.2rem; }
 .account-rail { width: 320px; flex: none; display: flex; flex-direction: column; gap: 1.2rem; }
+/* /account#membership from the tab bar: clear the sticky header. */
+#membership { scroll-margin-top: 92px; }
 @media (max-width: 900px) {
   .account-shell { flex-direction: column; }
   .account-rail { width: 100%; }

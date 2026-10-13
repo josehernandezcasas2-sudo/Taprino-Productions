@@ -722,7 +722,8 @@ export default function Account({ isSignedIn, isSubscriber, email, isAdmin, isSu
 
             {/* RIGHT RAIL — membership status + redeem code */}
             <div className="account-rail">
-              <div className="account-card">
+              {/* id: the tab bar's Membership row lands here (/account#membership). */}
+              <div className="account-card" id="membership">
                 <div className="account-subheading">Membership</div>
 
                 {isSubscriber ? (

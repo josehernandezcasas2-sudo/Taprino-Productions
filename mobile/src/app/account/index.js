@@ -1,10 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator, Alert, Linking, Pressable, ScrollView,
   StyleSheet, Text, TextInput, View
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -54,6 +54,18 @@ function formatDate(ms) {
 // website itself does under 900px; gender is a pill row instead of a select.
 export default function Account() {
   const router = useRouter();
+  // ?section=membership (BottomNav's Membership row): scroll to that card
+  // once it has laid out. The y is remembered so a later visit with the
+  // same param lands there too.
+  const { section } = useLocalSearchParams();
+  const scrollRef = useRef(null);
+  const membershipY = useRef(null);
+  const scrollToMembership = () => {
+    if (section === 'membership' && scrollRef.current && membershipY.current != null) {
+      scrollRef.current.scrollTo({ y: Math.max(0, membershipY.current - 12), animated: true });
+    }
+  };
+  useEffect(() => { scrollToMembership(); }, [section]); // eslint-disable-line react-hooks/exhaustive-deps
   const { isLoaded, isSignedIn, signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
 
@@ -404,7 +416,7 @@ export default function Account() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.stage}>
+      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.stage}>
         <Pressable style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/stream'))}>
           <BackArrowIcon /><Text style={styles.backText}>Back</Text>
         </Pressable>
@@ -745,7 +757,7 @@ export default function Account() {
         </View>
 
         {/* Membership (the website's right rail, stacked below on phones) */}
-        <View style={styles.card}>
+        <View style={styles.card} onLayout={(e) => { membershipY.current = e.nativeEvent.layout.y; scrollToMembership(); }}>
           <Text style={styles.subheading}>Membership</Text>
           {dashboard.isSubscriber ? (
             (dashboard.isAdmin || dashboard.isSubAdmin || dashboard.isComped) ? (

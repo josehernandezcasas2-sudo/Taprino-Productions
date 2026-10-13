@@ -86,6 +86,9 @@ const GROUPS = {
       // Their public page, as anyone else sees it (/api/my-role sends
       // the @handle URL once signed in).
       ...(roles.profileHref ? [{ href: roles.profileHref, label: 'View profile' }] : []),
+      // The Membership card on /account: status + Manage subscription for
+      // members, the Tapa + benefits + Join for everyone else.
+      { href: '/account#membership', label: 'Membership' },
       { href: '/wishlist', label: 'My List' },
       ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
