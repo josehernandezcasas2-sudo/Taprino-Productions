@@ -11,6 +11,7 @@ import Footer from '../components/Footer';
 import HomeOnNow from '../components/HomeOnNow';
 import TierChip from '../components/crew/TierChip';
 import { Avatar } from '../components/crew/CrewBits';
+import { avatarImgStyle } from '../lib/profileBanner';
 import { getOwnCard } from '../lib/crewCards';
 import { SITE } from '../lib/siteConfig';
 import { episodeHref } from '../lib/episodeLinks';
@@ -171,7 +172,7 @@ export default function Home({
               {featuredCreators.map((c) => (
                 <Link key={c.userId} href={`/profile/${c.userId}`} className="zine-polaroid">
                   <div className="zine-polaroid-photo">
-                    {c.avatarUrl && <Image src={c.avatarUrl} alt="" fill sizes="140px" className="zine-fill-img" />}
+                    {c.avatarUrl && <Image src={c.avatarUrl} alt="" fill sizes="140px" className="zine-fill-img" style={avatarImgStyle(c.avatarPosition)} />}
                   </div>
                   <h5>{c.displayName}</h5>
                   <span className="zine-credit">{c.credits.slice(0, 2).join(', ')}</span>
@@ -305,7 +306,7 @@ export default function Home({
               {openToWork.map((p) => (
                 <Link key={p.userId} href={p.profilePath} className="zine-crew-card">
                   <div className="zine-crew-head">
-                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} size="sm" />
+                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} size="sm" />
                     <b>{p.displayName}</b>
                   </div>
                   {p.tier && <TierChip person={p} />}

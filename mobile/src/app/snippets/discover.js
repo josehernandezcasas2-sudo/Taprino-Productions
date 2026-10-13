@@ -9,6 +9,7 @@ import ReelPlayer from '../../components/ReelPlayer';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import PositionedImage from '../../components/PositionedImage';
 import { buildVerticalUnits, expandUnitToSlides, pickNextUnit, unitKey } from '../../lib/verticalFeed';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -337,7 +338,7 @@ function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onSha
         <Pressable style={styles.authorRow} onPress={onOpenAuthor} disabled={!onOpenAuthor} hitSlop={6}>
           <View style={styles.authorAvatar}>
             {slide.episode.authorAvatarUrl
-              ? <SmartImage uri={slide.episode.authorAvatarUrl} style={absoluteFill} />
+              ? <PositionedImage uri={slide.episode.authorAvatarUrl} position={slide.episode.authorAvatarPosition} style={absoluteFill} />
               : <Text style={styles.authorAvatarLetter}>{authorName[0].toUpperCase()}</Text>}
           </View>
           <Text style={styles.captionAuthor}>{authorName}</Text>

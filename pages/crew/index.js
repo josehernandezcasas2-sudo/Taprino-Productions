@@ -264,7 +264,7 @@ function PersonCard({ p, signedIn }) {
   const where = [p.place, p.miles != null ? `${p.miles} mi` : null].filter(Boolean).join(' · ');
   return (
     <article className="crew-panel crew-person">
-      <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} />
+      <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} />
       <div style={{ minWidth: 0 }}>
         <div className="crew-pname">
           <Link href={p.profilePath}>{p.displayName}</Link>
@@ -305,7 +305,7 @@ function GearItem({ g, signedIn }) {
       <div className="crew-gitem-top"><b>{g.name}</b><span className={`crew-chip ${flagClass(g.flag)}`}>{flagLabel(g.flag)}</span></div>
       <span className="crew-mono">{g.category}</span>
       <div className="crew-owner">
-        <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} size="sm" />
+        <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} position={o.avatarPosition} size="sm" />
         <span>{o.displayName}{o.miles != null ? ` · ${o.miles} mi` : o.place ? ` · ${o.place}` : ''}{o.verified ? ' · ✓' : ''}</span>
       </div>
       <div className="crew-actions">

@@ -207,9 +207,10 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
       }));
       // HeaderNav fetched the old photo once on load — tell it about the
       // new one so the header avatar changes now, not on the next reload.
-      if ('avatarUrl' in data || 'handle' in data) {
+      if ('avatarUrl' in data || 'avatarPosition' in data || 'handle' in data) {
         const detail = {};
         if ('avatarUrl' in data) detail.avatarUrl = data.avatarUrl;
+        if ('avatarPosition' in data) detail.avatarPosition = data.avatarPosition;
         if ('handle' in data) detail.handle = data.handle;
         window.dispatchEvent(new CustomEvent('taprino:own-profile-updated', { detail }));
       }
@@ -385,8 +386,8 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
 
           <div className="account-identity">
             <div className="account-identity-top">
-              <div className="account-avatar" style={avatarStyle(profile && profile.avatarUrl, profile && profile.avatarPosition)}>
-                {!(profile && profile.avatarUrl) && avatarLetter}
+              <div className="account-avatar" style={avatarStyle(profile && (profile.avatarBase64 || profile.avatarUrl), profile && profile.avatarPosition)}>
+                {!(profile && (profile.avatarBase64 || profile.avatarUrl)) && avatarLetter}
               </div>
               <div className="account-identity-meta">
                 <div className="account-identity-name-row">

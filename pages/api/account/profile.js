@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken, normalizeHandle, handleError, isHandleTaken, BANNER_COLOR_PATTERN } from '../../../lib/userProfiles';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { normalizeImagePosition } from '../../../lib/profileBanner';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 const MAX_SOCIAL_LINKS = 6;
@@ -128,7 +129,13 @@ export default async function handler(req, res) {
         bannerPosition: removeBanner ? null : bannerPosition,
         avatarPosition: removeAvatar ? null : avatarPosition
       });
-      return res.status(200).json({ ok: true, avatarUrl, bannerUrl, handle });
+      // The focal points ride back so the page (and the header, via the
+      // own-profile-updated event) show the saved crop without a reload.
+      return res.status(200).json({
+        ok: true, avatarUrl, bannerUrl, handle,
+        ...(avatarPosition !== undefined || removeAvatar ? { avatarPosition: removeAvatar ? null : normalizeImagePosition(avatarPosition) } : {}),
+        ...(bannerPosition !== undefined || removeBanner ? { bannerPosition: removeBanner ? null : normalizeImagePosition(bannerPosition) } : {})
+      });
     } catch (err) {
       return res.status(500).json({ error: err.message });
     }

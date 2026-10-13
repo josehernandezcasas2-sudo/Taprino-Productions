@@ -7,6 +7,7 @@ import { apiGet } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import SmartImage from '../components/SmartImage';
+import PositionedImage from '../components/PositionedImage';
 import HomeOnNow from '../components/HomeOnNow';
 import { Avatar, Chip, TierChip } from '../components/CrewBits';
 
@@ -169,7 +170,7 @@ export default function Home() {
                 return (
                   <Pressable key={c.userId} style={[styles.polaroid, { marginTop, transform: [{ rotate }] }]} onPress={() => router.push(`/profile/${c.userId}`)}>
                     <View style={styles.polaroidPhoto}>
-                      {c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={absoluteFill} /> : null}
+                      {c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} style={absoluteFill} /> : null}
                     </View>
                     <Text style={styles.polaroidName}>{c.displayName}</Text>
                     <Text style={styles.polaroidCredit}>{c.credits.slice(0, 2).join(', ')}</Text>

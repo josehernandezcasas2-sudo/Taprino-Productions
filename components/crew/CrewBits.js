@@ -16,9 +16,11 @@ export function initialsOf(name) {
   return String(name || '?').split(/\s+/).map((w) => w[0]).filter(Boolean).join('').slice(0, 2).toUpperCase();
 }
 
-export function Avatar({ userId, name, src, size = 'md' }) {
+// `position` is the person's saved focal point (user_profiles.avatar_position),
+// so the crop here matches their profile and the account page.
+export function Avatar({ userId, name, src, position, size = 'md' }) {
   const cls = `crew-avatar crew-avatar-${size}`;
-  if (src) return <img className={cls} src={src} alt="" />;
+  if (src) return <img className={cls} src={src} alt="" style={{ objectPosition: position || 'center' }} />;
   return <span className={cls} style={{ background: colorFor(userId || name) }} aria-hidden="true">{initialsOf(name)}</span>;
 }
 

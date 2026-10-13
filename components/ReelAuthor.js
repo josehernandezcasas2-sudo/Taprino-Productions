@@ -11,7 +11,7 @@ export default function ReelAuthor({ episode }) {
     <Link href={`/profile/${episode.ownerId}`} className="reel-caption-author">
       <span
         className="reel-caption-avatar"
-        style={avatarUrl ? { backgroundImage: `url(${avatarUrl})` } : undefined}
+        style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundPosition: episode.authorAvatarPosition || 'center' } : undefined}
       >
         {!avatarUrl && name[0].toUpperCase()}
       </span>

@@ -97,7 +97,7 @@ export default function CallScreen() {
                 <Text style={crew.rowText}>{call.payNote}</Text>
               </View>
               <Pressable style={[crew.row, { marginTop: 4 }]} onPress={() => router.push(call.poster.profilePath)}>
-                <Avatar userId={call.poster.userId} name={call.poster.displayName} src={call.poster.avatarUrl} size={30} />
+                <Avatar userId={call.poster.userId} name={call.poster.displayName} src={call.poster.avatarUrl} position={call.poster.avatarPosition} size={30} />
                 <Text style={crew.rowText}>{call.poster.displayName}</Text>
                 {call.poster.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}
                 <TierChip person={call.poster} />
@@ -148,7 +148,7 @@ export default function CallScreen() {
                 {(data.responses || []).map((r) => (
                   <View key={r.id} style={[styles.resp, (r.status === 'booked' || r.outcome === 'worked') && styles.respBooked]}>
                     <Pressable style={crew.row} onPress={() => router.push(r.person.profilePath)}>
-                      <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} size={30} />
+                      <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} position={r.person.avatarPosition} size={30} />
                       <View style={{ flex: 1 }}>
                         <View style={crew.nameRow}><Text style={crew.name}>{r.person.displayName}</Text>{r.person.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}<TierChip person={r.person} /></View>
                         <Text style={crew.mono}>{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}</Text>

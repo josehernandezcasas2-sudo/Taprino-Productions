@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { avatarImgStyle } from '../lib/profileBanner';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
@@ -124,6 +125,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
 
   const avatarLetter = (email && email[0] ? email[0].toUpperCase() : (isSignedIn ? '?' : ''));
   const ownAvatarUrl = isSignedIn && ownProfile ? ownProfile.avatarUrl : null;
+  const ownAvatarStyle = avatarImgStyle(isSignedIn && ownProfile ? ownProfile.avatarPosition : null);
   const ownProfileHref = isSignedIn && ownProfile && ownProfile.userId ? `/profile/${ownProfile.handle || ownProfile.userId}` : null;
 
   // Deriving "what's active" from the real URL rather than trusting each
@@ -402,7 +404,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'account' ? null : 'account')); }}
         >
           {ownAvatarUrl ? (
-            <Image src={ownAvatarUrl} alt="" fill sizes="34px" className="avatar-img" />
+            <Image src={ownAvatarUrl} alt="" fill sizes="34px" className="avatar-img" style={ownAvatarStyle} />
           ) : (
             isSignedIn ? avatarLetter : '☺'
           )}
@@ -416,7 +418,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                   <Link href={ownProfileHref} className="account-dropdown-header account-dropdown-header-link" onClick={() => setOpenMenu(null)}>
                     <div className="account-dropdown-avatar">
                       {ownAvatarUrl ? (
-                        <Image src={ownAvatarUrl} alt="" fill sizes="38px" className="avatar-img" />
+                        <Image src={ownAvatarUrl} alt="" fill sizes="38px" className="avatar-img" style={ownAvatarStyle} />
                       ) : (
                         avatarLetter || '☺'
                       )}

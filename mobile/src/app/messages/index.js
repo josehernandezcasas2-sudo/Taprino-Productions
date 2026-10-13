@@ -78,7 +78,7 @@ export default function Inbox() {
 
         {threads.map((t) => (
           <Pressable key={t.id} style={styles.thread} onPress={() => router.push(`/messages/${t.id}`)}>
-            <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} size={40} />
+            <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} size={40} />
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.name} numberOfLines={1}>{t.other.displayName}{t.muted ? <Text style={styles.mutedTag}> · muted</Text> : null}</Text>
               <Text style={[styles.preview, t.unread && styles.previewUnread]} numberOfLines={1}>{t.lastSenderId && t.lastSenderId !== t.other.userId ? 'You: ' : ''}{t.preview || 'New conversation'}</Text>

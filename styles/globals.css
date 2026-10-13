@@ -8333,7 +8333,7 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
   position: absolute; left: 1rem; bottom: -18px;
   width: 52px; height: 52px; border-radius: 50%; background: var(--brass) center/cover;
   color: #241a05; font-family: var(--font-mono); font-weight: 700; font-size: 1.3rem;
-  display: flex; align-items: center; justify-content: center; border: 3px solid var(--surface-1);
+  display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--surface-1);
 }
 .account-banner-controls { display: flex; gap: 0.6rem; align-items: center; margin: 1.4rem 0 0.7rem; flex-wrap: wrap; }
 /* It's a <label> (so clicking it opens the hidden file input), which the

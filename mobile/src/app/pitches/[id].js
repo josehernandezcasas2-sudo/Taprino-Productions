@@ -9,6 +9,7 @@ import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import PositionedImage from '../../components/PositionedImage';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 const DONATION_PRESETS = [10, 25, 50];
@@ -308,7 +309,7 @@ export default function PitchDetail() {
     return (
       <View key={c.id} style={[styles.commentCard, isReply && styles.replyCard]}>
         <Pressable style={styles.commentMetaRow} onPress={() => router.push(`/profile/${c.user_id}`)}>
-          <View style={styles.commentAvatar}>{c.avatarUrl ? <SmartImage uri={c.avatarUrl} style={absoluteFill} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
+          <View style={styles.commentAvatar}>{c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} style={absoluteFill} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
           <Text style={styles.commentName}>{c.displayName}</Text>
           {isCreatorComment ? <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View> : null}
           <Text style={styles.commentDate}> · {formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</Text>
@@ -610,7 +611,7 @@ export default function PitchDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bleed} contentContainerStyle={styles.hRow}>
                 {recentBackers.map((b) => (
                   <Pressable key={b.userId} style={styles.backer} onPress={() => router.push(`/profile/${b.userId}`)}>
-                    <View style={styles.backerAvatar}>{b.avatarUrl ? <SmartImage uri={b.avatarUrl} style={absoluteFill} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
+                    <View style={styles.backerAvatar}>{b.avatarUrl ? <PositionedImage uri={b.avatarUrl} position={b.avatarPosition} style={absoluteFill} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
                     <Text style={styles.backerName} numberOfLines={1}>{b.displayName}</Text>
                   </Pressable>
                 ))}
