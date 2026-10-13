@@ -186,7 +186,7 @@ export default function PublicProfile() {
         <View style={styles.hero}>
           <View style={styles.banner}>
             {profile.bannerUrl ? (
-              <PositionedImage uri={profile.bannerUrl} position={profile.bannerPosition} style={absoluteFill} />
+              <PositionedImage uri={profile.bannerUrl} position={profile.bannerPosition} zoom={profile.bannerZoom || 1} style={absoluteFill} />
             ) : profile.bannerColor ? (
               <View style={[absoluteFill, { backgroundColor: profile.bannerColor }]} />
             ) : (
@@ -195,7 +195,7 @@ export default function PublicProfile() {
           </View>
           <View style={styles.header}>
             {profile.avatarUrl ? (
-              <PositionedImage uri={profile.avatarUrl} position={profile.avatarPosition} style={styles.avatar} />
+              <PositionedImage uri={profile.avatarUrl} position={profile.avatarPosition} zoom={profile.avatarZoom || 1} style={styles.avatar} />
             ) : (
               <View style={styles.avatar}><Text style={styles.avatarInitial}>{initial}</Text></View>
             )}

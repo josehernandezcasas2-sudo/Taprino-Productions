@@ -8363,12 +8363,17 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .account-banner-swatch-clear { background: none; border: 0; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-decoration: underline; }
 .account-banner-note { font-size: 0.78rem; color: var(--ink-dim); margin: -0.3rem 0 0.9rem; }
 /* Reposition mode (components/RepositionFrame.js, mockups/banner-reposition.html) */
-.reposition-frame { touch-action: none; }
-.reposition-frame.active { cursor: grab; outline: 2px solid var(--olive); outline-offset: 0; user-select: none; }
-.reposition-frame.active:active { cursor: grabbing; }
-.reposition-grip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
-.reposition-grip span { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(12,19,31,0.72); border: 1px solid rgba(251,232,211,0.25); color: var(--ink); padding: 0.4rem 0.8rem; border-radius: 999px; backdrop-filter: blur(4px); }
+/* A photo placed in its frame by components/PositionedPhoto.js. */
+.positioned-photo { position: relative; overflow: hidden; }
+.positioned-photo > img { display: block; pointer-events: none; }
+.reposition-frame { position: relative; }
+.reposition-frame .reposition-photo { position: absolute; inset: 0; border-radius: inherit; }
 .account-avatar.reposition-frame { position: relative; overflow: hidden; flex: none; }
+.profile-avatar.positioned-photo, .account-avatar.positioned-photo { background-size: 0; }
+.crop-zoom { display: flex; align-items: center; gap: 0.6rem; margin: -0.3rem 0 0.9rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-faint); }
+.crop-zoom input[type=range] { flex: 1; accent-color: var(--olive); margin: 0; }
+.crop-zoom-value { min-width: 3ch; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.crop-zoom-reset { background: none; border: 0; color: var(--olive); font-family: var(--font-mono); font-size: 0.76rem; cursor: pointer; text-decoration: underline; padding: 0; }
 .account-avatar.account-avatar-large { width: 140px; height: 140px; font-size: 2.6rem; }
 .account-avatar.account-avatar-large .reposition-grip span { font-size: 0.66rem; padding: 0.3rem 0.5rem; }
 .account-banner-preview.reposition-frame.active { overflow: hidden; }

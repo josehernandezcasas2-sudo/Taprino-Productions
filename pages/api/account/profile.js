@@ -41,16 +41,18 @@ export default async function handler(req, res) {
       bio: profile ? profile.bio : null,
       avatarUrl: profile ? profile.avatar_url : null,
       avatarPosition: profile ? profile.avatar_position || null : null,
+      avatarZoom: profile && profile.avatar_zoom ? Number(profile.avatar_zoom) : null,
       bannerUrl: profile ? profile.banner_url || null : null,
       bannerColor: profile ? profile.banner_color || null : null,
       bannerPosition: profile ? profile.banner_position || null : null,
+      bannerZoom: profile && profile.banner_zoom ? Number(profile.banner_zoom) : null,
       socialLinks: profile && Array.isArray(profile.social_links) ? profile.social_links : [],
       stayInStream: profile ? Boolean(profile.stay_in_stream) : false
     });
   }
 
   if (req.method === 'POST') {
-    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, stayInStream } = req.body || {};
+    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream } = req.body || {};
     if (bannerColor !== undefined && bannerColor !== null && bannerColor !== '' && !BANNER_COLOR_PATTERN.test(String(bannerColor))) {
       return res.status(400).json({ error: 'Banner color needs to be a hex color like #283c63.' });
     }
@@ -126,7 +128,9 @@ export default async function handler(req, res) {
         bannerColor: bannerColor === undefined ? undefined : (bannerColor || null),
         // A removed photo takes its focal point with it.
         bannerPosition: removeBanner ? null : bannerPosition,
-        avatarPosition: removeAvatar ? null : avatarPosition
+        avatarPosition: removeAvatar ? null : avatarPosition,
+        bannerZoom: removeBanner ? null : bannerZoom,
+        avatarZoom: removeAvatar ? null : avatarZoom
       });
       return res.status(200).json({ ok: true, avatarUrl, bannerUrl, handle });
     } catch (err) {

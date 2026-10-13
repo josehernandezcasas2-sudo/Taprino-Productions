@@ -1,25 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Image, PanResponder, Text, View } from 'react-native';
+import { Image, PanResponder, Pressable, Text, View } from 'react-native';
 import { colors, fonts } from '../lib/theme';
-import { parsePosition, formatPosition } from './PositionedImage';
+import { parsePosition, formatPosition, visibleSlice, clampZoom, ZOOM_MIN, ZOOM_MAX } from './PositionedImage';
 
 // Reposition mode's editor, the app's twin of the website's CropWindow
 // (components/RepositionFrame.js): the whole photo letterboxed, the part
-// outside the slice that will show dimmed, and a bright window you drag
-// to pick the slice. `frameAspect` is the frame's width/height (1 for
-// the avatar circle). The position string is the same one
-// PositionedImage draws with, so what you see here is what shows.
-function visibleSlice(img, frameAspect, position) {
-  const { x, y } = parsePosition(position);
-  let w = img.w;
-  let h = img.w / frameAspect;
-  if (h > img.h) { h = img.h; w = img.h * frameAspect; }
-  return { w, h, left: (img.w - w) * (x / 100), top: (img.h - h) * (y / 100) };
-}
-
+// outside the slice that will show dimmed, a bright window you drag to
+// pick the slice, and − / + to zoom. `frameAspect` is the frame's
+// width/height (1 for the avatar circle). Position and zoom are the
+// same values PositionedImage draws with, so what you see is what shows.
 const DIM = 'rgba(12,19,31,0.72)';
 
-export default function CropWindow({ uri, position, onChange, frameAspect = 3, round = false, height = 220 }) {
+export default function CropWindow({ uri, position, zoom = 1, onChange, onZoomChange, frameAspect = 3, round = false, height = 220 }) {
   const [area, setArea] = useState(null);
   const [img, setImg] = useState(null);
   const latest = useRef({ position, onChange, layout: null });
@@ -38,7 +30,7 @@ export default function CropWindow({ uri, position, onChange, frameAspect = 3, r
     const rh = img.h * c;
     const ox = (area.width - rw) / 2;
     const oy = (area.height - rh) / 2;
-    const slice = visibleSlice(img, frameAspect, position);
+    const slice = visibleSlice(img, frameAspect, position, zoom);
     layout = {
       image: { left: ox, top: oy, width: rw, height: rh },
       win: { left: ox + slice.left * c, top: oy + slice.top * c, width: slice.w * c, height: slice.h * c },
@@ -64,26 +56,41 @@ export default function CropWindow({ uri, position, onChange, frameAspect = 3, r
     }
   })).current;
 
+  const z = clampZoom(zoom);
   return (
-    <View
-      style={{ height, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.12)', marginBottom: 12 }}
-      onLayout={(e) => { const { width, height: h } = e.nativeEvent.layout; if (width > 0 && h > 0) setArea({ width, height: h }); }}
-    >
-      {layout ? (
-        <>
-          <Image source={{ uri }} style={{ position: 'absolute', ...layout.image }} />
-          {/* Four dim panels around the window (RN has no box-shadow spread). */}
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: layout.win.top, backgroundColor: DIM }} />
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: layout.win.top + layout.win.height, bottom: 0, backgroundColor: DIM }} />
-          <View pointerEvents="none" style={{ position: 'absolute', left: 0, width: layout.win.left, top: layout.win.top, height: layout.win.height, backgroundColor: DIM }} />
-          <View pointerEvents="none" style={{ position: 'absolute', left: layout.win.left + layout.win.width, right: 0, top: layout.win.top, height: layout.win.height, backgroundColor: DIM }} />
-          <View {...pan.panHandlers} style={{ position: 'absolute', ...layout.win, borderWidth: 2, borderColor: 'rgba(251,232,211,0.95)' }}>
-            {round ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(251,232,211,0.8)' }} /> : null}
-          </View>
-        </>
-      ) : (
-        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint }}>Loading photo…</Text></View>
-      )}
+    <View>
+      <View
+        style={{ height, borderRadius: 10, overflow: 'hidden', backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.12)', marginBottom: 10 }}
+        onLayout={(e) => { const { width, height: h } = e.nativeEvent.layout; if (width > 0 && h > 0) setArea({ width, height: h }); }}
+      >
+        {layout ? (
+          <>
+            <Image source={{ uri }} style={{ position: 'absolute', ...layout.image }} />
+            {/* Four dim panels around the window (RN has no box-shadow spread). */}
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, height: layout.win.top, backgroundColor: DIM }} />
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: layout.win.top + layout.win.height, bottom: 0, backgroundColor: DIM }} />
+            <View pointerEvents="none" style={{ position: 'absolute', left: 0, width: layout.win.left, top: layout.win.top, height: layout.win.height, backgroundColor: DIM }} />
+            <View pointerEvents="none" style={{ position: 'absolute', left: layout.win.left + layout.win.width, right: 0, top: layout.win.top, height: layout.win.height, backgroundColor: DIM }} />
+            <View {...pan.panHandlers} style={{ position: 'absolute', ...layout.win, borderWidth: 2, borderColor: 'rgba(251,232,211,0.95)' }}>
+              {round ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, top: 0, right: 0, bottom: 0, borderRadius: 999, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(251,232,211,0.8)' }} /> : null}
+            </View>
+          </>
+        ) : (
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}><Text style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint }}>Loading photo…</Text></View>
+        )}
+      </View>
+      {onZoomChange ? (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+          <Text style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint }}>Zoom</Text>
+          <Pressable accessibilityLabel="Zoom out" style={[zoomBtn, z <= ZOOM_MIN && { opacity: 0.4 }]} disabled={z <= ZOOM_MIN} onPress={() => onZoomChange(clampZoom(z - 0.1))}><Text style={zoomBtnText}>−</Text></Pressable>
+          <Text style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.inkDim, minWidth: 34, textAlign: 'center' }}>{z.toFixed(1)}×</Text>
+          <Pressable accessibilityLabel="Zoom in" style={[zoomBtn, z >= ZOOM_MAX && { opacity: 0.4 }]} disabled={z >= ZOOM_MAX} onPress={() => onZoomChange(clampZoom(z + 0.1))}><Text style={zoomBtnText}>+</Text></Pressable>
+          {z > 1 ? <Pressable onPress={() => onZoomChange(1)} hitSlop={8}><Text style={{ fontFamily: fonts.mono, fontSize: 12, color: colors.olive, textDecorationLine: 'underline' }}>Reset</Text></Pressable> : null}
+        </View>
+      ) : null}
     </View>
   );
 }
+
+const zoomBtn = { width: 34, height: 34, borderRadius: 17, borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', alignItems: 'center', justifyContent: 'center' };
+const zoomBtnText = { fontFamily: fonts.displaySemi, fontSize: 18, color: colors.ink, lineHeight: 20 };

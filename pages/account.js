@@ -12,8 +12,8 @@ import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
 import MembershipPlans from '../components/MembershipPlans';
 import { memberBadge } from '../lib/membershipTiers';
-import { avatarStyle } from '../lib/profileBanner';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
+import PositionedPhoto from '../components/PositionedPhoto';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -115,11 +115,11 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   // The banner preview's width/height, so the crop window shows the right slice.
   const [bannerAspect, setBannerAspect] = useState(3);
   function startReposition(which) {
-    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
+    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null, bannerZoom: profile.bannerZoom || null, avatarZoom: profile.avatarZoom || null });
     setReposition(which);
   }
   function cancelReposition() {
-    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar }));
+    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar, bannerZoom: positionBackup.bannerZoom, avatarZoom: positionBackup.avatarZoom }));
     setReposition(null);
   }
   // Live availability for the handle field: { handle, ok, reason }. ok is
@@ -385,9 +385,9 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
 
           <div className="account-identity">
             <div className="account-identity-top">
-              <div className="account-avatar" style={avatarStyle(profile && profile.avatarUrl, profile && profile.avatarPosition)}>
+              <PositionedPhoto className="account-avatar" url={profile && profile.avatarUrl} position={profile && profile.avatarPosition} zoom={(profile && profile.avatarZoom) || 1}>
                 {!(profile && profile.avatarUrl) && avatarLetter}
-              </div>
+              </PositionedPhoto>
               <div className="account-identity-meta">
                 <div className="account-identity-name-row">
                   <h3>{profile && profile.displayName ? profile.displayName : (email || 'Your account')}</h3>
@@ -495,7 +495,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         className={`account-avatar ${reposition === 'avatar' ? 'account-avatar-large' : ''}`}
                         url={profile.avatarBase64 || profile.avatarUrl}
                         position={profile.avatarPosition}
-                        onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
+                        zoom={profile.avatarZoom || 1}
                       >
                         {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
                       </RepositionFrame>
@@ -504,10 +504,12 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                           <CropWindow
                             url={profile.avatarBase64 || profile.avatarUrl}
                             position={profile.avatarPosition}
+                            zoom={profile.avatarZoom || 1}
                             frameAspect={1}
                             round
                             height={220}
                             onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
+                            onZoomChange={(z) => setProfile((p) => ({ ...p, avatarZoom: z }))}
                           />
                           <div className="account-reposition-actions">
                             <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
@@ -538,7 +540,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                           type="button"
                           className="account-btn-secondary"
                           style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true, avatarPosition: null }))}
+                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true, avatarPosition: null, avatarZoom: null }))}
                         >
                           Remove
                         </button>
@@ -557,23 +559,25 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                       className="account-banner-preview"
                       url={profile.bannerBase64 || profile.bannerUrl}
                       position={profile.bannerPosition}
-                      onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+                      zoom={profile.bannerZoom || 1}
                       onMeasure={setBannerAspect}
                       style={!(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor ? { background: profile.bannerColor } : undefined}
                     >
                       {reposition === 'banner' && <div className="account-banner-guide" aria-hidden="true" />}
-                      <div className={`account-banner-preview-avatar ${reposition === 'banner' ? 'dim' : ''}`} style={avatarStyle(profile.avatarBase64 || profile.avatarUrl, profile.avatarPosition)}>
+                      <PositionedPhoto className={`account-banner-preview-avatar ${reposition === 'banner' ? 'dim' : ''}`} url={profile.avatarBase64 || profile.avatarUrl} position={profile.avatarPosition} zoom={profile.avatarZoom || 1}>
                         {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
-                      </div>
+                      </PositionedPhoto>
                     </RepositionFrame>
                     {reposition === 'banner' ? (
                       <div className="account-reposition-panel">
                         <CropWindow
                           url={profile.bannerBase64 || profile.bannerUrl}
                           position={profile.bannerPosition}
+                          zoom={profile.bannerZoom || 1}
                           frameAspect={bannerAspect}
                           height={260}
                           onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
+                          onZoomChange={(z) => setProfile((p) => ({ ...p, bannerZoom: z }))}
                         />
                         <div className="account-reposition-actions">
                           <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
@@ -607,7 +611,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                           type="button"
                           className="account-btn-secondary"
                           style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true, bannerPosition: null }))}
+                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true, bannerPosition: null, bannerZoom: null }))}
                         >
                           Remove photo
                         </button>

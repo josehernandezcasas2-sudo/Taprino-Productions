@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, View } from 'react-native';
 
-// A photo that fills its frame ("cover") around a focal point — the
-// app's take on CSS background-position, for profile banners and
-// avatars (user_profiles.banner_position / avatar_position, "x% y%",
-// migration 084). RN's resizeMode="cover" always centres, so this
-// measures the frame and the image and places the scaled image itself.
+// A photo that fills its frame ("cover") around a focal point, at a
+// zoom — the app's take on the website's components/PositionedPhoto.js,
+// for profile banners and avatars (user_profiles.*_position "x% y%" and
+// *_zoom 1–3, migrations 084/085). RN's resizeMode="cover" always
+// centres and can't zoom, so this measures the frame and the image and
+// places the scaled image itself.
 const POS = /^(\d{1,3})% (\d{1,3})%$/;
 export function parsePosition(position) {
   const m = POS.exec(position || '');
@@ -15,10 +16,26 @@ export function formatPosition({ x, y }) {
   const c = (n) => Math.round(Math.max(0, Math.min(100, n)));
   return `${c(x)}% ${c(y)}%`;
 }
+export const ZOOM_MIN = 1;
+export const ZOOM_MAX = 3;
+export const clampZoom = (z) => Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, Number(z) || 1)) * 100) / 100;
+
+// The slice of the image (image px) a frame shows — same maths as the
+// website's lib/profileBanner.js visibleSlice.
+export function visibleSlice(img, frameAspect, position, zoom = 1) {
+  const { x, y } = parsePosition(position);
+  const z = clampZoom(zoom);
+  let w = img.w;
+  let h = img.w / frameAspect;
+  if (h > img.h) { h = img.h; w = img.h * frameAspect; }
+  w /= z;
+  h /= z;
+  return { w, h, left: (img.w - w) * (x / 100), top: (img.h - h) * (y / 100) };
+}
 
 const sizeCache = new Map();
 
-export default function PositionedImage({ uri, position, style, children }) {
+export default function PositionedImage({ uri, position, zoom = 1, style, children }) {
   const [frame, setFrame] = useState(null);
   const [size, setSize] = useState(sizeCache.get(uri) || null);
 
@@ -32,11 +49,9 @@ export default function PositionedImage({ uri, position, style, children }) {
 
   let placed = null;
   if (frame && size && size.w > 0 && size.h > 0) {
-    const scale = Math.max(frame.width / size.w, frame.height / size.h);
-    const w = size.w * scale;
-    const h = size.h * scale;
-    const { x, y } = parsePosition(position);
-    placed = { width: w, height: h, left: -(w - frame.width) * (x / 100), top: -(h - frame.height) * (y / 100) };
+    const slice = visibleSlice(size, frame.width / frame.height, position, zoom);
+    const scale = frame.width / slice.w;
+    placed = { width: size.w * scale, height: size.h * scale, left: -slice.left * scale, top: -slice.top * scale };
   }
 
   return (
