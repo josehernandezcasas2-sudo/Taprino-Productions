@@ -90,7 +90,11 @@ const GROUPS = {
       // members, the Tapa + benefits + Join for everyone else.
       { href: '/account#membership', label: 'Membership' },
       { href: '/wishlist', label: 'My List' },
+      // The account page's old quick links (2026-10-12) live here now.
+      { href: '/recs', label: 'My Recs' },
+      { href: '/#continue-watching', label: 'Continue Watching' },
       ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
+      ...(roles.isCreator || roles.canAccessAdmin ? [{ href: '/creator/analytics', label: 'Your Numbers' }] : []),
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
     ],
     match: (p) => p === '/account' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'

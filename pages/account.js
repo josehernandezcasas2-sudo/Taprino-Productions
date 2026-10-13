@@ -8,7 +8,6 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
 import { BANNER_COLORS } from '../lib/profileBanner';
-import { HeartIcon, SparkleIcon, PlayIcon, BarChartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
 import MembershipPlans from '../components/MembershipPlans';
@@ -95,7 +94,6 @@ function formatDate(ms) {
 }
 
 export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId }) {
-  const iconOverrides = usePlayerIconOverrides();
   const { signOut, openUserProfile } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
@@ -344,7 +342,6 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   }
 
   const avatarLetter = email && email[0] ? email[0].toUpperCase() : '?';
-  const canSeeNumbers = isCreator || isAdmin || isSubAdmin;
 
   // Priority order matters here — an account can technically match more
   // than one (e.g. an admin is also isCreator per lib/roles.js), and we
@@ -737,14 +734,6 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                     </button>
                   </div>
                 )}
-                <div className="account-quicklinks" style={{ marginTop: '0.6rem' }}>
-                  <Link href="/wishlist" className="account-quicklink"><HeartIcon size={14} active src={iconOverrides.heart_active} /> My Wishlist</Link>
-                  <Link href="/recs" className="account-quicklink"><SparkleIcon size={14} src={iconOverrides.sparkle} /> My Recs</Link>
-                  <Link href="/#continue-watching" className="account-quicklink"><PlayIcon size={14} src={iconOverrides.play} /> Continue Watching</Link>
-                  {canSeeNumbers && (
-                    <Link href="/creator/analytics" className="account-quicklink"><BarChartIcon size={14} src={iconOverrides.bar_chart} /> Your Numbers</Link>
-                  )}
-                </div>
               </div>
 
               {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}

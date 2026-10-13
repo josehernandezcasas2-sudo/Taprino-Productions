@@ -52,14 +52,19 @@ const GROUPS = {
     Icon: AccountIcon,
     // A function, like MobileTabBar.js's: "View profile" only exists once
     // the signed-in viewer's own profile is known (TopNav's cache).
-    items: (profileHref) => [
+    items: ({ profileHref, role }) => [
       { href: '/account', label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
       // The Account screen scrolls itself to its Membership card.
       { href: '/account?section=membership', label: 'Membership' },
       { href: '/messages', label: 'Messages', badge: 'messages' },
       { href: '/account/wishlist', label: 'My List' },
-      { href: '/account/my-work', label: 'My Work' }
+      // The Account screen's old quick links (2026-10-12) live here now.
+      { href: '/recs', label: 'My Recs' },
+      { href: '/stream', label: 'Continue Watching' },
+      { href: '/account/my-work', label: 'My Work' },
+      ...(role.isCreator || role.canAccessAdmin ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
+      ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ],
     match: (p) => p.startsWith('/account') || p.startsWith('/messages')
   }
@@ -151,7 +156,7 @@ export default function BottomNav() {
             ]}
           >
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
-            {(typeof openGroup.items === 'function' ? openGroup.items(profileHref) : openGroup.items).map((entry) => (
+            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role }) : openGroup.items).map((entry) => (
               <Pressable
                 key={entry.href}
                 style={({ pressed }) => [styles.dropupItem, pressed && styles.dropupItemPressed]}

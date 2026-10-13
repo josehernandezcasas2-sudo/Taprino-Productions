@@ -441,7 +441,6 @@ export default function Account() {
 
   const avatarLetter = dashboard.email && dashboard.email[0] ? dashboard.email[0].toUpperCase() : '?';
   const roleBadge = dashboard.isAdmin ? 'Admin' : dashboard.isSubAdmin ? 'Sub-admin' : dashboard.isCreator ? 'Creator' : null;
-  const canSeeNumbers = dashboard.isCreator || dashboard.isAdmin || dashboard.isSubAdmin;
   const avatarSrc = profile && (profile.avatarBase64 || profile.avatarUrl);
   const sub = dashboard.subscriptionDetails;
   // Team / comped / promo-code access = Premium without a subscription:
@@ -736,13 +735,6 @@ export default function Account() {
               </Pressable>
             </Row>
           ) : null}
-          <View style={styles.quicklinks}>
-            <Quicklink icon={<HeartGlyph />} label="My Wishlist" onPress={() => router.push('/account/wishlist')} />
-            <Quicklink icon={<SparkleGlyph />} label="My Recs" onPress={() => router.push('/recs')} />
-            <Quicklink icon={<PlayGlyph />} label="Continue Watching" onPress={() => router.push('/account/wishlist')} />
-            {canSeeNumbers ? <Quicklink icon={<BarsGlyph />} label="Your Numbers" onPress={() => router.push('/creator/numbers')} /> : null}
-            {!canSeeNumbers ? <Quicklink icon={<SparkleGlyph />} label="Become a creator" onPress={() => router.push('/apply')} /> : null}
-          </View>
         </View>
 
         {/* Payouts — creators and admins only; same card as the web /account */}
@@ -886,49 +878,12 @@ function SaveRow({ label, saving, saved, onPress }) {
     </View>
   );
 }
-function Quicklink({ icon, label, onPress, external }) {
-  return (
-    <Pressable style={styles.quicklink} onPress={onPress}>
-      {icon}
-      <Text style={styles.quicklinkText}>{label}</Text>
-      {external ? <Text style={styles.quicklinkExternal}>opens website {'↗'}</Text> : null}
-    </Pressable>
-  );
-}
 
 function BackArrowIcon({ size = 16, color = colors.olive }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Circle cx="12" cy="12" r="9.5" />
       <Path d="M13.5 8.5L10 12l3.5 3.5" />
-    </Svg>
-  );
-}
-function HeartGlyph() {
-  return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.danger}>
-      <Path d="M12 21s-6.7-4.35-9.33-8.2C.86 10.1 1.3 6.6 4.1 4.9a5.4 5.4 0 0 1 7.1 1.2 5.4 5.4 0 0 1 7.1-1.2c2.8 1.7 3.24 5.2 1.43 7.9C18.7 16.65 12 21 12 21z" />
-    </Svg>
-  );
-}
-function SparkleGlyph() {
-  return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.olive}>
-      <Path d="M12 2l2.2 6.3L20.5 10l-6.3 2.2L12 18.5l-2.2-6.3L3.5 10l6.3-1.7z" />
-    </Svg>
-  );
-}
-function PlayGlyph() {
-  return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill={colors.ink}>
-      <Path d="M8 5v14l11-7z" />
-    </Svg>
-  );
-}
-function BarsGlyph() {
-  return (
-    <Svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke={colors.sky} strokeWidth={2.2} strokeLinecap="round">
-      <Path d="M5 20V12M12 20V5M19 20v-9" />
     </Svg>
   );
 }
@@ -1018,12 +973,6 @@ const styles = StyleSheet.create({
   rowDivider: { borderTopWidth: 1, borderTopColor: 'rgba(251,232,211,0.08)' },
   rowLabel: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink },
   rowDetail: { fontFamily: fonts.body, fontSize: 12.8, lineHeight: 18, color: colors.inkDim, marginTop: 2 },
-
-  // .account-quicklinks
-  quicklinks: { gap: 8, marginTop: 10 },
-  quicklink: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 6, paddingVertical: 11, paddingHorizontal: 14 },
-  quicklinkText: { fontFamily: fonts.body, fontSize: 14, color: colors.ink, flex: 1 },
-  quicklinkExternal: { fontFamily: fonts.mono, fontSize: 9.6, color: colors.inkFaint },
 
   // age warning / delete confirm
   ageWarn: { backgroundColor: 'rgba(248,95,115,0.1)', borderWidth: 1, borderColor: 'rgba(248,95,115,0.3)', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 12, gap: 10 },
