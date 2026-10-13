@@ -8852,7 +8852,11 @@ a.crew-credit:hover { background: var(--surface-3); }
 .dm-unread { width: 8px; height: 8px; border-radius: 50%; background: var(--brass); display: block; }
 .dm-convo-wrap { min-width: 0; }
 .dm-pick { min-height: 300px; display: grid; place-items: center; }
-.dm-convo { display: grid; grid-template-rows: auto auto auto 1fr auto; min-height: 520px; gap: 0.6rem; }
+/* A column where the message list is the part that grows — not a
+   positional grid: the report box is optional, and when it was absent
+   the composer fell into the 1fr row and ballooned (2026-10-12). */
+.dm-convo { display: flex; flex-direction: column; min-height: 520px; gap: 0.6rem; }
+.dm-convo .dm-msgs { flex: 1 1 auto; }
 .dm-chead { display: flex; align-items: center; gap: 0.6rem; border-bottom: 1px solid var(--ocean-ink); padding-bottom: 0.6rem; }
 .dm-cacts { margin-left: auto; flex-wrap: nowrap; }
 .dm-back { display: none; }
