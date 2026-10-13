@@ -15,8 +15,8 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
 // The person's account-page photo over the letter circle at their saved
-// focal point, same as the header and profile page.
-import { avatarStyle } from '../../lib/profileBanner';
+// focal point and zoom, same as the header and profile page.
+import { AvatarImg } from '../../components/AvatarPhoto';
 
 export async function getServerSideProps({ req, res, params }) {
   const data = await getPitchDetailData(params.id, req);
@@ -303,7 +303,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
       <div key={c.id} className={`pitch-comment-card${isReply ? ' pitch-reply-card' : ''}`}>
         <div className="pitch-comment-meta">
           <div className="pitch-comment-who">
-            <Link href={`/profile/${c.user_id}`} className="pitch-comment-avatar" style={avatarStyle(c.avatarUrl, c.avatarPosition)}>{!c.avatarUrl && (c.displayName || '?')[0].toUpperCase()}</Link>
+            <Link href={`/profile/${c.user_id}`} className="pitch-comment-avatar avatar-photo">{c.avatarUrl ? <AvatarImg url={c.avatarUrl} position={c.avatarPosition} zoom={c.avatarZoom} /> : (c.displayName || '?')[0].toUpperCase()}</Link>
             <Link href={`/profile/${c.user_id}`} className="pitch-comment-name">{c.displayName}</Link>
             {isCreatorComment && <span className="pitch-comment-badge">Creator</span>}
           </div>
@@ -637,7 +637,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-backer-row">
               {recentBackers.map((b) => (
                 <Link key={b.userId} href={`/profile/${b.userId}`} className="pitch-backer">
-                  <div className="pitch-backer-avatar" style={avatarStyle(b.avatarUrl, b.avatarPosition)}>{!b.avatarUrl && (b.displayName || '?')[0].toUpperCase()}</div>
+                  <div className="pitch-backer-avatar avatar-photo">{b.avatarUrl ? <AvatarImg url={b.avatarUrl} position={b.avatarPosition} zoom={b.avatarZoom} /> : (b.displayName || '?')[0].toUpperCase()}</div>
                   <span>{b.displayName}</span>
                 </Link>
               ))}

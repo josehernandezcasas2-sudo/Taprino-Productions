@@ -109,7 +109,7 @@ export default function TopNav() {
       if (!token) return;
       const profile = await apiGet('/api/account/profile', token).catch(() => null);
       if (!cancelled && profile) {
-        updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, avatarUrl: profile.avatarUrl || null, avatarPosition: profile.avatarPosition || null, stayInStream: !!profile.stayInStream });
+        updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, avatarUrl: profile.avatarUrl || null, avatarPosition: profile.avatarPosition || null, avatarZoom: profile.avatarZoom || null, stayInStream: !!profile.stayInStream });
       }
     })();
     return () => { cancelled = true; };
@@ -141,7 +141,7 @@ export default function TopNav() {
         </Pressable>
         <Pressable style={styles.avatarBtn} onPress={() => router.push('/account')} hitSlop={8}>
           {isSignedIn && ownProfile && ownProfile.avatarUrl ? (
-            <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} style={styles.avatarImg} />
+            <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
           ) : (
             <Text style={styles.avatarText}>{avatarLetter || '☺'}</Text>
           )}

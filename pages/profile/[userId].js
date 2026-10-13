@@ -12,7 +12,8 @@ import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
-import { bannerStyle, avatarStyle } from '../../lib/profileBanner';
+import { bannerStyle } from '../../lib/profileBanner';
+import PositionedPhoto from '../../components/PositionedPhoto';
 import ReportButton from '../../components/ReportButton';
 import { CrewCardView } from '../../components/crew/CrewBits';
 import TierChip from '../../components/crew/TierChip';
@@ -323,14 +324,13 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
             name / @handle on the left and Follow · Share · Report on the
             right — Jose's sketch, 2026-10-07. */}
         <header className="profile-hero">
-          <div className={`profile-banner ${profile.bannerUrl ? 'has-photo' : ''}`} style={bannerStyle(profile)} />
+          {profile.bannerUrl
+            ? <PositionedPhoto className="profile-banner has-photo" url={profile.bannerUrl} position={profile.bannerPosition} zoom={profile.bannerZoom || 1} />
+            : <div className="profile-banner" style={bannerStyle(profile)} />}
           <div className="profile-hero-row">
-            <div
-              className="profile-avatar"
-              style={avatarStyle(profile.avatarUrl, profile.avatarPosition)}
-            >
+            <PositionedPhoto className="profile-avatar" url={profile.avatarUrl} position={profile.avatarPosition} zoom={profile.avatarZoom || 1}>
               {!profile.avatarUrl && initial}
-            </div>
+            </PositionedPhoto>
             <div className="profile-hero-id">
               <div className="profile-name-row">
                 <h1 className="profile-name">{profile.displayName}</h1>

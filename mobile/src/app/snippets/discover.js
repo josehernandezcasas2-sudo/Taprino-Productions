@@ -338,7 +338,7 @@ function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onSha
         <Pressable style={styles.authorRow} onPress={onOpenAuthor} disabled={!onOpenAuthor} hitSlop={6}>
           <View style={styles.authorAvatar}>
             {slide.episode.authorAvatarUrl
-              ? <PositionedImage uri={slide.episode.authorAvatarUrl} position={slide.episode.authorAvatarPosition} style={absoluteFill} />
+              ? <PositionedImage uri={slide.episode.authorAvatarUrl} position={slide.episode.authorAvatarPosition} zoom={slide.episode.authorAvatarZoom || 1} style={absoluteFill} />
               : <Text style={styles.authorAvatarLetter}>{authorName[0].toUpperCase()}</Text>}
           </View>
           <Text style={styles.captionAuthor}>{authorName}</Text>

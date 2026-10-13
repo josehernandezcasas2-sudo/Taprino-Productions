@@ -51,7 +51,7 @@ export default function Conversation() {
         // The person's name/photo for the header; the thread doesn't exist yet.
         const data = await apiGet(`/api/profile?userId=${encodeURIComponent(String(to || ''))}`, t);
         const p = data.profile;
-        setState({ loading: false, error: null, thread: { id: null, other: { userId: p.userId, displayName: p.displayName, handle: p.handle, avatarUrl: p.avatarUrl, avatarPosition: p.avatarPosition || null }, context: kind && label ? { kind: String(kind), label: String(label) } : null, muted: false, iBlocked: false, blockedMe: false }, messages: [] });
+        setState({ loading: false, error: null, thread: { id: null, other: { userId: p.userId, displayName: p.displayName, handle: p.handle, avatarUrl: p.avatarUrl, avatarPosition: p.avatarPosition || null, avatarZoom: p.avatarZoom || null }, context: kind && label ? { kind: String(kind), label: String(label) } : null, muted: false, iBlocked: false, blockedMe: false }, messages: [] });
       } else {
         const data = await apiGet(`/api/messages/${id}`, t);
         setState({ loading: false, error: null, thread: data.thread, messages: data.messages });
@@ -169,7 +169,7 @@ export default function Conversation() {
           <Pressable onPress={() => (router.canGoBack() ? router.back() : router.push('/messages'))} hitSlop={10} style={styles.back}><Text style={styles.backText}>‹</Text></Pressable>
           {t ? (
             <>
-              <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} size={34} />
+              <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} zoom={t.other.avatarZoom || 1} size={34} />
               <Pressable style={{ flex: 1, minWidth: 0 }} onPress={() => router.push(`/profile/${t.other.handle || t.other.userId}`)}>
                 <Text style={styles.name} numberOfLines={1}>{t.other.displayName}</Text>
                 {t.other.handle ? <Text style={styles.handle}>@{t.other.handle}</Text> : null}

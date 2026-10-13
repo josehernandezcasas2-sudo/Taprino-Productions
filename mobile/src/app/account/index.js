@@ -88,18 +88,23 @@ export default function Account() {
   const [positionBackup, setPositionBackup] = useState(null);
   // The banner preview's width/height, so the crop window shows the right slice.
   const [bannerAspect, setBannerAspect] = useState(3);
+  // True while a finger is on the crop editor or its zoom slider: the
+  // ScrollView stands still so the drag moves the photo, not the page.
+  const [cropDragging, setCropDragging] = useState(false);
   function startReposition(which) {
-    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null });
+    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null, bannerZoom: profile.bannerZoom || null, avatarZoom: profile.avatarZoom || null });
     setReposition(which);
   }
   function cancelReposition() {
-    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar }));
+    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar, bannerZoom: positionBackup.bannerZoom, avatarZoom: positionBackup.avatarZoom }));
     setReposition(null);
   }
   async function doneReposition() {
     const which = reposition;
     setReposition(null);
-    const body = which === 'banner' ? { bannerPosition: profile.bannerPosition || null } : { avatarPosition: profile.avatarPosition || null };
+    const body = which === 'banner'
+      ? { bannerPosition: profile.bannerPosition || null, bannerZoom: profile.bannerZoom || null }
+      : { avatarPosition: profile.avatarPosition || null, avatarZoom: profile.avatarZoom || null };
     const setStatus = which === 'banner' ? setBannerStatus : setAvatarStatus;
     setStatus('saving');
     try {
@@ -487,7 +492,7 @@ export default function Account() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.stage}>
+      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.stage} scrollEnabled={!cropDragging}>
         <Pressable style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/stream'))}>
           <BackArrowIcon /><Text style={styles.backText}>Back</Text>
         </Pressable>
@@ -556,12 +561,12 @@ export default function Account() {
 
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
-                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={[styles.avatar, reposition === 'avatar' && styles.avatarLarge]}>
+                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} zoom={profile.avatarZoom || 1} style={[styles.avatar, reposition === 'avatar' && styles.avatarLarge]}>
                   {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
                 </PositionedImage>
                 {reposition === 'avatar' ? (
                   <View style={{ flexBasis: '100%' }}>
-                    <CropWindow uri={avatarSrc} position={profile.avatarPosition} frameAspect={1} round height={220} onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))} />
+                    <CropWindow uri={avatarSrc} position={profile.avatarPosition} zoom={profile.avatarZoom || 1} frameAspect={1} round height={220} onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))} onZoomChange={(z) => setProfile((p) => ({ ...p, avatarZoom: z }))} onInteract={setCropDragging} />
                     <View style={styles.avatarRow}>
                       <Pressable style={styles.btnPrimarySmall} onPress={doneReposition}><Text style={styles.btnPrimarySmallText}>Done</Text></Pressable>
                       <Pressable style={styles.btnSmall} onPress={cancelReposition}><Text style={styles.btnSmallText}>Cancel</Text></Pressable>
@@ -590,7 +595,7 @@ export default function Account() {
               <View style={styles.bannerPreview} onLayout={(e) => { const { width, height } = e.nativeEvent.layout; if (height > 0) setBannerAspect(width / height); }}>
                 {(profile.bannerBase64 || profile.bannerUrl) ? (
                   <>
-                    <PositionedImage uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} style={[absoluteFill, { borderRadius: 8 }]} />
+                    <PositionedImage uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} zoom={profile.bannerZoom || 1} style={[absoluteFill, { borderRadius: 8 }]} />
                     {reposition === 'banner' ? <View style={styles.bannerGuide} pointerEvents="none" /> : null}
                   </>
                 ) : profile.bannerColor ? (
@@ -598,13 +603,13 @@ export default function Account() {
                 ) : (
                   <LinearGradient colors={bannerGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={absoluteFill} />
                 )}
-                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} style={[styles.bannerPreviewAvatar, reposition === 'banner' && { opacity: 0.55 }]}>
+                <PositionedImage uri={avatarSrc} position={profile.avatarPosition} zoom={profile.avatarZoom || 1} style={[styles.bannerPreviewAvatar, reposition === 'banner' && { opacity: 0.55 }]}>
                   {!avatarSrc ? <Text style={styles.avatarLetter}>{avatarLetter}</Text> : null}
                 </PositionedImage>
               </View>
               {reposition === 'banner' ? (
                 <View style={{ marginTop: 22 }}>
-                  <CropWindow uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} frameAspect={bannerAspect} height={240} onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))} />
+                  <CropWindow uri={profile.bannerBase64 || profile.bannerUrl} position={profile.bannerPosition} zoom={profile.bannerZoom || 1} frameAspect={bannerAspect} height={240} onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))} onZoomChange={(z) => setProfile((p) => ({ ...p, bannerZoom: z }))} onInteract={setCropDragging} />
                 </View>
               ) : null}
               <View style={[styles.avatarRow, reposition === 'banner' ? null : { marginTop: 22 }]}>

@@ -23,9 +23,9 @@ const initialsOf = (name) => String(name || '?').split(/\s+/).map((w) => w[0]).f
 
 // `position` is the person's saved focal point (user_profiles.avatar_position),
 // so the crop matches their profile and the account screen.
-export function Avatar({ userId, name, src, position, size = 48 }) {
+export function Avatar({ userId, name, src, position, zoom, size = 48 }) {
   const box = { width: size, height: size, borderRadius: size / 2 };
-  if (src) return <PositionedImage uri={src} position={position} style={[box, { backgroundColor: colors.surface2 }]} />;
+  if (src) return <PositionedImage uri={src} position={position} zoom={zoom || 1} style={[box, { backgroundColor: colors.surface2 }]} />;
   return (
     <View style={[box, { backgroundColor: colorFor(userId || name), alignItems: 'center', justifyContent: 'center' }]}>
       <Text style={{ fontFamily: fonts.displayBold, fontSize: size * 0.36, color: '#1b0a0e' }}>{initialsOf(name)}</Text>
@@ -174,7 +174,7 @@ export function PersonCard({ p, onOpen, onMessage }) {
   return (
     <Pressable style={crew.panel} onPress={onOpen}>
       <View style={[crew.row, { alignItems: 'flex-start' }]}>
-        <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} size={48} />
+        <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom || 1} size={48} />
         <View style={{ flex: 1, minWidth: 0 }}>
           <View style={crew.nameRow}>
             <Text style={crew.name}>{p.displayName}</Text>
@@ -212,7 +212,7 @@ export function GearCard({ g, onOpen, onAsk }) {
       </View>
       <Text style={crew.mono}>{g.category}</Text>
       <View style={crew.row}>
-        <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} position={o.avatarPosition} size={28} />
+        <Avatar userId={o.userId} name={o.displayName} src={o.avatarUrl} position={o.avatarPosition} zoom={o.avatarZoom || 1} size={28} />
         <Text style={crew.meta}>{o.displayName}{o.miles != null ? ` · ${o.miles} mi` : o.place ? ` · ${o.place}` : ''}{o.verified ? ' · ✓' : ''}</Text>
       </View>
       {onAsk ? (
@@ -381,7 +381,7 @@ export function CallCard({ c, onOpen }) {
       </View>
       {c.poster ? (
         <View style={crew.row}>
-          <Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} size={26} />
+          <Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom || 1} size={26} />
           <Text style={crew.meta}>{c.poster.displayName}</Text>
           <TierChip person={c.poster} />
           <Text style={crew.meta}>· {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</Text>

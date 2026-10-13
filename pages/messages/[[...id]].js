@@ -252,7 +252,7 @@ export default function MessagesPage({ mainGenres, isSignedIn, isSubscriber, ema
               )}
               {threads.map((t) => (
                 <Link key={t.id} href={`/messages/${t.id}`} className={`dm-thread${active && active.thread.id === t.id ? ' sel' : ''}`}>
-                  <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} size="sm" />
+                  <Avatar userId={t.other.userId} name={t.other.displayName} src={t.other.avatarUrl} position={t.other.avatarPosition} zoom={t.other.avatarZoom} size="sm" />
                   <span className="dm-thread-body">
                     <b>{t.other.displayName}{t.muted ? <span className="dm-muted" title="Muted"> · muted</span> : null}</b>
                     <small>{t.lastSenderId === viewerId ? 'You: ' : ''}{t.preview || 'New conversation'}</small>
@@ -269,7 +269,7 @@ export default function MessagesPage({ mainGenres, isSignedIn, isSubscriber, ema
                 <div className="crew-panel dm-convo">
                   <div className="dm-chead">
                     <Link href="/messages" className="crew-btn sm ghost dm-back" aria-label="Back to conversations">‹</Link>
-                    <Avatar userId={convo.other.userId} name={convo.other.displayName} src={convo.other.avatarUrl} position={convo.other.avatarPosition} size="sm" />
+                    <Avatar userId={convo.other.userId} name={convo.other.displayName} src={convo.other.avatarUrl} position={convo.other.avatarPosition} zoom={convo.other.avatarZoom} size="sm" />
                     <div style={{ minWidth: 0 }}>
                       <div className="crew-pname" style={{ fontSize: '0.95rem' }}>{convo.other.displayName}</div>
                       {convo.other.handle && <div className="crew-handle">@{convo.other.handle}</div>}

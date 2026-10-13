@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import AvatarPhoto from '../AvatarPhoto';
 import { GEAR_FLAGS } from '../../lib/crewOptions';
 
 // Small pieces shared by /crew, /crew/card and the profile page's
@@ -18,9 +19,9 @@ export function initialsOf(name) {
 
 // `position` is the person's saved focal point (user_profiles.avatar_position),
 // so the crop here matches their profile and the account page.
-export function Avatar({ userId, name, src, position, size = 'md' }) {
+export function Avatar({ userId, name, src, position, zoom, size = 'md' }) {
   const cls = `crew-avatar crew-avatar-${size}`;
-  if (src) return <img className={cls} src={src} alt="" style={{ objectPosition: position || 'center' }} />;
+  if (src) return <AvatarPhoto className={cls} url={src} position={position} zoom={zoom} />;
   return <span className={cls} style={{ background: colorFor(userId || name) }} aria-hidden="true">{initialsOf(name)}</span>;
 }
 

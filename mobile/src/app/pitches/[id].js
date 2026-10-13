@@ -309,7 +309,7 @@ export default function PitchDetail() {
     return (
       <View key={c.id} style={[styles.commentCard, isReply && styles.replyCard]}>
         <Pressable style={styles.commentMetaRow} onPress={() => router.push(`/profile/${c.user_id}`)}>
-          <View style={styles.commentAvatar}>{c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} style={absoluteFill} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
+          <View style={styles.commentAvatar}>{c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} zoom={c.avatarZoom || 1} style={absoluteFill} /> : <Text style={styles.commentAvatarText}>{(c.displayName || '?')[0].toUpperCase()}</Text>}</View>
           <Text style={styles.commentName}>{c.displayName}</Text>
           {isCreatorComment ? <View style={styles.creatorBadge}><Text style={styles.creatorBadgeText}>Creator</Text></View> : null}
           <Text style={styles.commentDate}> · {formatCommentDate(c.created_at)}{c.updated_at ? ' · edited' : ''}</Text>
@@ -611,7 +611,7 @@ export default function PitchDetail() {
               <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.bleed} contentContainerStyle={styles.hRow}>
                 {recentBackers.map((b) => (
                   <Pressable key={b.userId} style={styles.backer} onPress={() => router.push(`/profile/${b.userId}`)}>
-                    <View style={styles.backerAvatar}>{b.avatarUrl ? <PositionedImage uri={b.avatarUrl} position={b.avatarPosition} style={absoluteFill} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
+                    <View style={styles.backerAvatar}>{b.avatarUrl ? <PositionedImage uri={b.avatarUrl} position={b.avatarPosition} zoom={b.avatarZoom || 1} style={absoluteFill} /> : <Text style={styles.backerAvatarText}>{(b.displayName || '?')[0].toUpperCase()}</Text>}</View>
                     <Text style={styles.backerName} numberOfLines={1}>{b.displayName}</Text>
                   </Pressable>
                 ))}

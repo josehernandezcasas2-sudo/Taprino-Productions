@@ -174,7 +174,7 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
         ) : (
           <>
             <div className="crew-hero">
-              <Avatar userId={profile.userId} name={profile.displayName} src={profile.avatarUrl} position={profile.avatarPosition} size="lg" />
+              <Avatar userId={profile.userId} name={profile.displayName} src={profile.avatarUrl} position={profile.avatarPosition} zoom={profile.avatarZoom} size="lg" />
               <div style={{ minWidth: 0 }}>
                 <div className="crew-pname crew-pname-lg">{profile.displayName}{isCreator && <span className="crew-ver">✓ creator</span>}</div>
                 <div className="crew-handle">{profile.handle ? `@${profile.handle} · ` : ''}{creditedWork.length} released {creditedWork.length === 1 ? 'title' : 'titles'} on Studio Tapa</div>

@@ -121,7 +121,7 @@ function Shell({ title, children, mainGenres, isSignedIn, email, isAdmin, isCrea
 function PersonLine({ p, prefix }) {
   return (
     <span className="cl-person">
-      <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} size="sm" />
+      <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom} size="sm" />
       <span>
         {prefix}<Link href={p.profilePath}>{p.displayName}</Link>
         {p.verified && <span className="crew-ver"> ✓ creator</span>}{' '}
@@ -238,7 +238,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
             <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cl-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
               <div className="cl-title">{c.title}<span className={`cl-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
               <div className="cl-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
-              <div className="cl-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
+              <div className="cl-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
             </Link>
           ))}
         </div>
@@ -371,7 +371,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
           {(!responses || responses.length === 0) && <div className="crew-muted">No responses yet. Matching people were told when you posted.</div>}
           {responses && responses.map((r) => (
             <div key={r.id} className={`cl-resp${r.status === 'booked' || r.outcome === 'worked' ? ' booked' : ''}`}>
-              <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} position={r.person.avatarPosition} size="sm" />
+              <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} position={r.person.avatarPosition} zoom={r.person.avatarZoom} size="sm" />
               <div style={{ minWidth: 0 }}>
                 <div className="crew-pname"><Link href={r.person.profilePath}>{r.person.displayName}</Link>{r.person.verified && <span className="crew-ver">✓ creator</span>}<TierChip person={r.person} /></div>
                 <div className="crew-mono">{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} on Crew Call · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}</div>

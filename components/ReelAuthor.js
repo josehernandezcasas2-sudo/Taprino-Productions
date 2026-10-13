@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import AvatarPhoto from './AvatarPhoto';
 
 // The poster's photo + name on a user-posted reel (Snippets, and user
 // posts mixed into Vertical discover). Same photo as everywhere else —
@@ -9,12 +10,9 @@ export default function ReelAuthor({ episode }) {
   const avatarUrl = episode.authorAvatarUrl;
   return (
     <Link href={`/profile/${episode.ownerId}`} className="reel-caption-author">
-      <span
-        className="reel-caption-avatar"
-        style={avatarUrl ? { backgroundImage: `url(${avatarUrl})`, backgroundPosition: episode.authorAvatarPosition || 'center' } : undefined}
-      >
-        {!avatarUrl && name[0].toUpperCase()}
-      </span>
+      <AvatarPhoto className="reel-caption-avatar" url={avatarUrl} position={episode.authorAvatarPosition} zoom={episode.authorAvatarZoom}>
+        {name[0].toUpperCase()}
+      </AvatarPhoto>
       <span className="reel-caption-series reel-caption-post-author">{name}</span>
     </Link>
   );

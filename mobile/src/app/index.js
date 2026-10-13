@@ -170,7 +170,7 @@ export default function Home() {
                 return (
                   <Pressable key={c.userId} style={[styles.polaroid, { marginTop, transform: [{ rotate }] }]} onPress={() => router.push(`/profile/${c.userId}`)}>
                     <View style={styles.polaroidPhoto}>
-                      {c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} style={absoluteFill} /> : null}
+                      {c.avatarUrl ? <PositionedImage uri={c.avatarUrl} position={c.avatarPosition} zoom={c.avatarZoom || 1} style={absoluteFill} /> : null}
                     </View>
                     <Text style={styles.polaroidName}>{c.displayName}</Text>
                     <Text style={styles.polaroidCredit}>{c.credits.slice(0, 2).join(', ')}</Text>

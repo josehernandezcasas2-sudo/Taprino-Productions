@@ -8363,12 +8363,17 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .account-banner-swatch-clear { background: none; border: 0; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.72rem; cursor: pointer; text-decoration: underline; }
 .account-banner-note { font-size: 0.78rem; color: var(--ink-dim); margin: -0.3rem 0 0.9rem; }
 /* Reposition mode (components/RepositionFrame.js, mockups/banner-reposition.html) */
-.reposition-frame { touch-action: none; }
-.reposition-frame.active { cursor: grab; outline: 2px solid var(--olive); outline-offset: 0; user-select: none; }
-.reposition-frame.active:active { cursor: grabbing; }
-.reposition-grip { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; pointer-events: none; z-index: 2; }
-.reposition-grip span { font-family: var(--font-mono); font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(12,19,31,0.72); border: 1px solid rgba(251,232,211,0.25); color: var(--ink); padding: 0.4rem 0.8rem; border-radius: 999px; backdrop-filter: blur(4px); }
+/* A photo placed in its frame by components/PositionedPhoto.js. */
+.positioned-photo { position: relative; overflow: hidden; }
+.positioned-photo > img { display: block; pointer-events: none; }
+.reposition-frame { position: relative; }
+.reposition-frame .reposition-photo { position: absolute; inset: 0; border-radius: inherit; }
 .account-avatar.reposition-frame { position: relative; overflow: hidden; flex: none; }
+.profile-avatar.positioned-photo, .account-avatar.positioned-photo { background-size: 0; }
+.crop-zoom { display: flex; align-items: center; gap: 0.6rem; margin: -0.3rem 0 0.9rem; font-family: var(--font-mono); font-size: 0.76rem; color: var(--ink-faint); }
+.crop-zoom input[type=range] { flex: 1; accent-color: var(--olive); margin: 0; }
+.crop-zoom-value { min-width: 3ch; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.crop-zoom-reset { background: none; border: 0; color: var(--olive); font-family: var(--font-mono); font-size: 0.76rem; cursor: pointer; text-decoration: underline; padding: 0; }
 .account-avatar.account-avatar-large { width: 140px; height: 140px; font-size: 2.6rem; }
 .account-avatar.account-avatar-large .reposition-grip span { font-size: 0.66rem; padding: 0.3rem 0.5rem; }
 .account-banner-preview.reposition-frame.active { overflow: hidden; }
@@ -8377,7 +8382,9 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .account-reposition-panel { margin: 1rem 0 0.7rem; }
 /* The whole-photo crop editor (RepositionFrame.js CropWindow). The
    window's huge box-shadow is the dimming outside it. */
-.crop-area { position: relative; overflow: hidden; background: var(--void); border: 1px solid rgba(251,232,211,0.12); border-radius: 10px; margin-bottom: 0.9rem; user-select: none; }
+.crop-area { position: relative; overflow: hidden; background: var(--void); border: 1px solid rgba(251,232,211,0.12); border-radius: 10px; margin-bottom: 0.9rem; user-select: none; touch-action: none; cursor: grab; overscroll-behavior: contain; }
+.crop-area:active { cursor: grabbing; }
+.crop-zoom input[type=range] { touch-action: none; height: 28px; }
 .crop-image { position: absolute; display: block; user-select: none; pointer-events: none; }
 .crop-window { position: absolute; box-shadow: 0 0 0 4000px rgba(12, 19, 31, 0.72); outline: 2px solid rgba(251,232,211,0.95); outline-offset: -2px; cursor: grab; touch-action: none; }
 .crop-window:active { cursor: grabbing; }
@@ -9216,3 +9223,9 @@ a.crew-credit:hover { background: var(--surface-3); }
   .earn-list li { grid-template-columns: 1fr; gap: 0.1rem; }
   .bk-table th:nth-child(4), .bk-table td:nth-child(4), .bk-table th:nth-child(6), .bk-table td:nth-child(6) { display: none; }
 }
+
+/* A person's photo in a circle at their saved focal point + zoom
+   (components/AvatarPhoto.js); the wrapper keeps its own size, colour and
+   letter fallback, the image fills it. */
+.avatar-photo { position: relative; overflow: hidden; }
+.avatar-photo-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
