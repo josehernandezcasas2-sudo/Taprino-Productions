@@ -79,6 +79,26 @@ export default function Account() {
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   const [joiningTier, setJoiningTier] = useState(null);
+  // Live "@name is available / taken" under the handle field (same as
+  // the website): checked 350 ms after typing stops, only when the draft
+  // differs from what's saved. Saving re-checks; the DB index is final.
+  const [handleCheck, setHandleCheck] = useState({ handle: null, ok: null, reason: null });
+  const draftHandle = profile ? profile.handle || '' : '';
+  const savedHandle = profile ? profile.savedHandle || '' : '';
+  useEffect(() => {
+    if (!draftHandle || draftHandle === savedHandle) { setHandleCheck({ handle: null, ok: null, reason: null }); return undefined; }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      try {
+        const token = await withToken();
+        const d = await apiGet(`/api/account/handle-available?handle=${encodeURIComponent(draftHandle)}`, token);
+        if (!cancelled) setHandleCheck(d);
+      } catch {
+        // Advisory only — the save reports a real clash.
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [draftHandle, savedHandle]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
@@ -120,7 +140,7 @@ export default function Account() {
       return;
     }
     setDashboard(dash);
-    setProfile(profileData);
+    setProfile(profileData ? { ...profileData, savedHandle: profileData.handle || '' } : profileData);
     if (profileData) updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
     setOriginalAge(profileData ? profileData.age ?? null : null);
   }
@@ -168,7 +188,7 @@ export default function Account() {
     try {
       const token = await withToken();
       const data = await apiPost('/api/account/profile', profile, token);
-      setProfile((p) => ({ ...p, avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl, avatarBase64: undefined, removeAvatar: false }));
+      setProfile((p) => ({ ...p, savedHandle: p.handle || '', avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl, avatarBase64: undefined, removeAvatar: false }));
       // Handle too, so BottomNav's "View profile" row points at the new
       // @handle straight away.
       updateOwnProfileCache({ handle: profile.handle || null, ...('avatarUrl' in data ? { avatarUrl: data.avatarUrl } : {}) });
@@ -453,7 +473,11 @@ export default function Account() {
                 {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
                 {memberBadgeLabel ? <View style={styles.tierBadge}><Text style={styles.tierBadgeText}>{memberBadgeLabel}</Text></View> : null}
               </View>
-              <Text style={styles.identitySub}>{dashboard.email ? `Signed in as ${dashboard.email}` : 'Signed in'}</Text>
+              <Text style={styles.identitySub}>
+                {profile && profile.handle ? <Text style={styles.identityHandle}>@{profile.handle}</Text> : null}
+                {profile && profile.handle && dashboard.email ? ' · ' : ''}
+                {dashboard.email ? `Signed in as ${dashboard.email}` : 'Signed in'}
+              </Text>
             </View>
           </View>
           {dashboard.userId ? (
@@ -493,6 +517,11 @@ export default function Account() {
                   placeholderTextColor={colors.inkFaint}
                 />
               </View>
+              <Text style={[styles.handleHint, handleCheck.ok === true && { color: colors.ok }, handleCheck.ok === false && { color: colors.danger }]}>
+                {handleCheck.reason
+                  || (handleCheck.ok === true && handleCheck.handle ? `@${handleCheck.handle} is available` : '')
+                  || (profile.handle ? '' : 'Handles are unique — one person per name.')}
+              </Text>
 
               <Label style={{ marginTop: 6 }}>Avatar</Label>
               <View style={styles.avatarRow}>
@@ -951,7 +980,9 @@ const styles = StyleSheet.create({
   input: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)', borderRadius: 4, paddingVertical: 10, paddingHorizontal: 13, fontFamily: fonts.body, fontSize: 14.4, color: colors.ink, marginBottom: 14 },
   textarea: { minHeight: 70, textAlignVertical: 'top' },
   inlineRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  handleRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 14 },
+  handleRow: { flexDirection: 'row', alignItems: 'stretch', marginBottom: 6 },
+  handleHint: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkFaint, minHeight: 16, marginBottom: 12 },
+  identityHandle: { fontFamily: fonts.mono, color: colors.olive },
   handleAt: { color: colors.inkDim, fontSize: 14.4, paddingHorizontal: 10, borderWidth: 1, borderRightWidth: 0, borderColor: 'rgba(251,232,211,0.18)', borderTopLeftRadius: 4, borderBottomLeftRadius: 4, textAlignVertical: 'center', lineHeight: 40 },
   handleInput: { flex: 1, marginBottom: 0, borderTopLeftRadius: 0, borderBottomLeftRadius: 0 },
   avatarRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 14, flexWrap: 'wrap' },

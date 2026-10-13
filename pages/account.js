@@ -108,6 +108,23 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   const [redeemSuccess, setRedeemSuccess] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileSaving, setProfileSaving] = useState(false);
+  // Live availability for the handle field: { handle, ok, reason }. ok is
+  // null while nothing has been checked (empty, or unchanged from what's
+  // saved). The save still re-checks; the DB's unique index is final.
+  const [handleCheck, setHandleCheck] = useState({ handle: null, ok: null, reason: null });
+  const savedHandle = profile && profile.savedHandle;
+  const draftHandle = profile ? profile.handle || '' : '';
+  useEffect(() => {
+    if (!draftHandle || draftHandle === savedHandle) { setHandleCheck({ handle: null, ok: null, reason: null }); return undefined; }
+    let cancelled = false;
+    const t = setTimeout(() => {
+      fetch(`/api/account/handle-available?handle=${encodeURIComponent(draftHandle)}`)
+        .then((r) => r.json())
+        .then((d) => { if (!cancelled && !d.error) setHandleCheck(d); })
+        .catch(() => {});
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [draftHandle, savedHandle]);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -125,7 +142,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   useEffect(() => {
     fetch('/api/account/profile')
       .then((r) => r.json())
-      .then((data) => { setProfile(data); setOriginalAge(data.age ?? null); })
+      .then((data) => { setProfile({ ...data, savedHandle: data.handle || '' }); setOriginalAge(data.age ?? null); })
       .catch(() => setProfile({ displayName: '', gender: '', age: '', bio: '', avatarUrl: null, socialLinks: [], stayInStream: false }));
   }, []);
 
@@ -164,6 +181,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
       if (!res.ok) throw new Error(data.error || 'Could not save.');
       setProfile((p) => ({
         ...p,
+        savedHandle: p.handle || '',
         avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl,
         avatarBase64: null,
         avatarFileName: null,
@@ -363,7 +381,11 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                   {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
                   {memberBadge(tier, SITE.premiumTier) && <span className="account-tier-badge">{memberBadge(tier, SITE.premiumTier)}</span>}
                 </div>
-                <div className="account-identity-sub">{email ? <>Signed in as {email}</> : 'Signed in'}</div>
+                <div className="account-identity-sub">
+                  {profile && profile.handle && <span className="account-identity-handle">@{profile.handle}</span>}
+                  {profile && profile.handle && email && ' · '}
+                  {email ? <>Signed in as {email}</> : 'Signed in'}
+                </div>
               </div>
             </div>
             {userId && (
@@ -447,6 +469,11 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         spellCheck={false}
                         placeholder="yourname"
                       />
+                    </div>
+                    <div className={`account-handle-hint ${handleCheck.ok === true ? 'ok' : handleCheck.ok === false ? 'bad' : ''}`} aria-live="polite">
+                      {handleCheck.reason
+                        || (handleCheck.ok === true && handleCheck.handle ? `@${handleCheck.handle} is available` : '')
+                        || (profile.handle ? '' : 'Handles are unique — one person per name.')}
                     </div>
 
                     <label style={{ marginTop: '1rem' }}>Avatar</label>
