@@ -31,9 +31,10 @@ const GROUPS = {
     items: [
       { href: '/pitches/discover', label: 'Pitch Discover' },
       { href: '/vertical/discover', label: 'Vertical Discover' },
-      { href: '/crew', label: 'Crew Call' }
+      { href: '/crew', label: 'Crew Call' },
+      { href: '/locations', label: 'Locations' }
     ],
-    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew')
+    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew') || p.startsWith('/locations')
   },
   watch: {
     label: 'Watch',
@@ -63,6 +64,7 @@ const GROUPS = {
       { href: '/recs', label: 'My Recs' },
       { href: '/stream', label: 'Continue Watching' },
       { href: '/account/my-work', label: 'My Work' },
+      { href: '/locations/mine', label: 'My locations' },
       ...(role.isCreator || role.canAccessAdmin ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
       ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ],

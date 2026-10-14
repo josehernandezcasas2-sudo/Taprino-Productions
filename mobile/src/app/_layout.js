@@ -74,6 +74,12 @@ export default function RootLayout() {
           <Stack.Screen name="crew/calls/index" options={{ headerShown: false }} />
           <Stack.Screen name="crew/calls/new" options={{ headerShown: false }} />
           <Stack.Screen name="crew/calls/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/index" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/new" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/mine" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/requests/index" options={{ headerShown: false }} />
+          <Stack.Screen name="locations/requests/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="messages/index" options={{ headerShown: false }} />
           <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />
