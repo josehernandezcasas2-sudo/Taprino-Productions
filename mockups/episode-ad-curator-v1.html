@@ -78,7 +78,7 @@
   .stage { min-width:0; }
   .ep-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
   .ep-head .t { font-family:var(--font-display); font-weight:700; font-size:1.35rem; line-height:1.1; }
-  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0 10px; }
+  .stats { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin:14px 0 10px; }
   .stat { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:9px 11px; }
   .stat b { font-family:var(--font-display); font-size:1.15rem; display:block; line-height:1.1; }
   .stat span { font-family:var(--font-mono); font-size:.64rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; }
@@ -182,10 +182,11 @@
 <body>
 
 <div class="intro">
-  <h1>Episode Ad Curator — v1 mockups</h1>
+  <h1>Episode Ad Curator — v1 mockups, revised with your answers</h1>
   <p class="note">A screen every title passes through before it goes to the live scheduler (and that the on-demand player reads too). It takes the episode's length and the creator's break times, lets you <b>compose each break</b> out of pieces, and gives back one exact number: the <b>air length</b>. That number is what the scheduler has been missing.</p>
   <p class="note"><b>Why the timelines go weird today.</b> A creator types break times ("0:00, 10:00, 20:30"); each break plays one house ad of whatever length comes up. On a live channel the mid-roll breaks aren't played at all — the episode runs straight through and ads only fill the slot's tail and the gaps between shows. So a 27:40 title books a 28-minute slot, and the moment real breaks exist nothing knows how long they are. With a plan, a break is a fixed number of seconds, so 27:40 + 2:00 of breaks = 29:40, a 30-minute slot, with 20 seconds of bumpers to close.</p>
   <p class="note"><b>Words used below.</b> A <b>break</b> is a point in the show where ads play. A break is made of <b>pieces</b>: an <b>exact section</b> (15 s — any approved 15-second ad fills it at air time), a <b>range section</b> (10–15 s — holds one ad inside the range, books the top of the range, bumper takes the rest), a <b>flex block</b> (your "custom size": N seconds that takes ads of any length, best fit, and keeps the last few seconds for a bumper), a <b>pinned ad</b> (one specific creative, placed by hand), and a <b>bumper</b> ("presented by", "supported by", station ID — the auto one comes from a dropdown). A <b>self-implemented ad</b> is a sponsor segment already inside the video; you mark it so breaks keep clear of it and a QR / link card can show over it.</p>
+  <p class="note"><b>Decided so far (Oct 14).</b> Admins and content schedulers curate. Advertisers are steered to the size list, and longer sizes can be added. No cap per break; under <b>15 minutes of ads per hour</b> on a channel. Bumper time is computed, not typed: 1 s to 20 s or more, whatever makes a break an even length, and a dropdown picks which bumpers. Self-ads never count but are always shown. Pinning is internal: Studio Tapa's own ads only. Section 5 explains the two rules you asked about; section 10 lists what's still open.</p>
 </div>
 
 <!-- 1. The curator -->
@@ -218,7 +219,7 @@
           <div class="p fx"><span><i class="c-fx"></i><b>30 s block</b></span><small>tail 5 s</small></div>
           <div class="p fx"><span><i class="c-fx"></i><b>60 s block</b></span><small>tail 5 s</small></div>
         </div>
-        <span class="meta" style="margin-top:12px">Drag a piece onto a break, or onto the strip below. The count is how many approved ads could fill it right now.</span>
+        <span class="meta" style="margin-top:12px">Drag a piece onto a break, or onto the strip below. The count is how many approved ads could fill it on the air date.</span>
       </div>
 
       <!-- stage -->
@@ -237,6 +238,7 @@
           <div class="stat"><b>4</b><span>Breaks · 2:00 of ads</span></div>
           <div class="stat hot"><b>29:40</b><span>Air length</span></div>
           <div class="stat"><b>30 min</b><span>Slot · 0:20 bumpers to close</span></div>
+          <div class="stat"><b>4:03</b><span>Ads per hour · cap 15:00</span></div>
         </div>
 
         <div class="tl">
@@ -281,18 +283,18 @@
         <div class="comp">
           <div class="comp-head">
             <div><b>Break 2 · at 18:30</b><span class="meta">45 s · three pieces · at the creator's time. Drag the chip above to move it; it keeps 60 s clear of the self-ad.</span></div>
-            <div class="chips"><span class="chip ok">All pieces can fill today</span><span class="chip">Max per break 60 s</span></div>
+            <div class="chips"><span class="chip ok">All pieces can fill Thu</span><span class="chip">No cap per break · 15:00 per hour on the channel</span></div>
           </div>
           <div class="strip">
             <div class="c-ex" style="flex:15 0 0"><b>15 s</b>exact · 14 ads eligible<i class="h"></i></div>
-            <div class="c-pin" style="flex:20 0 0"><b>Acme Coffee “Morning” · 20 s</b>pinned · 1,240 credits<i class="h"></i></div>
-            <div class="c-bp" style="flex:10 0 0"><b>10 s</b>bumper · auto: Presented by</div>
-            <div class="drop" style="flex:15 0 0">drop a piece<br>+15 s left in the cap</div>
+            <div class="c-pin" style="flex:20 0 0"><b>Studio Tapa stickers · 20 s</b>pinned · house ad<i class="h"></i></div>
+            <div class="c-bp" style="flex:10 0 0"><b>10 s</b>bumpers · to the even 45</div>
+            <div class="drop" style="flex:15 0 0">drop a piece<br>the break grows, bumpers re-fit</div>
           </div>
           <div class="pieces">
             <div class="piece"><b><i class="c-ex"></i>Exact 15 s</b>Filled at air time by any approved 15-second ad eligible for Live TV / Main player. Weighted draw, same as now; credits are billed to the advertiser whose ad ran.</div>
-            <div class="piece"><b><i class="c-pin"></i>Pinned · Acme Coffee “Morning”</b>This creative, every time. Pinned from the Ads tab (attached to Acme's ad account). If Acme runs out of credits before air, the piece falls back to an exact 20 s section.</div>
-            <div class="piece"><b><i class="c-bp"></i>Bumper 10 s · auto</b>“Presented by Acme Coffee” — the sponsor name comes from the pinned ad in the same break. Pick a different bumper here, or let the dropdown on the right decide.</div>
+            <div class="piece"><b><i class="c-pin"></i>Pinned · Studio Tapa stickers</b>This creative, every time. Only Studio Tapa's own ads pin (internal); advertisers' ads only ever arrive through the draw. Pinning is how a house promo is guaranteed a spot.</div>
+            <div class="piece"><b><i class="c-bp"></i>Bumpers 10 s · computed</b>35 s of ads, rounded up to 45: the 10 s left is bumper time. “Presented by Studio Tapa” (6 s) + the sting (4 s). The dropdown on the right picks which bumpers; the length is never typed.</div>
           </div>
         </div>
       </div>
@@ -302,21 +304,22 @@
         <span class="eyebrow">Ad settings · this episode</span>
         <div class="row"><div><b>Breaks from the creator</b><small>0:00, 8:00, 18:30, 24:00 — their times are the default. Override moves or adds breaks here without touching their submission.</small></div><span class="tog on"></span></div>
         <div class="row"><div><b>Adjacent sections become one block</b><small>Pieces placed next to each other merge into a flex block of their combined length, so ads of any length can fill it; the last seconds go to a bumper.</small></div><span class="tog on"></span></div>
-        <div class="row"><div><b>Bumper tail</b><small>Seconds kept at the end of a flex block or a range section.</small></div><b>5 s</b></div>
+        <div class="row"><div><b>Round each break to</b><small>Ads first; bumpers fill up to the next even length, 1 s to 20 s or more. 20 s or more of bumpers = the curator suggests another ad.</small></div><b>15 s</b></div>
         <div class="row"><div style="flex:1"><b>Auto bumper</b><small>What fills bumper time when you don't pick one by hand.</small>
-          <div class="field dd"><b>Presented by · sponsor of the break</b><span>▾</span></div>
+          <div class="field dd"><b>Presented by · pinned Studio Tapa brand</b><span>▾</span></div>
           <div class="dd-menu">
-            <div class="on">Presented by · sponsor of the break <small>6 s</small></div>
-            <div>Supported by · sponsor of the break <small>6 s</small></div>
+            <div class="on">Presented by · pinned Studio Tapa brand <small>6 s</small></div>
+            <div>Supported by · pinned Studio Tapa brand <small>6 s</small></div>
             <div>TapaTV station ID <small>5 s</small></div>
             <div>Channel's bumpers (rotate) <small>5–10 s</small></div>
-            <div>None · pad with black</div>
+            <div>Hold card only · channel logo</div>
           </div>
         </div></div>
-        <div class="row"><div><b>Max ad time per break</b><small>Drop zones close when a break hits it.</small></div><b>60 s</b></div>
-        <div class="row"><div><b>If nothing fits at air time</b><small>An exact section with no eligible ad that day.</small></div><b>Bumper</b></div>
+        <div class="row"><div><b>Ads per hour on the channel</b><small>No cap per break. Breaks, gaps and slot tails add up per clock hour; the scheduler flags any hour over it. Self-ads don't count.</small></div><b>&lt; 15:00</b></div>
+        <div class="row"><div><b>If nothing fits at air time</b><small>A Studio Tapa ad of that length or shorter, then bumpers, then the hold card. Never an overrun.</small></div><b>Tapa ad → bumpers</b></div>
         <div class="row"><div><b>Round air length to the minute</b><small>29:40 → 30:00; the channel fills 0:20 with its own bumpers.</small></div><span class="tog on"></span></div>
         <div class="row"><div><b>On demand too</b><small>The same plan plays as mid-roll pods in the main player. Ad-free members skip them; live channels run them for everyone.</small></div><span class="tog on"></span></div>
+        <div class="row"><div><b>Creator's self-ads</b><small>Shown, never counted: the hatched piece, a note in the hour meter, and a warning when a break lands within 60 s of one.</small></div><b>Notify</b></div>
       </div>
     </div>
   </div>
@@ -331,25 +334,25 @@
         <div class="t"><i class="c-ex"></i>Exact section</div>
         <div class="mini"><span class="c-ex" style="flex:15"></span></div>
         <p><b>15 s</b> = any approved 15-second ad. The seconds are fixed; which ad plays is decided at air time by the weighted draw that already exists. If no 15-second ad is eligible that day, the fallback rule plays (bumper by default).</p>
-        <span class="meta">Sizes: 10 · 15 · 20 · 30 s (a setting, not code).</span>
+        <span class="meta">Sizes: 10 · 15 · 20 · 30 s to start; longer ones are added in settings. The advertiser form steers uploads to the list.</span>
       </div>
       <div class="tcard">
         <div class="t"><i class="c-rg"></i>Range section</div>
         <div class="mini"><span class="c-rg" style="flex:12"></span><span class="c-bp" style="flex:3"></span></div>
-        <p><b>10–15 s</b> books 15 seconds. It holds one ad whose length falls in the range (a 12-second ad, say) and a bumper takes the 3 seconds left, so the air length never moves. This is the home for ads that don't come in neat sizes.</p>
+        <p><b>10–15 s</b> books 15 seconds. It holds one ad whose length falls in the range (a 12-second ad, say) and bumper time takes the 3 seconds left, so the air length never moves. This is the home for ads that don't come in neat sizes.</p>
         <span class="meta">Ranges: 10–15 · 15–20 · 20–30 s.</span>
       </div>
       <div class="tcard">
         <div class="t"><i class="c-fx"></i>Flex block</div>
         <div class="mini"><span class="c-fx" style="flex:30"></span><span class="c-fx" style="flex:12;opacity:.7"></span><span class="c-fx" style="flex:8;opacity:.5"></span><span class="c-bp" style="flex:5"></span></div>
-        <p><b>60 s, any lengths.</b> At air time the block is packed with eligible ads of any length, longest first, until only the bumper tail is left (5 s). Three sections placed side by side turn into one of these when the merge setting is on. Type any length for a custom block.</p>
+        <p><b>60 s, any lengths.</b> At air time the block is packed with eligible ads of any length, longest first; whatever is left to the even length (1 s to 20 s or more) is bumper time. Three sections placed side by side turn into one of these when the merge setting is on. Type any length for a custom block.</p>
         <span class="meta">The piece you asked for: "a custom ad size that actually does that".</span>
       </div>
       <div class="tcard">
         <div class="t"><i class="c-pin"></i>Pinned ad</div>
         <div class="mini"><span class="c-pin" style="flex:20"></span></div>
-        <p><b>One specific creative</b>, as long as it is. Pulled from the Ads tab: an advertiser's approved ad (billed to their credits), a house ad, or an ad attached to the creator's own account. If its credits run out before air it degrades to an exact section of the same length.</p>
-        <span class="meta">The sponsor of a break = the pinned ad's advertiser; bumpers can name them.</span>
+        <p><b>One specific creative</b>, as long as it is. Internal only: Studio Tapa's own ads (the shop, Post Puppeteers, Pitch Room, a channel promo) from the Ads tab. Advertisers' ads are never pinned; they fill sections through the draw.</p>
+        <span class="meta">The “Presented by” bumper takes its brand from the pinned ad in the break.</span>
       </div>
     </div>
   </div>
@@ -369,7 +372,7 @@
       <div>
         <span class="eyebrow mint">Setting on · one 45 s flex block</span>
         <div class="strip" style="height:54px"><div class="c-fx" style="flex:25 0 0"><b>25 s</b>any ad</div><div class="c-fx" style="flex:15 0 0;opacity:.8"><b>15 s</b>any ad</div><div class="c-bp" style="flex:5 0 0"><b>5 s</b>tail</div></div>
-        <span class="meta">Still 45 s booked. The block takes ads of any length, best fit, so there's room for more and odder ads; the last 5 s is the bumper. Un-merge by dragging a piece out.</span>
+        <span class="meta">Still 45 s booked. The block takes ads of any length, best fit, so there's room for more and odder ads; what's left to the even 45 (here 5 s) is bumper time. Un-merge by dragging a piece out.</span>
       </div>
     </div>
     <p class="note" style="margin:18px 0 0">The air length is the same either way, which is the point: the scheduler only ever sees the booked seconds. Merging changes what can fill them, not how long they are.</p>
@@ -384,29 +387,26 @@
       <div class="rail" style="padding:14px">
         <div class="tabs"><span>Sections</span><span class="on">Ads</span><span>Bumpers</span></div>
         <div class="field">Search ads · <b>live tv · main player</b> <span>▾</span></div>
-        <div class="grp">Attached to this account · pin by dragging</div>
+        <div class="grp">Studio Tapa ads · pin by dragging · internal only</div>
         <div class="list">
-          <div class="ad mine"><div class="th b"></div><div class="n">The Fawns · tour dates<small>Marisol's own ad · no credits needed · main player only</small></div><div class="dur">12 s<small>fits 10–15</small></div></div>
+          <div class="ad mine"><div class="th e"></div><div class="n">Studio Tapa stickers<small>house · studiotapa.com · no credits needed</small></div><div class="dur">20 s<small>fits 20 · 15–20</small></div></div>
+          <div class="ad mine"><div class="th b"></div><div class="n">Post Puppeteers · “We cut it”<small>house · postpuppeteers.com</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
+          <div class="ad mine"><div class="th"></div><div class="n">Pitch Room · back a film<small>house · /pitches</small></div><div class="dur">10 s<small>fits 10 · 10–15</small></div></div>
         </div>
-        <div class="grp">Advertisers · approved, with credits</div>
+        <div class="grp">Advertisers · fill sections through the draw · not pinnable</div>
         <div class="list">
-          <div class="ad"><div class="th"></div><div class="n">Acme Coffee · “Morning”<small>Acme Coffee · 1,240 credits · live tv, main player</small></div><div class="dur">20 s<small>fits 20 · 15–20</small></div></div>
-          <div class="ad"><div class="th c"></div><div class="n">Highland Bakery · “Sourdough Sunday”<small>Highland Bakery · 310 credits · live tv</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
-          <div class="ad"><div class="th d"></div><div class="n">Echo Park Film Lab · “Develop here”<small>EPFL · 90 credits · low</small></div><div class="dur">25 s<small>fits 20–30 · flex</small></div></div>
+          <div class="ad"><div class="th"></div><div class="n">Acme Coffee · “Morning”<small>1,240 credits · live tv, main player</small></div><div class="dur">20 s<small>fits 20 · 15–20</small></div></div>
+          <div class="ad"><div class="th c"></div><div class="n">Highland Bakery · “Sourdough Sunday”<small>310 credits · live tv</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
+          <div class="ad"><div class="th d"></div><div class="n">Echo Park Film Lab · “Develop here”<small>90 credits · low · 25 s is off the size list</small></div><div class="dur">25 s<small>fits 20–30 · flex</small></div></div>
         </div>
-        <div class="grp">House ads · always eligible</div>
-        <div class="list">
-          <div class="ad"><div class="th e"></div><div class="n">Studio Tapa stickers<small>house · studiotapa.com</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
-          <div class="ad"><div class="th"></div><div class="n">Pitch Room · back a film<small>house · /pitches</small></div><div class="dur">10 s<small>fits 10 · 10–15</small></div></div>
-        </div>
-        <span class="meta" style="margin-top:10px">"fits" is which sections the ad can land in. Advertisers keep uploading any length; the form will suggest 10 / 15 / 20 / 30 so more of them fit exact sections.</span>
+        <span class="meta" style="margin-top:10px">"fits" is which sections the ad can land in. The advertiser form steers uploads to the size list (10 / 15 / 20 / 30 s, longer ones when you add them); odd lengths still land in range sections and flex blocks.</span>
       </div>
       <div class="rail" style="padding:14px">
         <div class="tabs"><span>Sections</span><span>Ads</span><span class="on">Bumpers</span></div>
         <div class="field">From <b>Channel uploads · CH 01 TapaTV</b> <span>▾</span></div>
-        <div class="grp">Templates · take the sponsor's name</div>
+        <div class="grp">Templates · take the brand's name</div>
         <div class="list">
-          <div class="ad"><div class="th c"></div><div class="n">Presented by ___<small>sponsor name + logo from the pinned ad in the break</small></div><div class="dur">6 s<small>template</small></div></div>
+          <div class="ad"><div class="th c"></div><div class="n">Presented by ___<small>brand + logo from the pinned Studio Tapa ad in the break</small></div><div class="dur">6 s<small>template</small></div></div>
           <div class="ad"><div class="th c"></div><div class="n">Supported by ___<small>same, quieter wording</small></div><div class="dur">6 s<small>template</small></div></div>
         </div>
         <div class="grp">Channel uploads · kind bumper / station ID</div>
@@ -416,16 +416,50 @@
           <div class="ad"><div class="th b"></div><div class="n">Snippets promo<small>promo · too long for a tail, fine as a piece</small></div><div class="dur">15 s</div></div>
         </div>
         <div class="grp">Auto bumper for this episode</div>
-        <div class="field"><b>Presented by · sponsor of the break</b><span>▾</span></div>
-        <span class="meta" style="margin-top:10px">Tails shorter than the shortest bumper pad with black. A break with no sponsor falls back to the station ID.</span>
+        <div class="field"><b>Presented by · pinned Studio Tapa brand</b><span>▾</span></div>
+        <span class="meta" style="margin-top:10px">Bumper time shorter than the shortest clip shows the hold card (the channel logo, silent). A break with no pinned ad falls back to the station ID.</span>
       </div>
     </div>
   </div>
 </section>
 
-<!-- 5. Where it sits -->
+<!-- 5. Bumper time + empty sections -->
 <section class="sec">
-  <div class="sec-head"><span class="tag">5 · Where it sits</span><h2>Library → Ad plan → scheduler → the two players</h2></div>
+  <div class="sec-head"><span class="tag">5 · Bumper time and empty sections</span><h2>the two rules you asked me to explain</h2></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <span class="eyebrow mint">Bumper time · computed, never typed</span>
+        <div class="h2">Ads first, bumpers to the even number</div>
+        <p class="lead" style="font-size:.92rem">A bumper is a short fixed clip: the station ID (5 s), the “Back in a moment” sting (4 s), “Presented by” (6 s). A break books an even length (rounded up to 15 s in the mocks). Ads are placed first, and whatever is left is bumper time: 1 s, or 20 s or more. The engine fits the longest bumpers it can; a remainder too short for any clip shows the hold card, the channel logo, silent.</p>
+        <div class="strip" style="height:50px"><div class="c-fx" style="flex:25 0 0"><b>25 s</b>ad</div><div class="c-fx" style="flex:15 0 0;opacity:.8"><b>15 s</b>ad</div><div class="c-bp" style="flex:5 0 0"><b>5 s</b>station ID</div></div>
+        <span class="meta">45 s block · 40 s of ads · 5 s left · one station ID.</span>
+        <div class="strip" style="height:50px;margin-top:12px"><div class="c-fx" style="flex:30 0 0"><b>30 s</b>ad</div><div class="c-fx" style="flex:20 0 0;opacity:.8"><b>20 s</b>ad</div><div class="c-bp" style="flex:6 0 0"><b>6 s</b>Presented by</div><div class="c-bp" style="flex:4 0 0;opacity:.75"><b>4 s</b>sting</div></div>
+        <span class="meta">60 s block · 50 s of ads · 10 s left · two bumpers.</span>
+        <div class="strip" style="height:50px;margin-top:12px"><div class="c-rg" style="flex:12 0 0"><b>12 s</b>ad · range 10–15</div><div class="c-bp" style="flex:3 0 0;opacity:.6"><b>3 s</b>hold</div></div>
+        <span class="meta">Range 10–15 s books 15 · a 12 s ad · 3 s left, too short for a clip · hold card.</span>
+        <div class="strip" style="height:50px;margin-top:12px"><div class="c-ex" style="flex:15 0 0"><b>15 s</b>ad</div><div class="c-bp" style="flex:5 0 0"><b>5 s</b>ID</div><div class="drop" style="flex:25 0 0">25 s of bumper time · room for another ad</div></div>
+        <span class="meta">A 45 s block with one 15 s ad: 20 s or more of bumpers is a flag, not a plan. The curator says “room for another ad”, and the hour meter counts the whole 45 either way.</span>
+      </div>
+      <div>
+        <span class="eyebrow olive">Empty section · the day it airs</span>
+        <div class="h2">A section is a promise, not a file</div>
+        <p class="lead" style="font-size:.92rem">“Exact 20 s” means “play some approved 20-second ad here”. Which one is drawn when the break actually plays, from ads that are approved, active, inside their dates, have credits, and allow Live TV / Main player. If no such ad exists that day, the 20 seconds still have to happen or the schedule drifts. So, in order:</p>
+        <div class="list">
+          <div class="ad"><div class="th e"></div><div class="n">1 · A Studio Tapa ad that fits<small>same length or shorter · shop, Post Puppeteers, Pitch Room, a channel promo</small></div><div class="dur">≤ 20 s</div></div>
+          <div class="ad"><div class="th c"></div><div class="n">2 · Bumpers for what's left<small>station ID, the sting, “Presented by Studio Tapa”</small></div><div class="dur">4–6 s</div></div>
+          <div class="ad"><div class="th"></div><div class="n">3 · The hold card<small>channel logo, silent · only ever a few seconds</small></div><div class="dur">rest</div></div>
+        </div>
+        <p class="lead" style="font-size:.92rem;margin-top:12px">Never a longer ad cut short, never an overrun. And you see it coming: the curator counts eligible ads per piece for the air date, so an empty section is something you notice on Tuesday, not something viewers notice on Thursday.</p>
+        <div class="librow"><div><b>Break 3 · exact 20 s</b><span class="meta">Thu Oct 16 · 0 advertiser ads eligible</span></div><span class="chip warn">Studio Tapa ad will play</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Where it sits -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">6 · Where it sits</span><h2>Library → Ad plan → scheduler → the two players</h2></div>
   <div class="frame">
     <div class="flow">
       <div class="fcard">
@@ -434,7 +468,7 @@
         <div class="librow"><div><b>The Fawns · Ep. 3 “Salt”</b><span class="meta">27:40 · PG-13 · approved</span></div><span class="chip olive">Ad plan · default</span></div>
         <div class="librow"><div><b>The Fawns · Ep. 2 “Tide”</b><span class="meta">26:10 · PG-13 · approved</span></div><span class="chip ok">Curated · air 28:00</span></div>
         <div class="librow"><div><b>Late Night Radio · 14</b><span class="meta">58:05 · podcast · approved</span></div><span class="chip warn">Break at 3:20 sits on a self-ad</span></div>
-        <p style="margin-top:10px">The creator's submission keeps its "Ad break times" field. Under it they see <i>Curated by TapaTV: 2:00 of ads in 4 breaks</i>, read-only, plus the new self-ad marker (section 6).</p>
+        <p style="margin-top:10px">The creator's submission keeps its "Ad break times" field. Under it they see <i>Curated by TapaTV: 2:00 of ads in 4 breaks</i>, read-only, plus the new self-ad marker (section 7).</p>
       </div>
       <div class="fcard">
         <div class="t">Scheduler</div>
@@ -448,14 +482,16 @@
           <span class="ln o" style="top:86px"></span>
           <span class="bt"></span>
         </div>
-        <p style="margin-top:10px">Edit a plan after it's scheduled and the block keeps its length; if the air length changes, the scheduler flags the block ("plan is now 31:10") instead of silently moving the day.</p>
+        <div class="librow"><div><b>9:00–10:00</b><span class="meta">breaks 2:00 + gap 2:00 + tail 0:20 + next show's breaks 5:40</span></div><span class="chip ok">10:00 / 15:00</span></div>
+        <p style="margin-top:10px">The hour meter adds up breaks, gaps and tails per clock hour. Over 15:00 the hour turns red and the block that tipped it is flagged. Self-ads show in it as a note, uncounted.</p>
+        <p>Edit a plan after it's scheduled and the block keeps its length; if the air length changes, the scheduler flags the block ("plan is now 31:10") instead of silently moving the day.</p>
       </div>
       <div class="fcard">
         <div class="t">Live channel and main player</div>
-        <p>The channel engine pauses the episode at 18:30, runs the 45 s plan (two ads, one bumper), and resumes. The slot math holds because the plan is exact. Someone tuning in mid-break sees the countdown card as now.</p>
+        <p>The channel engine pauses the episode at 18:30, runs the 45 s plan (a drawn 15 s ad, the pinned Studio Tapa ad, then bumpers), and resumes. The slot math holds because the plan is exact. Someone tuning in mid-break sees the countdown card as now.</p>
         <div class="player">
           <span class="bug">CH 01 · ad break · 0:31</span>
-          <div class="card"><b>Acme Coffee</b>“Morning” · ad 2 of 2</div>
+          <div class="card"><b>Highland Bakery</b>“Sourdough Sunday” · ad 1 of 2 · 15 s</div>
           <div class="pbar"><i style="left:2%"></i><i style="left:28%"></i><i style="left:63%;background:var(--paper)"></i><i style="left:82%"></i></div>
         </div>
         <p style="margin-top:10px">On demand, the main player requests the same pod at the same second; ad-free members skip it. The app's live screen shows the countdown card until its IMA ads land, as it does today.</p>
@@ -464,15 +500,15 @@
   </div>
 </section>
 
-<!-- 6. Self-implemented ad -->
+<!-- 7. Self-implemented ad -->
 <section class="sec">
-  <div class="sec-head"><span class="tag">6 · Self-implemented ad</span><h2>a sponsor segment that's already inside the video</h2></div>
+  <div class="sec-head"><span class="tag">7 · Self-implemented ad</span><h2>a sponsor segment that's already inside the video</h2></div>
   <div class="frame">
     <div class="selfgrid">
       <div>
         <span class="eyebrow olive">Creator's submission · new block under Ad break times</span>
         <div class="h2">Sponsor segment in the video</div>
-        <p class="lead" style="font-size:.92rem">If part of the episode is an ad you shot yourself (a read, a product moment), mark it. Breaks keep clear of it, it doesn't count as ad time, and the player can show a scannable card over it.</p>
+        <p class="lead" style="font-size:.92rem">If part of the episode is an ad you shot yourself (a read, a product moment), mark it. Breaks keep clear of it, it never counts toward the hour cap, the curator and the hour meter show it as a note so nobody stacks ads around it, and the player can show a scannable card over it.</p>
         <div class="form">
           <div class="field">In <b>12:10</b> · Out <b>12:33</b> <span>23 s</span></div>
           <div class="field">Sponsor <b>Acme Coffee</b></div>
@@ -496,22 +532,22 @@
   </div>
 </section>
 
-<!-- 7. Phones -->
+<!-- 8. Phones -->
 <section class="sec">
-  <div class="sec-head"><span class="tag">7 · Phones</span><h2>same rule as the scheduler</h2></div>
+  <div class="sec-head"><span class="tag">8 · Phones</span><h2>same rule as the scheduler</h2></div>
   <div class="phone-note">The curator is a tablet / computer screen: dragging pieces onto a 30-minute bar needs the width. On a phone the Library row shows the plan's state and air length and says "open on a tablet or computer to curate", like <b>/schedule</b> does. The app's admin tab gets the same note; the self-ad marker in the creator's submission works on phones as it's a form.</div>
 </section>
 
-<!-- 8. Ideas -->
+<!-- 9. Ideas -->
 <section class="sec">
-  <div class="sec-head"><span class="tag">8 · Things in the mocks you may not have thought of</span><h2>or easy to add</h2></div>
+  <div class="sec-head"><span class="tag">9 · Things in the mocks you may not have thought of</span><h2>or easy to add</h2></div>
   <div class="frame">
     <ul class="ideas">
       <li><b>A default plan for everything</b>, so the scheduler never waits on curating: one exact 30 s section per creator break. Curating is editing, not unblocking.</li>
       <li><b>Air length rounds to the minute</b> and the curator shows the tail ("0:20 bumpers to close"), the same whole-minute rule the channel already uses, so what you see here is what the day column gets.</li>
       <li><b>Eligible-ad counts on every piece</b> ("14 ads"), so you see an empty section before the day it airs, not after.</li>
-      <li><b>Pinned ads degrade</b> to an exact section of the same length when the advertiser's credits run out, instead of leaving a hole.</li>
-      <li><b>"Presented by" names the sponsor from the pinned ad</b> in the same break; no typing, and a break with no sponsor falls back to the station ID.</li>
+      <li><b>Pinned pieces never go empty</b>: they're Studio Tapa's own ads, which need no credits, so a pinned promo always plays.</li>
+      <li><b>"Presented by" takes the brand from the pinned Studio Tapa ad</b> in the break; no typing, and a break without one falls back to the station ID.</li>
       <li><b>Copy this plan to the whole series</b> (same break times, same pieces) with one button; most series keep the same shape episode to episode.</li>
       <li><b>Breaks keep clear of the self-ad</b> and of each other (a minimum spacing setting), which is the podcast case where a creator types a break two minutes after a sponsor read.</li>
       <li><b>The scheduler flags, never moves</b>: editing a plan after scheduling changes the block's length only when you say so.</li>
@@ -522,19 +558,25 @@
   </div>
 </section>
 
-<!-- 9. Decisions -->
+<!-- 10. Decided / open -->
 <section class="sec">
-  <div class="sec-head"><span class="tag">9 · Questions for you</span><h2>before building</h2></div>
+  <div class="sec-head"><span class="tag">10 · What's decided, what's left</span><h2>your answers, folded in</h2></div>
   <div class="frame">
     <ul class="ideas">
-      <li><b>Who curates?</b> The mocks assume full admins and content schedulers curate every title, creators only set break times and mark self-ads, advertisers never see the screen. Should creators be able to curate their own titles (within the max-load rules)?</li>
-      <li><b>Live mid-rolls are new.</b> Today the live channel plays an episode straight through and only runs ads between shows. With a plan, the channel will stop a show at 8:00 for 30 seconds. Is that the intent for every title, or only titles whose plan was curated by hand (default plans stay between-shows only)?</li>
-      <li><b>The exact sizes.</b> 10 / 15 / 20 / 30 s in the mocks. Should the advertiser form steer uploads to those lengths (a warning, "ads of 15 s fit the most breaks"), or leave it free and rely on range sections and flex blocks?</li>
-      <li><b>Caps.</b> Max ad time per break (60 s in the mocks) and whether there is an hourly cap on a channel (broadcast TV runs about 12–16 minutes an hour). Also a minimum spacing between breaks.</li>
-      <li><b>Bumper tail length</b> (5 s in the mocks) and the wording of the two templates, "Presented by" / "Supported by". Do you want a third, or a channel-only one?</li>
-      <li><b>When nothing fits at air time</b>: a bumper (the mocks), a house ad of any length even if it overruns the section, or black with the countdown card? Overrunning breaks the air length, so the mocks avoid it.</li>
-      <li><b>Self-implemented ads and ad load.</b> The mocks don't count them as ad time, and show the QR card on live too. Should they count, and should a creator's own ad be allowed as a pinned piece in a break (the "attached to this account" group) without credits?</li>
-      <li><b>The money side.</b> A pinned advertiser ad is still billed per impression from their credits, as now. Should a pinned placement in a specific episode cost more, or be something an advertiser can request (a sponsorship), or stay admin-only?</li>
+      <li><b>Decided · who curates:</b> full admins and content schedulers. Creators set break times and mark self-ads; advertisers never see the screen.</li>
+      <li><b>Decided · sizes:</b> advertisers are steered to the size list (10 / 15 / 20 / 30 s to start); longer sizes can be added in settings.</li>
+      <li><b>Decided · caps:</b> none per break; under 15:00 of ads per clock hour on a channel, counted by the scheduler across breaks, gaps and tails.</li>
+      <li><b>Decided · bumper time:</b> computed, 1 s to 20 s or more, whatever makes the break an even length; the dropdown picks which bumpers.</li>
+      <li><b>Decided · self-ads:</b> never counted, always shown, with a warning when a break lands near one.</li>
+      <li><b>Decided · pinning:</b> internal only, Studio Tapa's own ads. Advertisers fill sections through the draw.</li>
+    </ul>
+    <div class="h2" style="margin-top:18px">Still open</div>
+    <ul class="ideas">
+      <li><b>Live mid-rolls for every title?</b> Today the live channel plays a show straight through. With plans, it stops for each break. The mocks assume every title, default plan included (one 30 s exact section per creator break). The alternative: only hand-curated titles stop for breaks; default plans keep ads between shows only.</li>
+      <li><b>Round breaks to</b> 15 s (the mocks), 10 s, or 30 s? This is what "even time" means in practice.</li>
+      <li><b>The fallback order</b> in section 5: a Studio Tapa ad that fits, then bumpers, then the hold card. Yes, or a different order?</li>
+      <li><b>"Presented by"</b> names the pinned Studio Tapa brand. Should it also name an advertiser whose ad was drawn in the break (free, TV-like), or never?</li>
+      <li><b>The hold card:</b> the channel logo on the channel's colour, silent. Fine, or a short loop (the sting on repeat)?</li>
     </ul>
   </div>
 </section>
