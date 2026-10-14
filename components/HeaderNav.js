@@ -447,6 +447,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <Link href="/wishlist" className="dropdown-item"><HeartIcon size={15} active src={iconOverrides.heart_active} /> My Wishlist</Link>
                 <Link href="/crew/card" className="dropdown-item"><AccountIcon size={15} /> My working card</Link>
                 <Link href="/locations/mine" className="dropdown-item"><AccountIcon size={15} /> My locations</Link>
+                <Link href="/locations/requests" className="dropdown-item"><AccountIcon size={15} /> Location requests</Link>
                 <Link href="/messages" className="dropdown-item"><ChatIcon size={15} /> Messages{messagesUnread > 0 && <span className="nav-badge">{messagesUnread > 9 ? '9+' : messagesUnread}</span>}</Link>
                 <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
                 {siteSettings && siteSettings.elevatorPitchEnabled && (

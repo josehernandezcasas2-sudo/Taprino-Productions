@@ -6,7 +6,9 @@ import PayoutsCard from '../../components/creator/PayoutsCard';
 import { LocationShell, Crumbs, StatusPill, MonthCalendar, thisMonth, todayIso } from '../../components/locations/LocationBits';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { RequestCard } from '../../components/locations/RequestBits';
 import { getOwnListings } from '../../lib/locations';
+import { listMyRequests } from '../../lib/locationRequests';
 import { CANCELLATION } from '../../lib/locationRules';
 
 // Your locations (/locations/mine): every place you've listed with its
@@ -16,10 +18,13 @@ export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   let listings = [];
+  let requests = [];
   let loadError = null;
   if (account.isSignedIn) {
     try {
-      listings = JSON.parse(JSON.stringify(await getOwnListings(account.userId)));
+      const [own, mine] = await Promise.all([getOwnListings(account.userId), listMyRequests(account.userId)]);
+      listings = JSON.parse(JSON.stringify(own));
+      requests = JSON.parse(JSON.stringify(mine.asHost));
     } catch (err) {
       loadError = err.message;
     }
@@ -32,15 +37,22 @@ export async function getServerSideProps({ req, res }) {
       email: account.email,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
+      viewerId: account.userId || null,
       listings,
+      requests,
       loadError
     }
   };
 }
 
-export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, listings: initial, loadError }) {
+export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, listings: initial, requests: initialRequests, loadError }) {
   const router = useRouter();
   const [listings, setListings] = useState(initial);
+  const [requests, setRequests] = useState(initialRequests || []);
+  const updateRequest = (r) => setRequests((list) => list.map((x) => (x.id === r.id ? r : x)));
+  const waiting = requests.filter((r) => r.status === 'requested').length;
+  const openRequests = requests.filter((r) => ['requested', 'countered', 'accepted', 'paid'].includes(r.status));
+  const pastRequests = requests.filter((r) => !openRequests.includes(r));
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(loadError);
   const [note, setNote] = useState(null);
@@ -92,7 +104,7 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
         <div>
           <span className="crew-eyebrow">Locations</span>
           <h1>Your places</h1>
-          <p>{listings.length === 0 ? 'Nothing listed yet. If you hold the keys to somewhere a crew could shoot, list it.' : `${listed} listed${inReview ? ` · ${inReview} in review` : ''} · requests from producers will show here.`}</p>
+          <p>{listings.length === 0 ? 'Nothing listed yet. If you hold the keys to somewhere a crew could shoot, list it.' : `${listed} listed${inReview ? ` · ${inReview} in review` : ''}${waiting ? ` · ${waiting} ${waiting === 1 ? 'request' : 'requests'} waiting on you` : ' · no requests waiting'}.`}</p>
         </div>
         <Link href="/locations/new" className="crew-btn primary">+ List a place</Link>
       </div>
@@ -102,8 +114,10 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
       <div className="crew-card-grid">
         <div className="crew-wc">
           <section className="crew-panel">
-            <h3>Requests</h3>
-            <div className="crew-muted">When a producer asks for dates, the request lands here and in your Messages, with 48 hours to accept, counter or decline. Nothing yet.</div>
+            <h3>Requests <small>{waiting ? `${waiting} waiting · 48 hours to answer` : 'newest first'}</small></h3>
+            {requests.length === 0 && <div className="crew-muted">When a producer asks for dates, the request lands here and in your Messages, with 48 hours to accept, counter or decline. Nothing yet.</div>}
+            {openRequests.map((r) => <RequestCard key={r.id} r={r} side="host" viewerId={viewerId} onChange={updateRequest} />)}
+            {pastRequests.length > 0 && <details className="loc-past"><summary className="crew-mono">{pastRequests.length} past {pastRequests.length === 1 ? 'request' : 'requests'}</summary>{pastRequests.map((r) => <RequestCard key={r.id} r={r} side="host" viewerId={viewerId} onChange={updateRequest} />)}</details>}
           </section>
 
           <section className="crew-panel">

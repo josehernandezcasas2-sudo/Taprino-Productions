@@ -2,6 +2,7 @@ import { SITE } from '../../lib/siteConfig';
 import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
+import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -103,6 +104,16 @@ export default async function handler(req, res) {
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'donation not recorded' });
         }
+      } else if (session.metadata?.type === 'location_booking') {
+        // A location booking was paid: the accepted request becomes a
+        // confirmed booking and the address unlocks for the producer.
+        try {
+          await completeBookingFromSession(session);
+        } catch (err) {
+          console.error('completeBookingFromSession from webhook failed:', err.message);
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'booking not recorded' });
+        }
       } else {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
       }
@@ -127,6 +138,11 @@ export default async function handler(req, res) {
         await refundDonationFromCharge(event.data.object);
       } catch (err) {
         console.error('refundDonationFromCharge from webhook failed:', err.message);
+      }
+      try {
+        await refundBookingFromCharge(event.data.object);
+      } catch (err) {
+        console.error('refundBookingFromCharge from webhook failed:', err.message);
       }
       break;
     }

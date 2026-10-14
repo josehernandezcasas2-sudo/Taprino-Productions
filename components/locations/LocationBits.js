@@ -26,6 +26,13 @@ export function LocationShell({ title, description, children, mainGenres, isSign
   );
 }
 
+// "Hosted 6" / "New host": shoots that went as agreed, on the host card.
+export function HostedChip({ host }) {
+  if (!host) return null;
+  const n = host.hosted || 0;
+  return <span className={`crew-chip ${n > 0 ? 'olive' : 'sky'}`} title={n > 0 ? `${n} ${n === 1 ? 'shoot' : 'shoots'} went as agreed` : 'No completed shoots yet'}>{n > 0 ? `Hosted ${n}` : 'New host'}</span>;
+}
+
 export const STATUS_LABEL = { pending: 'In review', listed: 'Listed', paused: 'Paused', rejected: 'Not approved', removed: 'Removed' };
 
 export function StatusPill({ status }) {
