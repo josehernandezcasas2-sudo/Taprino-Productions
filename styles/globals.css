@@ -9187,6 +9187,13 @@ a.crew-credit:hover { background: var(--surface-3); }
 .loc-steps-line span.dead { background: rgba(248, 95, 115, 0.14); color: var(--brass); }
 .crew-chip.pitch { background: rgba(248, 95, 115, 0.16); color: var(--brass); text-decoration: none; }
 
+/* profile section */
+.loc-prof-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 0.6rem; }
+.loc-prof-card { display: grid; gap: 0.25rem; text-decoration: none; color: var(--ink); background: var(--surface-2); border: 1px solid transparent; border-radius: 10px; padding: 0.5rem; }
+.loc-prof-card:hover { border-color: var(--olive); }
+.loc-prof-ph { display: block; aspect-ratio: 4 / 3; border-radius: 6px; background: var(--surface-3) center / cover; }
+.loc-prof-t { font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; line-height: 1.2; }
+
 /* ---- Messages (/messages, Crew Call step 2) ---- */
 .dm-inbox { display: grid; grid-template-columns: 320px minmax(0, 1fr); gap: 0.9rem; align-items: start; min-height: 520px; }
 .dm-threads { display: grid; gap: 0.3rem; align-content: start; }

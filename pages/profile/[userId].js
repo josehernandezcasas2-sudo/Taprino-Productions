@@ -63,7 +63,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -85,10 +85,12 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
   // under it. Both still index into the same posts array for the viewer.
   const latestPost = posts[0] || null;
   const olderPosts = posts.slice(1);
+  const hasLocations = Boolean(locations && (locations.listings.length || locations.hosted || locations.shotAt.length || locations.lines.length));
   const sections = [
     { id: 'profile-about', label: 'About' },
     (crewCard || isOwnProfile) && { id: 'profile-crew', label: 'Working card' },
     crewRecord && { id: 'profile-record', label: 'Track record' },
+    hasLocations && { id: 'profile-locations', label: 'Locations' },
     latestPost && { id: 'profile-latest', label: 'Latest post' },
     olderPosts.length > 0 && { id: 'profile-posts', label: 'Posts' },
     isOwnProfile && savedSnippets.length > 0 && { id: 'profile-saved', label: 'Saved' },
@@ -484,6 +486,55 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                     </div>
                   )}
                   <span className="crew-mono">Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</span>
+                </div>
+              </section>
+            )}
+
+            {/* Locations (migration 086): places they host, shoots they
+                hosted or did, the lines people left. */}
+            {hasLocations && (
+              <section id="profile-locations" className="profile-section">
+                <div className="profile-section-label">Locations</div>
+                <div className="crew-cardview">
+                  {locations.hosted > 0 && <div className="crew-pmeta"><span className="crew-chip olive">Hosted {locations.hosted}</span><span>{locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed{locations.lines.length ? ` · ${locations.lines.length} ${locations.lines.length === 1 ? 'line' : 'lines'} from people` : ''}</span></div>}
+                  {locations.listings.length > 0 && (
+                    <div className="crew-cardview-block">
+                      <h4>Places to shoot</h4>
+                      <div className="loc-prof-grid">
+                        {locations.listings.map((l) => (
+                          <Link key={l.id} href={`/locations/${l.id}`} className="loc-prof-card">
+                            <span className="loc-prof-ph" style={l.coverUrl ? { backgroundImage: `url(${l.coverUrl})` } : undefined} />
+                            <span className="loc-prof-t">{l.title}</span>
+                            <span className="crew-mono">{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</span>
+                          </Link>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {locations.shotAt.length > 0 && (
+                    <div className="crew-cardview-block">
+                      <h4>Shot at</h4>
+                      <div className="crew-jobs">
+                        {locations.shotAt.map((s, i) => (
+                          <div key={i} className="crew-job">
+                            <span>{s.live ? <Link href={`/locations/${s.locationId}`}>{s.title}</Link> : s.title}{s.project ? ` · ${s.project}` : ''} <small>· {s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</small></span>
+                            <span className="crew-chip ok">as agreed</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {locations.lines.length > 0 && (
+                    <div className="crew-cardview-block">
+                      <h4>What people said</h4>
+                      <div className="crew-lines">
+                        {locations.lines.map((e, i) => (
+                          <div key={i}>“{e.line}” — <Link href={e.fromPath}>{e.fromName}</Link>, {new Date(e.createdAt).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {isOwnProfile && <span className="crew-mono"><Link href="/locations/mine">Your places →</Link></span>}
                 </div>
               </section>
             )}

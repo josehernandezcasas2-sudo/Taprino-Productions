@@ -158,7 +158,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -346,6 +346,50 @@ export default function PublicProfile() {
                 </>
               ) : null}
               <Text style={crew.mono}>Earned only through work someone else confirmed: a poster saying “yes, they worked it”, or a title released on Studio Tapa. Hand-typed credits don’t count.</Text>
+            </View>
+          </>
+        ) : null}
+
+        {/* Locations (migration 086): places they host, shoots they
+            hosted or did, the lines people left. */}
+        {locations && (locations.listings.length || locations.hosted || locations.shotAt.length || locations.lines.length) ? (
+          <>
+            <View style={styles.divider} />
+            <Text style={styles.sectionLabel}>Locations</Text>
+            <View style={{ gap: 10 }}>
+              {locations.hosted > 0 ? <Text style={crew.meta}>Hosted {locations.hosted} {locations.hosted === 1 ? 'shoot' : 'shoots'} that went as agreed</Text> : null}
+              {locations.listings.length > 0 ? (
+                <>
+                  <Text style={crew.h4}>Places to shoot</Text>
+                  {locations.listings.map((l) => (
+                    <Pressable key={l.id} style={[crew.gearRow, { alignItems: 'flex-start' }]} onPress={() => router.push(`/locations/${l.id}`)}>
+                      <View style={{ width: 64, aspectRatio: 4 / 3, borderRadius: 6, backgroundColor: colors.surface3, overflow: 'hidden' }}>{l.coverUrl ? <SmartImage uri={l.coverUrl} style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} /> : null}</View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={crew.rowText}>{l.title}</Text>
+                        <Text style={crew.mono}>{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</Text>
+                      </View>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+              {locations.shotAt.length > 0 ? (
+                <>
+                  <Text style={crew.h4}>Shot at</Text>
+                  {locations.shotAt.map((s, i) => (
+                    <Pressable key={i} style={crew.gearRow} onPress={s.live ? () => router.push(`/locations/${s.locationId}`) : undefined}>
+                      <Text style={[crew.rowText, { flex: 1 }]}>{s.title}{s.project ? ` · ${s.project}` : ''}</Text>
+                      <Text style={crew.mono}>{s.when ? new Date(`${s.when}T12:00:00`).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : ''}</Text>
+                    </Pressable>
+                  ))}
+                </>
+              ) : null}
+              {locations.lines.length > 0 ? (
+                <>
+                  <Text style={crew.h4}>What people said</Text>
+                  {locations.lines.map((e, i) => <Text key={i} style={crew.muted}>“{e.line}” — {e.fromName}</Text>)}
+                </>
+              ) : null}
+              {isOwnProfile ? <Pressable onPress={() => router.push('/locations/mine')}><Text style={[crew.mono, { color: colors.olive }]}>Your places →</Text></Pressable> : null}
             </View>
           </>
         ) : null}
