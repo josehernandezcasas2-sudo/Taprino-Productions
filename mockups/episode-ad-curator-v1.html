@@ -1,0 +1,543 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Episode Ad Curator v1 — breaks, sections, bumpers, air length</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1180px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1180px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:24px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); } .eyebrow.sky { color:var(--sky); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; line-height:1.05; margin:6px 0 8px; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.3rem; line-height:1.15; margin:4px 0 6px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:700px; margin:0 0 18px; }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.7rem; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; white-space:nowrap; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.plum { color:var(--plum); background:rgba(180,138,214,.16); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .top-in { display:flex; gap:14px; align-items:center; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); margin-bottom:12px; }
+  .back { font-family:var(--font-mono); font-size:.66rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border:1.4px solid var(--olive); color:var(--olive); border-radius:999px; padding:8px 13px; }
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--hair); margin:0 0 10px; }
+  .tabs span { font-family:var(--font-mono); font-size:.72rem; padding:8px 10px; color:var(--ink-dim); border-bottom:2px solid transparent; }
+  .tabs span.on { color:var(--ink); border-color:var(--brass); }
+  .field { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 12px; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .field b { color:var(--ink); font-weight:500; }
+  .ideas { margin:0; padding-left:18px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ideas li { margin:0 0 8px; } .ideas b { color:var(--ink); }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); margin-top:10px; }
+  .legend i { display:inline-block; width:11px; height:11px; border-radius:2px; vertical-align:-1px; margin-right:5px; }
+  .tog { width:32px; height:18px; border-radius:999px; background:var(--surface-3); position:relative; display:inline-block; flex:none; vertical-align:middle; }
+  .tog::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--ink-faint); }
+  .tog.on { background:var(--ok); } .tog.on::after { left:16px; background:#0f1f12; }
+
+  /* the segment colours — the same five everywhere in this file */
+  .c-ep { background:var(--sky); } .c-ex { background:var(--brass); } .c-rg { background:var(--olive); } .c-fx { background:var(--plum); } .c-pin { background:var(--paper); } .c-bp { background:var(--ok); }
+  .c-self { background:repeating-linear-gradient(135deg, var(--olive-bright) 0 4px, #c98a3c 4px 8px); }
+  .c-tail { background:repeating-linear-gradient(135deg, rgba(251,232,211,.22) 0 4px, transparent 4px 8px); }
+
+  /* 1 · the curator */
+  .cur { display:grid; grid-template-columns:212px 1fr 250px; gap:14px; align-items:start; }
+  .rail { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:12px; }
+  .rail .tabs { margin-top:0; }
+  .pal { display:flex; flex-direction:column; gap:7px; margin-top:10px; }
+  .pal .p { border-radius:9px; padding:8px 10px; display:flex; align-items:center; justify-content:space-between; gap:8px; font-family:var(--font-mono); font-size:.74rem; border:1px solid var(--hair); background:var(--surface-2); cursor:grab; }
+  .pal .p b { font-weight:600; }
+  .pal .p i { width:10px; height:10px; border-radius:2px; display:inline-block; flex:none; margin-right:7px; }
+  .pal .p small { color:var(--ink-faint); font-size:.64rem; }
+  .pal .p.ex { border-color:rgba(248,95,115,.5); } .pal .p.rg { border-color:rgba(231,162,85,.5); } .pal .p.fx { border-color:rgba(180,138,214,.5); background:rgba(180,138,214,.08); }
+  .pal .p.new { position:relative; }
+  .pal .p.new::after { content:"new"; position:absolute; right:-6px; top:-8px; font-size:.56rem; letter-spacing:.08em; text-transform:uppercase; background:var(--plum); color:#1b0f26; padding:2px 6px; border-radius:999px; font-weight:700; }
+  .grp { font-family:var(--font-mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin:12px 0 4px; }
+  .stage { min-width:0; }
+  .ep-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .ep-head .t { font-family:var(--font-display); font-weight:700; font-size:1.35rem; line-height:1.1; }
+  .stats { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin:14px 0 10px; }
+  .stat { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:9px 11px; }
+  .stat b { font-family:var(--font-display); font-size:1.15rem; display:block; line-height:1.1; }
+  .stat span { font-family:var(--font-mono); font-size:.64rem; color:var(--ink-faint); text-transform:uppercase; letter-spacing:.06em; }
+  .stat.hot { border-color:rgba(132,205,152,.5); } .stat.hot b { color:var(--ok); }
+  .tl { margin-top:10px; }
+  .ticks { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:.6rem; color:var(--ink-faint); margin-bottom:4px; }
+  .bar { display:flex; height:46px; border-radius:8px; overflow:hidden; border:1px solid var(--hair); }
+  .bar > span { position:relative; min-width:0; }
+  .bar > span.brk { min-width:40px; }
+  .bar > span.brk.sel { outline:2px solid var(--paper); outline-offset:-2px; z-index:2; }
+  .bar > span.brk::after { content:attr(data-n); position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:var(--font-mono); font-size:.68rem; font-weight:700; color:#1b0a0e; }
+  .bar > span.self { min-width:34px; }
+  .bar > span.self::after { content:"QR"; position:absolute; left:0; right:0; top:50%; transform:translateY(-50%); text-align:center; font-family:var(--font-mono); font-size:.6rem; font-weight:700; color:#2a1a05; }
+  .bar > span.tail { min-width:30px; }
+  .marks { display:flex; margin-top:6px; }
+  .marks > span { min-width:0; font-family:var(--font-mono); font-size:.6rem; color:var(--ink-faint); line-height:1.3; }
+  .marks > span.brk { min-width:40px; color:var(--ink); white-space:nowrap; overflow:visible; }
+  .marks > span.brk b { display:block; color:var(--ink); font-weight:600; }
+  .brks { display:flex; gap:6px; flex-wrap:wrap; margin:16px 0 10px; }
+  .brk-chip { font-family:var(--font-mono); font-size:.7rem; padding:7px 11px; border-radius:999px; border:1px solid var(--hair); background:var(--surface-1); color:var(--ink-dim); display:inline-flex; gap:8px; align-items:center; }
+  .brk-chip.on { border-color:var(--paper); color:var(--ink); }
+  .brk-chip i { width:8px; height:8px; border-radius:2px; display:inline-block; }
+  .comp { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:14px; }
+  .comp-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; flex-wrap:wrap; }
+  .comp-head b { font-family:var(--font-display); font-size:1.02rem; }
+  .strip { display:flex; gap:4px; height:62px; margin:12px 0 8px; }
+  .strip > div { border-radius:8px; padding:7px 9px; font-family:var(--font-mono); font-size:.66rem; line-height:1.3; color:#1b0a0e; position:relative; overflow:hidden; min-width:0; display:flex; flex-direction:column; justify-content:center; }
+  .strip > div b { font-size:.78rem; display:block; }
+  .strip > div.c-pin { color:#241a05; }
+  .strip > div.c-bp { color:#0f1f12; } .strip > div.c-fx { color:#1b0f26; }
+  .strip > div .h { position:absolute; right:4px; top:4px; bottom:4px; width:6px; border-radius:3px; background:rgba(0,0,0,.18); }
+  .strip > div.drop { border:1.5px dashed rgba(251,232,211,.35); color:var(--ink-faint); text-align:center; }
+  .pieces { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:8px; }
+  .piece { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 11px; font-family:var(--font-mono); font-size:.68rem; color:var(--ink-dim); line-height:1.45; }
+  .piece b { color:var(--ink); display:block; font-weight:600; margin-bottom:2px; }
+  .piece i { width:8px; height:8px; border-radius:2px; display:inline-block; margin-right:6px; }
+  .set { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:12px; }
+  .set .row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:9px 0; border-top:1px solid var(--hair); font-family:var(--font-mono); font-size:.7rem; color:var(--ink-dim); }
+  .set .row:first-of-type { border-top:0; padding-top:4px; }
+  .set .row b { color:var(--ink); font-weight:500; }
+  .set .row small { display:block; color:var(--ink-faint); font-size:.62rem; margin-top:2px; line-height:1.4; }
+  .set .dd { margin-top:6px; }
+  .dd-menu { margin-top:6px; background:var(--surface-2); border:1px solid rgba(251,232,211,.25); border-radius:10px; padding:4px; }
+  .dd-menu div { font-family:var(--font-mono); font-size:.7rem; padding:7px 9px; border-radius:7px; color:var(--ink-dim); display:flex; justify-content:space-between; }
+  .dd-menu div.on { background:rgba(132,205,152,.14); color:var(--ok); }
+  .dd-menu div small { color:var(--ink-faint); }
+
+  /* 2 · section types */
+  .types4 { display:grid; grid-template-columns:repeat(4,1fr); gap:12px; }
+  .tcard { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:14px; }
+  .tcard .t { font-family:var(--font-display); font-weight:700; font-size:1rem; display:flex; align-items:center; gap:8px; }
+  .tcard .t i { width:12px; height:12px; border-radius:3px; display:inline-block; }
+  .tcard p { font-size:.86rem; color:var(--ink-dim); line-height:1.5; margin:8px 0; }
+  .mini { display:flex; gap:3px; height:26px; margin:10px 0 6px; }
+  .mini > span { border-radius:5px; min-width:0; }
+  .mini > span.d { border:1.5px dashed rgba(251,232,211,.3); }
+
+  /* 3 · merge */
+  .merge { display:grid; grid-template-columns:1fr auto 1fr; gap:16px; align-items:center; }
+  .arrow { font-family:var(--font-display); font-size:1.6rem; color:var(--ink-faint); }
+
+  /* 4 · drawers */
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .list { display:flex; flex-direction:column; gap:6px; margin-top:8px; }
+  .ad { display:grid; grid-template-columns:44px 1fr auto; gap:10px; align-items:center; background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:8px 10px; }
+  .ad .th { width:44px; height:28px; border-radius:5px; background:linear-gradient(140deg,#3a2a4f,#1b2740); }
+  .ad .th.b { background:linear-gradient(140deg,#4a3418,#1b1a12); } .ad .th.c { background:linear-gradient(140deg,#1f3b3a,#0f1f2f); } .ad .th.d { background:linear-gradient(140deg,#5a2430,#1b1020); } .ad .th.e { background:linear-gradient(140deg,#243c5a,#101a2c); }
+  .ad .n { font-family:var(--font-display); font-weight:700; font-size:.9rem; line-height:1.15; }
+  .ad .n small { font-family:var(--font-mono); font-weight:400; font-size:.64rem; color:var(--ink-faint); display:block; margin-top:2px; }
+  .ad .dur { font-family:var(--font-mono); font-size:.9rem; font-weight:600; text-align:right; }
+  .ad .dur small { display:block; font-size:.6rem; color:var(--ink-faint); font-weight:400; }
+  .ad.mine { border-color:rgba(231,162,85,.5); }
+
+  /* 5 · flow */
+  .flow { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  .fcard { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:14px; min-width:0; }
+  .fcard .t { font-family:var(--font-display); font-weight:700; font-size:1rem; margin-bottom:6px; }
+  .fcard p { font-size:.86rem; color:var(--ink-dim); line-height:1.5; margin:6px 0; }
+  .librow { display:flex; justify-content:space-between; align-items:center; gap:8px; background:var(--surface-2); border:1px solid var(--hair); border-radius:9px; padding:8px 10px; font-family:var(--font-mono); font-size:.68rem; margin-top:6px; }
+  .librow b { font-family:var(--font-display); font-size:.86rem; }
+  .block { margin-top:8px; border-radius:8px; background:rgba(132,153,220,.22); border:1px solid rgba(132,153,220,.5); height:118px; position:relative; overflow:hidden; font-family:var(--font-mono); font-size:.62rem; padding:6px 8px; }
+  .block .ln { position:absolute; left:0; right:0; height:3px; background:var(--brass); }
+  .block .ln.p { background:var(--plum); } .block .ln.o { background:var(--olive); }
+  .block .bt { position:absolute; left:0; right:0; bottom:0; height:9px; background:repeating-linear-gradient(135deg, rgba(251,232,211,.25) 0 4px, transparent 4px 8px); border-top:1px dashed rgba(251,232,211,.4); }
+  .player { margin-top:8px; border-radius:9px; background:#000; aspect-ratio:16/9; position:relative; overflow:hidden; border:1px solid var(--hair); }
+  .player .bug { position:absolute; left:8px; top:8px; font-family:var(--font-mono); font-size:.6rem; background:rgba(0,0,0,.6); padding:2px 6px; border-radius:4px; color:var(--ink-dim); }
+  .player .card { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); text-align:center; font-family:var(--font-mono); font-size:.68rem; color:var(--ink); }
+  .player .card b { font-family:var(--font-display); font-size:1rem; display:block; }
+  .player .pbar { position:absolute; left:10px; right:10px; bottom:8px; height:4px; background:rgba(255,255,255,.2); border-radius:2px; }
+  .player .pbar i { position:absolute; top:0; bottom:0; width:2px; background:var(--brass); }
+  .player .qr { position:absolute; right:8px; bottom:16px; background:rgba(251,232,211,.95); color:#241a05; border-radius:8px; padding:6px 8px; display:flex; gap:6px; align-items:center; font-family:var(--font-mono); font-size:.58rem; line-height:1.3; }
+  .player .qr span { width:26px; height:26px; background:repeating-conic-gradient(#241a05 0 25%, transparent 0 50%) 0 0/8px 8px; border-radius:2px; flex:none; }
+
+  /* 6 · self-ad */
+  .selfgrid { display:grid; grid-template-columns:1.2fr 1fr; gap:14px; }
+  .form { display:flex; flex-direction:column; gap:8px; }
+
+  .phone-note { font-family:var(--font-mono); font-size:.74rem; color:var(--ink-faint); background:var(--surface-1); border:1px dashed var(--hair); border-radius:12px; padding:14px 16px; line-height:1.55; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Episode Ad Curator — v1 mockups</h1>
+  <p class="note">A screen every title passes through before it goes to the live scheduler (and that the on-demand player reads too). It takes the episode's length and the creator's break times, lets you <b>compose each break</b> out of pieces, and gives back one exact number: the <b>air length</b>. That number is what the scheduler has been missing.</p>
+  <p class="note"><b>Why the timelines go weird today.</b> A creator types break times ("0:00, 10:00, 20:30"); each break plays one house ad of whatever length comes up. On a live channel the mid-roll breaks aren't played at all — the episode runs straight through and ads only fill the slot's tail and the gaps between shows. So a 27:40 title books a 28-minute slot, and the moment real breaks exist nothing knows how long they are. With a plan, a break is a fixed number of seconds, so 27:40 + 2:00 of breaks = 29:40, a 30-minute slot, with 20 seconds of bumpers to close.</p>
+  <p class="note"><b>Words used below.</b> A <b>break</b> is a point in the show where ads play. A break is made of <b>pieces</b>: an <b>exact section</b> (15 s — any approved 15-second ad fills it at air time), a <b>range section</b> (10–15 s — holds one ad inside the range, books the top of the range, bumper takes the rest), a <b>flex block</b> (your "custom size": N seconds that takes ads of any length, best fit, and keeps the last few seconds for a bumper), a <b>pinned ad</b> (one specific creative, placed by hand), and a <b>bumper</b> ("presented by", "supported by", station ID — the auto one comes from a dropdown). A <b>self-implemented ad</b> is a sponsor segment already inside the video; you mark it so breaks keep clear of it and a QR / link card can show over it.</p>
+</div>
+
+<!-- 1. The curator -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">1 · The curator</span><h2>/admin/library → an episode → Ad plan (computers and tablets, like the scheduler)</h2></div>
+  <div class="frame">
+    <div class="top-in"><span class="back">‹ Library</span><span>Admin / Library / The Fawns · Ep. 3 / Ad plan</span></div>
+    <div class="cur">
+
+      <!-- left rail -->
+      <div class="rail">
+        <div class="tabs"><span class="on">Sections</span><span>Ads</span><span>Bumpers</span></div>
+        <div class="field">Search <span>⌕</span></div>
+        <div class="grp">Exact · any ad of this length</div>
+        <div class="pal">
+          <div class="p ex"><span><i class="c-ex"></i><b>10 s</b></span><small>9 ads</small></div>
+          <div class="p ex"><span><i class="c-ex"></i><b>15 s</b></span><small>14 ads</small></div>
+          <div class="p ex"><span><i class="c-ex"></i><b>20 s</b></span><small>6 ads</small></div>
+          <div class="p ex"><span><i class="c-ex"></i><b>30 s</b></span><small>11 ads</small></div>
+        </div>
+        <div class="grp">Range · one ad in the range, bumper takes the rest</div>
+        <div class="pal">
+          <div class="p rg"><span><i class="c-rg"></i><b>10–15 s</b></span><small>23 ads</small></div>
+          <div class="p rg"><span><i class="c-rg"></i><b>15–20 s</b></span><small>20 ads</small></div>
+          <div class="p rg"><span><i class="c-rg"></i><b>20–30 s</b></span><small>17 ads</small></div>
+        </div>
+        <div class="grp">Flex block · any lengths, bumper tail</div>
+        <div class="pal">
+          <div class="p fx new"><span><i class="c-fx"></i><b>Custom</b></span><small>type a length</small></div>
+          <div class="p fx"><span><i class="c-fx"></i><b>30 s block</b></span><small>tail 5 s</small></div>
+          <div class="p fx"><span><i class="c-fx"></i><b>60 s block</b></span><small>tail 5 s</small></div>
+        </div>
+        <span class="meta" style="margin-top:12px">Drag a piece onto a break, or onto the strip below. The count is how many approved ads could fill it right now.</span>
+      </div>
+
+      <!-- stage -->
+      <div class="stage">
+        <div class="ep-head">
+          <div>
+            <span class="eyebrow pink">Ad plan · The Fawns · Season 1</span>
+            <div class="t">Ep. 3 “Salt”</div>
+            <span class="meta">Runtime 27:40 · PG-13 · by Marisol Vega · breaks set by the creator: 0:00, 8:00, 18:30, 24:00</span>
+          </div>
+          <div class="chips" style="align-self:center"><span class="btn ghost sm">Reset to default plan</span><span class="btn sm">Save draft</span><span class="btn primary sm">Save · ready for air</span></div>
+        </div>
+
+        <div class="stats">
+          <div class="stat"><b>27:40</b><span>Runtime</span></div>
+          <div class="stat"><b>4</b><span>Breaks · 2:00 of ads</span></div>
+          <div class="stat hot"><b>29:40</b><span>Air length</span></div>
+          <div class="stat"><b>30 min</b><span>Slot · 0:20 bumpers to close</span></div>
+        </div>
+
+        <div class="tl">
+          <div class="ticks"><span>0:00</span><span>5:00</span><span>10:00</span><span>15:00</span><span>20:00</span><span>25:00</span><span>29:40</span><span style="color:var(--ink-dim)">30:00</span></div>
+          <div class="bar">
+            <span class="brk c-ex" data-n="15" style="flex:15 0 0" title="Pre-roll · exact 15 s"></span>
+            <span class="c-ep" style="flex:480 0 0" title="0:00–8:00"></span>
+            <span class="brk c-fx" data-n="30" style="flex:30 0 0" title="Break 1 · flex block 30 s"></span>
+            <span class="c-ep" style="flex:250 0 0"></span>
+            <span class="self c-self" style="flex:23 0 0" title="Self-implemented ad 12:10–12:33 · QR / link card"></span>
+            <span class="c-ep" style="flex:357 0 0"></span>
+            <span class="brk c-ex sel" data-n="45" style="flex:45 0 0" title="Break 2 · 45 s · selected"></span>
+            <span class="c-ep" style="flex:330 0 0"></span>
+            <span class="brk c-rg" data-n="30" style="flex:30 0 0" title="Break 3 · 30 s"></span>
+            <span class="c-ep" style="flex:220 0 0"></span>
+            <span class="tail c-tail" style="flex:20 0 0" title="Slot tail · 20 s · bumpers from the channel"></span>
+          </div>
+          <div class="marks">
+            <span class="brk" style="flex:15 0 0"><b>Pre-roll</b>15 s</span>
+            <span style="flex:480 0 0"></span>
+            <span class="brk" style="flex:30 0 0"><b>8:00</b>30 s</span>
+            <span style="flex:250 0 0"></span>
+            <span class="brk" style="flex:23 0 0;min-width:34px;color:var(--olive)"><b style="color:var(--olive)">12:10</b>self-ad 23 s</span>
+            <span style="flex:357 0 0"></span>
+            <span class="brk" style="flex:45 0 0"><b>18:30</b>45 s</span>
+            <span style="flex:330 0 0"></span>
+            <span class="brk" style="flex:30 0 0"><b>24:00</b>30 s</span>
+            <span style="flex:220 0 0"></span>
+            <span class="brk" style="flex:20 0 0;min-width:30px;color:var(--ink-faint)"><b style="color:var(--ink-faint)">tail</b>0:20</span>
+          </div>
+          <div class="legend"><span><i class="c-ep"></i>Episode</span><span><i class="c-ex"></i>Exact section</span><span><i class="c-rg"></i>Range section</span><span><i class="c-fx"></i>Flex block</span><span><i class="c-pin"></i>Pinned ad</span><span><i class="c-bp"></i>Bumper</span><span><i class="c-self"></i>Self-implemented ad</span><span><i class="c-tail"></i>Slot tail (channel's bumpers)</span><span style="margin-left:auto">breaks drawn wider than scale</span></div>
+        </div>
+
+        <div class="brks">
+          <span class="brk-chip"><i class="c-ex"></i>Pre-roll · 15 s</span>
+          <span class="brk-chip"><i class="c-fx"></i>Break 1 · 8:00 · 30 s</span>
+          <span class="brk-chip on"><i class="c-ex"></i>Break 2 · 18:30 · 45 s</span>
+          <span class="brk-chip"><i class="c-rg"></i>Break 3 · 24:00 · 30 s</span>
+          <span class="brk-chip" style="border-style:dashed">+ Add a break</span>
+        </div>
+
+        <div class="comp">
+          <div class="comp-head">
+            <div><b>Break 2 · at 18:30</b><span class="meta">45 s · three pieces · at the creator's time. Drag the chip above to move it; it keeps 60 s clear of the self-ad.</span></div>
+            <div class="chips"><span class="chip ok">All pieces can fill today</span><span class="chip">Max per break 60 s</span></div>
+          </div>
+          <div class="strip">
+            <div class="c-ex" style="flex:15 0 0"><b>15 s</b>exact · 14 ads eligible<i class="h"></i></div>
+            <div class="c-pin" style="flex:20 0 0"><b>Acme Coffee “Morning” · 20 s</b>pinned · 1,240 credits<i class="h"></i></div>
+            <div class="c-bp" style="flex:10 0 0"><b>10 s</b>bumper · auto: Presented by</div>
+            <div class="drop" style="flex:15 0 0">drop a piece<br>+15 s left in the cap</div>
+          </div>
+          <div class="pieces">
+            <div class="piece"><b><i class="c-ex"></i>Exact 15 s</b>Filled at air time by any approved 15-second ad eligible for Live TV / Main player. Weighted draw, same as now; credits are billed to the advertiser whose ad ran.</div>
+            <div class="piece"><b><i class="c-pin"></i>Pinned · Acme Coffee “Morning”</b>This creative, every time. Pinned from the Ads tab (attached to Acme's ad account). If Acme runs out of credits before air, the piece falls back to an exact 20 s section.</div>
+            <div class="piece"><b><i class="c-bp"></i>Bumper 10 s · auto</b>“Presented by Acme Coffee” — the sponsor name comes from the pinned ad in the same break. Pick a different bumper here, or let the dropdown on the right decide.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- right: settings -->
+      <div class="set">
+        <span class="eyebrow">Ad settings · this episode</span>
+        <div class="row"><div><b>Breaks from the creator</b><small>0:00, 8:00, 18:30, 24:00 — their times are the default. Override moves or adds breaks here without touching their submission.</small></div><span class="tog on"></span></div>
+        <div class="row"><div><b>Adjacent sections become one block</b><small>Pieces placed next to each other merge into a flex block of their combined length, so ads of any length can fill it; the last seconds go to a bumper.</small></div><span class="tog on"></span></div>
+        <div class="row"><div><b>Bumper tail</b><small>Seconds kept at the end of a flex block or a range section.</small></div><b>5 s</b></div>
+        <div class="row"><div style="flex:1"><b>Auto bumper</b><small>What fills bumper time when you don't pick one by hand.</small>
+          <div class="field dd"><b>Presented by · sponsor of the break</b><span>▾</span></div>
+          <div class="dd-menu">
+            <div class="on">Presented by · sponsor of the break <small>6 s</small></div>
+            <div>Supported by · sponsor of the break <small>6 s</small></div>
+            <div>TapaTV station ID <small>5 s</small></div>
+            <div>Channel's bumpers (rotate) <small>5–10 s</small></div>
+            <div>None · pad with black</div>
+          </div>
+        </div></div>
+        <div class="row"><div><b>Max ad time per break</b><small>Drop zones close when a break hits it.</small></div><b>60 s</b></div>
+        <div class="row"><div><b>If nothing fits at air time</b><small>An exact section with no eligible ad that day.</small></div><b>Bumper</b></div>
+        <div class="row"><div><b>Round air length to the minute</b><small>29:40 → 30:00; the channel fills 0:20 with its own bumpers.</small></div><span class="tog on"></span></div>
+        <div class="row"><div><b>On demand too</b><small>The same plan plays as mid-roll pods in the main player. Ad-free members skip them; live channels run them for everyone.</small></div><span class="tog on"></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 2. Section types -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">2 · The pieces</span><h2>what each kind of section does with its seconds</h2></div>
+  <div class="frame">
+    <div class="types4">
+      <div class="tcard">
+        <div class="t"><i class="c-ex"></i>Exact section</div>
+        <div class="mini"><span class="c-ex" style="flex:15"></span></div>
+        <p><b>15 s</b> = any approved 15-second ad. The seconds are fixed; which ad plays is decided at air time by the weighted draw that already exists. If no 15-second ad is eligible that day, the fallback rule plays (bumper by default).</p>
+        <span class="meta">Sizes: 10 · 15 · 20 · 30 s (a setting, not code).</span>
+      </div>
+      <div class="tcard">
+        <div class="t"><i class="c-rg"></i>Range section</div>
+        <div class="mini"><span class="c-rg" style="flex:12"></span><span class="c-bp" style="flex:3"></span></div>
+        <p><b>10–15 s</b> books 15 seconds. It holds one ad whose length falls in the range (a 12-second ad, say) and a bumper takes the 3 seconds left, so the air length never moves. This is the home for ads that don't come in neat sizes.</p>
+        <span class="meta">Ranges: 10–15 · 15–20 · 20–30 s.</span>
+      </div>
+      <div class="tcard">
+        <div class="t"><i class="c-fx"></i>Flex block</div>
+        <div class="mini"><span class="c-fx" style="flex:30"></span><span class="c-fx" style="flex:12;opacity:.7"></span><span class="c-fx" style="flex:8;opacity:.5"></span><span class="c-bp" style="flex:5"></span></div>
+        <p><b>60 s, any lengths.</b> At air time the block is packed with eligible ads of any length, longest first, until only the bumper tail is left (5 s). Three sections placed side by side turn into one of these when the merge setting is on. Type any length for a custom block.</p>
+        <span class="meta">The piece you asked for: "a custom ad size that actually does that".</span>
+      </div>
+      <div class="tcard">
+        <div class="t"><i class="c-pin"></i>Pinned ad</div>
+        <div class="mini"><span class="c-pin" style="flex:20"></span></div>
+        <p><b>One specific creative</b>, as long as it is. Pulled from the Ads tab: an advertiser's approved ad (billed to their credits), a house ad, or an ad attached to the creator's own account. If its credits run out before air it degrades to an exact section of the same length.</p>
+        <span class="meta">The sponsor of a break = the pinned ad's advertiser; bumpers can name them.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3. Merge rule -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">3 · Your merge setting</span><h2>adjacent sections become one block, with bumper time at the end</h2></div>
+  <div class="frame">
+    <div class="merge">
+      <div>
+        <span class="eyebrow">Setting off · three sections, three draws</span>
+        <div class="strip" style="height:54px"><div class="c-ex" style="flex:15 0 0"><b>15 s</b>exact</div><div class="c-ex" style="flex:10 0 0"><b>10 s</b>exact</div><div class="c-rg" style="flex:20 0 0"><b>15–20 s</b>range</div></div>
+        <span class="meta">45 s booked. Each piece draws its own ad; the range piece may leave up to 5 s to a bumper. An advertiser's 25-second ad can't play anywhere here.</span>
+      </div>
+      <div class="arrow">→</div>
+      <div>
+        <span class="eyebrow mint">Setting on · one 45 s flex block</span>
+        <div class="strip" style="height:54px"><div class="c-fx" style="flex:25 0 0"><b>25 s</b>any ad</div><div class="c-fx" style="flex:15 0 0;opacity:.8"><b>15 s</b>any ad</div><div class="c-bp" style="flex:5 0 0"><b>5 s</b>tail</div></div>
+        <span class="meta">Still 45 s booked. The block takes ads of any length, best fit, so there's room for more and odder ads; the last 5 s is the bumper. Un-merge by dragging a piece out.</span>
+      </div>
+    </div>
+    <p class="note" style="margin:18px 0 0">The air length is the same either way, which is the point: the scheduler only ever sees the booked seconds. Merging changes what can fill them, not how long they are.</p>
+  </div>
+</section>
+
+<!-- 4. Ads + Bumpers tabs -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">4 · The other two tabs</span><h2>Ads: what can fill a section · Bumpers: what fills the tails</h2></div>
+  <div class="frame">
+    <div class="two">
+      <div class="rail" style="padding:14px">
+        <div class="tabs"><span>Sections</span><span class="on">Ads</span><span>Bumpers</span></div>
+        <div class="field">Search ads · <b>live tv · main player</b> <span>▾</span></div>
+        <div class="grp">Attached to this account · pin by dragging</div>
+        <div class="list">
+          <div class="ad mine"><div class="th b"></div><div class="n">The Fawns · tour dates<small>Marisol's own ad · no credits needed · main player only</small></div><div class="dur">12 s<small>fits 10–15</small></div></div>
+        </div>
+        <div class="grp">Advertisers · approved, with credits</div>
+        <div class="list">
+          <div class="ad"><div class="th"></div><div class="n">Acme Coffee · “Morning”<small>Acme Coffee · 1,240 credits · live tv, main player</small></div><div class="dur">20 s<small>fits 20 · 15–20</small></div></div>
+          <div class="ad"><div class="th c"></div><div class="n">Highland Bakery · “Sourdough Sunday”<small>Highland Bakery · 310 credits · live tv</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
+          <div class="ad"><div class="th d"></div><div class="n">Echo Park Film Lab · “Develop here”<small>EPFL · 90 credits · low</small></div><div class="dur">25 s<small>fits 20–30 · flex</small></div></div>
+        </div>
+        <div class="grp">House ads · always eligible</div>
+        <div class="list">
+          <div class="ad"><div class="th e"></div><div class="n">Studio Tapa stickers<small>house · studiotapa.com</small></div><div class="dur">15 s<small>fits 15 · 10–15</small></div></div>
+          <div class="ad"><div class="th"></div><div class="n">Pitch Room · back a film<small>house · /pitches</small></div><div class="dur">10 s<small>fits 10 · 10–15</small></div></div>
+        </div>
+        <span class="meta" style="margin-top:10px">"fits" is which sections the ad can land in. Advertisers keep uploading any length; the form will suggest 10 / 15 / 20 / 30 so more of them fit exact sections.</span>
+      </div>
+      <div class="rail" style="padding:14px">
+        <div class="tabs"><span>Sections</span><span>Ads</span><span class="on">Bumpers</span></div>
+        <div class="field">From <b>Channel uploads · CH 01 TapaTV</b> <span>▾</span></div>
+        <div class="grp">Templates · take the sponsor's name</div>
+        <div class="list">
+          <div class="ad"><div class="th c"></div><div class="n">Presented by ___<small>sponsor name + logo from the pinned ad in the break</small></div><div class="dur">6 s<small>template</small></div></div>
+          <div class="ad"><div class="th c"></div><div class="n">Supported by ___<small>same, quieter wording</small></div><div class="dur">6 s<small>template</small></div></div>
+        </div>
+        <div class="grp">Channel uploads · kind bumper / station ID</div>
+        <div class="list">
+          <div class="ad"><div class="th e"></div><div class="n">TapaTV station ID<small>station_id · Jose · approved</small></div><div class="dur">5 s</div></div>
+          <div class="ad"><div class="th"></div><div class="n">“Back in a moment” sting<small>bumper · Jose · approved</small></div><div class="dur">4 s</div></div>
+          <div class="ad"><div class="th b"></div><div class="n">Snippets promo<small>promo · too long for a tail, fine as a piece</small></div><div class="dur">15 s</div></div>
+        </div>
+        <div class="grp">Auto bumper for this episode</div>
+        <div class="field"><b>Presented by · sponsor of the break</b><span>▾</span></div>
+        <span class="meta" style="margin-top:10px">Tails shorter than the shortest bumper pad with black. A break with no sponsor falls back to the station ID.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 5. Where it sits -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">5 · Where it sits</span><h2>Library → Ad plan → scheduler → the two players</h2></div>
+  <div class="frame">
+    <div class="flow">
+      <div class="fcard">
+        <div class="t">Library and submissions</div>
+        <p>An approved episode gets a default plan on its own (one 30 s exact section at each of the creator's times) so nothing is blocked. The Library row shows the state; curating is refining it.</p>
+        <div class="librow"><div><b>The Fawns · Ep. 3 “Salt”</b><span class="meta">27:40 · PG-13 · approved</span></div><span class="chip olive">Ad plan · default</span></div>
+        <div class="librow"><div><b>The Fawns · Ep. 2 “Tide”</b><span class="meta">26:10 · PG-13 · approved</span></div><span class="chip ok">Curated · air 28:00</span></div>
+        <div class="librow"><div><b>Late Night Radio · 14</b><span class="meta">58:05 · podcast · approved</span></div><span class="chip warn">Break at 3:20 sits on a self-ad</span></div>
+        <p style="margin-top:10px">The creator's submission keeps its "Ad break times" field. Under it they see <i>Curated by TapaTV: 2:00 of ads in 4 breaks</i>, read-only, plus the new self-ad marker (section 6).</p>
+      </div>
+      <div class="fcard">
+        <div class="t">Scheduler</div>
+        <p>Titles in the library tab carry the <b>air length</b>, not the runtime. A dropped block is 30 minutes, with the breaks drawn inside it and the tail hatched as today.</p>
+        <div class="librow"><div><b>Ep. 3 “Salt”</b><span class="meta">air 29:40 · 27:40 + 2:00 ads · 4 breaks</span></div><span class="chip sky">drag</span></div>
+        <div class="block">
+          <span style="color:var(--ink)">9:00 · The Fawns · Ep. 3 “Salt”</span><br><span style="color:var(--ink-faint)">30 min · 4 breaks</span>
+          <span class="ln" style="top:4px;height:2px"></span>
+          <span class="ln p" style="top:31px"></span>
+          <span class="ln" style="top:66px"></span>
+          <span class="ln o" style="top:86px"></span>
+          <span class="bt"></span>
+        </div>
+        <p style="margin-top:10px">Edit a plan after it's scheduled and the block keeps its length; if the air length changes, the scheduler flags the block ("plan is now 31:10") instead of silently moving the day.</p>
+      </div>
+      <div class="fcard">
+        <div class="t">Live channel and main player</div>
+        <p>The channel engine pauses the episode at 18:30, runs the 45 s plan (two ads, one bumper), and resumes. The slot math holds because the plan is exact. Someone tuning in mid-break sees the countdown card as now.</p>
+        <div class="player">
+          <span class="bug">CH 01 · ad break · 0:31</span>
+          <div class="card"><b>Acme Coffee</b>“Morning” · ad 2 of 2</div>
+          <div class="pbar"><i style="left:2%"></i><i style="left:28%"></i><i style="left:63%;background:var(--paper)"></i><i style="left:82%"></i></div>
+        </div>
+        <p style="margin-top:10px">On demand, the main player requests the same pod at the same second; ad-free members skip it. The app's live screen shows the countdown card until its IMA ads land, as it does today.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6. Self-implemented ad -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">6 · Self-implemented ad</span><h2>a sponsor segment that's already inside the video</h2></div>
+  <div class="frame">
+    <div class="selfgrid">
+      <div>
+        <span class="eyebrow olive">Creator's submission · new block under Ad break times</span>
+        <div class="h2">Sponsor segment in the video</div>
+        <p class="lead" style="font-size:.92rem">If part of the episode is an ad you shot yourself (a read, a product moment), mark it. Breaks keep clear of it, it doesn't count as ad time, and the player can show a scannable card over it.</p>
+        <div class="form">
+          <div class="field">In <b>12:10</b> · Out <b>12:33</b> <span>23 s</span></div>
+          <div class="field">Sponsor <b>Acme Coffee</b></div>
+          <div class="field">Link for the card <b>acme.example/fawns</b></div>
+          <div class="field">Show a QR / link card during it <span class="tog on"></span></div>
+          <div class="field">Keep ad breaks at least <b>60 s</b> away from it <span class="tog on"></span></div>
+          <div class="field" style="border-style:dashed;color:var(--ink-faint)">+ Another segment</div>
+        </div>
+        <span class="meta" style="margin-top:10px">In the curator it shows as the hatched piece inside the episode. Moving a break onto it is refused with the reason.</span>
+      </div>
+      <div>
+        <span class="eyebrow">What the viewer sees at 12:10</span>
+        <div class="player" style="margin-top:8px">
+          <span class="bug">The Fawns · Ep. 3</span>
+          <div class="qr"><span></span><div><b>Acme Coffee</b><br>acme.example/fawns</div></div>
+          <div class="pbar"><i style="left:2%"></i><i style="left:28%"></i><i style="left:42%;width:1.3%;background:var(--olive-bright)"></i><i style="left:63%"></i><i style="left:82%"></i></div>
+        </div>
+        <span class="meta" style="margin-top:10px">The card is the site's own overlay (web and app), so it works on live too, where nothing else can be clicked. Tap or scan; it fades out at 12:33.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7. Phones -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">7 · Phones</span><h2>same rule as the scheduler</h2></div>
+  <div class="phone-note">The curator is a tablet / computer screen: dragging pieces onto a 30-minute bar needs the width. On a phone the Library row shows the plan's state and air length and says "open on a tablet or computer to curate", like <b>/schedule</b> does. The app's admin tab gets the same note; the self-ad marker in the creator's submission works on phones as it's a form.</div>
+</section>
+
+<!-- 8. Ideas -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">8 · Things in the mocks you may not have thought of</span><h2>or easy to add</h2></div>
+  <div class="frame">
+    <ul class="ideas">
+      <li><b>A default plan for everything</b>, so the scheduler never waits on curating: one exact 30 s section per creator break. Curating is editing, not unblocking.</li>
+      <li><b>Air length rounds to the minute</b> and the curator shows the tail ("0:20 bumpers to close"), the same whole-minute rule the channel already uses, so what you see here is what the day column gets.</li>
+      <li><b>Eligible-ad counts on every piece</b> ("14 ads"), so you see an empty section before the day it airs, not after.</li>
+      <li><b>Pinned ads degrade</b> to an exact section of the same length when the advertiser's credits run out, instead of leaving a hole.</li>
+      <li><b>"Presented by" names the sponsor from the pinned ad</b> in the same break; no typing, and a break with no sponsor falls back to the station ID.</li>
+      <li><b>Copy this plan to the whole series</b> (same break times, same pieces) with one button; most series keep the same shape episode to episode.</li>
+      <li><b>Breaks keep clear of the self-ad</b> and of each other (a minimum spacing setting), which is the podcast case where a creator types a break two minutes after a sponsor read.</li>
+      <li><b>The scheduler flags, never moves</b>: editing a plan after scheduling changes the block's length only when you say so.</li>
+      <li><b>Per-channel bumper set</b>: TapaTV's station ID on CH 01, another channel's on CH 02, chosen by the channel, not per episode.</li>
+      <li><b>Podcasts too</b>: audio episodes get the same plan with audio ads and audio bumpers; the RSS feed keeps serving the file without them (it's a different product).</li>
+      <li><b>Preview a break</b> in the curator: plays the pieces back to back with whatever would fill them today.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 9. Decisions -->
+<section class="sec">
+  <div class="sec-head"><span class="tag">9 · Questions for you</span><h2>before building</h2></div>
+  <div class="frame">
+    <ul class="ideas">
+      <li><b>Who curates?</b> The mocks assume full admins and content schedulers curate every title, creators only set break times and mark self-ads, advertisers never see the screen. Should creators be able to curate their own titles (within the max-load rules)?</li>
+      <li><b>Live mid-rolls are new.</b> Today the live channel plays an episode straight through and only runs ads between shows. With a plan, the channel will stop a show at 8:00 for 30 seconds. Is that the intent for every title, or only titles whose plan was curated by hand (default plans stay between-shows only)?</li>
+      <li><b>The exact sizes.</b> 10 / 15 / 20 / 30 s in the mocks. Should the advertiser form steer uploads to those lengths (a warning, "ads of 15 s fit the most breaks"), or leave it free and rely on range sections and flex blocks?</li>
+      <li><b>Caps.</b> Max ad time per break (60 s in the mocks) and whether there is an hourly cap on a channel (broadcast TV runs about 12–16 minutes an hour). Also a minimum spacing between breaks.</li>
+      <li><b>Bumper tail length</b> (5 s in the mocks) and the wording of the two templates, "Presented by" / "Supported by". Do you want a third, or a channel-only one?</li>
+      <li><b>When nothing fits at air time</b>: a bumper (the mocks), a house ad of any length even if it overruns the section, or black with the countdown card? Overrunning breaks the air length, so the mocks avoid it.</li>
+      <li><b>Self-implemented ads and ad load.</b> The mocks don't count them as ad time, and show the QR card on live too. Should they count, and should a creator's own ad be allowed as a pinned piece in a break (the "attached to this account" group) without credits?</li>
+      <li><b>The money side.</b> A pinned advertiser ad is still billed per impression from their credits, as now. Should a pinned placement in a specific episode cost more, or be something an advertiser can request (a sponsorship), or stay admin-only?</li>
+    </ul>
+  </div>
+</section>
+
+</body>
+</html>
