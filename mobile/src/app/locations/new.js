@@ -8,7 +8,7 @@ import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 import { crew, Chip, PlaceBox } from '../../components/CrewBits';
-import { pickAndUpload, loc } from '../../components/LocationBits';
+import { pickImage, uploadPicked, resolveToken, loc } from '../../components/LocationBits';
 import { splitBooking, dollars, DEFAULT_CUT_PERCENT, MAX_PHOTOS } from '../../lib/locationRules';
 
 // List a place (pages/locations/new on the web), or edit one
@@ -64,28 +64,43 @@ export default function ListAPlace() {
     return () => { alive = false; };
   }, [signedIn, edit])); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // The picked photo shows at once (local uri, "Uploading…" over it) and
+  // is swapped for the stored copy when the upload lands. A failed upload
+  // drops it again with the reason.
+  const [pending, setPending] = useState(null); // { uri, purpose }
   async function addPhoto() {
-    setUploading(true);
     setError(null);
+    let picked;
+    try { picked = await pickImage(1600); } catch (err) { setError(err.message); return; }
+    if (!picked) return;
+    setPending({ uri: picked.uri, purpose: 'photo' });
+    setUploading(true);
     try {
-      const url = await pickAndUpload(tokenRef.current, 'photo');
-      if (url) set({ photos: [...form.photos, { url, caption: '' }].slice(0, MAX_PHOTOS) });
-    } catch (err) { setError(err.message); } finally { setUploading(false); }
+      const url = await uploadPicked(picked, 'photo', getToken);
+      setForm((f) => ({ ...f, photos: [...f.photos, { url, caption: '', localUri: picked.uri }].slice(0, MAX_PHOTOS) }));
+    } catch (err) { setError(`Photo upload failed: ${err.message}`); } finally { setUploading(false); setPending(null); }
   }
   async function addProof() {
-    setUploading(true);
     setError(null);
+    let picked;
+    try { picked = await pickImage(2000); } catch (err) { setError(err.message); return; }
+    if (!picked) return;
+    setPending({ uri: picked.uri, purpose: 'proof' });
+    setUploading(true);
     try {
-      const url = await pickAndUpload(tokenRef.current, 'proof', 2000);
-      if (url) set({ proofUrl: url });
-    } catch (err) { setError(err.message); } finally { setUploading(false); }
+      const url = await uploadPicked(picked, 'proof', getToken);
+      set({ proofUrl: url, proofLocalUri: picked.uri });
+    } catch (err) { setError(`Proof upload failed: ${err.message}`); } finally { setUploading(false); setPending(null); }
   }
   async function save() {
     setBusy(true);
     setError(null);
     try {
-      if (editing) await apiPatch(`/api/locations/${editing.id}`, form, tokenRef.current);
-      else await apiPost('/api/locations', form, tokenRef.current);
+      const token = await resolveToken(getToken);
+      const body = { ...form, photos: form.photos.map(({ localUri, ...p }) => p) };
+      delete body.proofLocalUri;
+      if (editing) await apiPatch(`/api/locations/${editing.id}`, body, token);
+      else await apiPost('/api/locations', body, token);
       router.replace('/locations/mine');
     } catch (err) {
       setError(err.message);
@@ -141,8 +156,8 @@ export default function ListAPlace() {
               <Text style={crew.h3}>2 · Photos · {form.photos.length} of {MAX_PHOTOS} · the first is the cover</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
                 {form.photos.map((p, i) => (
-                  <View key={p.url} style={{ gap: 4, width: 96 }}>
-                    <View style={loc.photo}><SmartImage uri={p.url} style={StyleSheet.absoluteFill} />{i === 0 ? <Text style={[loc.k, { top: 6, bottom: undefined }]}>Cover</Text> : null}</View>
+                  <View key={p.url} style={{ gap: 4, width: 120 }}>
+                    <View style={loc.photo}><SmartImage uri={p.localUri || p.url} style={StyleSheet.absoluteFill} />{i === 0 ? <Text style={[loc.k, { top: 6, bottom: undefined }]}>Cover</Text> : null}</View>
                     <TextInput style={[crew.input, { paddingVertical: 5, fontSize: 11 }]} value={p.caption} onChangeText={(v) => set({ photos: form.photos.map((x, j) => (j === i ? { ...x, caption: v } : x)) })} placeholder="Caption" placeholderTextColor={colors.inkFaint} maxLength={80} />
                     <View style={crew.row}>
                       {i > 0 ? <Pressable onPress={() => set({ photos: [p, ...form.photos.filter((_, j) => j !== i)] })}><Text style={crew.mono}>Cover</Text></Pressable> : null}
@@ -150,7 +165,10 @@ export default function ListAPlace() {
                     </View>
                   </View>
                 ))}
-                {form.photos.length < MAX_PHOTOS ? <Pressable style={loc.photoAdd} disabled={uploading} onPress={addPhoto}>{uploading ? <ActivityIndicator color={colors.brass} /> : <Text style={[crew.mono, { color: colors.brass }]}>+ Add</Text>}</Pressable> : null}
+                {pending && pending.purpose === 'photo' ? (
+                  <View style={[loc.photo, { alignItems: 'center', justifyContent: 'center' }]}><SmartImage uri={pending.uri} style={[StyleSheet.absoluteFill, { opacity: 0.5 }]} /><ActivityIndicator color={colors.brass} /><Text style={[crew.mono, { color: colors.ink }]}>Uploading…</Text></View>
+                ) : null}
+                {form.photos.length < MAX_PHOTOS ? <Pressable style={loc.photoAdd} disabled={uploading} onPress={addPhoto}><Text style={[crew.mono, { color: colors.brass }]}>{uploading ? '…' : '+ Add photo'}</Text></Pressable> : null}
               </ScrollView>
               <Text style={crew.mono}>One frame per room at the time of day the light is best; say the time in the caption.</Text>
             </View>
@@ -220,11 +238,13 @@ export default function ListAPlace() {
                 <Pressable key={k} style={[styles.radio, form.ownership === k && { borderColor: colors.olive }]} onPress={() => set({ ownership: k })}><Text style={crew.rowText}>{form.ownership === k ? '● ' : '○ '}{v}</Text></Pressable>
               ))}
               <View style={[crew.row, { alignItems: 'flex-start' }]}>
-                {form.proofUrl ? <View style={loc.thumb}><SmartImage uri={form.proofUrl} style={StyleSheet.absoluteFill} /></View> : null}
+                {pending && pending.purpose === 'proof' ? (
+                  <View style={[loc.photo, { alignItems: 'center', justifyContent: 'center' }]}><SmartImage uri={pending.uri} style={[StyleSheet.absoluteFill, { opacity: 0.5 }]} /><ActivityIndicator color={colors.brass} /></View>
+                ) : form.proofUrl ? <View style={loc.photo}><SmartImage uri={form.proofLocalUri || form.proofUrl} style={StyleSheet.absoluteFill} /><Text style={[loc.k, { top: 6, bottom: undefined }]}>Proof</Text></View> : null}
                 <View style={{ flex: 1, gap: 6 }}>
                   <View style={crew.row}>
                     <Pressable style={crew.btnSm} disabled={uploading} onPress={addProof}><Text style={crew.btnSmText}>{form.proofUrl ? 'Replace proof' : uploading ? 'Uploading…' : 'Upload proof'}</Text></Pressable>
-                    {form.proofUrl ? <Pressable style={[crew.btnSm, crew.btnGhost]} onPress={() => set({ proofUrl: null })}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>Remove</Text></Pressable> : null}
+                    {form.proofUrl ? <Pressable style={[crew.btnSm, crew.btnGhost]} onPress={() => set({ proofUrl: null, proofLocalUri: null })}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>Remove</Text></Pressable> : null}
                   </View>
                   <Text style={crew.mono}>A deed or tax bill, a lease, a utility bill in your name, or a letter from the owner. Only admins see it.</Text>
                 </View>

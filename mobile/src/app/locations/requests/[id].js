@@ -110,10 +110,10 @@ export default function RequestScreen() {
 
             <View style={crew.panel}>
               <Text style={crew.h3}>{side === 'host' ? 'Your answer' : 'Next'}</Text>
-              {side === 'host' ? <HostAnswer r={r} token={tokenRef.current} onChange={setR} /> : null}
-              {side === 'producer' ? <ProducerActions r={r} token={tokenRef.current} onChange={setR} onPay={onPay} /> : null}
-              {side === 'host' ? <OutcomeForm r={r} token={tokenRef.current} onChange={setR} /> : null}
-              <EndorseForm r={r} userId={userId} token={tokenRef.current} onChange={setR} />
+              {side === 'host' ? <HostAnswer r={r} token={getToken} onChange={setR} /> : null}
+              {side === 'producer' ? <ProducerActions r={r} token={getToken} onChange={setR} onPay={onPay} /> : null}
+              {side === 'host' ? <OutcomeForm r={r} token={getToken} onChange={setR} /> : null}
+              <EndorseForm r={r} userId={userId} token={getToken} onChange={setR} />
               {side === 'host' && r.status === 'accepted' ? <Text style={crew.mono}>Accepted — waiting on {other.displayName.split(' ')[0]} to pay. The dates stay open until they do.</Text> : null}
               {r.status === 'paid' && !r.pastEnd ? <Text style={crew.mono}>Confirmed. {side === 'host' ? 'After the last day you’ll be asked how it went.' : 'Take load-in and wrap photos and drop them in the conversation.'}</Text> : null}
               {side === 'host' && ['requested', 'countered'].includes(r.status) ? <Text style={crew.mono}>Accepting needs a payout account (Your places → Payouts).</Text> : null}

@@ -10,7 +10,7 @@ import TopNav from '../../components/TopNav';
 import PayoutsCard from '../../components/PayoutsCard';
 import SmartImage from '../../components/SmartImage';
 import { crew, Chip } from '../../components/CrewBits';
-import { StatusPill, RequestCard, MonthCalendar, loc } from '../../components/LocationBits';
+import { StatusPill, RequestCard, MonthCalendar, resolveToken, loc } from '../../components/LocationBits';
 import { thisMonth, todayIso } from '../../lib/locationRules';
 
 // Your places (pages/locations/mine on the web): every place you've
@@ -41,7 +41,7 @@ export default function MyLocations() {
     const go = async () => {
       setBusy(l.id);
       try {
-        const d = await apiPatch(`/api/locations/${l.id}`, { status }, tokenRef.current);
+        const d = await apiPatch(`/api/locations/${l.id}`, { status }, await resolveToken(getToken));
         setState((s) => ({ ...s, listings: status === 'removed' ? s.listings.filter((x) => x.id !== l.id) : s.listings.map((x) => (x.id === l.id ? { ...x, ...d.listing } : x)) }));
       } catch (err) {
         Alert.alert('Could not change that', err.message);
@@ -81,9 +81,9 @@ export default function MyLocations() {
 
             <Text style={crew.h3}>Requests{waiting ? ` · ${waiting} waiting · 48 hours to answer` : ''}</Text>
             {!state.loading && requests.length === 0 ? <Text style={[crew.muted, { marginBottom: 10 }]}>When a producer asks for dates, the request lands here and in your Messages, with 48 hours to accept, counter or decline.</Text> : null}
-            {open.map((r) => <RequestCard key={r.id} r={r} side="host" token={tokenRef.current} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />)}
+            {open.map((r) => <RequestCard key={r.id} r={r} side="host" token={getToken} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />)}
             {past.length > 0 ? <Pressable onPress={() => setShowPast((v) => !v)}><Text style={[crew.mono, { marginBottom: 8 }]}>{showPast ? '▾' : '▸'} {past.length} past {past.length === 1 ? 'request' : 'requests'}</Text></Pressable> : null}
-            {showPast ? past.map((r) => <RequestCard key={r.id} r={r} side="host" token={tokenRef.current} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />) : null}
+            {showPast ? past.map((r) => <RequestCard key={r.id} r={r} side="host" token={getToken} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />) : null}
 
             <Text style={[crew.h3, { marginTop: 8 }]}>Your places · {listings.length} of 10</Text>
             {listings.map((l) => (
@@ -105,7 +105,7 @@ export default function MyLocations() {
                   {['listed', 'paused'].includes(l.status) ? <Pressable style={crew.btnSm} onPress={() => setBlocking(blocking === l.id ? null : l.id)}><Text style={crew.btnSmText}>{blocking === l.id ? 'Close calendar' : 'Block days'}</Text></Pressable> : null}
                   <Pressable style={[crew.btnSm, crew.btnGhost]} disabled={busy === l.id} onPress={() => setStatus(l, 'removed')}><Text style={[crew.btnSmText, { color: colors.danger }]}>Remove</Text></Pressable>
                 </View>
-                {blocking === l.id ? <BlockDays listing={l} token={tokenRef.current} /> : null}
+                {blocking === l.id ? <BlockDays listing={l} token={getToken} /> : null}
               </View>
             ))}
 
@@ -126,7 +126,7 @@ function BlockDays({ listing, token }) {
 
   useFocusEffect(useCallback(() => {
     let alive = true;
-    apiGet(`/api/locations/${listing.id}`, token).then((d) => { if (alive) setDays(new Set(d.listing.blockedDays || [])); }).catch(() => { if (alive) setDays(new Set()); });
+    resolveToken(token).then((t) => apiGet(`/api/locations/${listing.id}`, t)).then((d) => { if (alive) setDays(new Set(d.listing.blockedDays || [])); }).catch(() => { if (alive) setDays(new Set()); });
     return () => { alive = false; };
   }, [listing.id, token]));
 
@@ -137,7 +137,7 @@ function BlockDays({ listing, token }) {
     setBusy(true);
     setNote(null);
     try {
-      await apiPost(`/api/locations/${listing.id}/blocked-days`, { days: [...days] }, token);
+      await apiPost(`/api/locations/${listing.id}/blocked-days`, { days: [...days] }, await resolveToken(token));
       setNote('Saved.');
     } catch (err) {
       setNote(err.message);

@@ -104,21 +104,35 @@ export function MonthCalendar({ month, onMonth, marks = {}, min, onPick }) {
   );
 }
 
-// Picks a photo from the library, shrinks it, and sends it up. Returns
-// the stored URL.
-export async function pickAndUpload(token, purpose = 'photo', width = 1600) {
+// `token` on these helpers is either a string or Clerk's getToken function.
+// Screens pass the function: a token fetched when the screen opened goes
+// stale while someone fills in a long form, and the server then answers
+// "sign in first" to a signed-in person.
+export async function resolveToken(token) {
+  if (typeof token === 'function') return token().catch(() => null);
+  return token || null;
+}
+
+// Picks a photo from the library and shrinks it. Returns { uri, base64 }
+// so the screen can show it straight away, or null if they cancelled.
+export async function pickImage(width = 1600) {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) throw new Error('Photo library access is needed to pick an image.');
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
   if (result.canceled || !result.assets || !result.assets[0]) return null;
   const rendered = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width }).renderAsync();
   const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.85, base64: true });
-  const data = await apiPost('/api/locations/upload', { base64: `data:image/jpeg;base64,${saved.base64}`, fileName: 'photo.jpg', purpose }, token);
+  return { uri: saved.uri, base64: `data:image/jpeg;base64,${saved.base64}` };
+}
+
+// Sends a picked image up. Returns the stored URL.
+export async function uploadPicked(picked, purpose, token) {
+  const data = await apiPost('/api/locations/upload', { base64: picked.base64, fileName: 'photo.jpg', purpose }, await resolveToken(token));
   return data.url;
 }
 
 export async function requestAction(id, body, token) {
-  return apiPatch(`/api/locations/requests/${id}`, body, token);
+  return apiPatch(`/api/locations/requests/${id}`, body, await resolveToken(token));
 }
 
 export function MoneyLine({ r, side }) {

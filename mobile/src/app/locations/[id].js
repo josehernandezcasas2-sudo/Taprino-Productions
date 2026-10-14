@@ -9,7 +9,7 @@ import TopNav from '../../components/TopNav';
 import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import { crew, Chip, Avatar } from '../../components/CrewBits';
-import { HostedChip, StatusPill, MonthCalendar, KV, loc } from '../../components/LocationBits';
+import { HostedChip, StatusPill, MonthCalendar, KV, resolveToken, loc } from '../../components/LocationBits';
 import { quoteFor, splitBooking, dollars, dayCount, daysBetween, hoursBetween, hoursLabel, fmtRange, todayIso, thisMonth, MIN_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
 
 // One place (pages/locations/<id> on the web): gallery, facts, rates,
@@ -113,7 +113,7 @@ export default function ListingScreen() {
             </View>
 
             {!l.mine ? (signedIn
-              ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} token={tokenRef.current} onDone={(r) => router.push(`/locations/requests/${r.id}`)} />
+              ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} token={getToken} onDone={(r) => router.push(`/locations/requests/${r.id}`)} />
               : (
                 <View style={[crew.panel, { borderColor: 'rgba(248,95,115,0.45)' }]}>
                   <Text style={crew.label}>Request to book</Text>
@@ -214,7 +214,7 @@ function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) 
     setError(null);
     try {
       const [type, pid] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost(`/api/locations/${l.id}/requests`, { startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id: pid } : null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer }, token);
+      const data = await apiPost(`/api/locations/${l.id}/requests`, { startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id: pid } : null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer }, await resolveToken(token));
       onDone(data.request);
     } catch (err) {
       setError(err.message);

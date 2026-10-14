@@ -35,7 +35,7 @@ export default function MyRequests() {
   const onPay = async (url) => { await WebBrowser.openBrowserAsync(url); load(); };
   const open = state.requests.filter((r) => ['requested', 'countered', 'accepted', 'paid'].includes(r.status));
   const past = state.requests.filter((r) => !open.includes(r));
-  const card = (r) => <RequestCard key={r.id} r={r} side="producer" token={tokenRef.current} userId={userId} onChange={update} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />;
+  const card = (r) => <RequestCard key={r.id} r={r} side="producer" token={getToken} userId={userId} onChange={update} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />;
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
