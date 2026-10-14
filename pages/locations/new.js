@@ -159,6 +159,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
           <p>{editing ? 'Changes to the address, who you are or the proof send the place back to review; everything else updates straight away.' : 'Seven short sections. A new place goes to review first: we check you’re the owner or can book it, then it’s public under Locations.'}</p>
         </div>
       </div>
+      <p className="crew-mono loc-req-legend"><i className="req-dot" aria-hidden="true" /> marks what a listing needs before it can go to review.</p>
       {error && <div className="crew-status error loc-topstatus" role="alert">{error}</div>}
       {editing && editing.status === 'rejected' && editing.rejectionReason && <div className="crew-status error loc-topstatus">Not approved last time: {editing.rejectionReason} — fix it and save to resubmit.</div>}
 
@@ -170,24 +171,24 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
         <div className="crew-wc">
           <section className="crew-panel" id="basics">
             <h3>Basics</h3>
-            <label className="crew-field"><span>Title</span><input type="text" className="crew-input" value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder="Mid-century bungalow with a big back yard" maxLength={90} required /></label>
+            <label className="crew-field"><span>Title<i className="req-dot" aria-hidden="true" /></span><input type="text" className="crew-input" value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder="Mid-century bungalow with a big back yard" maxLength={90} required /></label>
             <div className="crew-row2">
-              <label className="crew-field"><span>What it is</span>
+              <label className="crew-field"><span>What it is<i className="req-dot" aria-hidden="true" /></span>
                 <select className="crew-select" value={form.kind} onChange={(e) => set({ kind: e.target.value })}>{Object.entries(LOCATION_TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</select>
               </label>
-              <div className="crew-field"><span>Neighbourhood or city (shows publicly)</span>
+              <div className="crew-field"><span>Neighbourhood or city (shows publicly)<i className="req-dot" aria-hidden="true" /></span>
                 <PlaceSearch value={form.place} onChange={(p) => set({ place: p })} placeholder="Highland Park, Los Angeles" id="loc-place" />
               </div>
             </div>
             <label className="crew-field"><span>Describe it</span><textarea className="crew-input" rows={5} value={form.description} onChange={(e) => set({ description: e.target.value })} placeholder="Year built, materials, what the light does, who lives or works there, what has shot here before." maxLength={2000} /></label>
             <div className="crew-row2">
-              <label className="crew-field"><span>Street address (private until a booking is paid)</span><input type="text" className="crew-input" value={form.address} onChange={(e) => set({ address: e.target.value })} placeholder="1234 Avenue 56, Los Angeles, CA 90042" maxLength={200} required /></label>
+              <label className="crew-field"><span>Street address (private until a booking is paid)<i className="req-dot" aria-hidden="true" /></span><input type="text" className="crew-input" value={form.address} onChange={(e) => set({ address: e.target.value })} placeholder="1234 Avenue 56, Los Angeles, CA 90042" maxLength={200} required /></label>
               <label className="crew-field"><span>Access notes (private, same)</span><input type="text" className="crew-input" value={form.accessNotes} onChange={(e) => set({ accessNotes: e.target.value })} placeholder="Gate code, where to park the truck, which door" maxLength={1000} /></label>
             </div>
           </section>
 
           <section className="crew-panel" id="photos">
-            <h3>Photos <small>up to {MAX_PHOTOS} · the first is the cover</small></h3>
+            <h3>Photos<i className="req-dot" aria-hidden="true" /> <small>up to {MAX_PHOTOS} · the first is the cover</small></h3>
             <PhotoStrip photos={form.photos} max={MAX_PHOTOS} busy={uploading} onChange={(next) => (Array.isArray(next) && next[0] instanceof File ? addPhotos(next) : set({ photos: next }))} />
             <span className="crew-mono">One frame per room at the time of day the light is best, and say the time in the caption. Photos are shrunk to 1600px before upload.</span>
           </section>
@@ -226,7 +227,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
           </section>
 
           <section className="crew-panel" id="rates">
-            <h3>Rates <small>hourly, a day rate, or take offers — any mix</small></h3>
+            <h3>Rates<i className="req-dot" aria-hidden="true" /> <small>hourly, a day rate, or open to deals — at least one</small></h3>
             <div className="crew-row2">
               <label className="crew-field"><span>Hourly ($)</span><input type="number" className="crew-input" min="0" step="1" value={form.hourly} onChange={(e) => set({ hourly: e.target.value })} placeholder="85" /></label>
               <label className="crew-field"><span>Minimum hours</span><input type="number" className="crew-input" min="1" max="24" value={form.minHours} onChange={(e) => set({ minHours: e.target.value })} /></label>
@@ -270,7 +271,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
           </section>
 
           <section className="crew-panel" id="proof">
-            <h3>Who you are to this place <small>checked by an admin before it’s public</small></h3>
+            <h3>Who you are to this place<i className="req-dot" aria-hidden="true" /> <small>checked by an admin before it’s public</small></h3>
             <div className="loc-radios">
               {Object.entries(OWNERSHIP).map(([k, v]) => (
                 <label key={k} className={`loc-radio${form.ownership === k ? ' on' : ''}`}><input type="radio" name="ownership" checked={form.ownership === k} onChange={() => set({ ownership: k })} /><b>{v}</b></label>

@@ -11,6 +11,13 @@ import { dollars, fmtRange, fmtDay, hoursLabel, STATUS_LABEL } from '../lib/loca
 // Pieces shared by the Locations screens (locations/*): mirrors
 // components/locations/LocationBits.js + RequestBits.js on the website.
 
+// Required-field dot on the listing form (web: .req-dot): the app's
+// attention colour, the same brass as the unread badge. Goes inside a
+// label's <Text>.
+export function Req() {
+  return <Text style={{ color: colors.brass }}> ●</Text>;
+}
+
 export function HostedChip({ host }) {
   if (!host) return null;
   const n = host.hosted || 0;

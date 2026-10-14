@@ -8,7 +8,7 @@ import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 import { crew, Chip, PlaceBox } from '../../components/CrewBits';
-import { pickImage, uploadPicked, resolveToken, loc } from '../../components/LocationBits';
+import { pickImage, uploadPicked, resolveToken, loc, Req } from '../../components/LocationBits';
 import { splitBooking, dollars, DEFAULT_CUT_PERCENT, MAX_PHOTOS } from '../../lib/locationRules';
 
 // List a place (pages/locations/new on the web), or edit one
@@ -141,19 +141,21 @@ export default function ListAPlace() {
 
             <View style={crew.panel}>
               <Text style={crew.h3}>1 · Basics</Text>
+              <Text style={crew.mono}><Req /> marks what a listing needs before it can go to review.</Text>
+              <Text style={crew.label}>Title<Req /></Text>
               <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder="Mid-century bungalow with a big back yard" placeholderTextColor={colors.inkFaint} maxLength={90} />
-              <Text style={crew.label}>What it is</Text>
+              <Text style={crew.label}>What it is<Req /></Text>
               <View style={crew.chips}>{Object.entries(rules.types).map(([k, v]) => <Chip key={k} label={v} on={form.kind === k} onPress={() => set({ kind: k })} />)}</View>
-              <Text style={crew.label}>Neighbourhood or city (shows publicly)</Text>
+              <Text style={crew.label}>Neighbourhood or city (shows publicly)<Req /></Text>
               <PlaceBox value={form.place} onChange={(p) => set({ place: p })} placeholder="Highland Park, Los Angeles" />
               <TextInput style={[crew.input, { minHeight: 90, textAlignVertical: 'top' }]} value={form.description} onChangeText={(v) => set({ description: v })} placeholder="Year built, materials, what the light does, who lives or works there, what has shot here before." placeholderTextColor={colors.inkFaint} multiline maxLength={2000} />
-              <Text style={crew.label}>Street address (private until a booking is paid)</Text>
+              <Text style={crew.label}>Street address (private until a booking is paid)<Req /></Text>
               <TextInput style={crew.input} value={form.address} onChangeText={(v) => set({ address: v })} placeholder="1234 Avenue 56, Los Angeles, CA 90042" placeholderTextColor={colors.inkFaint} maxLength={200} />
               <TextInput style={crew.input} value={form.accessNotes} onChangeText={(v) => set({ accessNotes: v })} placeholder="Access notes (private): gate code, where the truck parks" placeholderTextColor={colors.inkFaint} maxLength={1000} />
             </View>
 
             <View style={crew.panel}>
-              <Text style={crew.h3}>2 · Photos · {form.photos.length} of {MAX_PHOTOS} · the first is the cover</Text>
+              <Text style={crew.h3}>2 · Photos<Req /> · {form.photos.length} of {MAX_PHOTOS} · the first is the cover</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ flexDirection: 'row', gap: 8 }}>
                 {form.photos.map((p, i) => (
                   <View key={p.url} style={{ gap: 4, width: 120 }}>
@@ -198,7 +200,7 @@ export default function ListAPlace() {
             </View>
 
             <View style={crew.panel}>
-              <Text style={crew.h3}>4 · Rates · hourly, a day rate, or offers — any mix</Text>
+              <Text style={crew.h3}>4 · Rates<Req /> · hourly, a day rate, or open to deals — at least one</Text>
               <View style={crew.row}>{num('hourly', 'Hourly $')}{num('minHours', 'Min hours')}</View>
               <View style={crew.row}>{num('day', 'Full day $')}{num('dayHours', 'A day is (hrs)')}</View>
               <View style={crew.row}>{num('halfDay', 'Half day $')}{num('overtime', 'Overtime $/hr')}</View>
@@ -233,7 +235,7 @@ export default function ListAPlace() {
             </View>
 
             <View style={crew.panel}>
-              <Text style={crew.h3}>7 · Who you are to this place · checked by an admin</Text>
+              <Text style={crew.h3}>7 · Who you are to this place<Req /> · checked by an admin</Text>
               {Object.entries(rules.ownership).map(([k, v]) => (
                 <Pressable key={k} style={[styles.radio, form.ownership === k && { borderColor: colors.olive }]} onPress={() => set({ ownership: k })}><Text style={crew.rowText}>{form.ownership === k ? '● ' : '○ '}{v}</Text></Pressable>
               ))}
