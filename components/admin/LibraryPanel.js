@@ -177,17 +177,17 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                   {e.status === 'approved' ? '✓ live' : e.status === 'pending' ? '⏳ pending' : '✕ rejected'}
                   {' · '}{e.tier}{e.featured ? ' · ⭐ hero-eligible' : ''}{e.deletionRequested ? ' · 🗑 pending deletion' : ''}
                   {!e.rating && <span style={{ color: 'var(--signal-amber)' }}> · no rating set (treated as 17+)</span>}
-                  {e.status === 'approved' && (
-                    <span>
-                      {' · '}
-                      <a href={`/ad-plan/${e.id}`} style={{ color: e.adPlan && e.adPlan.status === 'ready' ? 'var(--ok)' : e.adPlan ? 'var(--olive)' : 'var(--ink-dim)' }}>
-                        Ad plan · {e.adPlan ? (e.adPlan.status === 'ready' ? `ready · air ${fmtAir(e.adPlan.airSeconds)}` : 'draft') : 'default'}
-                      </a>
+                  {e.status === 'approved' && e.adPlan && (
+                    <span style={{ color: e.adPlan.status === 'ready' ? 'var(--ok)' : 'var(--olive)' }}>
+                      {' · '}ad plan {e.adPlan.status === 'ready' ? `ready · air ${fmtAir(e.adPlan.airSeconds)}` : 'draft'}
                     </span>
                   )}
                 </div>
               </div>
-              <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setEditingEpisode(e)}>Edit</button>
+              <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                {e.status === 'approved' && <a className="account-btn-secondary" style={{ width: 'auto', textDecoration: 'none' }} href={`/ad-plan/${e.id}`}>Ad plan</a>}
+                <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setEditingEpisode(e)}>Edit</button>
+              </span>
             </div>
           ))
         )}
