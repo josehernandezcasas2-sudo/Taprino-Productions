@@ -319,7 +319,7 @@ export default function Scheduler(props) {
   // What a library item becomes when it lands on the day.
   function slotFor(item, start) {
     const base = { id: newTmpId(), layer, airDate: layer === 'week' ? day : null, dayOfWeek: layer === 'default' ? day : null, start, episodeId: null, mediaId: null, seriesId: null, pinEpisodeId: null, pinLabel: null, rerunOf: null, title: item.name, tier: item.tier || null, unavailable: false };
-    if (item.type === 'title') return { ...base, kind: 'episode', episodeId: item.id, durationSeconds: Math.ceil(item.durationSeconds / 60) * 60, runtimeSeconds: item.durationSeconds };
+    if (item.type === 'title') return { ...base, kind: 'episode', episodeId: item.id, durationSeconds: Math.ceil(item.durationSeconds / 60) * 60, runtimeSeconds: item.runtimeSeconds || item.durationSeconds, airSeconds: item.durationSeconds, adBreaks: item.adBreaks || null };
     if (item.type === 'series') {
       const s = seriesById[item.id];
       return { ...base, kind: layer === 'default' ? 'series_continue' : 'series_pinned', seriesId: item.id, pinEpisodeId: layer === 'default' ? null : s.episodes[0].id, pinLabel: layer === 'default' ? null : (s.episodes[0].label || s.episodes[0].title), durationSeconds: defaultSeriesLength(s.episodes, 0), title: s.name };
@@ -680,6 +680,7 @@ export default function Scheduler(props) {
               {data ? (
                 <ScheduleTimeline
                   key={`${channelId}-${view}-${day}-${weekStart}`}
+                  hourCap={data && data.hourCapSeconds ? data.hourCapSeconds : 900}
                   slots={daySlots}
                   ghosts={ghostsFor(day)}
                   seriesById={seriesById}
@@ -806,11 +807,14 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
               {open === s.id && (
                 <div className="sch-eps">
                   {s.episodes.map((e) => {
-                    const epItem = { type: 'title', id: e.id, name: `${s.name} · ${e.label || e.title}`, durationSeconds: e.durationSeconds, tier: e.tier };
+                    const epItem = { type: 'title', id: e.id, name: `${s.name} · ${e.label || e.title}`, durationSeconds: e.durationSeconds, runtimeSeconds: e.runtimeSeconds, adBreaks: e.adBreaks, tier: e.tier };
                     return (
-                      <button key={e.id} type="button" className={`sch-ep ${isPicked('title', e.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', e.id) ? null : epItem)} {...drag(epItem)}>
-                        <span>{e.label ? `${e.label} · ` : ''}{e.title}</span><small>{dur(e.durationSeconds)}</small>
-                      </button>
+                      <div key={e.id} className="sch-ep-row">
+                        <button type="button" className={`sch-ep ${isPicked('title', e.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', e.id) ? null : epItem)} {...drag(epItem)}>
+                          <span>{e.label ? `${e.label} · ` : ''}{e.title}</span><small>{dur(e.durationSeconds)}{e.adBreaks ? ` air · ${e.adBreaks.length} break${e.adBreaks.length === 1 ? '' : 's'}` : ''}</small>
+                        </button>
+                        <a className="sch-ep-link" href={`/ad-plan/${e.id}`} title="Open the ad plan">plan</a>
+                      </div>
                     );
                   })}
                 </div>
@@ -821,16 +825,19 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
         {library && tab === 'series' && library.series.length === 0 && <div className="sch-muted">No series are opted in to channels yet.</div>}
 
         {library && tab === 'titles' && library.titles.filter((t) => !query || t.title.toLowerCase().includes(query)).map((t) => {
-          const item = { type: 'title', id: t.id, name: t.title, durationSeconds: t.durationSeconds, tier: t.tier };
+          const item = { type: 'title', id: t.id, name: t.title, durationSeconds: t.durationSeconds, runtimeSeconds: t.runtimeSeconds, adBreaks: t.adBreaks, tier: t.tier };
           return (
-            <button key={t.id} type="button" className={`sch-item sch-item-main ${isPicked('title', t.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', t.id) ? null : item)} {...drag(item)}>
-              <span className="sch-thumb" style={t.thumbnail ? { backgroundImage: `url(${t.thumbnail})` } : undefined} />
-              <span className="sch-item-text">
-                <b>{t.title}</b>
-                <small>{dur(t.durationSeconds)}{t.contentType ? ` · ${t.contentType === 'movie' ? 'film' : t.contentType}` : ''}</small>
-                {t.tier === 'premium' && <span className="sch-chips"><span className="sch-chip prem">Premium · ads</span></span>}
-              </span>
-            </button>
+            <div key={t.id} className={`sch-item ${isPicked('title', t.id) ? 'picked' : ''}`}>
+              <button type="button" className="sch-item-main" onClick={() => setPicked(isPicked('title', t.id) ? null : item)} {...drag(item)}>
+                <span className="sch-thumb" style={t.thumbnail ? { backgroundImage: `url(${t.thumbnail})` } : undefined} />
+                <span className="sch-item-text">
+                  <b>{t.title}</b>
+                  <small>{t.adBreaks ? `air ${dur(t.durationSeconds)} · ${dur(t.runtimeSeconds)} + ${dur(t.durationSeconds - t.runtimeSeconds)} ads · ${t.adBreaks.length} break${t.adBreaks.length === 1 ? '' : 's'}` : dur(t.durationSeconds)}{t.contentType ? ` · ${t.contentType === 'movie' ? 'film' : t.contentType}` : ''}</small>
+                  {t.tier === 'premium' && <span className="sch-chips"><span className="sch-chip prem">Premium · ads</span></span>}
+                </span>
+              </button>
+              <a className="sch-expand" href={`/ad-plan/${t.id}`}>Ad plan{t.adBreaks ? ' · ready' : ' · default'} ↗</a>
+            </div>
           );
         })}
         {library && tab === 'titles' && library.titles.length === 0 && <div className="sch-muted">No standalone titles are opted in to channels yet.</div>}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
 
@@ -102,6 +102,13 @@ export default function VideoPlayer({
   const [adState, setAdState] = useState(null);
   const [cuePoints, setCuePoints] = useState([]);
   const [srcError, setSrcError] = useState(false);
+  // Episode Ad Curator pods: a ready plan's break plays in this second
+  // <video> (ads are MP4s, bumpers signed HLS) while the episode waits;
+  // cards and the hold card are drawn over it.
+  const podRef = useRef(null);
+  const podRunRef = useRef(null);
+  const stopPodRef = useRef(() => {});
+  const [podCard, setPodCard] = useState(null);
   // Caption tracks can arrive two ways: advertised inside the HLS manifest
   // (captions uploaded to Cloudflare Stream) or as a <track> element built
   // from episode.captionsUrl. Both end up in this one list so the CC menu
@@ -110,6 +117,14 @@ export default function VideoPlayer({
   const [activeTrack, setActiveTrack] = useState(-1); // -1 = off
 
   const isYouTube = episode.type === 'youtube';
+  // The ad plan (lib/adPlanRules.js) when there is one and this viewer gets ads.
+  const plan = useMemo(
+    () => (adsEnabled && episode.adPlan && Array.isArray(episode.adPlan.breaks) && episode.adPlan.breaks.length ? episode.adPlan : null),
+    [adsEnabled, episode.adPlan]
+  );
+  useEffect(() => {
+    if (plan) setCuePoints(plan.breaks.map((b) => b.at).filter((a) => a > 0));
+  }, [plan, episode.id]);
 
   /* ------------------------------------------------------------------ *
    * Watch progress — unchanged behaviour, still throttled to ~15s.
@@ -394,6 +409,9 @@ export default function VideoPlayer({
       adsManagerRef.current.destroy();
       adsManagerRef.current = null;
     }
+    // stopPod is declared further down (a const); reach it through the ref
+    // so this effect's deps don't hit the temporal dead zone at render.
+    stopPodRef.current();
   }, [episode.id, isYouTube]);
 
   /* ------------------------------------------------------------------ *
@@ -507,6 +525,126 @@ export default function VideoPlayer({
   }, []);
 
   /* ------------------------------------------------------------------ *
+   * Ad plan pods. One break of a ready plan: /api/ad-plan/fill says what
+   * plays (ads, bumpers, a "Presented by" card, the hold card); it plays
+   * in podRef while the episode is paused, then the episode resumes. Any
+   * problem fails open, the same posture as the IMA path.
+   * ------------------------------------------------------------------ */
+  const stopPod = useCallback(() => {
+    const run = podRunRef.current;
+    if (run) {
+      run.stop();
+      podRunRef.current = null;
+    }
+    const pv = podRef.current;
+    if (pv) {
+      pv.pause();
+      pv.removeAttribute('src');
+      pv.load();
+    }
+    setPodCard(null);
+  }, []);
+  stopPodRef.current = stopPod;
+
+  const runPod = useCallback((breakIndex) => {
+    const v = videoRef.current;
+    const pv = podRef.current;
+    if (!v || !pv || !episode.adPlan) return false;
+    stopPod();
+    v.pause();
+    let finished = false;
+    let hls = null;
+    let cardTimer = null;
+    let tick = null;
+    let onT = null;
+    let items = [];
+    let i = 0;
+    const unlisten = () => {
+      pv.removeEventListener('ended', next);
+      pv.removeEventListener('error', next);
+      if (onT) { pv.removeEventListener('timeupdate', onT); onT = null; }
+    };
+    const clear = () => {
+      unlisten();
+      if (hls) { hls.destroy(); hls = null; }
+      if (cardTimer) { clearTimeout(cardTimer); cardTimer = null; }
+      if (tick) { clearInterval(tick); tick = null; }
+    };
+    const done = () => {
+      if (finished) return;
+      finished = true;
+      clear();
+      podRunRef.current = null;
+      pv.pause();
+      pv.removeAttribute('src');
+      pv.load();
+      setPodCard(null);
+      setAdState(null);
+      v.play().catch(() => {});
+    };
+    function next() {
+      if (finished) return;
+      clear();
+      const it = items[i++];
+      if (!it) { done(); return; }
+      const adIndex = items.slice(0, i).filter((x) => x.type === 'ad').length;
+      const totalAds = items.filter((x) => x.type === 'ad').length;
+      const base = { pod: true, index: Math.max(1, adIndex), total: Math.max(1, totalAds), remaining: it.seconds, brand: it.brand || null, clickUrl: it.type === 'ad' ? it.clickUrl || null : null, clickTrackUrl: it.type === 'ad' ? it.clickTrackUrl || null : null };
+      setAdState(base);
+      if (it.type === 'ad' || it.type === 'bumper') {
+        setPodCard(null);
+        if (it.type === 'ad' && it.impressionUrl) { try { new Image().src = it.impressionUrl; } catch (err) { /* counting is best effort */ } }
+        pv.volume = v.volume;
+        pv.muted = v.muted;
+        const start = () => pv.play().catch(() => { pv.muted = true; pv.play().catch(() => {}); });
+        onT = () => setAdState((s) => (s ? { ...s, remaining: Math.max(0, (pv.duration || it.seconds) - pv.currentTime) } : s));
+        pv.addEventListener('ended', next);
+        pv.addEventListener('error', next);
+        pv.addEventListener('timeupdate', onT);
+        if (it.src && it.src.includes('.m3u8')) {
+          import('hls.js').then(({ default: Hls }) => {
+            if (finished || items[i - 1] !== it) return;
+            if (Hls.isSupported()) {
+              hls = new Hls();
+              hls.loadSource(it.src);
+              hls.attachMedia(pv);
+              hls.on(Hls.Events.MANIFEST_PARSED, start);
+              hls.on(Hls.Events.ERROR, (_e, data) => { if (data.fatal) next(); });
+            } else {
+              pv.src = it.src;
+              pv.addEventListener('loadedmetadata', start, { once: true });
+            }
+          });
+        } else {
+          pv.src = it.src;
+          pv.addEventListener('loadedmetadata', start, { once: true });
+        }
+        // An item never runs past its booked seconds by much.
+        cardTimer = setTimeout(next, (it.seconds + 6) * 1000);
+        return;
+      }
+      setPodCard(it.type === 'card' ? { type: 'card', variant: it.variant, brand: it.brand } : { type: 'hold' });
+      let left = it.seconds;
+      tick = setInterval(() => { left -= 1; setAdState((s) => (s ? { ...s, remaining: Math.max(0, left) } : s)); }, 1000);
+      cardTimer = setTimeout(next, Math.max(1, it.seconds) * 1000);
+    }
+    podRunRef.current = { stop: () => { finished = true; clear(); } };
+    setAdState({ pod: true, index: 1, total: 1, remaining: 0 });
+    setPodCard({ type: 'wait' });
+    fetch(`/api/ad-plan/fill?episode=${encodeURIComponent(episode.id)}&break=${breakIndex}&surface=vod`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (finished) return;
+        const fill = d && d.fill;
+        if (!fill || !Array.isArray(fill.items) || !fill.items.length) { done(); return; }
+        items = fill.items;
+        next();
+      })
+      .catch(() => { if (!finished) done(); });
+    return true;
+  }, [episode.id, episode.adPlan, stopPod]);
+
+  /* ------------------------------------------------------------------ *
    * Mid-roll ad breaks — admin/creator-configured second-offsets into
    * the video (episode.adBreakSeconds), not anything read from the ad
    * server's own response. Pre-roll (offset 0) is handled separately in
@@ -525,7 +663,9 @@ export default function VideoPlayer({
     const videoElement = videoRef.current;
     if (!videoElement) return;
 
-    const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
+    // With a ready plan the breaks are the plan's and play as pods.
+    const planBreaks = plan ? plan.breaks : null;
+    const breaks = planBreaks ? planBreaks.map((b) => b.at) : (Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0]);
     const midRolls = breaks.filter((s) => s > 0);
     if (midRolls.length === 0) return;
 
@@ -550,8 +690,9 @@ export default function VideoPlayer({
       for (const breakSeconds of midRolls) {
         if (now >= breakSeconds && !consumedBreaksRef.current.has(breakSeconds)) {
           consumedBreaksRef.current.add(breakSeconds);
-          startAds();
-          break; // one break at a time - startAds() pauses content itself
+          if (planBreaks) runPod(planBreaks.find((b) => b.at === breakSeconds).index);
+          else startAds();
+          break; // one break at a time - the pod/startAds() pauses content itself
         }
       }
     }
@@ -562,7 +703,7 @@ export default function VideoPlayer({
       videoElement.removeEventListener('timeupdate', handleMidRollCheck);
       videoElement.removeEventListener('seeked', handleSeeked);
     };
-  }, [episode.id, episode.adBreakSeconds, isYouTube, adsEnabled, startAds]);
+  }, [episode.id, episode.adBreakSeconds, isYouTube, adsEnabled, startAds, plan, runPod]);
 
   useEffect(() => {
     return () => {
@@ -574,8 +715,9 @@ export default function VideoPlayer({
         adsLoaderRef.current.contentComplete();
       }
       if (hideTimerRef.current) clearTimeout(hideTimerRef.current);
+      stopPod();
     };
-  }, []);
+  }, [stopPod]);
 
   /* ------------------------------------------------------------------ *
    * Controls
@@ -621,6 +763,15 @@ export default function VideoPlayer({
       // this used to be unconditional on adsEnabled alone, which meant a
       // mid-roll-only configuration (say, just "10:00") would still get an
       // uninvited pre-roll on top of it.
+      if (plan) {
+        const pre = plan.breaks.find((b) => b.at === 0);
+        if (pre) {
+          consumedBreaksRef.current.add(0);
+          if (runPod(pre.index)) return;
+        }
+        v.play();
+        return;
+      }
       const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
       if (adsEnabled && breaks.includes(0)) {
         consumedBreaksRef.current.add(0);
@@ -633,7 +784,7 @@ export default function VideoPlayer({
     if (v.paused) v.play();
     else v.pause();
     showControlsTemporarily();
-  }, [adsEnabled, started, startAds, showControlsTemporarily, episode.adBreakSeconds]);
+  }, [adsEnabled, started, startAds, showControlsTemporarily, episode.adBreakSeconds, plan, runPod]);
 
   const seekTo = useCallback((t) => {
     const v = videoRef.current;
@@ -858,7 +1009,32 @@ export default function VideoPlayer({
       </video>
 
       {/* IMA renders its creative into this layer. */}
-      <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: adState ? 'auto' : 'none' }} />
+      <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: adState && !adState.pod ? 'auto' : 'none' }} />
+      {/* An ad plan's break plays here (lib/adPlanRules.js), the episode paused beneath. */}
+      <video ref={podRef} className="tp-pod-video" playsInline style={{ display: adState && adState.pod && !podCard ? 'block' : 'none' }} />
+      {adState && adState.pod && podCard && (
+        <div className="tp-pod-card" role="status">
+          {podCard.type === 'card' ? (
+            <>
+              <span className="tp-pod-kicker">{podCard.variant === 'supported_by' ? 'Supported by' : 'Presented by'}</span>
+              <strong>{podCard.brand}</strong>
+            </>
+          ) : (
+            <span className="tp-pod-kicker">{podCard.type === 'wait' ? 'Loading the break…' : 'Back in a moment'}</span>
+          )}
+        </div>
+      )}
+      {adState && adState.pod && adState.clickUrl && (
+        <a
+          className="tp-pod-visit"
+          href={adState.clickUrl}
+          target="_blank"
+          rel="noopener sponsored"
+          onClick={() => { if (adState.clickTrackUrl) { try { new Image().src = adState.clickTrackUrl; } catch (err) { /* counting is best effort */ } } }}
+        >
+          Visit {adState.brand || 'the advertiser'} ↗
+        </a>
+      )}
 
       {buffering && !adState && (
         <div className="tp-spinner" aria-live="polite" aria-label="Buffering">

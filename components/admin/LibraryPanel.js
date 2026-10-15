@@ -8,6 +8,15 @@ import ManualEpisodeForm from '../ManualEpisodeForm';
 // out of the old pages/admin.js hub (2026-10-08); rendered by
 // pages/admin/library.js. Section ids match the old hub's anchors so
 // old links still land in the right place.
+// 1780 -> "29:40" for the Ad plan link on a library row.
+function fmtAir(sec) {
+  const s = Math.max(0, Math.round(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, '0')}:${String(r).padStart(2, '0')}` : `${m}:${String(r).padStart(2, '0')}`;
+}
+
 export default function LibraryPanel({ allSeries: initialAllSeries }) {
   const [allSeries, setAllSeries] = useState(initialAllSeries || []);
   const [library, setLibrary] = useState(null);
@@ -168,6 +177,14 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                   {e.status === 'approved' ? '✓ live' : e.status === 'pending' ? '⏳ pending' : '✕ rejected'}
                   {' · '}{e.tier}{e.featured ? ' · ⭐ hero-eligible' : ''}{e.deletionRequested ? ' · 🗑 pending deletion' : ''}
                   {!e.rating && <span style={{ color: 'var(--signal-amber)' }}> · no rating set (treated as 17+)</span>}
+                  {e.status === 'approved' && (
+                    <span>
+                      {' · '}
+                      <a href={`/ad-plan/${e.id}`} style={{ color: e.adPlan && e.adPlan.status === 'ready' ? 'var(--ok)' : e.adPlan ? 'var(--olive)' : 'var(--ink-dim)' }}>
+                        Ad plan · {e.adPlan ? (e.adPlan.status === 'ready' ? `ready · air ${fmtAir(e.adPlan.airSeconds)}` : 'draft') : 'default'}
+                      </a>
+                    </span>
+                  )}
                 </div>
               </div>
               <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setEditingEpisode(e)}>Edit</button>

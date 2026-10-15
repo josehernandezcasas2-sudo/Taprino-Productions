@@ -2,7 +2,7 @@
 // Exercises lib/scheduleLayout.js — how blocks move around a day in the scheduler.
 import assert from 'node:assert/strict';
 import {
-  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary, ripple, insertWithRipple, spaceOut, arrangeMany, dayProblem
+  snapToGrid, magnetStart, episodeEdges, defaultSeriesLength, fitLength, arrange, blockerOf, rerunProblem, dayGaps, firstRoomAfter, fitSummary, ripple, insertWithRipple, spaceOut, arrangeMany, dayProblem, hourlyAdSeconds
 } from '../lib/scheduleLayout.js';
 
 let passed = 0;
@@ -173,6 +173,31 @@ test('group move: the set shifts together and ad breaks hop out of the way', () 
   assert.deepEqual(out.pushed, ['ad1']);
   const bad = arrangeMany(day, [{ id: 'a', start: H(18, 30) }, { id: 'b', start: H(19, 40) }]);
   assert.match(dayProblem(bad.slots, ['a', 'b']), /would overlap/);
+});
+
+test('the hour meter adds plan breaks, slot tails, short gaps and ad breaks per clock hour', () => {
+  const H = (h, m = 0) => h * 3600 + m * 60;
+  const breaks = [{ airStart: 0, booked: 15 }, { airStart: 495, booked: 30 }, { airStart: 1155, booked: 45 }, { airStart: 1530, booked: 30 }];
+  const slots = [
+    // 9:00 a 29:40 air length in a 30-minute slot: 120 s of breaks + 20 s tail
+    { id: 'a', kind: 'episode', start: H(9), durationSeconds: 1800, runtimeSeconds: 1660, airSeconds: 1780, adBreaks: breaks },
+    // 9:32: a 2-minute gap before it (ads), then a show with no plan, 26:10 in 27 minutes (50 s tail)
+    { id: 'b', kind: 'episode', start: H(9, 32), durationSeconds: 1620, runtimeSeconds: 1570, airSeconds: 1570, adBreaks: null },
+    // 10:00 an explicit 2-minute ad break, straddling nothing
+    { id: 'c', kind: 'ad_break', start: H(10), durationSeconds: 120 },
+    // 10:50 a series block of two planned 29:40 episodes in 60 minutes (20 s leftover)
+    { id: 'd', kind: 'series_pinned', seriesId: 's', pinEpisodeId: 'e1', start: H(10, 50), durationSeconds: 3600 }
+  ];
+  const eps = [{ id: 'e1', durationSeconds: 1780, adBreaks: breaks }, { id: 'e2', durationSeconds: 1780, adBreaks: breaks }];
+  const h = hourlyAdSeconds(slots, { epsFor: (s) => (s.seriesId === 's' ? eps : []) });
+  // 9:00–10:00: 120 + 20 + 120 (gap 9:30–9:32) + 50 (tail at 9:58:10–9:59) + 60 (gap 9:59–10:00) = 370
+  assert.equal(h[9], 370);
+  // 10:00–11:00: the 120 s ad break + e1's first three breaks (15 at 10:50:00, 30 at 10:58:15, 45 at 11:09:15 → next hour)
+  assert.equal(h[10], 120 + 15 + 30);
+  // 11:00–12:00: e1's 45 + 30, e2's four (120), the 40 s leftover at 11:49:20; after 11:50 the gap is long, so the loop plays (not ads)
+  assert.equal(h[11], 45 + 30 + 120 + 40);
+  assert.equal(h.length, 24);
+  assert.equal(h.slice(12).reduce((s, n) => s + n, 0) + h.slice(0, 9).reduce((s, n) => s + n, 0), 0);
 });
 
 console.log(`\n${passed} passed`);

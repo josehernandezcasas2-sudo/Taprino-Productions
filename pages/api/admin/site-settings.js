@@ -121,6 +121,23 @@ export default async function handler(req, res) {
   // Blank clears back to the default rather than saving an empty kicker —
   // an admin clearing the field is almost certainly "put it back," not
   // "show nothing in the nav."
+  // Episode Ad Curator settings (migration 087).
+  const { adSectionSizes, adHourCapSeconds, adBreakRoundSeconds } = req.body || {};
+  if (adSectionSizes !== undefined) {
+    const sizes = [...new Set((Array.isArray(adSectionSizes) ? adSectionSizes : String(adSectionSizes).split(/[,\s]+/)).map((n) => Math.round(Number(n))).filter((n) => Number.isFinite(n) && n >= 3 && n <= 600))].sort((a, b) => a - b);
+    if (!sizes.length) return res.status(400).json({ error: 'Ad section sizes need at least one length between 3 and 600 seconds, like "10, 15, 20, 30".' });
+    updates.ad_section_sizes = sizes;
+  }
+  if (adHourCapSeconds !== undefined) {
+    const cap = Math.round(Number(adHourCapSeconds));
+    if (!Number.isFinite(cap) || cap < 60 || cap > 3600) return res.status(400).json({ error: 'The ads-per-hour cap has to be between 1 and 60 minutes.' });
+    updates.ad_hour_cap_seconds = cap;
+  }
+  if (adBreakRoundSeconds !== undefined) {
+    const r = Math.round(Number(adBreakRoundSeconds));
+    if (![5, 10, 15, 30, 60].includes(r)) return res.status(400).json({ error: 'Round breaks to 5, 10, 15, 30 or 60 seconds.' });
+    updates.ad_break_round_seconds = r;
+  }
   if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';
   if (streamLabel !== undefined) updates.stream_label = streamLabel && streamLabel.trim() ? streamLabel.trim() : 'Stream';
 

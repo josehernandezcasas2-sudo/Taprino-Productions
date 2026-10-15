@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DAY_SECONDS, SHORT_GAP_SECONDS } from '../lib/channelPlan';
 import {
-  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, arrangeMany, ripple, dayProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps
+  SNAP_SECONDS, snapToGrid, magnetStart, fitLength, arrange, arrangeMany, ripple, dayProblem, dayGaps, hasFixedLength, isSeriesKind, fitSummary, overlaps, hourlyAdSeconds
 } from '../lib/scheduleLayout';
 
 // One day of the channel scheduler: the hour lane with every block on it.
@@ -48,7 +48,7 @@ export function dur(sec) {
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 export default function ScheduleTimeline({
-  slots, ghosts = [], seriesById = {}, layer, px, picked, selectedIds, canLive, isPastDay, isToday, nowSec, adGap = 0,
+  slots, ghosts = [], seriesById = {}, layer, px, picked, selectedIds, canLive, isPastDay, isToday, nowSec, adGap = 0, hourCap = 900,
   onSelect, onPlace, onArrange, onMoveToDay, onTabHover, onAdGapChange, onSpaceOut, onZoom, needPick
 }) {
   const laneRef = useRef(null);
@@ -202,6 +202,8 @@ export default function ScheduleTimeline({
 
   const shown = (preview ? preview.slots : slots).slice().sort((a, b) => a.start - b.start);
   const gaps = dayGaps(shown);
+  // Ads per clock hour (lib/scheduleLayout.js): plan breaks, tails, gaps, ad breaks.
+  const hourLoad = hourlyAdSeconds(shown, { epsFor });
   const visibleGhosts = ghosts.filter((g) => !shown.some((s) => overlaps(s, g)));
   const gapLabel = layer === 'week' ? 'Default schedule fills this' : 'Loop fills this';
 
@@ -310,7 +312,7 @@ export default function ScheduleTimeline({
                     </b>
                     <small>
                       {clock(s.start)}–{clock(s.start + s.durationSeconds)}
-                      {hasFixedLength(s) ? ' · runtime' : ''}
+                      {hasFixedLength(s) ? (s.adBreaks && s.adBreaks.length ? ' · air' : ' · runtime') : ''}
                       {fit && fit.leftover < 60 && fit.count > 0 ? <span className="sch-badge">exact</span> : null}
                     </small>
                   </span>
@@ -326,6 +328,9 @@ export default function ScheduleTimeline({
                     <div className="sch-tail" style={{ height: y(fit.leftover) }}>{y(fit.leftover) >= 14 ? <small>ads + bumpers · {dur(fit.leftover)}</small> : null}</div>
                   )}
                   {s.kind === 'ad_break' && h >= 30 && <small className="sch-sub">{dur(s.durationSeconds)}</small>}
+                  {s.kind === 'episode' && h >= 34 && (s.adBreaks || []).map((b) => (
+                    <div key={b.airStart} className="sch-adline" style={{ top: y(b.airStart), height: Math.max(2, y(b.booked)) }} title={`Ad plan break · ${dur(b.booked)}`} />
+                  ))}
                   {s.unavailable && <small className="sch-sub">Not available anymore · falls through to {layer === 'week' ? 'the default' : 'the loop'}</small>}
                   {!hasFixedLength(s) && !locked(s) && <div className="sch-handle" title="Pull to change the length" />}
                 </div>
@@ -334,10 +339,18 @@ export default function ScheduleTimeline({
 
             {isToday && nowSec != null && <div className="sch-now" style={{ top: y(nowSec) }}><small>now {clock(nowSec)}</small></div>}
           </div>
+          <div className="sch-hourload" aria-label="Ads per hour">
+            {hourLoad.map((sec, h) => (
+              <div key={h} style={{ height: px }} className={sec > hourCap ? 'over' : sec ? '' : 'none'} title={`${clock(h * 3600).replace(':00', '')} · ${dur(sec)} of ads${sec > hourCap ? ` · over the ${dur(hourCap)} cap` : ''}`}>
+                {sec && px >= 40 ? dur(sec) : ''}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
       <div className="sch-legend">
         <span><i style={{ background: 'repeating-linear-gradient(135deg, rgba(251,232,211,.3) 0 2px, transparent 2px 4px)' }} />Gaps under 5 min play ads and bumpers</span>
+        <span><i style={{ background: 'rgba(248, 95, 115, 0.55)' }} />Ad plan breaks · the column on the right adds up ads per hour, red over {dur(hourCap)}</span>
         {layer === 'week' && <span><i style={{ border: '1px dashed var(--sky)' }} />Faded = the default schedule, filling what&rsquo;s open</span>}
         <span><i style={{ outline: '1px dashed var(--olive)', outlineOffset: '-1px' }} />Dashed outline = moved along with the block you&rsquo;re dragging</span>
       </div>

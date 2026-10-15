@@ -11,6 +11,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet, apiPost } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
+import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 
 const SAFETY_POLL_MS = 45000;
 // Viewers without an age on file take the live TV terms once; the player
@@ -89,6 +90,15 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const [userPaused, setUserPaused] = useState(false); // paused by the viewer: stays paused until they press play
   const pausedRef = useRef(false);
   const pausedKey = useRef(null); // the program that was on when they paused
+  // A ready ad plan for the program on air (lib/adPlanTime.js): the
+  // channel counts air seconds, the video its own. Ads don't play on
+  // mobile yet, so a planned break is the countdown card for its booked
+  // seconds, then we catch up to wherever the channel is.
+  const planRef = useRef(null);
+  const breakTimer = useRef(null);
+  const screenRef = useRef('loading');
+  const startBreakRef = useRef(null);
+  const [breakUntil, setBreakUntil] = useState(null);
 
   const player = useVideoPlayer(null, (p) => {
     p.timeUpdateEventInterval = 1;
@@ -110,6 +120,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
 
   async function tune(state) {
     const seq = ++tuneSeq.current;
+    if (breakTimer.current) clearTimeout(breakTimer.current);
+    setBreakUntil(null);
     const program = state && state.program;
     if (!state || (!state.onAir && !state.live)) {
       player.pause();
@@ -145,7 +157,16 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       }
       return;
     }
-    pendingSeek.current = play.kind === 'live' ? null : { offset: play.offsetSeconds || 0, at: Date.now() };
+    const plan = play.kind !== 'live' && play.adPlan && play.adPlan.breaks && play.adPlan.breaks.length ? play.adPlan : null;
+    planRef.current = plan ? { breaks: plan.breaks, consumed: new Set(plan.breaks.filter((b) => b.airEnd <= (play.offsetSeconds || 0)).map((b) => b.index)) } : null;
+    if (plan && play.inBreak) {
+      planRef.current.consumed.add(play.inBreak.index);
+      pendingSeek.current = null;
+      player.pause();
+      startPlanBreak(play.inBreak.remaining);
+      return;
+    }
+    pendingSeek.current = play.kind === 'live' ? null : { offset: plan ? play.episodeOffsetSeconds || 0 : play.offsetSeconds || 0, at: Date.now() };
     try {
       await player.replaceAsync(play.src);
     } catch (err) {
@@ -156,6 +177,17 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     setScreen(null);
     player.play();
   }
+
+  // The countdown card for a planned break; when it ends, catch up to the
+  // channel (a fresh /play lands on the right second of the video).
+  function startPlanBreak(seconds) {
+    if (breakTimer.current) clearTimeout(breakTimer.current);
+    setScreen('ad');
+    setBreakUntil(Date.now() + Math.max(0, seconds) * 1000);
+    breakTimer.current = setTimeout(() => { setBreakUntil(null); catchUp(true); }, Math.max(0, seconds) * 1000 + 300);
+  }
+  startBreakRef.current = startPlanBreak;
+  useEffect(() => { screenRef.current = screen; }, [screen]);
 
   async function catchUp(force = false) {
     const fresh = await fetchNow();
@@ -183,9 +215,20 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     });
     const timeSub = player.addListener('timeUpdate', ({ currentTime }) => {
       const p = nowRef.current && nowRef.current.program;
+      const plan = planRef.current;
       if (p && p.durationSeconds) {
-        setRemaining(Math.max(0, p.durationSeconds - currentTime));
-        setProgress(Math.min(1, currentTime / p.durationSeconds));
+        const air = plan ? episodeToAir(currentTime, plan.breaks) : currentTime;
+        setRemaining(Math.max(0, p.durationSeconds - air));
+        setProgress(Math.min(1, air / p.durationSeconds));
+      }
+      // A planned break starts the moment playback reaches it.
+      if (plan && screenRef.current === null) {
+        const due = plan.breaks.find((b) => !plan.consumed.has(b.index) && b.at <= currentTime + 0.3 && b.at > currentTime - 20);
+        if (due) {
+          plan.consumed.add(due.index);
+          player.pause();
+          if (startBreakRef.current) startBreakRef.current(due.booked);
+        }
       }
     });
     return () => { sub.remove(); playSub.remove(); timeSub.remove(); };
@@ -219,6 +262,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     return () => {
       tuneSeq.current += 1;
       if (endTimer.current) clearTimeout(endTimer.current);
+      if (breakTimer.current) clearTimeout(breakTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelSlug, initialNow]);
@@ -317,7 +361,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       if (!fresh) return;
       const cur = nowRef.current || {};
       const changed = !!fresh.live !== !!cur.live || (fresh.program && cur.program ? fresh.program.key !== cur.program.key : !!fresh.program !== !!cur.program);
-      const drift = fresh.program && screen === null && !fresh.live ? Math.abs(fresh.program.offsetSeconds - player.currentTime) : 0;
+      const airNow = planRef.current ? episodeToAir(player.currentTime, planRef.current.breaks) : player.currentTime;
+      const drift = fresh.program && screen === null && !fresh.live ? Math.abs(fresh.program.offsetSeconds - airNow) : 0;
       if (changed || drift > 8) {
         updateNow(fresh);
         tune(fresh);
@@ -332,12 +377,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   useEffect(() => {
     if (screen !== 'ad') return undefined;
     const p = nowRef.current && nowRef.current.program;
-    if (!p || !p.endsAt) return undefined;
-    const tick = () => setAdLeft(Math.max(0, (Date.parse(p.endsAt) - Date.now()) / 1000));
+    const until = breakUntil || (p && p.endsAt ? Date.parse(p.endsAt) : null);
+    if (!until) return undefined;
+    const tick = () => setAdLeft(Math.max(0, (until - Date.now()) / 1000));
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [screen, now]);
+  }, [screen, now, breakUntil]);
 
   /* ---------------- controls ---------------- */
 

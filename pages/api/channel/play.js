@@ -6,6 +6,7 @@ import { getOwnProfile } from '../../../lib/userProfiles';
 import { meetsAgeRequirement } from '../../../lib/ageGate';
 import { getRatings } from '../../../lib/ratings';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
+import { airToEpisode } from '../../../lib/adPlanRules';
 
 // Hands one viewer a playable URL for whatever is airing on a channel right
 // now — and only that. This is what lets premium titles air on channels
@@ -66,11 +67,21 @@ export default async function handler(req, res) {
 
   const remaining = Math.max(60, Math.ceil(program.durationSeconds - program.offsetSeconds));
   const signed = await signedSrcForStoredUrl(storedSrc, { expiresInSeconds: remaining + 15 * 60 });
+  // With a ready ad plan the program is longer than the video (its breaks
+  // are part of it): offsetSeconds is the air offset, episodeOffsetSeconds
+  // is where the video is at this moment, and inBreak says the channel is
+  // mid-break right now (the player runs the rest of it, then resumes).
+  const plan = program.kind === 'episode' && program.adPlan && program.adPlan.breaks && program.adPlan.breaks.length ? program.adPlan : null;
+  const pos = plan ? airToEpisode(program.offsetSeconds, plan.breaks) : { episodeSeconds: program.offsetSeconds, inBreak: null };
   return res.status(200).json({
     kind: program.kind,
     key: program.key,
+    episodeId: program.episodeId || null,
     src: signed ? signed.src : storedSrc,
     offsetSeconds: program.offsetSeconds,
+    episodeOffsetSeconds: pos.episodeSeconds,
+    inBreak: pos.inBreak,
+    adPlan: plan ? { breaks: plan.breaks, runtimeSeconds: plan.runtimeSeconds || null, selfAds: plan.selfAds || [] } : null,
     durationSeconds: program.durationSeconds,
     serverTime: now.serverTime
   });

@@ -58,6 +58,9 @@ export default function SiteSettingsPanel() {
           recommendationCloseness: siteSettings.recommendationCloseness,
           elevatorPitchEnabled: siteSettings.elevatorPitchEnabled,
           adCpmCents: siteSettings.adCpmCents,
+          adSectionSizes: siteSettings.adSectionSizes,
+          adHourCapSeconds: siteSettings.adHourCapSeconds,
+          adBreakRoundSeconds: siteSettings.adBreakRoundSeconds,
           connectLabel: siteSettings.connectLabel,
           streamLabel: siteSettings.streamLabel,
           ...overrides
@@ -217,6 +220,26 @@ export default function SiteSettingsPanel() {
             Only the default an advertiser&rsquo;s ad starts with when you review it — you can still set a different rate per ad. Never affects an ad already approved.
           </p>
           <input type="number" min="0" step="0.01" value={(siteSettings.adCpmCents / 100).toFixed(2)} onChange={(e) => setSiteSettings((s) => ({ ...s, adCpmCents: Math.round(Number(e.target.value) * 100) }))} style={{ maxWidth: '140px' }} />
+        </div>
+
+        <div style={rowStyle}>
+          <label style={{ display: 'block', marginBottom: '0.4rem' }}>Ad plans — exact section sizes (seconds)</label>
+          <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
+            The lengths the Episode Ad Curator offers as exact sections, and the lengths advertisers are steered to. Comma-separated; add longer ones here when you want them.
+          </p>
+          <input type="text" value={Array.isArray(siteSettings.adSectionSizes) ? siteSettings.adSectionSizes.join(', ') : ''} onChange={(e) => setSiteSettings((s) => ({ ...s, adSectionSizes: e.target.value.split(/[,\s]+/).map((n) => Number(n)).filter((n) => Number.isFinite(n) && n > 0) }))} placeholder="10, 15, 20, 30" style={{ maxWidth: '260px' }} />
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginTop: '0.7rem' }}>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+              Ads per hour on a channel (minutes)
+              <input type="number" min="1" max="60" value={Math.round((siteSettings.adHourCapSeconds || 900) / 60)} onChange={(e) => setSiteSettings((s) => ({ ...s, adHourCapSeconds: Math.round(Number(e.target.value) * 60) }))} style={{ maxWidth: '120px' }} />
+            </label>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+              Round each break to
+              <select value={siteSettings.adBreakRoundSeconds || 15} onChange={(e) => setSiteSettings((s) => ({ ...s, adBreakRoundSeconds: Number(e.target.value) }))} style={{ maxWidth: '140px' }}>
+                {[5, 10, 15, 30, 60].map((r) => <option key={r} value={r}>{r} seconds</option>)}
+              </select>
+            </label>
+          </div>
         </div>
 
         <button className="account-btn-primary" style={{ width: 'auto', marginTop: '0.4rem' }} onClick={() => saveSiteSettings()} disabled={siteSettingsSaving}>

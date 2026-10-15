@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 import LiveVideoPlayer from './LiveVideoPlayer';
 import { useContentRatings } from './RatingOptions';
+import { airToEpisode, episodeToAir } from '../lib/adPlanRules';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
@@ -58,6 +59,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const pausedKey = useRef(null);    // the program that was on when they paused
   const hideTimer = useRef(null);
   const lastBreakAt = useRef(Date.now());
+  // A ready ad plan (lib/adPlanRules.js) for the program on air: its breaks
+  // at air positions, which ones already played, and the air clock (the
+  // offset /play answered with, and when) so the episode resumes exactly
+  // where the channel is after a break, whatever the ad files did.
+  const planRef = useRef(null);
+  const breakRef = useRef(null); // the plan break running right now: { stop }
+  const [breakCard, setBreakCard] = useState(null); // { type: 'card', variant, brand } | { type: 'hold' } | { type: 'wait' }
   const ratings = useContentRatings();
 
   const nowUrl = `/api/channel/now?channel=${encodeURIComponent(channelSlug)}`;
@@ -126,6 +134,101 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     }
   }
 
+  function stopPlanBreak() {
+    if (breakRef.current) {
+      breakRef.current.stop();
+      breakRef.current = null;
+    }
+    setBreakCard(null);
+  }
+  // The program's air offset right now, from the clock /play answered with.
+  function planAirNow() {
+    const plan = planRef.current;
+    return plan ? plan.airAt.air + (Date.now() - plan.airAt.ms) / 1000 : 0;
+  }
+  // After a break the video picks up where the channel is now, never where
+  // the ads happened to end.
+  function resumeFromPlanClock() {
+    const plan = planRef.current;
+    if (!plan) return;
+    const pos = airToEpisode(planAirNow(), plan.breaks);
+    setScreen(null);
+    setAdCountdown(null);
+    if (pos.inBreak && !plan.consumed.has(pos.inBreak.index)) {
+      plan.consumed.add(pos.inBreak.index);
+      runPlanBreak(pos.inBreak.index, pos.inBreak.remaining, pos.inBreak.elapsed);
+      return;
+    }
+    attachSrc(plan.src, pos.episodeSeconds);
+  }
+  // One break of the ad plan, for exactly `seconds` more: the fill
+  // (/api/ad-plan/fill) says which ads, bumpers and cards play in the same
+  // <video>; the wall clock says when the episode is back.
+  function runPlanBreak(index, seconds, elapsed = 0) {
+    const plan = planRef.current;
+    const v = videoRef.current;
+    if (!plan || !v) return;
+    stopPlanBreak();
+    detachVideo();
+    setScreen('ad');
+    setBug(null);
+    setBreakCard({ type: 'wait' });
+    const untilMs = Date.now() + Math.max(0, seconds) * 1000;
+    let finished = false;
+    let cardTimer = null;
+    let items = [];
+    let i = 0;
+    setAdCountdown(Math.max(0, seconds));
+    const tick = setInterval(() => setAdCountdown(Math.max(0, (untilMs - Date.now()) / 1000)), 500);
+    const unlisten = () => { v.removeEventListener('ended', next); v.removeEventListener('error', next); };
+    const cleanup = () => { clearInterval(tick); clearTimeout(timer); if (cardTimer) clearTimeout(cardTimer); unlisten(); };
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      cleanup();
+      breakRef.current = null;
+      setBreakCard(null);
+      resumeFromPlanClock();
+    };
+    function next() {
+      if (finished) return;
+      unlisten();
+      if (cardTimer) { clearTimeout(cardTimer); cardTimer = null; }
+      const it = items[i++];
+      if (!it) { detachVideo(); setBreakCard({ type: 'hold' }); return; } // the clock ends the break
+      if (it.type === 'ad' || it.type === 'bumper') {
+        setBreakCard(null);
+        if (it.type === 'ad' && it.impressionUrl) { try { new Image().src = it.impressionUrl; } catch (err) { /* counting is best effort */ } }
+        attachSrc(it.src, it.skip || 0);
+        v.addEventListener('ended', next);
+        v.addEventListener('error', next);
+        return;
+      }
+      detachVideo();
+      setBreakCard(it.type === 'card' ? { type: 'card', variant: it.variant, brand: it.brand } : { type: 'hold' });
+      cardTimer = setTimeout(next, Math.max(1, it.seconds - (it.skip || 0)) * 1000);
+    }
+    const timer = setTimeout(finish, Math.max(0, untilMs - Date.now()));
+    breakRef.current = { stop: () => { finished = true; cleanup(); } };
+    fetch(`/api/ad-plan/fill?episode=${encodeURIComponent(plan.episodeId)}&break=${index}&surface=live`)
+      .then((r) => r.json())
+      .then((d) => {
+        if (finished) return;
+        const fill = d && d.fill;
+        if (!fill || !Array.isArray(fill.items)) { setBreakCard({ type: 'hold' }); return; }
+        // Tuned in mid-break: skip what already played.
+        let skip = Math.max(0, elapsed);
+        items = [];
+        for (const it of fill.items) {
+          if (skip >= it.seconds) { skip -= it.seconds; continue; }
+          items.push(skip > 0 ? { ...it, skip } : it);
+          skip = 0;
+        }
+        next();
+      })
+      .catch(() => { if (!finished) setBreakCard({ type: 'hold' }); });
+  }
+
   // Plays house ads back to back until `untilMs`, or once if untilMs is
   // null (the short break between two programs). Falls back to a plain
   // "ad break" card with a countdown if no ad can be shown.
@@ -189,6 +292,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // Tunes the player to whatever `state` says is on.
   async function tune(state, { withBreak = false } = {}) {
     const program = state && state.program;
+    stopPlanBreak();
     if (!state || !state.onAir || state.live || !program) {
       detachVideo();
       tunedKey.current = state && state.live ? 'live' : null;
@@ -229,14 +333,30 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       }
       return;
     }
+    const plan = play.adPlan && play.adPlan.breaks && play.adPlan.breaks.length ? play.adPlan : null;
+    planRef.current = plan ? { episodeId: play.episodeId, src: play.src, breaks: plan.breaks, consumed: new Set(), airAt: { air: play.offsetSeconds, ms: fetchedAt } } : null;
     const go = () => {
       setScreen(null);
-      // The offset was right when /play answered; the request itself and the
-      // ad break (if any) have moved the channel on since.
-      attachSrc(play.src, play.offsetSeconds + (Date.now() - fetchedAt) / 1000);
       setBug(program.rating ? { key: program.key, code: program.rating } : null);
+      if (!plan) {
+        // The offset was right when /play answered; the request itself and the
+        // ad break (if any) have moved the channel on since.
+        attachSrc(play.src, play.offsetSeconds + (Date.now() - fetchedAt) / 1000);
+        return;
+      }
+      // A planned program: the channel counts air seconds, the video its own.
+      const airNow = planAirNow();
+      for (const b of plan.breaks) if (b.airEnd <= airNow) planRef.current.consumed.add(b.index);
+      const pos = airToEpisode(airNow, plan.breaks);
+      if (pos.inBreak) {
+        planRef.current.consumed.add(pos.inBreak.index);
+        runPlanBreak(pos.inBreak.index, pos.inBreak.remaining, pos.inBreak.elapsed);
+        return;
+      }
+      attachSrc(play.src, pos.episodeSeconds);
     };
-    if (withBreak) {
+    // The short between-programs break is the plan's job once there is one.
+    if (withBreak && !plan) {
       lastBreakAt.current = Date.now();
       runAds(null, go);
     } else {
@@ -275,6 +395,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     scheduleNextCheck(initialNow);
     return () => {
       if (endTimer.current) clearTimeout(endTimer.current);
+      stopPlanBreak();
       detachVideo();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -292,7 +413,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const cur = nowRef.current || {};
       const changed = !!fresh.live !== !!cur.live ||
         (fresh.program && cur.program ? fresh.program.key !== cur.program.key : !!fresh.program !== !!cur.program);
-      const drift = fresh.program && v && screen === null && !fresh.live ? Math.abs(fresh.program.offsetSeconds - v.currentTime) : 0;
+      const airNow = planRef.current && v ? episodeToAir(v.currentTime, planRef.current.breaks) : (v ? v.currentTime : 0);
+      const drift = fresh.program && v && screen === null && !fresh.live ? Math.abs(fresh.program.offsetSeconds - airNow) : 0;
       if (changed || drift > 8) {
         updateNow(fresh);
         tune(fresh);
@@ -311,9 +433,19 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     const onVol = () => { setVolume(v.volume); setMuted(v.muted); };
     const onTime = () => {
       const p = nowRef.current && nowRef.current.program;
+      const plan = planRef.current;
       if (p && p.durationSeconds) {
-        setProgressPct(Math.min(100, (v.currentTime / p.durationSeconds) * 100));
-        setTimeRemaining(Math.max(0, p.durationSeconds - v.currentTime));
+        const air = plan ? episodeToAir(v.currentTime, plan.breaks) : v.currentTime;
+        setProgressPct(Math.min(100, (air / p.durationSeconds) * 100));
+        setTimeRemaining(Math.max(0, p.durationSeconds - air));
+      }
+      // A planned break starts the moment playback reaches it.
+      if (plan && !breakRef.current && screen === null) {
+        const due = plan.breaks.find((b) => !plan.consumed.has(b.index) && b.at <= v.currentTime + 0.3 && b.at > v.currentTime - 20);
+        if (due) {
+          plan.consumed.add(due.index);
+          runPlanBreak(due.index, due.booked, 0);
+        }
       }
     };
     v.addEventListener('play', onPlay);
@@ -439,6 +571,24 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         </div>
       )}
 
+      {screen === 'ad' && breakCard && (
+        <div className="channel-card-screen channel-hold" role="status">
+          {breakCard.type === 'card' ? (
+            <>
+              <span className="channel-hold-kicker">{breakCard.variant === 'supported_by' ? 'Supported by' : 'Presented by'}</span>
+              <strong>{breakCard.brand}</strong>
+            </>
+          ) : (
+            <>
+              {now && now.channel && now.channel.logoUrl
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img className="channel-hold-logo" src={now.channel.logoUrl} alt={channelName} />
+                : <strong>{channelName}</strong>}
+              {breakCard.type === 'wait' && <span>Back in a moment</span>}
+            </>
+          )}
+        </div>
+      )}
       {screen === 'ad' && (
         <div className="tp-adbar">
           <span className="tp-adbar-tag">Ad</span>

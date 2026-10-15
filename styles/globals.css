@@ -9425,3 +9425,102 @@ a.crew-credit:hover { background: var(--surface-3); }
    letter fallback, the image fills it. */
 .avatar-photo { position: relative; overflow: hidden; }
 .avatar-photo-img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; pointer-events: none; }
+
+/* Episode Ad Curator (/ad-plan/<episode>, mockups/episode-ad-curator-v1.html):
+   the rail of pieces, the bar, the break composer, the settings column.
+   Tablet/computer only, like the scheduler (.sch-phone / .sch-work). */
+.adc-back { color: var(--olive); text-decoration: none; }
+.adc-status { font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.2rem 0.55rem; border-radius: 999px; background: var(--surface-2); color: var(--ink-dim); vertical-align: middle; margin-left: 0.5rem; font-weight: 400; }
+.adc-status.ready { background: rgba(132, 205, 152, 0.16); color: var(--ok); }
+.adc-status.draft { background: var(--olive-shadow); color: var(--olive); }
+.adc-stats { display: grid; grid-template-columns: repeat(5, 1fr); gap: 0.5rem; margin: 0.8rem 0 0.6rem; }
+.adc-stat { background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 10px; padding: 0.5rem 0.7rem; min-width: 0; }
+.adc-stat b { display: block; font-family: var(--font-display); font-size: 1.15rem; line-height: 1.1; }
+.adc-stat span { font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.06em; }
+.adc-stat.hot { border-color: rgba(132, 205, 152, 0.5); } .adc-stat.hot b { color: var(--ok); }
+.adc-stat.bad { border-color: rgba(214, 124, 81, 0.6); } .adc-stat.bad b { color: var(--danger); }
+.adc-warn { background: rgba(214, 124, 81, 0.12); border: 1px solid rgba(214, 124, 81, 0.4); color: var(--ink); border-radius: 10px; padding: 0.5rem 0.7rem; font-family: var(--font-mono); font-size: 0.7rem; line-height: 1.45; margin: 0.4rem 0; }
+.adc-warn.ok { background: rgba(132, 205, 152, 0.12); border-color: rgba(132, 205, 152, 0.4); }
+.adc-grid { display: grid; grid-template-columns: 222px minmax(0, 1fr) 262px; gap: 0.9rem; align-items: start; margin-top: 0.6rem; }
+@media (max-width: 1180px) { .adc-grid { grid-template-columns: 200px minmax(0, 1fr); } .adc-settings { grid-column: 1 / -1; } }
+.adc-rail, .adc-settings, .adc-comp { background: var(--surface-1); border: 1px solid var(--ocean-ink); border-radius: 12px; padding: 0.8rem; min-width: 0; }
+.adc-rail .sch-search { margin-top: 0.6rem; }
+.adc-grp { font-family: var(--font-mono); font-size: 0.58rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin: 0.8rem 0 0.3rem; }
+.adc-pal { display: flex; flex-direction: column; gap: 0.35rem; }
+.adc-pal button { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 8px; padding: 0.45rem 0.6rem; font-family: var(--font-mono); font-size: 0.74rem; cursor: grab; text-align: left; }
+.adc-pal button:hover { background: var(--surface-3); }
+.adc-pal button small { color: var(--ink-faint); font-size: 0.62rem; white-space: nowrap; }
+.adc-pal button.ex { border-color: rgba(248, 95, 115, 0.5); } .adc-pal button.rg { border-color: rgba(231, 162, 85, 0.5); } .adc-pal button.fx { border-color: rgba(180, 138, 214, 0.5); }
+.adc-pal i, .adc-legend i, .adc-chip i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 0.45rem; vertical-align: -1px; }
+.adc-custom { display: flex; gap: 0.35rem; align-items: center; font-family: var(--font-mono); font-size: 0.72rem; color: var(--ink-dim); padding: 0.2rem 0.2rem; }
+.adc-custom input { width: 60px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 7px; padding: 0.3rem 0.4rem; font: inherit; font-size: 0.74rem; }
+.adc-ep { background: var(--sky); } .adc-ex { background: var(--brass); } .adc-rg { background: var(--olive); } .adc-fx { background: #b48ad6; } .adc-pin { background: var(--ink); } .adc-bp { background: var(--ok); }
+.adc-self-seg { background: repeating-linear-gradient(135deg, #f2bf88 0 4px, #c98a3c 4px 8px); }
+.adc-tail { background: repeating-linear-gradient(135deg, rgba(251, 232, 211, 0.22) 0 4px, transparent 4px 8px); }
+.adc-ticks { display: flex; justify-content: space-between; font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); margin-bottom: 0.25rem; }
+.adc-bar { display: flex; height: 44px; border-radius: 8px; overflow: hidden; border: 1px solid var(--ocean-ink); }
+.adc-bar > * { min-width: 0; border: 0; padding: 0; position: relative; }
+.adc-bar button { cursor: pointer; min-width: 34px; font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; color: #1b0a0e; }
+.adc-bar button.sel { outline: 2px solid var(--ink); outline-offset: -2px; z-index: 2; }
+.adc-bar button.empty { background: repeating-linear-gradient(135deg, rgba(251, 232, 211, 0.25) 0 3px, transparent 3px 6px); color: var(--ink); min-width: 22px; }
+.adc-bar .self { min-width: 24px; font-family: var(--font-mono); font-size: 0.58rem; font-weight: 700; color: #2a1a05; display: flex; align-items: center; justify-content: center; }
+.adc-bar .tail { min-width: 24px; }
+.adc-legend { display: flex; gap: 0.8rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); margin-top: 0.45rem; }
+.adc-chips { display: flex; gap: 0.4rem; flex-wrap: wrap; margin: 0.8rem 0 0.6rem; align-items: center; }
+.adc-chip { font-family: var(--font-mono); font-size: 0.68rem; padding: 0.35rem 0.65rem; border-radius: 999px; border: 1px solid var(--ocean-ink); background: var(--surface-1); color: var(--ink-dim); display: inline-flex; gap: 0.1rem; align-items: center; cursor: pointer; }
+.adc-chip.on { border-color: var(--ink); color: var(--ink); }
+.adc-chip.over, .adc-strip.over { outline: 2px dashed var(--ok); outline-offset: 2px; }
+.adc-addbreak { display: inline-flex; gap: 0.3rem; align-items: center; }
+.adc-addbreak input, .adc-at { width: 74px; background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 7px; padding: 0.3rem 0.45rem; font-family: var(--font-mono); font-size: 0.74rem; }
+.adc-comp-head { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.adc-comp-head b { font-family: var(--font-display); font-size: 1rem; }
+.adc-strip { display: flex; gap: 4px; min-height: 68px; margin: 0.7rem 0 0.2rem; border-radius: 10px; }
+.adc-piece { border-radius: 8px; padding: 0.4rem 0.5rem; font-family: var(--font-mono); font-size: 0.6rem; line-height: 1.3; color: #1b0a0e; min-width: 92px; display: flex; flex-direction: column; justify-content: space-between; }
+.adc-piece b { font-size: 0.76rem; display: block; }
+.adc-piece.bp { color: #0f1f12; } .adc-piece.fx { color: #1b0f26; } .adc-piece.pin { color: #241a05; }
+.adc-piece .ctl { display: flex; gap: 2px; margin-top: 0.25rem; }
+.adc-piece .ctl button { background: rgba(0, 0, 0, 0.18); border: 0; color: inherit; border-radius: 4px; padding: 0 0.3rem; font-size: 0.66rem; cursor: pointer; line-height: 1.5; }
+.adc-piece .ctl button:disabled { opacity: 0.35; cursor: default; }
+.adc-drop { border: 1.5px dashed rgba(251, 232, 211, 0.35); border-radius: 8px; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.6rem; display: flex; align-items: center; justify-content: center; text-align: center; min-width: 110px; padding: 0.4rem; flex: 1 1 110px; }
+.adc-set .row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.55rem 0; border-top: 1px solid rgba(251, 232, 211, 0.1); font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); }
+.adc-set .row:first-of-type { border-top: 0; }
+.adc-set .row b { color: var(--ink); font-weight: 500; }
+.adc-set .row small { display: block; color: var(--ink-faint); font-size: 0.6rem; margin-top: 2px; line-height: 1.4; }
+.adc-set .row select, .adc-select, .adc-self input { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 7px; padding: 0.3rem 0.4rem; font: inherit; font-size: 0.72rem; max-width: 100%; }
+.adc-select { width: 100%; margin-top: 0.3rem; }
+.adc-tog { width: 32px; height: 18px; border-radius: 999px; background: var(--surface-3); position: relative; border: 0; cursor: pointer; flex: none; }
+.adc-tog::after { content: ''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: var(--ink-faint); }
+.adc-tog.on { background: var(--ok); } .adc-tog.on::after { left: 16px; background: #0f1f12; }
+.adc-ads { display: flex; flex-direction: column; gap: 0.35rem; }
+.adc-ad { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.4rem; align-items: center; background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 8px; padding: 0.45rem 0.6rem; }
+.adc-ad .n { font-family: var(--font-display); font-weight: 700; font-size: 0.82rem; line-height: 1.15; min-width: 0; }
+.adc-ad .n small { display: block; font-family: var(--font-mono); font-weight: 400; font-size: 0.58rem; color: var(--ink-faint); margin-top: 2px; }
+.adc-ad .d { font-family: var(--font-mono); font-size: 0.82rem; font-weight: 600; text-align: right; display: grid; gap: 0.25rem; justify-items: end; }
+.adc-ad.mine { border-color: rgba(231, 162, 85, 0.5); cursor: grab; }
+.adc-self { display: grid; gap: 0.5rem; margin-top: 0.5rem; }
+.adc-self-row { display: grid; gap: 0.3rem; background: var(--surface-2); border: 1px solid var(--ocean-ink); border-radius: 8px; padding: 0.5rem; }
+.adc-self-row label { display: grid; gap: 0.15rem; font-size: 0.58rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-faint); }
+.adc-self-row label.adc-inline { display: flex; align-items: center; gap: 0.35rem; text-transform: none; letter-spacing: 0; font-size: 0.66rem; color: var(--ink-dim); }
+.adc-self-row .f { display: grid; grid-template-columns: 1fr 1fr; gap: 0.3rem; }
+
+/* Scheduler: ad plan breaks inside a block, and the ads-per-hour column. */
+.sch-tl { grid-template-columns: 54px minmax(0, 1fr) 52px; }
+.sch-hourload div { font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); border-top: 1px solid var(--ocean-ink); border-left: 1px solid var(--ocean-ink); padding: 2px 5px 0 0; text-align: right; box-sizing: border-box; }
+.sch-hourload div.over { color: var(--danger); background: rgba(214, 124, 81, 0.14); font-weight: 600; }
+.sch-adline { position: absolute; left: 4px; right: 4px; background: rgba(248, 95, 115, 0.55); border-radius: 2px; z-index: 1; pointer-events: none; }
+.sch-ep-row { display: flex; gap: 3px; align-items: stretch; }
+.sch-ep-row .sch-ep { flex: 1; min-width: 0; }
+.sch-ep-link { font-family: var(--font-mono); font-size: 0.58rem; color: var(--ink-faint); border: 1px solid transparent; border-radius: 6px; padding: 0.35rem 0.4rem; text-decoration: none; display: flex; align-items: center; }
+.sch-ep-link:hover { color: var(--ink); border-color: var(--ocean-ink); }
+
+/* Channel player: the hold card and the "Presented by" card during a planned break. */
+.channel-hold { z-index: 3; }
+.channel-hold-logo { max-width: 200px; max-height: 96px; object-fit: contain; }
+.channel-hold-kicker { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+
+/* Main player: an ad plan's break (a pod) in its own layer, with the card and the visit link. */
+.tp-pod-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; z-index: 2; }
+.tp-pod-card { position: absolute; inset: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.3rem; background: radial-gradient(120% 90% at 20% 15%, var(--surface-3), transparent 60%), var(--surface-0); color: var(--ink); text-align: center; padding: 1rem; }
+.tp-pod-card strong { font-family: var(--font-display); font-size: 1.4rem; }
+.tp-pod-kicker { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.tp-pod-visit { position: absolute; right: 0.9rem; bottom: 2.8rem; z-index: 4; font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; background: rgba(251, 232, 211, 0.92); color: #241a05; padding: 0.4rem 0.7rem; border-radius: 999px; text-decoration: none; }

@@ -1,5 +1,6 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
+import { listPlanStates } from '../../../lib/adPlans';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -38,8 +39,12 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not load the library.' });
   }
 
+  // Episode Ad Curator state per row (lib/adPlans.js): default / draft / ready.
+  const plans = await listPlanStates((data || []).map((e) => e.id));
+
   return res.status(200).json({
     episodes: (data || []).map((e) => ({
+      adPlan: plans[e.id] || null,
       id: e.id,
       title: e.title,
       description: e.description,
