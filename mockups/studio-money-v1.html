@@ -1,0 +1,348 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Studio Money</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: the admin "Studio money" page drawn section by section, with the sign-off list last. Same tokens as the site (styles/globals.css) and the other mockups. */
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+    color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding-block:28px 80px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); font-size:16px; }
+  .intro { max-width:1180px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; text-wrap:balance; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1180px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; flex-wrap:wrap; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:24px; margin-bottom:14px; min-width:0; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); } .eyebrow.sky { color:var(--sky); } .eyebrow.plum { color:var(--plum); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.olive { background:var(--olive); border-color:var(--olive); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; line-height:1.05; margin:6px 0 8px; text-wrap:balance; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.3rem; line-height:1.15; margin:4px 0 6px; text-wrap:balance; }
+  .h3 { font-family:var(--font-display); font-weight:700; font-size:1.02rem; line-height:1.2; margin:2px 0 4px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:760px; margin:0 0 18px; }
+  .lead b { color:var(--ink); }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.7rem; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; line-height:1.4; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.plum { color:var(--plum); background:rgba(180,138,214,.16); }
+  .chip.mint { color:var(--mint); background:rgba(147,208,164,.14); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .field { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 12px; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); display:flex; align-items:center; justify-content:space-between; gap:10px; min-width:0; }
+  .field b { color:var(--ink); font-weight:500; }
+  .ideas { margin:0; padding-left:18px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ideas li { margin:0 0 8px; } .ideas b { color:var(--ink); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  .two > *, .three > * { min-width:0; }
+  @media (max-width:860px) { .two, .three { grid-template-columns:1fr; } }
+  code { font-family:var(--font-mono); font-size:.84em; color:var(--olive-bright); }
+
+  /* admin shell hint */
+  .shell { display:grid; grid-template-columns:200px 1fr; gap:0; border:1px solid var(--hair); border-radius:16px; overflow:hidden; background:var(--surface-0); }
+  .shell nav { background:var(--surface-1); padding:16px 14px; border-right:1px solid var(--hair); font-family:var(--font-mono); font-size:.74rem; color:var(--ink-dim); }
+  .shell nav .g { color:#f6d65d; letter-spacing:.08em; text-transform:uppercase; font-size:.66rem; margin:14px 0 6px; }
+  .shell nav .g:first-child { margin-top:0; }
+  .shell nav div.l { padding:5px 8px; border-radius:8px; }
+  .shell nav div.l.on { background:rgba(248,95,115,.14); color:var(--brass); }
+  .shell main { padding:22px 24px; min-width:0; }
+  @media (max-width:860px) { .shell { grid-template-columns:1fr; } .shell nav { border-right:0; border-bottom:1px solid var(--hair); display:flex; gap:6px; flex-wrap:wrap; } .shell nav .g { display:none; } .shell nav div.l { border:1px solid var(--hair); } }
+
+  /* tiles + ledger */
+  .tiles { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin:0 0 16px; }
+  .tile { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:12px 14px; min-width:0; }
+  .tile b { display:block; font-family:var(--font-display); font-size:1.35rem; line-height:1; font-variant-numeric:tabular-nums; }
+  .tile span { display:block; font-family:var(--font-mono); font-size:.68rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-faint); margin-top:6px; line-height:1.4; }
+  .tile.hot { border-color:rgba(231,162,85,.5); } .tile.hot b { color:var(--olive-bright); }
+  .tile.bad { border-color:rgba(214,124,81,.5); } .tile.bad b { color:var(--danger); }
+  @media (max-width:860px) { .tiles { grid-template-columns:1fr 1fr; } }
+  .ledger { width:100%; border-collapse:collapse; font-size:.9rem; }
+  .ledger td { padding:8px 6px; border-bottom:1px solid rgba(251,232,211,.07); vertical-align:top; }
+  .ledger td:last-child { text-align:right; font-family:var(--font-mono); font-size:.86rem; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .ledger td.op { width:18px; color:var(--ink-faint); font-family:var(--font-mono); text-align:center; }
+  .ledger tr.total td { border-top:1px solid var(--ocean-ink); border-bottom:0; font-family:var(--font-display); font-weight:700; }
+  .ledger tr.total td:last-child { color:var(--olive-bright); font-size:1.05rem; }
+  .ledger .sub { display:block; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); margin-top:2px; }
+  .ledger .neg { color:var(--danger); }
+  .ledger .pos { color:var(--ok); }
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  table.grid { width:100%; border-collapse:collapse; font-size:.82rem; }
+  table.grid th { text-align:left; font-family:var(--font-mono); font-size:.64rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); font-weight:500; padding:6px 10px 6px 0; border-bottom:1px solid var(--ocean-ink); white-space:nowrap; }
+  table.grid td { padding:7px 10px 7px 0; border-bottom:1px solid rgba(251,232,211,.06); vertical-align:top; }
+  table.grid td.n, table.grid th.n { text-align:right; font-family:var(--font-mono); font-variant-numeric:tabular-nums; white-space:nowrap; }
+  table.grid tr.sum td { font-weight:700; border-top:1px solid var(--ocean-ink); border-bottom:0; }
+  .bar { display:flex; height:22px; border-radius:6px; overflow:hidden; margin:10px 0 8px; }
+  .bar div { height:100%; }
+  .legend { display:flex; gap:14px; flex-wrap:wrap; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); }
+  .legend i { display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:6px; vertical-align:-1px; }
+  .tl { display:grid; grid-template-columns:repeat(5, 1fr); gap:8px; margin:12px 0 4px; }
+  .tl div { background:var(--surface-2); border-radius:10px; padding:10px 12px; min-width:0; }
+  .tl b { display:block; font-family:var(--font-display); font-size:.95rem; }
+  .tl span { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); line-height:1.45; display:block; margin-top:3px; }
+  .tl div.hot { outline:1px solid rgba(231,162,85,.5); }
+  @media (max-width:860px) { .tl { grid-template-columns:1fr 1fr; } }
+  .check { display:flex; gap:10px; align-items:flex-start; padding:8px 0; border-top:1px solid rgba(251,232,211,.07); font-size:.9rem; }
+  .check:first-child { border-top:0; }
+  .check .m { font-family:var(--font-mono); width:18px; flex:none; }
+  .check.ok .m { color:var(--ok); } .check.bad .m { color:var(--danger); }
+  .check small { display:block; color:var(--ink-faint); font-family:var(--font-mono); font-size:.72rem; margin-top:2px; }
+  .row { display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap; }
+  textarea.mock, input.mock { width:100%; background:var(--surface-2); border:1px solid var(--hair); border-radius:8px; color:var(--ink); font-family:var(--font-mono); font-size:.8rem; padding:8px 10px; }
+  .dec { display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.95rem; line-height:1.5; color:var(--ink-dim); }
+  .dec b { color:var(--ink); }
+  .dec .k { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; padding-top:4px; }
+  .dec .k.ok { color:var(--ok); } .dec .k.pro { color:var(--olive); } .dec .k.open { color:var(--brass); }
+  @media (max-width:600px) { .dec { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Studio money, v1: what leaves Stripe, what stays, and why</h1>
+  <p class="note">The Creator Share page (<code>/admin/creator-money</code>, built) moves money <b>to creators</b>. This page moves money <b>to the studio's bank</b>, on a schedule, by a calculation you can read line by line: the Stripe balance, minus everything that has to stay in Stripe (what creators are owed, advertisers' unused credits, a refund reserve, and the amounts you earmark for films), equals what can leave. Every number has a source, every difference between Stripe and our records is shown, and the studio's own share for upkeep and projects is worked out from the same figures. Example numbers throughout, from a plausible November.</p>
+  <p class="note"><b>One rule that makes all of it work:</b> the platform's Stripe account must be on <b>manual payouts</b> (Stripe Dashboard → Settings → Payouts). Today it sweeps the balance to the bank on its own, so there would be nothing left for the creator batch on the 1st and nothing for this page to decide. Stripe doesn't let a platform change its own schedule through the API, so this is a one-time setting you make; the page checks it and says so.</p>
+</div>
+
+<section class="sec">
+  <div class="sec-head"><h2>1. Where it sits</h2><span class="tag">admin nav · a "Money" group</span></div>
+  <div class="shell">
+    <nav>
+      <div class="g">Content</div><div class="l">Review queue</div><div class="l">Library &amp; queues</div>
+      <div class="g">Money</div><div class="l">Creator Share payouts</div><div class="l on">Studio money</div><div class="l">Pitches &amp; comments</div>
+      <div class="g">Ads</div><div class="l">House ads</div>
+      <div class="g">Site</div><div class="l">Settings</div><div class="l">Audit log</div>
+    </nav>
+    <main>
+      <span class="eyebrow">Money</span>
+      <div class="h2">Studio money</div>
+      <p class="lead" style="margin-bottom:10px">The Stripe balance, what has to stay in it, what can go to the bank, and how this month's money split between creators, Stripe, reserves and the studio. Full admins only.</p>
+      <div class="chips"><span class="chip olive">Stripe · live</span><span class="chip warn">Payout schedule: daily, automatic → set to manual</span><span class="chip">Last sweep Oct 5 · $1,812.40</span></div>
+    </main>
+  </div>
+  <p class="note" style="margin-top:12px">"Pitches &amp; comments" moves from its own Pitch Room group into Money, next to the two payout pages, so everything that touches Stripe is in one place.</p>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>2. The calculation: what can leave Stripe today</h2><span class="tag">the top of the page</span></div>
+  <div class="frame">
+    <div class="tiles">
+      <div class="tile"><b>$2,942.18</b><span>Available in Stripe</span></div>
+      <div class="tile"><b>$388.40</b><span>Pending · clears by Nov 7</span></div>
+      <div class="tile bad"><b>daily</b><span>Stripe payout schedule · must be manual</span></div>
+      <div class="tile hot"><b>$1,250.18</b><span>Can leave to the bank</span></div>
+    </div>
+    <div class="two">
+      <div>
+        <span class="eyebrow olive">How it's worked out</span>
+        <table class="ledger" style="margin-top:8px">
+          <tr><td class="op"></td><td>Available in Stripe<span class="sub">Stripe balance · pending money is never counted</span></td><td>$2,942.18</td></tr>
+          <tr><td class="op">−</td><td>Owed to creators<span class="sub">Creator Share ledger, unpaid lines · ready $540.00 (9 creators) · held $72.00 (6 under the minimum or without a payout account)</span></td><td class="neg">$612.00</td></tr>
+          <tr><td class="op">−</td><td>Advertisers' credits not yet served<span class="sub">ad_accounts.credit_balance_cents · prepaid, refundable until the impressions run</span></td><td class="neg">$230.00</td></tr>
+          <tr><td class="op">−</td><td>Refund &amp; dispute reserve<span class="sub">5% of the last 90 days' card volume ($4,120.40 → $206.02), floor $300 · a setting</span></td><td class="neg">$300.00</td></tr>
+          <tr><td class="op">−</td><td>Earmarked for films and matches<span class="sub">2 earmarks, section 4 · the studio's own money kept in Stripe on purpose</span></td><td class="neg">$550.00</td></tr>
+          <tr class="total"><td class="op">=</td><td>Can leave to the bank</td><td>$1,250.18</td></tr>
+        </table>
+        <span class="meta" style="margin-top:10px">Stays in Stripe: $1,692.00 · for creators $612.00 · for films $550.00 · reserves and advertisers $530.00</span>
+      </div>
+      <div>
+        <span class="eyebrow pink">The sweep</span>
+        <div class="field" style="margin:8px 0 10px"><span>Next sweep</span><b>Nov 5 · confirm mode</b></div>
+        <div class="field" style="margin-bottom:10px"><span>Proposed amount on the day</span><b>recomputed that morning</b></div>
+        <div class="row" style="margin:14px 0 8px"><span class="btn primary">Send $1,250.18 to the bank →</span><span class="btn ghost">Hold this month</span></div>
+        <span class="meta">Creates one Stripe payout to the studio's bank (arrives in about 2 business days) and a <code>studio_sweeps</code> row with this exact breakdown frozen in it, so later you can see what the number was made of. Disabled while the Stripe schedule isn't manual, while the unexplained difference (section 5) is over the tolerance, or while a creator batch from the 1st still has pending rows.</span>
+        <div class="h3" style="margin-top:18px">Sweep history</div>
+        <div class="scroll"><table class="grid">
+          <tr><th>Date</th><th class="n">Sent</th><th>Arrived</th><th class="n">Difference then</th><th>Note</th></tr>
+          <tr><td>Oct 5, 2026</td><td class="n">$1,812.40</td><td>Oct 7</td><td class="n">$0.00</td><td>first sweep after launch</td></tr>
+          <tr><td>Sep 5, 2026</td><td class="n">$940.12</td><td>Sep 8</td><td class="n">−$1.10</td><td>Amex fees above the cover</td></tr>
+        </table></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>3. The month, in order</h2><span class="tag">why the 5th</span></div>
+  <div class="frame">
+    <div class="tl">
+      <div class="hot"><b>1st · 09:00 UTC</b><span>Creator Share batch (built). Transfers from the balance to each creator's Stripe account.</span></div>
+      <div><b>1st – 4th</b><span>Refunds, disputes and failed transfers from the batch settle. Pending card money from late in the month clears.</span></div>
+      <div class="hot"><b>5th</b><span>Studio sweep. The page proposes the amount; in confirm mode you press the button, in automatic mode the cron sends it and emails you the breakdown.</span></div>
+      <div><b>Any day</b><span>Earmarks added or released; the reserve rule changed; a discrepancy explained. The calculation updates live.</span></div>
+      <div><b>January</b><span>Tax forms for creators through Stripe (section 7). The sweep itself never changes.</span></div>
+    </div>
+    <p class="note" style="margin-top:12px">Settings on the page (full admins): <b>sweep day</b> (5th), <b>mode</b> (confirm now, automatic once you trust it), <b>reserve rule</b> (percent, window, floor), <b>tolerance</b> for unexplained differences ($25 or 1% of the period, whichever is larger; over it the sweep waits for a human). All in <code>site_settings</code>.</p>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>4. Earmarks: money for films that stays in Stripe on purpose</h2><span class="tag">"how much stays for the films"</span></div>
+  <div class="frame">
+    <p class="lead">An earmark is a named amount of the studio's own money that the sweep must leave in Stripe. It doesn't move anything and it doesn't change what creators are owed; it just lowers what can leave. When the film is paid for (or the match is spent) you release it.</p>
+    <div class="scroll"><table class="grid">
+      <tr><th>Earmark</th><th class="n">Amount</th><th>Added</th><th>Note</th><th></th></tr>
+      <tr><td><b>Film fund · The Salt Hours finishing</b></td><td class="n">$400.00</td><td>Oct 20 · Jose</td><td>colour + mix, paid from the studio share in December</td><td><span class="btn sm ghost">Release</span></td></tr>
+      <tr><td><b>Pitch Room match · December</b></td><td class="n">$150.00</td><td>Nov 2 · Jose</td><td>the studio matches the first $150 on the holiday pitch</td><td><span class="btn sm ghost">Release</span></td></tr>
+      <tr class="sum"><td>Earmarked</td><td class="n">$550.00</td><td></td><td></td><td></td></tr>
+    </table></div>
+    <div class="row" style="margin-top:14px"><input class="mock" style="max-width:280px" value="Label"><input class="mock" style="max-width:120px" value="$ amount"><input class="mock" style="max-width:360px" value="Note (optional)"><span class="btn olive sm">Add earmark</span></div>
+    <span class="meta" style="margin-top:10px">Every add and release is an audit-log entry. An earmark can't exceed what would otherwise leave; the page says "that leaves −$X" and refuses.</span>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>5. Reconciliation: Stripe vs our records, with room for discrepancies</h2><span class="tag">since the last sweep · Oct 5 → Nov 5</span></div>
+  <div class="frame">
+    <p class="lead">Stripe's balance transactions for the period, grouped, next to what our tables say happened. Where they differ, the difference is a line of its own, explained or not. Differences come from real things: cards that cost more than the fee cover (international, Amex), Stripe fee adjustments, a dispute fee returned later. They never silently vanish into the studio's share.</p>
+    <div class="scroll"><table class="grid">
+      <tr><th>Lane</th><th>Stripe says</th><th class="n">Net to balance</th><th>Our records say</th><th class="n">Expected</th><th class="n">Difference</th></tr>
+      <tr><td><b>Memberships</b></td><td>391 charges · gross $3,560.21 · Stripe fees $220.55</td><td class="n">+$3,339.66</td><td>391 paid invoices (<code>member_payments</code>)</td><td class="n">+$3,339.66</td><td class="n">$0.00</td></tr>
+      <tr><td><b>Pitch Room backing</b></td><td>31 charges · $1,282.16 incl. fee cover · fees $44.90 · transfers to creators −$1,178.00</td><td class="n">+$59.26</td><td>31 backings · cut $62.00 · fee cover $42.16 (<code>pitch_donations</code>)</td><td class="n">+$61.76</td><td class="n" style="color:var(--danger)">−$2.50</td></tr>
+      <tr><td><b>Location bookings</b></td><td>3 charges · cut kept after transfers</td><td class="n">+$84.88</td><td>3 paid bookings · cut $85.00 (<code>location_requests</code>)</td><td class="n">+$85.00</td><td class="n" style="color:var(--danger)">−$0.12</td></tr>
+      <tr><td><b>Advertiser credits</b></td><td>1 charge · $300.00 · fees $9.00</td><td class="n">+$291.00</td><td>1 top-up $300.00 (<code>add_ad_credits</code>) · $70.00 served this period</td><td class="n">+$291.00</td><td class="n">$0.00</td></tr>
+      <tr><td><b>Creator Share batch</b></td><td>14 transfers on Nov 1</td><td class="n">−$1,184.00</td><td>14 payouts, paid (<code>creator_payouts</code>)</td><td class="n">−$1,184.00</td><td class="n">$0.00</td></tr>
+      <tr><td><b>Refunds</b></td><td>2 membership refunds</td><td class="n">−$25.98</td><td>2 invoices reversed · credits reversed in the ledger</td><td class="n">−$25.98</td><td class="n">$0.00</td></tr>
+      <tr><td><b>Disputes</b></td><td>1 dispute $12.99 + $15.00 fee</td><td class="n">−$27.99</td><td>1 <code>charge.dispute.created</code> · credits reversed</td><td class="n">−$27.99</td><td class="n">$0.00</td></tr>
+      <tr><td><b>Stripe adjustments</b></td><td>1 balance adjustment, Oct 29</td><td class="n">−$3.72</td><td>nothing on our side</td><td class="n">$0.00</td><td class="n" style="color:var(--danger)">−$3.72</td></tr>
+      <tr class="sum"><td>Period</td><td></td><td class="n">+$2,533.11</td><td></td><td class="n">+$2,539.45</td><td class="n" style="color:var(--danger)">−$6.34</td></tr>
+    </table></div>
+    <div class="two" style="margin-top:16px">
+      <div>
+        <span class="eyebrow olive">Discrepancy this period</span>
+        <table class="ledger" style="margin-top:6px">
+          <tr><td class="op"></td><td>Explained<span class="sub">fees above the cover on 2 international cards (−$2.50) · booking fee rounding (−$0.12)</span></td><td class="neg">−$2.62</td></tr>
+          <tr><td class="op"></td><td>Unexplained<span class="sub">Stripe adjustment Oct 29 · 0.15% of the period · within tolerance ($25 / 1%)</span></td><td class="neg">−$3.72</td></tr>
+          <tr class="total"><td class="op">=</td><td>Carried as a studio adjustment</td><td style="color:var(--danger)">−$6.34</td></tr>
+        </table>
+      </div>
+      <div>
+        <span class="eyebrow pink">Explain it</span>
+        <textarea class="mock" rows="3" style="margin-top:6px">Oct 29 adjustment: Stripe reversed a Radar fee credit from September. Checked in Dashboard → Balance → Adjustments.</textarea>
+        <div class="row" style="margin-top:8px"><span class="btn sm olive">Save explanation</span><span class="meta">Stored on the period (<code>studio_adjustments</code>) with who wrote it. Explained differences don't count toward the tolerance; unexplained ones do, and over it the sweep waits.</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>6. The studio's share this period</h2><span class="tag">"how much we keep for maintenance and other projects"</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <span class="eyebrow mint">Memberships · $3,560.21 gross</span>
+        <div class="bar" aria-hidden="true"><div style="width:6.2%;background:var(--ink-faint)"></div><div style="width:34.7%;background:var(--olive)"></div><div style="width:1.5%;background:var(--danger)"></div><div style="width:57.6%;background:var(--mint)"></div></div>
+        <div class="legend"><span><i style="background:var(--ink-faint)"></i>Stripe fees $220.55</span><span><i style="background:var(--olive)"></i>Creators $1,236.00</span><span><i style="background:var(--danger)"></i>Refunds &amp; disputes $53.97</span><span><i style="background:var(--mint)"></i>Studio $2,049.69</span></div>
+        <table class="ledger" style="margin-top:14px">
+          <tr><td class="op"></td><td>Membership revenue<span class="sub">391 renewals · Standard 214 · Premium 151 · Sponsor 26</span></td><td>$3,560.21</td></tr>
+          <tr><td class="op">−</td><td>Stripe fees</td><td class="neg">$220.55</td></tr>
+          <tr><td class="op">−</td><td>Creator Share credited<span class="sub">member shares $1,140.00 · referral bonuses $96.00 · 34.7% of gross</span></td><td class="neg">$1,236.00</td></tr>
+          <tr><td class="op">−</td><td>Refunds and disputes<span class="sub">their credits were reversed; what's left is the studio's loss</span></td><td class="neg">$53.97</td></tr>
+          <tr class="total"><td class="op">=</td><td>Membership margin</td><td>$2,049.69</td></tr>
+        </table>
+      </div>
+      <div>
+        <span class="eyebrow sky">Everything together</span>
+        <table class="ledger" style="margin-top:8px">
+          <tr><td class="op"></td><td>Membership margin</td><td>$2,049.69</td></tr>
+          <tr><td class="op">+</td><td>Pitch Room cut kept<span class="sub">5% of $1,240.00, less the fee gap</span></td><td class="pos">$59.26</td></tr>
+          <tr><td class="op">+</td><td>Location cut kept<span class="sub">10% of $850.00, less rounding</span></td><td class="pos">$84.88</td></tr>
+          <tr><td class="op">+</td><td>Ads served<span class="sub">impressions actually delivered · the unserved $230 stays a liability</span></td><td class="pos">$70.00</td></tr>
+          <tr><td class="op">−</td><td>Unexplained adjustments carried</td><td class="neg">$3.72</td></tr>
+          <tr class="total"><td class="op">=</td><td>Studio share this period<span class="sub" style="font-family:var(--font-mono);font-weight:400">for maintenance and other projects · before the reserve and earmarks you chose to keep in Stripe</span></td><td>$2,260.11</td></tr>
+        </table>
+        <span class="meta" style="margin-top:10px">This is an operating number, not a tax number: it ignores the studio's other costs (hosting, Cloudflare Stream, Clerk, Resend) and recognises ad credits when served, not when bought. The accountant's books start from the same Stripe balance transactions, exported from the Stripe Dashboard.</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>7. Tax season card</h2><span class="tag">on the same page · January</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <div class="tiles" style="grid-template-columns:1fr 1fr 1fr">
+          <div class="tile"><b>23</b><span>Creators paid in 2026 (Creator Share transfers)</span></div>
+          <div class="tile"><b>21</b><span>Over $10 (1099-MISC royalties threshold)</span></div>
+          <div class="tile"><b>4 · 1</b><span>Over $600 · over $2,000 (1099-NEC thresholds, 2025 · 2026)</span></div>
+        </div>
+        <span class="meta">Which threshold matters depends on how the lawyer characterises the member share (royalty for the licence → 1099-MISC box 2 at $10; payment for services → 1099-NEC). The card shows both until that's answered.</span>
+      </div>
+      <div>
+        <div class="check ok"><span class="m">✓</span><span>Creators' tax IDs collected in Stripe Express onboarding<small>Stripe asks for SSN/EIN before payouts are enabled</small></span></div>
+        <div class="check bad"><span class="m">✕</span><span>Stripe Connect tax forms not enabled<small>Dashboard → Connect → Tax forms: pick the form, Stripe prepares and e-files for connected accounts (per-form fee). Do it before January.</small></span></div>
+        <div class="check ok"><span class="m">✓</span><span>Backing and bookings are destination charges<small>the creator's part never counts as studio income; only the cut does (section 8 and the lawyer's question 3)</small></span></div>
+        <div class="check bad"><span class="m">✕</span><span>Sales tax on memberships: not set up<small>streaming subscriptions are taxable in some states once sales there pass a threshold; Stripe Tax can do it when it's time</small></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>8. Plumbing</h2><span class="tag">what gets built</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <div class="h3">Stripe calls (all read, one write)</div>
+        <ul class="ideas">
+          <li><code>balance.retrieve()</code> for available and pending.</li>
+          <li><code>accounts.retrieve()</code> for the platform's own payout schedule; the page refuses to sweep unless it reads <code>manual</code>.</li>
+          <li><code>balanceTransactions.list({ created: since the last sweep })</code>, paged, grouped by <code>reporting_category</code> and matched to our rows by charge id (<code>member_payments</code>, <code>pitch_donations</code>, <code>location_requests</code>, ad top-ups) and transfer id (<code>creator_payouts</code>). What doesn't match is the discrepancy.</li>
+          <li><code>payouts.create({ amount, currency:'usd', description:'Studio sweep 2026-11' })</code> with an idempotency key per sweep row. <code>payout.paid</code> / <code>payout.failed</code> on the account webhook endpoint update the row (two more events for the Payments checklist).</li>
+          <li><code>payouts.list()</code> so a payout made by hand in the Dashboard still shows in the history.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="h3">Ours</div>
+        <ul class="ideas">
+          <li><b>Migration 089:</b> <code>studio_sweeps</code> (cents, stripe_payout_id, status, the frozen breakdown as jsonb, discrepancy, note, created_by, arrived_on), <code>studio_earmarks</code> (label, cents, note, created_by, released_at), <code>studio_adjustments</code> (period, cents, explanation, created_by); settings columns for the day, mode, reserve rule and tolerance.</li>
+          <li><b><code>lib/studioMoney.js</code></b>: <code>getMoneyPage()</code> (balance, schedule check, obligations, reconciliation, studio share), <code>createSweep()</code>, earmark and adjustment writes; the pure arithmetic in <code>lib/studioMoneyRules.js</code> with tests.</li>
+          <li><b>Pages:</b> <code>/admin/money</code> (this page), API <code>/api/admin/money</code> (GET page, POST sweep / earmark / release / explain), cron <code>/api/cron/studio-sweep</code> on the sweep day (automatic mode only; in confirm mode it emails "sweep ready: $X" and does nothing).</li>
+          <li><b>Nav:</b> the Money group; audit-log entries for every sweep, earmark and explanation.</li>
+          <li><b>Not in v1:</b> top-ups from the bank into Stripe (Stripe supports it; add when a batch ever waits on balance), multi-currency, and splitting the studio share by business line (Studio Tapa TV only; the shop and Post Puppeteers don't run through this account).</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>9. Decided / proposed / open</h2><span class="tag">sign-off list</span></div>
+  <div class="frame">
+    <div class="dec">
+      <span class="k ok">Decided</span><span>Creator batch on the 1st, $10 minimum, oldest credit first, as far as the balance goes (built). Only earnings-lane money ever sits in the balance for creators; backing and bookings reach them at charge time.</span>
+      <span class="k pro">Proposed</span><span><b>Sweep on the 5th</b>, monthly, confirm mode first and automatic once you've watched it run twice.</span>
+      <span class="k pro">Proposed</span><span><b>Reserve</b>: 5% of the last 90 days' card volume with a $300 floor. Covers refunds, disputes and the $15 dispute fee without touching creators' money.</span>
+      <span class="k pro">Proposed</span><span><b>Tolerance</b>: unexplained differences up to $25 or 1% of the period carry as a studio adjustment; over that, the sweep waits for a human.</span>
+      <span class="k pro">Proposed</span><span><b>Earmarks</b> are free-form (label, amount, note) and belong to full admins; a per-pitch "match" earmark can link to a pitch later.</span>
+      <span class="k pro">Proposed</span><span><b>Pending balance is never counted.</b> Only cleared money can leave or be promised.</span>
+      <span class="k open">Open</span><span>Fixed reserve instead of a percentage? A different sweep day, or twice a month?</span>
+      <span class="k open">Open</span><span>Should the film fund be its own lane with per-project ledgers (what was earmarked, what was spent, on what), or is a label and an amount enough for now?</span>
+      <span class="k open">Open</span><span>The accountant's answers: royalty or service (which 1099), whether to book the pass-through lanes as agent revenue (the cut only), and whether any state needs sales tax on memberships yet.</span>
+      <span class="k open">Open</span><span>The one setting only you can make: Stripe Dashboard → Settings → Payouts → <b>manual</b>. Nothing on this page works until it is.</span>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
