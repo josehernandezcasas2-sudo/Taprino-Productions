@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator Share v2 — money lanes, the creator's home base, referrals, tips, and the Stripe plan</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1180px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1180px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:24px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); } .eyebrow.sky { color:var(--sky); } .eyebrow.plum { color:var(--plum); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.olive { background:var(--olive); border-color:var(--olive); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; line-height:1.05; margin:6px 0 8px; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.3rem; line-height:1.15; margin:4px 0 6px; }
+  .h3 { font-family:var(--font-display); font-weight:700; font-size:1.02rem; line-height:1.2; margin:2px 0 4px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:760px; margin:0 0 18px; }
+  .lead b { color:var(--ink); }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.7rem; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; white-space:nowrap; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.plum { color:var(--plum); background:rgba(180,138,214,.16); }
+  .chip.mint { color:var(--mint); background:rgba(147,208,164,.14); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .field { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 12px; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .field b { color:var(--ink); font-weight:500; }
+  .ideas { margin:0; padding-left:18px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ideas li { margin:0 0 8px; } .ideas b { color:var(--ink); }
+  .tog { width:32px; height:18px; border-radius:999px; background:var(--surface-3); position:relative; display:inline-block; flex:none; vertical-align:middle; }
+  .tog::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--ink-faint); }
+  .tog.on { background:var(--ok); } .tog.on::after { left:16px; background:#0f1f12; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  @media (max-width:860px) { .two, .three { grid-template-columns:1fr; } }
+  code { font-family:var(--font-mono); font-size:.84em; color:var(--olive-bright); }
+
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:18px 20px; }
+  .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+  .row { display:grid; grid-template-columns:42px 1fr auto auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); }
+  .row:first-of-type { border-top:0; }
+  .av { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; font-family:var(--font-display); font-weight:700; font-size:.9rem; color:#0f1a12; flex:none; }
+  .nm { font-family:var(--font-display); font-weight:700; font-size:.98rem; }
+  .amt { font-family:var(--font-mono); font-size:.8rem; color:var(--ink); text-align:right; }
+  .amt small { display:block; color:var(--ink-faint); font-size:.66rem; }
+  .hist { margin-top:14px; border-top:1px solid var(--hair); padding-top:10px; }
+  .hist div { display:flex; justify-content:space-between; gap:10px; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); padding:4px 0; }
+  .hist div b { color:var(--ink); font-weight:500; }
+
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th { text-align:left; font-family:var(--font-mono); font-size:.66rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; padding:6px 10px; border-bottom:1px solid var(--hair); }
+  td { padding:9px 10px; border-bottom:1px solid var(--hair); vertical-align:top; color:var(--ink-dim); line-height:1.45; }
+  td b { color:var(--ink); font-family:var(--font-display); }
+  td.m { font-family:var(--font-mono); font-size:.78rem; color:var(--ink); white-space:nowrap; }
+  td .lane { display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:7px; vertical-align:-1px; }
+
+  .flow { display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; }
+  @media (max-width:860px) { .flow { grid-template-columns:1fr; } }
+  .flow div { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px 14px; font-size:.88rem; color:var(--ink-dim); line-height:1.45; }
+  .flow div b { display:block; font-family:var(--font-display); color:var(--ink); margin-bottom:4px; }
+  .flow div i { font-family:var(--font-mono); font-style:normal; font-size:.68rem; color:var(--ink-faint); display:block; margin-top:6px; }
+  .flow.loop div { border-color:rgba(248,95,115,.3); }
+
+  .hero { display:flex; gap:16px; align-items:center; background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:16px 18px; flex-wrap:wrap; }
+  .hero .av { width:64px; height:64px; font-size:1.3rem; }
+  .hero .nm { font-size:1.25rem; }
+  .hero .acts { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  .plates { display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:12px; }
+  @media (max-width:860px) { .plates { grid-template-columns:1fr 1fr; } }
+  .plate { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px 14px; }
+  .plate .eyebrow { margin-bottom:4px; }
+  .plate b { font-family:var(--font-display); display:block; }
+  .plate span { font-size:.84rem; color:var(--ink-dim); }
+  .linkbar { display:flex; gap:10px; align-items:center; background:var(--surface-2); border:1px dashed rgba(251,232,211,.3); border-radius:12px; padding:12px 14px; margin-top:12px; font-family:var(--font-mono); font-size:.84rem; }
+  .linkbar b { color:var(--ink); font-weight:500; }
+
+  .kpis { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin:10px 0 12px; }
+  @media (max-width:860px) { .kpis { grid-template-columns:1fr 1fr; } }
+  .kpi { background:var(--surface-2); border-radius:10px; padding:12px 14px; border-top:3px solid var(--surface-3); }
+  .kpi b { display:block; font-family:var(--font-display); font-size:1.4rem; line-height:1.1; }
+  .kpi span { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); display:block; margin-top:4px; line-height:1.4; }
+  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); } .kpi.grant { border-top-color:var(--plum); }
+
+  .sum { font-family:var(--font-mono); font-size:.8rem; }
+  .sum div { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--hair); color:var(--ink-dim); }
+  .sum div b { color:var(--ink); font-weight:500; }
+  .sum div.total { border-bottom:0; color:var(--ink); font-weight:600; }
+
+  .presets { display:flex; gap:8px; margin:10px 0; }
+  .presets span { flex:1; text-align:center; font-family:var(--font-mono); font-size:.9rem; padding:10px 0; border-radius:10px; border:1px solid var(--hair); color:var(--ink-dim); }
+  .presets span.on { border-color:var(--olive); color:var(--olive-bright); background:rgba(231,162,85,.12); }
+
+  .draft { background:var(--surface-1); border-left:3px solid var(--olive); border-radius:0 12px 12px 0; padding:14px 18px; color:var(--ink-dim); line-height:1.6; font-size:.93rem; }
+  .draft h4 { font-family:var(--font-display); color:var(--ink); margin:0 0 6px; font-size:1rem; }
+  .draft p { margin:0 0 10px; }
+  .draft mark { background:rgba(231,162,85,.2); color:var(--olive-bright); padding:0 4px; border-radius:4px; font-family:var(--font-mono); font-size:.82rem; }
+
+  .todo { counter-reset:step; margin:0; padding:0; list-style:none; }
+  .todo li { display:grid; grid-template-columns:30px 1fr; gap:10px; padding:10px 0; border-top:1px solid var(--hair); color:var(--ink-dim); line-height:1.5; font-size:.93rem; }
+  .todo li:first-child { border-top:0; }
+  .todo li::before { counter-increment:step; content:counter(step); font-family:var(--font-mono); font-size:.72rem; width:24px; height:24px; border-radius:50%; border:1px solid var(--brass); color:var(--brass); display:grid; place-items:center; margin-top:2px; }
+  .todo b { color:var(--ink); }
+  .todo .where { font-family:var(--font-mono); font-size:.68rem; color:var(--ink-faint); display:block; margin-top:3px; }
+  .yes, .no, .soon { font-family:var(--font-mono); font-size:.72rem; padding:2px 8px; border-radius:6px; margin-right:6px; white-space:nowrap; }
+  .yes { color:var(--ok); background:rgba(132,205,152,.14); } .no { color:var(--danger); background:rgba(214,124,81,.16); } .soon { color:var(--sky); background:rgba(132,153,220,.16); }
+  .ask { background:var(--surface-1); border:1px solid rgba(248,95,115,.35); border-radius:12px; padding:14px 16px; }
+  .ask ol { margin:0; padding-left:20px; color:var(--ink-dim); line-height:1.55; font-size:.93rem; }
+  .ask li { margin:0 0 8px; } .ask b { color:var(--ink); }
+  .rule { background:rgba(248,95,115,.08); border:1px solid rgba(248,95,115,.3); border-radius:12px; padding:12px 16px; color:var(--ink-dim); line-height:1.5; font-size:.93rem; margin-top:12px; }
+  .rule b { color:var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <span class="tag">mockup · creator share · v2 · 2026-10-17 · builds on v1</span>
+  <h1>Creator Share v2 — the money lanes, the creator's home base, referrals, tips, and what to do in Stripe</h1>
+  <p class="note">v1 designed the member's side: a slice of every paid membership that the member points at up to 10 creators, with a default until they do. v2 is the whole loop around it. <b>Creators bring their audience → fans watch, subscribe, tip and back projects → money flows back to creators → the library grows → it attracts new viewers and creators.</b> It only turns if a creator has a reason to send fans to their Studio Tapa TV link instead of YouTube or Patreon, so v2 adds the four things that give them one, keeps the four money lanes apart from the start, and ends with the exact list of what has to happen in Stripe.</p>
+  <div class="flow loop">
+    <div><b>1 · Creator shares one link</b>Their profile is the home base: watch, support, tip, back, shop, follow.<i>studiotapatv.site/@handle</i></div>
+    <div><b>2 · Fan joins through it</b>Watches free with ads, or subscribes to Tapa +. The link is remembered.<i>referral attribution</i></div>
+    <div><b>3 · Money flows back</b>Member share + referral bonus (Earnings), tips (Fan support), backing (Pitch Room).<i>Stripe Connect</i></div>
+    <div><b>4 · The creator sees it</b>One Money page: every lane, every supporter, the next payout.<i>/creator/money</i></div>
+    <div><b>5 · The library grows</b>More work, more reasons for the next creator to bring their people.<i>the loop</i></div>
+  </div>
+</div>
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>1. Four money lanes, kept apart</h2><span class="tag">designed in from the start</span></div>
+  <div class="frame">
+    <table>
+      <tr><th>Lane</th><th>What it is</th><th>Whose money</th><th>Stripe shape</th><th>Settles</th><th>Today</th></tr>
+      <tr><td><b><i class="lane" style="background:var(--brass)"></i>Earnings</b></td><td>Revenue share: the <b>member share</b> (v1), the <b>referral bonus</b> (§3), and later an <b>ad share</b>.</td><td>The LLC's revenue, paid out as a share.</td><td>Membership payments land in the LLC's balance → a ledger line per creator → <b>one Connect transfer per creator each month</b>.</td><td>Monthly, 1st</td><td><span class="yes">subscriptions live</span><span class="no">no ledger, no transfers</span></td></tr>
+      <tr><td><b><i class="lane" style="background:var(--olive)"></i>Fan support</b></td><td><b>Tips</b> to one creator (§4).</td><td>The fan's money, passed through; the LLC keeps a small cut.</td><td>One-time Checkout, <b>destination charge</b> to the creator's Express account, the cut + card fee as the application fee — the exact shape of Pitch Room backing.</td><td>At the tip</td><td><span class="no">not built</span></td></tr>
+      <tr><td><b><i class="lane" style="background:var(--mint)"></i>Project backing</b></td><td><b>Pitch Room</b>.</td><td>The backer's money for a project; the LLC's cut per pitch.</td><td>Destination charge to the creator's Express account (built, 2026-10-11).</td><td>At the backing</td><td><span class="yes">built</span><span class="soon">"rewards-based" isn't: backing is donation-style today, no reward tiers</span></td></tr>
+      <tr><td><b><i class="lane" style="background:var(--plum)"></i>Grants</b></td><td>The Juanita Foundation, through From the Heart.</td><td>The nonprofit's — never the LLC's.</td><td><b>Not through our Stripe at all.</b> A Grants page explains and links out to the nonprofit's own application and giving pages.</td><td>Outside</td><td><span class="no">no page yet</span></td></tr>
+    </table>
+    <div class="rule"><b>The one rule that keeps it legal and auditable:</b> a ledger line belongs to exactly one lane, and <b>only Earnings moves money by transfer</b>. Tips and backing moved the moment the card was charged — the ledger only records them so the Money page can show them. Grants never touch the ledger, the database or the LLC's Stripe. Each creator has one Express account (<code>creator_payout_accounts</code>) that all three Stripe lanes pay into, and Stripe's own records (transfers vs. destination charges) tell the lanes apart on their side too.</div>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>2. The creator page as home base</h2><span class="tag">one link instead of linktree + ko-fi + kickstarter + a shop link</span></div>
+  <div class="frame">
+    <div class="hero">
+      <div class="av" style="background:var(--brass)">MR</div>
+      <div><div class="nm">Mara Reyes</div><span class="meta">@marareyes · Director, editor · <span class="chip ok" style="padding:2px 7px">✓ creator</span> · 2 titles · 3 shorts · 38 followers</span><div class="chips" style="margin-top:8px"><span class="chip on">In your lineup · $1.00/mo</span><span class="chip olive">You tipped $5 in Sep</span></div></div>
+      <div class="acts"><span class="btn sm">Following</span><span class="btn sm primary">✓ Supporting</span><span class="btn sm olive">Tip</span><span class="btn sm">Message</span></div>
+    </div>
+    <div class="plates">
+      <div class="plate"><span class="eyebrow">Watch</span><b>The Salt Hours · Low Tide</b><span>+ 3 shorts, 1 podcast</span></div>
+      <div class="plate"><span class="eyebrow mint">Back</span><b>Fawns</b><span>$3,400 of $5,500 · 41 backers</span></div>
+      <div class="plate"><span class="eyebrow olive">Shop</span><b>Studio Tapa</b><span>Her sticker sheet + zine → studiotapa.com</span></div>
+      <div class="plate"><span class="eyebrow sky">Crew</span><b>Working card</b><span>Director · editor · Brooklyn · 50 mi</span></div>
+      <div class="plate"><span class="eyebrow plum">Grants</span><b>From the Heart</b><span>Supported by the Juanita Foundation ↗</span></div>
+    </div>
+    <div class="linkbar"><span>Her link</span><b>studiotapatv.site/@marareyes</b><span class="chip">copy</span><span class="chip">QR</span><span class="meta" style="margin:0 0 0 auto">every join through it is hers (§3)</span></div>
+    <ul class="ideas" style="margin-top:14px">
+      <li><b>Already there:</b> titles, pitches, crew card, locations, follow, message, member badge, track record (<code>lib/profileHub.js</code>). <b>New:</b> the Support and Tip buttons, the Back plate when a pitch is funding, a Shop plate from a plain <code>shop_url</code> on the profile (Shopify's integration is still blocked, so a link to their collection on studiotapa.com is the honest v1), the Grants plate only for creators the foundation supports (a flag an admin sets).</li>
+      <li><b><code>/@handle</code></b> is a redirect to the profile page, which already accepts handles (migration 075). Short enough for a bio, a sticker, an end card.</li>
+      <li><b>The creator's "Your link" card</b> on the Money page (§6): copy, QR, and its numbers — clicks, joins, members still active.</li>
+      <li>Basic members see the Support button as <b>"Members fund creators · see plans"</b>; signed-out visitors get sign-in. Tip works for anyone signed in.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>3. Referral attribution — the mechanic that makes creators bring people</h2><span class="tag">earnings lane · the "bigger cut"</span></div>
+  <div class="frame">
+    <p class="lead">A fan who subscribes through a creator's link earns that creator a <b>referral bonus on every renewal</b>, for as long as that subscription lives — on top of the member share, and untouched by what the member later does with their lineup. The referred member also starts with the referrer as their first pick, so the share goes to them too until the member changes it.</p>
+    <div class="flow">
+      <div><b>1 · Click</b><code>/@mara</code> or <code>?via=mara</code> on any page sets a <code>via</code> cookie: 30 days, last click wins.<i>middleware.js</i></div>
+      <div><b>2 · Join</b>They sign up and pick a plan. Checkout carries <code>client_reference_id</code> = the member and <code>subscription_data.metadata.via</code> = Mara.<i>/api/create-checkout-session</i></div>
+      <div><b>3 · Lock</b>The first paid invoice writes <code>member_referrals</code>: member, creator, subscription, locked_at. Self-referral refused. Nothing locks on a $0 or trial invoice.<i>invoice.paid</i></div>
+      <div><b>4 · Earn</b>Every <code>invoice.paid</code> on that subscription adds a ledger line for Mara: <b>$1.00 Standard · $2.00 Premium · $1.00 Sponsor</b> (flat per tier, admin setting, locked per payment).<i>creator_ledger · kind = referral</i></div>
+      <div><b>5 · End</b>The subscription is cancelled → the attribution ends. Resubscribe within 90 days keeps it; after that the next link wins.<i>customer.subscription.deleted</i></div>
+    </div>
+    <div class="two" style="margin-top:14px">
+      <div class="card">
+        <span class="eyebrow pink">Worked example · Standard member via Mara's link</span>
+        <div class="h3" style="margin-top:6px">Lineup left as it starts (Mara is the only pick)</div>
+        <div class="sum">
+          <div><span>Member pays</span><b>$7.99</b></div>
+          <div><span>Stripe's card fee (2.9% + 30¢)</span><b>− $0.53</b></div>
+          <div><span>Member share → Mara, sole pick</span><b>$2.00</b></div>
+          <div><span>Referral bonus → Mara</span><b>$1.00</b></div>
+          <div class="total"><span>Mara, this month</span><b>$3.00 · 38% of the fee</b></div>
+          <div class="total"><span>Studio keeps</span><b>≈ $4.46</b></div>
+        </div>
+        <span class="meta" style="margin-top:10px">If the member later picks four creators: Mara $0.50 + $1.00 bonus = $1.50. The bonus doesn't move. Premium: $4 share + $2 bonus = $6 of $12.99 when Mara is the sole pick.</span>
+      </div>
+      <div>
+        <div class="card" style="margin-bottom:14px">
+          <span class="eyebrow olive">Optional · creator codes</span>
+          <div class="h3" style="margin-top:6px">A reason for the fan, a second attribution path</div>
+          <p class="lead" style="margin:6px 0 10px; font-size:.95rem">One Stripe coupon ("Creator welcome", say <b>$2 off the first month</b>) and a promotion code per creator — <code>MARA</code> — that the site creates through the API, first-time members only. A code on the invoice attributes the member even when the cookie is gone (typed on a phone, a different browser). Checkout already has <code>allow_promotion_codes</code> on.</p>
+          <span class="meta">Not the same thing as the existing promo codes (comped access, migration 041); those stay as they are. Whether fans get a discount at all is your call (§10).</span>
+        </div>
+        <ul class="ideas">
+          <li><b>Who the referrer is</b> is never shown to the member; it just shows up as "You joined through Mara's link" on their lineup card, with Mara pre-filled and removable.</li>
+          <li><b>Guards:</b> no self-referral, no bonus on $0 invoices, one attribution per subscription, an admin can void one (fraud, a creator removed). Referred members count on the creator's Money page and in Your Numbers.</li>
+          <li><b>Why flat, not a percentage:</b> "Bring a Standard member, earn $1 a month for as long as they stay" is a sentence a creator will repeat. A percentage of net is a spreadsheet.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>4. Tips — fan support, passed through</h2><span class="tag">fan support lane</span></div>
+  <div class="two">
+    <div class="card" style="max-width:420px">
+      <div class="card-head"><div><span class="eyebrow olive">Tip</span><div class="h2">Mara Reyes</div></div><div class="av" style="background:var(--brass)">MR</div></div>
+      <div class="presets"><span>$3</span><span class="on">$5</span><span>$10</span><span>Custom</span></div>
+      <div class="field" style="margin-bottom:8px">Say something (optional) <b>140</b></div>
+      <div class="sum">
+        <div><span>Mara receives</span><b>$4.75</b></div>
+        <div><span>Studio Tapa TV (5%)</span><b>$0.25</b></div>
+        <div><span>Card processing, covered by you</span><b>$0.45</b></div>
+        <div class="total"><span>You pay</span><b>$5.45</b></div>
+      </div>
+      <div style="display:flex; gap:14px; align-items:center; margin:12px 0; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim)"><span><span class="tog on"></span> Show my name to Mara</span></div>
+      <span class="btn olive" style="width:100%; text-align:center">Tip $5 →</span>
+      <span class="meta" style="margin-top:8px">Opens Stripe Checkout. Tips aren't refundable except by us; they're a thank-you, not a purchase.</span>
+    </div>
+    <div>
+      <ul class="ideas">
+        <li><b>Same plumbing as backing:</b> <code>createTipCheckout</code> in a new <code>lib/tips.js</code> → destination charge to the creator's Express account with <code>application_fee_amount</code> = cut + fee cover (<code>lib/donationMath.js</code> does this maths already) → <code>checkout.session.completed</code> with <code>metadata.type = tip</code> → <code>creator_tips</code> row completed. <code>charge.refunded</code> mirrored like donations.</li>
+        <li><b>Rules:</b> $1 minimum, $500 maximum, signed in. Cut = <code>site_settings.tip_platform_cut_percent</code> (5% proposed, same as Pitch Room's default), locked per tip. A creator takes tips once their account is <code>charges_enabled</code>; before that the button says "Mara hasn't set up payouts yet" and offers Follow.</li>
+        <li><b>The note</b> goes through <code>lib/moderation.js</code> (flags, a report path) and the creator can hide any. The creator gets a notification + email (Resend), at most one email per tipper per day.</li>
+        <li><b>Where the button lives:</b> the profile hero, under the player on episode pages ("Tip the maker"), and the end-of-episode card. The app opens Checkout in <code>expo-web-browser</code> like backing does.</li>
+        <li><b>Refunds</b> are admin-only and final, from the same admin page as donation refunds; the studio absorbs Stripe's fee.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>5. The member share — unchanged from v1</h2><span class="tag">earnings lane · see creator-share-v1.html for the full card</span></div>
+  <div class="frame">
+    <div class="three">
+      <div class="card">
+        <span class="eyebrow pink">Per tier · flat, admin-set, locked per payment</span>
+        <div class="sum" style="margin-top:8px">
+          <div><span>Standard $7.99</span><b>$2.00 share · $1.00 referral bonus</b></div>
+          <div><span>Premium $12.99</span><b>$4.00 share · $2.00 referral bonus</b></div>
+          <div><span>Sponsor $6.99</span><b>$2.00 share · $1.00 referral bonus (open)</b></div>
+          <div><span>Basic, team, comped, promo</span><b>nothing to split</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <span class="eyebrow pink">The lineup</span>
+        <p class="lead" style="margin:6px 0 0; font-size:.95rem">Up to 10 creators on the account page (and in the app), equal shares unless "set my own shares" is on, snapshot at each renewal, history per payment. Support buttons on profiles and titles add to it. Can't pick yourself.</p>
+      </div>
+      <div class="card">
+        <span class="eyebrow pink">The default</span>
+        <p class="lead" style="margin:6px 0 0; font-size:.95rem">Lineup set → all of it to the picks. Empty → follows what you watched the 30 days before the renewal (<code>watch_history</code>). Watched nothing → the site-wide pool by views (<code>creator_views</code>). Referred members start with their referrer picked.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>6. The creator's Money page — the reason they come back</h2><span class="tag">/creator/money · app: creator → money</span></div>
+  <div class="frame">
+    <div class="card-head"><div><span class="eyebrow">Creator · Mara Reyes</span><div class="h1" style="font-size:1.6rem">Money · October</div></div><div class="chips"><span class="chip ok">Payouts ready · bank ····4421</span><span class="chip">Export CSV</span></div></div>
+    <div class="kpis">
+      <div class="kpi earn"><b>$23.10</b><span>EARNINGS this month<br>member share $14.50 · referrals $8.60 · ads — soon</span></div>
+      <div class="kpi tip"><b>$27.00</b><span>TIPS · 6 tips, 5 people<br>already in your Stripe balance</span></div>
+      <div class="kpi back"><b>$340.00</b><span>BACKING · Fawns, 4 new backers<br>already in your Stripe balance</span></div>
+      <div class="kpi grant"><b>From the Heart</b><span>GRANTS · the Juanita Foundation<br>apply, report, and see your grant there ↗</span></div>
+    </div>
+    <div class="three">
+      <div class="card">
+        <span class="eyebrow pink">Earnings · pays out Nov 1</span>
+        <div class="sum" style="margin-top:8px">
+          <div><span>Carried over from September</span><b>$9.60</b></div>
+          <div><span>October so far</span><b>$23.10</b></div>
+          <div class="total"><span>Transfer on Nov 1 (≥ $10)</span><b>$32.70</b></div>
+        </div>
+        <span class="meta" style="margin-top:8px">Then Stripe pays your bank on your Express schedule — the Payouts card shows that part.</span>
+      </div>
+      <div class="card">
+        <span class="eyebrow sky">Your link · studiotapatv.site/@marareyes</span>
+        <div class="sum" style="margin-top:8px">
+          <div><span>Clicks, 30 days</span><b>212</b></div>
+          <div><span>Joined through it</span><b>14</b></div>
+          <div><span>Still members</span><b>9 · $8.60 / month</b></div>
+          <div><span>Code MARA used</span><b>3</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <span class="eyebrow olive">Supporters</span>
+        <div class="sum" style="margin-top:8px">
+          <div><span>Members with you in their lineup</span><b>6</b></div>
+          <div><span>By watching (default)</span><b>3</b></div>
+          <div><span>Tipped you this month</span><b>5</b></div>
+          <div><span>Names shown</span><b>2 · the rest anonymous</b></div>
+        </div>
+      </div>
+    </div>
+    <div class="hist">
+      <span class="eyebrow">History</span>
+      <div><span><span class="chip olive" style="padding:2px 7px">tip</span> Oct 16 · Anika K.</span><b>$4.75 · "the sound design in Low Tide!!"</b></div>
+      <div><span><span class="chip on" style="padding:2px 7px">earnings</span> Oct 14 · member share · 1 member</span><b>$1.00</b></div>
+      <div><span><span class="chip on" style="padding:2px 7px">earnings</span> Oct 14 · referral · 1 member renewed</span><b>$1.00</b></div>
+      <div><span><span class="chip mint" style="padding:2px 7px">backing</span> Oct 12 · Fawns · J. Hernandez</span><b>$95.00</b></div>
+      <div><span><span class="chip on" style="padding:2px 7px">payout</span> Oct 1 · transfer tr_… → your Stripe balance</span><b>$22.80</b></div>
+    </div>
+    <ul class="ideas" style="margin-top:14px">
+      <li><b>Your Numbers stays</b> for views; the pitch dashboard's earnings card links here; the Payouts card (setup state, balance, next payout) sits at the top of this page too. The app gets <code>creator/money.js</code> fed by <code>/api/creator/money</code>.</li>
+      <li>Every line links to its source: the member payment (anonymised), the tip, the backing, the Stripe transfer id. <b>Export CSV</b> for their accountant.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>7. The plumbing — ledger, batch, edge cases</h2><span class="tag">migration 088 + lib/creatorLedger.js</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <span class="eyebrow mint">Tables</span>
+        <ul class="ideas" style="margin-top:8px">
+          <li><code>member_lineups</code> — member, creator, weight, position; ≤ 10 per member, member ≠ creator.</li>
+          <li><code>member_customers</code> — Stripe customer id → Clerk user. Today the link only goes the other way (the Clerk user carries <code>stripeCustomerId</code>); an <code>invoice.paid</code> needs the reverse, so we write this row when a customer is linked and stamp <code>metadata.clerkUserId</code> on the Stripe customer too.</li>
+          <li><code>member_payments</code> — one per paid invoice: member, subscription, tier, amount, share, bonus, period, basis used. Unique on the invoice id.</li>
+          <li><code>member_referrals</code> — member, creator, subscription, locked_at, ended_at, source (link / code), voided_by.</li>
+          <li><code>creator_ledger</code> — creator, <b>lane</b> (earnings / tips / backing), <b>kind</b> (member_share / referral / ad_share / tip / backing / reversal / payout), signed cents, the source ids, created_at. Tips and backing lines are mirrors for the Money page (<code>moves_money = false</code>).</li>
+          <li><code>creator_payouts</code> — creator, cents, period, stripe_transfer_id, status, the ledger ids it covered.</li>
+          <li><code>creator_tips</code> — like <code>pitch_donations</code>: amount, cut, fee cover, status, note, visible.</li>
+          <li><code>site_settings</code> — share and bonus per tier, tip cut, payout minimum, the referral window and grace days.</li>
+        </ul>
+      </div>
+      <div>
+        <span class="eyebrow olive">Behaviour</span>
+        <ul class="ideas" style="margin-top:8px">
+          <li><b>Split maths is pure and tested</b> (<code>lib/creatorShareRules.js</code>, like <code>donationMath</code> and <code>adPlanRules</code>): cents never vanish in rounding — the remainder goes to the first pick.</li>
+          <li><b>The batch</b> (Vercel cron, the 1st, 09:00 UTC; "run now" + dry run on the admin page): for each creator with a ready account and ≥ $10 unpaid earnings, one <code>transfers.create</code> with <code>transfer_group</code> = the period and the ledger ids in metadata; a <code>payout</code> line closes them. It checks <code>balance.retrieve()</code> first and pays what the available balance covers, oldest first; the rest waits for the next run and the admin page says so.</li>
+          <li><b>Refund or dispute</b> on a membership payment: its share and bonus lines get a <code>reversal</code> if still unpaid; if already transferred, the studio absorbs it (same posture as Pitch Room). <code>charge.dispute.created</code> is a new webhook event.</li>
+          <li><b>Idempotent</b> through <code>stripe_events</code>; a replayed <code>invoice.paid</code> never splits twice (unique invoice id).</li>
+          <li><b>US creators only in v1.</b> Transfers from a US platform to a non-US account need Stripe's cross-border payouts and a different agreement; the Express onboarding already limits who gets an account.</li>
+          <li><b>Audit log</b> entries for every batch, void, refund and settings change. The admin page: <code>/admin/creator-money</code> (Pitch Room group): ledger by month, who's owed what, held balances, the batch and its history, referrals to review, tips refunds, settings.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>8. Stripe — what has to happen there</h2><span class="tag">the list you asked for</span></div>
+  <div class="three">
+    <div class="frame" style="margin:0">
+      <span class="eyebrow mint">Already in place</span>
+      <ul class="ideas" style="margin-top:8px">
+        <li><span class="yes">done</span>Live keys; the three tier products with <code>tier</code> metadata and one recurring price each; <code>STRIPE_PRICE_ID</code> fallback.</li>
+        <li><span class="yes">done</span>Customer Portal with plan switching.</li>
+        <li><span class="yes">done</span>Two webhook endpoints at <code>www.studiotapatv.site/api/webhook</code>: account (<code>checkout.session.completed/expired</code>, <code>charge.refunded</code>) and Connect (<code>account.updated</code>), each with its secret.</li>
+        <li><span class="yes">done</span>Express accounts created with <code>card_payments</code> + <code>transfers</code> requested; hosted onboarding; dashboard links; <code>account.updated</code> sync.</li>
+        <li><span class="yes">done</span>Destination charges with <code>application_fee_amount</code> (Pitch Room, Locations) and refunds mirrored.</li>
+        <li><span class="yes">done</span><code>stripe_events</code> idempotency; test/live switch by key in <code>lib/stripe.js</code>.</li>
+      </ul>
+    </div>
+    <div class="frame" style="margin:0">
+      <span class="eyebrow pink">Jose, in the Stripe dashboard</span>
+      <ol class="todo" style="margin-top:8px">
+        <li><div><b>Add events to the account webhook endpoint:</b> <code>invoice.paid</code>, <code>customer.subscription.updated</code>, <code>customer.subscription.deleted</code>, <code>charge.dispute.created</code>. (<code>invoice.payment_failed</code> is already there.) The Connect endpoint stays as it is.<span class="where">Developers → Webhooks → the www endpoint → Update → Select events</span></div></li>
+        <li><div><b>Connect settings:</b> finish the platform profile if Stripe still asks for it; set the Express branding (name, icon, colour — it's what creators see during onboarding and in their Express dashboard); confirm the statement descriptor.<span class="where">Settings → Connect → Platform settings / Branding</span></div></li>
+        <li><div><b>Tax forms:</b> turn on 1099 filing for connected accounts and decide who pays Stripe's per-form fee. Express onboarding collects the TIN. 1099-K covers card money that landed in their account (tips, backing); 1099-NEC the transfers (member share, referrals). Thresholds are the IRS's and changed for 2026 — confirm with your accountant before launch.<span class="where">Settings → Connect → Tax forms</span></div></li>
+        <li><div><b>The LLC's own balance:</b> transfers draw on the <i>available</i> balance. Either leave automatic daily payouts on and accept the batch pays what's available (the rest waits a month), or move the LLC's payout schedule to weekly so the 1st has cover. Your call (§10).<span class="where">Settings → Payouts (your account)</span></div></li>
+        <li><div><b>Only if fans get a welcome discount:</b> one coupon ("Creator welcome", $2 off, duration once). The site then creates the per-creator promotion codes on it through the API. No discount → nothing to do.<span class="where">Products → Coupons</span></div></li>
+        <li><div><b>Do 1–5 in test mode first</b> with the test endpoints and secrets on a Vercel preview, then once more in live. Stripe's <b>test clocks</b> let us advance a test subscription a month in seconds, so a whole year of renewals, cancellations and bonuses can be rehearsed in an afternoon.<span class="where">Toggle "Test mode" top-right; Developers → Test clocks</span></div></li>
+        <li><div><b>Nothing to do</b> for tips and backing (Checkout with ad-hoc prices), the Portal, or Radar.</div></li>
+      </ol>
+    </div>
+    <div class="frame" style="margin:0">
+      <span class="eyebrow olive">Code (mine), in order</span>
+      <ol class="todo" style="margin-top:8px">
+        <li><div>Migration 088 + <code>lib/creatorShareRules.js</code> (pure maths, tests).</div></li>
+        <li><div><code>member_customers</code> + stamping the Stripe customer; <code>invoice.paid</code> → payment → split → ledger; subscription updated/deleted; dispute reversal.</div></li>
+        <li><div>Lineup API + the account card + Support buttons (web, then app).</div></li>
+        <li><div>Referral: <code>via</code> cookie in <code>middleware.js</code>, Checkout metadata, lock on first invoice, bonus lines, creator codes (if yes), the "Your link" card.</div></li>
+        <li><div>Tips: <code>lib/tips.js</code>, Checkout, webhook branch, the Tip sheet (profile, episode, app), moderation hook.</div></li>
+        <li><div>The batch (cron + admin run/dry-run), <code>/admin/creator-money</code>, new rows on the Payments checklist: <code>invoice.paid</code> and <code>charge.dispute.created</code> subscribed, migration 088, available balance vs. the pending batch, ready Express accounts, a manual tick for tax forms.</div></li>
+        <li><div><code>/creator/money</code> (web + app), Terms words live, About line, tier perks line. Then a full test-clock rehearsal before the first live transfer.</div></li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>9. Terms — v1's drafts stand; these are the additions</h2><span class="tag">numbers bracketed</span></div>
+  <div class="two">
+    <div class="draft">
+      <h4>Section 5 · if you submit work — after "Member share"</h4>
+      <p><strong>Referral bonus.</strong> When someone subscribes through your creator link or code, we credit you <mark>$1.00</mark> (Standard, Sponsor) or <mark>$2.00</mark> (Premium) for each renewal of that subscription while it stays active, on top of any member share. A subscription is attributed once, to the last link or code used in the <mark>30 days</mark> before joining; it ends when the subscription is cancelled, unless it is resumed within <mark>90 days</mark>. You may not refer yourself, pay people to subscribe, or run ads that misrepresent Studio Tapa TV; we can void an attribution that breaks this. Bonuses are paid with your member share, under the same schedule and minimum.</p>
+      <p><strong>Advertising revenue.</strong> <mark>[still to be decided; the ledger is built to take it when it is]</mark></p>
+      <p><strong>Grants.</strong> Grants from The Juanita Foundation are made by From the Heart, a separate nonprofit, under its own terms. Studio Tapa TV only links to it; we don't take, hold, or decide on grant money.</p>
+    </div>
+    <div class="draft">
+      <h4>New section · Tips</h4>
+      <p><strong>For fans.</strong> You can tip a creator from their profile or a title's page. A tip is a thank-you, not a purchase: it buys nothing and isn't a donation to a charity. Of each tip, Studio Tapa TV keeps <mark>5%</mark> and you cover the card processing fee shown before you pay; the rest goes to the creator's account at Stripe. Tips are final except where the law requires a refund or we decide one is warranted — email <mark>contact address</mark>. Notes with tips are moderated; be kind.</p>
+      <p><strong>For creators.</strong> Tips reach your connected Stripe account at the moment they're paid, less our cut and the processing fee the fan covered. You're responsible for your own taxes on tips, member share, bonuses and backing; Stripe issues the forms where the law requires it.</p>
+      <p><strong>Section 4 addition.</strong> The "Your creator share" paragraph from v1, plus one sentence: "If you joined through a creator's link, they're your first pick until you change it, and they receive a referral bonus from us that doesn't come out of your share."</p>
+    </div>
+  </div>
+</section>
+
+<!-- 10 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>10. Decided / proposed / open</h2><span class="tag">sign-off list</span></div>
+  <div class="two">
+    <div class="frame" style="margin:0">
+      <span class="eyebrow mint">From Jose</span>
+      <ul class="ideas" style="margin-top:8px">
+        <li>Four lanes, kept apart: Earnings · Fan support · Project backing · Grants (nonprofit, outside).</li>
+        <li>Members point their share at up to 10 creators; a default until they do.</li>
+        <li>Referrals: a creator who brings a member gets a bigger cut of that subscription.</li>
+        <li>The creator page is the home base; one link. A transparent dashboard with earnings, referrals and backing.</li>
+        <li>Real payouts through Stripe Connect (already built for backing; this extends it).</li>
+      </ul>
+      <span class="eyebrow olive" style="margin-top:14px">Proposed here</span>
+      <ul class="ideas" style="margin-top:8px">
+        <li>Share $2 / $4 / $2; bonus $1 / $2 / $1; flat, admin-set, locked per payment.</li>
+        <li>Referral: 30-day last click, locked on the first paid invoice, ends on cancel, 90-day grace; referrer = first pick.</li>
+        <li>Tips: 5% cut, $1–$500, fee covered by the fan, notes moderated, names opt-in.</li>
+        <li>Earnings paid monthly on the 1st, $10 minimum, carry-over; tips and backing settle instantly.</li>
+        <li>Money page at /creator/money; admin at /admin/creator-money; Grants as a link-out plate and page.</li>
+      </ul>
+    </div>
+    <div class="ask">
+      <span class="eyebrow pink">Open — your call</span>
+      <ol style="margin-top:8px">
+        <li><b>The numbers.</b> Share $2 / $4, bonus $1 / $2 — and Sponsor on Standard's or Premium's amounts?</li>
+        <li><b>Welcome discount.</b> Do fans get $2 off their first month through a creator code, or is the link alone the deal?</li>
+        <li><b>Tips.</b> 5% cut? $500 cap? Tipper names opt-in (proposed) or shown by default like backers?</li>
+        <li><b>The default</b> when a lineup is empty: your watching → pool (proposed), straight to the pool, or your picks of the month. Studio Tapa's own titles in the pool?</li>
+        <li><b>Shares.</b> Equal only in v1, or the 5% steppers now?</li>
+        <li><b>Payouts.</b> $10 minimum, the 1st, unclaimed credit → pool after 12 months? And the LLC balance: leave daily payouts and pay what's available, or weekly payouts so the batch always clears?</li>
+        <li><b>1099s.</b> Stripe files them; who pays the per-form fee — the studio, or deducted from the creator?</li>
+        <li><b>Grants page.</b> The words, and From the Heart's application and giving links. Which creators get the plate?</li>
+        <li><b>Names.</b> "Money" for the page, "Support" and "Tip" for the buttons, "Creator Share" for the whole thing?</li>
+        <li><b>Terms.</b> Approve v1's §4/§5 drafts plus the additions above, with the numbers — nothing pays out before they're live.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
