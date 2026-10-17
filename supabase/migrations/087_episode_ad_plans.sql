@@ -17,7 +17,9 @@
 -- internal, Studio Tapa's own ads only. Run after 086.
 
 create table if not exists episode_ad_plans (
-  episode_id uuid primary key references episodes(id) on delete cascade,
+  -- episodes.id is text (not uuid) on this database, like every other
+  -- table that points at an episode.
+  episode_id text primary key references episodes(id) on delete cascade,
   status text not null default 'draft' check (status in ('draft', 'ready')),
   -- [{ "at": seconds, "pieces": [{ "kind": "exact", "seconds": 15 } |
   --   { "kind": "range", "min": 10, "max": 15 } | { "kind": "flex", "seconds": 60 } |
