@@ -88,7 +88,7 @@
   .hero .av { width:64px; height:64px; font-size:1.3rem; }
   .hero .nm { font-size:1.25rem; }
   .hero .acts { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
-  .plates { display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; margin-top:12px; }
+  .plates { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin-top:12px; }
   @media (max-width:860px) { .plates { grid-template-columns:1fr 1fr; } }
   .plate { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px 14px; }
   .plate .eyebrow { margin-bottom:4px; }
@@ -97,12 +97,12 @@
   .linkbar { display:flex; gap:10px; align-items:center; background:var(--surface-2); border:1px dashed rgba(251,232,211,.3); border-radius:12px; padding:12px 14px; margin-top:12px; font-family:var(--font-mono); font-size:.84rem; }
   .linkbar b { color:var(--ink); font-weight:500; }
 
-  .kpis { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; margin:10px 0 12px; }
-  @media (max-width:860px) { .kpis { grid-template-columns:1fr 1fr; } }
+  .kpis { display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin:10px 0 12px; }
+  @media (max-width:860px) { .kpis { grid-template-columns:1fr 1fr; } .kpi.earn { grid-column:1 / -1; } }
   .kpi { background:var(--surface-2); border-radius:10px; padding:12px 14px; border-top:3px solid var(--surface-3); }
   .kpi b { display:block; font-family:var(--font-display); font-size:1.4rem; line-height:1.1; }
   .kpi span { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); display:block; margin-top:4px; line-height:1.4; }
-  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); } .kpi.grant { border-top-color:var(--plum); }
+  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); }
 
   .sum { font-family:var(--font-mono); font-size:.8rem; }
   .sum div { display:flex; justify-content:space-between; gap:12px; padding:6px 0; border-bottom:1px solid var(--hair); color:var(--ink-dim); }
@@ -138,7 +138,7 @@
 <div class="intro">
   <span class="tag">mockup · creator share · v2 · 2026-10-17 · builds on v1</span>
   <h1>Creator Share v2 — the money lanes, the creator's home base, referrals, tips, and what to do in Stripe</h1>
-  <p class="note">v1 designed the member's side: a slice of every paid membership that the member points at up to 10 creators, with a default until they do. v2 is the whole loop around it. <b>Creators bring their audience → fans watch, subscribe, tip and back projects → money flows back to creators → the library grows → it attracts new viewers and creators.</b> It only turns if a creator has a reason to send fans to their Studio Tapa TV link instead of YouTube or Patreon, so v2 adds the four things that give them one, keeps the four money lanes apart from the start, and ends with the exact list of what has to happen in Stripe.</p>
+  <p class="note">v1 designed the member's side: a slice of every paid membership that the member points at up to 10 creators, with a default until they do. v2 is the whole loop around it. <b>Creators bring their audience → fans watch, subscribe, tip and back projects → money flows back to creators → the library grows → it attracts new viewers and creators.</b> It only turns if a creator has a reason to send fans to their Studio Tapa TV link instead of YouTube or Patreon, so v2 adds the four things that give them one, keeps the money lanes apart from the start, and ends with the exact list of what has to happen in Stripe.</p>
   <div class="flow loop">
     <div><b>1 · Creator shares one link</b>Their profile is the home base: watch, support, tip, back, shop, follow.<i>studiotapatv.site/@handle</i></div>
     <div><b>2 · Fan joins through it</b>Watches free with ads, or subscribes to Tapa +. The link is remembered.<i>referral attribution</i></div>
@@ -150,16 +150,14 @@
 
 <!-- 1 ─────────────────────────────────────────────── -->
 <section class="sec">
-  <div class="sec-head"><h2>1. Four money lanes, kept apart</h2><span class="tag">designed in from the start</span></div>
+  <div class="sec-head"><h2>1. Three money lanes, kept apart</h2><span class="tag">designed in from the start</span></div>
   <div class="frame">
     <table>
       <tr><th>Lane</th><th>What it is</th><th>Whose money</th><th>Stripe shape</th><th>Settles</th><th>Today</th></tr>
       <tr><td><b><i class="lane" style="background:var(--brass)"></i>Earnings</b></td><td>Revenue share: the <b>member share</b> (v1), the <b>referral bonus</b> (§3), and later an <b>ad share</b>.</td><td>The LLC's revenue, paid out as a share.</td><td>Membership payments land in the LLC's balance → a ledger line per creator → <b>one Connect transfer per creator each month</b>.</td><td>Monthly, 1st</td><td><span class="yes">subscriptions live</span><span class="no">no ledger, no transfers</span></td></tr>
       <tr><td><b><i class="lane" style="background:var(--olive)"></i>Fan support</b></td><td><b>Tips</b> to one creator (§4).</td><td>The fan's money, passed through; the LLC keeps a small cut.</td><td>One-time Checkout, <b>destination charge</b> to the creator's Express account, the cut + card fee as the application fee — the exact shape of Pitch Room backing.</td><td>At the tip</td><td><span class="no">not built</span></td></tr>
-      <tr><td><b><i class="lane" style="background:var(--mint)"></i>Project backing</b></td><td><b>Pitch Room</b>.</td><td>The backer's money for a project; the LLC's cut per pitch.</td><td>Destination charge to the creator's Express account (built, 2026-10-11).</td><td>At the backing</td><td><span class="yes">built</span><span class="soon">"rewards-based" isn't: backing is donation-style today, no reward tiers</span></td></tr>
-      <tr><td><b><i class="lane" style="background:var(--plum)"></i>Grants</b></td><td>The Juanita Foundation, through From the Heart.</td><td>The nonprofit's — never the LLC's.</td><td><b>Not through our Stripe at all.</b> A Grants page explains and links out to the nonprofit's own application and giving pages.</td><td>Outside</td><td><span class="no">no page yet</span></td></tr>
-    </table>
-    <div class="rule"><b>The one rule that keeps it legal and auditable:</b> a ledger line belongs to exactly one lane, and <b>only Earnings moves money by transfer</b>. Tips and backing moved the moment the card was charged — the ledger only records them so the Money page can show them. Grants never touch the ledger, the database or the LLC's Stripe. Each creator has one Express account (<code>creator_payout_accounts</code>) that all three Stripe lanes pay into, and Stripe's own records (transfers vs. destination charges) tell the lanes apart on their side too.</div>
+      <tr><td><b><i class="lane" style="background:var(--mint)"></i>Project backing</b></td><td><b>Pitch Room</b>.</td><td>The backer's money for a project; the LLC's cut per pitch.</td><td>Destination charge to the creator's Express account (built, 2026-10-11).</td><td>At the backing</td><td><span class="yes">built</span><span class="soon">"rewards-based" isn't: backing is donation-style today, no reward tiers</span></td></tr>    </table>
+    <div class="rule"><b>The one rule that keeps it legal and auditable:</b> a ledger line belongs to exactly one lane, and <b>only Earnings moves money by transfer</b>. Tips and backing moved the moment the card was charged — the ledger only records them so the Money page can show them. Each creator has one Express account (<code>creator_payout_accounts</code>) that all three lanes pay into, and Stripe's own records (transfers vs. destination charges) tell the lanes apart on their side too.</div>
   </div>
 </section>
 
@@ -176,12 +174,10 @@
       <div class="plate"><span class="eyebrow">Watch</span><b>The Salt Hours · Low Tide</b><span>+ 3 shorts, 1 podcast</span></div>
       <div class="plate"><span class="eyebrow mint">Back</span><b>Fawns</b><span>$3,400 of $5,500 · 41 backers</span></div>
       <div class="plate"><span class="eyebrow olive">Shop</span><b>Studio Tapa</b><span>Her sticker sheet + zine → studiotapa.com</span></div>
-      <div class="plate"><span class="eyebrow sky">Crew</span><b>Working card</b><span>Director · editor · Brooklyn · 50 mi</span></div>
-      <div class="plate"><span class="eyebrow plum">Grants</span><b>From the Heart</b><span>Supported by the Juanita Foundation ↗</span></div>
-    </div>
+      <div class="plate"><span class="eyebrow sky">Crew</span><b>Working card</b><span>Director · editor · Brooklyn · 50 mi</span></div>    </div>
     <div class="linkbar"><span>Her link</span><b>studiotapatv.site/@marareyes</b><span class="chip">copy</span><span class="chip">QR</span><span class="meta" style="margin:0 0 0 auto">every join through it is hers (§3)</span></div>
     <ul class="ideas" style="margin-top:14px">
-      <li><b>Already there:</b> titles, pitches, crew card, locations, follow, message, member badge, track record (<code>lib/profileHub.js</code>). <b>New:</b> the Support and Tip buttons, the Back plate when a pitch is funding, a Shop plate from a plain <code>shop_url</code> on the profile (Shopify's integration is still blocked, so a link to their collection on studiotapa.com is the honest v1), the Grants plate only for creators the foundation supports (a flag an admin sets).</li>
+      <li><b>Already there:</b> titles, pitches, crew card, locations, follow, message, member badge, track record (<code>lib/profileHub.js</code>). <b>New:</b> the Support and Tip buttons, the Back plate when a pitch is funding, a Shop plate from a plain <code>shop_url</code> on the profile (Shopify's integration is still blocked, so a link to their collection on studiotapa.com is the honest v1).</li>
       <li><b><code>/@handle</code></b> is a redirect to the profile page, which already accepts handles (migration 075). Short enough for a bio, a sticker, an end card.</li>
       <li><b>The creator's "Your link" card</b> on the Money page (§6): copy, QR, and its numbers — clicks, joins, members still active.</li>
       <li>Basic members see the Support button as <b>"Members fund creators · see plans"</b>; signed-out visitors get sign-in. Tip works for anyone signed in.</li>
@@ -296,9 +292,7 @@
     <div class="kpis">
       <div class="kpi earn"><b>$23.10</b><span>EARNINGS this month<br>member share $14.50 · referrals $8.60 · ads — soon</span></div>
       <div class="kpi tip"><b>$27.00</b><span>TIPS · 6 tips, 5 people<br>already in your Stripe balance</span></div>
-      <div class="kpi back"><b>$340.00</b><span>BACKING · Fawns, 4 new backers<br>already in your Stripe balance</span></div>
-      <div class="kpi grant"><b>From the Heart</b><span>GRANTS · the Juanita Foundation<br>apply, report, and see your grant there ↗</span></div>
-    </div>
+      <div class="kpi back"><b>$340.00</b><span>BACKING · Fawns, 4 new backers<br>already in your Stripe balance</span></div>    </div>
     <div class="three">
       <div class="card">
         <span class="eyebrow pink">Earnings · pays out Nov 1</span>
@@ -425,9 +419,7 @@
     <div class="draft">
       <h4>Section 5 · if you submit work — after "Member share"</h4>
       <p><strong>Referral bonus.</strong> When someone subscribes through your creator link or code, we credit you <mark>$1.00</mark> (Standard, Sponsor) or <mark>$2.00</mark> (Premium) for each renewal of that subscription while it stays active, on top of any member share. A subscription is attributed once, to the last link or code used in the <mark>30 days</mark> before joining; it ends when the subscription is cancelled, unless it is resumed within <mark>90 days</mark>. You may not refer yourself, pay people to subscribe, or run ads that misrepresent Studio Tapa TV; we can void an attribution that breaks this. Bonuses are paid with your member share, under the same schedule and minimum.</p>
-      <p><strong>Advertising revenue.</strong> <mark>[still to be decided; the ledger is built to take it when it is]</mark></p>
-      <p><strong>Grants.</strong> Grants from The Juanita Foundation are made by From the Heart, a separate nonprofit, under its own terms. Studio Tapa TV only links to it; we don't take, hold, or decide on grant money.</p>
-    </div>
+      <p><strong>Advertising revenue.</strong> <mark>[still to be decided; the ledger is built to take it when it is]</mark></p>    </div>
     <div class="draft">
       <h4>New section · Tips</h4>
       <p><strong>For fans.</strong> You can tip a creator from their profile or a title's page. A tip is a thank-you, not a purchase: it buys nothing and isn't a donation to a charity. Of each tip, Studio Tapa TV keeps <mark>5%</mark> and you cover the card processing fee shown before you pay; the rest goes to the creator's account at Stripe. Tips are final except where the law requires a refund or we decide one is warranted — email <mark>contact address</mark>. Notes with tips are moderated; be kind.</p>
@@ -444,7 +436,7 @@
     <div class="frame" style="margin:0">
       <span class="eyebrow mint">From Jose</span>
       <ul class="ideas" style="margin-top:8px">
-        <li>Four lanes, kept apart: Earnings · Fan support · Project backing · Grants (nonprofit, outside).</li>
+        <li>Three lanes, kept apart: Earnings · Fan support · Project backing.</li>
         <li>Members point their share at up to 10 creators; a default until they do.</li>
         <li>Referrals: a creator who brings a member gets a bigger cut of that subscription.</li>
         <li>The creator page is the home base; one link. A transparent dashboard with earnings, referrals and backing.</li>
@@ -456,7 +448,7 @@
         <li>Referral: 30-day last click, locked on the first paid invoice, ends on cancel, 90-day grace; referrer = first pick.</li>
         <li>Tips: 5% cut, $1–$500, fee covered by the fan, notes moderated, names opt-in.</li>
         <li>Earnings paid monthly on the 1st, $10 minimum, carry-over; tips and backing settle instantly.</li>
-        <li>Money page at /creator/money; admin at /admin/creator-money; Grants as a link-out plate and page.</li>
+        <li>Money page at /creator/money; admin at /admin/creator-money.</li>
       </ul>
     </div>
     <div class="ask">
@@ -468,9 +460,7 @@
         <li><b>The default</b> when a lineup is empty: your watching → pool (proposed), straight to the pool, or your picks of the month. Studio Tapa's own titles in the pool?</li>
         <li><b>Shares.</b> Equal only in v1, or the 5% steppers now?</li>
         <li><b>Payouts.</b> $10 minimum, the 1st, unclaimed credit → pool after 12 months? And the LLC balance: leave daily payouts and pay what's available, or weekly payouts so the batch always clears?</li>
-        <li><b>1099s.</b> Stripe files them; who pays the per-form fee — the studio, or deducted from the creator?</li>
-        <li><b>Grants page.</b> The words, and From the Heart's application and giving links. Which creators get the plate?</li>
-        <li><b>Names.</b> "Money" for the page, "Support" and "Tip" for the buttons, "Creator Share" for the whole thing?</li>
+        <li><b>1099s.</b> Stripe files them; who pays the per-form fee — the studio, or deducted from the creator?</li>        <li><b>Names.</b> "Money" for the page, "Support" and "Tip" for the buttons, "Creator Share" for the whole thing?</li>
         <li><b>Terms.</b> Approve v1's §4/§5 drafts plus the additions above, with the numbers — nothing pays out before they're live.</li>
       </ol>
     </div>

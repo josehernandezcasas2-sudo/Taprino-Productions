@@ -37,6 +37,7 @@
   @media (max-width: 900px) {
     .split { grid-template-columns:1fr; }
     .seg { display:inline-flex; }
+    .kpis { grid-template-columns:1fr 1fr; } .kpi.earn { grid-column:1 / -1; }
     body[data-view="member"] .pane.creator { display:none; }
     body[data-view="creator"] .pane.member { display:none; }
   }
@@ -108,11 +109,11 @@
   .sum div { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--hair); color:var(--ink-dim); }
   .sum div b { color:var(--ink); font-weight:500; }
   .sum div.total { border-bottom:0; color:var(--ink); font-weight:600; }
-  .kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0 12px; }
+  .kpis { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin:10px 0 12px; }
   .kpi { background:var(--surface-2); border-radius:10px; padding:10px 12px; border-top:3px solid var(--surface-3); }
   .kpi b { display:block; font-family:var(--font-display); font-size:1.3rem; line-height:1.1; }
   .kpi span { font-family:var(--font-mono); font-size:.64rem; color:var(--ink-faint); display:block; margin-top:4px; line-height:1.4; }
-  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); } .kpi.grant { border-top-color:var(--plum); }
+  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); }
   .you { background:rgba(248,95,115,.08); border-radius:10px; padding:2px 10px; margin:4px -10px; }
   .flash { animation:flash .9s ease; }
   @keyframes flash { 0% { background:rgba(132,205,152,.35); } 100% { background:transparent; } }
@@ -351,9 +352,7 @@
       <div class="kpis">
         <div class="kpi earn"><b>${dollars(month)}</b><span>EARNINGS this month<br>member share ${dollars(c.month + L.month)} · referrals ${dollars(L.bonus)}</span></div>
         <div class="kpi tip"><b>${dollars(c.tips)}</b><span>TIPS · already in your Stripe balance</span></div>
-        <div class="kpi back"><b>${dollars(c.backing)}</b><span>BACKING · Pitch Room, already in your balance</span></div>
-        <div class="kpi grant"><b>From the Heart</b><span>GRANTS · the Juanita Foundation ↗</span></div>
-      </div>
+        <div class="kpi back"><b>${dollars(c.backing)}</b><span>BACKING · Pitch Room, already in your balance</span></div>      </div>
       <span class="eyebrow pink">Earnings · pays out on the 1st</span>
       <div class="sum" style="margin:4px 0 12px">
         <div><span>Carried over</span><b>${dollars(c.carried)}</b></div>
