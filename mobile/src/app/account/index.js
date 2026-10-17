@@ -21,6 +21,7 @@ import PositionedImage from '../../components/PositionedImage';
 import CropWindow from '../../components/CropWindow';
 import PayoutsCard from '../../components/PayoutsCard';
 import ReferralCard from '../../components/ReferralCard';
+import MemberSupportCard from '../../components/MemberSupportCard';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to answer' },
@@ -810,6 +811,7 @@ export default function Account() {
 
         {/* Payouts — creators and admins only; same card as the web /account */}
         {(dashboard.isCreator || dashboard.isAdmin) ? <PayoutsCard /> : null}
+        {(dashboard.isCreator || dashboard.isAdmin) ? <MemberSupportCard /> : null}
         {(dashboard.isCreator || dashboard.isAdmin) ? <ReferralCard /> : null}
 
         {/* Security */}

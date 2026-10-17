@@ -9595,3 +9595,23 @@ a.asup-name:hover { color: var(--brass); }
 .refc-stat { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
 .refc-stat b { display: block; font-family: var(--font-display); font-size: 1.3rem; line-height: 1.1; }
 .refc-stat span { font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); }
+
+/* Member support card (components/creator/MemberSupportCard.js) */
+.msc-next { background: var(--void); border: 1px solid rgba(231,162,85,0.45); border-radius: 6px; padding: 0.9rem 1rem; margin: 0 0 0.8rem; }
+.msc-next-amount { font-family: var(--font-display); font-size: 1.55rem; font-weight: 700; margin: 0.3rem 0 0.2rem; font-variant-numeric: tabular-nums; color: var(--olive-bright, var(--olive)); }
+
+/* Creator Share payouts (components/admin/CreatorMoneyPanel.js) */
+.cm-sub { font-size: 0.82rem; line-height: 1.5; color: var(--ink-dim); max-width: 60ch; }
+.cm-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2rem; align-items: start; }
+.cm-code { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); word-break: break-all; }
+.cm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.cm-table { width: 100%; border-collapse: collapse; font-size: 0.78rem; }
+.cm-table th { text-align: left; font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); font-weight: 500; padding: 0.3rem 0.5rem 0.3rem 0; border-bottom: 1px solid var(--ocean-ink); white-space: nowrap; }
+.cm-table td { padding: 0.4rem 0.5rem 0.4rem 0; border-bottom: 1px solid rgba(251, 232, 211, 0.06); vertical-align: top; }
+.cm-result { font-size: 0.86rem; margin: 0.6rem 0 0; }
+.cm-result .bad { color: var(--danger); }
+.cm-fail { display: block; font-family: var(--font-mono); font-size: 0.74rem; color: var(--danger); margin-top: 0.2rem; }
+@media (max-width: 900px) {
+  .cm-cols { grid-template-columns: 1fr; }
+  .adm-stats.cm-stats { grid-template-columns: repeat(2, 1fr); }
+}

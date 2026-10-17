@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
-  buildLedgerLines, reversalLinesFor, referralIsActive, cleanViaSlug
+  buildLedgerLines, reversalLinesFor, referralIsActive, cleanViaSlug, planPayouts, applyBalance
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -91,6 +91,38 @@ test('cleanViaSlug: handles and ids pass, junk does not', () => {
   assert.equal(cleanViaSlug('<script>'), '');
   assert.equal(cleanViaSlug(''), '');
   assert.equal(cleanViaSlug(null), '');
+});
+
+test('planPayouts: pays ready accounts over the minimum, holds the rest with a reason, carries non-positive balances', () => {
+  const owed = [
+    { creatorId: 'mara', cents: 1400, lineIds: ['a'], oldestAt: '2026-10-02' },
+    { creatorId: 'dev', cents: 1200, lineIds: ['b'], oldestAt: '2026-10-01' },
+    { creatorId: 'lena', cents: 1200, lineIds: ['c'], oldestAt: '2026-10-03' },
+    { creatorId: 'sol', cents: 900, lineIds: ['d'], oldestAt: '2026-10-04' },
+    { creatorId: 'ruth', cents: -50, lineIds: ['e'], oldestAt: '2026-10-05' },
+    { creatorId: 'hugo', cents: 1000, lineIds: ['f'], oldestAt: '2026-09-30' }
+  ];
+  const accounts = {
+    mara: { stripeAccountId: 'acct_m', chargesEnabled: true },
+    lena: { stripeAccountId: 'acct_l', chargesEnabled: false },
+    sol: { stripeAccountId: 'acct_s', chargesEnabled: true },
+    hugo: { stripeAccountId: 'acct_h', chargesEnabled: true }
+  };
+  const plan = planPayouts({ owed, accounts, minimumCents: 1000 });
+  assert.deepEqual(plan.pay.map((p) => [p.creatorId, p.cents, p.stripeAccountId]), [['hugo', 1000, 'acct_h'], ['mara', 1400, 'acct_m']]);
+  assert.deepEqual(plan.held.map((h) => [h.creatorId, h.reason]), [['dev', 'no payout account'], ['lena', 'payout account not ready'], ['sol', 'under the minimum']]);
+  assert.deepEqual(plan.carry.map((c) => c.creatorId), ['ruth']);
+  assert.equal(plan.payCents, 2400);
+  assert.equal(plan.heldCents, 3300);
+});
+
+test('applyBalance: pays in order while the platform balance covers it', () => {
+  const pay = [{ creatorId: 'a', cents: 1000 }, { creatorId: 'b', cents: 1400 }, { creatorId: 'c', cents: 1000 }];
+  const out = applyBalance(pay, 2100);
+  assert.deepEqual(out.pay.map((p) => p.creatorId), ['a', 'c']);
+  assert.deepEqual(out.skippedForBalance.map((p) => [p.creatorId, p.reason]), [['b', 'platform balance too low']]);
+  assert.equal(applyBalance(pay, Infinity).pay.length, 3);
+  assert.equal(applyBalance(pay, null).pay.length, 3);
 });
 
 console.log(`\n${passed} passed`);

@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/expire-content",
       "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/creator-payouts",
+      "schedule": "0 9 1 * *"
     }
   ]
 }
