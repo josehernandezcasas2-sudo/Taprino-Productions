@@ -1,0 +1,427 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator Share — playable: the member picks, the creator sees it</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e;
+    --brass:#f85f73; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); font-size:16px; padding:18px 16px 60px; }
+  button { font:inherit; cursor:pointer; }
+  .top { max-width:1240px; margin:0 auto 14px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  .top h1 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.72rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .top .hint { color:var(--ink-dim); font-size:.92rem; flex:1 1 320px; line-height:1.45; }
+  .seg { display:none; gap:4px; background:var(--surface-1); border:1px solid var(--hair); border-radius:999px; padding:3px; }
+  .seg button { background:transparent; border:0; color:var(--ink-dim); font-family:var(--font-mono); font-size:.74rem; padding:7px 14px; border-radius:999px; }
+  .seg button.on { background:var(--brass); color:#241a05; font-weight:700; }
+  .btn { font-family:var(--font-mono); font-size:.78rem; padding:8px 14px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.olive { background:var(--olive); border-color:var(--olive); color:#241a05; font-weight:700; }
+  .btn.sm { padding:5px 11px; font-size:.7rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+
+  .split { max-width:1240px; margin:0 auto; display:grid; grid-template-columns:1fr 1fr; gap:16px; align-items:start; }
+  .pane { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:18px; min-width:0; }
+  .pane-head { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:12px; }
+  .pane-head h2 { font-family:var(--font-display); font-size:1rem; margin:0; }
+  @media (max-width: 900px) {
+    .split { grid-template-columns:1fr; }
+    .seg { display:inline-flex; }
+    body[data-view="member"] .pane.creator { display:none; }
+    body[data-view="creator"] .pane.member { display:none; }
+  }
+
+  .eyebrow { font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); } .eyebrow.sky { color:var(--sky); }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.3rem; line-height:1.15; margin:3px 0 4px; }
+  .h3 { font-family:var(--font-display); font-weight:700; font-size:1rem; line-height:1.2; margin:0; }
+  .meta { font-family:var(--font-mono); font-size:.7rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.68rem; padding:4px 9px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; white-space:nowrap; border:1px solid transparent; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.mint { color:var(--mint); background:rgba(147,208,164,.14); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  button.chip { cursor:pointer; } button.chip.sel { border-color:var(--ink-faint); color:var(--ink); }
+  .dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--brass); margin-left:5px; vertical-align:1px; }
+
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:16px 18px; margin-bottom:12px; }
+  .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:10px; flex-wrap:wrap; }
+  .pool { display:flex; align-items:baseline; gap:10px; margin:4px 0 2px; flex-wrap:wrap; }
+  .pool b { font-family:var(--font-display); font-size:1.7rem; line-height:1; }
+  .pool span { color:var(--ink-dim); font-size:.92rem; }
+  .bar { height:8px; border-radius:999px; background:var(--surface-3); overflow:hidden; display:flex; margin:10px 0 4px; }
+  .bar i { display:block; height:100%; transition:width .25s ease; }
+  .row { display:grid; grid-template-columns:38px 1fr auto auto; gap:10px; align-items:center; padding:9px 0; border-top:1px solid var(--hair); }
+  .row:first-child { border-top:0; }
+  .av { width:38px; height:38px; border-radius:50%; display:grid; place-items:center; font-family:var(--font-display); font-weight:700; font-size:.82rem; color:#0f1a12; flex:none; }
+  .nm { font-family:var(--font-display); font-weight:700; font-size:.95rem; }
+  .amt { font-family:var(--font-mono); font-size:.8rem; color:var(--ink); text-align:right; white-space:nowrap; }
+  .amt small { display:block; color:var(--ink-faint); font-size:.64rem; }
+  .x { width:26px; height:26px; border-radius:50%; border:1px solid var(--hair); background:transparent; color:var(--ink-faint); font-family:var(--font-mono); font-size:.7rem; }
+  .x:hover { color:var(--brass); border-color:var(--brass); }
+  .step { display:inline-flex; gap:4px; align-items:center; }
+  .step button { width:24px; height:24px; border-radius:50%; border:1px solid var(--hair); background:transparent; color:var(--ink-dim); font-family:var(--font-mono); font-size:.72rem; padding:0; }
+  .step button:hover { color:var(--ink); border-color:var(--ink-faint); }
+  .step span { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); width:22px; text-align:center; }
+  .tog { width:30px; height:17px; border-radius:999px; background:var(--surface-3); position:relative; display:inline-block; flex:none; vertical-align:middle; border:0; padding:0; }
+  .tog::after { content:""; position:absolute; top:2px; left:2px; width:13px; height:13px; border-radius:50%; background:var(--ink-faint); transition:left .15s; }
+  .tog.on { background:var(--ok); } .tog.on::after { left:15px; background:#0f1f12; }
+  .togs { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:10px; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-dim); }
+  .togs label { display:inline-flex; align-items:center; gap:7px; cursor:pointer; }
+  .search { display:flex; gap:8px; margin:12px 0 8px; }
+  .search input { flex:1; background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 12px; font-family:var(--font-mono); font-size:.76rem; color:var(--ink); outline:none; }
+  .search input:focus { border-color:var(--ink-faint); }
+  .list { max-height:230px; overflow:auto; border:1px solid var(--hair); border-radius:10px; padding:0 10px; }
+  .list .row { grid-template-columns:30px 1fr auto; }
+  .list .av { width:30px; height:30px; font-size:.68rem; }
+  .list .nm { font-size:.88rem; }
+  .empty { border:1px dashed rgba(251,232,211,.25); border-radius:12px; padding:12px 14px; color:var(--ink-dim); line-height:1.5; font-size:.92rem; }
+  .empty b { color:var(--ink); }
+  .hist { margin-top:12px; border-top:1px solid var(--hair); padding-top:8px; }
+  .hist div { display:flex; justify-content:space-between; gap:10px; font-family:var(--font-mono); font-size:.7rem; color:var(--ink-dim); padding:4px 0; }
+  .hist div b { color:var(--ink); font-weight:500; text-align:right; }
+  .hist .none { color:var(--ink-faint); font-style:italic; }
+  .say { background:rgba(248,95,115,.08); border:1px solid rgba(248,95,115,.3); border-radius:12px; padding:10px 14px; color:var(--ink-dim); line-height:1.5; font-size:.92rem; margin-top:12px; }
+  .say b { color:var(--ink); }
+  .tiers { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:12px; }
+  .tiers button { background:var(--surface-1); border:1px solid var(--hair); color:var(--ink-dim); border-radius:10px; padding:8px 12px; font-family:var(--font-mono); font-size:.72rem; text-align:left; }
+  .tiers button b { display:block; font-family:var(--font-display); font-size:.9rem; color:var(--ink); }
+  .tiers button.on { border-color:var(--brass); background:rgba(248,95,115,.1); }
+  .watch { display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center; padding:7px 0; border-top:1px solid var(--hair); font-size:.9rem; color:var(--ink-dim); }
+  .watch:first-child { border-top:0; }
+  .watch b { color:var(--ink); font-family:var(--font-display); font-size:.9rem; }
+  .watch .step span { width:18px; }
+  .sum { font-family:var(--font-mono); font-size:.76rem; }
+  .sum div { display:flex; justify-content:space-between; gap:12px; padding:5px 0; border-bottom:1px solid var(--hair); color:var(--ink-dim); }
+  .sum div b { color:var(--ink); font-weight:500; }
+  .sum div.total { border-bottom:0; color:var(--ink); font-weight:600; }
+  .kpis { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:10px 0 12px; }
+  .kpi { background:var(--surface-2); border-radius:10px; padding:10px 12px; border-top:3px solid var(--surface-3); }
+  .kpi b { display:block; font-family:var(--font-display); font-size:1.3rem; line-height:1.1; }
+  .kpi span { font-family:var(--font-mono); font-size:.64rem; color:var(--ink-faint); display:block; margin-top:4px; line-height:1.4; }
+  .kpi.earn { border-top-color:var(--brass); } .kpi.tip { border-top-color:var(--olive); } .kpi.back { border-top-color:var(--mint); } .kpi.grant { border-top-color:var(--plum); }
+  .you { background:rgba(248,95,115,.08); border-radius:10px; padding:2px 10px; margin:4px -10px; }
+  .flash { animation:flash .9s ease; }
+  @keyframes flash { 0% { background:rgba(132,205,152,.35); } 100% { background:transparent; } }
+  .foot { max-width:1240px; margin:16px auto 0; color:var(--ink-faint); font-family:var(--font-mono); font-size:.68rem; line-height:1.6; }
+</style>
+</head>
+<body data-view="member">
+
+<div class="top">
+  <div><span class="tag">playable mockup · creator share · 2026-10-17</span><h1>The member picks. The creator sees it.</h1></div>
+  <div class="hint">Left: what a member sees on their account page. Right: what the creator sees on their Money page, updating as you pick, set shares, change tier and renew. Nothing is real; every number is demo data.</div>
+  <div class="seg"><button data-view="member" class="on">Member</button><button data-view="creator">Creator</button></div>
+  <button class="btn sm ghost" id="reset">Reset demo</button>
+</div>
+
+<div class="split">
+  <!-- MEMBER -->
+  <section class="pane member">
+    <div class="pane-head"><h2>Member · your account page</h2><span class="meta" id="member-id">Signed in as Jose H.</span></div>
+    <span class="eyebrow">Your membership</span>
+    <div class="tiers" id="tiers"></div>
+
+    <div class="card">
+      <div class="card-head">
+        <div><span class="eyebrow pink">Your creators</span><div class="h2" id="count">0 of 10 picked</div></div>
+        <span class="chip ok" id="tier-chip">Premium</span>
+      </div>
+      <div class="pool"><b id="share">$4.00</b><span id="share-copy">of your membership goes to your creators every month.</span></div>
+      <div class="bar" id="bar"></div>
+      <span class="meta" id="bar-meta"></span>
+      <div id="lineup" style="margin-top:8px"></div>
+      <div id="default-box"></div>
+      <div class="togs">
+        <label><button class="tog" id="tog-custom" aria-label="Set my own shares"></button> Set my own shares</label>
+        <label><button class="tog on" id="tog-name" aria-label="Let my creators see my name"></button> Let my creators see my name</label>
+        <label><button class="tog" id="tog-via" aria-label="Joined through Mara's link"></button> Joined through Mara's link</label>
+      </div>
+      <div class="search"><input id="q" placeholder="Add a creator — search by name or title" autocomplete="off"><span class="meta" id="q-meta" style="align-self:center; white-space:nowrap"></span></div>
+      <div class="list" id="results"></div>
+      <div class="say" id="say"></div>
+      <div style="display:flex; gap:10px; align-items:center; margin-top:12px; flex-wrap:wrap">
+        <button class="btn primary" id="renew">Renew now (simulate)</button>
+        <span class="meta" id="renew-meta" style="margin:0"></span>
+      </div>
+      <div class="hist"><span class="eyebrow">History</span><div id="member-hist"></div></div>
+    </div>
+  </section>
+
+  <!-- CREATOR -->
+  <section class="pane creator">
+    <div class="pane-head"><h2>Creator · the Money page</h2><span class="meta">pick whose page to look at</span></div>
+    <div class="chips" id="creator-picker" style="margin-bottom:12px"></div>
+    <div class="card" id="creator-card"></div>
+  </section>
+</div>
+
+<div class="foot">Rules in play: share per tier $0 / $2 / $4 / $2 (Basic / Standard / Premium / Sponsor); referral bonus $1 / $2 / $1 for the creator whose link you joined through; up to 10 picks; equal shares unless you set your own; cents that don't divide go to your first pick; empty lineup → split by what you watched in the last 30 days → if nothing, the site-wide pool by views; payouts on the 1st once a creator has $10, the rest carries over. Baseline supporters and tips on each creator's page are demo data so the pages aren't empty.</div>
+
+<script>
+(function () {
+  const CREATORS = [
+    { id: 'mara', name: 'Mara Reyes', ini: 'MR', color: '#f85f73', titles: 'The Salt Hours · Low Tide', members: 5, picked: 4, month: 950, carried: 960, views: 18, tips: 2700, backing: 34000, ready: true, bank: '4421' },
+    { id: 'dev', name: 'Dev Okafor', ini: 'DO', color: '#e7a255', titles: 'Night Shift (podcast)', members: 3, picked: 2, month: 400, carried: 320, views: 12, tips: 500, backing: 0, ready: true, bank: '0188' },
+    { id: 'lena', name: 'Lena Park', ini: 'LP', color: '#93d0a4', titles: 'Paper Moons · 3 shorts', members: 4, picked: 3, month: 650, carried: 0, views: 14, tips: 1200, backing: 0, ready: true, bank: '7730' },
+    { id: 'tomas', name: 'Tomas Abreu', ini: 'TA', color: '#8499dc', titles: 'Fawns', members: 2, picked: 2, month: 200, carried: 1240, views: 9, tips: 0, backing: 9500, ready: false, bank: null },
+    { id: 'priya', name: 'Priya Natarajan', ini: 'PN', color: '#b48ad6', titles: 'Ferrous (series)', members: 6, picked: 5, month: 1100, carried: 410, views: 20, tips: 3100, backing: 0, ready: true, bank: '2206' },
+    { id: 'owen', name: 'Owen Castellanos', ini: 'OC', color: '#d67c51', titles: 'Blue Hour Sessions (podcast)', members: 1, picked: 1, month: 100, carried: 0, views: 6, tips: 300, backing: 0, ready: true, bank: '9014' },
+    { id: 'sol', name: 'Sol Marchetti', ini: 'SM', color: '#f2bf88', titles: 'Hinterland', members: 3, picked: 2, month: 500, carried: 200, views: 10, tips: 800, backing: 12000, ready: true, bank: '5587' },
+    { id: 'ines', name: 'Inês Duarte', ini: 'ID', color: '#84cd98', titles: 'Kitchen Table (Snippets)', members: 2, picked: 1, month: 250, carried: 0, views: 8, tips: 1500, backing: 0, ready: true, bank: '3342' },
+    { id: 'kwame', name: 'Kwame Boateng', ini: 'KB', color: '#f85f73', titles: 'Night Market', members: 4, picked: 3, month: 700, carried: 150, views: 15, tips: 2000, backing: 0, ready: true, bank: '6019' },
+    { id: 'ruth', name: 'Ruth Adler', ini: 'RA', color: '#e7a255', titles: 'Reels & Zines (Snippets)', members: 1, picked: 1, month: 50, carried: 0, views: 4, tips: 0, backing: 0, ready: true, bank: '8871' },
+    { id: 'hugo', name: 'Hugo Lindqvist', ini: 'HL', color: '#8499dc', titles: 'Tidewater (series)', members: 3, picked: 2, month: 450, carried: 0, views: 11, tips: 600, backing: 0, ready: true, bank: '1150' }
+  ];
+  const BY_ID = Object.fromEntries(CREATORS.map((c) => [c.id, c]));
+  const TITLES = [
+    { id: 't1', name: 'Low Tide', creator: 'mara' },
+    { id: 't2', name: 'Night Shift · ep. 12', creator: 'dev' },
+    { id: 't3', name: 'Paper Moons', creator: 'lena' },
+    { id: 't4', name: 'Ferrous · S1 E3', creator: 'priya' },
+    { id: 't5', name: 'Night Market', creator: 'kwame' },
+    { id: 't6', name: 'Hinterland', creator: 'sol' }
+  ];
+  const TIERS = [
+    { id: 'basic', label: 'Basic', price: 0, share: 0, bonus: 0 },
+    { id: 'standard', label: 'Standard', price: 799, share: 200, bonus: 100 },
+    { id: 'premium', label: 'Premium', price: 1299, share: 400, bonus: 200 },
+    { id: 'sponsor', label: 'Sponsor', price: 699, share: 200, bonus: 100 }
+  ];
+  const TIER = Object.fromEntries(TIERS.map((t) => [t.id, t]));
+  const MAX = 10;
+  const MONTHS = ['Oct 17', 'Nov 17', 'Dec 17', 'Jan 17', 'Feb 17', 'Mar 17', 'Apr 17', 'May 17', 'Jun 17', 'Jul 17', 'Aug 17', 'Sep 17'];
+
+  function fresh() {
+    return {
+      tier: 'premium', lineup: [], custom: false, showName: true, via: false,
+      plays: { t1: 2, t2: 1, t4: 1 }, creator: 'mara', renewals: 0,
+      ledger: Object.fromEntries(CREATORS.map((c) => [c.id, { month: 0, bonus: 0, hist: [] }])),
+      memberHist: [], query: ''
+    };
+  }
+  let S = fresh();
+
+  const $ = (id) => document.getElementById(id);
+  const dollars = (c) => '$' + (c / 100).toFixed(2);
+  const pct = (part, whole) => (whole ? Math.round((part / whole) * 1000) / 10 : 0) + '%';
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  // Split `cents` across entries by weight; leftover cents go to the first entries, one each.
+  function splitByWeight(cents, entries) {
+    const W = entries.reduce((s, e) => s + e.w, 0);
+    if (!W || cents <= 0) return entries.map((e) => ({ id: e.id, cents: 0, w: e.w, W }));
+    const out = entries.map((e) => ({ id: e.id, cents: Math.floor((cents * e.w) / W), w: e.w, W }));
+    let left = cents - out.reduce((s, o) => s + o.cents, 0);
+    for (let i = 0; left > 0; i = (i + 1) % out.length) { out[i].cents += 1; left -= 1; }
+    return out;
+  }
+
+  // What the next renewal does with the share: picks → watched → pool.
+  function nextSplit() {
+    const tier = TIER[S.tier];
+    if (S.lineup.length) {
+      const entries = S.lineup.map((l) => ({ id: l.id, w: S.custom ? l.w : 1 }));
+      return { basis: 'picks', items: splitByWeight(tier.share, entries) };
+    }
+    const plays = {};
+    for (const t of TITLES) if (S.plays[t.id]) plays[t.creator] = (plays[t.creator] || 0) + S.plays[t.id];
+    const watched = Object.keys(plays);
+    if (watched.length) return { basis: 'watched', items: splitByWeight(tier.share, watched.map((id) => ({ id, w: plays[id] }))) };
+    return { basis: 'pool', items: splitByWeight(tier.share, CREATORS.map((c) => ({ id: c.id, w: c.views }))) };
+  }
+
+  function basisLabel(b) { return b === 'picks' ? 'your picks' : b === 'watched' ? 'followed your watching' : 'the site-wide pool'; }
+
+  function render() {
+    renderMember();
+    renderCreator();
+  }
+
+  function renderMember() {
+    const tier = TIER[S.tier];
+    const split = nextSplit();
+    $('tiers').innerHTML = TIERS.map((t) => `<button data-tier="${t.id}" class="${t.id === S.tier ? 'on' : ''}"><b>${t.label}</b>${t.price ? dollars(t.price) + ' / mo · ' + dollars(t.share) + ' to creators' : 'free · nothing to split'}</button>`).join('');
+    $('count').textContent = `${S.lineup.length} of ${MAX} picked`;
+    $('tier-chip').textContent = tier.label;
+    $('tier-chip').className = 'chip ' + (tier.share ? 'ok' : '');
+    $('share').textContent = dollars(tier.share);
+    $('share-copy').textContent = tier.share ? 'of your membership goes to your creators every month.' : "on Basic. Your picks are saved — they start getting paid the day you join Tapa +.";
+
+    // bar
+    const bar = $('bar');
+    if (tier.share && split.items.some((i) => i.cents)) {
+      bar.innerHTML = split.items.filter((i) => i.cents).map((i) => `<i style="width:${(i.cents / tier.share) * 100}%; background:${BY_ID[i.id].color}" title="${BY_ID[i.id].name} ${dollars(i.cents)}"></i>`).join('');
+    } else bar.innerHTML = '';
+    $('bar-meta').textContent = S.lineup.length
+      ? `${S.custom ? 'Your own shares' : 'Equal shares'} · next split on ${MONTHS[(S.renewals + 1) % 12]} (your renewal) · changes apply from then`
+      : `Nothing picked · the next split ${basisLabel(split.basis)}`;
+
+    // lineup rows
+    $('lineup').innerHTML = S.lineup.map((l, idx) => {
+      const c = BY_ID[l.id];
+      const item = split.items.find((i) => i.id === l.id) || { cents: 0, w: 1, W: 1 };
+      const steps = S.custom ? `<span class="step"><button data-step="-1" data-id="${c.id}" aria-label="less">−</button><span>×${l.w}</span><button data-step="1" data-id="${c.id}" aria-label="more">+</button></span>` : '';
+      return `<div class="row"><div class="av" style="background:${c.color}">${c.ini}</div><div><div class="nm">${esc(c.name)}${S.via && c.id === 'mara' ? ' <span class="chip sky" style="padding:2px 7px">their link brought you</span>' : ''}</div><span class="meta">${esc(c.titles)}${c.ready ? '' : ' · <span class="chip warn" style="padding:1px 6px">payouts not set up</span>'}</span></div><div class="amt">${dollars(item.cents)}<small>${pct(item.w, item.W)}${idx === 0 && !S.custom && S.lineup.length > 1 ? ' · first pick' : ''}</small></div><div style="display:flex; gap:6px; align-items:center">${steps}<button class="x" data-remove="${c.id}" aria-label="remove">✕</button></div></div>`;
+    }).join('');
+
+    // default box
+    const box = $('default-box');
+    if (S.lineup.length) box.innerHTML = '';
+    else {
+      const played = TITLES.map((t) => `<div class="watch"><div><b>${esc(t.name)}</b> <span class="meta" style="display:inline">· ${esc(BY_ID[t.creator].name)}</span></div><span class="step"><button data-play="-1" data-title="${t.id}" aria-label="fewer plays">−</button><span>${S.plays[t.id] || 0}</span><button data-play="1" data-title="${t.id}" aria-label="more plays">+</button></span></div>`).join('');
+      const list = split.items.filter((i) => i.cents).sort((a, b) => b.cents - a.cents);
+      const where = split.basis === 'watched'
+        ? `<span class="eyebrow mint" style="margin-top:10px">So your next ${dollars(tier.share)} follows your watching</span>`
+        : `<span class="eyebrow olive" style="margin-top:10px">You watched nothing, so your next ${dollars(tier.share)} joins the site-wide pool (by views)</span>`;
+      box.innerHTML = `<div class="empty"><b>Nobody picked yet.</b> Until you pick someone, your share follows what you watch: on each renewal it's split between the creators of the titles you watched in the last 30 days. Watched nothing? It joins the site-wide pool. Pick up to 10 creators below and it goes to them instead.</div>
+        <div style="margin-top:10px"><span class="eyebrow">What you watched in the last 30 days (demo — press + and −)</span><div style="margin-top:4px">${played}</div></div>
+        ${tier.share ? where + `<div class="sum" style="margin-top:4px">${list.slice(0, 6).map((i) => `<div><span>${esc(BY_ID[i.id].name)}</span><b>${dollars(i.cents)}</b></div>`).join('')}${list.length > 6 ? `<div><span>+ ${list.length - 6} more creators</span><b>${dollars(list.slice(6).reduce((s, i) => s + i.cents, 0))}</b></div>` : ''}</div>` : ''}`;
+    }
+
+    // toggles
+    $('tog-custom').classList.toggle('on', S.custom);
+    $('tog-name').classList.toggle('on', S.showName);
+    $('tog-via').classList.toggle('on', S.via);
+
+    // search results
+    const q = S.query.trim().toLowerCase();
+    const hits = CREATORS.filter((c) => !q || c.name.toLowerCase().includes(q) || c.titles.toLowerCase().includes(q));
+    const full = S.lineup.length >= MAX;
+    $('q-meta').textContent = full ? 'Your 10 are full — swap someone out' : `${hits.length} creators`;
+    $('results').innerHTML = hits.map((c) => {
+      const inL = S.lineup.some((l) => l.id === c.id);
+      return `<div class="row"><div class="av" style="background:${c.color}">${c.ini}</div><div><div class="nm">${esc(c.name)}</div><span class="meta">${esc(c.titles)} · ${c.members + (inL ? 1 : 0)} supporters</span></div>${inL ? '<span class="chip on">✓ in your lineup</span>' : `<button class="btn sm ${full ? '' : 'primary'}" data-add="${c.id}" ${full ? 'disabled' : ''}>Support</button>`}</div>`;
+    }).join('') || '<div class="meta" style="padding:10px 0">No creator matches that.</div>';
+
+    // the sentence
+    const say = $('say');
+    if (!tier.share) say.innerHTML = `<b>You're on Basic.</b> Nothing is split this month. Pick a paid plan above to see the share move${S.lineup.length ? ` to your ${S.lineup.length} pick${S.lineup.length > 1 ? 's' : ''}` : ''}.`;
+    else if (split.basis === 'picks') {
+      const parts = split.items.map((i) => `${esc(BY_ID[i.id].name)} ${dollars(i.cents)}`);
+      say.innerHTML = `<b>At your next renewal</b> ${dollars(tier.share)} of your ${dollars(tier.price)} goes to ${S.lineup.length === 1 ? parts[0] : parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1]}.${S.via ? ` Mara also gets a <b>${dollars(tier.bonus)} referral bonus</b> from us because you joined through her link — it doesn't come out of your share.` : ''}`;
+    } else if (split.basis === 'watched') {
+      const parts = split.items.filter((i) => i.cents).sort((a, b) => b.cents - a.cents).map((i) => `${esc(BY_ID[i.id].name)} ${dollars(i.cents)}`);
+      say.innerHTML = `<b>You haven't picked anyone,</b> so your next ${dollars(tier.share)} follows your watching: ${parts.join(', ')}.${S.via ? ` Mara still gets her ${dollars(tier.bonus)} referral bonus.` : ''}`;
+    } else say.innerHTML = `<b>You haven't picked anyone and watched nothing,</b> so your next ${dollars(tier.share)} is shared across all ${CREATORS.length} creators by how much their work was watched this month.${S.via ? ` Mara still gets her ${dollars(tier.bonus)} referral bonus.` : ''}`;
+
+    $('renew').disabled = !tier.share;
+    $('renew-meta').textContent = tier.share ? `Next renewal: ${MONTHS[(S.renewals + 1) % 12]} · ${dollars(tier.price)}` : 'Basic has no renewal';
+    $('member-hist').innerHTML = S.memberHist.length ? S.memberHist.map((h) => `<div><span>${h.when} · ${h.tier}</span><b>${h.text}</b></div>`).join('') : '<div class="none">Nothing yet — press Renew now.</div>';
+  }
+
+  function renderCreator() {
+    const c = BY_ID[S.creator];
+    const L = S.ledger[c.id];
+    const tier = TIER[S.tier];
+    const split = nextSplit();
+    const yours = split.items.find((i) => i.id === c.id);
+    const inLineup = S.lineup.some((l) => l.id === c.id);
+    const bonusNext = S.via && c.id === 'mara' ? tier.bonus : 0;
+
+    $('creator-picker').innerHTML = CREATORS.map((k) => `<button class="chip ${k.id === S.creator ? 'sel' : ''}" data-creator="${k.id}">${esc(k.name.split(' ')[0])}${S.lineup.some((l) => l.id === k.id) ? '<span class="dot"></span>' : ''}</button>`).join('');
+
+    const month = c.month + L.month + L.bonus;
+    const owed = c.carried + month;
+    const youMembers = (inLineup || (split.basis !== 'picks' && yours && yours.cents)) && tier.share ? 1 : 0;
+    const members = c.members + youMembers;
+    const pickedCount = c.picked + (inLineup && tier.share ? 1 : 0);
+    const watchingCount = members - pickedCount;
+    const youLine = !tier.share
+      ? `<div class="row you"><div class="av" style="background:var(--surface-3); color:var(--ink-dim)">${S.showName ? 'JH' : '?'}</div><div><div class="nm">${S.showName ? 'Jose H.' : 'A member'}</div><span class="meta">on Basic · nothing to split yet</span></div><div class="amt">$0.00</div><div></div></div>`
+      : yours && yours.cents
+        ? `<div class="row you"><div class="av" style="background:var(--surface-3); color:var(--ink)">${S.showName ? 'JH' : '?'}</div><div><div class="nm">${S.showName ? 'Jose H.' : 'A member'} <span class="chip on" style="padding:1px 6px">you, the member on the left</span></div><span class="meta">${inLineup ? 'picked you' : split.basis === 'watched' ? 'by watching' : 'from the pool'} · ${tier.label} · next renewal ${MONTHS[(S.renewals + 1) % 12]}</span></div><div class="amt">${dollars(yours.cents)}${bonusNext ? `<small>+ ${dollars(bonusNext)} referral</small>` : ''}</div><div></div></div>`
+        : `<div class="row you"><div class="av" style="background:var(--surface-3); color:var(--ink-dim)">${S.showName ? 'JH' : '?'}</div><div><div class="nm" style="color:var(--ink-dim)">${S.showName ? 'Jose H.' : 'A member'}</div><span class="meta">hasn't picked you${bonusNext ? ' · but joined through your link' : ''}</span></div><div class="amt">$0.00${bonusNext ? `<small>+ ${dollars(bonusNext)} referral</small>` : ''}</div><div></div></div>`;
+
+    $('creator-card').innerHTML = `
+      <div class="card-head"><div><span class="eyebrow">Creator · ${esc(c.name)}</span><div class="h2">Money · ${MONTHS[S.renewals % 12].split(' ')[0]}</div></div><div class="chips">${c.ready ? `<span class="chip ok">Payouts ready · bank ····${c.bank}</span>` : '<span class="chip warn">Payouts not set up</span>'}</div></div>
+      <div class="kpis">
+        <div class="kpi earn"><b>${dollars(month)}</b><span>EARNINGS this month<br>member share ${dollars(c.month + L.month)} · referrals ${dollars(L.bonus)}</span></div>
+        <div class="kpi tip"><b>${dollars(c.tips)}</b><span>TIPS · already in your Stripe balance</span></div>
+        <div class="kpi back"><b>${dollars(c.backing)}</b><span>BACKING · Pitch Room, already in your balance</span></div>
+        <div class="kpi grant"><b>From the Heart</b><span>GRANTS · the Juanita Foundation ↗</span></div>
+      </div>
+      <span class="eyebrow pink">Earnings · pays out on the 1st</span>
+      <div class="sum" style="margin:4px 0 12px">
+        <div><span>Carried over</span><b>${dollars(c.carried)}</b></div>
+        <div><span>This month so far</span><b>${dollars(month)}</b></div>
+        ${c.ready
+          ? (owed >= 1000 ? `<div class="total"><span>Transfer on the 1st (≥ $10)</span><b>${dollars(owed)}</b></div>` : `<div class="total"><span>Under $10 · carries over</span><b>${dollars(owed)}</b></div>`)
+          : `<div class="total"><span>Waiting until payouts are set up</span><b>${dollars(owed)}</b></div>`}
+      </div>
+      ${c.ready ? '' : `<div class="empty" style="margin-bottom:12px"><b>${dollars(owed)} is waiting for you.</b> Set up payouts (the same two-minute Stripe form Pitch Room uses) and it's yours on the 1st. <span class="btn sm primary" style="margin-left:6px">Set up payouts</span></div>`}
+      <span class="eyebrow olive">Supporters</span>
+      <div class="sum" style="margin:4px 0 8px">
+        <div><span>Members with you in their lineup</span><b>${pickedCount}</b></div>
+        <div><span>By watching or the pool (default)</span><b>${watchingCount}</b></div>
+        <div><span>Names shown</span><b>${1 + (youMembers && S.showName ? 1 : 0)} · the rest anonymous</b></div>
+      </div>
+      <div class="row"><div class="av" style="background:var(--plum)">AK</div><div><div class="nm">Anika K.</div><span class="meta">since Aug · picked you</span></div><div class="amt">$0.50</div><div></div></div>
+      ${youLine}
+      <div class="row"><div class="av" style="background:var(--surface-3); color:var(--ink-dim)">${Math.max(0, members - 1 - (youMembers && S.showName ? 1 : 0))}</div><div><div class="nm" style="color:var(--ink-dim)">${Math.max(0, members - 1 - (youMembers && S.showName ? 1 : 0))} members who stay anonymous</div><span class="meta">${Math.max(0, pickedCount - 1 - (youMembers && S.showName && inLineup ? 1 : 0))} picked you · ${Math.max(0, watchingCount - (youMembers && S.showName && !inLineup ? 1 : 0))} by watching</span></div><div class="amt">${dollars(Math.max(0, c.month - 50))}</div><div></div></div>
+      <div class="hist"><span class="eyebrow">History</span>${L.hist.length ? L.hist.map((h) => `<div><span><span class="chip ${h.kind === 'referral' ? 'sky' : 'on'}" style="padding:1px 6px">${h.kind}</span> ${h.when} · ${h.text}</span><b>${dollars(h.cents)}</b></div>`).join('') : ''}<div><span><span class="chip olive" style="padding:1px 6px">tip</span> Oct 16 · Anika K.</span><b>$4.75</b></div><div><span><span class="chip on" style="padding:1px 6px">earnings</span> Oct 14 · member share · 1 member</span><b>$1.00</b></div><div><span><span class="chip on" style="padding:1px 6px">payout</span> Oct 1 · transfer → your Stripe balance</span><b>$22.80</b></div></div>`;
+  }
+
+  function renew() {
+    const tier = TIER[S.tier];
+    if (!tier.share) return;
+    const split = nextSplit();
+    const when = MONTHS[(S.renewals + 1) % 12];
+    for (const i of split.items) {
+      if (!i.cents) continue;
+      S.ledger[i.id].month += i.cents;
+      S.ledger[i.id].hist.unshift({ kind: 'earnings', when, text: `member share · ${S.showName ? 'Jose H.' : 'a member'} · ${basisLabel(split.basis)}`, cents: i.cents });
+    }
+    if (S.via) {
+      S.ledger.mara.bonus += tier.bonus;
+      S.ledger.mara.hist.unshift({ kind: 'referral', when, text: `referral bonus · ${S.showName ? 'Jose H.' : 'a member'} renewed`, cents: tier.bonus });
+    }
+    const n = split.items.filter((i) => i.cents).length;
+    S.memberHist.unshift({ when, tier: tier.label, text: `${dollars(tier.share)} → ${n} creator${n === 1 ? '' : 's'} · ${basisLabel(split.basis)}` });
+    S.renewals += 1;
+    render();
+    $('creator-card').classList.remove('flash'); void $('creator-card').offsetWidth; $('creator-card').classList.add('flash');
+  }
+
+  // events
+  document.addEventListener('click', (e) => {
+    const t = e.target.closest('[data-tier],[data-add],[data-remove],[data-step],[data-play],[data-creator],[data-view]');
+    if (!t) return;
+    if (t.dataset.tier) S.tier = t.dataset.tier;
+    else if (t.dataset.add) { if (S.lineup.length < MAX && !S.lineup.some((l) => l.id === t.dataset.add)) S.lineup.push({ id: t.dataset.add, w: 1 }); }
+    else if (t.dataset.remove) S.lineup = S.lineup.filter((l) => l.id !== t.dataset.remove);
+    else if (t.dataset.step) { const l = S.lineup.find((x) => x.id === t.dataset.id); if (l) l.w = Math.min(5, Math.max(1, l.w + Number(t.dataset.step))); }
+    else if (t.dataset.play) { const id = t.dataset.title; S.plays[id] = Math.max(0, (S.plays[id] || 0) + Number(t.dataset.play)); }
+    else if (t.dataset.creator) S.creator = t.dataset.creator;
+    else if (t.dataset.view) { document.body.dataset.view = t.dataset.view; document.querySelectorAll('.seg button').forEach((b) => b.classList.toggle('on', b.dataset.view === t.dataset.view)); return; }
+    render();
+  });
+  $('tog-custom').addEventListener('click', () => { S.custom = !S.custom; if (S.custom) S.lineup.forEach((l) => { l.w = 1; }); render(); });
+  $('tog-name').addEventListener('click', () => { S.showName = !S.showName; render(); });
+  $('tog-via').addEventListener('click', () => {
+    S.via = !S.via;
+    if (S.via && !S.lineup.some((l) => l.id === 'mara') && S.lineup.length < MAX) S.lineup.unshift({ id: 'mara', w: 1 });
+    render();
+  });
+  $('q').addEventListener('input', (e) => { S.query = e.target.value; render(); $('q').focus(); });
+  $('renew').addEventListener('click', renew);
+  $('reset').addEventListener('click', () => { S = fresh(); $('q').value = ''; render(); });
+
+  render();
+})();
+</script>
+</body>
+</html>
