@@ -9586,3 +9586,12 @@ a.asup-name:hover { color: var(--brass); }
   .asup-row-actions { grid-column: 2 / -1; justify-content: flex-end; }
   .asup-results .asup-row { grid-template-columns: 36px 1fr auto; }
 }
+
+/* ─── Bring your people: the creator's referral card (components/creator/ReferralCard.js) ─── */
+.refc-title { font-family: var(--font-display); font-size: 1.2rem; margin: 2px 0 6px; }
+.refc-link { display: flex; gap: 10px; align-items: center; justify-content: space-between; background: var(--surface-2); border-radius: 10px; padding: 9px 12px; margin-top: 4px; }
+.refc-link-text { font-family: var(--font-mono); font-size: 0.82rem; color: var(--ink); word-break: break-all; user-select: all; }
+.refc-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 8px; margin: 12px 0; }
+.refc-stat { background: var(--surface-2); border-radius: 10px; padding: 10px 12px; }
+.refc-stat b { display: block; font-family: var(--font-display); font-size: 1.3rem; line-height: 1.1; }
+.refc-stat span { font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); }

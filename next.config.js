@@ -2,6 +2,12 @@
 const nextConfig = {
   // Don't advertise the framework in every response.
   poweredByHeader: false,
+  // A creator's short link (Creator Share referrals): studiotapatv.site/@handle
+  // opens their profile carrying ?via=handle, which middleware.js remembers
+  // in a cookie so a membership bought later is attributed to them.
+  async redirects() {
+    return [{ source: '/@:handle', destination: '/profile/:handle?via=:handle', permanent: false }];
+  },
   // Baseline browser protections the site was serving none of (only
   // Vercel's HSTS): no MIME sniffing, no framing by other sites, referrers
   // trimmed on cross-origin requests, and the powerful device APIs this

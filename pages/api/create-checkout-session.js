@@ -1,7 +1,9 @@
+import { getAuth } from '@clerk/nextjs/server';
 import { getStripe, isStripeConfigured } from '../../lib/stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
 import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
+import { resolveReferrer } from '../../lib/creatorShare';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
 //   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
@@ -57,6 +59,21 @@ export default async function handler(req, res) {
     }
 
     const back = body.returnTo === '/account' ? '/account' : '/';
+
+    // Creator Share (lib/creatorShare.js): the subscription carries the
+    // member's id, so every renewal can be recorded without a lookup, and
+    // the creator whose link brought them (the tapa_via cookie middleware.js
+    // set from /@handle; the app can send `via` in the body instead), so
+    // that creator earns the referral bonus on each renewal.
+    const { userId } = getAuth(req);
+    let via = null;
+    try {
+      via = userId ? await resolveReferrer(body.via || (req.cookies && req.cookies.tapa_via), userId) : null;
+    } catch (err) {
+      console.error('create-checkout-session referrer lookup failed:', err.message);
+    }
+    const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...(via ? { via, via_source: 'link' } : {}) };
+
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       payment_method_types: ['card'],
@@ -67,7 +84,9 @@ export default async function handler(req, res) {
       cancel_url: `${origin}${back}?checkout=cancelled`,
       allow_promotion_codes: true,
       customer: existingCustomerId,
-      metadata: { tier: plan.tier }
+      ...(userId ? { client_reference_id: userId } : {}),
+      subscription_data: { metadata: stamp },
+      metadata: stamp
     });
     res.status(200).json({ url: session.url });
   } catch (err) {

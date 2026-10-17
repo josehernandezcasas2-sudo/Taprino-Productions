@@ -3,6 +3,7 @@ import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
+import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -116,6 +117,39 @@ export default async function handler(req, res) {
         }
       } else {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
+        // Creator Share: remember which member this Stripe customer is,
+        // so every later invoice.paid finds them without a Stripe call.
+        try {
+          await recordCheckoutCustomer(session);
+        } catch (err) {
+          console.error('recordCheckoutCustomer from webhook failed:', err.message);
+        }
+      }
+      break;
+    }
+    case 'invoice.paid': {
+      // A membership renewal (or first payment). Creator Share records it
+      // and writes the creators' ledger lines: the member's share by their
+      // lineup, plus the referral bonus for whoever brought them. A failure
+      // lets Stripe retry, the same way donations and bookings do.
+      try {
+        const result = await recordMembershipInvoice(event.data.object);
+        if (result && result.skipped) console.log(`invoice.paid ${event.data.object.id}: skipped (${result.skipped})`);
+      } catch (err) {
+        console.error('recordMembershipInvoice from webhook failed:', err.message);
+        await getSupabase().from('stripe_events').delete().eq('id', event.id);
+        return res.status(500).json({ error: 'membership payment not recorded' });
+      }
+      break;
+    }
+    case 'charge.dispute.created': {
+      // A chargeback on a membership payment takes back the creator credits
+      // that haven't been paid out yet (lib/creatorShare.js).
+      const dispute = event.data.object;
+      try {
+        await reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed');
+      } catch (err) {
+        console.error('reverseMembershipCharge (dispute) from webhook failed:', err.message);
       }
       break;
     }
@@ -144,10 +178,25 @@ export default async function handler(req, res) {
       } catch (err) {
         console.error('refundBookingFromCharge from webhook failed:', err.message);
       }
+      // A fully refunded membership payment: its unpaid creator credits
+      // are reversed (a partial refund leaves them alone).
+      if (event.data.object.refunded) {
+        try {
+          await reverseMembershipCharge(event.data.object, 'refunded');
+        } catch (err) {
+          console.error('reverseMembershipCharge from webhook failed:', err.message);
+        }
+      }
       break;
     }
     case 'customer.subscription.deleted':
       console.log(`${SITE.premiumTier} member cancelled. Stripe customer:`, event.data.object.customer);
+      // The referral attribution ends with the subscription.
+      try {
+        await endReferralForSubscription(event.data.object.id);
+      } catch (err) {
+        console.error('endReferralForSubscription from webhook failed:', err.message);
+      }
       break;
     case 'invoice.payment_failed':
       console.log('Payment failed for customer:', event.data.object.customer);

@@ -10,6 +10,7 @@ import { SITE } from '../lib/siteConfig';
 import { BANNER_COLORS } from '../lib/profileBanner';
 import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
+import ReferralCard from '../components/creator/ReferralCard';
 import MembershipPlans from '../components/MembershipPlans';
 import { memberBadge } from '../lib/membershipTiers';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
@@ -818,6 +819,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
               </div>
 
               {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}
+              {(isCreator || isAdmin) && <ReferralCard />}
 
               <div className="account-card">
                 <div className="account-subheading">Security</div>
