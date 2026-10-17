@@ -20,7 +20,15 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -49,6 +57,21 @@
           "locationWhenInUsePermission": "Studio Tapa TV uses your location to find crew and gear near you on Crew Call."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "router": {
+        "root": "src/app",
+        "asyncRoutes": {
+          "web": true
+        }
+      },
+      "eas": {
+        "projectId": "217f9775-b623-406f-bbfa-54fbe11eeefa"
+      }
+    },
+    "owner": "studiotapa237",
+    "updates": {
+      "url": "https://u.expo.dev/217f9775-b623-406f-bbfa-54fbe11eeefa"
+    }
   }
 }
