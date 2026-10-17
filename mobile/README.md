@@ -19,6 +19,21 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
 - **On your phone (recommended — this is the real app):** install the free
   **Expo Go** app (App Store / Play Store), then scan the QR code. Your phone and
   PC need to be on the same Wi-Fi network. Reloads live as you edit code.
+
+  Two rules that have bitten before:
+  - **Expo Go only runs the newest Expo SDK.** When Expo Go updates on the
+    phone and the project suddenly won't open ("incompatible with this version
+    of Expo Go" or similar), the app has to move to that SDK: check
+    `npm view expo dist-tags`, then `npx expo install expo@latest --fix` from
+    `mobile/`, `npm install`, and `npx expo export --platform ios` to prove it
+    still bundles before testing on the phone. Done on 2026-10-17 for SDK 58.
+  - **Same Expo account on both ends.** `npx expo whoami` on the PC and the
+    account signed into Expo Go must match (studiotapa237). If not:
+    `npx expo logout`, `npx expo login`, and sign Expo Go in again.
+
+  Other quick fixes when the QR won't connect: `npx expo start -c` (clears
+  Metro's cache), and `npx expo start --tunnel` when the phone and PC can't
+  see each other on the network (works from anywhere, but the PC must be on).
 - **In a browser on your PC (fastest, good for quick checks):** run `npm run web`
   instead, or press `w` in the terminal after `npm start`. Note: a few native-only
   features (camera, push notifications, native video, etc.) won't work in the
@@ -29,9 +44,42 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
 - **iOS simulator:** requires a Mac — not available on Windows. Physical iPhone +
   Expo Go is the way to test iOS from this PC.
 
+## The cloud version (EAS Update) — testing away from home
+
+Every push to `main` that touches `mobile/` publishes the app's JavaScript to
+EAS Update (branch `preview`) through `.github/workflows/mobile-update.yml`, so
+the current app can be opened in Expo Go anywhere, with no dev server running.
+It uses the production API and the committed Clerk key in `mobile/.env`.
+
+One-time setup (on the PC, signed in as studiotapa237):
+
+```bash
+cd mobile
+npx eas-cli@latest login
+npx eas-cli@latest init                # creates the project on expo.dev, writes extra.eas.projectId
+npx eas-cli@latest update:configure    # writes updates.url (runtimeVersion is already set)
+git add app.json && git commit -m "Mobile: link EAS project" && git push
+```
+
+Then on expo.dev → account settings → **Access tokens** → create one, and add it
+to the GitHub repo as a secret named `EXPO_TOKEN` (Settings → Secrets and
+variables → Actions). From the next push on, the workflow publishes.
+
+To open it on the phone: expo.dev → the project → **Updates** → the latest
+update → scan its QR code with the iPhone camera (opens in Expo Go). The first
+publish can also be done by hand:
+
+```bash
+npx eas-cli@latest update --branch preview --environment preview --message "first"
+```
+
+Expo Go has to be on the same SDK as the app (see above); updates are plain
+JavaScript, so anything needing a native module outside Expo Go still needs a
+development build later.
+
 ## Pointing it at a different API
 
-By default the app talks to production (`https://studiotapatv.site`). To point it
+By default the app talks to production (`https://www.studiotapatv.site`). To point it
 at your local `npm run dev` (running from the repo root, port 3000) instead,
 create `mobile/.env.local`:
 

@@ -1,0 +1,54 @@
+# The cloud version of the app: every push to main that touches mobile/
+# publishes the JS bundle to EAS Update (branch "preview"), so the current
+# app can be opened in Expo Go from anywhere without the dev server at home.
+# Needs one repository secret, EXPO_TOKEN (expo.dev → account → Access
+# tokens), and the project linked once with `npx eas-cli@latest init` +
+# `npx eas-cli@latest update:configure` (writes extra.eas.projectId and
+# updates.url into mobile/app.json). See mobile/README.md.
+name: Mobile · publish update
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-update.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: mobile-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    name: eas update (preview)
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'josehernandezcasas2-sudo' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+
+      - name: Publish to the preview branch
+        working-directory: mobile
+        env:
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual run' }}
+        run: |
+          MSG="${COMMIT_MESSAGE%%$'\n'*}"
+          eas update --branch preview --environment preview --message "${MSG:0:120}" --non-interactive
