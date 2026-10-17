@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "mobile",
-    "slug": "mobile",
+    "name": "Studio Tapa TV",
+    "slug": "studio-tapa-tv",
     "scheme": "studiotapatv",
     "version": "1.0.0",
     "runtimeVersion": {
