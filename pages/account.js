@@ -427,6 +427,12 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                   joiningTier={joiningTier}
                   portalLoading={portalLoading}
                 />
+                {/* Quick access to Membership Artist Support — the creators
+                    a member's share goes to (pages/artist-support.js). */}
+                <Link href="/artist-support" className="asup-quick">
+                  <span className="asup-quick-kicker">Membership Artist Support</span>
+                  <span className="asup-quick-text">Choose up to 10 creators your membership supports, and how your share splits between them. →</span>
+                </Link>
                 <div className="account-divider" />
                 <div className="account-subheading" style={{ fontSize: '0.72rem' }}>Have a code?</div>
                 <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.5rem' }}>

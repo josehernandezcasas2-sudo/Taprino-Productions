@@ -58,6 +58,8 @@ const GROUPS = {
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
       // The Account screen scrolls itself to its Membership card.
       { href: '/account?section=membership', label: 'Membership' },
+      // Membership Artist Support: the creators a member's share goes to.
+      { href: '/account/artist-support', label: 'Artist Support' },
       { href: '/messages', label: 'Messages', badge: 'messages' },
       { href: '/account/wishlist', label: 'My List' },
       // The Account screen's old quick links (2026-10-12) live here now.

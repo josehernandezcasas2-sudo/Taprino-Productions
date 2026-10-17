@@ -90,6 +90,8 @@ const GROUPS = {
       // The Membership card on /account: status + Manage subscription for
       // members, the Tapa + benefits + Join for everyone else.
       { href: '/account#membership', label: 'Membership' },
+      // Membership Artist Support: the creators a member's share goes to.
+      { href: '/artist-support', label: 'Artist Support' },
       { href: '/wishlist', label: 'My List' },
       // The account page's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
@@ -98,7 +100,7 @@ const GROUPS = {
       ...(roles.isCreator || roles.canAccessAdmin ? [{ href: '/creator/analytics', label: 'Your Numbers' }] : []),
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
     ],
-    match: (p) => p === '/account' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'
+    match: (p) => p === '/account' || p === '/artist-support' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'
   }
 };
 

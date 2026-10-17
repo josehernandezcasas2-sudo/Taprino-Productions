@@ -886,6 +886,12 @@ export default function Account() {
               portalLoading={portalLoading}
             />
           )}
+          {/* Quick access to Membership Artist Support — the creators a
+              member's share goes to (account/artist-support.js). */}
+          <Pressable style={styles.asupQuick} onPress={() => router.push('/account/artist-support')}>
+            <Text style={styles.asupQuickKicker}>Membership Artist Support</Text>
+            <Text style={styles.asupQuickText}>Choose up to 10 creators your membership supports, and how your share splits between them. →</Text>
+          </Pressable>
 
           <View style={styles.divider} />
           <Text style={[styles.subheading, { fontSize: 11.5 }]}>Have a code?</Text>
@@ -1068,5 +1074,8 @@ const styles = StyleSheet.create({
   freeBadge: { backgroundColor: colors.olive, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4, marginBottom: 8 },
   freeBadgeText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.5, textTransform: 'uppercase', color: '#1a1408' },
   freeNoteText: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 20, color: colors.inkDim },
-  divider: { height: 1, backgroundColor: 'rgba(251,232,211,0.12)', marginTop: 16, marginBottom: 18 }
+  divider: { height: 1, backgroundColor: 'rgba(251,232,211,0.12)', marginTop: 16, marginBottom: 18 },
+  asupQuick: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(248,95,115,0.35)', backgroundColor: 'rgba(248,95,115,0.08)' },
+  asupQuickKicker: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.brass, marginBottom: 3 },
+  asupQuickText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim }
 });
