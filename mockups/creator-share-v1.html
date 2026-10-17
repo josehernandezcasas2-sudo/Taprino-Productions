@@ -1,0 +1,446 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Creator Share v1 — members pick up to 10 creators; a default until they do</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --paper:#fbe8d3; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding:28px 16px 80px; font-size:16px; }
+  .intro { max-width:1180px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1180px; margin:0 auto 64px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:24px; margin-bottom:14px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); display:block; }
+  .eyebrow.pink { color:var(--brass); } .eyebrow.olive { color:var(--olive); } .eyebrow.mint { color:var(--mint); } .eyebrow.sky { color:var(--sky); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.primary { background:var(--brass); border-color:var(--brass); color:#241a05; font-weight:700; }
+  .btn.ok { background:var(--ok); border-color:var(--ok); color:#0f1f12; font-weight:700; }
+  .btn.sm { padding:6px 12px; font-size:.74rem; }
+  .btn.ghost { border-color:transparent; color:var(--ink-dim); }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; line-height:1.05; margin:6px 0 8px; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.3rem; line-height:1.15; margin:4px 0 6px; }
+  .h3 { font-family:var(--font-display); font-weight:700; font-size:1.02rem; line-height:1.2; margin:2px 0 4px; }
+  .lead { font-size:1.02rem; line-height:1.55; color:var(--ink-dim); max-width:700px; margin:0 0 18px; }
+  .meta { font-family:var(--font-mono); font-size:.72rem; color:var(--ink-faint); line-height:1.5; display:block; margin-top:3px; }
+  .chip { font-family:var(--font-mono); font-size:.7rem; padding:5px 10px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; white-space:nowrap; }
+  .chip.on { color:var(--brass); background:rgba(248,95,115,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.plum { color:var(--plum); background:rgba(180,138,214,.16); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; }
+  .field { background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:9px 12px; font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .field b { color:var(--ink); font-weight:500; }
+  .ideas { margin:0; padding-left:18px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ideas li { margin:0 0 8px; } .ideas b { color:var(--ink); }
+  .tog { width:32px; height:18px; border-radius:999px; background:var(--surface-3); position:relative; display:inline-block; flex:none; vertical-align:middle; }
+  .tog::after { content:""; position:absolute; top:2px; left:2px; width:14px; height:14px; border-radius:50%; background:var(--ink-faint); }
+  .tog.on { background:var(--ok); } .tog.on::after { left:16px; background:#0f1f12; }
+  .cols { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  .cols3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; }
+  @media (max-width:860px) { .cols, .cols3 { grid-template-columns:1fr; } }
+
+  /* account-page card */
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:18px 20px; }
+  .card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:12px; }
+  .pool { display:flex; align-items:baseline; gap:10px; margin:6px 0 2px; }
+  .pool b { font-family:var(--font-display); font-size:1.8rem; line-height:1; }
+  .pool span { color:var(--ink-dim); font-size:.95rem; }
+  .bar { height:8px; border-radius:999px; background:var(--surface-3); overflow:hidden; display:flex; margin:10px 0 4px; }
+  .bar i { display:block; height:100%; }
+  .row { display:grid; grid-template-columns:42px 1fr auto auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--hair); }
+  .row:first-of-type { border-top:0; }
+  .av { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; font-family:var(--font-display); font-weight:700; font-size:.9rem; color:#0f1a12; }
+  .row .nm { font-family:var(--font-display); font-weight:700; font-size:.98rem; }
+  .row .amt { font-family:var(--font-mono); font-size:.8rem; color:var(--ink); text-align:right; }
+  .row .amt small { display:block; color:var(--ink-faint); font-size:.66rem; }
+  .x { width:26px; height:26px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; color:var(--ink-faint); font-family:var(--font-mono); font-size:.72rem; }
+  .step { display:inline-flex; align-items:center; gap:6px; font-family:var(--font-mono); font-size:.74rem; }
+  .step i { width:22px; height:22px; border-radius:50%; border:1px solid var(--hair); display:grid; place-items:center; font-style:normal; color:var(--ink-dim); }
+  .search { display:flex; gap:8px; margin-top:12px; }
+  .search .field { flex:1; }
+  .hist { margin-top:14px; border-top:1px solid var(--hair); padding-top:10px; }
+  .hist div { display:flex; justify-content:space-between; gap:10px; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim); padding:4px 0; }
+  .hist div b { color:var(--ink); font-weight:500; }
+  .empty { border:1px dashed rgba(251,232,211,.25); border-radius:12px; padding:16px; color:var(--ink-dim); line-height:1.5; }
+  .empty b { color:var(--ink); }
+
+  /* tier table */
+  table { width:100%; border-collapse:collapse; font-size:.92rem; }
+  th { text-align:left; font-family:var(--font-mono); font-size:.68rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-faint); font-weight:500; padding:6px 10px; border-bottom:1px solid var(--hair); }
+  td { padding:9px 10px; border-bottom:1px solid var(--hair); vertical-align:top; color:var(--ink-dim); }
+  td b { color:var(--ink); font-family:var(--font-display); }
+  td.m { font-family:var(--font-mono); font-size:.8rem; color:var(--ink); }
+  tr.dim td { color:var(--ink-faint); }
+
+  /* the default-rule ladder */
+  .ladder { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media (max-width:860px) { .ladder { grid-template-columns:1fr; } }
+  .rung { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px 16px; position:relative; }
+  .rung .n { font-family:var(--font-mono); font-size:.66rem; color:var(--brass); letter-spacing:.08em; }
+  .rung p { margin:6px 0 0; color:var(--ink-dim); font-size:.92rem; line-height:1.5; }
+  .rung p b { color:var(--ink); }
+
+  /* money flow */
+  .flow { display:grid; grid-template-columns:repeat(5, 1fr); gap:10px; }
+  @media (max-width:860px) { .flow { grid-template-columns:1fr; } }
+  .flow div { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:12px 14px; font-size:.88rem; color:var(--ink-dim); line-height:1.45; }
+  .flow div b { display:block; font-family:var(--font-display); color:var(--ink); margin-bottom:4px; }
+  .flow div i { font-family:var(--font-mono); font-style:normal; font-size:.68rem; color:var(--ink-faint); display:block; margin-top:6px; }
+
+  /* profile hero mock */
+  .hero { display:flex; gap:16px; align-items:center; background:var(--surface-1); border:1px solid var(--hair); border-radius:14px; padding:16px 18px; }
+  .hero .av { width:64px; height:64px; font-size:1.3rem; }
+  .hero .nm { font-family:var(--font-display); font-weight:700; font-size:1.25rem; }
+  .hero .acts { margin-left:auto; display:flex; gap:8px; }
+
+  /* creator card */
+  .kpis { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; margin:10px 0 12px; }
+  .kpi { background:var(--surface-2); border-radius:10px; padding:10px 12px; }
+  .kpi b { display:block; font-family:var(--font-display); font-size:1.35rem; line-height:1.1; }
+  .kpi span { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); }
+
+  /* terms draft */
+  .draft { background:var(--surface-1); border-left:3px solid var(--olive); border-radius:0 12px 12px 0; padding:14px 18px; color:var(--ink-dim); line-height:1.6; font-size:.95rem; }
+  .draft h4 { font-family:var(--font-display); color:var(--ink); margin:0 0 6px; font-size:1rem; }
+  .draft p { margin:0 0 10px; }
+  .draft mark { background:rgba(231,162,85,.2); color:var(--olive-bright); padding:0 4px; border-radius:4px; font-family:var(--font-mono); font-size:.82rem; }
+
+  /* phone */
+  .phone { width:300px; border:1px solid var(--hair); border-radius:28px; padding:14px 12px; background:var(--surface-0); }
+  .phone .card { padding:12px 14px; }
+  .phone .row { grid-template-columns:34px 1fr auto; }
+  .phone .av { width:34px; height:34px; font-size:.75rem; }
+  .phone .nm { font-size:.9rem; }
+  .phones { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; }
+  .status { display:flex; justify-content:space-between; font-family:var(--font-mono); font-size:.6rem; color:var(--ink-faint); padding:0 10px 10px; }
+
+  .yes, .no { font-family:var(--font-mono); font-size:.74rem; padding:2px 8px; border-radius:6px; margin-right:6px; }
+  .yes { color:var(--ok); background:rgba(132,205,152,.14); } .no { color:var(--danger); background:rgba(214,124,81,.16); }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; } @media (max-width:860px) { .two { grid-template-columns:1fr; } }
+  .ask { background:var(--surface-1); border:1px solid rgba(248,95,115,.35); border-radius:12px; padding:14px 16px; }
+  .ask ol { margin:0; padding-left:20px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ask li { margin:0 0 8px; } .ask b { color:var(--ink); }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <span class="tag">mockup · creator share · v1 · 2026-10-17</span>
+  <h1>Creator Share — members decide where their share goes</h1>
+  <p class="note">A slice of every paid membership is set aside for creators. The member names <b>up to 10 creators</b> (their lineup) and that slice is split between them on every renewal. A member who never picks anyone still funds creators: a <b>default rule</b> spends their share for them until they choose. Nothing here is built; this page is the proposal to sign off before any code.</p>
+  <p class="note"><b>Do the Terms already have this in mind?</b> No. Section 4 (membership) only promises access, Section 5's <b>Revenue</b> paragraph is still the bracketed "to be finalised" placeholder, and the About page says ads "help maintain the site and fund new projects". Nothing forbids it either — the placeholder is exactly where these words belong. Section 9 of this page drafts them.</p>
+</div>
+
+<!-- 1 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>1. The share, per tier</h2><span class="tag">numbers to decide</span></div>
+  <div class="frame">
+    <p class="lead">A flat amount per tier, set on <b>/admin/settings</b> and locked into each payment the moment it lands (a later change never moves old money). Flat beats a percentage because it's a sentence a member understands: "$2 of your $7.99 goes to your creators."</p>
+    <table>
+      <tr><th>Tier</th><th>Price</th><th>Stripe keeps</th><th>Creator share (proposal)</th><th>Studio keeps</th><th>Reads as</th></tr>
+      <tr class="dim"><td><b>Basic</b></td><td class="m">$0</td><td class="m">—</td><td class="m">—</td><td class="m">—</td><td>No share. Can still build a lineup for when they join.</td></tr>
+      <tr><td><b>Standard</b></td><td class="m">$7.99</td><td class="m">≈ $0.53</td><td class="m">$2.00</td><td class="m">≈ $5.46</td><td>"$2 of your membership goes to creators."</td></tr>
+      <tr><td><b>Premium</b></td><td class="m">$12.99</td><td class="m">≈ $0.68</td><td class="m">$4.00</td><td class="m">≈ $8.31</td><td>"$4 of your membership goes to creators."</td></tr>
+      <tr><td><b>Sponsor</b></td><td class="m">$6.99</td><td class="m">≈ $0.50</td><td class="m">$2.00</td><td class="m">≈ $4.49</td><td>Premium perks at a launch price — Standard's share, or Premium's? (open)</td></tr>
+    </table>
+    <span class="meta">Stripe's card fee is 2.9% + 30¢ per payment. Team, comped and promo-code members read as Premium today but pay nothing — no share for them, nothing to split.</span>
+  </div>
+</section>
+
+<!-- 2 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>2. The member's lineup — the card on /account</h2><span class="tag">main column, under Membership</span></div>
+  <div class="two">
+    <div class="card">
+      <div class="card-head">
+        <div><span class="eyebrow pink">Your creators</span><div class="h2">4 of 10 picked</div></div>
+        <span class="chip ok">Premium</span>
+      </div>
+      <div class="pool"><b>$4.00</b><span>of your membership goes to your creators every month.</span></div>
+      <div class="bar"><i style="width:25%;background:var(--brass)"></i><i style="width:25%;background:var(--olive)"></i><i style="width:25%;background:var(--mint)"></i><i style="width:25%;background:var(--sky)"></i></div>
+      <span class="meta">Equal shares · next split on Nov 14 (your renewal) · changes apply from then</span>
+      <div style="margin-top:10px">
+        <div class="row"><div class="av" style="background:var(--brass)">MR</div><div><div class="nm">Mara Reyes</div><span class="meta">The Salt Hours · Low Tide</span></div><div class="amt">$1.00<small>25%</small></div><div class="x">✕</div></div>
+        <div class="row"><div class="av" style="background:var(--olive)">DO</div><div><div class="nm">Dev Okafor</div><span class="meta">Night Shift (podcast)</span></div><div class="amt">$1.00<small>25%</small></div><div class="x">✕</div></div>
+        <div class="row"><div class="av" style="background:var(--mint)">LP</div><div><div class="nm">Lena Park</div><span class="meta">Paper Moons · 3 shorts</span></div><div class="amt">$1.00<small>25%</small></div><div class="x">✕</div></div>
+        <div class="row"><div class="av" style="background:var(--sky)">TA</div><div><div class="nm">Tomas Abreu</div><span class="meta">Fawns · <span class="chip warn" style="padding:2px 7px">payouts not set up</span></span></div><div class="amt">$1.00<small>25%</small></div><div class="x">✕</div></div>
+      </div>
+      <div class="search"><div class="field">Add a creator — search by name or title <b>⌕</b></div><span class="btn sm">Browse</span></div>
+      <div style="display:flex; gap:14px; align-items:center; margin-top:12px; font-family:var(--font-mono); font-size:.72rem; color:var(--ink-dim)">
+        <span><span class="tog"></span> Set my own shares</span>
+        <span><span class="tog on"></span> Let my creators see my name</span>
+      </div>
+      <div class="hist">
+        <span class="eyebrow">History</span>
+        <div><span>Oct 14 · Premium</span><b>$4.00 → 4 creators · your picks</b></div>
+        <div><span>Sep 14 · Premium</span><b>$4.00 → 3 creators · your picks</b></div>
+        <div><span>Aug 14 · Standard</span><b>$2.00 → 5 creators · followed your watching</b></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head"><div><span class="eyebrow pink">Your creators</span><div class="h2">Nobody picked yet</div></div><span class="chip ok">Standard</span></div>
+        <div class="pool"><b>$2.00</b><span>of your membership goes to creators every month.</span></div>
+        <div class="empty" style="margin-top:10px">Until you pick someone, your share <b>follows what you watch</b>: on each renewal it's split between the creators of the titles you watched in the last 30 days. Watched nothing? It joins the site-wide pool. Pick up to 10 creators and it goes to them instead.</div>
+        <div class="search"><div class="field">Add a creator — search by name or title <b>⌕</b></div><span class="btn sm primary">Browse</span></div>
+        <div class="hist">
+          <span class="eyebrow">History</span>
+          <div><span>Oct 2 · Standard</span><b>$2.00 → Mara Reyes, Dev Okafor · followed your watching</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><div><span class="eyebrow olive">Set my own shares</span><div class="h3">When the toggle is on</div></div></div>
+        <div class="row"><div class="av" style="background:var(--brass)">MR</div><div class="nm">Mara Reyes</div><div class="amt">$2.00<small>50%</small></div><div class="step"><i>−</i><i>+</i></div></div>
+        <div class="row"><div class="av" style="background:var(--olive)">DO</div><div class="nm">Dev Okafor</div><div class="amt">$1.00<small>25%</small></div><div class="step"><i>−</i><i>+</i></div></div>
+        <div class="row"><div class="av" style="background:var(--mint)">LP</div><div class="nm">Lena Park</div><div class="amt">$0.60<small>15%</small></div><div class="step"><i>−</i><i>+</i></div></div>
+        <div class="row"><div class="av" style="background:var(--sky)">TA</div><div class="nm">Tomas Abreu</div><div class="amt">$0.40<small>10%</small></div><div class="step"><i>−</i><i>+</i></div></div>
+        <span class="meta">Steps of 5%, always totals 100%. Off = equal shares, which is what most people will leave it on. Could ship in v2 if you want v1 small.</span>
+      </div>
+    </div>
+  </div>
+  <ul class="ideas">
+    <li><b>Avatars</b> honour the focal point + zoom like everywhere else (<code>AvatarPhoto</code> with <code>avatarPosition</code>/<code>avatarZoom</code>).</li>
+    <li><b>The lineup is yours even on Basic</b> — the card shows "Join to fund them" instead of a dollar figure, and the picks start paying the day they subscribe.</li>
+    <li><b>You can't pick yourself</b> (same rule as follows). A creator whose account is held by moderation drops off lineups quietly.</li>
+    <li><b>Snapshot on renewal.</b> Each payment is split the way the lineup looks at that moment. Editing the list never moves money already split — the history line says exactly what happened.</li>
+  </ul>
+</section>
+
+<!-- 3 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>3. The default — what happens until they pick</h2><span class="tag">rule to decide</span></div>
+  <div class="frame">
+    <p class="lead">Jose's rule: not setting it up still funds creators. Proposal: the default is <b>personal</b>, not a house pick — it follows the member's own watching, so two members who never touch the card still fund different people.</p>
+    <div class="ladder">
+      <div class="rung"><span class="n">1 · LINEUP SET</span><p><b>Everything goes to the picks.</b> Three creators picked = the whole share split three ways, not 3/10ths. A half-empty lineup is still a full choice.</p></div>
+      <div class="rung"><span class="n">2 · LINEUP EMPTY</span><p><b>Follows what you watched.</b> The 30 days before the renewal, from <code>watch_history</code>: each creator's share = their titles' plays ÷ all plays. Watch minutes once we save progress; plays until then.</p></div>
+      <div class="rung"><span class="n">3 · WATCHED NOTHING</span><p><b>The site-wide pool.</b> Split between every eligible creator by their share of the month's views (<code>creator_views</code> in Redis already counts this per day).</p></div>
+    </div>
+    <ul class="ideas" style="margin-top:14px">
+      <li><b>Alternatives if you'd rather:</b> straight to the pool (simplest, least personal) · Studio Tapa's picks of the month (editorial, needs curating) · a 50/50 of watched + pool.</li>
+      <li><b>Eligible creator</b> = has at least one released title on the site. Pitch-only creators? Location hosts? Proposed no — this is for the people whose work members are watching; Pitch Room already funds pitches.</li>
+      <li><b>Podcast and Snippet creators</b> count the same as film and series creators. Studio Tapa's own titles: in the pool or out? (open — if in, the studio funds itself from the default.)</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 4 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>4. Picking from around the site</h2><span class="tag">profiles, titles, directory</span></div>
+  <div class="frame">
+    <div class="hero">
+      <div class="av" style="background:var(--brass)">MR</div>
+      <div><div class="nm">Mara Reyes</div><span class="meta">@marareyes · Director, editor · <span class="chip ok" style="padding:2px 7px">✓ creator</span> · 2 titles · 38 followers</span><div class="chips" style="margin-top:8px"><span class="chip on">In your lineup · $1.00/mo</span></div></div>
+      <div class="acts"><span class="btn sm">Following</span><span class="btn sm primary">✓ Supporting</span><span class="btn sm">Message</span></div>
+    </div>
+    <ul class="ideas" style="margin-top:14px">
+      <li><b>Profile hero</b>: a <b>Support</b> button next to Follow. One tap adds them to the lineup (full lineup → "Your 10 are full — swap someone out" opens the card). Signed out → sign in; Basic → "Members fund creators · see plans".</li>
+      <li><b>Episode and series pages</b>: the creator line gets "Support" too — the moment someone finishes something they liked.</li>
+      <li><b>Follow ≠ Support.</b> Follows stay what they are (<code>user_follows</code>, feed + notifications). A nudge on the lineup card: "You follow 6 creators who aren't in your lineup — add them?"</li>
+      <li><b>Creator gets a notification</b> ("Lena added you to her lineup") only if the member left "Let my creators see my name" on; otherwise just the count moves.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 5 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>5. The creator's side</h2><span class="tag">/account payouts area · creator dashboard · app</span></div>
+  <div class="two">
+    <div class="card">
+      <div class="card-head"><div><span class="eyebrow mint">Member support</span><div class="h2">October</div></div><span class="chip ok">Payouts ready</span></div>
+      <div class="kpis">
+        <div class="kpi"><b>$14.50</b><span>this month so far</span></div>
+        <div class="kpi"><b>9</b><span>members · 6 picked you, 3 by watching</span></div>
+        <div class="kpi"><b>$31.20</b><span>pays out Nov 1</span></div>
+      </div>
+      <span class="eyebrow">Supporters</span>
+      <div class="row"><div class="av" style="background:var(--plum)">JH</div><div><div class="nm">Jose H.</div><span class="meta">since Aug · picked you</span></div><div class="amt">$1.00</div><div></div></div>
+      <div class="row"><div class="av" style="background:var(--sky)">AK</div><div><div class="nm">Anika K.</div><span class="meta">since Oct · picked you</span></div><div class="amt">$0.50</div><div></div></div>
+      <div class="row"><div class="av" style="background:var(--surface-3); color:var(--ink-dim)">7</div><div><div class="nm" style="color:var(--ink-dim)">7 members who stay anonymous</div><span class="meta">4 picked you · 3 by watching</span></div><div class="amt">$13.00</div><div></div></div>
+      <div class="hist">
+        <span class="eyebrow">Payouts</span>
+        <div><span>Oct 1</span><b>$22.80 → bank ····4421</b></div>
+        <div><span>Sep 1</span><b>$9.60 · under $10, carried over</b></div>
+      </div>
+    </div>
+    <div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-head"><div><span class="eyebrow mint">Member support</span><div class="h2">$12.40 waiting for you</div></div><span class="chip warn">Payouts not set up</span></div>
+        <p class="lead" style="margin:0 0 12px">5 members put you in their lineup. Set up payouts (the same two-minute Stripe form Pitch Room uses) and it's yours on the 1st.</p>
+        <span class="btn primary">Set up payouts</span>
+        <span class="meta" style="margin-top:10px">Credit waits 12 months, then returns to the pool (open — see §10).</span>
+      </div>
+      <ul class="ideas">
+        <li>Lives in the <b>Payouts card's</b> neighbourhood on /account (creators + admins) and on the creator dashboard; the app gets the same card (<code>mobile/src/components/PayoutsCard.js</code> sibling).</li>
+        <li><b>Your Numbers</b> gets a "member support" line next to views, so a creator sees watching and funding side by side.</li>
+        <li>Supporters show by <b>display name only when the member opted in</b>; everyone else is a count. Pitch Room shows backers by name today — this is the quieter default because it recurs every month.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<!-- 6 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>6. The money — how it actually moves</h2><span class="tag">stripe connect transfers</span></div>
+  <div class="frame">
+    <p class="lead">Membership payments land in the studio's own Stripe balance (a normal subscription, not a destination charge like Pitch Room). So creators are paid by <b>Stripe Connect transfers</b> from that balance into the same Express account Pitch Room and Locations already pay into (<code>creator_payout_accounts</code>; the <code>transfers</code> capability is already requested when the account is created).</p>
+    <div class="flow">
+      <div><b>1 · Renewal</b>Stripe fires <code>invoice.paid</code> (we don't listen for it yet). We record the payment: member, tier, amount, share, period.<i>member_payments</i></div>
+      <div><b>2 · Split</b>The share is split by the lineup as it stands right then (or the default rule) into one ledger line per creator.<i>creator_share_ledger · basis = picked / watched / pool</i></div>
+      <div><b>3 · Accrue</b>Lines add up per creator through the month. The creator card shows the running total; the member's history shows the split.<i>nothing moves yet</i></div>
+      <div><b>4 · Pay · 1st of the month</b>One transfer per creator with a ready account and ≥ $10 accrued. Under $10 carries over. No account → it waits.<i>stripe.transfers.create · creator_share_payouts</i></div>
+      <div><b>5 · Bank</b>Stripe pays the creator's bank on their Express schedule. Their Payouts card already shows that part.<i>existing PayoutsCard</i></div>
+    </div>
+    <ul class="ideas" style="margin-top:14px">
+      <li><b>Why a $10 minimum:</b> Stripe's Express pricing (US) is $2 per <i>active</i> connected account per month plus 0.25% + 25¢ per payout. Paying $0.60 to a creator would cost more than it sends. Accruing to $10 keeps the fees sane — and the Terms placeholder asks for exactly this threshold and schedule.</li>
+      <li><b>Refunded membership payment</b> (<code>charge.refunded</code>, which we already handle for pitches and bookings): its ledger lines are reversed if not yet paid out; if they were, the studio absorbs it. Same posture as Pitch Room refunds.</li>
+      <li><b>Idempotent</b> through <code>stripe_events</code> (migration 083) like every other webhook; a replayed <code>invoice.paid</code> never splits twice.</li>
+      <li><b>The batch</b> runs from a Vercel cron on the 1st with a "run now" button and a dry-run preview on the admin page; every transfer carries the ledger ids in its metadata so Stripe and the database can be reconciled.</li>
+      <li><b>Admin page</b> <code>/admin/creator-share</code> (Pitch Room group, cap <code>manage_payouts</code> or full admins): this month's ledger, who's owed what, held balances (no account), the payout batch and its history, settings per tier. The existing Payments checklist on /admin/pitch-room gains a row: "<code>invoice.paid</code> is on the account webhook".</li>
+    </ul>
+  </div>
+</section>
+
+<!-- 7 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>7. What exists today vs. what this needs</h2><span class="tag">honest inventory</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <span class="eyebrow mint">Already there</span>
+        <ul class="ideas" style="margin-top:8px">
+          <li><span class="yes">yes</span>Stripe Connect Express accounts per creator, onboarding, dashboard link, <code>account.updated</code> sync, the Payouts card (web + app).</li>
+          <li><span class="yes">yes</span>Tiers from Stripe product metadata; <code>getAccountContext</code> knows a member's tier.</li>
+          <li><span class="yes">yes</span><code>watch_history</code> per member (who watched which episode, when) — the default rule's input.</li>
+          <li><span class="yes">yes</span><code>creator_views</code> per day in Redis — the pool's input.</li>
+          <li><span class="yes">yes</span>Webhook idempotency (<code>stripe_events</code>), refund handling pattern, audit log, notifications with <code>href</code>.</li>
+          <li><span class="yes">yes</span>Profiles with Follow, identity payloads with focal-point avatars.</li>
+        </ul>
+      </div>
+      <div>
+        <span class="eyebrow olive">To build</span>
+        <ul class="ideas" style="margin-top:8px">
+          <li><span class="no">no</span>No record of membership payments in our database at all — <code>invoice.paid</code> isn't handled; only cancellations and failed payments get logged.</li>
+          <li><span class="no">no</span>No transfers code anywhere (Pitch Room and Locations use destination charges at checkout time).</li>
+          <li><span class="no">no</span>Migration 088: <code>member_lineups</code> (≤10 rows per member, weight, position), <code>member_payments</code>, <code>creator_share_ledger</code>, <code>creator_share_payouts</code>, <code>site_settings.creator_share_cents</code> per tier + payout minimum, <code>user_profiles.share_visible</code>.</li>
+          <li><span class="no">no</span><code>lib/creatorShare.js</code> (lineup rules, split maths — pure + tested like <code>donationMath</code> —, ledger, batch), <code>/api/creator-share/*</code>, the three cards, the Support buttons, the admin page, the cron, the Terms words, the app screens.</li>
+          <li><span class="no">no</span>The Terms. Section 5's Revenue paragraph must be real before the first transfer — it says so itself.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>8. Phones and the app</h2><span class="tag">account → your creators</span></div>
+  <div class="frame">
+    <div class="phones">
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="card">
+          <span class="eyebrow pink">Your creators</span>
+          <div class="h3">4 of 10 picked</div>
+          <div class="pool"><b style="font-size:1.4rem">$4.00</b><span style="font-size:.8rem">a month to your creators</span></div>
+          <div class="bar"><i style="width:25%;background:var(--brass)"></i><i style="width:25%;background:var(--olive)"></i><i style="width:25%;background:var(--mint)"></i><i style="width:25%;background:var(--sky)"></i></div>
+          <div class="row"><div class="av" style="background:var(--brass)">MR</div><div class="nm">Mara Reyes</div><div class="amt">$1.00</div></div>
+          <div class="row"><div class="av" style="background:var(--olive)">DO</div><div class="nm">Dev Okafor</div><div class="amt">$1.00</div></div>
+          <div class="row"><div class="av" style="background:var(--mint)">LP</div><div class="nm">Lena Park</div><div class="amt">$1.00</div></div>
+          <div class="row"><div class="av" style="background:var(--sky)">TA</div><div class="nm">Tomas Abreu</div><div class="amt">$1.00</div></div>
+          <div class="search"><div class="field" style="font-size:.68rem">Add a creator <b>⌕</b></div></div>
+          <span class="meta">Next split Nov 14 · swipe a row to remove</span>
+        </div>
+      </div>
+      <div class="phone">
+        <div class="status"><span>9:41</span><span>●●●</span></div>
+        <div class="hero" style="flex-direction:column; align-items:flex-start; gap:10px">
+          <div class="av" style="background:var(--brass)">MR</div>
+          <div><div class="nm">Mara Reyes</div><span class="meta">Director, editor · ✓ creator</span></div>
+          <div class="acts" style="margin-left:0"><span class="btn sm">Following</span><span class="btn sm primary">Support</span></div>
+        </div>
+        <span class="meta" style="margin-top:10px">Profile hero in the app: Support sits with Follow and Message. Account → <b>Your creators</b> is the card on the left; the creator's Member support card joins Payouts on Account and Your pitches.</span>
+      </div>
+      <div style="flex:1; min-width:260px">
+        <ul class="ideas">
+          <li>Website on a phone: the card stacks (avatar, name, share) and the share steppers become a bottom sheet.</li>
+          <li>App routes: <code>account/creators.js</code>, Support on <code>profile/[handle]</code>, the creator card; data via <code>/api/creator-share/{lineup,search,history,creator}</code> with the Bearer token like everything else.</li>
+          <li>Search = the same creator search the Crew directory uses, filtered to eligible creators, with "in your lineup" state.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 9 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>9. Terms — draft words</h2><span class="tag">needs your sign-off, numbers bracketed</span></div>
+  <div class="two">
+    <div class="draft">
+      <h4>Section 4 · membership — new paragraph</h4>
+      <p><strong>Your creator share.</strong> Part of every paid membership is set aside for the people who make what's on Studio Tapa TV: <mark>$2.00</mark> a month on Standard and <mark>$4.00</mark> on Premium (<mark>$2.00</mark> on Sponsor). You decide where it goes by naming up to 10 creators on your account page; it's split between them, equally unless you set your own shares, each time your membership renews. If you haven't named anyone, it follows what you watched in the 30 days before the renewal, and if you watched nothing it's shared among all creators on the platform in proportion to how much their work was watched. Changing your list affects future renewals only. This is part of your membership fee, not a donation or a purchase from the creator, and it doesn't give you anything beyond the membership itself.</p>
+    </div>
+    <div class="draft">
+      <h4>Section 5 · if you submit work — replaces the Revenue placeholder</h4>
+      <p><strong>Member share.</strong> When a member names you, or watches your released work under the default described in section 4, a share of that member's payment is credited to you. Credits are paid on the <mark>1st of each month</mark> through Stripe to the connected account you set up on your account page, once your balance reaches <mark>$10</mark>; smaller balances carry over. Credit you haven't set up an account to receive within <mark>12 months</mark> returns to the platform pool. If a member's payment is refunded or reversed, the matching credit is reversed too. We publish the per-tier amounts and may change them with 30 days' notice; the share already credited to you never changes.</p>
+      <p><strong>Advertising revenue.</strong> <mark>[still to be decided — ad revenue share, if any, is a separate decision from this one]</mark></p>
+    </div>
+  </div>
+  <ul class="ideas" style="margin-top:14px">
+    <li>The About page's line ("ads help maintain the site and fund new projects") gains a sentence: "Members go further: part of every membership goes straight to the creators they choose."</li>
+    <li>The tier picker (<code>lib/membershipTiers.js</code> perks, web + app) gets the share as a perk line on Standard/Premium/Sponsor — it's the differentiator, it belongs on the card.</li>
+  </ul>
+</section>
+
+<!-- 10 ─────────────────────────────────────────────── -->
+<section class="sec">
+  <div class="sec-head"><h2>10. Decided so far / open questions</h2><span class="tag">sign-off list</span></div>
+  <div class="two">
+    <div class="frame" style="margin:0">
+      <span class="eyebrow mint">From Jose's note</span>
+      <ul class="ideas" style="margin-top:8px">
+        <li>Members choose where their share goes — <b>up to 10 creators</b>.</li>
+        <li>Not choosing still funds creators: <b>a default applies until they allot it</b>.</li>
+        <li>The Terms don't cover it yet; they need to before money moves.</li>
+      </ul>
+      <span class="eyebrow olive" style="margin-top:14px">Proposed defaults in this mockup</span>
+      <ul class="ideas" style="margin-top:8px">
+        <li>Flat share per tier ($2 / $4 / $2), set in admin, locked per payment.</li>
+        <li>Equal split; "set my own shares" as a toggle (v1 or v2).</li>
+        <li>Default: your watching (30 days) → the pool.</li>
+        <li>Snapshot at each renewal; monthly transfers on the 1st; $10 minimum; 12-month hold for creators without an account.</li>
+        <li>Supporters anonymous unless they opt in; no self-support; eligible = has a released title.</li>
+      </ul>
+    </div>
+    <div class="ask">
+      <span class="eyebrow pink">Open — your call</span>
+      <ol style="margin-top:8px">
+        <li><b>Share amounts.</b> $2 Standard / $4 Premium? Sponsor = $2 or $4? Flat dollars or a percentage?</li>
+        <li><b>Shares.</b> Equal only in v1, or ship the steppers now?</li>
+        <li><b>The default.</b> Your watching → pool, or straight to the pool, or Studio Tapa's picks? Do the studio's own titles sit in the pool?</li>
+        <li><b>Who's pickable.</b> Only creators with released titles? Pitch-only creators too?</li>
+        <li><b>Payout rules.</b> 1st of the month, $10 minimum, unclaimed credit → pool after 12 months?</li>
+        <li><b>Visibility.</b> Anonymous by default with opt-in names — or names by default like Pitch Room backers?</li>
+        <li><b>Name.</b> "Creator Share" / "Your creators" here; other options: "Your lineup", "Patronage", "Member share".</li>
+        <li><b>Terms.</b> Approve the draft in §9 (with the numbers) — nothing pays out before it's live.</li>
+      </ol>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>
