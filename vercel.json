@@ -7,6 +7,10 @@
     {
       "path": "/api/cron/creator-payouts",
       "schedule": "0 9 1 * *"
+    },
+    {
+      "path": "/api/cron/studio-sweep",
+      "schedule": "0 10 * * *"
     }
   ]
 }

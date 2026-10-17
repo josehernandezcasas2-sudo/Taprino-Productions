@@ -4,6 +4,7 @@ import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
 import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
+import { recordAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -92,6 +93,12 @@ export default async function handler(req, res) {
           // retry through firstDelivery.
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'credits not applied' });
+        }
+        // Studio money: a row the reconciliation can match the charge to.
+        try {
+          await recordAdCreditPurchase(session);
+        } catch (err) {
+          console.error('recordAdCreditPurchase from webhook failed:', err.message);
         }
       } else if (session.metadata?.type === 'pitch_donation') {
         // A Pitch Room backing was paid: the pending row becomes the
@@ -201,6 +208,18 @@ export default async function handler(req, res) {
     case 'invoice.payment_failed':
       console.log('Payment failed for customer:', event.data.object.customer);
       break;
+    case 'payout.paid':
+    case 'payout.failed':
+    case 'payout.canceled': {
+      // The platform's own payouts to the bank: a studio sweep's row
+      // follows Stripe's status; Stripe's automatic payouts match no row.
+      try {
+        await syncSweepFromPayout(event.data.object);
+      } catch (err) {
+        console.error('syncSweepFromPayout from webhook failed:', err.message);
+      }
+      break;
+    }
     default:
       break;
   }

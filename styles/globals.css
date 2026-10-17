@@ -9615,3 +9615,47 @@ a.asup-name:hover { color: var(--brass); }
   .cm-cols { grid-template-columns: 1fr; }
   .adm-stats.cm-stats { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* Studio money (components/admin/StudioMoneyPanel.js) */
+.adm-stat.sm-hot { border-color: rgba(231,162,85,0.5); }
+.adm-stat.sm-hot b { color: var(--olive-bright); }
+.adm-stat.sm-bad { border-color: rgba(214,124,81,0.5); }
+.adm-stat.sm-bad b { color: var(--danger); }
+.sm-notice { font-size: 0.88rem; color: var(--ok); margin: 0 0 0.8rem; }
+.cm-cols > * { min-width: 0; }
+.sm-ledger { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.4rem; }
+.sm-ledger td { padding: 0.5rem 0.4rem; border-bottom: 1px solid rgba(251,232,211,0.07); vertical-align: top; overflow-wrap: anywhere; }
+.sm-ledger td:last-child { width: 7.5em; text-align: right; font-family: var(--font-mono); font-size: 0.84rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-ledger td.op { width: 18px; color: var(--ink-faint); font-family: var(--font-mono); text-align: center; }
+.sm-ledger tr.total td { border-top: 1px solid var(--ocean-ink); border-bottom: 0; font-family: var(--font-display); font-weight: 700; }
+.sm-ledger tr.total td:last-child { color: var(--olive-bright); font-size: 1.02rem; }
+.sm-ledger .neg { color: var(--danger); }
+.sm-ledger .pos { color: var(--ok); }
+.sm-sub { display: block; font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-faint); margin-top: 2px; font-weight: 400; line-height: 1.5; }
+.sm-amt { font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.sm-amt.neg { color: var(--danger); }
+.sm-amt.pos { color: var(--ok); }
+.sm-amt.zero { color: var(--ink-faint); }
+.cm-table tr.sm-sum td { font-weight: 700; border-top: 1px solid var(--ocean-ink); border-bottom: 0; }
+.sm-kv { display: flex; justify-content: space-between; gap: 0.8rem; align-items: baseline; font-size: 0.86rem; padding: 0.35rem 0; border-bottom: 1px solid rgba(251,232,211,0.07); }
+.sm-kv span { color: var(--ink-dim); } .sm-kv b { text-align: right; }
+.sm-reasons { margin: 0.4rem 0 0; padding-left: 1.1rem; color: var(--danger); font-size: 0.84rem; line-height: 1.5; }
+.sm-reasons li { margin: 0 0 0.2rem; }
+.sm-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 0.7rem 0.9rem; align-items: end; margin-top: 0.6rem; }
+.sm-form label { display: flex; flex-direction: column; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); min-width: 0; }
+.sm-form label.sm-wide { grid-column: 1 / -1; }
+.sm-form-actions { display: flex; align-items: end; }
+.sm-input { width: 100%; box-sizing: border-box; background: var(--surface-2); border: 1px solid rgba(251,232,211,0.14); border-radius: 8px; color: var(--ink); font-family: var(--font-mono); font-size: 0.82rem; padding: 0.5rem 0.65rem; margin: 0; text-transform: none; letter-spacing: 0; }
+.sm-input:focus { outline: 2px solid rgba(231,162,85,0.5); outline-offset: 1px; }
+textarea.sm-input { resize: vertical; font-family: var(--font-body); }
+.sm-bar { display: flex; height: 20px; border-radius: 6px; overflow: hidden; margin: 0.4rem 0; background: var(--surface-2); }
+.sm-bar div { height: 100%; }
+.sm-legend { display: flex; gap: 0.9rem; flex-wrap: wrap; font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); }
+.sm-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+.sm-unmatched { margin: 0.3rem 0 0; padding-left: 1.1rem; font-family: var(--font-mono); font-size: 0.74rem; color: var(--ink-dim); line-height: 1.6; }
+.sm-unmatched b { color: var(--ink); }
+.sm-check { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.5rem 0; border-top: 1px solid rgba(251,232,211,0.07); font-size: 0.88rem; }
+.sm-check:first-child { border-top: 0; }
+.sm-check .m { font-family: var(--font-mono); width: 16px; flex: none; color: var(--ink-faint); }
+.sm-check.ok .m { color: var(--ok); } .sm-check.bad .m { color: var(--danger); }
+.sm-check small { display: block; color: var(--ink-faint); font-family: var(--font-mono); font-size: 0.7rem; margin-top: 2px; line-height: 1.5; }

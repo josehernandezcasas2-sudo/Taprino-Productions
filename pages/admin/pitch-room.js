@@ -9,7 +9,7 @@ export async function getServerSideProps(ctx) {
 
 export default function AdminPitchRoom({ account, mainGenres }) {
   return (
-    <AdminShell account={account} mainGenres={mainGenres} title="Pitches & comments" crumbs={['Pitch Room']}
+    <AdminShell account={account} mainGenres={mainGenres} title="Pitches & comments" crumbs={['Money']}
       intro="The Stripe setup donations depend on, reported comments, every pitch with approve / reject / delete, and the in-platform funding switch per project.">
       <StripeStatusPanel />
       <PitchRoomPanel />
