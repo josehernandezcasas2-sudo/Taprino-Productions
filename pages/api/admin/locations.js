@@ -44,7 +44,7 @@ export async function handleLocationsAdmin(req, res, account) {
       const cutCents = requests.filter((r) => r.status === 'paid' || r.status === 'done').reduce((n, r) => n + r.platformCutCents, 0);
       return res.status(200).json({
         pendingCount: pending.length,
-        issues: requests.filter((r) => r.outcome && r.outcome !== 'as_agreed'),
+        issues: requests.filter((r) => r.outcome && r.outcome !== 'as_agreed' && !r.outcomeSettledByAdmin),
         settle: requests.filter((r) => r.status === 'paid' && !r.outcome && r.pastEnd),
         bookings: requests,
         listings,
@@ -74,9 +74,10 @@ export async function handleLocationsAdmin(req, res, account) {
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'location_booking_cancelled', targetType: 'location_request', targetId: requestId, details: reason || null });
         return res.status(200).json({ request: result });
       }
-      if (op === 'pause' || op === 'remove') {
-        const result = await setListingStatus(account.userId, locationId, op === 'pause' ? 'paused' : 'removed', { isAdmin: true });
-        await recordAudit({ adminId: account.userId, adminEmail: account.email, action: op === 'pause' ? 'location_paused' : 'location_removed', targetType: 'location', targetId: locationId });
+      if (op === 'pause' || op === 'remove' || op === 'resume') {
+        const next = { pause: 'paused', remove: 'removed', resume: 'listed' }[op];
+        const result = await setListingStatus(account.userId, locationId, next, { isAdmin: true });
+        await recordAudit({ adminId: account.userId, adminEmail: account.email, action: { pause: 'location_paused', remove: 'location_removed', resume: 'location_resumed' }[op], targetType: 'location', targetId: locationId });
         return res.status(200).json(result);
       }
       return res.status(400).json({ error: 'Unknown op.' });

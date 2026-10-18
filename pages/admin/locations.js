@@ -65,8 +65,13 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
           {data.issues.length > 0 && (
             <section>
               <H>Reported problems · {data.issues.length}</H>
-              <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '64ch' }}>A host said a paid shoot ended in damage or a no-show. Read both sides in the conversation, then refund (full, final) or leave the booking as paid. Nothing happens automatically.</p>
-              <div className="crew-results">{data.issues.map((r) => <BookingRow key={r.id} r={r} busy={busy} onRefund={() => refund(r)} showNote />)}</div>
+              <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '64ch' }}>A host said a paid shoot ended in damage or a no-show. Read both sides in the conversation, then refund (full, final), or settle it: keep the host’s answer, or change it to “as agreed”. Settling takes it off this list. Nothing happens automatically.</p>
+              <div className="crew-results">{data.issues.map((r) => (
+                <BookingRow key={r.id} r={r} busy={busy} onRefund={() => refund(r)} showNote>
+                  <button type="button" className="crew-btn sm" disabled={busy === r.id} onClick={() => act(r.id, { op: 'outcome', requestId: r.id, outcome: r.outcome, note: `${r.outcomeNote ? `${r.outcomeNote} · ` : ''}Settled by an admin: host’s report stands` })}>Settle, report stands</button>
+                  <button type="button" className="crew-btn sm" disabled={busy === r.id} onClick={() => act(r.id, { op: 'outcome', requestId: r.id, outcome: 'as_agreed', note: 'Settled by an admin: went as agreed' })}>Settle as agreed</button>
+                </BookingRow>
+              ))}</div>
             </section>
           )}
 
@@ -108,6 +113,7 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
                       </span>
                       <span className="crew-actions">
                         {l.status === 'listed' && <button type="button" className="crew-btn sm" disabled={busy === l.id} onClick={() => act(l.id, { op: 'pause', locationId: l.id })}>Pause</button>}
+                        {l.status === 'paused' && <button type="button" className="crew-btn sm" disabled={busy === l.id} onClick={() => act(l.id, { op: 'resume', locationId: l.id })}>Resume</button>}
                         <button type="button" className="crew-btn sm ghost" style={{ color: 'var(--danger)' }} disabled={busy === l.id} onClick={() => { if (window.confirm(`Remove “${l.title}”? The host keeps their bookings; the listing goes.`)) act(l.id, { op: 'remove', locationId: l.id }); }}>Remove</button>
                       </span>
                     </div>
