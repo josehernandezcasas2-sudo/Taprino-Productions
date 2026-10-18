@@ -88,8 +88,18 @@ export default async function handler(req, res) {
       await run('syncAccountFromStripe', () => syncAccountFromStripe(event.data.object));
       break;
     }
-    case 'checkout.session.completed': {
+    case 'checkout.session.completed':
+    case 'checkout.session.async_payment_succeeded': {
       const session = event.data.object;
+      // A one-off payment (ad credits, a backing, a booking) only counts
+      // once the money is actually in. Cards are paid on completion; a
+      // delayed method completes as "unpaid" and arrives later as
+      // async_payment_succeeded, which lands here too.
+      const oneOff = ['ad_credits', 'pitch_donation', 'location_booking'].includes(session.metadata?.type);
+      if (oneOff && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
+        console.log(`checkout ${session.id} (${session.metadata.type}) completed unpaid; waiting for the money`);
+        break;
+      }
       // Two entirely different kinds of checkout land here — the
       // subscription join flow (no metadata.type) and an ad-credits
       // top-up (metadata.type === 'ad_credits', set when the session
