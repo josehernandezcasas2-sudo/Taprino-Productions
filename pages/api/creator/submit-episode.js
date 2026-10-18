@@ -93,6 +93,24 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'That video ID isn\u2019t ready to stream yet in Cloudflare — wait for it to finish processing.' });
       }
     }
+    // Whatever the browser says about where the id came from, it has to be
+    // this creator's video: uploads are tagged with the uploader's account
+    // (get-upload-url / import-video-url). An older, untagged video is
+    // accepted only if no other creator's episode already uses it, so
+    // nobody can attach someone else's film by its id.
+    if (!isAdmin) {
+      if (!/^[a-zA-Z0-9]{16,64}$/.test(String(body.videoUid))) {
+        return res.status(400).json({ error: 'That doesn’t look like a video id from this site.' });
+      }
+      const owner = await getCloudflareVideoStatus(body.videoUid);
+      if (owner && owner.creator && owner.creator !== userId) {
+        return res.status(403).json({ error: 'That video was uploaded by someone else.' });
+      }
+      if (!owner || !owner.creator) {
+        const { data: inUse } = await getSupabase().from('episodes').select('id').ilike('src', `%${body.videoUid}%`).neq('submitted_by', userId).limit(1);
+        if (inUse && inUse.length) return res.status(403).json({ error: 'That video is already used by another creator’s episode.' });
+      }
+    }
   }
 
   // trailerUid is optional — a creator may not have a separate trailer cut
