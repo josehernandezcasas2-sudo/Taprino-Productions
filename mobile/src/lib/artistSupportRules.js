@@ -8,8 +8,11 @@ export const MIN_WEIGHT = 1;
 export const MAX_WEIGHT = 5;
 export const LINEUP_MODES = ['equal', 'custom'];
 
-export const DEFAULT_SHARE_CENTS = { standard: 200, premium: 400, sponsor: 200 };
-export const DEFAULT_BONUS_CENTS = { standard: 100, premium: 200, sponsor: 100 };
+// Jose's numbers, 2026-10-18 (migration 090 writes them to site_settings).
+export const DEFAULT_SHARE_CENTS = { standard: 200, premium: 350, sponsor: 150 };
+export const DEFAULT_BONUS_CENTS = { standard: 100, premium: 150, sponsor: 50 };
+export const DEFAULT_PAYOUT_MINIMUM_CENTS = 2500;
+export const DEFAULT_REFERRAL_BONUS_MONTHS = 12;
 
 export function shareCentsFor(shareCents, tier) {
   const table = shareCents && typeof shareCents === 'object' ? shareCents : DEFAULT_SHARE_CENTS;

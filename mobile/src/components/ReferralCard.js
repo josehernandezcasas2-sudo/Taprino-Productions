@@ -45,7 +45,7 @@ export default function ReferralCard() {
       <Text style={styles.subheading}>Bring your people</Text>
       <Text style={styles.title}>Your link</Text>
       <Text style={styles.lede}>
-        Every member who joins through it earns you {dollars(bonus.standard || 0)} a month on Standard and Sponsor and {dollars(bonus.premium || 0)} on Premium, for as long as they stay. That's on top of the share they point at you, and it never comes out of theirs.
+        Every member who joins through it earns you {dollars(bonus.premium || 0)} a month on Premium, {dollars(bonus.standard || 0)} on Standard and {dollars(bonus.sponsor || 0)} on Sponsor, for their first {data && data.bonusMonths ? data.bonusMonths : 12} months. That's on top of the share they point at you, and it never comes out of theirs.
       </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {data ? (

@@ -3,7 +3,7 @@
 import assert from 'node:assert/strict';
 import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
-  buildLedgerLines, reversalLinesFor, referralIsActive, cleanViaSlug, planPayouts, applyBalance
+  buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -123,6 +123,19 @@ test('applyBalance: pays in order while the platform balance covers it', () => {
   assert.deepEqual(out.skippedForBalance.map((p) => [p.creatorId, p.reason]), [['b', 'platform balance too low']]);
   assert.equal(applyBalance(pay, Infinity).pay.length, 3);
   assert.equal(applyBalance(pay, null).pay.length, 3);
+});
+
+test('referralEarnsBonus: only the first N months from the first paid invoice; 0 means no limit', () => {
+  const ref = { id: 'r', creator_id: 'user_mara', locked_at: '2026-01-15T10:00:00Z', ended_at: null, voided_at: null };
+  assert.equal(referralEarnsBonus(ref, '2026-01-15T10:00:00Z', 12), true);
+  assert.equal(referralEarnsBonus(ref, '2026-12-15T10:00:00Z', 12), true);
+  assert.equal(referralEarnsBonus(ref, '2027-01-15T10:00:00Z', 12), false);
+  assert.equal(referralEarnsBonus(ref, '2030-01-01T00:00:00Z', 0), true);
+  assert.equal(referralEarnsBonus({ ...ref, ended_at: '2026-03-01T00:00:00Z' }, '2026-02-01T00:00:00Z', 12), false);
+  const late = buildLedgerLines({ memberId: 'm', paymentId: 'p', shareCents: 200, basis: 'picks', entries: [{ id: 'user_x', weight: 1 }], referral: ref, bonusCents: 100, paidAt: '2027-02-15T10:00:00Z', bonusMonths: 12 });
+  assert.deepEqual(late.map((l) => l.kind), ['member_share']);
+  const early = buildLedgerLines({ memberId: 'm', paymentId: 'p', shareCents: 200, basis: 'picks', entries: [{ id: 'user_x', weight: 1 }], referral: ref, bonusCents: 100, paidAt: '2026-06-15T10:00:00Z', bonusMonths: 12 });
+  assert.deepEqual(early.map((l) => l.kind), ['member_share', 'referral']);
 });
 
 console.log(`\n${passed} passed`);

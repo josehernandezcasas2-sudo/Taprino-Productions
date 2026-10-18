@@ -7,7 +7,8 @@ import { dollars } from '../../lib/artistSupportRules';
 // (Creator Share, lib/creatorShare.js). On /account under the Payouts
 // card for creators and admins; the app's ReferralCard mirrors it. A
 // member who joins through the link earns the creator a flat bonus on
-// every renewal for as long as that membership lasts, on top of the
+// renewal for the first 12 months of that membership (site_settings
+// referral_bonus_months), on top of the
 // share the member points at them.
 export default function ReferralCard({ apiPath = '/api/creator/referrals' }) {
   const [data, setData] = useState(null);
@@ -42,7 +43,7 @@ export default function ReferralCard({ apiPath = '/api/creator/referrals' }) {
       <div className="account-subheading">Bring your people</div>
       <h3 className="refc-title">Your link</h3>
       <p className="account-card-lede">
-        Every member who joins through it earns you {dollars(bonus.standard || 0)} a month on Standard and Sponsor and {dollars(bonus.premium || 0)} on Premium, for as long as they stay. That&rsquo;s on top of the share they point at you, and it never comes out of theirs.
+        Every member who joins through it earns you {dollars(bonus.premium || 0)} a month on Premium, {dollars(bonus.standard || 0)} on Standard and {dollars(bonus.sponsor || 0)} on Sponsor, for their first {data && data.bonusMonths ? data.bonusMonths : 12} months. That&rsquo;s on top of the share they point at you, and it never comes out of theirs.
       </p>
       {error && <p className="asup-note error">{error}</p>}
       {data && (
