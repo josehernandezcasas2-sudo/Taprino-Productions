@@ -31,6 +31,6 @@ export default async function handler(req, res) {
   if (!UUID_RE.test(String(pitchId || ''))) return res.status(400).json({ error: 'pitchId is required.' });
 
   const result = await togglePitchLike(userId, pitchId);
-  if (result.error) return res.status(500).json({ error: result.error });
+  if (result.error) return res.status(result.error === 'That project isn’t open yet.' ? 409 : 500).json({ error: result.error });
   return res.status(200).json(result);
 }
