@@ -1,13 +1,13 @@
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChatIcon, ClapperboardIcon, ClockIcon, CloseIcon, EyeIcon, ExternalLinkIcon,
   HeadphonesIcon, ImageIcon, LinkIcon, PencilIcon, SettingsIcon, TrashIcon, UndoIcon, WarningIcon
 } from '../../components/WorkIcons';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -30,10 +30,6 @@ const CF_STATE_LABEL = {
 };
 
 const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
-
-function withTimeout(promise, ms) {
-  return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
-}
 
 function publicUrlFor(s) {
   const path = s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
@@ -64,12 +60,13 @@ export default function MyWork() {
   const [deleteError, setDeleteError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [actionError, setActionError] = useState(null);
-  const tokenRef = useRef(null);
 
+  // Every request asks Clerk for a fresh token: a token kept from when the
+  // screen opened has expired a minute later (edits/deletion requests then
+  // failed as "signed out").
   async function loadSubmissions() {
     try {
-      const token = tokenRef.current !== null ? tokenRef.current : await withTimeout(getToken().catch(() => null), 4000);
-      tokenRef.current = token;
+      const token = await freshToken(getToken);
       const data = await apiGet('/api/creator/my-submissions', token);
       setFeedState({ loading: false, error: null, forbidden: false, submissions: data.submissions });
     } catch (err) {
@@ -102,7 +99,7 @@ export default function MyWork() {
       const body = isEpisode
         ? { episodeId: editModal.currentValues.id, title: nameValue, description }
         : { seriesId: editModal.currentValues.id, name: nameValue, description };
-      await apiPost(endpoint, body, tokenRef.current);
+      await apiPost(endpoint, body, await freshToken(getToken));
       setEditModal(null);
     } catch (err) {
       setEditError(err.message);
@@ -119,7 +116,7 @@ export default function MyWork() {
     setDeleteSaving(true);
     setDeleteError(null);
     try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, tokenRef.current);
+      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, await freshToken(getToken));
       setDeleteModal(null);
       setDeleteReason('');
       loadSubmissions();
@@ -133,7 +130,7 @@ export default function MyWork() {
   async function cancelDeletion(episodeId) {
     setActionError(null);
     try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId, action: 'cancel' }, tokenRef.current);
+      await apiPost('/api/creator/request-episode-deletion', { episodeId, action: 'cancel' }, await freshToken(getToken));
       loadSubmissions();
     } catch (err) {
       setActionError(err.message);

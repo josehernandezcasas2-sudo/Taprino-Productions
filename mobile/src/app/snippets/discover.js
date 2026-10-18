@@ -6,7 +6,7 @@ import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Share, StyleSheet
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import ReelPlayer from '../../components/ReelPlayer';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
@@ -71,7 +71,6 @@ export default function SnippetsDiscover() {
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
-  const tokenRef = useRef(null);
   const listRef = useRef(null);
 
   const [feedState, setFeedState] = useState({ loading: true, error: null, feed: null });
@@ -94,7 +93,6 @@ export default function SnippetsDiscover() {
     async function load() {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        tokenRef.current = token;
         const feed = await apiGet('/api/snippets-feed', token);
         if (cancelled) return;
         setFeedState({ loading: false, error: null, feed });
@@ -162,7 +160,7 @@ export default function SnippetsDiscover() {
     if (!menuSlide) return;
     setDeleting(true);
     try {
-      await apiDelete(`/api/posts/${menuSlide.episode.postId}`, {}, tokenRef.current);
+      await apiDelete(`/api/posts/${menuSlide.episode.postId}`, {}, await freshToken(getToken));
       const postId = menuSlide.episode.postId;
       setDeck((d) => d.filter((s) => !(s.kind === 'episode' && s.episode.postId === postId)));
       closeMenu();
@@ -185,7 +183,7 @@ export default function SnippetsDiscover() {
     setEditError(null);
     try {
       const postId = menuSlide.episode.postId;
-      await apiPatch(`/api/posts/${postId}`, { caption: editText.trim() }, tokenRef.current);
+      await apiPatch(`/api/posts/${postId}`, { caption: editText.trim() }, await freshToken(getToken));
       setDeck((d) => d.map((s) => (
         s.kind === 'episode' && s.episode.postId === postId
           ? { ...s, episode: { ...s.episode, title: editText.trim() } }
@@ -202,7 +200,8 @@ export default function SnippetsDiscover() {
   async function handleReport(reason) {
     if (!menuSlide) return;
     setMenuMode('reported');
-    apiPost('/api/posts/report', { postId: menuSlide.episode.postId, reason }, tokenRef.current).catch(() => {});
+    const postId = menuSlide.episode.postId;
+    freshToken(getToken).then((t) => apiPost('/api/posts/report', { postId, reason }, t)).catch(() => {});
   }
 
   if (feedState.loading) {

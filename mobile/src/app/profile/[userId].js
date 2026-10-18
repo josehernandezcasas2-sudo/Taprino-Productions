@@ -1,10 +1,10 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Modal, Pressable, ScrollView, Share, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, absoluteFill, bannerGradient } from '../../lib/theme';
 import ReportSheet from '../../components/ReportSheet';
@@ -94,7 +94,6 @@ export default function PublicProfile() {
   // (the website's PostViewerModal has no mobile equivalent yet; video
   // posts still go to /snippets/discover, which is the real reel viewer).
   const [photoPost, setPhotoPost] = useState(null);
-  const tokenRef = useRef(null);
 
   useEffect(() => {
     if (!profileUserId) return undefined;
@@ -103,7 +102,6 @@ export default function PublicProfile() {
       // Token so the server can tell whether this is the viewer's own
       // profile (isSignedIn / viewerId); never blocks for more than 4s.
       const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
-      tokenRef.current = token;
       try {
         // /profile/<slug> on the site accepts a user id or an @handle;
         // the API's userId param is the same slug.
@@ -137,7 +135,7 @@ export default function PublicProfile() {
     if (followBusy) return;
     setFollowBusy(true);
     try {
-      const data = await apiPost('/api/profile-follow', { followedId: profile.userId }, tokenRef.current);
+      const data = await apiPost('/api/profile-follow', { followedId: profile.userId }, await freshToken(getToken));
       setFollowing(data.following);
       setFollowerCount(data.followers);
     } catch (err) {

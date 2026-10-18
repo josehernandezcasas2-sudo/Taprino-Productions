@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
-import { API_BASE_URL, apiGet, apiPost } from '../lib/api';
+import { API_BASE_URL, apiGet, apiPost, freshToken } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 
 // Mirrors pages/apply.js, the creator onboarding page: what we take, the
@@ -126,7 +126,8 @@ export default function Apply() {
     setBusy(true);
     setSendError(null);
     try {
-      const res = await apiPost('/api/apply', { ...form, rightsAnswers: answers, rightsAttested: true }, tokenRef.current);
+      // A fresh token: the form takes longer than a token lasts.
+      const res = await apiPost('/api/apply', { ...form, rightsAnswers: answers, rightsAttested: true }, await freshToken(getToken));
       setState((s) => ({ ...s, data: { ...s.data, application: res.application } }));
       setReapply(false);
       setForm(EMPTY_FORM);

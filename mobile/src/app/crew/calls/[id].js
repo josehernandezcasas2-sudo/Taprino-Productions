@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, Text
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPatch, apiPost } from '../../../lib/api';
+import { apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
@@ -56,19 +56,19 @@ export default function CallScreen() {
   const isPoster = Boolean(call && userId && call.poster.userId === userId);
 
   const respond = () => act(async () => {
-    await apiPost(`/api/crew/calls/${id}/respond`, { message: reply }, tokenRef.current);
+    await apiPost(`/api/crew/calls/${id}/respond`, { message: reply }, await freshToken(getToken));
     setReply('');
     return null;
   }, `Sent — it's in your Messages with the call attached.`);
-  const book = (responseId, action) => act(() => apiPost(`/api/crew/calls/${id}/book`, { responseId, action }, tokenRef.current));
+  const book = (responseId, action) => act(async () => apiPost(`/api/crew/calls/${id}/book`, { responseId, action }, await freshToken(getToken)));
   const outcome = (responseId, value) => act(async () => {
-    const d = await apiPost(`/api/crew/calls/${id}/outcome`, { responseId, outcome: value }, tokenRef.current);
+    const d = await apiPost(`/api/crew/calls/${id}/outcome`, { responseId, outcome: value }, await freshToken(getToken));
     if (value === 'worked') setEndorsing(responseId);
     return d;
   });
-  const setStatus = (status) => act(() => apiPatch(`/api/crew/calls/${id}`, { status }, tokenRef.current));
+  const setStatus = (status) => act(async () => apiPatch(`/api/crew/calls/${id}`, { status }, await freshToken(getToken)));
   const endorse = () => act(async () => {
-    await apiPost('/api/crew/endorse', { responseId: endorsing, line, wouldAgain: true }, tokenRef.current);
+    await apiPost('/api/crew/endorse', { responseId: endorsing, line, wouldAgain: true }, await freshToken(getToken));
     setEndorsing(null);
     setLine('');
     return null;

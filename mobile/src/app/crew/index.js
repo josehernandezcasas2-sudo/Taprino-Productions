@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../lib/api';
+import { apiGet, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, PersonCard, GearCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '../../components/CrewBits';
@@ -73,7 +73,9 @@ export default function CrewCall() {
       if (verifiedOnly) params.push('verified=1');
       if (tab === 'gear') params.push('view=gear');
       try {
-        const data = await apiGet(`/api/crew/people?${params.join('&')}`, tokenRef.current);
+        // Fresh each search (a token from when the screen opened has expired
+        // a minute later, and day rates quietly disappear).
+        const data = await apiGet(`/api/crew/people?${params.join('&')}`, tokenRef.current ? await freshToken(getToken) : null);
         if (id !== reqId.current) return;
         if (tab === 'gear') setGear(data); else setPeople(data);
         setError(null);

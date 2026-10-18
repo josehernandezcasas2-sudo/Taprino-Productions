@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, Tex
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPost } from '../../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip, PlaceBox } from '../../../components/CrewBits';
@@ -54,7 +54,7 @@ export default function PostCall() {
     setError(null);
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null }, tokenRef.current);
+      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null }, await freshToken(getToken));
       router.replace(`/crew/calls/${data.call.id}`);
     } catch (err) {
       setError(err.message);

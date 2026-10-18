@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import Svg, { Path } from 'react-native-svg';
-import { apiGet } from '../../lib/api';
+import { apiGet, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 
@@ -81,7 +81,6 @@ function Bar({ pct, watch }) {
 export default function YourNumbers() {
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const tokenRef = useRef(null);
   const [days, setDays] = useState(30);
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [selectedId, setSelectedId] = useState(null);
@@ -95,8 +94,7 @@ export default function YourNumbers() {
     setState((s) => ({ ...s, loading: true, error: null }));
     (async () => {
       try {
-        tokenRef.current = await getToken();
-        const data = await apiGet(`/api/creator/analytics?days=${days}`, tokenRef.current);
+        const data = await apiGet(`/api/creator/analytics?days=${days}`, await freshToken(getToken));
         if (!cancelled) setState({ loading: false, error: null, data });
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });
@@ -116,7 +114,7 @@ export default function YourNumbers() {
     setDetail({ loading: true, error: null, data: null });
     latestRef.current = episodeId;
     try {
-      const d = await apiGet(`/api/creator/episode-detail-analytics?episodeId=${encodeURIComponent(episodeId)}`, tokenRef.current);
+      const d = await apiGet(`/api/creator/episode-detail-analytics?episodeId=${encodeURIComponent(episodeId)}`, await freshToken(getToken));
       if (latestRef.current !== episodeId) return;
       setDetail({ loading: false, error: null, data: d });
     } catch (err) {

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../../lib/api';
+import { apiGet, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip, PlaceBox, CallCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '../../../components/CrewBits';
@@ -64,7 +64,8 @@ export default function CallsBoard() {
       if (matches) params.push('matches=1');
       if (near) params.push(`lat=${near.lat}`, `lng=${near.lng}`, `within=${within}`);
       try {
-        const data = await apiGet(`/api/crew/calls?${params.join('&')}`, tokenRef.current);
+        // Fresh each search, or "Matches my card" stops matching after a minute.
+        const data = await apiGet(`/api/crew/calls?${params.join('&')}`, tokenRef.current ? await freshToken(getToken) : null);
         if (id !== reqId.current) return;
         setBoard(data);
         setError(null);

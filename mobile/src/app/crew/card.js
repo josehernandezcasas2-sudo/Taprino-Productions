@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Te
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiDelete, apiGet, apiPost } from '../../lib/api';
+import { apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, GearRows, CreditRows, GEAR_FLAGS } from '../../components/CrewBits';
@@ -100,7 +100,7 @@ export default function CrewCardScreen() {
     setBusy(true);
     setStatus(null);
     try {
-      const data = await apiPost('/api/crew/card', form, tokenRef.current);
+      const data = await apiPost('/api/crew/card', form, await freshToken(getToken));
       setState((s) => ({ ...s, card: data.card }));
       setForm(fromCard(data.card));
       setStatus({ kind: 'ok', text: data.card.listed && (data.card.roles.length || data.card.gear.length) ? 'Saved — you’re on Crew Call.' : 'Saved.' });
@@ -120,7 +120,7 @@ export default function CrewCardScreen() {
         onPress: async () => {
           setBusy(true);
           try {
-            await apiDelete('/api/crew/card', {}, tokenRef.current);
+            await apiDelete('/api/crew/card', {}, await freshToken(getToken));
             setState((s) => ({ ...s, card: null }));
             setForm(EMPTY);
             setStatus({ kind: 'ok', text: 'Card removed.' });

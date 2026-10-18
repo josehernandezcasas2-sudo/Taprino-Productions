@@ -11,6 +11,17 @@
 // who you were).
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.studiotapatv.site';
 
+// A Clerk session token lasts about a minute, so a token fetched when a
+// screen opened is stale by the time someone taps Save or a poll fires,
+// and the server then treats a signed-in person as signed out. Ask for one
+// right before each request instead (Clerk hands back its cached token
+// while it's still good). Gives up after 4 s so a slow Clerk can't hang a
+// screen; null means "send it anonymous".
+export function freshToken(getToken, ms = 4000) {
+  if (typeof getToken !== 'function') return Promise.resolve(getToken || null);
+  return Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), ms))]);
+}
+
 // `token` is a Clerk session token (from useAuth().getToken()) — same
 // reasoning as apiPost below. Omit it for anonymous/free-tier requests.
 export async function apiGet(path, token) {

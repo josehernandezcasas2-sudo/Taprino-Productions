@@ -1,9 +1,9 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import PayoutsCard from '../../components/PayoutsCard';
@@ -42,7 +42,7 @@ function Earnings({ pitch, earnings }) {
   );
 }
 
-function UpdateForm({ pitchId, token, onPosted }) {
+function UpdateForm({ pitchId, getToken, onPosted }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [saving, setSaving] = useState(false);
@@ -52,7 +52,7 @@ function UpdateForm({ pitchId, token, onPosted }) {
     setSaving(true);
     setError(null);
     try {
-      await apiPost('/api/creator/pitch-update', { pitchId, title: title.trim(), body: body.trim() }, token);
+      await apiPost('/api/creator/pitch-update', { pitchId, title: title.trim(), body: body.trim() }, await freshToken(getToken));
       setTitle('');
       setBody('');
       onPosted();
@@ -77,7 +77,6 @@ function UpdateForm({ pitchId, token, onPosted }) {
 export default function YourPitches() {
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const tokenRef = useRef(null);
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [openUpdateFor, setOpenUpdateFor] = useState(null);
   const [postedFlash, setPostedFlash] = useState(null);
@@ -86,8 +85,7 @@ export default function YourPitches() {
     if (!isLoaded) return;
     if (!isSignedIn) { setState({ loading: false, error: null, data: null }); return; }
     try {
-      tokenRef.current = await getToken();
-      const data = await apiGet('/api/creator/pitches', tokenRef.current);
+      const data = await apiGet('/api/creator/pitches', await freshToken(getToken));
       setState({ loading: false, error: null, data });
     } catch (err) {
       setState({ loading: false, error: err.message, data: null });
@@ -152,7 +150,7 @@ export default function YourPitches() {
             {p.status === 'approved' && (p.funding_enabled || earnings[p.id]) ? <Earnings pitch={p} earnings={earnings[p.id]} /> : null}
             {p.status === 'approved' ? (
               openUpdateFor === p.id ? (
-                <UpdateForm pitchId={p.id} token={tokenRef.current} onPosted={() => { setOpenUpdateFor(null); setPostedFlash(p.id); }} />
+                <UpdateForm pitchId={p.id} getToken={getToken} onPosted={() => { setOpenUpdateFor(null); setPostedFlash(p.id); }} />
               ) : (
                 <Pressable style={[styles.btnSmall, { marginTop: 10 }]} onPress={() => setOpenUpdateFor(p.id)}>
                   <Text style={styles.btnSmallText}>+ Post an update</Text>

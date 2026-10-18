@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -23,7 +23,6 @@ export default function AdminReview() {
   const router = useRouter();
   const { kind } = useLocalSearchParams();
   const { getToken } = useAuth();
-  const tokenRef = useRef(null);
   const [state, setState] = useState({ loading: true, error: null, items: [] });
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -31,15 +30,11 @@ export default function AdminReview() {
   const [reason, setReason] = useState('');
   const [done, setDone] = useState(0);
 
-  async function withToken() {
-    const t = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
-    tokenRef.current = t;
-    return t;
-  }
-
+  // A fresh token for every request: one kept from when the queue opened
+  // has expired a minute later, and Approve/Reject then failed.
   async function load() {
     try {
-      const token = await withToken();
+      const token = await freshToken(getToken);
       const data = await apiGet('/api/admin/review-queue', token);
       const items = (data.items || []).filter((i) => !kind || i.kind === kind);
       setState({ loading: false, error: null, items });
@@ -58,7 +53,7 @@ export default function AdminReview() {
     if (!item || busy) return;
     setBusy(true);
     try {
-      await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' ? reason : undefined, tierOverride: item.kind === 'submission' ? item.meta.tier : undefined }, tokenRef.current);
+      await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' ? reason : undefined, tierOverride: item.kind === 'submission' ? item.meta.tier : undefined }, await freshToken(getToken));
       setRejecting(false);
       setReason('');
       setDone((d) => d + 1);
@@ -99,7 +94,7 @@ export default function AdminReview() {
         <ReviewCard
           key={`${item.kind}-${item.id}`}
           item={item}
-          token={tokenRef.current}
+          getToken={getToken}
           busy={busy}
           onApprove={() => decide('approve')}
           onReject={() => setRejecting(true)}
@@ -137,7 +132,7 @@ export default function AdminReview() {
   );
 }
 
-function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, dots }) {
+function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip, dots }) {
   const { width } = useWindowDimensions();
   const [previewSrc, setPreviewSrc] = useState(item.media.src || null);
   const needsWeb = item.kind === 'ad' || item.kind === 'series';
@@ -146,7 +141,8 @@ function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, d
   useEffect(() => {
     if (item.kind !== 'channel' || !item.media.previewId) return undefined;
     let cancelled = false;
-    apiGet(`/api/admin/channel-media?preview=${encodeURIComponent(item.media.previewId)}`, token)
+    freshToken(getToken)
+      .then((t) => apiGet(`/api/admin/channel-media?preview=${encodeURIComponent(item.media.previewId)}`, t))
       .then((d) => { if (!cancelled && d.src) setPreviewSrc(d.src); })
       .catch(() => {});
     return () => { cancelled = true; };

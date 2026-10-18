@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, Sc
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { bumpUnread } from '../../lib/useUnread';
 import { Avatar, Chip } from '../../components/CrewBits';
@@ -38,8 +38,10 @@ export default function Conversation() {
   const [sendError, setSendError] = useState(null);
   const [note, setNote] = useState(null);
 
+  // A fresh token for every request (poll, send, mute, block, report): one
+  // kept from when the thread opened expires after about a minute.
   const token = async () => {
-    tokenRef.current = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+    tokenRef.current = await freshToken(getToken);
     return tokenRef.current;
   };
 
@@ -69,7 +71,7 @@ export default function Conversation() {
       if (!tokenRef.current) return;
       try {
         const last = state.messages.length ? state.messages[state.messages.length - 1].createdAt : null;
-        const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, tokenRef.current);
+        const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, await token());
         if (data.messages && data.messages.length) {
           setState((s) => ({ ...s, messages: [...s.messages, ...data.messages.filter((m) => !s.messages.some((x) => x.id === m.id))] }));
         }
@@ -88,7 +90,7 @@ export default function Conversation() {
     setBusy(true);
     setSendError(null);
     try {
-      const t = tokenRef.current || (await token());
+      const t = await token();
       if (state.thread.id) {
         const data = await apiPost(`/api/messages/${state.thread.id}`, { body }, t);
         setState((s) => ({ ...s, messages: [...s.messages, data.message] }));
@@ -112,7 +114,7 @@ export default function Conversation() {
   async function toggleMute() {
     const muted = !state.thread.muted;
     try {
-      await apiPatch(`/api/messages/${state.thread.id}`, { muted }, tokenRef.current);
+      await apiPatch(`/api/messages/${state.thread.id}`, { muted }, await token());
       setState((s) => ({ ...s, thread: { ...s.thread, muted } }));
       flash(muted ? 'Muted. No emails or badge for this conversation.' : 'Unmuted.');
     } catch (err) { flash(err.message); }
@@ -122,7 +124,7 @@ export default function Conversation() {
     const blocked = !state.thread.iBlocked;
     const go = async () => {
       try {
-        await apiPost('/api/messages/block', { userId: state.thread.other.userId, blocked }, tokenRef.current);
+        await apiPost('/api/messages/block', { userId: state.thread.other.userId, blocked }, await token());
         setState((s) => ({ ...s, thread: { ...s.thread, iBlocked: blocked } }));
         flash(blocked ? 'Blocked.' : 'Unblocked.');
       } catch (err) { flash(err.message); }
@@ -140,7 +142,7 @@ export default function Conversation() {
         text: v,
         onPress: async () => {
           try {
-            await apiPost('/api/messages/report', { threadId: state.thread.id, reason: k }, tokenRef.current);
+            await apiPost('/api/messages/report', { threadId: state.thread.id, reason: k }, await token());
             flash('Reported to Studio Tapa.');
           } catch (err) { flash(err.message); }
         }

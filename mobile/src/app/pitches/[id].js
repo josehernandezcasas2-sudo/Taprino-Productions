@@ -1,12 +1,12 @@
 import { useAuth } from '@clerk/expo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
-import { apiDelete, apiGet, apiPatch, apiPost } from '../../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
@@ -67,7 +67,6 @@ export default function PitchDetail() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { getToken } = useAuth();
-  const tokenRef = useRef(null);
   const insets = useSafeAreaInsets();
 
   const [state, setState] = useState({ loading: true, error: null, data: null });
@@ -99,7 +98,6 @@ export default function PitchDetail() {
     async function load() {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        tokenRef.current = token;
         const data = await apiGet(`/api/pitch-detail?id=${encodeURIComponent(id)}`, token);
         if (cancelled) return;
         setState({ loading: false, error: null, data });
@@ -117,7 +115,7 @@ export default function PitchDetail() {
   async function toggleSave() {
     if (!state.data?.isSignedIn) return;
     setSaved((s) => !s);
-    apiPost('/api/pitch-save', { pitchId: id }, tokenRef.current).catch(() => {});
+    apiPost('/api/pitch-save', { pitchId: id }, await freshToken(getToken)).catch(() => {});
   }
 
   async function donate(pitchId) {
@@ -129,7 +127,7 @@ export default function PitchDetail() {
     }
     setDonating(true);
     try {
-      const data = await apiPost('/api/pitches/donate', { pitchId, amountDollars: amount }, tokenRef.current);
+      const data = await apiPost('/api/pitches/donate', { pitchId, amountDollars: amount }, await freshToken(getToken));
       // Stripe Checkout in the in-app browser; when it closes, re-read the
       // pitch so a paid backing shows in the total.
       await WebBrowser.openBrowserAsync(data.url);
@@ -170,7 +168,7 @@ export default function PitchDetail() {
     setPosting(true);
     setCommentError(null);
     try {
-      await apiPost('/api/pitch-comment', { pitchId: id, body: commentText }, tokenRef.current);
+      await apiPost('/api/pitch-comment', { pitchId: id, body: commentText }, await freshToken(getToken));
       setCommentText('');
       await refreshComments();
     } catch (err) {
@@ -185,7 +183,7 @@ export default function PitchDetail() {
     setPostingReply(true);
     setCommentError(null);
     try {
-      await apiPost('/api/pitch-comment', { pitchId: id, body: replyText, parentCommentId }, tokenRef.current);
+      await apiPost('/api/pitch-comment', { pitchId: id, body: replyText, parentCommentId }, await freshToken(getToken));
       setReplyText('');
       setReplyingTo(null);
       await refreshComments();
@@ -199,7 +197,7 @@ export default function PitchDetail() {
   async function reportComment(commentId, reason) {
     setReportingId(null);
     setReportedIds((prev) => new Set(prev).add(commentId));
-    apiPost('/api/pitch-comment-report', { commentId, reason }, tokenRef.current).catch(() => {});
+    apiPost('/api/pitch-comment-report', { commentId, reason }, await freshToken(getToken)).catch(() => {});
   }
 
   function startEdit(c) {
@@ -217,7 +215,7 @@ export default function PitchDetail() {
     setEditSaving(true);
     setEditError(null);
     try {
-      await apiPatch('/api/pitch-comment', { commentId, body: editText }, tokenRef.current);
+      await apiPatch('/api/pitch-comment', { commentId, body: editText }, await freshToken(getToken));
       setEditingId(null);
       setEditText('');
       await refreshComments();
@@ -237,7 +235,7 @@ export default function PitchDetail() {
         onPress: async () => {
           setDeletingId(commentId);
           try {
-            await apiDelete('/api/pitch-comment', { commentId }, tokenRef.current);
+            await apiDelete('/api/pitch-comment', { commentId }, await freshToken(getToken));
             await refreshComments();
           } catch {
             Alert.alert('Could not delete that comment', 'Try again.');
