@@ -3,6 +3,14 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import { SITE } from '../../lib/siteConfig';
+import { isHttpUrl } from '../../lib/safeUrl';
+
+// Applicants typed these. Only a web address becomes a link; anything
+// else (a javascript: URL above all) shows as plain text.
+function ApplicantLink({ url }) {
+  if (!isHttpUrl(url)) return <span>{url} <em>(not a web link)</em></span>;
+  return <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>;
+}
 
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, { caps: ['manage_applications'] });
@@ -141,10 +149,10 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
                     <div className="app-detail">
                       {app.description && <p>{app.description}</p>}
                       {app.portfolio_url && (
-                        <p><strong>Portfolio:</strong> <a href={app.portfolio_url} target="_blank" rel="noopener noreferrer">{app.portfolio_url}</a></p>
+                        <p><strong>Portfolio:</strong> <ApplicantLink url={app.portfolio_url} /></p>
                       )}
                       {app.media_link && (
-                        <p><strong>Files:</strong> <a href={app.media_link} target="_blank" rel="noopener noreferrer">{app.media_link}</a></p>
+                        <p><strong>Files:</strong> <ApplicantLink url={app.media_link} /></p>
                       )}
                       {app.media_notes && <p><strong>Notes from them:</strong> {app.media_notes}</p>}
                       {app.user_id && <p><strong>Account:</strong> <Link href={`/profile/${app.user_id}`}>{app.user_id}</Link>{app.role_granted_at ? ' · Creator Studio granted' : ''}</p>}
