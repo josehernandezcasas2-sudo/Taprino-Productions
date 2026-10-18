@@ -5,6 +5,7 @@ import { completeDonationFromSession, failDonationFromSession, refundDonationFro
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
 import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
 import { recordAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
+import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -208,6 +209,16 @@ export default async function handler(req, res) {
     case 'invoice.payment_failed':
       console.log('Payment failed for customer:', event.data.object.customer);
       break;
+    case 'transfer.reversed': {
+      // A Creator Share payout reversed in the Stripe dashboard: the
+      // credits are owed to the creator again.
+      try {
+        await syncPayoutReversal(event.data.object);
+      } catch (err) {
+        console.error('syncPayoutReversal from webhook failed:', err.message);
+      }
+      break;
+    }
     case 'payout.paid':
     case 'payout.failed':
     case 'payout.canceled': {

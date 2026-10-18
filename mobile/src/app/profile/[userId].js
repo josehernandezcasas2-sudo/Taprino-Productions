@@ -11,6 +11,7 @@ import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
+import { rememberVia } from '../../lib/referral';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -79,8 +80,11 @@ function formatRuntime(totalSeconds) {
 // only video posts are tappable this way, since that's the only kind
 // with a mobile viewer; a photo tile just isn't interactive yet.
 export default function PublicProfile() {
-  const { userId: profileUserId } = useLocalSearchParams();
+  const { userId: profileUserId, via } = useLocalSearchParams();
   const router = useRouter();
+  // Opened from a creator's link (?via=<handle>): remember who sent them,
+  // for "Did a creator send you?" at checkout (lib/referral.js).
+  useEffect(() => { if (via) rememberVia(String(via)); }, [via]);
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [following, setFollowing] = useState(false);

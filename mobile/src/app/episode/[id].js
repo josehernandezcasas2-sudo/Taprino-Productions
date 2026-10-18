@@ -7,8 +7,9 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
-import { formatRuntimeLong } from '../../lib/runtime';
+import { formatRuntimeLong, parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
+import { useWatchProgress } from '../../lib/useWatchProgress';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
@@ -56,8 +57,10 @@ function sideTier(tier, adsEnabled) {
 // chips, Next/Previous episode (series) or Watch next (standalone), and
 // Bonus Content. Finishing a series episode moves on to the next one.
 //
-// Not on mobile yet: ad breaks (paused), captions / audio description
-// (the website's AccessibilityPanel), and resume/progress saving.
+// Signed-in viewers resume where they left off and their progress is
+// saved (lib/useWatchProgress.js), like the website. Not on mobile yet:
+// ad breaks (paused) and captions / audio description (the website's
+// AccessibilityPanel).
 export default function Episode() {
   const { id, autoplay, trailer } = useLocalSearchParams();
   const router = useRouter();
@@ -114,6 +117,14 @@ export default function Episode() {
 
   const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
+  const resumeSeconds = (state.page && state.page.resumeSeconds) || 0;
+  useWatchProgress({
+    player,
+    episodeId: episode && episode.id,
+    enabled: Boolean(state.page && state.page.isSignedIn && !showingTrailer && playback.src),
+    startAt: resumeSeconds,
+    getToken: () => withTimeout(getToken().catch(() => null), 4000)
+  });
 
   // Same reason as HeroSpotlight's trailer: a play() issued before the
   // stream has loaded can be dropped, so start again once it's ready.
@@ -286,6 +297,14 @@ export default function Episode() {
                   </Pressable>
                 ) : null}
               </View>
+              {!showingTrailer && resumeSeconds > 0 ? (
+                <View style={styles.resumeNote}>
+                  <Text style={styles.resumeText}>{'↺'} Resuming from {Math.floor(resumeSeconds / 60)}:{String(Math.floor(resumeSeconds % 60)).padStart(2, '0')}</Text>
+                  {runtimeSeconds(episode.runtime) ? (
+                    <View style={styles.resumeTrack}><View style={[styles.resumeFill, { width: `${Math.min(100, Math.round((resumeSeconds / runtimeSeconds(episode.runtime)) * 100))}%` }]} /></View>
+                  ) : null}
+                </View>
+              ) : null}
               {showingTrailer ? (
                 <Pressable style={[styles.chip, { alignSelf: 'flex-start', marginBottom: 14 }]} onPress={() => setShowingTrailer(false)}>
                   <Text style={styles.chipText}>{'▶'} Back to full episode</Text>
@@ -414,6 +433,10 @@ const styles = StyleSheet.create({
   chip: { borderWidth: 1, borderColor: 'rgba(74,168,162,0.4)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 4 },
   chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   chipText: { fontFamily: fonts.mono, fontSize: 10.9, color: colors.brass },
+  resumeNote: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 14 },
+  resumeText: { fontFamily: fonts.mono, fontSize: 11, color: colors.brass },
+  resumeTrack: { width: 100, height: 4, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.15)', overflow: 'hidden' },
+  resumeFill: { height: '100%', backgroundColor: colors.brass },
 
   // .episode-nav-sidebar (stacked below the card on phones)
   sidebar: { marginTop: 24 },

@@ -9,7 +9,7 @@ import { dollars } from '../../lib/artistSupportRules';
 // /api/creator/member-support (lib/creatorShareBatch.js getCreatorMoney).
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
 
-const PAYOUT_STATUS = { paid: ['Paid', 'paid'], pending: ['Sending', 'transit'], failed: ['Failed', 'failed'] };
+const PAYOUT_STATUS = { paid: ['Paid', 'paid'], pending: ['Sending', 'transit'], failed: ['Failed', 'failed'], reversed: ['Returned', 'failed'], partly_reversed: ['Partly returned', 'transit'] };
 
 export default function MemberSupportCard({ apiPath = '/api/creator/member-support' }) {
   const [data, setData] = useState(null);

@@ -13,6 +13,8 @@ import PayoutsCard from '../components/creator/PayoutsCard';
 import ReferralCard from '../components/creator/ReferralCard';
 import MemberSupportCard from '../components/creator/MemberSupportCard';
 import MembershipPlans from '../components/MembershipPlans';
+import ReferredByField from '../components/ReferredByField';
+import { cleanViaSlug } from '../lib/creatorShareRules';
 import { memberBadge } from '../lib/membershipTiers';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
 import PositionedPhoto from '../components/PositionedPhoto';
@@ -39,7 +41,10 @@ export async function getServerSideProps({ req, res }) {
       newsletterStatus,
       subscriptionDetails,
       promoAccessExpiresAt,
-      userId: account.userId || null
+      userId: account.userId || null,
+      // The creator link they followed, if any (middleware.js), to prefill
+      // "Did a creator send you?".
+      viaHandle: cleanViaSlug(req.cookies && req.cookies.tapa_via) || null
     }
   };
 }
@@ -97,13 +102,14 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId }) {
+export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, viaHandle = null }) {
   const { signOut, openUserProfile } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
   const [portalLoading, setPortalLoading] = useState(false);
   // Which plan's Join button is opening Checkout (null = none).
   const [joiningTier, setJoiningTier] = useState(null);
+  const [referredBy, setReferredBy] = useState(viaHandle || '');
   const [redeemInput, setRedeemInput] = useState('');
   const [redeeming, setRedeeming] = useState(false);
   const [redeemError, setRedeemError] = useState(null);
@@ -232,11 +238,12 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
   // in, so no sign-in detour like the episode paywall needs).
   async function startCheckout(planTier) {
     setJoiningTier(planTier);
+    const via = referredBy.trim();
     try {
       const res = await fetch('/api/create-checkout-session', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: planTier, returnTo: '/account' })
+        body: JSON.stringify({ tier: planTier, returnTo: '/account', ...(via ? { via, viaSource: via === viaHandle ? 'link' : 'typed' } : {}) })
       });
       const data = await res.json();
       if (data.url) {
@@ -419,6 +426,9 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                   id = where the tab bar's Membership row lands. */}
               <div className="account-card" id="membership">
                 <div className="account-subheading">Membership</div>
+                {!freeAccessNote && !['standard', 'premium', 'sponsor'].includes(tier) && (
+                  <ReferredByField value={referredBy} onChange={setReferredBy} fromLink={viaHandle} />
+                )}
                 <MembershipPlans
                   plans={plans}
                   tier={tier}

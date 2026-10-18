@@ -45,7 +45,7 @@ export default function ReferralCard() {
       <Text style={styles.subheading}>Bring your people</Text>
       <Text style={styles.title}>Your link</Text>
       <Text style={styles.lede}>
-        Every member who joins through it earns you {dollars(bonus.premium || 0)} a month on Premium, {dollars(bonus.standard || 0)} on Standard and {dollars(bonus.sponsor || 0)} on Sponsor, for their first {data && data.bonusMonths ? data.bonusMonths : 12} months. That's on top of the share they point at you, and it never comes out of theirs.
+        Every member who joins through it earns you {dollars(bonus.premium || 0)} a month on Premium, {dollars(bonus.standard || 0)} on Standard and {dollars(bonus.sponsor || 0)} on Sponsor, {data && data.bonusMonths === 0 ? 'for as long as they stay' : `for their first ${data && data.bonusMonths ? data.bonusMonths : 12} months`}. That's on top of the share they point at you, and it never comes out of theirs.
       </Text>
       {error ? <Text style={styles.error}>{error}</Text> : null}
       {data ? (
@@ -54,6 +54,7 @@ export default function ReferralCard() {
             <Text style={styles.linkText} selectable numberOfLines={2}>{shown}</Text>
             <Pressable style={styles.btnSmall} onPress={copy}><Text style={styles.btnSmallText}>{copied ? 'Copied' : 'Copy'}</Text></Pressable>
           </View>
+          {data.handle ? <Text style={styles.fineprint}>Joining in the app, or lost the link? They can type @{data.handle} under "Did a creator send you?" when they pick a plan.</Text> : null}
           {!data.handle ? <Text style={styles.fineprint}>Set a handle in Public profile above and this becomes a short /@yourname link.</Text> : null}
           <View style={styles.stats}>
             <View style={styles.stat}><Text style={styles.statNum}>{data.joined}</Text><Text style={styles.statLabel}>joined through it</Text></View>

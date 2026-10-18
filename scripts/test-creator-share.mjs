@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
-  standingState, forfeitLines
+  standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -177,6 +177,46 @@ test('forfeitLines: the balance leaves the creator and is split across the pool,
   assert.equal(lines.reduce((s, l) => s + l.cents, 0), 0);
   assert.deepEqual(forfeitLines({ creatorId: 'gone', cents: 0, pool: { a: 1 } }), []);
   assert.deepEqual(forfeitLines({ creatorId: 'gone', cents: 500, pool: { gone: 3 } }), []);
+});
+
+const NOW_NUMBERS = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12 };
+
+test('normalizeShareNumbers: rounds, bounds and explains', () => {
+  const ok = normalizeShareNumbers({ shareCents: { standard: '200', premium: 350.4, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: '2500', referralBonusMonths: '12' });
+  assert.deepEqual(ok.errors, []);
+  assert.deepEqual(ok.numbers, NOW_NUMBERS);
+  const bad = normalizeShareNumbers({ shareCents: { standard: -1, premium: 9000, sponsor: 'x' }, bonusCents: {}, payoutMinimumCents: 50, referralBonusMonths: 200 });
+  assert.equal(bad.errors.length, 8); // three bad shares, three missing bonuses, the minimum, the months
+});
+
+test('shareChanges + earliestEffective: anything against creators waits 30 days; the rest applies now', () => {
+  const now = new Date('2026-10-18T12:00:00Z');
+  const raise = { ...NOW_NUMBERS, shareCents: { ...NOW_NUMBERS.shareCents, premium: 400 }, payoutMinimumCents: 2000 };
+  assert.deepEqual(shareChanges(NOW_NUMBERS, raise).adverse, []);
+  assert.equal(shareChanges(NOW_NUMBERS, raise).favourable.length, 2);
+  assert.equal(earliestEffective(NOW_NUMBERS, raise, now), now.toISOString());
+  const cut = { ...NOW_NUMBERS, bonusCents: { ...NOW_NUMBERS.bonusCents, sponsor: 25 }, referralBonusMonths: 6 };
+  assert.deepEqual(shareChanges(NOW_NUMBERS, cut).adverse, ['Sponsor referral bonus $0.50 → $0.25', 'Bonus paid for 12 months → 6 months']);
+  assert.equal(earliestEffective(NOW_NUMBERS, cut, now), '2026-11-17T12:00:00.000Z');
+  assert.equal(shareChanges(NOW_NUMBERS, { ...NOW_NUMBERS, referralBonusMonths: 0 }).adverse.length, 0);
+  assert.equal(shareChanges({ ...NOW_NUMBERS, referralBonusMonths: 0 }, NOW_NUMBERS).adverse.length, 1);
+  assert.equal(shareChanges(NOW_NUMBERS, { ...NOW_NUMBERS, payoutMinimumCents: 3000 }).adverse.length, 1);
+  assert.equal(shareChanges(NOW_NUMBERS, NOW_NUMBERS).changed, false);
+  assert.equal(scheduledDue({ effectiveAt: '2026-10-18T11:59:00Z' }, now), true);
+  assert.equal(scheduledDue({ effectiveAt: '2026-11-17T12:00:00Z' }, now), false);
+  assert.equal(scheduledDue(null, now), false);
+});
+
+test('reminderDue: 60, 30 and 7 days before the end, once each, the most urgent only', () => {
+  const left = { left_at: '2026-10-01T00:00:00Z', collect_until: '2026-12-30T00:00:00Z', reminders_sent: [] };
+  assert.equal(reminderDue(left, new Date('2026-10-15T00:00:00Z')), null);
+  assert.deepEqual(reminderDue(left, new Date('2026-11-01T00:00:00Z')), { days: 60, daysLeft: 59, markSent: ['60'] });
+  assert.equal(reminderDue({ ...left, reminders_sent: ['60'] }, new Date('2026-11-01T00:00:00Z')), null);
+  assert.equal(reminderDue({ ...left, reminders_sent: ['60'] }, new Date('2026-12-01T00:00:00Z')).days, 30);
+  assert.deepEqual(reminderDue(left, new Date('2026-12-25T00:00:00Z')), { days: 7, daysLeft: 5, markSent: ['60', '30', '7'] });
+  assert.equal(reminderDue(left, new Date('2026-12-31T00:00:00Z')), null);
+  assert.equal(reminderDue({ ...left, forfeited_at: '2026-12-31T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
+  assert.equal(reminderDue({ collect_until: '2026-12-30T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
 });
 
 console.log(`\n${passed} passed`);

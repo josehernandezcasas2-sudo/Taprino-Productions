@@ -65,14 +65,24 @@ export default async function handler(req, res) {
     // the creator whose link brought them (the tapa_via cookie middleware.js
     // set from /@handle; the app can send `via` in the body instead), so
     // that creator earns the referral bonus on each renewal.
+    // A member can also name the creator who sent them ("Did a creator
+    // send you?" on the account page, web and app) — the only way a
+    // referral reaches the app, whose sign-ups never carry the cookie.
+    // A name they typed that isn't a creator is refused, so they can fix
+    // it; a stale link just doesn't count.
     const { userId } = getAuth(req);
+    const typed = body.viaSource === 'typed';
     let via = null;
     try {
       via = userId ? await resolveReferrer(body.via || (req.cookies && req.cookies.tapa_via), userId) : null;
     } catch (err) {
       console.error('create-checkout-session referrer lookup failed:', err.message);
     }
-    const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...(via ? { via, via_source: 'link' } : {}) };
+    if (typed && body.via && !via) {
+      return res.status(400).json({ error: 'We couldn’t find a creator with released work by that handle. Check it, or leave the box empty.' });
+    }
+    const viaStamp = via ? (typed ? { via, via_source: 'code', via_code: String(body.via).trim().replace(/^@+/, '').slice(0, 40) } : { via, via_source: 'link' }) : {};
+    const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...viaStamp };
 
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',

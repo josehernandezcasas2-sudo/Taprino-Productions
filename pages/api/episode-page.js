@@ -48,6 +48,9 @@ export default async function handler(req, res) {
     isSignedIn: data.account.isSignedIn,
     isSubscriber: data.account.isSubscriber,
     adFree: data.account.adFree,
+    // Where to pick up (seconds), from the same Stripe-held progress the
+    // website resumes from; 0 when there's nothing worth resuming.
+    resumeSeconds: (data.account.watchProgress && Number(data.account.watchProgress[data.episode.id])) || 0,
     parentSeriesName: data.parentSeriesName,
     nextEpisode: stripPlayable(data.nextEpisode),
     previousEpisode: stripPlayable(data.previousEpisode),

@@ -9,6 +9,10 @@
       "schedule": "0 9 1 * *"
     },
     {
+      "path": "/api/cron/creator-reminders",
+      "schedule": "30 9 * * *"
+    },
+    {
       "path": "/api/cron/studio-sweep",
       "schedule": "0 10 * * *"
     }

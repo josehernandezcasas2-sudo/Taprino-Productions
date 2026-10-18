@@ -11,7 +11,7 @@ import { dollars } from '../lib/artistSupportRules';
 // behind it and the payouts so far. Between Payouts and Bring your
 // people on Account.
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
-const PAYOUT_STATUS = { paid: ['Paid', colors.ok], pending: ['Sending', colors.olive], failed: ['Failed', colors.danger] };
+const PAYOUT_STATUS = { paid: ['Paid', colors.ok], pending: ['Sending', colors.olive], failed: ['Failed', colors.danger], reversed: ['Returned', colors.danger], partly_reversed: ['Partly returned', colors.olive] };
 
 export default function MemberSupportCard() {
   const router = useRouter();

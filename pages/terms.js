@@ -2,6 +2,8 @@ import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
 import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
+import { getShareSettings } from '../lib/artistSupport';
+import { dollars } from '../lib/artistSupportRules';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -31,10 +33,19 @@ export async function getServerSideProps({ req, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const account = await getAccountContext(req);
-  const episodes = await getPublicEpisodes();
+  const [account, episodes, share] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null)]);
   return {
     props: {
+      // The Creator Share numbers in sections 4 and 5 are whatever
+      // /admin/creator-money has in force, plus any change it scheduled.
+      share: share ? {
+        shareCents: share.shareCents,
+        bonusCents: share.bonusCents,
+        payoutMinimumCents: share.payoutMinimumCents,
+        referralBonusMonths: share.referralBonusMonths,
+        scheduled: share.scheduled ? { numbers: share.scheduled.numbers, effectiveAt: share.scheduled.effectiveAt, setAt: share.scheduled.setAt || null } : null,
+        changedAt: share.changedAt || null
+      } : null,
       account: {
         mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
         isSignedIn: account.isSignedIn,
@@ -47,11 +58,21 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function Terms({ account }) {
+// The text was last edited on this date; a Creator Share change saved or
+// scheduled later moves the "updated" date with it.
+const TEXT_UPDATED = '2026-10-18';
+const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12 };
+const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
+const bonusSpan = (m) => (Number(m) > 0 ? `during its first ${m} months` : 'for as long as that membership lasts');
+
+export default function Terms({ account, share }) {
+  const n = share || FALLBACK_SHARE;
+  const next = share && share.scheduled ? share.scheduled.numbers : null;
+  const updated = [TEXT_UPDATED, share && share.changedAt, share && share.scheduled && share.scheduled.setAt].filter(Boolean).sort().pop();
   return (
     <LegalLayout
       title="Terms of Service"
-      updated="October 18, 2026"
+      updated={longDate(updated.length === 10 ? `${updated}T12:00:00Z` : updated)}
       account={account}
       summary={
         <>
@@ -103,8 +124,8 @@ export default function Terms({ account }) {
       </p>
       <p>
         <strong>Your creator share.</strong> We pay the people who make what&rsquo;s on {SITE.name} a
-        share of our membership revenue. For each paid membership that share is $2.00 a month on
-        Standard, $3.50 on Premium and $1.50 on Sponsor. You choose who receives it by naming up to 10
+        share of our membership revenue. For each paid membership that share is {dollars(n.shareCents.standard)} a month on
+        Standard, {dollars(n.shareCents.premium)} on Premium and {dollars(n.shareCents.sponsor)} on Sponsor. You choose who receives it by naming up to 10
         creators on your account page (Artist Support); we split it between them, equally unless you
         set your own shares, every month you pay, including the first. If you haven&rsquo;t named
         anyone, we allocate it to the creators of the titles you watched in the 30 days before that
@@ -147,19 +168,29 @@ export default function Terms({ account }) {
       <p>
         <strong>Member share.</strong> When a member names you on their account page, or watches your
         released work under the default described in section 4, we credit you a share of that
-        member&rsquo;s payment. Payouts start on the 1st of each month for every balance of $25 or more;
+        member&rsquo;s payment. Payouts start on the 1st of each month for every balance of {dollars(n.payoutMinimumCents)} or more;
         smaller balances carry over. If our own balance can&rsquo;t cover every payout that day, the
         longest-waiting credits are paid first and the rest follow as soon as funds allow. If a member&rsquo;s payment is refunded or reversed, the
-        matching unpaid credit is reversed; if it has already been paid to you, we absorb it. We
-        publish the per-tier amounts and may change them with 30 days&rsquo; notice; a credit already
-        made never changes.
+        matching unpaid credit is reversed; if it has already been paid to you, we absorb it. The
+        amounts are published here. A change that pays creators less takes effect no sooner than 30
+        days after we publish it here and email creators about it; a change in creators&rsquo; favour
+        can start straight away. A credit already made never changes.
       </p>
+      {next && (
+        <p>
+          <strong>Change announced.</strong> From {longDate(share.scheduled.effectiveAt)}, the member
+          share becomes {dollars(next.shareCents.standard)} (Standard), {dollars(next.shareCents.premium)} (Premium)
+          and {dollars(next.shareCents.sponsor)} (Sponsor); the referral bonus {dollars(next.bonusCents.standard)},{' '}
+          {dollars(next.bonusCents.premium)} and {dollars(next.bonusCents.sponsor)}, paid {bonusSpan(next.referralBonusMonths)};
+          and payouts go out at {dollars(next.payoutMinimumCents)} or more. Credits made before then don&rsquo;t change.
+        </p>
+      )}
       <p>
         <strong>Referral bonus.</strong> When someone becomes a paying member through your creator
-        link, we credit you $1.00 (Standard), $1.50 (Premium) or $0.50 (Sponsor) for each paid month of
-        that membership during its first 12 months, including the first, on top of any member share. A membership is
-        credited to the last creator link used in the 30 days before joining, once; the bonus stops
-        after 12 months from its first payment, or sooner if the membership is cancelled. You may not
+        link, we credit you {dollars(n.bonusCents.standard)} (Standard), {dollars(n.bonusCents.premium)} (Premium) or {dollars(n.bonusCents.sponsor)} (Sponsor) for each paid month of
+        that membership {bonusSpan(n.referralBonusMonths)}, including the first, on top of any member share. A membership is
+        credited to the last creator link used in the 30 days before joining (or to the creator a member
+        names when they join), once; {Number(n.referralBonusMonths) > 0 ? `the bonus stops after ${n.referralBonusMonths} months from its first payment, or sooner if the membership is cancelled` : 'the bonus stops if the membership is cancelled'}. You may not
         refer yourself, pay people to subscribe, or misrepresent {SITE.name} when you share your
         link, and when you share it you must say that you earn from it. We can cancel a referral that
         breaks these rules.
@@ -187,7 +218,8 @@ export default function Terms({ account }) {
         <strong>If your work comes down or your account closes.</strong> Credits you earned before you
         withdraw your work, close your account, or we suspend or close it stay yours (apart from
         credits that weren&rsquo;t earned, above). From that date you have 90 days to collect them: we
-        pay out the whole balance, even under $25, once you have a payout account set up. Anything not
+        pay out the whole balance, even under {dollars(n.payoutMinimumCents)}, once you have a payout account set up, and we
+        email you reminders before the time runs out. Anything not
         collected within those 90 days goes into the site-wide pool and is shared among other creators
         in proportion to how much their work was watched. We can extend the 90 days by agreement, for
         example while we work with you on a new cut of your film.

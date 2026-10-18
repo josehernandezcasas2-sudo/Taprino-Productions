@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { forfeitExpired, getAdminSummary, runPayoutBatch } from '../../../lib/creatorShareBatch';
 import { cancelCredits, clearLeaving, extendCollect, holdPayouts, markLeaving, releaseHold } from '../../../lib/creatorStanding';
 import { resolveProfileUserId } from '../../../lib/userProfiles';
+import { cancelScheduledNumbers, saveShareNumbers } from '../../../lib/creatorShareSettings';
 import { recordAudit } from '../../../lib/auditLog';
 import { dollars } from '../../../lib/artistSupportRules';
 
@@ -29,6 +30,20 @@ export default async function handler(req, res) {
         unleave: () => clearLeaving({ creatorId }),
         forfeit: () => forfeitExpired({ createdBy: userId, only: creatorId })
       };
+      if (action === 'numbers' || action === 'cancel_numbers') {
+        const result = action === 'numbers'
+          ? await saveShareNumbers({ input: body.numbers, effectiveAt: body.effectiveAt || null, adminId: userId })
+          : await cancelScheduledNumbers();
+        recordAudit({
+          adminId: userId,
+          adminEmail: email || null,
+          action: action === 'numbers' ? 'creator_share_numbers' : 'creator_share_numbers_cancel',
+          targetType: 'creator_share',
+          targetId: 'settings',
+          details: action === 'numbers' ? `${result.applied ? 'applied now' : `scheduled for ${result.effectiveAt}`} · ${[...result.changes.adverse, ...result.changes.favourable].join('; ')}`.slice(0, 500) : 'scheduled change cancelled'
+        }).catch(() => {});
+        return res.status(200).json({ ok: true, ...result });
+      }
       let creatorId = null;
       if (standingActions[action]) {
         // A creator by user id or @handle, as typed on the page.

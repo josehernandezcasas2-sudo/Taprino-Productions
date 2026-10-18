@@ -92,6 +92,10 @@ test('classifyTransaction: charges by our ids, transfers by their charge, payout
   assert.deepEqual(classifyTransaction(txns[11], ids), { lane: 'sweeps', matched: true });
   assert.equal(classifyTransaction(txns[12], ids).matched, false);
   assert.equal(classifyTransaction(txns[13], ids).lane, 'stripe');
+  // a creator payout reversed in the dashboard goes back to the batch's lane; other reversals are refunds
+  const reversal = { id: 'txn15', type: 'transfer_refund', reporting_category: 'transfer_reversal', amount: 1400, fee: 0, net: 1400, source: { id: 'trr_1', object: 'transfer_reversal', transfer: 'tr_c1' } };
+  assert.deepEqual(classifyTransaction(reversal, ids), { lane: 'creatorBatch', matched: true });
+  assert.deepEqual(classifyTransaction({ ...reversal, source: { id: 'trr_2', object: 'transfer_reversal', transfer: 'tr_b1' } }, ids), { lane: 'refunds', matched: true });
 });
 
 test('groupTransactions: lanes sum to the period, unmatched listed', () => {

@@ -23,6 +23,8 @@ import PayoutsCard from '../../components/PayoutsCard';
 import ReferralCard from '../../components/ReferralCard';
 import { rememberStayInStream } from '../../lib/stayInStream';
 import MemberSupportCard from '../../components/MemberSupportCard';
+import ReferredByField from '../../components/ReferredByField';
+import { readVia } from '../../lib/referral';
 
 const GENDERS = [
   { value: '', label: 'Prefer not to answer' },
@@ -70,6 +72,11 @@ export default function Account() {
 
   const [busyMode, setBusyMode] = useState(null);
   const [dashboard, setDashboard] = useState(null);
+  const [referredBy, setReferredBy] = useState('');
+  const [viaFromLink, setViaFromLink] = useState('');
+  useEffect(() => {
+    readVia().then((v) => { if (v) { setViaFromLink(v); setReferredBy((cur) => cur || v); } });
+  }, []);
   const [profile, setProfile] = useState(null);
   const [originalAge, setOriginalAge] = useState(null);
   const [ageChangeConfirmed, setAgeChangeConfirmed] = useState(false);
@@ -348,7 +355,8 @@ export default function Account() {
     setJoiningTier(tier);
     try {
       const token = await withToken();
-      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account' }, token);
+      const via = referredBy.trim();
+      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account', ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
       if (data.url) {
         await WebBrowser.openBrowserAsync(data.url);
         await loadAll();
@@ -889,6 +897,10 @@ export default function Account() {
               <Text style={styles.freeNoteText}>{freeAccessNote}</Text>
             </View>
           ) : (
+            <>
+            {!['standard', 'premium', 'sponsor'].includes(dashboard.tier) ? (
+              <ReferredByField value={referredBy} onChange={setReferredBy} fromLink={viaFromLink} />
+            ) : null}
             <MembershipPlans
               plans={dashboard.plans || []}
               tier={dashboard.tier || 'basic'}
@@ -898,6 +910,7 @@ export default function Account() {
               joiningTier={joiningTier}
               portalLoading={portalLoading}
             />
+            </>
           )}
           {/* Quick access to Membership Artist Support — the creators a
               member's share goes to (account/artist-support.js). */}
