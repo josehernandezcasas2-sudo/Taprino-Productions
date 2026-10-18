@@ -10,7 +10,7 @@ import TopNav from '../../../components/TopNav';
 import SmartImage from '../../../components/SmartImage';
 import { crew, Chip, Avatar } from '../../../components/CrewBits';
 import { StatusChip, MoneyLine, HostAnswer, ProducerActions, OutcomeForm, EndorseForm, HostedChip, KV, loc } from '../../../components/LocationBits';
-import { dollars, fmtRange, hoursLabel } from '../../../lib/locationRules';
+import { dollars, fmtRange, hoursLabel, disputeLine } from '../../../lib/locationRules';
 
 // One booking request, both sides (pages/locations/requests/<id> on the
 // web). Once paid, the producer sees the street address here. Paying
@@ -86,6 +86,7 @@ export default function RequestScreen() {
               <KV k="Producer pays" v={dollars(r.totalChargedCents)} />
               <KV k="Host receives" v={`${dollars(r.hostPayoutCents)} after ${r.cutPercent}%`} />
               {r.refundCents != null ? <KV k="Refunded" v={`${dollars(r.refundCents)}${r.refundReason ? ` · ${r.refundReason}` : ''}`} /> : null}
+              {r.dispute ? <KV k="Payment dispute" v={disputeLine(r.dispute)} /> : null}
               {policy ? <KV k="Cancellation" v={`${policy.label} · ${policy.text}`} /> : null}
               <MoneyLine r={r} side={side === 'host' ? 'host' : 'producer'} />
             </View>

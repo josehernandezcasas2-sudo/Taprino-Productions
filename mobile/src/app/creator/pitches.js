@@ -28,12 +28,13 @@ function Earnings({ pitch, earnings }) {
         <View><Text style={styles.earnNum}>{e.backers}</Text><Text style={styles.earnLabel}>backer{e.backers === 1 ? '' : 's'}</Text></View>
         <View><Text style={[styles.earnNum, { color: colors.brass }]}>{money(e.yourShareCents)}</Text><Text style={styles.earnLabel}>your share after {cut}%</Text></View>
         {e.refundedCount > 0 ? <View><Text style={styles.earnNum}>{money(e.refundedCents)}</Text><Text style={styles.earnLabel}>refunded ({e.refundedCount})</Text></View> : null}
+        {e.disputedCount > 0 ? <View><Text style={styles.earnNum}>{money(e.disputedCents)}</Text><Text style={styles.earnLabel}>disputed by a bank ({e.disputedCount})</Text></View> : null}
       </View>
       {e.recent.length > 0 ? e.recent.map((r) => (
         <View key={r.id} style={styles.earnRow}>
-          <Text style={[styles.earnRowText, r.status === 'refunded' && styles.dim]} numberOfLines={1}>{r.backerName}</Text>
+          <Text style={[styles.earnRowText, r.status !== 'completed' && styles.dim]} numberOfLines={1}>{r.backerName}</Text>
           <Text style={[styles.earnRowText, styles.dim]}>{fmtDate(r.at)}</Text>
-          <Text style={[styles.earnRowText, r.status === 'refunded' && styles.dim]}>{r.status === 'refunded' ? `${money(r.amountCents)} refunded` : `${money(r.amountCents)} · ${money(r.yourShareCents)} to you`}</Text>
+          <Text style={[styles.earnRowText, r.status !== 'completed' && styles.dim]}>{r.status === 'refunded' ? `${money(r.amountCents)} refunded` : r.status === 'disputed' ? `${money(r.amountCents)} disputed · share taken back` : `${money(r.amountCents)} · ${money(r.yourShareCents)} to you`}</Text>
         </View>
       )) : (
         <Text style={styles.cardBody}>{pitch.funding_enabled ? 'No backings yet — share your project page to get the first one.' : 'Backing is off for this project.'}</Text>

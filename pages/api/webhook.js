@@ -6,6 +6,7 @@ import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/l
 import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
 import { recordAdCreditPurchase, reverseAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
+import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -179,6 +180,16 @@ export default async function handler(req, res) {
       // A disputed ad-credit purchase: the credits come off the balance.
       const disputedPi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent && dispute.payment_intent.id;
       await run('reverseAdCreditPurchase (dispute)', () => reverseAdCreditPurchase({ paymentIntentId: disputedPi, totalReversedCents: dispute.amount, reason: 'disputed' }));
+      // A disputed Pitch backing or location booking (lib/paymentDisputes.js):
+      // the backing stops counting and the creator's share is taken back;
+      // a booking waits for an admin on /admin/locations.
+      await run('openDispute', () => openDispute(dispute));
+      break;
+    }
+    case 'charge.dispute.closed': {
+      // The bank ruled. Won: a backing counts again and anything taken back
+      // from a creator or host is paid back. Lost: it stays as it is.
+      await run('closeDispute', () => closeDispute(event.data.object));
       break;
     }
     case 'checkout.session.expired': {

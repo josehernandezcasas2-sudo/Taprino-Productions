@@ -5,6 +5,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { searchListings, setListingStatus, listPendingListings, isMissingLocationsTable } from '../../../lib/locations';
 import { LOCATION_TYPES } from '../../../lib/locationRules';
 import { listRequestsForAdmin, refundBooking, setOutcome, cancelRequest } from '../../../lib/locationRequests';
+import { listBookingDisputes, decideBookingDispute } from '../../../lib/paymentDisputes';
 
 // Admin: Locations (/admin/locations).
 //   GET  → { pendingCount, issues, settle, bookings, listings, totals }
@@ -12,10 +13,12 @@ import { listRequestsForAdmin, refundBooking, setOutcome, cancelRequest } from '
 //          settle   = paid bookings past their last day with no outcome (host gone quiet)
 //          bookings = every paid / done / refunded booking, newest first
 //          listings = every listed or paused place with its open report count
+//          disputes = bookings a producer's bank disputed (lib/paymentDisputes.js)
 //   POST { op: 'refund', requestId, reason }        full refund, final
 //        { op: 'outcome', requestId, outcome, note } settle a booking for a quiet host
 //        { op: 'cancel', requestId }                 cancel an unpaid/paid request as admin
 //        { op: 'pause' | 'remove', locationId }      hide a place
+//        { op: 'dispute', requestId, decision }      clawback (take the host's payout back) | absorb
 export default async function handler(req, res) {
   const account = await getRoleContext(req);
   if (!(account.isAdmin || hasCapability(account, 'handle_flags'))) return res.status(403).json({ error: 'Admin access required.' });
@@ -27,12 +30,13 @@ export async function handleLocationsAdmin(req, res, account) {
   try {
     if (req.method === 'GET') {
       const supabase = getSupabase();
-      const [pending, requests, listed, paused, reports] = await Promise.all([
+      const [pending, requests, listed, paused, reports, disputes] = await Promise.all([
         listPendingListings(),
         listRequestsForAdmin(),
         searchListings({ sort: 'new' }, { viewerId: null }),
         supabase.from('locations').select('id, title, kind, host_id, place_label, status, shoots_count, cover_url').eq('status', 'paused').order('updated_at', { ascending: false }).limit(100),
-        supabase.from('content_reports').select('target_id').eq('target_type', 'location').eq('status', 'open')
+        supabase.from('content_reports').select('target_id').eq('target_type', 'location').eq('status', 'open'),
+        listBookingDisputes().catch((err) => { console.error('listBookingDisputes:', err.message); return []; })
       ]);
       const reportCounts = {};
       for (const r of reports.data || []) reportCounts[r.target_id] = (reportCounts[r.target_id] || 0) + 1;
@@ -48,6 +52,7 @@ export async function handleLocationsAdmin(req, res, account) {
         settle: requests.filter((r) => r.status === 'paid' && !r.outcome && r.pastEnd),
         bookings: requests,
         listings,
+        disputes,
         totals: { listed: listed.total, paused: (paused.data || []).length, paidCents, cutCents, refunded: requests.filter((r) => r.status === 'refunded').length }
       });
     }
@@ -56,13 +61,19 @@ export async function handleLocationsAdmin(req, res, account) {
       // These move money and can't be undone: full admins only, the same
       // as Pitch Room refunds. Sub-admins with handle_flags still see the
       // page, settle outcomes and pause or remove places.
-      if ((op === 'refund' || op === 'cancel') && !account.isAdmin) {
+      if ((op === 'refund' || op === 'cancel' || op === 'dispute') && !account.isAdmin) {
         return res.status(403).json({ error: 'Only a full admin can refund or cancel a booking, since that moves money.' });
       }
       if (op === 'refund') {
         const result = await refundBooking(rc, requestId, reason);
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'location_booking_refunded', targetType: 'location_request', targetId: requestId, details: reason || null });
         return res.status(200).json({ request: result });
+      }
+      if (op === 'dispute') {
+        const { decision } = req.body || {};
+        const result = await decideBookingDispute({ requestId, decision, adminEmail: account.email });
+        await recordAudit({ adminId: account.userId, adminEmail: account.email, action: decision === 'clawback' ? 'location_dispute_clawback' : 'location_dispute_absorbed', targetType: 'location_request', targetId: requestId, details: result.clawbackCents ? `took back ${result.clawbackCents} cents` : null });
+        return res.status(200).json({ dispute: result });
       }
       if (op === 'outcome') {
         const result = await setOutcome(account.userId, requestId, { outcome, note }, { isAdmin: true });

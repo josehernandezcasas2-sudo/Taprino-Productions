@@ -107,6 +107,7 @@ export default function AdminHome() {
             {[
               ['Ads & new series', `${adsAndSeries ? `${adsAndSeries} waiting · ` : ''}Ads need a billing rate; series need a look at artwork`, '/admin/review'],
               ['Library & queues', 'Artwork, edits, deletions, orphaned media', '/admin/library'],
+              ['Locations', 'Reported problems, hosts gone quiet, refunds, pause or remove a place', '/admin/locations'],
               ['Styles & Guides', 'Colors, icons, type', '/admin/styles'],
               ['Everything else', 'Settings, people, channels, ads', '/admin']
             ].map(([title, sub, href]) => (

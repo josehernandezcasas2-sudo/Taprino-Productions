@@ -57,6 +57,7 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
             <Stat n={data.totals.listed} label="listed" />
             <Stat n={data.issues.length} label="reported problems" warn={data.issues.length > 0} />
             <Stat n={data.settle.length} label="hosts gone quiet" warn={data.settle.length > 0} />
+            {(data.disputes || []).length > 0 && <Stat n={data.disputes.filter((d) => !d.decision && d.disputeStatus !== 'won').length} label="disputes to decide" warn={data.disputes.some((d) => !d.decision && d.disputeStatus !== 'won')} />}
             <Stat n={dollars(data.totals.paidCents)} label="booked, paid" />
             <Stat n={dollars(data.totals.cutCents)} label="platform cut" />
           </div>
@@ -72,6 +73,30 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
                   <button type="button" className="crew-btn sm" disabled={busy === r.id} onClick={() => act(r.id, { op: 'outcome', requestId: r.id, outcome: 'as_agreed', note: 'Settled by an admin: went as agreed' })}>Settle as agreed</button>
                 </BookingRow>
               ))}</div>
+            </section>
+          )}
+
+          {(data.disputes || []).length > 0 && (
+            <section>
+              <H>Disputed payments · {data.disputes.length}</H>
+              <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '66ch' }}>A producer’s bank reversed the payment, so the studio has lost it plus Stripe’s $15 dispute fee; the host still has their payout. Decide whether to take that back from the host (paid back automatically if the bank rules for us) or let the studio absorb it. Answer the dispute itself with evidence in the Stripe Dashboard. Full admins only.</p>
+              <div className="crew-results">
+                {data.disputes.map((d) => (
+                  <div key={d.id} className="crew-panel" style={{ display: 'grid', gap: '0.4rem' }}>
+                    <div className="crew-rhead">
+                      <span><Link href={`/locations/requests/${d.id}`}>{d.placeTitle}</Link> · {fmtRange(d.startsOn, d.endsOn)}</span>
+                      <span className="crew-mono" style={{ color: d.disputeStatus === 'open' ? 'var(--danger)' : 'var(--ink-dim)' }}>{d.disputeStatus === 'open' ? 'waiting on the bank' : d.disputeStatus === 'won' ? 'bank ruled for us' : 'bank ruled for the producer'}</span>
+                    </div>
+                    <span className="crew-mono">Disputed {dollars(d.disputeAmountCents || d.totalCents)} on {new Date(d.disputedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} · host received {dollars(d.hostPayoutCents)}{d.decision === 'clawback' ? ` · ${dollars(d.clawbackCents)} taken back from the host${d.returnedCents ? `, ${dollars(d.returnedCents)} paid back` : ''}` : d.decision === 'absorb' ? ' · the studio absorbed it' : ''}{d.decidedBy ? ` (${d.decidedBy})` : ''}</span>
+                    {!d.decision && d.disputeStatus !== 'won' && (
+                      <span className="crew-actions">
+                        <button type="button" className="crew-btn sm" style={{ color: 'var(--danger)' }} disabled={busy === d.id} onClick={() => { if (window.confirm(`Take up to ${dollars(d.hostPayoutCents)} back from the host? They’re told, and it’s paid back if the bank rules for us.`)) act(d.id, { op: 'dispute', requestId: d.id, decision: 'clawback' }); }}>Take it back from the host</button>
+                        <button type="button" className="crew-btn sm" disabled={busy === d.id} onClick={() => { if (window.confirm('Let the studio absorb this? The host keeps their payout. This can’t be changed later.')) act(d.id, { op: 'dispute', requestId: d.id, decision: 'absorb' }); }}>Studio absorbs it</button>
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
             </section>
           )}
 

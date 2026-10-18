@@ -5,7 +5,7 @@ import { SITE } from '../../lib/siteConfig';
 // backings only, the creator's share after the platform cut, refunds
 // shown so the numbers match their Stripe balance. Backer names are
 // public display names, never emails.
-const EMPTY = { raisedCents: 0, yourShareCents: 0, platformCutCents: 0, backers: 0, refundedCents: 0, refundedCount: 0, recent: [] };
+const EMPTY = { raisedCents: 0, yourShareCents: 0, platformCutCents: 0, backers: 0, refundedCents: 0, refundedCount: 0, disputedCents: 0, disputedCount: 0, recent: [] };
 
 export default function PitchEarnings({ pitch, earnings }) {
   const e = earnings || EMPTY;
@@ -31,6 +31,12 @@ export default function PitchEarnings({ pitch, earnings }) {
             <span className="earn-label">refunded ({e.refundedCount})</span>
           </div>
         )}
+        {e.disputedCount > 0 && (
+          <div>
+            <span className="earn-num">{dollars(e.disputedCents)}</span>
+            <span className="earn-label">disputed by a bank ({e.disputedCount})</span>
+          </div>
+        )}
       </div>
       {e.recent.length > 0 ? (
         <ul className="earn-list">
@@ -38,7 +44,7 @@ export default function PitchEarnings({ pitch, earnings }) {
             <li key={r.id} className={r.status}>
               <span>{r.backerName}</span>
               <span>{new Date(r.at).toLocaleDateString()}</span>
-              <span>{r.status === 'refunded' ? `${dollars(r.amountCents)} refunded` : `${dollars(r.amountCents)} · ${dollars(r.yourShareCents)} to you`}</span>
+              <span>{r.status === 'refunded' ? `${dollars(r.amountCents)} refunded` : r.status === 'disputed' ? `${dollars(r.amountCents)} disputed · share taken back` : `${dollars(r.amountCents)} · ${dollars(r.yourShareCents)} to you`}</span>
             </li>
           ))}
         </ul>
@@ -46,7 +52,7 @@ export default function PitchEarnings({ pitch, earnings }) {
         <p className="earn-empty">{pitch.funding_enabled ? 'No backings yet — share your project page to get the first one.' : 'Backing is off for this project.'}</p>
       )}
       <p className="earn-note">
-        Backers pay the pledge plus Stripe’s card fee. Your share is the pledge minus {SITE.studio}’s cut; it lands in your Stripe balance and pays out to your bank on Stripe’s schedule. A refund returns the whole backing to the backer and takes your share back out of your balance.
+        Backers pay the pledge plus Stripe’s card fee. Your share is the pledge minus {SITE.studio}’s cut; it lands in your Stripe balance and pays out to your bank on Stripe’s schedule. A refund returns the whole backing to the backer and takes your share back out of your balance. If a backer’s bank disputes a backing, your share is taken back while the bank decides, and paid back if it rules for us.
       </p>
     </div>
   );

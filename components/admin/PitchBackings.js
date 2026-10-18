@@ -56,6 +56,13 @@ export default function PitchBackings({ pitchId, onChanged }) {
   const cut = paid.reduce((s, b) => s + b.platformCutCents, 0);
   const backers = new Set(paid.map((b) => b.donorUserId)).size;
   const refunded = data.backings.filter((b) => b.status === 'refunded');
+  const disputed = data.backings.filter((b) => b.status === 'disputed');
+  const statusText = (b) => {
+    if (b.status === 'refunded') return `Refunded${b.refundReason ? ` · ${b.refundReason}` : ''}`;
+    if (b.status === 'disputed') return `Disputed · ${b.disputeStatus === 'lost' ? 'lost' : 'waiting on the bank'}${b.clawbackCents ? ` · ${dollars(b.clawbackCents)} taken back from the creator` : ''}`;
+    if (b.disputeStatus === 'won') return `Paid · dispute won${b.returnedCents ? ` · ${dollars(b.returnedCents)} paid back` : ''}`;
+    return 'Paid';
+  };
 
   return (
     <div className="bk">
@@ -63,6 +70,7 @@ export default function PitchBackings({ pitchId, onChanged }) {
         <span><b>{dollars(raised)}</b> raised from {backers} backer{backers === 1 ? '' : 's'}</span>
         <span>{dollars(cut)} platform cut</span>
         {refunded.length > 0 && <span>{refunded.length} refunded</span>}
+        {disputed.length > 0 && <span>{disputed.length} disputed (answer in the Stripe Dashboard)</span>}
         {data.pendingCount > 0 && <span>{data.pendingCount} checkout{data.pendingCount === 1 ? '' : 's'} still open</span>}
         {data.failedCount > 0 && <span>{data.failedCount} expired or failed</span>}
       </div>
@@ -85,7 +93,7 @@ export default function PitchBackings({ pitchId, onChanged }) {
                 <td>{dollars(b.totalChargedCents || b.amountCents)}</td>
                 <td>{dollars(b.creatorPayoutCents)}</td>
                 <td>{dollars(b.platformCutCents)}</td>
-                <td>{b.status === 'refunded' ? `Refunded${b.refundReason ? ` · ${b.refundReason}` : ''}` : 'Paid'}</td>
+                <td>{statusText(b)}</td>
                 <td>
                   {b.status === 'completed' && (
                     <button type="button" className="account-btn-secondary" style={{ width: 'auto', fontSize: 12 }} disabled={busyId === b.id} onClick={() => refund(b)}>
