@@ -125,6 +125,7 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
             </p>
           </div>
           <div className="ap-invite-actions">
+            <a className="account-btn-secondary" href="/apply?preview=visitor" target="_blank" rel="noopener noreferrer">Preview applicant page</a>
             <button type="button" className="account-btn-secondary" onClick={copyApplyLink}>{copied ? 'Link copied' : 'Copy apply link'}</button>
             <button type="button" className="account-btn-primary" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null); }} aria-expanded={inviteOpen}>Invite to apply</button>
           </div>

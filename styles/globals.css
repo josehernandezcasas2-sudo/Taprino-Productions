@@ -9738,3 +9738,9 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .ap-invite p.ap-invite-ok { color: var(--ok); }
 .ap-invite p.ap-invite-err { color: var(--danger); }
 @media (max-width: 640px) { .ap-invite-row { grid-template-columns: 1fr; } }
+
+/* /apply?preview=visitor|member (admins): what an applicant sees */
+.apply-preview-bar { position: sticky; top: 0; z-index: 30; display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; align-items: center; justify-content: space-between; padding: 0.6rem 1rem; background: var(--olive); color: var(--olive-shadow); font-family: var(--font-mono); font-size: 0.8rem; }
+.apply-preview-bar b { font-weight: 700; }
+.apply-preview-links { display: flex; gap: 1rem; flex-wrap: wrap; }
+.apply-preview-links a { color: var(--olive-shadow); font-weight: 600; }

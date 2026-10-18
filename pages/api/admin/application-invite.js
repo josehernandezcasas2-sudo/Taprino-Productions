@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   const mail = applicationEmails.invite({ name, note });
   const result = await sendEmail({ to: email, ...mail });
   if (!result || !result.sent) {
-    return res.status(502).json({ error: 'The email service didn’t accept it. Check the address and try again.' });
+    return res.status(502).json({ error: `The email service didn’t accept it${result && result.reason ? `: ${result.reason}` : '. Check the address and try again.'}` });
   }
   await recordAudit({ adminId: userId, adminEmail, action: 'application_invite_sent', targetType: 'application', details: `Invited ${email}${name ? ` (${name})` : ''} to apply` });
   return res.status(200).json({ ok: true, email });
