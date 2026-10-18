@@ -40,7 +40,8 @@ export default async function handler(req, res) {
       imageUrl = await uploadArtworkImage({
         base64: imageBase64,
         fileName: imageFileName,
-        pathPrefix: `player-icon-${iconKey}`
+        pathPrefix: `player-icon-${iconKey}`,
+        allowSvg: true // admin-only icon sets
       });
     } catch (err) {
       return res.status(400).json({ error: err.message });
