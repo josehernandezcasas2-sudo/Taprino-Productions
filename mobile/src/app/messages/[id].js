@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -43,6 +43,14 @@ export default function Conversation() {
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [note, setNote] = useState(null);
+  // The composer keeps room for the floating bottom nav, which the
+  // keyboard covers: while it's up, that room would just be a gap.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
   // A fresh token for every request (poll, send, mute, block, report): one
   // kept from when the thread opened expires after about a minute.
@@ -108,7 +116,9 @@ export default function Conversation() {
       const t = await token();
       if (state.thread.id) {
         const data = await apiPost(`/api/messages/${state.thread.id}`, { body }, t);
-        setState((s) => ({ ...s, messages: [...s.messages, data.message] }));
+        // A poll that was already on the wire can bring this same message
+        // back first, so only add it if it isn't there yet.
+        setState((s) => (s.messages.some((x) => x.id === data.message.id) ? s : { ...s, messages: [...s.messages, data.message] }));
       } else {
         const data = await apiPost('/api/messages', { toUserId: state.thread.other.userId, body, context: state.thread.context }, t);
         router.replace(`/messages/${data.threadId}`);
@@ -230,12 +240,12 @@ export default function Conversation() {
             {note ? <Text style={styles.note}>{note}</Text> : null}
             {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
             {blockedEither ? (
-              <View style={styles.composer}>
+              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
                 <Text style={[styles.muted, { flex: 1 }]}>{t.iBlocked ? `You blocked ${t.other.displayName}.` : 'This person isn’t taking messages right now.'}</Text>
                 {t.iBlocked ? <Pressable style={styles.btn} onPress={toggleBlock}><Text style={styles.btnText}>Unblock</Text></Pressable> : null}
               </View>
             ) : (
-              <View style={styles.composer}>
+              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
                 <TextInput
                   style={styles.input}
                   value={draft}
@@ -275,6 +285,7 @@ const styles = StyleSheet.create({
   msgText: { fontFamily: fonts.body, fontSize: 14.5, color: colors.ink, lineHeight: 20 },
   msgTime: { fontFamily: fonts.mono, fontSize: 9.5, color: colors.inkFaint, marginTop: 3 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.hairline, backgroundColor: colors.surface1, paddingBottom: 90 },
+  composerKeyboard: { paddingBottom: 12 },
   input: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, color: colors.ink, borderRadius: 18, paddingVertical: 9, paddingHorizontal: 14, fontFamily: fonts.body, fontSize: 14.5, maxHeight: 120 },
   btn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 18, paddingVertical: 10, paddingHorizontal: 16 },
   btnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
