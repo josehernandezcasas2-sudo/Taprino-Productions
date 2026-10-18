@@ -106,10 +106,11 @@ export default function Terms({ account }) {
         share of our membership revenue. For each paid membership that share is $2.00 a month on
         Standard, $3.50 on Premium and $1.50 on Sponsor. You choose who receives it by naming up to 10
         creators on your account page (Artist Support); we split it between them, equally unless you
-        set your own shares, each time your membership renews. If you haven&rsquo;t named anyone, we
-        allocate it to the creators of the titles you watched in the 30 days before the renewal, and
+        set your own shares, every month you pay, including the first. If you haven&rsquo;t named
+        anyone, we allocate it to the creators of the titles you watched in the 30 days before that
+        payment, and
         if you watched nothing, among creators on the platform in proportion to how much their work
-        was watched. Changing your list affects future renewals only. This is how we share our own
+        was watched. You can&rsquo;t name yourself. Changing your list affects future payments only. This is how we share our own
         revenue: it is not a payment from you to a creator, not a donation and not a purchase, it is
         not tax-deductible, and it gives you nothing beyond the membership itself. If you joined
         through a creator&rsquo;s link, that creator is your first pick until you change it, and we
@@ -125,10 +126,12 @@ export default function Terms({ account }) {
         ownership of your work to us. It stays yours.
       </p>
       <p>
-        <strong>What you&rsquo;re granting us.</strong> A non-exclusive, worldwide, royalty-free
-        licence to host, encode, stream, and promote your work on {SITE.name} and in
+        <strong>What you&rsquo;re granting us.</strong> A non-exclusive, worldwide licence to host, encode, stream, and promote your work on {SITE.name} and in
         marketing for the platform (thumbnails, trailers, social posts, and similar). Non-exclusive
-        means you remain free to put the same work anywhere else, including your own channels.
+        means you remain free to put the same work anywhere else, including your own channels. We
+        don&rsquo;t pay a fee each time your work is streamed or promoted; what creators earn from
+        {SITE.name} is the creator share described below, and any separate agreement we make with
+        you in writing.
       </p>
       <p>
         <strong>You can withdraw it.</strong> Request removal and we&rsquo;ll take it down within 30
@@ -144,16 +147,17 @@ export default function Terms({ account }) {
       <p>
         <strong>Member share.</strong> When a member names you on their account page, or watches your
         released work under the default described in section 4, we credit you a share of that
-        member&rsquo;s payment. We pay your credits on the 1st of each month once your balance reaches
-        $25; smaller balances carry over. If a member&rsquo;s payment is refunded or reversed, the
+        member&rsquo;s payment. Payouts start on the 1st of each month for every balance of $25 or more;
+        smaller balances carry over. If our own balance can&rsquo;t cover every payout that day, the
+        longest-waiting credits are paid first and the rest follow as soon as funds allow. If a member&rsquo;s payment is refunded or reversed, the
         matching unpaid credit is reversed; if it has already been paid to you, we absorb it. We
         publish the per-tier amounts and may change them with 30 days&rsquo; notice; a credit already
         made never changes.
       </p>
       <p>
         <strong>Referral bonus.</strong> When someone becomes a paying member through your creator
-        link, we credit you $1.00 (Standard), $1.50 (Premium) or $0.50 (Sponsor) for each paid renewal
-        of that membership during its first 12 months, on top of any member share. A membership is
+        link, we credit you $1.00 (Standard), $1.50 (Premium) or $0.50 (Sponsor) for each paid month of
+        that membership during its first 12 months, including the first, on top of any member share. A membership is
         credited to the last creator link used in the 30 days before joining, once; the bonus stops
         after 12 months from its first payment, or sooner if the membership is cancelled. You may not
         refer yourself, pay people to subscribe, or misrepresent {SITE.name} when you share your
@@ -169,6 +173,24 @@ export default function Terms({ account }) {
         name. You must be 18 or older to hold one. Until you set one up, your credits wait for you.
         You&rsquo;re responsible for your own taxes on what we pay you, and Stripe issues tax forms
         where the law requires them.
+      </p>
+      <p>
+        <strong>Credits that aren&rsquo;t earned.</strong> Credits that come from fraud or from gaming
+        how shares are allocated are not earned. That includes payments made with stolen cards or later
+        disputed as unauthorised, fake or coordinated accounts, bots or paid viewing, swapping picks
+        with other creators for money, and referring yourself. When we see signs of this we can hold
+        your payouts while we look into it (for up to 90 days, and we&rsquo;ll tell you), cancel the
+        credits involved, and recover any of them already paid out from your future credits. Ordinary
+        refunds are different: as above, we absorb those once you&rsquo;ve been paid.
+      </p>
+      <p>
+        <strong>If your work comes down or your account closes.</strong> Credits you earned before you
+        withdraw your work, close your account, or we suspend or close it stay yours (apart from
+        credits that weren&rsquo;t earned, above). From that date you have 90 days to collect them: we
+        pay out the whole balance, even under $25, once you have a payout account set up. Anything not
+        collected within those 90 days goes into the site-wide pool and is shared among other creators
+        in proportion to how much their work was watched. We can extend the 90 days by agreement, for
+        example while we work with you on a new cut of your film.
       </p>
       <p>
         <strong>Review.</strong> Submissions are reviewed before publication. We can decline or remove
@@ -215,7 +237,8 @@ export default function Terms({ account }) {
       <p>
         You can close your account any time. We can suspend or close accounts that breach these terms,
         with notice where it&rsquo;s reasonable to give it. If we close your paid membership without
-        cause, we&rsquo;ll refund the unused portion.
+        cause, we&rsquo;ll refund the unused portion. If you&rsquo;re a creator, section 5 says what
+        happens to credits you&rsquo;ve earned.
       </p>
 
       <h2>11. Governing law</h2>
