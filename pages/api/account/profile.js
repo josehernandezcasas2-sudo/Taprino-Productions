@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
-import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken, normalizeHandle, handleError, isHandleTaken, BANNER_COLOR_PATTERN } from '../../../lib/userProfiles';
+import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken, normalizeHandle, handleError, isHandleTaken, isReservedHandle, BANNER_COLOR_PATTERN } from '../../../lib/userProfiles';
+import { getRoleContext } from '../../../lib/roles';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeImagePosition, normalizeZoom } from '../../../lib/profileBanner';
 
@@ -62,10 +63,13 @@ export default async function handler(req, res) {
     }
     const handle = normalizeHandle(rawHandle);
     if (handle) {
-      const problem = handleError(handle);
-      if (problem) return res.status(400).json({ error: problem });
       const current = await getOwnProfile(userId);
       const unchanged = current && current.handle && current.handle.toLowerCase() === handle.toLowerCase();
+      // A reserved handle is the team's to take; someone who already has
+      // one keeps it.
+      const reservedOk = isReservedHandle(handle) && (unchanged || (await getRoleContext(req)).canAccessAdmin);
+      const problem = reservedOk ? null : handleError(handle);
+      if (problem) return res.status(400).json({ error: problem });
       if (!unchanged && await isHandleTaken(handle, userId)) {
         return res.status(409).json({ error: `@${handle} is already taken — try another.` });
       }
