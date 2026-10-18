@@ -45,10 +45,16 @@ jobs:
         working-directory: mobile
         run: npm ci --no-audit --no-fund
 
+      # mobile/.env (committed: it holds only Clerk's publishable key) is
+      # sourced into the step so the EXPO_PUBLIC_* values are inlined into
+      # the bundle. With --environment, EAS CLI ignores .env files and
+      # takes variables from expo.dev instead, which is why the first
+      # publishes came out without the key; no --environment here.
       - name: Publish to the preview branch
         working-directory: mobile
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual run' }}
         run: |
+          set -a; . ./.env; set +a
           MSG="${COMMIT_MESSAGE%%$'\n'*}"
-          eas update --branch preview --environment preview --message "${MSG:0:120}" --non-interactive
+          eas update --branch preview --message "${MSG:0:120}" --non-interactive

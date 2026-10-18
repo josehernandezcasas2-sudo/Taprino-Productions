@@ -74,8 +74,11 @@ update → scan its QR code with the iPhone camera (opens in Expo Go). The first
 publish can also be done by hand:
 
 ```bash
-npx eas-cli@latest update --branch preview --environment preview --message "first"
+npx eas-cli@latest update --branch preview --message "first"
 ```
+
+(No `--environment` flag: with it, EAS CLI ignores `.env` and the bundle ships
+without the Clerk key. The workflow sources `mobile/.env` for the same reason.)
 
 Expo Go has to be on the same SDK as the app (see above); updates are plain
 JavaScript, so anything needing a native module outside Expo Go still needs a
