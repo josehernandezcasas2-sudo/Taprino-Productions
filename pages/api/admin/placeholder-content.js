@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
-import { generatePlaceholderContent, removePlaceholderContent } from '../../../lib/placeholderContent';
+import { generatePlaceholderContent } from '../../../lib/placeholderContent';
 
 export default async function handler(req, res) {
   const { userId, email, isAdmin } = await getRoleContext(req);
@@ -23,21 +23,7 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, created: result.created });
   }
 
-  if (req.method === 'DELETE') {
-    const result = await removePlaceholderContent();
-    if (result.error) {
-      return res.status(500).json({ error: result.error });
-    }
-    await recordAudit({
-      adminId: userId,
-      adminEmail: email,
-      action: 'remove_placeholder_content',
-      targetType: 'episode',
-      details: `Removed ${result.removed} placeholder rows`
-    });
-    return res.status(200).json({ ok: true, removed: result.removed });
-  }
 
-  res.setHeader('Allow', 'POST, DELETE');
+  res.setHeader('Allow', 'POST');
   return res.status(405).json({ error: 'Method not allowed' });
 }

@@ -125,23 +125,6 @@ export default function SiteSettingsPanel() {
     }
   }
 
-  async function removePlaceholders() {
-    if (!window.confirm('Permanently delete every placeholder episode and series? This cannot be undone.')) return;
-    setPlaceholderBusy(true);
-    setPlaceholderError(null);
-    setPlaceholderResult(null);
-    try {
-      const res = await fetch('/api/admin/placeholder-content', { method: 'DELETE' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not remove placeholder content.');
-      setPlaceholderResult(`Removed ${data.removed} placeholder rows.`);
-    } catch (err) {
-      setPlaceholderError(err.message);
-    } finally {
-      setPlaceholderBusy(false);
-    }
-  }
-
   const dirty = (keys) => confirmedSiteSettings && keys.some((k) => siteSettings[k] !== confirmedSiteSettings[k]);
   const rowStyle = { borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' };
   const unsaved = <div style={{ fontSize: '0.74rem', color: 'var(--signal-amber)', marginTop: '0.4rem' }}>Unsaved changes — click Save below to apply.</div>;
@@ -269,15 +252,13 @@ export default function SiteSettingsPanel() {
         <div className="account-eyebrow">Placeholder content</div>
         <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.6rem' }}>
           Generate one sample item for each content type so you can see how every type looks across the site without hand-creating test content.
-          None have a real video behind them, so playback won&rsquo;t work. Every title is marked &ldquo;[Placeholder]&rdquo; and visible to real visitors while it exists, so remove it when you&rsquo;re done.
+          None have a real video behind them, so playback won&rsquo;t work. Every title is marked &ldquo;[Placeholder]&rdquo; and visible to real visitors while it exists, so remove it when you&rsquo;re done (Content &rarr; Test content).
         </p>
         <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', marginBottom: '0.6rem' }}>
           <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={generatePlaceholders} disabled={placeholderBusy}>
             {placeholderBusy ? 'Working…' : 'Generate placeholder content'}
           </button>
-          <button className="account-btn-secondary" style={{ width: 'auto', color: 'var(--danger)' }} onClick={removePlaceholders} disabled={placeholderBusy}>
-            Remove all placeholders
-          </button>
+          <a className="account-btn-secondary" style={{ width: 'auto', textDecoration: 'none' }} href="/admin/test-content">Remove them in Test content</a>
         </div>
         {placeholderResult && <p style={{ fontSize: '0.82rem', color: 'var(--brass)' }}>{placeholderResult}</p>}
         {placeholderError && <p style={{ fontSize: '0.82rem', color: 'var(--danger)' }}>{placeholderError}</p>}
