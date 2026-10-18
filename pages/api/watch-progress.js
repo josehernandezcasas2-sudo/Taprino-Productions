@@ -2,6 +2,8 @@ import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { parseWatchProgress } from '../../lib/watchProgress';
 import { recordWatchSeconds } from '../../lib/redis';
+import { firstInWindow } from '../../lib/rateLimit';
+import { findEpisode } from '../../lib/episodes';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -64,8 +66,13 @@ export default async function handler(req, res) {
     // killed mid-flight on serverless before they complete.
     const previousPosition = current[episodeId] || 0;
     const watchedDelta = position - previousPosition;
-    if (watchedDelta > 0 && watchedDelta <= 30) {
-      await recordWatchSeconds(episodeId, watchedDelta);
+    // Credited at most once per ~15 s per viewer and episode, and only for
+    // a real public episode: posting progress in a loop (or for any id)
+    // used to pump "average watch time" in creator analytics.
+    if (watchedDelta > 0 && watchedDelta <= 30
+      && (await firstInWindow(`watch-tick:${customerId}:${episodeId}`, 14))
+      && (await findEpisode(String(episodeId)))) {
+      await recordWatchSeconds(episodeId, Math.min(watchedDelta, 15));
     }
 
     // Delete-then-reinsert so this episode moves to the "most recent" end —
