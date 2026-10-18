@@ -4,13 +4,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://www.studiotapatv.site';
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place' };
 const SWIPE_THRESHOLD = 90;
 
 // Review on the go (2026-10-08): one item at a time as a card. The video
@@ -18,7 +19,9 @@ const SWIPE_THRESHOLD = 90;
 // (with a reason sheet) at the bottom, swipe left to skip to the next.
 // Ads and series need the web (billing rate, artwork), so their cards
 // deep-link there instead of approving blind.
-// ?kind=submission|channel|ad|series narrows the deck.
+// Places (Locations listings) approve here too; the host's proof opens in
+// the in-app browser when it's a web address.
+// ?kind=submission|channel|ad|series|location narrows the deck.
 export default function AdminReview() {
   const router = useRouter();
   const { kind } = useLocalSearchParams();
@@ -190,7 +193,13 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
                 {meta.map(([k, v]) => (
                   <View key={k} style={styles.kvRow}>
                     <Text style={styles.kvKey}>{labelFor(k)}</Text>
-                    <Text style={styles.kvVal}>{fmtValue(k, v)}</Text>
+                    {k === 'proofUrl' && isWebUrl(v) ? (
+                      <Pressable style={{ flex: 1 }} onPress={() => WebBrowser.openBrowserAsync(String(v)).catch(() => {})} accessibilityRole="link">
+                        <Text style={[styles.kvVal, styles.kvLink]}>Open the proof ↗</Text>
+                      </Pressable>
+                    ) : (
+                      <Text style={styles.kvVal}>{fmtValue(k, v)}</Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -217,7 +226,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
 }
 
 function labelFor(k) {
-  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser' }[k]
+  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing' }[k]
     || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 function fmtValue(k, v) {
@@ -225,6 +234,11 @@ function fmtValue(k, v) {
   if (k === 'durationSeconds') return fmtDuration(v);
   if (k === 'budgetTotalCents') return `$${(v / 100).toFixed(2)}`;
   return String(v);
+}
+// Only a real web address becomes a link (the proof field can also read
+// "no proof attached").
+function isWebUrl(v) {
+  return /^https?:\/\//i.test(String(v || ''));
 }
 function fmtDuration(s) {
   return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -264,6 +278,7 @@ const styles = StyleSheet.create({
   kvRow: { flexDirection: 'row', gap: 10 },
   kvKey: { fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint, width: 90 },
   kvVal: { fontFamily: fonts.mono, fontSize: 12, color: colors.ink, flex: 1 },
+  kvLink: { color: colors.brass, textDecorationLine: 'underline' },
   decide: { flexDirection: 'row', gap: 8, marginTop: 8 },
   btnOk: { flex: 1, backgroundColor: colors.ok, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   btnOkText: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.onBrass },
