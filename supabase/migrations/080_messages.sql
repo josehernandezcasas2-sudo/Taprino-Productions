@@ -77,7 +77,9 @@ create index if not exists dm_reports_open_idx on dm_reports (status, created_at
 -- Profile reports (the Report button on /profile/<id>, and a reported
 -- conversation) were never allowed by 072's check constraints, which only
 -- listed episode/series/channel_media — the insert failed. Widen them.
+-- The full list of report/flag targets to date (later migrations added
+-- to it), so running this file again can't narrow it back down.
 alter table content_reports drop constraint if exists content_reports_target_type_check;
-alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile'));
+alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));
 alter table content_flags drop constraint if exists content_flags_target_type_check;
-alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile'));
+alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));
