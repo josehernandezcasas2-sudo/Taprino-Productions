@@ -21,7 +21,8 @@ export async function getServerSideProps({ req, res, params }) {
 }
 
 function formatDate(iso) {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  // Fixed locale and zone: the server and the browser must print the same.
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
 export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, show, episodes }) {

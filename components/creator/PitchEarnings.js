@@ -15,7 +15,7 @@ export default function PitchEarnings({ pitch, earnings }) {
       <div className="earn-stats">
         <div>
           <span className="earn-num">{dollars(e.raisedCents)}</span>
-          <span className="earn-label">raised{pitch.funding_goal ? ` of $${Number(pitch.funding_goal).toLocaleString()}` : ''}</span>
+          <span className="earn-label">raised{pitch.funding_goal ? ` of $${Number(pitch.funding_goal).toLocaleString('en-US')}` : ''}</span>
         </div>
         <div>
           <span className="earn-num">{e.backers}</span>

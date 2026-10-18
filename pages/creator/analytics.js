@@ -35,7 +35,7 @@ export async function getServerSideProps({ req, res }) {
 
 function formatDate(iso) {
   const d = new Date(iso + 'T00:00:00Z');
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 // A plain inline SVG rather than a charting library — one dependency-free
@@ -141,7 +141,7 @@ function Sparkline({ trend }) {
       </svg>
       {hovered && (
         <div className="ca-chart-tooltip" style={{ left: `${tooltipLeftPct}%` }}>
-          <strong>{hovered.views.toLocaleString()}</strong>{' '}
+          <strong>{hovered.views.toLocaleString('en-US')}</strong>{' '}
           view{hovered.views === 1 ? '' : 's'}
           <span>{formatDate(hovered.date)}</span>
         </div>
@@ -282,12 +282,12 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
 
             <div className="ca-stats">
               <div className="ca-stat">
-                <b>{t.views.toLocaleString()}</b>
+                <b>{t.views.toLocaleString('en-US')}</b>
                 <small>Views all time</small>
               </div>
               {!data.isAllTime && (
                 <div className="ca-stat">
-                  <b>{t.windowViews.toLocaleString()}</b>
+                  <b>{t.windowViews.toLocaleString('en-US')}</b>
                   <small>Last {data.days} days</small>
                 </div>
               )}
@@ -361,7 +361,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
                         </span>
                       </span>
                       <span role="cell" className="ca-num">{ep.avgWatchSeconds != null ? formatRuntime(ep.avgWatchSeconds) : '—'}</span>
-                      <span role="cell" className="ca-num">{ep.views.toLocaleString()}</span>
+                      <span role="cell" className="ca-num">{ep.views.toLocaleString('en-US')}</span>
                     </div>
                   );
                 })}
@@ -386,7 +386,7 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
 
                     <div className="ca-stats">
                       <div className="ca-stat">
-                        <b>{detail.totals.views.toLocaleString()}</b>
+                        <b>{detail.totals.views.toLocaleString('en-US')}</b>
                         <small>Views all time</small>
                       </div>
                       <div className="ca-stat">

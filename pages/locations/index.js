@@ -171,7 +171,7 @@ export default function LocationsDirectory({ mainGenres, isSignedIn, isSubscribe
 
 function ListingCard({ l, from }) {
   const facts = [
-    l.sqFt ? `${l.sqFt.toLocaleString()} sq ft` : null,
+    l.sqFt ? `${l.sqFt.toLocaleString('en-US')} sq ft` : null,
     l.rooms ? `${l.rooms.split('·').length} ${l.rooms.split('·').length === 1 ? 'room' : 'rooms'}` : null,
     l.crewMax ? `crew up to ${l.crewMax}` : null,
     l.features.includes('quiet') ? 'quiet' : null,

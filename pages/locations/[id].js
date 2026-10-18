@@ -92,7 +92,7 @@ export default function ListingPage(props) {
   };
 
   const kv = [
-    [['Rooms', l.rooms], ['Inside', l.sqFt ? `${l.sqFt.toLocaleString()} sq ft` : null], ['Outside', l.outdoorSqFt ? `${l.outdoorSqFt.toLocaleString()} sq ft` : null], ['Ceilings', l.ceilingFt ? `${l.ceilingFt} ft` : null], ['Crew max', l.crewMax], ['Hours', hoursLabel(l.hoursFrom, l.hoursTo)], ['Furniture', yesNo(l, 'furniture_moves', 'May move; photograph first', null)], ['Green room', yesNo(l, 'green_room', 'Yes', null)], ['Makeup area', yesNo(l, 'makeup_area', 'Yes', null)]],
+    [['Rooms', l.rooms], ['Inside', l.sqFt ? `${l.sqFt.toLocaleString('en-US')} sq ft` : null], ['Outside', l.outdoorSqFt ? `${l.outdoorSqFt.toLocaleString('en-US')} sq ft` : null], ['Ceilings', l.ceilingFt ? `${l.ceilingFt} ft` : null], ['Crew max', l.crewMax], ['Hours', hoursLabel(l.hoursFrom, l.hoursTo)], ['Furniture', yesNo(l, 'furniture_moves', 'May move; photograph first', null)], ['Green room', yesNo(l, 'green_room', 'Yes', null)], ['Makeup area', yesNo(l, 'makeup_area', 'Yes', null)]],
     [['Windows face', l.windowsFace], ['Best light', l.bestLight], ['Natural light', yesNo(l, 'natural_light', 'Yes', 'Little')], ['Blackout', yesNo(l, 'blackout', 'Possible', 'No')], ['Power', l.power || (has(l, 'power_tiein') ? 'Tie-in available' : has(l, 'power_50a') ? '50A+ outlet' : has(l, 'household_power') ? 'Household circuits' : null)], ['Sound', l.sound || (has(l, 'soundproof') ? 'Soundproofed' : has(l, 'quiet') ? 'Quiet' : has(l, 'flight_path') ? 'Near a flight path' : null)]],
     [['Parking', [has(l, 'driveway') && 'driveway', has(l, 'street_parking') && 'street', has(l, 'truck_access') && 'truck access'].filter(Boolean).join(' · ') || null], ['Load-in', [has(l, 'ground_loadin') && 'ground level', has(l, 'elevator') && 'elevator', has(l, 'loading_dock') && 'loading dock'].filter(Boolean).join(' · ') || null], ['Bathrooms', yesNo(l, 'bathrooms', 'Crew may use', null)], ['Kitchen', yesNo(l, 'kitchen', 'Usable', null)], ['Wifi', yesNo(l, 'wifi', 'Yes', null)], ['Overnight', yesNo(l, 'overnight', 'OK', 'No')], ['Access notes', l.accessNotes || (l.mine ? null : 'Shared once a booking is paid')]],
     [['Cancellation', `${CANCELLATION[l.cancellation].label} · ${CANCELLATION[l.cancellation].text}`], ['Hours', hoursLabel(l.hoursFrom, l.hoursTo)], ['Crew max', l.crewMax], ['House rules', l.rules || 'None posted']],
@@ -129,8 +129,8 @@ export default function ListingPage(props) {
             </div>
           </div>
           <div className="loc-tiles">
-            <div className="loc-tile"><b>{l.sqFt ? `${l.sqFt.toLocaleString()} sq ft` : '—'}</b><span>Inside</span></div>
-            <div className="loc-tile"><b>{l.rooms ? `${l.rooms.split('·').length} ${l.rooms.split('·').length === 1 ? 'space' : 'spaces'}` : l.outdoorSqFt ? `${l.outdoorSqFt.toLocaleString()} sq ft` : '—'}</b><span>{l.rooms ? 'Spaces' : 'Outside'}</span></div>
+            <div className="loc-tile"><b>{l.sqFt ? `${l.sqFt.toLocaleString('en-US')} sq ft` : '—'}</b><span>Inside</span></div>
+            <div className="loc-tile"><b>{l.rooms ? `${l.rooms.split('·').length} ${l.rooms.split('·').length === 1 ? 'space' : 'spaces'}` : l.outdoorSqFt ? `${l.outdoorSqFt.toLocaleString('en-US')} sq ft` : '—'}</b><span>{l.rooms ? 'Spaces' : 'Outside'}</span></div>
             <div className="loc-tile"><b>{l.crewMax ? `Crew up to ${l.crewMax}` : 'Any crew'}</b><span>People</span></div>
             <div className="loc-tile"><b>{hoursLabel(l.hoursFrom, l.hoursTo)}</b><span>Hours</span></div>
           </div>
@@ -300,7 +300,7 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
           {hasRates && <button type="button" aria-pressed={form.pricing === 'posted'} onClick={() => set({ pricing: 'posted' })}>Posted rate</button>}
           {l.dealsOk && <button type="button" aria-pressed={form.pricing === 'offer'} onClick={() => set({ pricing: 'offer' })}>Make an offer</button>}
         </div>
-        {form.pricing === 'offer' && <input type="number" className="crew-input" min="25" step="1" value={form.offer} onChange={(e) => set({ offer: e.target.value })} placeholder={`Your number for the whole booking ($${MIN_BOOKING_CENTS / 100}–$${(MAX_BOOKING_CENTS / 100).toLocaleString()})`} required />}
+        {form.pricing === 'offer' && <input type="number" className="crew-input" min="25" step="1" value={form.offer} onChange={(e) => set({ offer: e.target.value })} placeholder={`Your number for the whole booking ($${MIN_BOOKING_CENTS / 100}–$${(MAX_BOOKING_CENTS / 100).toLocaleString('en-US')})`} required />}
       </div>
       <label className="crew-field"><span>A note to {l.host.displayName.split(' ')[0]}</span><textarea className="crew-input" rows={3} value={form.message} onChange={(e) => set({ message: e.target.value })} placeholder="Anything they should know: generator, night work, how you found them." maxLength={2000} /></label>
       {est ? (

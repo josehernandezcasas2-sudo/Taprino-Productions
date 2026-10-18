@@ -79,7 +79,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
   const isOwnProfile = Boolean(viewerId) && viewerId === profile.userId;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
-    ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
+    ? new Date(profile.joinedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : null;
   // Newest post gets the big slot in the middle column; the rest grid up
   // under it. Both still index into the same posts array for the viewer.

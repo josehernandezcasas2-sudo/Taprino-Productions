@@ -62,7 +62,7 @@ const ATTEST = [
   { key: 'terms', text: null } // rendered inline: links to the terms
 ];
 
-const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
 
 export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, application }) {
   const { isSignedIn: clerkSignedIn, user } = useUser();
