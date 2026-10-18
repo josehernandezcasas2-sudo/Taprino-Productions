@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { creatorOwnsSeries } from '../../../lib/series';
 
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
@@ -63,6 +64,10 @@ export default async function handler(req, res) {
 
   const effectiveContentType = updates.contentType || existing.content_type;
   const isNewSeries = updates.seriesId === '__new__';
+  // Moving a submission into a series: only one of the creator's own.
+  if (updates.seriesId && !isNewSeries && updates.seriesId !== existing.series_id && !(await creatorOwnsSeries(userId, updates.seriesId, { isAdmin }))) {
+    return res.status(403).json({ error: 'You can only add episodes to your own series.' });
+  }
 
   const dbUpdates = {};
   if (updates.title !== undefined) dbUpdates.title = updates.title;

@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { creatorOwnsSeries } from '../../../lib/series';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
@@ -141,6 +142,14 @@ export default async function handler(req, res) {
   // told in the UI to name the new series in their description instead;
   // the admin sets up the real series and reassigns this during review.
   const isNewSeries = body.seriesId === '__new__';
+
+  // An episode or bonus clip goes only into the creator's own series: the
+  // review queue doesn't show which series a submission targets, so this
+  // used to let one creator file episodes into another's show.
+  const targetsSeries = (body.contentType === 'series' || body.contentType === 'podcast' || body.contentType === 'bonus') && body.seriesId && !isNewSeries;
+  if (targetsSeries && !(await creatorOwnsSeries(userId, body.seriesId, { isAdmin }))) {
+    return res.status(403).json({ error: 'You can only add episodes to your own series.' });
+  }
 
   const supabase = getSupabase();
   const { error } = await supabase.from('episodes').insert({
