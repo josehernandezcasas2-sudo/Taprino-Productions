@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -36,14 +36,22 @@ export default async function handler(req, res) {
 
   const supabase = getSupabase();
 
+  // Only into a show you own (an admin can import into any).
+  if (existingSeriesId) {
+    const { data: show } = await supabase.from('series').select('id, creator_id').eq('id', existingSeriesId).maybeSingle();
+    if (!show) return res.status(404).json({ error: 'That show doesn’t exist.' });
+    if (!isAdmin && show.creator_id !== userId) return res.status(403).json({ error: 'You can only import into your own shows.' });
+  }
+  const tier = defaultTier === 'premium' ? 'premium' : 'free';
+
   let seriesId = existingSeriesId;
   if (!seriesId) {
     // Matches the exact id scheme used everywhere else series get
     // created (see create-series.js) — series.id is a slug string, not
-    // an auto-generated UUID, and there's no created_by column on this
-    // table at all.
+    // an auto-generated UUID. Owned by the importer and pending review,
+    // like any show made through Add Series.
     seriesId = `${String(showName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
-    const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: showName });
+    const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: String(showName).slice(0, 200), creator_id: userId, submitted_by: email || null, status: 'pending' });
     if (seriesError) {
       return res.status(500).json({ error: `Could not create the show: ${seriesError.message}` });
     }
@@ -77,11 +85,10 @@ export default async function handler(req, res) {
         artist: defaultArtist || null,
         genre: defaultGenre || null,
         main_genre: defaultMainGenre || null,
-        tier: defaultTier || 'free',
+        tier,
         audio_url: audioUrl,
         status: 'pending',
-        submitted_by: userId,
-        created_by: userId
+        submitted_by: userId
       });
       if (insertError) {
         results.failed.push({ title: ep.title, error: insertError.message });
