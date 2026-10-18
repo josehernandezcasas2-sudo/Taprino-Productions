@@ -73,6 +73,8 @@ export async function getServerSideProps({ req, params, res }) {
   }
   if (heroPool.length === 0) heroPool = buildHeroCandidates(typeEpisodes, allSeries).slice(0, 3);
 
+  const seriesUsed = new Set([...typeEpisodes, ...curatedRows.flatMap((r) => r.episodes || [])].map((e) => e.seriesId).filter(Boolean));
+
   return {
     props: {
       type,
@@ -83,20 +85,23 @@ export async function getServerSideProps({ req, params, res }) {
       email: account.email,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
-      episodes,
-      allSeries,
+      // Only what this page renders: its own type's episodes and their
+      // series (it used to ship the whole catalogue), plus the genre
+      // list the header needs.
+      episodes: typeEpisodes,
+      allSeries: allSeries.filter((s) => seriesUsed.has(s.id)),
+      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       genreIcons,
       curatedRows
     }
   };
 }
 
-export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, isAdmin, isCreator, genreIcons, curatedRows }) {
+export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, heroPool, email, episodes, allSeries, mainGenres, isAdmin, isCreator, genreIcons, curatedRows }) {
   const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
 
-  const typeEpisodes = episodes.filter((e) => e.contentType === type);
+  const typeEpisodes = episodes;
   const label = TYPE_LABELS[type];
 
   function goToInfo(ep) {
