@@ -10,6 +10,7 @@ import SmartImage from '../components/SmartImage';
 import PositionedImage from '../components/PositionedImage';
 import HomeOnNow from '../components/HomeOnNow';
 import { Avatar, Chip, TierChip } from '../components/CrewBits';
+import { readStayInStream, takeLaunchCheck } from '../lib/stayInStream';
 
 const PAPER_INK = '#241a05';
 const PAPER_MUTED = '#6b6248';
@@ -29,6 +30,12 @@ export default function Home() {
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
   const [isSubscriber, setIsSubscriber] = useState(false);
+
+  // "Here only for the stream?" on: the app opens on Stream.
+  useEffect(() => {
+    if (!takeLaunchCheck()) return;
+    readStayInStream().then((on) => { if (on) router.replace('/stream'); });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;

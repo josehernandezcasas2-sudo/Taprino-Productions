@@ -6,6 +6,7 @@ import { apiGet } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 import { SearchIcon } from './TabBarIcons';
 import PositionedImage from './PositionedImage';
+import { rememberStayInStream } from '../lib/stayInStream';
 
 // The mobile routes that count as the Stream half of the site — the same
 // pages lib/streamSection.js's isStreamPath() marks on the website, mapped
@@ -110,6 +111,7 @@ export default function TopNav() {
       const profile = await apiGet('/api/account/profile', token).catch(() => null);
       if (!cancelled && profile) {
         updateOwnProfileCache({ userId: profile.userId || null, handle: profile.handle || null, avatarUrl: profile.avatarUrl || null, avatarPosition: profile.avatarPosition || null, avatarZoom: profile.avatarZoom || null, stayInStream: !!profile.stayInStream });
+        rememberStayInStream(!!profile.stayInStream);
       }
     })();
     return () => { cancelled = true; };

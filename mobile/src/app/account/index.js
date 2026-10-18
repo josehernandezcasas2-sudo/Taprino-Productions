@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator, Alert, Linking, Pressable, ScrollView,
+  ActivityIndicator, Alert, Linking, Pressable, ScrollView, Switch,
   StyleSheet, Text, TextInput, View
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,6 +21,7 @@ import PositionedImage from '../../components/PositionedImage';
 import CropWindow from '../../components/CropWindow';
 import PayoutsCard from '../../components/PayoutsCard';
 import ReferralCard from '../../components/ReferralCard';
+import { rememberStayInStream } from '../../lib/stayInStream';
 import MemberSupportCard from '../../components/MemberSupportCard';
 
 const GENDERS = [
@@ -181,6 +182,7 @@ export default function Account() {
     setDashboard(dash);
     setProfile(profileData ? { ...profileData, savedHandle: profileData.handle || '' } : profileData);
     if (profileData) updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
+    if (profileData) rememberStayInStream(!!profileData.stayInStream);
     setOriginalAge(profileData ? profileData.age ?? null : null);
   }
 
@@ -421,12 +423,14 @@ export default function Account() {
     const next = !(profile && profile.stayInStream);
     setProfile((p) => ({ ...p, stayInStream: next }));
     updateOwnProfileCache({ stayInStream: next });
+    rememberStayInStream(next);
     try {
       const token = await withToken();
       await apiPost('/api/account/profile', { stayInStream: next }, token);
     } catch {
       setProfile((p) => ({ ...p, stayInStream: !next }));
       updateOwnProfileCache({ stayInStream: !next });
+      rememberStayInStream(!next);
     }
   }
 
@@ -799,12 +803,17 @@ export default function Account() {
           {profile ? (
             <Row
               label="Here only for the stream?"
-              detail={profile.stayInStream ? 'On — Home takes you straight to Stream, skipping the Studio Tapa TV homepage.' : 'Off — Home shows the Studio Tapa TV homepage by default.'}
+              detail={profile.stayInStream ? 'On: the app opens on Stream, skipping the Studio Tapa TV homepage.' : 'Off: the app opens on the Studio Tapa TV homepage.'}
               divider
             >
-              <Pressable style={styles.btnSmall} onPress={toggleStayInStream}>
-                <Text style={styles.btnSmallText}>{profile.stayInStream ? 'Turn off' : 'Stay in the stream'}</Text>
-              </Pressable>
+              <Switch
+                value={!!profile.stayInStream}
+                onValueChange={toggleStayInStream}
+                trackColor={{ false: colors.surface3, true: colors.brass }}
+                thumbColor={colors.ink}
+                ios_backgroundColor={colors.surface3}
+                accessibilityLabel="Here only for the stream"
+              />
             </Row>
           ) : null}
         </View>
