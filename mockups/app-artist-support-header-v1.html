@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Artist Support Header Fix</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* Layout: today's screen and the fixed screen side by side as phones, then the list of screens the same fix covers. */
+  :root { --s0:#0c131f; --s1:#121c2d; --s2:#18243c; --ink:#fbe8d3; --dim:#cab59e; --faint:#b3a18c; --brass:#ff8c42; --olive:#f2c14e; --mint:#93d0a4; --sky:#8499dc; --red:#ef5b5b; --hair:rgba(251,232,211,.12);
+    --d:'Space Grotesk',sans-serif; --b:'Fraunces',serif; --m:'IBM Plex Mono',monospace; color-scheme:dark; }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--b); padding-block:28px 60px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); }
+  .wrap { max-width:900px; margin:0 auto; }
+  h1 { font-family:var(--d); font-size:1.5rem; margin:0 0 8px; text-wrap:balance; }
+  p.note { color:var(--dim); line-height:1.55; margin:0 0 20px; max-width:760px; }
+  .pair { display:grid; grid-template-columns:1fr 1fr; gap:22px; }
+  @media (max-width:720px) { .pair { grid-template-columns:1fr; } }
+  .lbl { font-family:var(--m); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; margin:0 0 8px; }
+  .lbl.bad { color:var(--red); } .lbl.good { color:var(--mint); }
+  .phone { width:100%; max-width:360px; height:720px; margin:0 auto; border-radius:34px; border:1px solid var(--hair); background:var(--s0); overflow:hidden; position:relative; }
+  .status { height:34px; display:flex; justify-content:space-between; align-items:center; padding:0 22px; font-family:var(--d); font-size:.8rem; }
+  .native { height:56px; background:var(--s1); display:flex; align-items:center; gap:14px; padding:0 12px; border-bottom:1px solid var(--hair); }
+  .native .bk { width:36px; height:36px; border-radius:50%; background:#9aa3b5; color:#111; display:flex; align-items:center; justify-content:center; font-size:1.1rem; }
+  .native span { font-family:-apple-system,system-ui,sans-serif; font-weight:600; font-size:.95rem; }
+  .gap { height:52px; background:var(--s0); outline:2px dashed rgba(239,91,91,.6); outline-offset:-6px; }
+  .top { display:flex; justify-content:space-between; align-items:center; padding:10px 16px; background:var(--s1); border-bottom:1px solid var(--hair); }
+  .logo { font-family:var(--d); font-size:1.1rem; } .logo b { color:var(--brass); font-weight:500; }
+  .logo small { display:block; font-family:var(--m); font-size:.56rem; letter-spacing:.14em; color:var(--mint); }
+  .av { width:26px; height:26px; border-radius:50%; background:linear-gradient(135deg,#8a6d3b,#3a2a1a); }
+  .body { padding:12px 16px 120px; }
+  .back { font-family:var(--m); font-size:.72rem; color:var(--olive); }
+  .kick { font-family:var(--m); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); margin-top:10px; }
+  .h { font-family:var(--d); font-weight:700; font-size:1.35rem; line-height:1.1; margin:4px 0 8px; }
+  .lede { font-size:.82rem; line-height:1.45; color:var(--dim); margin:0 0 12px; }
+  .card { background:var(--s1); border:1px solid var(--hair); border-radius:6px; padding:14px; }
+  .sub { font-family:var(--m); font-size:.62rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brass); }
+  .ttl { font-family:var(--d); font-weight:700; font-size:1.15rem; margin:4px 0 8px; }
+  .amt { font-family:var(--d); font-weight:700; font-size:1.4rem; }
+  .bar { height:7px; border-radius:4px; background:var(--s2); margin:10px 0 6px; }
+  .tabs { position:absolute; left:10px; right:10px; bottom:14px; display:flex; justify-content:space-around; align-items:center; background:rgba(41,39,25,.96); border-radius:999px; padding:6px; }
+  .tab { font-family:var(--m); font-size:.54rem; letter-spacing:.1em; text-transform:uppercase; padding:9px 10px; border-radius:999px; }
+  .tab.on { background:var(--brass); color:#241a05; } .tab.d { color:var(--sky); }
+  .callout { position:absolute; font-family:var(--m); font-size:.62rem; color:#fff; background:var(--red); border-radius:6px; padding:3px 7px; }
+  ul { color:var(--dim); line-height:1.6; padding-left:18px; }
+  ul b { color:var(--ink); }
+  code { font-family:var(--m); font-size:.84em; color:var(--olive); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Artist Support on the phone: drop the extra header</h1>
+  <p class="note">The screen was never told to hide the app's built-in navigation bar, so it draws three things on top of each other: a grey system bar titled with the raw route name <code>account/artist-support</code>, an empty band where that bar's safe-area space is counted twice, and then the real Studio Tapa top bar. The fix removes the system bar on this screen (and four others with the same miss) so it opens like Account does. The blue gear in your screenshot is Expo Go's developer button; it isn't part of the app and won't be in a real build.</p>
+  <div class="pair">
+    <div>
+      <div class="lbl bad">Today</div>
+      <div class="phone">
+        <div class="status"><span>7:18</span><span>●●● 96</span></div>
+        <div class="native"><div class="bk">‹</div><span>account/artist-support</span></div>
+        <div class="gap"></div>
+        <div class="top"><div class="logo">Studio <b>Tapa</b><small>CONNECT</small></div><div class="av"></div></div>
+        <div class="body">
+          <div class="back">← Account</div>
+          <div class="kick">Membership</div>
+          <div class="h">Membership Artist Support</div>
+          <p class="lede">Part of every paid membership goes to the people who make what's on Studio Tapa TV…</p>
+          <div class="card"><div class="sub">Your creators</div><div class="ttl">0 of 10 picked</div><div class="amt">$0.00</div><div class="bar"></div></div>
+        </div>
+        <span class="callout" style="top:48px;right:16px">system bar, route name</span>
+        <span class="callout" style="top:104px;right:16px">empty band</span>
+        <div class="tabs"><span class="tab">Home</span><span class="tab d">Discover</span><span class="tab">Watch</span><span class="tab on">Account</span></div>
+      </div>
+    </div>
+    <div>
+      <div class="lbl good">After</div>
+      <div class="phone">
+        <div class="status"><span>7:18</span><span>●●● 96</span></div>
+        <div class="top"><div class="logo">Studio <b>Tapa</b><small>CONNECT</small></div><div class="av"></div></div>
+        <div class="body">
+          <div class="back">← Account</div>
+          <div class="kick">Membership</div>
+          <div class="h">Membership Artist Support</div>
+          <p class="lede">Part of every paid membership goes to the people who make what's on Studio Tapa TV. Pick up to 10 creators and your share goes to them. Pick nobody and it follows what you watch.</p>
+          <div class="card"><div class="sub">Your creators</div><div class="ttl">0 of 10 picked</div><div class="amt">$0.00</div><div class="bar"></div><div style="font-family:var(--m);font-size:.6rem;color:var(--faint)">Nothing picked · your share follows what you watch</div></div>
+        </div>
+        <div class="tabs"><span class="tab">Home</span><span class="tab d">Discover</span><span class="tab">Watch</span><span class="tab on">Account</span></div>
+      </div>
+    </div>
+  </div>
+  <h1 style="margin-top:32px;font-size:1.15rem">Same miss, same fix</h1>
+  <ul>
+    <li><b>Artist Support</b> (Account → Artist Support)</li>
+    <li><b>Your pitches</b> and <b>Submit a project</b> (creator screens)</li>
+    <li><b>Your Numbers</b> (creator analytics)</li>
+    <li><b>My Recs</b></li>
+  </ul>
+  <p class="note">One line each in the app's router file. The "← Account" link stays as the way back; the swipe-back gesture keeps working. Nothing changes on the website.</p>
+</div>
+</body>
+</html>
