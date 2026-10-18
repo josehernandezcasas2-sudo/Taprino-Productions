@@ -82,6 +82,8 @@ export default function YourNumbers() {
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const [days, setDays] = useState(30);
+  // Bumped by "Try again" so the load below runs again for the same range.
+  const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState({ loading: false, error: null, data: null });
@@ -101,7 +103,7 @@ export default function YourNumbers() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isLoaded, isSignedIn, getToken, days]);
+  }, [isLoaded, isSignedIn, getToken, days, reloadKey]);
 
   const toggleEpisode = useCallback(async (episodeId) => {
     if (selectedId === episodeId) {
@@ -141,7 +143,7 @@ export default function YourNumbers() {
       <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
         <TopNav />
         <Text style={styles.p}>{needsRole ? 'Your numbers are for creators. Apply once and your account unlocks them.' : state.error}</Text>
-        <Pressable style={styles.btnPrimary} onPress={() => (needsRole ? router.push('/apply') : setDays((d) => d))}><Text style={styles.btnPrimaryText}>{needsRole ? 'Apply to be a creator' : 'Try again'}</Text></Pressable>
+        <Pressable style={styles.btnPrimary} onPress={() => (needsRole ? router.push('/apply') : setReloadKey((k) => k + 1))}><Text style={styles.btnPrimaryText}>{needsRole ? 'Apply to be a creator' : 'Try again'}</Text></Pressable>
       </SafeAreaView>
     );
   }
