@@ -3,6 +3,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   ChatIcon, ClapperboardIcon, ClockIcon, CloseIcon, EyeIcon, ExternalLinkIcon,
   HeadphonesIcon, ImageIcon, LinkIcon, PencilIcon, SettingsIcon, TrashIcon, UndoIcon, WarningIcon
@@ -31,9 +32,13 @@ const CF_STATE_LABEL = {
 
 const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
+// The same path is a native screen in the app (episode/[id], podcasts/[id])
+// and the public page on the site (for "Copy public link").
+function publicPathFor(s) {
+  return s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
+}
 function publicUrlFor(s) {
-  const path = s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
-  return `${SITE_ORIGIN}${path}`;
+  return `${SITE_ORIGIN}${publicPathFor(s)}`;
 }
 
 // Mirrors pages/creator/my-work.js — same stats dashboard, same grouped/
@@ -44,7 +49,10 @@ function publicUrlFor(s) {
 // modal all open the website instead — each of those is really its own
 // file-picker + upload flow (or, for the admin modal, a dense multi-field
 // form) that deserves its own pass rather than being squeezed in here.
+// Numbers and the public page are native screens; submitting a new
+// episode has no app screen yet, so that still opens the website.
 export default function MyWork() {
+  const router = useRouter();
   const { getToken } = useAuth();
   const [feedState, setFeedState] = useState({ loading: true, error: null, forbidden: false, submissions: null });
   const [statusFilter, setStatusFilter] = useState('all');
@@ -226,7 +234,7 @@ export default function MyWork() {
           </Pressable>
         </View>
 
-        <Pressable onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/analytics`)}>
+        <Pressable onPress={() => router.push('/creator/numbers')}>
           <Text style={styles.analyticsLink}>Want to see how they're doing? View your numbers →</Text>
         </Pressable>
 
@@ -359,6 +367,7 @@ export default function MyWork() {
               onDelete={(item) => { setActionSheet(null); setDeleteModal(item); setDeleteReason(''); setDeleteError(null); }}
               onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
               onCopyLink={copyPublicLink}
+              onOpenPublic={(item) => { setActionSheet(null); router.push(publicPathFor(item)); }}
               copiedId={copiedId}
             /> : null}
           </Pressable>
@@ -417,7 +426,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, copiedId }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, copiedId }) {
   const { type, item } = actionSheet;
   if (type === 'series') {
     return (
@@ -440,7 +449,7 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
       <Text style={styles.sheetTitle} numberOfLines={1}>{s.title}</Text>
       {s.status === 'approved' ? (
         <>
-          <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(publicUrlFor(s))}>
+          <Pressable style={styles.sheetRow} onPress={() => onOpenPublic(s)}>
             <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>View public page</Text>
           </Pressable>
           <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
