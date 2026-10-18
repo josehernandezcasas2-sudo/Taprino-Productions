@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -90,13 +90,16 @@ export default function ArtistSupport() {
     return () => { cancelled = true; clearTimeout(timer.current); };
   }, [query, state.loading, state.signedOut]);
 
+  // `mode` is Clerk's HostedAuthMode: 'sign-in' | 'sign-up'.
   async function handleStartAuth(mode) {
     setBusyAuth(true);
     try {
       await startHostedAuth({ mode });
       load();
-    } catch {
-      // Stay on the sign-in prompt.
+    } catch (err) {
+      // Stay on the sign-in prompt, but say why (a cancel isn't an error:
+      // Clerk returns createdSessionId: null for that).
+      Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {
       setBusyAuth(false);
     }
@@ -160,8 +163,8 @@ export default function ArtistSupport() {
           <Text style={styles.h1}>Membership Artist Support</Text>
           <Text style={styles.lede}>Part of every paid membership goes to the people who make what's on Studio Tapa TV. Sign in to choose up to {MAX_PICKS} creators your share goes to.</Text>
           <View style={styles.authRow}>
-            <Pressable style={[styles.btnPrimary, busyAuth && { opacity: 0.6 }]} onPress={() => handleStartAuth('signIn')} disabled={busyAuth}><Text style={styles.btnPrimaryText}>Sign in</Text></Pressable>
-            <Pressable style={[styles.btnSmall, busyAuth && { opacity: 0.6 }]} onPress={() => handleStartAuth('signUp')} disabled={busyAuth}><Text style={styles.btnSmallText}>Create account</Text></Pressable>
+            <Pressable style={[styles.btnPrimary, busyAuth && { opacity: 0.6 }]} onPress={() => handleStartAuth('sign-in')} disabled={busyAuth}><Text style={styles.btnPrimaryText}>Sign in</Text></Pressable>
+            <Pressable style={[styles.btnSmall, busyAuth && { opacity: 0.6 }]} onPress={() => handleStartAuth('sign-up')} disabled={busyAuth}><Text style={styles.btnSmallText}>Create account</Text></Pressable>
           </View>
         </View>
       </SafeAreaView>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
@@ -58,7 +58,8 @@ export default function Wishlist() {
       await startHostedAuth({ mode });
       load();
     } catch (err) {
-      // Swallow — the screen just stays on the sign-in prompt.
+      // The screen stays on the sign-in prompt; say why.
+      Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {
       setBusyMode(null);
     }
