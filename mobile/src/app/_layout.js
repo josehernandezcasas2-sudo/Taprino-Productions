@@ -90,6 +90,11 @@ export default function RootLayout() {
           <Stack.Screen name="account/index" options={{ headerShown: false }} />
           <Stack.Screen name="account/wishlist" options={{ headerShown: false }} />
           <Stack.Screen name="account/my-work" options={{ headerShown: false }} />
+          <Stack.Screen name="account/artist-support" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/pitches" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/pitch-new" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/numbers" options={{ headerShown: false }} />
+          <Stack.Screen name="recs" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
           <Stack.Screen name="apply" options={{ title: 'Become a creator' }} />
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
