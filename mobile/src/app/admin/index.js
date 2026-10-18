@@ -19,7 +19,7 @@ export default function AdminHome() {
   const router = useRouter();
   const { getToken } = useAuth();
   const role = useAdminRole();
-  const [state, setState] = useState({ loading: true, error: null, counts: null, stats: null });
+  const [state, setState] = useState({ loading: true, error: null, counts: null, byKind: null, stats: null });
   const [refreshing, setRefreshing] = useState(false);
 
   async function withToken() {
@@ -29,13 +29,16 @@ export default function AdminHome() {
   async function load() {
     try {
       const token = await withToken();
-      const [counts, stats] = await Promise.all([
+      // queue-counts only splits out channel uploads; the review queue
+      // itself carries a count per kind (submission/ad/series/channel/location).
+      const [counts, queue, stats] = await Promise.all([
         apiGet('/api/admin/queue-counts', token),
+        apiGet('/api/admin/review-queue', token).catch(() => null),
         apiGet('/api/admin/stats', token).catch(() => null)
       ]);
-      setState({ loading: false, error: null, counts, stats });
+      setState({ loading: false, error: null, counts, byKind: queue ? queue.counts : null, stats });
     } catch (err) {
-      setState({ loading: false, error: err.message, counts: null, stats: null });
+      setState({ loading: false, error: err.message, counts: null, byKind: null, stats: null });
     }
   }
 
@@ -47,12 +50,15 @@ export default function AdminHome() {
     setRefreshing(false);
   }
 
-  const { counts, stats } = state;
+  const { counts, byKind, stats } = state;
+  // Places are full-admin only (the queue leaves them out for sub-admins).
   const queues = counts ? [
-    { key: 'submission', title: 'Submissions', sub: 'Episodes & shorts', n: counts.review - (counts.channel || 0), kind: 'submission' },
+    { key: 'submission', title: 'Submissions', sub: 'Episodes & shorts', n: byKind ? byKind.submission || 0 : 0, kind: 'submission' },
     { key: 'channel', title: 'Channel uploads', sub: 'For the live channels', n: counts.channel || 0, kind: 'channel' },
+    ...(role.isAdmin ? [{ key: 'location', title: 'Places', sub: 'New and re-verified Locations listings', n: byKind ? byKind.location || 0 : 0, kind: 'location' }] : []),
     { key: 'flags', title: 'Flags & reports', sub: 'Opens the web admin', n: counts.flags || 0, web: '/admin/content', warn: true }
   ] : [];
+  const adsAndSeries = byKind ? (byKind.ad || 0) + (byKind.series || 0) : 0;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -99,7 +105,7 @@ export default function AdminHome() {
 
             <Text style={styles.sectionLabel}>On the web</Text>
             {[
-              ['Ads & new series', 'Ads need a billing rate; series need a look at artwork', '/admin/review'],
+              ['Ads & new series', `${adsAndSeries ? `${adsAndSeries} waiting · ` : ''}Ads need a billing rate; series need a look at artwork`, '/admin/review'],
               ['Library & queues', 'Artwork, edits, deletions, orphaned media', '/admin/library'],
               ['Styles & Guides', 'Colors, icons, type', '/admin/styles'],
               ['Everything else', 'Settings, people, channels, ads', '/admin']
