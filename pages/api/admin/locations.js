@@ -53,6 +53,12 @@ export async function handleLocationsAdmin(req, res, account) {
     }
     if (req.method === 'POST') {
       const { op, requestId, locationId, reason, outcome, note } = req.body || {};
+      // These move money and can't be undone: full admins only, the same
+      // as Pitch Room refunds. Sub-admins with handle_flags still see the
+      // page, settle outcomes and pause or remove places.
+      if ((op === 'refund' || op === 'cancel') && !account.isAdmin) {
+        return res.status(403).json({ error: 'Only a full admin can refund or cancel a booking, since that moves money.' });
+      }
       if (op === 'refund') {
         const result = await refundBooking(rc, requestId, reason);
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'location_booking_refunded', targetType: 'location_request', targetId: requestId, details: reason || null });
