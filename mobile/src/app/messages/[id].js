@@ -30,8 +30,14 @@ export default function Conversation() {
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const isNew = id === 'new';
-  const tokenRef = useRef(null);
   const scrollRef = useRef(null);
+  // The poll reads these instead of state, so a new message doesn't tear
+  // the timer down and reload the whole thread: the newest message's time
+  // (the poll's `since`), whether the first load has landed, and whether a
+  // poll is still on the wire.
+  const lastAtRef = useRef(null);
+  const loadedRef = useRef(false);
+  const pollingRef = useRef(false);
   const [state, setState] = useState({ loading: true, error: null, thread: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -40,10 +46,12 @@ export default function Conversation() {
 
   // A fresh token for every request (poll, send, mute, block, report): one
   // kept from when the thread opened expires after about a minute.
-  const token = async () => {
-    tokenRef.current = await freshToken(getToken);
-    return tokenRef.current;
-  };
+  const token = () => freshToken(getToken);
+
+  useEffect(() => {
+    const m = state.messages;
+    lastAtRef.current = m.length ? m[m.length - 1].createdAt : null;
+  }, [state.messages]);
 
   const load = useCallback(async () => {
     if (!signedIn) { setState((s) => ({ ...s, loading: false })); return; }
@@ -57,6 +65,7 @@ export default function Conversation() {
       } else {
         const data = await apiGet(`/api/messages/${id}`, t);
         setState({ loading: false, error: null, thread: data.thread, messages: data.messages });
+        loadedRef.current = true;
         bumpUnread(getToken);
       }
     } catch (err) {
@@ -64,21 +73,27 @@ export default function Conversation() {
     }
   }, [signedIn, id, to, kind, label]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load once per focus, then poll for anything newer than the last
+  // message we have. Only focus/sign-in/thread changes restart this.
   useFocusEffect(useCallback(() => {
+    loadedRef.current = false;
     load();
-    if (isNew) return undefined;
+    if (isNew || !signedIn) return undefined;
     const timer = setInterval(async () => {
-      if (!tokenRef.current) return;
+      if (!loadedRef.current || pollingRef.current) return;
+      pollingRef.current = true;
       try {
-        const last = state.messages.length ? state.messages[state.messages.length - 1].createdAt : null;
+        const last = lastAtRef.current;
         const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, await token());
         if (data.messages && data.messages.length) {
           setState((s) => ({ ...s, messages: [...s.messages, ...data.messages.filter((m) => !s.messages.some((x) => x.id === m.id))] }));
         }
-      } catch (err) { /* next tick */ }
+      } catch (err) { /* next tick */ } finally {
+        pollingRef.current = false;
+      }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [load, id, isNew, state.messages.length])); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, id, isNew, signedIn])); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (scrollRef.current) setTimeout(() => scrollRef.current && scrollRef.current.scrollToEnd({ animated: true }), 50);
