@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount } from '../../../lib/adAccounts';
 import { redeemAdCreditCode } from '../../../lib/adCreditCodes';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -16,6 +17,11 @@ export default async function handler(req, res) {
   const account = await getOwnAdAccount(userId);
   if (!account) {
     return res.status(403).json({ error: 'Create an ad account first.' });
+  }
+
+  // Per account: enough for typos, not enough to guess a code.
+  if (!(await checkRateLimit(`ratelimit:redeem-ad-credit:${userId}`, 10, 3600))) {
+    return res.status(429).json({ error: 'Too many tries. Wait an hour and check the code again.' });
   }
 
   const { code } = req.body || {};

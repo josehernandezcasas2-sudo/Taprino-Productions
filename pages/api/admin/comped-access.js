@@ -1,5 +1,6 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
+import { likeLiteral } from '../../../lib/likeLiteral';
 import { recordAudit } from '../../../lib/auditLog';
 
 // GET  -> list the current invite list
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
     if (!email) {
       return res.status(400).json({ error: 'email is required.' });
     }
-    const { error } = await supabase.from('comped_access').delete().ilike('email', email);
+    const { error } = await supabase.from('comped_access').delete().ilike('email', likeLiteral(email));
     if (error) {
       console.error('comped-access DELETE error:', error.message);
       return res.status(500).json({ error: 'Could not remove that email.' });
