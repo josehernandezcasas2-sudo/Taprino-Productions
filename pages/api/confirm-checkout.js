@@ -25,6 +25,9 @@ export default async function handler(req, res) {
     console.error('confirm-checkout error:', err.message);
   }
 
-  res.writeHead(302, { Location: '/?welcome=1' });
+  // Joined from the account page: land back there (the only other
+  // destination is the home page, so nothing else can be asked for here).
+  const to = req.query.to === 'account' ? '/account' : '/';
+  res.writeHead(302, { Location: `${to}?welcome=1` });
   res.end();
 }

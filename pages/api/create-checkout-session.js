@@ -101,7 +101,7 @@ export default async function handler(req, res) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back === '/account' ? '&to=account' : ''}`,
       // From the account page (web or app) land back on it; the in-app
       // browser then closes and the screen re-reads membership.
       cancel_url: `${origin}${back}?checkout=cancelled`,
