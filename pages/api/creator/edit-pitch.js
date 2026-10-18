@@ -4,7 +4,9 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 
-const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingRaised', 'fundingDeadline', 'team', 'photos'];
+// funding_raised isn't here: with real backing it's counted from paid
+// donations, never typed in.
+const EDITABLE_FIELDS = ['title', 'logline', 'description', 'projectUrl', 'tag', 'fundingGoal', 'fundingDeadline', 'team', 'photos'];
 const FIELD_TO_COLUMN = { projectUrl: 'project_url', fundingGoal: 'funding_goal', fundingRaised: 'funding_raised', fundingDeadline: 'funding_deadline' };
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
@@ -33,7 +35,7 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
-  const { data: existing, error: fetchError } = await supabase.from('pitches').select('created_by').eq('id', pitchId).maybeSingle();
+  const { data: existing, error: fetchError } = await supabase.from('pitches').select('created_by, status').eq('id', pitchId).maybeSingle();
   if (fetchError || !existing) {
     return res.status(404).json({ error: 'Pitch not found.' });
   }
@@ -42,6 +44,12 @@ export default async function handler(req, res) {
   // someone else's project.
   if (existing.created_by !== userId) {
     return res.status(403).json({ error: 'You can only edit your own pitches.' });
+  }
+  // Only before review: an approved pitch rewritten here would go live
+  // without anyone looking at it. Changes after approval go through a
+  // pitch update on the dashboard.
+  if (existing.status !== 'pending') {
+    return res.status(409).json({ error: 'This pitch has been reviewed, so it can’t be edited here. Post an update from your Pitch Room dashboard instead.' });
   }
 
   if (fields.tag && !PITCH_TAGS.includes(fields.tag)) {
