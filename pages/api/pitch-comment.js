@@ -1,4 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
+import { checkRateLimit } from '../../lib/rateLimit';
 import { getSupabase } from '../../lib/supabase';
 import { getPitchById } from '../../lib/pitches';
 
@@ -21,6 +22,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
+    // Per account: plenty for a conversation, not for a flood.
+    if (!(await checkRateLimit(`pitch-comment:${userId}`, 30, 3600))) {
+      return res.status(429).json({ error: 'That’s a lot of comments for one hour. Try again a bit later.' });
+    }
     const { pitchId, body, parentCommentId } = req.body || {};
     if (!pitchId || typeof body !== 'string' || !body.trim()) {
       return res.status(400).json({ error: 'A comment body is required.' });
