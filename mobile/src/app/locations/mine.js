@@ -42,7 +42,10 @@ export default function MyLocations() {
       setBusy(l.id);
       try {
         const d = await apiPatch(`/api/locations/${l.id}`, { status }, await resolveToken(getToken));
-        setState((s) => ({ ...s, listings: status === 'removed' ? s.listings.filter((x) => x.id !== l.id) : s.listings.map((x) => (x.id === l.id ? { ...x, ...d.listing } : x)) }));
+        // A status change answers with the listing itself (not { listing }),
+        // or { ok, status } for a removal; fall back to the status we asked for.
+        const listing = d && d.id ? d : d && d.listing ? d.listing : { status };
+        setState((s) => ({ ...s, listings: status === 'removed' ? s.listings.filter((x) => x.id !== l.id) : s.listings.map((x) => (x.id === l.id ? { ...x, ...listing } : x)) }));
       } catch (err) {
         Alert.alert('Could not change that', err.message);
       } finally {
