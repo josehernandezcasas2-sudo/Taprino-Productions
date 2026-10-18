@@ -272,7 +272,7 @@ export default function ManualEpisodeForm({ allSeries, standaloneEpisodes, onCre
       )}
 
       {existingDraft && !draftApplied && (
-        <div className="account-card" style={{ maxWidth: 'none', background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)' }}>
+        <div className="account-card" style={{ maxWidth: 'none', background: 'rgba(var(--brass-rgb),0.1)', border: '1px solid rgba(var(--brass-rgb),0.3)' }}>
           <p style={{ margin: '0 0 0.8rem' }}>You have an unsaved draft of an episode submission. Resume where you left off?</p>
           <button className="account-btn-primary" type="button" style={{ width: 'auto', marginRight: '0.6rem' }} onClick={resumeDraft}>Resume draft</button>
           <button className="account-btn-secondary" type="button" style={{ width: 'auto' }} onClick={dismissDraft}>Start fresh</button>

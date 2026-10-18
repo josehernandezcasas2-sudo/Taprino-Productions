@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
   projectSub: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
   projectBadges: { gap: 4, alignItems: 'flex-end' },
   badge: { fontSize: 9, fontWeight: '700', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 999, overflow: 'hidden' },
-  badgePending: { color: colors.olive, backgroundColor: 'rgba(231,162,85,0.15)' },
+  badgePending: { color: colors.olive, backgroundColor: 'rgba(242,193,78,0.15)' },
   badgeMissing: { color: colors.danger, backgroundColor: 'rgba(226,116,90,0.15)' },
 
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline },

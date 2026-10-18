@@ -110,7 +110,7 @@ export default function AdminAdAccounts({ account, mainGenres }) {
                           fontWeight: 'bold',
                           padding: '0.2rem 0.55rem',
                           borderRadius: '999px',
-                          background: account.status === 'active' ? 'rgba(46,204,113,0.15)' : 'rgba(248,95,115,0.15)',
+                          background: account.status === 'active' ? 'rgba(46,204,113,0.15)' : 'rgba(var(--brass-rgb),0.15)',
                           color: account.status === 'active' ? 'var(--ok)' : 'var(--danger)'
                         }}
                       >

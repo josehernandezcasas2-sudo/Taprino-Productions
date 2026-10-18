@@ -86,7 +86,7 @@ export default function RatingsAdmin({ account, mainGenres }) {
               channel player shows top-left for a few seconds as a program starts. Upload a PNG for each rating;
               until one is there the player shows the code as text.
             </p>
-            <div style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+            <div style={{ background: 'rgba(var(--brass-rgb),0.1)', border: '1px solid rgba(var(--brass-rgb),0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
               <strong>PNG guidelines:</strong> use the standard TV Parental Guidelines and MPAA bugs, as transparent PNGs,
               at least 200px tall (they show at about a tenth of the player&rsquo;s height, bigger in fullscreen). White or
               light artwork reads best over video; a thin dark edge or shadow in the file helps on bright scenes.

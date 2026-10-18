@@ -66,7 +66,7 @@ export default function ListingScreen() {
         {l ? (
           <>
             {l.mine ? (
-              <View style={[crew.panel, { borderColor: 'rgba(231,162,85,0.5)', marginTop: 10 }]}>
+              <View style={[crew.panel, { borderColor: 'rgba(242,193,78,0.5)', marginTop: 10 }]}>
                 <View style={[crew.row, { flexWrap: 'wrap' }]}><StatusPill status={l.status} /><Text style={crew.meta}>This is how producers see your place.</Text></View>
                 <View style={crew.row}>
                   <Pressable style={crew.btnSm} onPress={() => router.push(`/locations/new?edit=${l.id}`)}><Text style={crew.btnSmText}>Edit</Text></Pressable>
@@ -115,7 +115,7 @@ export default function ListingScreen() {
             {!l.mine ? (signedIn
               ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} token={getToken} onDone={(r) => router.push(`/locations/requests/${r.id}`)} />
               : (
-                <View style={[crew.panel, { borderColor: 'rgba(248,95,115,0.45)' }]}>
+                <View style={[crew.panel, { borderColor: 'rgba(255,140,66,0.45)' }]}>
                   <Text style={crew.label}>Request to book</Text>
                   <Text style={crew.muted}>Pick dates, say what you’re shooting, pay the posted rate or make an offer. Nothing is charged until the host accepts.</Text>
                   <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push('/account')}><Text style={[crew.btnText, crew.btnPrimaryText]}>Sign in to request dates</Text></Pressable>
@@ -226,7 +226,7 @@ function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) 
   const first = l.host.displayName.split(' ')[0];
   const canSend = dates.from && days <= MAX_DAYS && form.shooting.trim().length >= 3 && (form.pricing !== 'offer' || Number(form.offer) > 0) && !busy;
   return (
-    <View style={[crew.panel, { borderColor: 'rgba(248,95,115,0.45)' }]}>
+    <View style={[crew.panel, { borderColor: 'rgba(255,140,66,0.45)' }]}>
       <Text style={crew.label}>Request to book</Text>
       <Text style={crew.mono}>{dates.from ? `${fmtRange(dates.from, endsOn)} · ${days} ${days === 1 ? 'day' : 'days'}` : 'Pick your dates on the calendar above.'}</Text>
       <Text style={crew.label}>Hours (HH:MM)</Text>

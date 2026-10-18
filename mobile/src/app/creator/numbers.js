@@ -49,7 +49,7 @@ function Sparkline({ trend }) {
   return (
     <View style={styles.chart}>
       <Svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-        <Path d={area} fill="rgba(248,95,115,0.16)" />
+        <Path d={area} fill="rgba(255,140,66,0.16)" />
         <Path d={line} stroke={colors.brass} strokeWidth={2.5} fill="none" />
       </Svg>
       <View style={styles.axis}>
@@ -255,7 +255,7 @@ const styles = StyleSheet.create({
   pillOn: { backgroundColor: colors.brass, borderColor: colors.brass },
   pillText: { fontFamily: fonts.displaySemi, fontSize: 12.5, color: colors.ink },
   pillTextOn: { color: PAPER },
-  notice: { backgroundColor: 'rgba(231,162,85,0.1)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.35)', borderRadius: 6, padding: 12, marginBottom: 14 },
+  notice: { backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.35)', borderRadius: 6, padding: 12, marginBottom: 14 },
   noticeText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink },
   stats: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 10 },
   stat: { flexBasis: '47%', flexGrow: 1, backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 4, padding: 14 },
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   axis: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 },
   axisText: { fontFamily: fonts.mono, fontSize: 10, color: colors.inkDim },
   row: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 4, padding: 14, marginBottom: 10 },
-  rowOn: { borderColor: 'rgba(248,95,115,0.5)' },
+  rowOn: { borderColor: 'rgba(255,140,66,0.5)' },
   rowHead: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginBottom: 6 },
   rowTitle: { flex: 1, fontFamily: fonts.displayBold, fontSize: 15, color: colors.ink },
   rowEp: { fontFamily: fonts.body, color: colors.inkDim },

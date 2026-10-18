@@ -219,5 +219,5 @@ function Endorse({ line, setLine, onSend, onSkip, busy, who }) {
 const styles = StyleSheet.create({
   resp: { gap: 8, backgroundColor: colors.surface2, borderRadius: 10, padding: 10 },
   respBooked: { borderWidth: 1, borderColor: 'rgba(132,205,152,0.5)' },
-  outcome: { gap: 6, padding: 8, borderRadius: 8, backgroundColor: 'rgba(231,162,85,0.1)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.35)' }
+  outcome: { gap: 6, padding: 8, borderRadius: 8, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.35)' }
 });

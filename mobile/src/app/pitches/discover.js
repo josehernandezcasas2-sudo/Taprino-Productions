@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
 
   // The round-2 explainer and the held lamp share the cab's top strip;
   // they never show at the same time (held is round 1 only).
-  roundTag: { position: 'absolute', top: 10, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.olive, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.4)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
+  roundTag: { position: 'absolute', top: 10, alignSelf: 'center', zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.olive, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.4)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
   holdLamp: { position: 'absolute', top: 10, right: 10, zIndex: 7, fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.2, color: colors.mint, backgroundColor: 'rgba(12,19,31,0.6)', borderWidth: 1, borderColor: 'rgba(147,208,164,0.5)', borderRadius: 4, paddingVertical: 3, paddingHorizontal: 7, overflow: 'hidden' },
 
   // The card sits in the room left of the plate (84px: ring + plate

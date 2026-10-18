@@ -165,7 +165,7 @@ export default function AdvertiserAdForm({ onSubmitted }) {
       </p>
 
       {existingDraft && !draftApplied && (
-        <div className="account-card" style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', marginBottom: '1rem' }}>
+        <div className="account-card" style={{ background: 'rgba(var(--brass-rgb),0.1)', border: '1px solid rgba(var(--brass-rgb),0.3)', marginBottom: '1rem' }}>
           <p style={{ margin: '0 0 0.8rem' }}>You have an unfinished ad. Resume where you left off?</p>
           <p style={{ margin: '0 0 0.8rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
             The video file itself couldn&rsquo;t be saved — you&rsquo;ll need to choose it again, but

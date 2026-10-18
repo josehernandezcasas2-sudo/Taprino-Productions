@@ -5,7 +5,7 @@ import { GEAR_FLAGS } from '../../lib/crewOptions';
 // Small pieces shared by /crew, /crew/card and the profile page's
 // "Working card" section. Styles are the .crew-* block in globals.css.
 
-const AVATAR_COLORS = ['#f85f73', '#e7a255', '#93d0a4', '#8499dc', '#c85924', '#f2bf88', '#d67c51', '#84cd98'];
+const AVATAR_COLORS = ['#ff8c42', '#f2c14e', '#93d0a4', '#8499dc', '#c85924', '#f8d98a', '#ef5b5b', '#84cd98'];
 
 function colorFor(id) {
   let h = 0;

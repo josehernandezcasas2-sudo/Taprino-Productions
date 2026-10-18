@@ -369,7 +369,7 @@ export default function AdManagerDashboard({ adAccount: initialAdAccount, ads: i
                   </div>
 
                   {ad.reviewStatus === 'rejected' && ad.rejectionReason && (
-                    <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.3rem', padding: '0.5rem 0.7rem', background: 'rgba(248,95,115,0.08)', borderRadius: '6px' }}>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--danger)', marginTop: '0.3rem', padding: '0.5rem 0.7rem', background: 'rgba(var(--brass-rgb),0.08)', borderRadius: '6px' }}>
                       {ad.rejectionReason}
                     </div>
                   )}

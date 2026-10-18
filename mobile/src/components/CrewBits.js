@@ -9,7 +9,7 @@ import PositionedImage from './PositionedImage';
 // profile screen's "Working card" block. Mirrors components/crew/CrewBits.js
 // on the website; vocabularies come from /api/crew/options.
 
-const AVATAR_COLORS = ['#f85f73', '#e7a255', '#93d0a4', '#8499dc', '#c85924', '#f2bf88', '#d67c51', '#84cd98'];
+const AVATAR_COLORS = ['#ff8c42', '#f2c14e', '#93d0a4', '#8499dc', '#c85924', '#f8d98a', '#ef5b5b', '#84cd98'];
 export const GEAR_FLAGS = { brings: 'Brings it to set', lends: 'Open to lending', ask: 'Ask' };
 export const WITHIN_CHOICES = [10, 25, 50, 100, 0];
 export const DEFAULT_WITHIN = 50;
@@ -317,7 +317,7 @@ export const crew = StyleSheet.create({
   chipText: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkDim },
   chipOnText: { color: colors.ink },
   chipRole: { backgroundColor: 'rgba(132,153,220,0.18)', color: colors.sky },
-  chipGear: { backgroundColor: 'rgba(231,162,85,0.16)', color: colors.olive },
+  chipGear: { backgroundColor: 'rgba(242,193,78,0.16)', color: colors.olive },
   chipOk: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
   chipMute: { backgroundColor: colors.surface3, color: colors.inkFaint },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
@@ -351,7 +351,7 @@ export const crew = StyleSheet.create({
   tierDot: { width: 6, height: 6, borderRadius: 3 },
   tierText: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.6 },
   payPaid: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
-  payDeferred: { backgroundColor: 'rgba(231,162,85,0.16)', color: colors.olive },
+  payDeferred: { backgroundColor: 'rgba(242,193,78,0.16)', color: colors.olive },
   payUnpaid: { backgroundColor: colors.surface3, color: colors.inkDim }
 });
 

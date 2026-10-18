@@ -98,7 +98,7 @@ const styles = StyleSheet.create({
   stat: { flexBasis: '47%', flexGrow: 1, backgroundColor: colors.surface2, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12 },
   statNum: { fontFamily: fonts.displayBold, fontSize: 20, color: colors.ink },
   statLabel: { fontFamily: fonts.mono, fontSize: 10, color: colors.inkFaint, marginTop: 2 },
-  next: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(231,162,85,0.45)', borderRadius: 6, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10 },
+  next: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(242,193,78,0.45)', borderRadius: 6, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 10 },
   nextLabel: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint },
   nextAmount: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.oliveBright, marginTop: 4, marginBottom: 2, fontVariant: ['tabular-nums'] },
   nextDetail: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17, color: colors.inkDim },

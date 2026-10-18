@@ -30,7 +30,7 @@ const TAP_THRESHOLD = 6;
 // --elev-steel-* custom properties; the lamp is the site's olive.
 const steel = { s0: '#1a2338', s1: '#2b3852', s2: '#3d4b6a', s3: '#5a6a8d', hi: '#8c9bbd' };
 const LAMP = colors.olive;
-const LAMP_GLOW = 'rgba(231,162,85,0.55)';
+const LAMP_GLOW = 'rgba(242,193,78,0.55)';
 const easeDoors = Easing.bezier(0.4, 0, 0.2, 1);
 
 // ---------- Icons (color passed in, like currentColor on the web) ----------
@@ -124,7 +124,7 @@ export function ElevatorCab({ closed, children, style }) {
 // ---------- One steel button with an illuminated ring ----------
 export function ElevatorButton({ icon, label, lit, variant, disabled, onPress, accessibilityLabel, count }) {
   const lamp = variant === 'heart' ? colors.brass : LAMP;
-  const glow = variant === 'heart' ? 'rgba(248,95,115,0.5)' : LAMP_GLOW;
+  const glow = variant === 'heart' ? 'rgba(255,140,66,0.5)' : LAMP_GLOW;
   const iconColor = lit ? lamp : colors.ink;
   return (
     <Pressable

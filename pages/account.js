@@ -756,7 +756,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                     </div>
 
                     {ageWasChanged && (
-                      <div style={{ background: 'rgba(248,95,115,0.1)', border: '1px solid rgba(248,95,115,0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
+                      <div style={{ background: 'rgba(var(--brass-rgb),0.1)', border: '1px solid rgba(var(--brass-rgb),0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
                         <p style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
                           <strong>Before you save this change:</strong> the age you provide here determines
                           which age-restricted titles are shown to you — content rated for adults won&rsquo;t
@@ -853,7 +853,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                   )}
                 </div>
                 {deleteConfirmOpen && (
-                  <div style={{ background: 'rgba(214,124,81,0.08)', border: '1px solid var(--danger-deep)', borderRadius: 6, padding: '0.9rem 1rem', marginTop: '0.4rem' }}>
+                  <div style={{ background: 'rgba(var(--danger-rgb),0.08)', border: '1px solid var(--danger-deep)', borderRadius: 6, padding: '0.9rem 1rem', marginTop: '0.4rem' }}>
                     <p style={{ margin: '0 0 0.7rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
                       This sends a deletion request to our team, who will action it and confirm by email — it
                       doesn&rsquo;t delete anything instantly. Type <strong>DELETE</strong> to confirm.

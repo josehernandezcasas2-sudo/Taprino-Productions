@@ -12,7 +12,7 @@ import { MAX_PICKS, MAX_WEIGHT, MIN_WEIGHT, dollars, splitLineup } from '../lib/
 // through /api/artist-support; the app's account/artist-support screen
 // mirrors it. `apiPath`/`searchPath` exist so a dev page can point the
 // card at no-auth routes.
-const COLORS = ['var(--brass)', 'var(--olive)', 'var(--mint)', 'var(--sky)', '#b48ad6', 'var(--danger)', 'var(--olive-bright)', 'var(--ok)', '#f2bf88', '#8499dc'];
+const COLORS = ['var(--brass)', 'var(--olive)', 'var(--mint)', 'var(--sky)', '#b48ad6', 'var(--danger)', 'var(--olive-bright)', 'var(--ok)', '#f8d98a', '#8499dc'];
 
 const signature = (picks, mode, shareVisible) => JSON.stringify({ picks: picks.map((p) => `${p.creatorId}:${p.weight}`), mode, shareVisible });
 

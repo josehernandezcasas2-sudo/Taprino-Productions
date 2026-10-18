@@ -244,6 +244,6 @@ const styles = StyleSheet.create({
     minWidth: 180
   },
   dropupItem: { paddingVertical: 11, paddingHorizontal: 18 },
-  dropupItemPressed: { backgroundColor: 'rgba(248,95,115,0.15)' },
+  dropupItemPressed: { backgroundColor: 'rgba(255,140,66,0.15)' },
   dropupItemText: { color: colors.ink, fontSize: 13.6, fontFamily: fonts.body }
 });

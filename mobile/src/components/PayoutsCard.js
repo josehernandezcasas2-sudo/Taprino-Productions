@@ -171,7 +171,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.45 },
   money: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   tile: { flexBasis: '45%', flexGrow: 1, backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 6, paddingVertical: 12, paddingHorizontal: 14 },
-  tileNext: { flexBasis: '100%', borderColor: 'rgba(231,162,85,0.45)' },
+  tileNext: { flexBasis: '100%', borderColor: 'rgba(242,193,78,0.45)' },
   tileLabel: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint },
   tileAmount: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.ink, marginTop: 4, marginBottom: 2, fontVariant: ['tabular-nums'] },
   tileDetail: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17, color: colors.inkDim },

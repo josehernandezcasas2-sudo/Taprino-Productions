@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
   artScrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
   cardTag: { position: 'absolute', top: 10, left: 10, backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
   cardTagText: { fontFamily: fonts.displayBold, fontSize: 11.5, color: colors.onBrass },
-  deadlineChip: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(10,10,14,0.7)', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(231,162,85,0.5)', paddingVertical: 4, paddingHorizontal: 10 },
+  deadlineChip: { position: 'absolute', bottom: 10, left: 10, backgroundColor: 'rgba(10,10,14,0.7)', borderRadius: 999, borderWidth: 1, borderColor: 'rgba(242,193,78,0.5)', paddingVertical: 4, paddingHorizontal: 10 },
   deadlineText: { fontFamily: fonts.monoMedium, fontSize: 10.5, letterSpacing: 1, textTransform: 'uppercase', color: colors.olive },
 
   cardBody: { padding: 16, paddingTop: 14 },

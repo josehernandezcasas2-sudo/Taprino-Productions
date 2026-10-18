@@ -15,7 +15,7 @@ import { MAX_PICKS, MAX_WEIGHT, MIN_WEIGHT, dollars, splitLineup } from '../../l
 // membership supports (up to 10, equal or set shares, name visibility),
 // via GET/POST /api/artist-support and GET /api/artist-support/search.
 // Reached from the Account tab's drop-up and the Membership card.
-const COLORS = [colors.brass, colors.olive, colors.mint, colors.sky, '#b48ad6', colors.danger, colors.oliveBright, colors.ok, '#f2bf88', '#8499dc'];
+const COLORS = [colors.brass, colors.olive, colors.mint, colors.sky, '#b48ad6', colors.danger, colors.oliveBright, colors.ok, '#f8d98a', '#8499dc'];
 const TIER_LABELS = { basic: 'Basic', standard: 'Standard', premium: 'Premium', sponsor: 'Sponsor' };
 
 const signature = (picks, mode, shareVisible) => JSON.stringify({ picks: picks.map((p) => `${p.creatorId}:${p.weight}`), mode, shareVisible });
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: 'rgba(251,232,211,0.12)', borderRadius: 10, paddingVertical: 9, paddingHorizontal: 12, fontFamily: fonts.mono, fontSize: 12, color: colors.ink },
   count: { fontFamily: fonts.mono, fontSize: 10, color: colors.inkFaint },
   results: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.12)', borderRadius: 10, paddingHorizontal: 10, maxHeight: 320 },
-  inChip: { backgroundColor: 'rgba(248,95,115,0.14)', borderRadius: 999, paddingVertical: 4, paddingHorizontal: 9 },
+  inChip: { backgroundColor: 'rgba(255,140,66,0.14)', borderRadius: 999, paddingVertical: 4, paddingHorizontal: 9 },
   inChipText: { fontFamily: fonts.mono, fontSize: 10, color: colors.brass },
   btnSmall: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
   btnSmallText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.ink },

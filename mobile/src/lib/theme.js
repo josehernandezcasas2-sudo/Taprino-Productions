@@ -1,5 +1,5 @@
-// Mirrors styles/globals.css's :root custom properties (the "Tropical
-// System" palette: Tropical Pink / Butter Linen / Ocean Ink) so the app
+// Mirrors styles/globals.css's :root custom properties (the palette:
+// Tangerine / gold / Butter Linen / Ocean Ink) so the app
 // uses the website's actual colors instead of a separately invented set.
 // Keep this in sync by hand if that palette changes — there's no shared
 // build step between the two codebases to do it automatically.
@@ -25,13 +25,13 @@ export const colors = {
   surface3: '#202f4e', // hover states on cards
   oceanInk: '#283c63', // borders, elevated accents
 
-  olive: '#e7a255',
-  oliveBright: '#f2bf88',
-  oliveDeep: '#96642c',
-  oliveShadow: '#342514',
+  olive: '#f2c14e',
+  oliveBright: '#f8d98a',
+  oliveDeep: '#9a7b1f',
+  oliveShadow: '#352c0f',
 
-  brass: '#f85f73', // premium-tier accent (Tropical Pink)
-  brassDeep: '#811826',
+  brass: '#ff8c42', // the accent (Tangerine; was Tropical Pink until 2026-10-18)
+  brassDeep: '#8a3a0f',
   onBrass: '#241a05', // text/icon color sitting on top of brass fills
 
   mint: '#93d0a4',
@@ -43,8 +43,8 @@ export const colors = {
   inkFaint: '#b3a18c',
 
   ok: '#84cd98',
-  warn: '#e0863c',
-  danger: '#d67c51',
+  warn: '#edb53f',
+  danger: '#ef5b5b',
 
   // Approximations of the website's translucent bar/dropup fills
   // (rgba(41,39,25,x) — a warm near-black, distinct from the navy
@@ -55,6 +55,13 @@ export const colors = {
   dropupBackground: 'rgba(30, 28, 18, 0.98)',
   hairline: 'rgba(251, 232, 211, 0.12)'
 };
+
+// Tints of the accents, the app's twin of the website's
+// rgba(var(--brass-rgb), a). Use these for new work instead of literal
+// numbers, so the next palette change is one file.
+export const brassTint = (a) => `rgba(255,140,66,${a})`;
+export const oliveTint = (a) => `rgba(242,193,78,${a})`;
+export const dangerTint = (a) => `rgba(239,91,91,${a})`;
 
 // Use this instead of StyleSheet.absoluteFillObject — React Native 0.86
 // removed that export (only StyleSheet.absoluteFill remains), so on a real
@@ -69,8 +76,8 @@ export const absoluteFill = { position: 'absolute', left: 0, right: 0, top: 0, b
 // list as lib/profileBanner.js on the website — keep them in sync.
 export const bannerColors = [
   { value: '#283c63', label: 'Ocean ink' },
-  { value: '#f85f73', label: 'Tropical pink' },
-  { value: '#e7a255', label: 'Olive' },
+  { value: '#ff8c42', label: 'Tangerine' },
+  { value: '#f2c14e', label: 'Gold' },
   { value: '#93d0a4', label: 'Mint' },
   { value: '#8499dc', label: 'Sky' },
   { value: '#c85924', label: 'Rust' },

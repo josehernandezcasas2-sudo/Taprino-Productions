@@ -56,7 +56,7 @@ function verdictFor(questions, answers) {
 }
 
 const LEVEL_COLOR = { neutral: colors.inkDim, ok: colors.ok, warn: colors.warn, bad: colors.danger };
-const LEVEL_BG = { neutral: 'rgba(202,181,158,0.06)', ok: 'rgba(132,205,152,0.08)', warn: 'rgba(224,134,60,0.08)', bad: 'rgba(214,124,81,0.08)' };
+const LEVEL_BG = { neutral: 'rgba(202,181,158,0.06)', ok: 'rgba(132,205,152,0.08)', warn: 'rgba(237,181,63,0.08)', bad: 'rgba(239,91,91,0.08)' };
 
 const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 const openSite = (path) => WebBrowser.openBrowserAsync(`${API_BASE_URL}${path}`);
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
   textarea: { minHeight: 84, textAlignVertical: 'top' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   chip: { borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12, backgroundColor: colors.surface0, borderWidth: 1, borderColor: 'rgba(251,232,211,0.18)' },
-  chipOn: { backgroundColor: 'rgba(231,162,85,0.16)', borderColor: colors.olive },
+  chipOn: { backgroundColor: 'rgba(242,193,78,0.16)', borderColor: colors.olive },
   chipText: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim },
   chipTextOn: { color: colors.olive },
   check: { flexDirection: 'row', gap: 10, alignItems: 'flex-start', marginBottom: 10 },

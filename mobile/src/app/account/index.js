@@ -1000,7 +1000,7 @@ const styles = StyleSheet.create({
 
   // .account-card
   card: { backgroundColor: colors.surface1, borderWidth: 1, borderColor: 'rgba(251,232,211,0.1)', borderRadius: 4, paddingVertical: 25, paddingHorizontal: 24 },
-  cardDanger: { borderColor: '#5c2c22' },
+  cardDanger: { borderColor: '#5c2222' },
   cardHead: { marginBottom: 18, gap: 8 },
   cardTitle: { fontFamily: fonts.displayBold, fontSize: 19.2, color: colors.brass },
   cardP: { fontFamily: fonts.body, fontSize: 14.4, color: colors.inkDim },
@@ -1049,7 +1049,7 @@ const styles = StyleSheet.create({
   btnSecondaryText: { fontFamily: fonts.display, fontSize: 13.6, color: colors.ink },
   btnSmall: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
   btnSmallText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.ink },
-  btnDanger: { borderWidth: 1, borderColor: '#5c2c22', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
+  btnDanger: { borderWidth: 1, borderColor: '#5c2222', borderRadius: 999, paddingVertical: 9, paddingHorizontal: 16 },
   btnDangerText: { fontFamily: fonts.display, fontSize: 12.5, color: colors.danger },
   savedText: { fontFamily: fonts.body, fontSize: 14, color: colors.brass },
 
@@ -1060,14 +1060,14 @@ const styles = StyleSheet.create({
   rowDetail: { fontFamily: fonts.body, fontSize: 12.8, lineHeight: 18, color: colors.inkDim, marginTop: 2 },
 
   // age warning / delete confirm
-  ageWarn: { backgroundColor: 'rgba(248,95,115,0.1)', borderWidth: 1, borderColor: 'rgba(248,95,115,0.3)', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 12, gap: 10 },
+  ageWarn: { backgroundColor: 'rgba(255,140,66,0.1)', borderWidth: 1, borderColor: 'rgba(255,140,66,0.3)', borderRadius: 8, paddingVertical: 14, paddingHorizontal: 16, marginVertical: 12, gap: 10 },
   ageWarnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink },
   checkboxRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   checkbox: { width: 18, height: 18, borderRadius: 3, borderWidth: 1, borderColor: colors.inkDim, alignItems: 'center', justifyContent: 'center' },
   checkboxChecked: { backgroundColor: colors.brass, borderColor: colors.brass },
   checkMark: { color: colors.onBrass, fontSize: 12, fontFamily: fonts.monoBold },
   checkboxLabel: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
-  deleteBox: { backgroundColor: 'rgba(214,124,81,0.08)', borderWidth: 1, borderColor: '#5c2c22', borderRadius: 6, paddingVertical: 14, paddingHorizontal: 16, marginTop: 6 },
+  deleteBox: { backgroundColor: 'rgba(239,91,91,0.08)', borderWidth: 1, borderColor: '#5c2222', borderRadius: 6, paddingVertical: 14, paddingHorizontal: 16, marginTop: 6 },
   deleteText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.ink, marginBottom: 11 },
   errorInline: { fontFamily: fonts.body, fontSize: 13, color: colors.danger, marginBottom: 10 },
   okText: { fontFamily: fonts.body, fontSize: 13.6, color: colors.ok, marginTop: 10 },
@@ -1079,7 +1079,7 @@ const styles = StyleSheet.create({
   freeBadgeText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.5, textTransform: 'uppercase', color: '#1a1408' },
   freeNoteText: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 20, color: colors.inkDim },
   divider: { height: 1, backgroundColor: 'rgba(251,232,211,0.12)', marginTop: 16, marginBottom: 18 },
-  asupQuick: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(248,95,115,0.35)', backgroundColor: 'rgba(248,95,115,0.08)' },
+  asupQuick: { marginTop: 14, paddingVertical: 12, paddingHorizontal: 14, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,140,66,0.35)', backgroundColor: 'rgba(255,140,66,0.08)' },
   asupQuickKicker: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.brass, marginBottom: 3 },
   asupQuickText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim }
 });

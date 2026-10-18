@@ -79,7 +79,7 @@ export function MonthCalendar({ month, onMonth, marks = {}, min, onPick }) {
   for (let d = 1; d <= daysIn; d += 1) cells.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
   while (cells.length % 7) cells.push(null);
   const shift = (n) => { const d = new Date(Date.UTC(y, m - 1 + n, 1)); onMonth(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`); };
-  const bg = { booked: 'rgba(248,95,115,0.16)', blocked: colors.surface3, sel: colors.olive, open: colors.surface2, past: colors.surface1 };
+  const bg = { booked: 'rgba(255,140,66,0.16)', blocked: colors.surface3, sel: colors.olive, open: colors.surface2, past: colors.surface1 };
   const fg = { booked: colors.brass, blocked: colors.inkFaint, sel: colors.onBrass, open: colors.inkDim, past: colors.inkFaint };
   return (
     <View style={{ gap: 6 }}>
@@ -335,7 +335,7 @@ export const loc = StyleSheet.create({
   calH: { flex: 1, textAlign: 'center', fontFamily: fonts.mono, fontSize: 9, color: colors.inkFaint, letterSpacing: 1 },
   calD: { fontFamily: fonts.mono, fontSize: 12 },
   answerForm: { gap: 6, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 10, padding: 10 },
-  outcome: { gap: 6, padding: 8, borderRadius: 8, backgroundColor: 'rgba(231,162,85,0.1)', borderWidth: 1, borderColor: 'rgba(231,162,85,0.35)' },
+  outcome: { gap: 6, padding: 8, borderRadius: 8, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.35)' },
   money: { backgroundColor: colors.surface2, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.oceanInk, borderRadius: 8, padding: 10 },
   moneyText: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkDim, lineHeight: 17 },
   tile: { flex: 1, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 10, padding: 10, minWidth: 0 },
@@ -343,7 +343,7 @@ export const loc = StyleSheet.create({
   tileS: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1, textTransform: 'uppercase', color: colors.inkFaint, marginTop: 2 },
   thumb: { width: 72, aspectRatio: 4 / 3, borderRadius: 8, backgroundColor: colors.surface2, overflow: 'hidden' },
   photo: { width: 96, aspectRatio: 4 / 3, borderRadius: 8, backgroundColor: colors.surface2, overflow: 'hidden' },
-  photoAdd: { width: 96, aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(248,95,115,0.6)', alignItems: 'center', justifyContent: 'center' },
+  photoAdd: { width: 96, aspectRatio: 4 / 3, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(255,140,66,0.6)', alignItems: 'center', justifyContent: 'center' },
   type: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 999, paddingVertical: 7, paddingHorizontal: 12 },
   typeOn: { borderColor: colors.brass },
   typeText: { fontFamily: fonts.displaySemi, fontSize: 12.5, color: colors.ink },

@@ -350,7 +350,7 @@ export default function ScheduleTimeline({
       </div>
       <div className="sch-legend">
         <span><i style={{ background: 'repeating-linear-gradient(135deg, rgba(251,232,211,.3) 0 2px, transparent 2px 4px)' }} />Gaps under 5 min play ads and bumpers</span>
-        <span><i style={{ background: 'rgba(248, 95, 115, 0.55)' }} />Ad plan breaks · the column on the right adds up ads per hour, red over {dur(hourCap)}</span>
+        <span><i style={{ background: 'rgba(var(--brass-rgb),0.55)' }} />Ad plan breaks · the column on the right adds up ads per hour, red over {dur(hourCap)}</span>
         {layer === 'week' && <span><i style={{ border: '1px dashed var(--sky)' }} />Faded = the default schedule, filling what&rsquo;s open</span>}
         <span><i style={{ outline: '1px dashed var(--olive)', outlineOffset: '-1px' }} />Dashed outline = moved along with the block you&rsquo;re dragging</span>
       </div>

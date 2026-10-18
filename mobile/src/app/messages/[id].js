@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   msgs: { padding: 12, gap: 6, paddingBottom: 16 },
   msg: { maxWidth: '78%', paddingVertical: 8, paddingHorizontal: 12, borderRadius: 14 },
   msgThem: { alignSelf: 'flex-start', backgroundColor: colors.surface2, borderBottomLeftRadius: 4 },
-  msgMe: { alignSelf: 'flex-end', backgroundColor: 'rgba(248,95,115,0.18)', borderBottomRightRadius: 4 },
+  msgMe: { alignSelf: 'flex-end', backgroundColor: 'rgba(255,140,66,0.18)', borderBottomRightRadius: 4 },
   msgText: { fontFamily: fonts.body, fontSize: 14.5, color: colors.ink, lineHeight: 20 },
   msgTime: { fontFamily: fonts.mono, fontSize: 9.5, color: colors.inkFaint, marginTop: 3 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.hairline, backgroundColor: colors.surface1, paddingBottom: 90 },
