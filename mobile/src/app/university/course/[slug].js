@@ -67,21 +67,20 @@ export default function Course() {
             {lessons.length > 0 ? <Progress pct={Math.round((doneCount / lessons.length) * 100)} /> : null}
 
             <Tabs tabs={tabs} active={tab} onPick={setTab} />
+            {/* A tapped video (material or example) plays here on any tab;
+                it used to render only inside Examples, so a video under
+                Materials did nothing. */}
+            {playing ? (
+              <View style={[uni.box, { borderColor: 'rgba(147,208,164,0.35)' }]}>
+                <Text style={[uni.eyebrow, uni.eyebrowMint]}>{playing.role === 'example' ? 'Example' : 'Video'}</Text>
+                <Text style={uni.boxTitle}>{playing.title}</Text>
+                <LessonVideo fileId={playing.id} />
+                <Btn label="Close" small style={{ marginTop: 10 }} onPress={() => setPlaying(null)} />
+              </View>
+            ) : null}
             {tab === 'syllabus' && (lessons.length ? <Syllabus syllabus={data.syllabus} isDone={isDone} currentId={next ? next.id : null} /> : <Text style={uni.empty}>No lessons published yet.</Text>)}
             {tab === 'materials' && (data.materials.length ? data.materials.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />) : <Text style={uni.empty}>No files for this course yet.</Text>)}
-            {tab === 'examples' && (
-              <>
-                {playing ? (
-                  <View style={[uni.box, { borderColor: 'rgba(147,208,164,0.35)' }]}>
-                    <Text style={[uni.eyebrow, uni.eyebrowMint]}>Example</Text>
-                    <Text style={uni.boxTitle}>{playing.title}</Text>
-                    <LessonVideo fileId={playing.id} />
-                    <Btn label="Close" small style={{ marginTop: 10 }} onPress={() => setPlaying(null)} />
-                  </View>
-                ) : null}
-                {data.examples.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />)}
-              </>
-            )}
+            {tab === 'examples' && data.examples.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />)}
 
             <View style={[uni.box, { marginTop: 16 }]}>
               <Text style={uni.eyebrow}>About this course</Text>
