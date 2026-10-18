@@ -50,7 +50,9 @@ export default function MemberSupportCard() {
             <Text style={styles.nextLabel}>Next payout · {fmtDate(next.on)}</Text>
             <Text style={styles.nextAmount}>{dollars(next.cents)}</Text>
             <Text style={styles.nextDetail}>
-              {next.willPay
+              {next.note
+                ? next.note
+                : next.willPay
                 ? 'Goes to your Stripe account on the 1st, then to your bank on your payout schedule.'
                 : next.reason === 'set up payouts'
                   ? 'Set up payouts above and this goes out on the 1st. Credits wait for you.'

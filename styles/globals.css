@@ -9627,6 +9627,9 @@ a.asup-name:hover { color: var(--brass); }
 .adm-stat.sm-bad b { color: var(--danger); }
 .sm-notice { font-size: 0.88rem; color: var(--ok); margin: 0 0 0.8rem; }
 .cm-cols > * { min-width: 0; }
+.cm-actions { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.45rem; }
+.cm-actions:empty { display: none; }
+.cm-table .payouts-pill { white-space: nowrap; }
 .sm-ledger { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 0.88rem; margin-top: 0.4rem; }
 .sm-ledger td { padding: 0.5rem 0.4rem; border-bottom: 1px solid rgba(251,232,211,0.07); vertical-align: top; overflow-wrap: anywhere; }
 .sm-ledger td:last-child { width: 7.5em; text-align: right; font-family: var(--font-mono); font-size: 0.84rem; font-variant-numeric: tabular-nums; white-space: nowrap; }

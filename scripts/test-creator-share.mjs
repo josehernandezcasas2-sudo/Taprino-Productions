@@ -3,7 +3,8 @@
 import assert from 'node:assert/strict';
 import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
-  buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance
+  buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
+  standingState, forfeitLines
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -136,6 +137,46 @@ test('referralEarnsBonus: only the first N months from the first paid invoice; 0
   assert.deepEqual(late.map((l) => l.kind), ['member_share']);
   const early = buildLedgerLines({ memberId: 'm', paymentId: 'p', shareCents: 200, basis: 'picks', entries: [{ id: 'user_x', weight: 1 }], referral: ref, bonusCents: 100, paidAt: '2026-06-15T10:00:00Z', bonusMonths: 12 });
   assert.deepEqual(early.map((l) => l.kind), ['member_share', 'referral']);
+});
+
+test('standingState: holds lapse after hold_until; leaving expires after collect_until unless already moved', () => {
+  const now = new Date('2026-11-01T00:00:00Z');
+  assert.equal(standingState(null, now).held, false);
+  const hold = { hold_started_at: '2026-10-01T00:00:00Z', hold_until: '2026-12-30T00:00:00Z' };
+  assert.deepEqual([standingState(hold, now).held, standingState(hold, now).holdLapsed], [true, false]);
+  assert.deepEqual([standingState(hold, new Date('2027-01-01')).held, standingState(hold, new Date('2027-01-01')).holdLapsed], [false, true]);
+  const left = { left_at: '2026-08-01T00:00:00Z', collect_until: '2026-10-30T00:00:00Z' };
+  assert.deepEqual([standingState(left, now).leaving, standingState(left, now).expired], [true, true]);
+  assert.equal(standingState({ ...left, forfeited_at: '2026-10-31T00:00:00Z' }, now).expired, false);
+  assert.equal(standingState({ ...left, collect_until: '2026-12-01T00:00:00Z' }, now).expired, false);
+});
+
+test('planPayouts: a hold keeps a creator out; a creator who left is paid under the minimum', () => {
+  const owed = [
+    { creatorId: 'held', cents: 5000, lineIds: ['a'], oldestAt: '2026-10-01' },
+    { creatorId: 'gone', cents: 700, lineIds: ['b'], oldestAt: '2026-10-02' },
+    { creatorId: 'small', cents: 700, lineIds: ['c'], oldestAt: '2026-10-03' }
+  ];
+  const ready = { stripeAccountId: 'acct', chargesEnabled: true };
+  const standing = {
+    held: { hold_started_at: '2026-10-20T00:00:00Z', hold_until: '2027-01-18T00:00:00Z' },
+    gone: { left_at: '2026-10-20T00:00:00Z', collect_until: '2027-01-18T00:00:00Z' }
+  };
+  const plan = planPayouts({ owed, accounts: { held: ready, gone: ready, small: ready }, minimumCents: 2500, standing, now: new Date('2026-11-01') });
+  assert.deepEqual(plan.pay.map((p) => [p.creatorId, p.leaving]), [['gone', true]]);
+  assert.deepEqual(plan.held.map((h) => [h.creatorId, h.reason]), [['held', 'on hold'], ['small', 'under the minimum']]);
+  const expired = planPayouts({ owed, accounts: { held: ready, gone: ready, small: ready }, minimumCents: 2500, standing, now: new Date('2027-02-01') });
+  assert.equal(expired.held.find((h) => h.creatorId === 'gone').reason, 'not collected in time; moves to the pool');
+  const later = planPayouts({ owed, accounts: { held: ready, gone: ready, small: ready }, minimumCents: 2500, standing, now: new Date('2027-02-01') });
+  assert.deepEqual(later.pay.map((p) => p.creatorId), ['held']);
+});
+
+test('forfeitLines: the balance leaves the creator and is split across the pool, never back to them', () => {
+  const lines = forfeitLines({ creatorId: 'gone', cents: 1001, pool: { gone: 50, a: 2, b: 1, c: 0 } });
+  assert.deepEqual(lines.map((l) => [l.creator_id, l.kind, l.cents]), [['gone', 'forfeit', -1001], ['a', 'pool_share', 668], ['b', 'pool_share', 333]]);
+  assert.equal(lines.reduce((s, l) => s + l.cents, 0), 0);
+  assert.deepEqual(forfeitLines({ creatorId: 'gone', cents: 0, pool: { a: 1 } }), []);
+  assert.deepEqual(forfeitLines({ creatorId: 'gone', cents: 500, pool: { gone: 3 } }), []);
 });
 
 console.log(`\n${passed} passed`);

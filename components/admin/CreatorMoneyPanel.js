@@ -10,12 +10,16 @@ import { applyBalance } from '../../lib/creatorShareRules';
 const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—');
 
 const PAYOUT_STATUS = { paid: ['Paid', 'paid'], pending: ['Pending', 'transit'], failed: ['Failed', 'failed'] };
+const EMPTY_FORM = { creator: '', action: 'hold', reason: '', dollars: '', note: '', leaving: 'withdrew' };
 
 export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money' }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState(null);
+  const [busy, setBusy] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const load = useCallback(async () => {
     setError(null);
@@ -61,10 +65,56 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
     }
   }
 
+  // Holds and departures (Terms section 5; lib/creatorStanding.js).
+  async function act(action, payload, label) {
+    setBusy(action);
+    setError(null);
+    setNotice(null);
+    try {
+      const res = await fetch(apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ...payload }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'That didn’t work.');
+      if (label) setNotice(label(d));
+      await load();
+      return d;
+    } catch (err) {
+      setError(err.message);
+      return null;
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  function holdRow(creatorId, name) {
+    const reason = window.prompt(`Hold ${name}'s payouts for up to 90 days?\n\nWhy (kept on the record; they get a general message):`);
+    if (reason && reason.trim()) act('hold', { creator: creatorId, reason }, () => `${name}'s payouts are on hold.`);
+  }
+
+  function extendRow(st) {
+    const until = window.prompt(`Give ${st.displayName} until which date to collect? (YYYY-MM-DD)`, (st.collectUntil || '').slice(0, 10));
+    if (until) act('extend', { creator: st.creatorId, until }, () => `${st.displayName} now has until ${fmtDate(until)}.`);
+  }
+
+  function submitForm(e) {
+    e.preventDefault();
+    const name = form.creator.trim();
+    if (form.action === 'hold') {
+      act('hold', { creator: name, reason: form.reason }, () => 'Payouts held for up to 90 days; the creator was told.').then((d) => { if (d) setForm(EMPTY_FORM); });
+    } else if (form.action === 'cancel') {
+      const cents = Math.round(Number(form.dollars) * 100);
+      if (!window.confirm(`Cancel ${dollars(cents)} of ${name}'s credits?\n\nA negative line goes on their ledger; if they've already been paid, it comes out of their future credits.`)) return;
+      act('cancel', { creator: name, cents, note: form.note }, () => `${dollars(cents)} cancelled.`).then((d) => { if (d) setForm(EMPTY_FORM); });
+    } else {
+      if (!window.confirm(`Mark ${name} as leaving?\n\nNo new credits from today. They have 90 days to collect what they earned (paid in full, even under the minimum); after that it moves to the site-wide pool.`)) return;
+      act('leave', { creator: name, reason: form.leaving, note: form.note }, () => 'Marked as leaving; the creator was told how to collect.').then((d) => { if (d) setForm(EMPTY_FORM); });
+    }
+  }
+
   if (error && !data) return <p className="rq-error">{error}</p>;
   if (!data) return <p className="adm-empty">Loading…</p>;
 
   const { summary, plan, balance, recentPayouts } = data;
+  const standings = data.standings || [];
   const waiting = covered.skippedForBalance;
 
   return (
@@ -101,6 +151,7 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
         {error && <p className="rq-error">{error}</p>}
         {result && (
           <p className="cm-result">
+            {result.forfeited && result.forfeited.filter((f) => f.cents > 0).length > 0 && <>Moved {dollars(result.forfeited.reduce((t, f) => t + f.cents, 0))} of uncollected credits to the pool. </>}
             Ran: <b>{result.paid.length}</b> paid ({dollars(result.paidCents)}){result.failed.length > 0 && <>, <b className="bad">{result.failed.length} failed</b></>}{result.skippedForBalance.length > 0 && <>, {result.skippedForBalance.length} waiting on balance</>}, {result.held.length} held.
             {result.failed.map((f) => <span key={f.creatorId} className="cm-fail">{f.displayName || f.creatorId}: {f.reason}</span>)}
           </p>
@@ -112,14 +163,15 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
             {plan.pay.length === 0 ? <p className="adm-empty">Nobody is due yet.</p> : (
               <div className="cm-scroll">
                 <table className="cm-table">
-                  <thead><tr><th>Creator</th><th>Owed</th><th>Oldest credit</th><th>Stripe</th></tr></thead>
+                  <thead><tr><th>Creator</th><th>Owed</th><th>Oldest credit</th><th>Stripe</th><th aria-label="Actions" /></tr></thead>
                   <tbody>
                     {plan.pay.map((p) => (
                       <tr key={p.creatorId}>
-                        <td>{p.displayName}<span className="bk-email">{p.creatorId}</span></td>
+                        <td>{p.displayName}<span className="bk-email">{p.creatorId}</span>{p.leaving && <span className="bk-email">left · paid in full</span>}</td>
                         <td>{dollars(p.cents)}</td>
                         <td>{fmtDate(p.oldestAt)}</td>
                         <td><code className="cm-code">{p.stripeAccountId}</code></td>
+                        <td><button type="button" className="rq-btn" disabled={busy === 'hold'} onClick={() => holdRow(p.creatorId, p.displayName)}>Hold</button></td>
                       </tr>
                     ))}
                   </tbody>
@@ -132,13 +184,14 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
             {plan.held.length === 0 ? <p className="adm-empty">Nothing held.</p> : (
               <div className="cm-scroll">
                 <table className="cm-table">
-                  <thead><tr><th>Creator</th><th>Owed</th><th>Why</th></tr></thead>
+                  <thead><tr><th>Creator</th><th>Owed</th><th>Why</th><th aria-label="Actions" /></tr></thead>
                   <tbody>
                     {plan.held.map((h) => (
                       <tr key={h.creatorId}>
                         <td>{h.displayName}<span className="bk-email">{h.creatorId}</span></td>
                         <td>{dollars(h.cents)}</td>
-                        <td>{h.reason}</td>
+                        <td>{h.reason === 'on hold' ? `on hold until ${fmtDate(h.holdUntil)}` : h.reason}{h.leaving && <span className="bk-email">left · collect by {fmtDate(h.collectUntil)}</span>}</td>
+                        <td>{h.reason !== 'on hold' && !h.leaving && <button type="button" className="rq-btn" disabled={busy === 'hold'} onClick={() => holdRow(h.creatorId, h.displayName)}>Hold</button>}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -152,6 +205,79 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
             )}
           </div>
         </div>
+      </div>
+
+      <div className="account-card" style={{ marginBottom: '1rem' }}>
+        <div className="account-eyebrow">Holds and departures</div>
+        <p className="cm-sub">
+          Terms section 5. A <b>hold</b> stops a creator’s payouts for up to 90 days while you look into fraud; it lapses on its own. <b>Cancel credits</b> takes back credits that weren’t earned (stolen or disputed cards, fake accounts, bots, paid picks); past what they’re owed, it comes out of future credits. A creator who <b>left</b> (withdrew their work, closed their account, suspended) gets no new credits and has 90 days to collect, paid in full even under {dollars(plan.minimumCents)}; then the next run moves the rest to the site-wide pool.
+        </p>
+        {notice && <p className="cm-result">{notice}</p>}
+        {standings.length === 0 ? <p className="adm-empty">Every creator is in good standing.</p> : (
+          <div className="cm-scroll">
+            <table className="cm-table">
+              <thead><tr><th>Creator</th><th>Owed</th><th>Standing</th></tr></thead>
+              <tbody>
+                {standings.map((st) => (
+                  <tr key={st.creatorId}>
+                    <td>{st.displayName}<span className="bk-email">{st.creatorId}</span></td>
+                    <td>{dollars(Math.max(0, st.owedCents))}</td>
+                    <td>
+                      {st.held && <div><span className="payouts-pill failed">On hold</span> until {fmtDate(st.holdUntil)}{st.holdReason && <span className="bk-email">{st.holdReason}</span>}</div>}
+                      {st.holdLapsed && !st.held && <div><span className="payouts-pill transit">Hold lapsed</span> {fmtDate(st.holdUntil)} · paid again from the next run</div>}
+                      {st.leaving && (
+                        <div style={{ marginTop: st.held ? '0.3rem' : 0 }}>
+                          <span className={`payouts-pill ${st.forfeitedAt ? 'paid' : st.expired ? 'failed' : 'transit'}`}>{st.forfeitedAt ? 'Moved to pool' : st.expired ? '90 days up' : 'Left'}</span>{' '}
+                          {st.leavingReason} {fmtDate(st.leftAt)}
+                          <span className="bk-email">{st.forfeitedAt ? `${dollars(st.forfeitedCents || 0)} to the pool on ${fmtDate(st.forfeitedAt)}` : `collect by ${fmtDate(st.collectUntil)}`}</span>
+                          {st.note && <span className="bk-email">{st.note}</span>}
+                        </div>
+                      )}
+                      <div className="cm-actions">
+                      {st.held && <button type="button" className="rq-btn" disabled={Boolean(busy)} onClick={() => act('release', { creator: st.creatorId }, () => `${st.displayName}'s payouts are back on.`)}>Release</button>}
+                      {st.leaving && !st.forfeitedAt && <button type="button" className="rq-btn" disabled={Boolean(busy)} onClick={() => extendRow(st)}>Extend</button>}
+                      {st.expired && <button type="button" className="rq-btn" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`Move ${st.displayName}'s ${dollars(Math.max(0, st.owedCents))} to the site-wide pool now?`)) act('forfeit', { creator: st.creatorId }, () => 'Moved to the site-wide pool.'); }}>Move to pool</button>}
+                      {st.leaving && <button type="button" className="rq-btn" disabled={Boolean(busy)} onClick={() => { if (window.confirm(`Put ${st.displayName} back in good standing? New credits resume.${st.forfeitedAt ? ' What already went to the pool stays there.' : ''}`)) act('unleave', { creator: st.creatorId }, () => `${st.displayName} is back in good standing.`); }}>Back in good standing</button>}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <form className="sm-form" onSubmit={submitForm}>
+          <label><span>Creator</span><input id="cm-st-creator" className="sm-input" value={form.creator} onChange={(e) => setForm({ ...form, creator: e.target.value })} placeholder="@handle or user_…" required /></label>
+          <label><span>Action</span>
+            <select id="cm-st-action" className="sm-input" value={form.action} onChange={(e) => setForm({ ...form, action: e.target.value })}>
+              <option value="hold">Hold payouts (90 days)</option>
+              <option value="cancel">Cancel credits</option>
+              <option value="leave">Mark as leaving</option>
+            </select>
+          </label>
+          {form.action === 'hold' && (
+            <label className="sm-wide"><span>Why (for the record)</span><input id="cm-st-reason" className="sm-input" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="3 disputed memberships through their link this week" required /></label>
+          )}
+          {form.action === 'cancel' && (
+            <>
+              <label><span>Amount ($)</span><input id="cm-st-amount" className="sm-input" type="number" min="0.01" step="0.01" value={form.dollars} onChange={(e) => setForm({ ...form, dollars: e.target.value })} required /></label>
+              <label className="sm-wide"><span>Why (goes on the ledger line)</span><input id="cm-st-note" className="sm-input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="stolen-card memberships, Oct 3–9" required /></label>
+            </>
+          )}
+          {form.action === 'leave' && (
+            <>
+              <label><span>Why they left</span>
+                <select id="cm-st-leaving" className="sm-input" value={form.leaving} onChange={(e) => setForm({ ...form, leaving: e.target.value })}>
+                  <option value="withdrew">Withdrew their work</option>
+                  <option value="closed">Closed their account</option>
+                  <option value="suspended">Suspended</option>
+                </select>
+              </label>
+              <label className="sm-wide"><span>Note</span><input id="cm-st-note" className="sm-input" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} placeholder="optional, e.g. working on a new cut" /></label>
+            </>
+          )}
+          <div className="sm-form-actions"><button type="submit" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} disabled={Boolean(busy)}>{busy && busy !== 'run' ? 'Saving…' : form.action === 'hold' ? 'Hold payouts' : form.action === 'cancel' ? 'Cancel credits' : 'Mark as leaving'}</button></div>
+        </form>
       </div>
 
       <div className="account-card">
