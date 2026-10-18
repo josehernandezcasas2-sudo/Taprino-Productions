@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orange Palette</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* Layout: the same sample screens drawn three times, each under its own palette (CSS variables scoped per column), then the swatch tables with contrast, then what changes. */
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12); --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --on-accent:#241a05;
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+    color-scheme:dark;
+  }
+  /* The three palettes. Only the warm tokens differ. */
+  .pal-now { --brass:#f85f73; --brass-rgb:248,95,115; --brass-deep:#811826; --olive:#e7a255; --olive-bright:#f2bf88; --olive-deep:#96642c; --olive-shadow:#342514; --warn:#e0863c; --danger:#d67c51; --danger-deep:#5c2c22; --rust:#c85924; --admin-section:#f6d65d; }
+  .pal-a   { --brass:#ff8c42; --brass-rgb:255,140,66; --brass-deep:#8a3a0f; --olive:#f2c14e; --olive-bright:#f8d98a; --olive-deep:#9a7b1f; --olive-shadow:#352c0f; --warn:#edb53f; --danger:#ef5b5b; --danger-deep:#5c2222; --rust:#c85924; --admin-section:#f6d65d; }
+  .pal-b   { --brass:#f4733a; --brass-rgb:244,115,58; --brass-deep:#7f2a12; --olive:#f2c14e; --olive-bright:#f8d98a; --olive-deep:#9a7b1f; --olive-shadow:#352c0f; --warn:#edb53f; --danger:#ef5b5b; --danger-deep:#5c2222; --rust:#c85924; --admin-section:#f6d65d; }
+
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding-block:28px 80px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); font-size:16px; }
+  .intro { max-width:1180px; margin:0 auto 28px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; text-wrap:balance; }
+  .note { color:var(--ink-dim); margin:0 0 16px; font-size:1rem; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec { max-width:1180px; margin:0 auto 56px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; flex-wrap:wrap; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:#ff8c42; letter-spacing:.06em; text-transform:uppercase; }
+  .cols { display:grid; grid-template-columns:repeat(3, 1fr); gap:14px; }
+  @media (max-width:980px) { .cols { grid-template-columns:1fr; } }
+  .col { min-width:0; }
+  .col-title { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink-faint); margin:0 0 8px; display:flex; gap:8px; align-items:center; }
+  .col-title i { width:12px; height:12px; border-radius:3px; background:var(--brass); display:inline-block; }
+  .col-title b { color:var(--ink); font-weight:500; }
+  .phone { background:var(--surface-0); border:1px solid var(--hair); border-radius:18px; padding:14px; min-width:0; }
+  .hdr { display:flex; justify-content:space-between; align-items:center; padding:8px 4px 12px; border-bottom:1px solid var(--hair); }
+  .logo { font-family:var(--font-display); font-size:1.25rem; }
+  .logo b { color:var(--brass); font-weight:700; }
+  .logo small { display:block; font-family:var(--font-mono); font-size:.62rem; letter-spacing:.12em; color:var(--mint); margin-top:2px; }
+  .avatar { width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,#8a6d3b,#3a2a1a); }
+  .card { background:var(--surface-1); border:1px solid var(--hair); border-radius:12px; padding:14px; margin-top:12px; }
+  .eyebrow { font-family:var(--font-mono); font-size:.66rem; letter-spacing:.12em; text-transform:uppercase; color:var(--brass); display:block; margin-bottom:4px; }
+  .h2 { font-family:var(--font-display); font-weight:700; font-size:1.25rem; color:var(--brass); margin:0 0 6px; }
+  .vis { font-family:var(--font-mono); font-size:.7rem; color:var(--mint); margin:0 0 10px; }
+  .vis::before { content:"● "; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0; }
+  .btn { font-family:var(--font-display); font-size:.82rem; font-weight:600; padding:9px 14px; border-radius:999px; border:1px solid rgba(251,232,211,.25); color:var(--ink); background:transparent; white-space:nowrap; }
+  .btn.olive { background:var(--olive); border-color:var(--olive); color:var(--on-accent); }
+  .btn.brass { background:var(--brass); border-color:var(--brass); color:var(--on-accent); }
+  .btn.back { border-color:var(--olive); color:var(--olive); font-family:var(--font-mono); font-size:.72rem; letter-spacing:.08em; }
+  .link { font-family:var(--font-display); font-size:.82rem; color:var(--olive); }
+  .badge { font-family:var(--font-mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--olive); background:var(--olive-shadow); border:1px solid var(--olive-deep); border-radius:999px; padding:4px 9px; }
+  .chip { font-family:var(--font-mono); font-size:.66rem; padding:4px 9px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); white-space:nowrap; }
+  .chip.on { color:var(--brass); background:rgba(var(--brass-rgb),.16); }
+  .chip.olive { color:var(--olive); background:rgba(242,193,78,.14); }
+  .pal-now .chip.olive { background:rgba(231,162,85,.14); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .chip.warn { color:var(--warn); border:1px solid var(--warn); background:transparent; }
+  .chip.danger { color:var(--danger); border:1px solid var(--danger); background:transparent; }
+  .chip.mint { color:var(--mint); background:rgba(147,208,164,.14); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.rust { color:#f0b79a; background:rgba(200,89,36,.28); }
+  .fine { font-family:var(--font-mono); font-size:.66rem; color:var(--ink-faint); line-height:1.5; margin:6px 0 0; }
+  .err { font-size:.8rem; color:var(--danger); margin:6px 0 0; }
+  .stat { background:var(--surface-2); border:1px solid rgba(var(--brass-rgb),.5); border-radius:10px; padding:10px 12px; display:inline-block; }
+  .stat b { display:block; font-family:var(--font-display); font-size:1.2rem; color:var(--olive-bright); }
+  .stat span { font-family:var(--font-mono); font-size:.62rem; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-faint); }
+  .adm { display:flex; gap:6px; flex-wrap:wrap; align-items:center; }
+  .adm .sect { font-family:var(--font-mono); font-size:.62rem; letter-spacing:.1em; text-transform:uppercase; color:var(--admin-section); }
+  .adm .lnk { font-family:var(--font-mono); font-size:.7rem; padding:5px 9px; border-radius:8px; color:var(--ink-dim); }
+  .adm .lnk.on { color:var(--brass); background:rgba(var(--brass-rgb),.14); }
+  .bubble { background:rgba(var(--brass-rgb),.18); border-radius:12px 12px 4px 12px; padding:8px 10px; font-size:.82rem; max-width:80%; margin-left:auto; }
+  .cal { display:flex; gap:4px; }
+  .cal i { width:26px; height:26px; border-radius:6px; background:var(--surface-2); display:inline-block; font-style:normal; font-family:var(--font-mono); font-size:.62rem; line-height:26px; text-align:center; color:var(--ink-dim); }
+  .cal i.booked { background:rgba(var(--brass-rgb),.16); color:var(--brass); }
+  .cal i.sel { background:var(--olive); color:var(--on-accent); }
+  .chart { height:44px; border-radius:6px; background:linear-gradient(to top, rgba(var(--brass-rgb),.16), transparent 70%); border-bottom:2px solid var(--brass); position:relative; }
+  .tabs { display:flex; justify-content:space-around; align-items:center; background:rgba(41,39,25,.96); border-radius:999px; padding:6px; margin-top:14px; }
+  .tab { font-family:var(--font-mono); font-size:.58rem; letter-spacing:.1em; text-transform:uppercase; color:var(--ink); padding:9px 10px; border-radius:999px; text-align:center; }
+  .tab.discover { color:var(--sky); }
+  .tab.on { background:var(--brass); color:var(--on-accent); font-weight:600; }
+  .tab small { display:block; font-size:.9rem; letter-spacing:0; margin-bottom:2px; }
+  .elev { margin-top:10px; background:var(--surface-2); border-radius:10px; padding:10px; display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .elev .heart { width:26px; height:26px; border-radius:50%; background:var(--brass); box-shadow:0 0 14px rgba(var(--brass-rgb),.5); }
+  .swatches { width:100%; border-collapse:collapse; font-size:.8rem; }
+  .swatches th { text-align:left; font-family:var(--font-mono); font-size:.62rem; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-dim); font-weight:500; padding:6px 8px 6px 0; border-bottom:1px solid var(--ocean-ink); }
+  .swatches td { padding:6px 8px 6px 0; border-bottom:1px solid rgba(251,232,211,.06); vertical-align:middle; font-family:var(--font-mono); font-size:.74rem; }
+  .sw { display:inline-block; width:34px; height:20px; border-radius:5px; vertical-align:middle; margin-right:6px; border:1px solid rgba(255,255,255,.08); }
+  .cr { font-variant-numeric:tabular-nums; }
+  .cr.aaa { color:var(--ok); } .cr.aa { color:#f2c14e; } .cr.fail { color:#ef5b5b; }
+  .scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+  .frame { background:var(--surface-0); border:1px solid var(--hair); border-radius:16px; padding:22px; margin-bottom:14px; min-width:0; }
+  .ideas { margin:0; padding-left:18px; color:var(--ink-dim); line-height:1.55; font-size:.95rem; }
+  .ideas li { margin:0 0 8px; } .ideas b { color:var(--ink); }
+  code { font-family:var(--font-mono); font-size:.84em; color:#f8d98a; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+  @media (max-width:860px) { .two { grid-template-columns:1fr; } }
+  .dec { display:grid; grid-template-columns:150px 1fr; gap:6px 14px; font-size:.95rem; line-height:1.5; color:var(--ink-dim); }
+  .dec b { color:var(--ink); }
+  .dec .k { font-family:var(--font-mono); font-size:.72rem; letter-spacing:.06em; text-transform:uppercase; padding-top:4px; }
+  .dec .k.pro { color:#f2c14e; } .dec .k.open { color:#ff8c42; }
+  @media (max-width:600px) { .dec { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Orange palette, v1: the pink becomes orange, and what has to move with it</h1>
+  <p class="note">Every colour on the site and in the app comes from one list of tokens (<code>styles/globals.css</code> <code>:root</code>, mirrored in <code>mobile/src/lib/theme.js</code>). The pink is <code>--brass</code>: the logo's "Tapa", headings, the active tab, the hot chips, message bubbles, booked days. Changing it means changing the warm colours around it too, or the site reads as three oranges fighting. Below: the same screens under the current palette and two orange candidates, the swatch tables with contrast checked, and the list of what changes in the code.</p>
+  <p class="note"><b>The conflicts an orange primary creates:</b> the secondary accent (<code>--olive</code>, really an amber) sits right next to it on the wheel; the danger colour is a burnt orange; the warning colour is an orange; the "rust" content tag is orange-brown. The proposal moves the secondary to a <b>gold</b>, danger to a <b>true red</b>, warning to a <b>deeper gold</b>, and keeps rust (it's muted enough and only tags vertical video). Blues, mint and the text stay exactly as they are.</p>
+</div>
+
+<section class="sec">
+  <div class="sec-head"><h2>1. Same screens, three palettes</h2><span class="tag">left: today · middle: A Tangerine · right: B Persimmon</span></div>
+  <div class="cols" id="cols"></div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>2. The tokens, with contrast on the page and on cards</h2><span class="tag">WCAG ratio · AAA ≥ 7 · AA ≥ 4.5 · large text ≥ 3</span></div>
+  <div class="two" id="swatches"></div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>3. What changes in the code</h2><span class="tag">one commit, web + app</span></div>
+  <div class="frame">
+    <div class="two">
+      <div>
+        <div class="col-title"><b>Website</b></div>
+        <ul class="ideas">
+          <li><code>styles/globals.css</code>: the <code>:root</code> values, and the 47 hard-coded pink tints (<code>rgba(248,95,115,…)</code>) become <code>rgba(var(--brass-rgb),…)</code> so they follow the token from now on.</li>
+          <li><code>lib/themeColors.js</code>: the defaults the Styles &amp; Guides theme editor compares against. <b>Any override saved there in the past wins over the new defaults</b>, so after the switch that page should show every swatch as "default"; if one is marked changed, press Reset.</li>
+          <li>Inline literals in 8 files (pitch/episode/ad forms' notice boxes, the schedule legend, two admin pages, the account page's age notice, the crew avatar colours) move to the token.</li>
+          <li><code>lib/profileBanner.js</code>: the banner colour choice "Tropical pink" becomes the orange; a profile that already picked pink keeps its saved value.</li>
+          <li><code>lib/university.js</code>: the course cover gradients named by token.</li>
+          <li><code>lib/messages.js</code>: the email's quote border.</li>
+          <li><code>public/og-image.png</code> (the link preview card) is regenerated; <code>logo.svg</code> / <code>icon.svg</code> don't use the pink.</li>
+        </ul>
+      </div>
+      <div>
+        <div class="col-title"><b>App and elsewhere</b></div>
+        <ul class="ideas">
+          <li><code>mobile/src/lib/theme.js</code>: the same tokens, plus a <code>brassTint(alpha)</code> helper replacing the 14 literal tints in screens (university chips, the elevator heart glow, live tags, booked days, the drop-up press state, message bubbles, the numbers chart, the age notice).</li>
+          <li>The Figma design system's variables are ported by hand (no live sync).</li>
+          <li>Mockups in <code>mockups/</code> keep their pink; they're history.</li>
+          <li>Nothing in the database changes. A member's saved pink banner stays pink until they pick again.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><h2>4. Decide</h2><span class="tag">sign-off list</span></div>
+  <div class="frame">
+    <div class="dec">
+      <span class="k open">Pick one</span><span><b>A Tangerine</b> (#ff8c42): brighter, friendlier, the clearer read on navy (8.1:1 on the page). <b>B Persimmon</b> (#f4733a): deeper, closer in temperature to the old pink, a touch more "film". My recommendation is A.</span>
+      <span class="k pro">Proposed</span><span><b>Secondary → gold</b> #f2c14e (hover #f8d98a). Buttons like "Set up payouts" and "Send to the bank", links, the Back outline and the creator badge keep their own identity next to the orange.</span>
+      <span class="k pro">Proposed</span><span><b>Danger → red</b> #ef5b5b, so an error never looks like the brand. <b>Warning → deeper gold</b> #edb53f.</span>
+      <span class="k pro">Proposed</span><span><b>Rust stays</b> (#c85924, the vertical-video tag). It's dark and muted, and it only appears as a small tag. Say so if you'd rather it went plum.</span>
+      <span class="k pro">Proposed</span><span><b>Admin section titles stay yellow</b> (#f6d65d). Admin only, and it reads as a label, not a brand colour.</span>
+      <span class="k open">Open</span><span>Want a yellower orange (marigold, #ffa23a)? Then the secondary can't be gold and would have to go cool (the sky blue). I'd avoid it.</span>
+    </div>
+  </div>
+</section>
+
+<script>
+  const sample = (title, cls, swatch) => `
+    <div class="col ${cls}">
+      <div class="col-title"><i></i><b>${title}</b></div>
+      <div class="phone">
+        <div class="hdr"><div class="logo">Studio <b>Tapa</b><small>CONNECT</small></div><div class="avatar"></div></div>
+        <div class="card">
+          <span class="eyebrow">Member support</span>
+          <div class="h2">Public profile</div>
+          <p class="vis">Visible to anyone on Studio Tapa TV</p>
+          <div class="row"><span class="btn olive">Set up payouts with Stripe →</span><span class="badge">Creator</span></div>
+          <div class="row"><span class="btn back">◀ Back</span><span class="btn">Open Stripe dashboard →</span><span class="link">Your earnings →</span></div>
+          <div class="row"><span class="chip on">Picked you</span><span class="chip olive">Stripe · live</span><span class="chip ok">Paid</span><span class="chip warn">Needs details</span><span class="chip danger">Failed</span></div>
+          <p class="err">A payout didn’t reach your bank. Check your bank details in Stripe.</p>
+          <p class="fine">2 members have you in their lineup. Your share never changes what a member pays.</p>
+        </div>
+        <div class="card">
+          <div class="row"><span class="stat"><b>$1,847.18</b><span>can leave to the bank</span></span><span class="btn brass">Run now · $35.00</span></div>
+          <div class="adm"><span class="sect">Money</span><span class="lnk on">Studio money</span><span class="lnk">Creator Share payouts</span></div>
+          <div class="row" style="margin-top:10px"><span class="chip mint">Movie</span><span class="chip sky">Short</span><span class="chip rust">Vertical</span><span class="chip on">Premium</span></div>
+          <div class="chart" style="margin-top:8px"></div>
+          <div class="row" style="margin-top:10px"><div class="cal"><i>12</i><i class="booked">13</i><i class="booked">14</i><i class="sel">15</i><i>16</i></div></div>
+          <div class="bubble">See you at the location Saturday, 8am call.</div>
+          <div class="elev"><span style="font-family:var(--font-display);font-weight:700;color:var(--brass)">◆ Back with $20</span><span class="heart"></span></div>
+        </div>
+        <div class="tabs"><span class="tab"><small>⌂</small>Home</span><span class="tab discover"><small>✦</small>Discover</span><span class="tab"><small>▭</small>Watch</span><span class="tab on"><small>●</small>Account</span></div>
+      </div>
+    </div>`;
+  document.getElementById('cols').innerHTML = sample('Today · Tropical pink', 'pal-now') + sample('A · Tangerine', 'pal-a') + sample('B · Persimmon', 'pal-b');
+
+  const tokens = [
+    ['--brass', 'Accent: logo, headings, active tab, hot chips'],
+    ['--brass-deep', 'Accent, deep: hovers, dark fills'],
+    ['--olive', 'Secondary: buttons, links, Back, creator badge'],
+    ['--olive-bright', 'Secondary, bright: hover, big numbers'],
+    ['--olive-deep', 'Secondary, deep: borders, disabled'],
+    ['--warn', 'Status: warning'],
+    ['--danger', 'Status: danger / error text'],
+    ['--rust', 'Content tag: vertical video']
+  ];
+  const now = { '--brass':'#f85f73','--brass-deep':'#811826','--olive':'#e7a255','--olive-bright':'#f2bf88','--olive-deep':'#96642c','--warn':'#e0863c','--danger':'#d67c51','--rust':'#c85924' };
+  const pals = {
+    'A · Tangerine': { '--brass':'#ff8c42','--brass-deep':'#8a3a0f','--olive':'#f2c14e','--olive-bright':'#f8d98a','--olive-deep':'#9a7b1f','--warn':'#edb53f','--danger':'#ef5b5b','--rust':'#c85924' },
+    'B · Persimmon': { '--brass':'#f4733a','--brass-deep':'#7f2a12','--olive':'#f2c14e','--olive-bright':'#f8d98a','--olive-deep':'#9a7b1f','--warn':'#edb53f','--danger':'#ef5b5b','--rust':'#c85924' }
+  };
+  const lum = (hex) => { const n = parseInt(hex.slice(1), 16); return [16, 8, 0].map((s) => ((n >> s) & 255) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4))).reduce((a, c, i) => a + c * [0.2126, 0.7152, 0.0722][i], 0); };
+  const ratio = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+  const cell = (r) => `<span class="cr ${r >= 7 ? 'aaa' : r >= 4.5 ? 'aa' : 'fail'}">${r.toFixed(1)}</span>`;
+  document.getElementById('swatches').innerHTML = Object.entries(pals).map(([name, p]) => `
+    <div class="frame">
+      <div class="col-title"><b>${name}</b></div>
+      <div class="scroll"><table class="swatches">
+        <tr><th>Token</th><th>Today</th><th>New</th><th>On page</th><th>On card</th><th>Role</th></tr>
+        ${tokens.map(([k, role]) => `<tr><td>${k}</td><td><span class="sw" style="background:${now[k]}"></span>${now[k]}</td><td><span class="sw" style="background:${p[k]}"></span>${p[k]}</td><td>${cell(ratio(p[k], '#0c131f'))}</td><td>${cell(ratio(p[k], '#18243c'))}</td><td style="font-family:var(--font-body);font-size:.8rem;color:var(--ink-dim)">${role}</td></tr>`).join('')}
+      </table></div>
+      <p class="fine" style="margin-top:8px">Ratios are for text in that colour on that surface; the deep tones are used as fills and borders, never as text, which is why they score low.</p>
+    </div>`).join('');
+</script>
+</body>
+</html>
