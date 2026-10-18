@@ -206,7 +206,7 @@ function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) 
       if (cents > 0) { subtotal = cents; how = 'your offer'; }
     }
     if (subtotal == null) return null;
-    return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: DEFAULT_CUT_PERCENT }), how };
+    return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: l.cutPercent ?? DEFAULT_CUT_PERCENT }), how };
   }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, l, days]);
 
   async function submit() {

@@ -10,7 +10,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getListing } from '../../lib/locations';
 import { getOwnCard } from '../../lib/crewCards';
 import { getSupabase } from '../../lib/supabase';
-import { FEATURES, CANCELLATION, PERMIT_HELP, quoteFor, splitBooking, dollars, dayCount, MIN_BOOKING_CENTS, MAX_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
+import { FEATURES, CANCELLATION, PERMIT_HELP, quoteFor, splitBooking, dollars, dayCount, hoursBetween, MIN_BOOKING_CENTS, MAX_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
 
 // One place (mockups/locations-v1.html §2): gallery, the facts a scout
 // wants, availability, the host, and the request panel. The host sees
@@ -212,15 +212,6 @@ export default function ListingPage(props) {
 
 /* ---------------- the request panel ---------------- */
 
-function hoursBetween(from, to) {
-  if (!from || !to) return null;
-  const [fh, fm] = from.split(':').map(Number);
-  const [th, tm] = to.split(':').map(Number);
-  let h = (th + tm / 60) - (fh + fm / 60);
-  if (h <= 0) h += 24;
-  return Math.round(h * 2) / 2;
-}
-
 function RequestPanel({ listing: l, projects, dates, setDates }) {
   const router = useRouter();
   const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
@@ -245,7 +236,7 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
       if (cents > 0) { subtotal = cents; how = 'your offer'; }
     }
     if (subtotal == null) return null;
-    return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: DEFAULT_CUT_PERCENT }), how };
+    return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: l.cutPercent ?? DEFAULT_CUT_PERCENT }), how };
   }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, l, days]);
 
   async function submit(e) {

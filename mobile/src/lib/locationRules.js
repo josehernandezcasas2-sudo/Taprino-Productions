@@ -75,7 +75,8 @@ export function hoursBetween(from, to) {
   const [th, tm] = to.split(':').map(Number);
   let h = (th + tm / 60) - (fh + fm / 60);
   if (h <= 0) h += 24;
-  return Math.round(h * 2) / 2;
+  // Whole hours, the way the server prices a request (lib/locationRules.js).
+  return Math.max(1, Math.round(h));
 }
 
 export const STATUS_LABEL = { pending: 'In review', listed: 'Listed', paused: 'Paused', rejected: 'Not approved', removed: 'Removed' };
