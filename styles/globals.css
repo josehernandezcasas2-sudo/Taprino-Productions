@@ -9727,3 +9727,14 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .tc-actions { display: flex; gap: 0.5rem; justify-content: flex-end; flex-wrap: wrap; }
 @media (max-width: 860px) { .tc-stats { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 640px) { .tc-row { grid-template-columns: 22px minmax(0, 1fr); } .tc-chips { grid-column: 2; justify-content: flex-start; } }
+
+/* /admin/applications: Invite to apply */
+.ap-invite-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center; }
+.ap-invite-actions .account-btn-secondary, .ap-invite-actions .account-btn-primary { width: auto; margin: 0; padding: 0.55rem 1.1rem; font-size: 0.82rem; }
+.ap-invite { margin-top: 1rem; max-width: 640px; }
+.ap-invite-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0 0.8rem; }
+.ap-invite label { display: block; }
+.ap-invite .ap-invite-actions { justify-content: flex-end; }
+.ap-invite p.ap-invite-ok { color: var(--ok); }
+.ap-invite p.ap-invite-err { color: var(--danger); }
+@media (max-width: 640px) { .ap-invite-row { grid-template-columns: 1fr; } }

@@ -30,6 +30,40 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
   const [openId, setOpenId] = useState(null);
   const [notes, setNotes] = useState({});
   const [flash, setFlash] = useState({});
+  // "Invite to apply" (top of the page): emails someone the /apply link.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invite, setInvite] = useState({ email: '', name: '', note: '' });
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const applyUrl = `${SITE.productionDomain}/apply`;
+
+  async function sendInvite(e) {
+    e.preventDefault();
+    setInviteBusy(true);
+    setInviteMsg(null);
+    try {
+      const res = await fetch('/api/admin/application-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invite) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send the invite.');
+      setInviteMsg({ ok: true, text: `Invite sent to ${data.email}.` });
+      setInvite({ email: '', name: '', note: '' });
+    } catch (err) {
+      setInviteMsg({ ok: false, text: err.message });
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function copyApplyLink() {
+    try {
+      await navigator.clipboard.writeText(applyUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy the apply link:', applyUrl);
+    }
+  }
 
   async function load() {
     try {
@@ -90,8 +124,28 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
               and emails them; they upload the master there and it lands in <Link href="/admin/review">Review</Link>.
             </p>
           </div>
-          <Link href="/admin" className="library-back">← Back to admin</Link>
+          <div className="ap-invite-actions">
+            <button type="button" className="account-btn-secondary" onClick={copyApplyLink}>{copied ? 'Link copied' : 'Copy apply link'}</button>
+            <button type="button" className="account-btn-primary" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null); }} aria-expanded={inviteOpen}>Invite to apply</button>
+          </div>
         </div>
+
+        {inviteOpen && (
+          <form className="account-card ap-invite" onSubmit={sendInvite}>
+            <div className="account-eyebrow">Invite to apply</div>
+            <p>They get an email from {SITE.studio} with a link to <a href={applyUrl} target="_blank" rel="noopener noreferrer">{applyUrl.replace(/^https?:\/\//, '')}</a>. Nothing is created until they apply.</p>
+            <div className="ap-invite-row">
+              <label><span className="account-field-label">Email</span><input type="email" required value={invite.email} onChange={(e) => setInvite((v) => ({ ...v, email: e.target.value }))} placeholder="name@example.com" /></label>
+              <label><span className="account-field-label">Name (optional)</span><input type="text" maxLength={80} value={invite.name} onChange={(e) => setInvite((v) => ({ ...v, name: e.target.value }))} placeholder="Used in “Hi …”" /></label>
+            </div>
+            <label><span className="account-field-label">A note from you (optional)</span><textarea rows={3} maxLength={1000} value={invite.note} onChange={(e) => setInvite((v) => ({ ...v, note: e.target.value }))} placeholder="Saw your short at the festival and loved it…" /></label>
+            {inviteMsg && <p className={inviteMsg.ok ? 'ap-invite-ok' : 'ap-invite-err'}>{inviteMsg.text}</p>}
+            <div className="ap-invite-actions">
+              <button type="button" className="account-btn-secondary" onClick={() => setInviteOpen(false)}>Close</button>
+              <button type="submit" className="account-btn-primary" disabled={inviteBusy || !invite.email.trim()}>{inviteBusy ? 'Sending…' : 'Send invite'}</button>
+            </div>
+          </form>
+        )}
 
         {error && <div className="house-ad-error" style={{ marginTop: '1rem' }}>{error}</div>}
 
