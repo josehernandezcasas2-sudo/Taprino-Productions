@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
-import { apiGet, apiPost } from '../lib/api';
+import { apiGet, apiPost, freshToken } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 
 // The creator's payout setup and money — the app's twin of
@@ -27,14 +27,18 @@ export default function PayoutsCard({ showEarningsLink = true }) {
   const { getToken } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
+  // Why the GET failed, kept apart from the Stripe-button errors: with no
+  // data yet the card says so with a Try again instead of "Checking…" forever.
+  const [loadError, setLoadError] = useState(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async (sync) => {
+    setLoadError(null);
     try {
-      const token = await getToken();
+      const token = await freshToken(getToken);
       setData(await apiGet(`/api/creator/payouts${sync ? '?sync=1' : ''}`, token));
     } catch (err) {
-      setError(err.message);
+      setLoadError(err.message || 'Something went wrong.');
     }
   }, [getToken]);
   useFocusEffect(useCallback(() => { load(false); }, [load]));
@@ -43,7 +47,7 @@ export default function PayoutsCard({ showEarningsLink = true }) {
     setBusy(true);
     setError(null);
     try {
-      const token = await getToken();
+      const token = await freshToken(getToken);
       const d = await apiPost('/api/creator/payouts', { action }, token);
       await WebBrowser.openBrowserAsync(d.url);
       await load(true);
@@ -54,11 +58,12 @@ export default function PayoutsCard({ showEarningsLink = true }) {
     }
   }
 
-  const state = data ? (data.configured ? data.state : 'off') : 'loading';
+  const state = data ? (data.configured ? data.state : 'off') : loadError ? 'failed' : 'loading';
   const summary = data && data.summary;
   const needs = data && data.account && data.account.requirementsDue && data.account.requirementsDue.length > 0;
   const status = {
     loading: [colors.inkFaint, 'Checking…'],
+    failed: [colors.danger, 'Couldn’t check'],
     off: [colors.inkFaint, 'Not available yet'],
     none: [colors.inkFaint, 'Not set up'],
     incomplete: [colors.warn, 'Needs details'],
@@ -67,6 +72,7 @@ export default function PayoutsCard({ showEarningsLink = true }) {
   }[state];
 
   const copy = {
+    failed: `Couldn’t load your payout details: ${loadError}`,
     off: 'Once payments are switched on for this site, this is where you’ll connect a bank account to take backing.',
     none: 'Connect a bank account so your projects can take backing. Money goes to your own Stripe account, minus Studio Tapa’s cut, and pays out to your bank. About five minutes: have your ID and bank details ready.',
     incomplete: 'Stripe still needs a few details before your projects can take backing.',
@@ -85,6 +91,11 @@ export default function PayoutsCard({ showEarningsLink = true }) {
       </View>
 
       {copy ? <Text style={styles.copy}>{copy}</Text> : null}
+      {state === 'failed' ? (
+        <Pressable style={styles.btnSecondary} onPress={() => load(false)}>
+          <Text style={styles.btnSecondaryText}>Try again</Text>
+        </Pressable>
+      ) : null}
       {primaryLabel ? (
         <Pressable style={[state === 'review' && !needs ? styles.btnSecondary : styles.btnPrimary, busy && styles.disabled]} disabled={busy} onPress={() => go('onboard')}>
           <Text style={state === 'review' && !needs ? styles.btnSecondaryText : styles.btnPrimaryText}>{busy ? 'Opening Stripe…' : primaryLabel}</Text>
@@ -137,6 +148,7 @@ export default function PayoutsCard({ showEarningsLink = true }) {
       {state === 'ready' && !summary ? <Text style={styles.copy}>{data.summaryError || 'Backing to your approved projects lands in your Stripe account and pays out to your bank on Stripe’s schedule.'}</Text> : null}
 
       {error ? <Text style={[styles.copy, { color: colors.danger, marginTop: 6 }]}>{error}</Text> : null}
+      {data && loadError ? <Text style={[styles.copy, { color: colors.danger, marginTop: 6 }]}>Couldn’t refresh: {loadError}</Text> : null}
 
       {state === 'ready' ? (
         <View style={styles.foot}>
