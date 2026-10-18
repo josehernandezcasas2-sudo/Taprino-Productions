@@ -278,7 +278,7 @@ export default function Home() {
               {openToWork.map((p, i) => (
                 <Pressable key={p.userId} style={[styles.crewCard, { transform: [{ rotate: i % 2 ? '0.7deg' : '-0.6deg' }] }]} onPress={() => router.push(p.profilePath)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} size={32} />
+                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom || 1} size={32} />
                     <Text style={styles.crewName} numberOfLines={1}>{p.displayName}</Text>
                   </View>
                   {p.tier ? <TierChip person={p} /> : null}

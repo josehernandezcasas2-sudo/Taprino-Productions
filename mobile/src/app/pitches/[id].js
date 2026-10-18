@@ -267,7 +267,7 @@ export default function PitchDetail() {
     );
   }
 
-  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null } = state.data;
+  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorAvatarPosition = null, creatorAvatarZoom = null, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null } = state.data;
   const creatorName = pitch.creator_name || creatorDisplayName;
 
   const raisedForPct = pitch.funding_enabled ? (currentTotalRaisedCents || 0) / 100 : (pitch.funding_raised || 0);
@@ -445,7 +445,7 @@ export default function PitchDetail() {
               >
                 <View style={styles.creatorAvatar}>
                   {creatorAvatarUrl
-                    ? <SmartImage uri={creatorAvatarUrl} style={absoluteFill} />
+                    ? <PositionedImage uri={creatorAvatarUrl} position={creatorAvatarPosition} zoom={creatorAvatarZoom || 1} style={absoluteFill} />
                     : <Text style={styles.creatorAvatarText}>{creatorName[0].toUpperCase()}</Text>}
                 </View>
                 <Text style={styles.creatorText}>by <Text style={pitch.created_by ? styles.creatorLink : null}>{creatorName}</Text></Text>
