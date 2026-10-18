@@ -93,7 +93,7 @@ export default function SnippetsDiscover() {
     async function load() {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        const feed = await apiGet('/api/snippets-feed', token);
+        const feed = await apiGet(`/api/snippets-feed${requestedPostId ? `?post=${encodeURIComponent(requestedPostId)}` : ''}`, token);
         if (cancelled) return;
         setFeedState({ loading: false, error: null, feed });
 

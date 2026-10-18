@@ -20,6 +20,6 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
-  const data = await getSnippetsFeedData(req);
+  const data = await getSnippetsFeedData(req, { postId: req.query.post || null });
   return res.status(200).json(data);
 }

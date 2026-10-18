@@ -19,12 +19,12 @@ import { SITE } from '../../lib/siteConfig';
 // carries a lot of catalog-only machinery (entitlement filtering, series
 // grouping, personalization) that doesn't apply here and would just be
 // dead weight on every request.
-export async function getServerSideProps({ req, res }) {
+export async function getServerSideProps({ req, res, query }) {
   // Per-viewer (PostMenu shows edit/delete only to a post's own owner,
   // report only to signed-in viewers) — same reasoning as
   // pages/vertical/discover.js's own Cache-Control.
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const data = await getSnippetsFeedData(req);
+  const data = await getSnippetsFeedData(req, { postId: query.post || null });
   return { props: data };
 }
 
