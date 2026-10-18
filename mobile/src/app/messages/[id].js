@@ -15,7 +15,7 @@ import { Avatar, Chip } from '../../components/CrewBits';
 const POLL_MS = 10000;
 const MAX_CHARS = 2000;
 const REASONS = { copyright: 'Stolen or copyrighted', sexual: 'Sexual content', violence: 'Violence or graphic', hate: 'Hate or harassment', spam: 'Spam or misleading', broken: "Won't play or broken" };
-const CTX_LABEL = { gear: 'About gear', call: 'About a call', card: 'From a card', profile: 'From a profile' };
+const CTX_LABEL = { gear: 'About gear', call: 'About a call', card: 'From a card', profile: 'From a profile', location: 'About a place' };
 
 function fmtTime(iso) {
   const d = new Date(iso);

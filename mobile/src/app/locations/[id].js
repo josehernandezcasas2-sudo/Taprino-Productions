@@ -132,7 +132,7 @@ export default function ListingScreen() {
               </Pressable>
               {!l.mine ? (
                 <View style={crew.row}>
-                  {signedIn ? <Pressable style={crew.btnSm} onPress={() => router.push(`/messages?to=${encodeURIComponent(l.host.userId)}&kind=location&label=${encodeURIComponent(l.title)}`)}><Text style={crew.btnSmText}>Ask about a date</Text></Pressable> : null}
+                  {signedIn ? <Pressable style={crew.btnSm} onPress={() => router.push({ pathname: '/messages/new', params: { to: l.host.userId, kind: 'location', label: l.title } })}><Text style={crew.btnSmText}>Ask about a date</Text></Pressable> : null}
                   <Pressable style={crew.btnSm} onPress={() => router.push(l.host.profilePath)}><Text style={crew.btnSmText}>Profile</Text></Pressable>
                 </View>
               ) : null}
