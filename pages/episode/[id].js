@@ -356,9 +356,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
           ) : (
             <VideoPlayer
               episode={playingEpisode}
-              // Ads follow the membership tier, not "any member": Standard
-              // still gets them (lib/membershipTiers.js adFree).
-              adsEnabled={!showingTrailer && !adFree && !isAdmin && episode.tier === 'free' && episode.adsEnabled !== false}
+              // Ads follow the membership tier, not the title: Standard members
+              // get them on premium titles too; only Premium/Sponsor are
+              // ad-free (lib/membershipTiers.js adFree).
+              adsEnabled={!showingTrailer && !adFree && !isAdmin && episode.adsEnabled !== false}
               onEnded={handleEnded}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
@@ -413,7 +414,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                     repeated the runtime a second time — everything about
                     this episode's status now lives in this one row. */}
                 <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
-                  {episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
+                  {episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · members`}
                 </span>
                 {describedActive && (
                   <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>🔊 Audio described</span>

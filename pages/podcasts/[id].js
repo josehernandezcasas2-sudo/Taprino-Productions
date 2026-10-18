@@ -25,7 +25,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
-export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, show, episodes }) {
+export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes }) {
   const player = usePodcastPlayer();
   const iconOverrides = usePlayerIconOverrides();
   const firstEpisode = episodes[0];
@@ -144,7 +144,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
                 <VideoPlayer
                   episode={ep}
                   signedPlayback={Boolean(ep.signedPlayback)}
-                  adsEnabled={!isSubscriber && !isAdmin && ep.tier === 'free' && ep.adsEnabled !== false}
+                  adsEnabled={!adFree && !isAdmin && ep.adsEnabled !== false}
                   onEnded={() => setExpandedVideoId(null)}
                 />
               </div>
