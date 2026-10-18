@@ -4,7 +4,7 @@ import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
 import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
-import { recordAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
+import { recordAdCreditPurchase, reverseAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
@@ -63,16 +63,29 @@ export default async function handler(req, res) {
   // Subscription status is read live from Stripe on every page load (see
   // pages/index.js), so those cases only log. Ad credits and creator
   // payout accounts do get written here.
+  //
+  // The event row above is written before any work is done, so a step
+  // that fails must hand the event back to Stripe: run() collects the
+  // failures and the end of the handler removes the row and answers 500,
+  // and Stripe retries the whole event. Every step run() wraps is safe
+  // to run twice (each checks the state it's moving from).
+  const failed = [];
+  const run = async (name, fn) => {
+    try {
+      return await fn();
+    } catch (err) {
+      console.error(`${name} from webhook failed:`, err.message);
+      failed.push(name);
+      return null;
+    }
+  };
+
   switch (event.type) {
     case 'account.updated': {
       // A creator's Connect onboarding moved: details submitted, charges
       // enabled, or Stripe asking for more. Mirror it so the Get paid
       // card and the admin funding switch see the same thing Stripe does.
-      try {
-        await syncAccountFromStripe(event.data.object);
-      } catch (err) {
-        console.error('syncAccountFromStripe from webhook failed:', err.message);
-      }
+      await run('syncAccountFromStripe', () => syncAccountFromStripe(event.data.object));
       break;
     }
     case 'checkout.session.completed': {
@@ -96,6 +109,8 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'credits not applied' });
         }
         // Studio money: a row the reconciliation can match the charge to.
+        // Not retried: the credits above are already applied, and a retry
+        // would add them again.
         try {
           await recordAdCreditPurchase(session);
         } catch (err) {
@@ -127,11 +142,7 @@ export default async function handler(req, res) {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
         // Creator Share: remember which member this Stripe customer is,
         // so every later invoice.paid finds them without a Stripe call.
-        try {
-          await recordCheckoutCustomer(session);
-        } catch (err) {
-          console.error('recordCheckoutCustomer from webhook failed:', err.message);
-        }
+        await run('recordCheckoutCustomer', () => recordCheckoutCustomer(session));
       }
       break;
     }
@@ -154,21 +165,16 @@ export default async function handler(req, res) {
       // A chargeback on a membership payment takes back the creator credits
       // that haven't been paid out yet (lib/creatorShare.js).
       const dispute = event.data.object;
-      try {
-        await reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed');
-      } catch (err) {
-        console.error('reverseMembershipCharge (dispute) from webhook failed:', err.message);
-      }
+      await run('reverseMembershipCharge (dispute)', () => reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed'));
+      // A disputed ad-credit purchase: the credits come off the balance.
+      const disputedPi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent && dispute.payment_intent.id;
+      await run('reverseAdCreditPurchase (dispute)', () => reverseAdCreditPurchase({ paymentIntentId: disputedPi, totalReversedCents: dispute.amount, reason: 'disputed' }));
       break;
     }
     case 'checkout.session.expired': {
       const session = event.data.object;
       if (session.metadata?.type === 'pitch_donation') {
-        try {
-          await failDonationFromSession(session, 'checkout expired');
-        } catch (err) {
-          console.error('failDonationFromSession from webhook failed:', err.message);
-        }
+        await run('failDonationFromSession', () => failDonationFromSession(session, 'checkout expired'));
       }
       break;
     }
@@ -176,35 +182,26 @@ export default async function handler(req, res) {
       // A full refund issued from the Stripe dashboard. The admin page's
       // own refunds are marked before Stripe confirms them, so this is
       // a no-op for those.
-      try {
-        await refundDonationFromCharge(event.data.object);
-      } catch (err) {
-        console.error('refundDonationFromCharge from webhook failed:', err.message);
-      }
-      try {
-        await refundBookingFromCharge(event.data.object);
-      } catch (err) {
-        console.error('refundBookingFromCharge from webhook failed:', err.message);
+      await run('refundDonationFromCharge', () => refundDonationFromCharge(event.data.object));
+      await run('refundBookingFromCharge', () => refundBookingFromCharge(event.data.object));
+      // An ad-credit purchase refunded (fully or partly): that much credit
+      // comes off the balance.
+      {
+        const charge = event.data.object;
+        const pi = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent && charge.payment_intent.id;
+        await run('reverseAdCreditPurchase', () => reverseAdCreditPurchase({ paymentIntentId: pi, totalReversedCents: charge.amount_refunded, reason: 'refunded' }));
       }
       // A fully refunded membership payment: its unpaid creator credits
       // are reversed (a partial refund leaves them alone).
       if (event.data.object.refunded) {
-        try {
-          await reverseMembershipCharge(event.data.object, 'refunded');
-        } catch (err) {
-          console.error('reverseMembershipCharge from webhook failed:', err.message);
-        }
+        await run('reverseMembershipCharge', () => reverseMembershipCharge(event.data.object, 'refunded'));
       }
       break;
     }
     case 'customer.subscription.deleted':
       console.log(`${SITE.premiumTier} member cancelled. Stripe customer:`, event.data.object.customer);
       // The referral attribution ends with the subscription.
-      try {
-        await endReferralForSubscription(event.data.object.id);
-      } catch (err) {
-        console.error('endReferralForSubscription from webhook failed:', err.message);
-      }
+      await run('endReferralForSubscription', () => endReferralForSubscription(event.data.object.id));
       break;
     case 'invoice.payment_failed':
       console.log('Payment failed for customer:', event.data.object.customer);
@@ -212,11 +209,7 @@ export default async function handler(req, res) {
     case 'transfer.reversed': {
       // A Creator Share payout reversed in the Stripe dashboard: the
       // credits are owed to the creator again.
-      try {
-        await syncPayoutReversal(event.data.object);
-      } catch (err) {
-        console.error('syncPayoutReversal from webhook failed:', err.message);
-      }
+      await run('syncPayoutReversal', () => syncPayoutReversal(event.data.object));
       break;
     }
     case 'payout.paid':
@@ -224,16 +217,16 @@ export default async function handler(req, res) {
     case 'payout.canceled': {
       // The platform's own payouts to the bank: a studio sweep's row
       // follows Stripe's status; Stripe's automatic payouts match no row.
-      try {
-        await syncSweepFromPayout(event.data.object);
-      } catch (err) {
-        console.error('syncSweepFromPayout from webhook failed:', err.message);
-      }
+      await run('syncSweepFromPayout', () => syncSweepFromPayout(event.data.object));
       break;
     }
     default:
       break;
   }
 
+  if (failed.length) {
+    await getSupabase().from('stripe_events').delete().eq('id', event.id);
+    return res.status(500).json({ error: `not applied: ${failed.join(', ')}` });
+  }
   res.json({ received: true });
 }
