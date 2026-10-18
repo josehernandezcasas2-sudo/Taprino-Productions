@@ -51,7 +51,7 @@ export default function Terms({ account }) {
   return (
     <LegalLayout
       title="Terms of Service"
-      updated="October 10, 2026"
+      updated="October 18, 2026"
       account={account}
       summary={
         <>
@@ -59,14 +59,16 @@ export default function Terms({ account }) {
           subscription you can cancel any time. If you upload work, <strong>you keep ownership of
           it</strong> — you&rsquo;re giving us permission to stream it, not signing it over. Don&rsquo;t
           upload things you don&rsquo;t have the rights to, and don&rsquo;t try to rip our video.
+          We&rsquo;re in private testing, and these terms may still be revised before we open to the
+          public (section 15).
         </>
       }
     >
       <h2>1. Who these terms are between</h2>
       <p>
-        These terms are between you and {SITE.studio}{SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}, which operates {SITE.name}
-        Transmission. Using the site means you accept them. If you don&rsquo;t, please don&rsquo;t use
-        it.
+        These terms are between you and {SITE.legalName}, doing business as {SITE.studio}
+        {SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}, which operates {SITE.name}. Using the site means you
+        accept them. If you don&rsquo;t, please don&rsquo;t use it.
       </p>
 
       <h2>2. Accounts</h2>
@@ -99,6 +101,20 @@ export default function Terms({ account }) {
         affects them. Membership benefits may change over time; we won&rsquo;t remove a benefit that
         was the main reason you subscribed without telling you first.
       </p>
+      <p>
+        <strong>Your creator share.</strong> We pay the people who make what&rsquo;s on {SITE.name} a
+        share of our membership revenue. For each paid membership that share is $2.00 a month on
+        Standard, $3.50 on Premium and $1.50 on Sponsor. You choose who receives it by naming up to 10
+        creators on your account page (Artist Support); we split it between them, equally unless you
+        set your own shares, each time your membership renews. If you haven&rsquo;t named anyone, we
+        allocate it to the creators of the titles you watched in the 30 days before the renewal, and
+        if you watched nothing, among creators on the platform in proportion to how much their work
+        was watched. Changing your list affects future renewals only. This is how we share our own
+        revenue: it is not a payment from you to a creator, not a donation and not a purchase, it is
+        not tax-deductible, and it gives you nothing beyond the membership itself. If you joined
+        through a creator&rsquo;s link, that creator is your first pick until you change it, and we
+        pay them a referral bonus that doesn&rsquo;t come out of your share.
+      </p>
 
       <h2 id="submit-work">5. If you submit work</h2>
       <p>
@@ -126,9 +142,33 @@ export default function Terms({ account }) {
         uploaded without the rights to it, you&rsquo;re responsible for that.
       </p>
       <p>
-        <strong>Revenue.</strong> [REVENUE SHARE TERMS — to be finalised. State plainly: what share of
-        ad and subscription revenue creators receive, how it&rsquo;s calculated, the minimum payout
-        threshold, and the payment schedule. Do not launch creator payouts without this filled in.]
+        <strong>Member share.</strong> When a member names you on their account page, or watches your
+        released work under the default described in section 4, we credit you a share of that
+        member&rsquo;s payment. We pay your credits on the 1st of each month once your balance reaches
+        $25; smaller balances carry over. If a member&rsquo;s payment is refunded or reversed, the
+        matching unpaid credit is reversed; if it has already been paid to you, we absorb it. We
+        publish the per-tier amounts and may change them with 30 days&rsquo; notice; a credit already
+        made never changes.
+      </p>
+      <p>
+        <strong>Referral bonus.</strong> When someone becomes a paying member through your creator
+        link, we credit you $1.00 (Standard), $1.50 (Premium) or $0.50 (Sponsor) for each paid renewal
+        of that membership during its first 12 months, on top of any member share. A membership is
+        credited to the last creator link used in the 30 days before joining, once; the bonus stops
+        after 12 months from its first payment, or sooner if the membership is cancelled. You may not
+        refer yourself, pay people to subscribe, or misrepresent {SITE.name} when you share your
+        link, and when you share it you must say that you earn from it. We can cancel a referral that
+        breaks these rules.
+      </p>
+      <p>
+        <strong>Advertising revenue</strong> is not shared with creators at this time. If that changes,
+        we&rsquo;ll update this section with 30 days&rsquo; notice.
+      </p>
+      <p>
+        <strong>Getting paid and taxes.</strong> Payouts go through Stripe Connect to an account in your
+        name. You must be 18 or older to hold one. Until you set one up, your credits wait for you.
+        You&rsquo;re responsible for your own taxes on what we pay you, and Stripe issues tax forms
+        where the law requires them.
       </p>
       <p>
         <strong>Review.</strong> Submissions are reviewed before publication. We can decline or remove
@@ -242,6 +282,12 @@ export default function Terms({ account }) {
       <p>
         We&rsquo;ll update the date at the top. Material changes get 30 days&rsquo; notice by email to
         account holders. Continuing to use the service after that means you accept the new terms.
+      </p>
+      <p>
+        <strong>Before public launch.</strong> {SITE.name} is in private testing. These terms, the
+        creator share in section 5 included, are being reviewed and may be revised before we open to
+        the public. We&rsquo;ll email account holders before a revision takes effect, and no revision
+        reduces credits you&rsquo;ve already earned.
       </p>
 
       <h2>16. Contact</h2>

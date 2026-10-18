@@ -51,7 +51,7 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="August 11, 2026"
+      updated="October 18, 2026"
       account={account}
       summary={
         <>
@@ -65,7 +65,7 @@ export default function Privacy({ account }) {
     >
       <h2>Who we are</h2>
       <p>
-        {SITE.name} is a streaming service operated by {SITE.studio}{SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}.
+        {SITE.name} is a streaming service operated by {SITE.legalName}, doing business as {SITE.studio}{SITE_ADDRESS ? ` (${SITE_ADDRESS})` : ''}.
         For anything in this policy, reach us at {SITE.contactEmail}.
       </p>
 
@@ -82,7 +82,7 @@ export default function Privacy({ account }) {
       <h3>If you make an account</h3>
       <ul>
         <li><strong>Email address and password</strong> — handled by our authentication provider, Clerk. We never see or store your password.</li>
-        <li><strong>Watch progress</strong> — which episodes you&rsquo;ve started and how far in, so you can resume.</li>
+        <li><strong>Watch progress</strong> — which episodes you&rsquo;ve started and how far in, so you can resume. If you&rsquo;re a member and haven&rsquo;t chosen creators on Artist Support, we also use it to allocate the creator share of your membership.</li>
         <li><strong>Your wishlist</strong> — episodes and series you&rsquo;ve saved.</li>
         <li><strong>Email preferences</strong> — whether you want to hear about new drops.</li>
       </ul>
