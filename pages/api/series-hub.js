@@ -35,6 +35,9 @@ export default async function handler(req, res) {
     seriesEpisodes: data.seriesEpisodes,
     bonusContent: data.bonusContent,
     isSignedIn: data.isSignedIn,
-    wishlist: data.wishlist
+    wishlist: data.wishlist,
+    // Buy to own: the series bundle and each episode's price for this viewer.
+    bundle: data.bundle,
+    episodeOffers: data.episodeOffers
   });
 }

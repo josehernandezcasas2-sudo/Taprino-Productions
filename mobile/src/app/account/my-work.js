@@ -11,6 +11,8 @@ import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
+import SellTitleSheet, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/SellTitleSheet';
+import { dollars } from '../../lib/purchaseRules';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -64,7 +66,19 @@ export default function MyWork() {
   const [deleteError, setDeleteError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>"
+  // (/api/creator/pricing) and the title the Sell sheet is open for.
+  const [pricing, setPricing] = useState({ prices: {}, settings: {} });
+  const [sellModal, setSellModal] = useState(null); // { type, id, title, sub }
   const tokenRef = useRef(null);
+
+  async function loadPricing() {
+    try {
+      setPricing(await apiGet('/api/creator/pricing', tokenRef.current));
+    } catch (err) {
+      // The rows just show no price.
+    }
+  }
 
   async function loadSubmissions() {
     try {
@@ -72,6 +86,7 @@ export default function MyWork() {
       tokenRef.current = token;
       const data = await apiGet('/api/creator/my-submissions', token);
       setFeedState({ loading: false, error: null, forbidden: false, submissions: data.submissions });
+      loadPricing();
     } catch (err) {
       const forbidden = /creator access required/i.test(err.message || '');
       setFeedState({ loading: false, error: err.message, forbidden, submissions: null });
@@ -329,6 +344,11 @@ export default function MyWork() {
                           </Text>
                           {s.status === 'rejected' && s.rejectionReason ? <Text style={styles.rowRejection}>Admin's note: {s.rejectionReason}</Text> : null}
                           {s.deletionRequested ? <Text style={styles.rowRejection}>Deletion reason: {s.deletionReason}</Text> : null}
+                          {s.status === 'approved' && pricing.prices[`episode:${s.id}`] ? (() => {
+                            const row = pricing.prices[`episode:${s.id}`];
+                            const st = priceState(row);
+                            return <Text style={[styles.rowPrice, { color: st === 'on' ? colors.ok : st === 'pending' ? colors.olive : colors.inkFaint }]}>{st === 'on' ? `On sale · ${dollars(row.price_cents)}` : st === 'pending' ? `Price in review · ${dollars(row.pending_cents)}` : SELL_STATE_LABEL[st]}</Text>;
+                          })() : null}
                         </View>
                         <View style={styles.rowRight}>
                           <Text style={[styles.statusPill, { color: (STATUS_LABEL[s.status] || {}).color || colors.inkDim }]}>{(STATUS_LABEL[s.status] || {}).text || s.status}</Text>
@@ -363,6 +383,24 @@ export default function MyWork() {
               onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
               onCopyLink={copyPublicLink}
               copiedId={copiedId}
+              pricing={pricing}
+              onSell={(target) => { setActionSheet(null); setSellModal(target); }}
+            /> : null}
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* Buy to own: Sell this title / Run a sale (components/SellTitleSheet.js) */}
+      <Modal visible={!!sellModal} transparent animationType="fade" onRequestClose={() => setSellModal(null)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setSellModal(null)}>
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            {sellModal ? <SellTitleSheet
+              target={sellModal}
+              price={pricing.prices[`${sellModal.type}:${sellModal.id}`] || null}
+              settings={pricing.settings}
+              getToken={() => withTimeout(getToken().catch(() => tokenRef.current), 4000)}
+              onClose={() => setSellModal(null)}
+              onSaved={loadPricing}
             /> : null}
           </Pressable>
         </Pressable>
@@ -420,7 +458,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, copiedId }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, copiedId, pricing, onSell }) {
   const { type, item } = actionSheet;
   if (type === 'series') {
     return (
@@ -428,6 +466,9 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
         <Text style={styles.sheetTitle} numberOfLines={1}>{item.name}</Text>
         <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'series', currentValues: { id: item.id, name: item.name, description: '' } })}>
           <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Edit show details</Text>
+        </Pressable>
+        <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'series', id: item.id, title: item.name, sub: 'Whole series' })}>
+          <Text style={[styles.sheetRowText, { color: colors.olive, fontWeight: '700' }]}>$</Text><Text style={styles.sheetRowText}>{pricing.prices[`series:${item.id}`] ? 'Series price and sales' : 'Sell the whole series'}</Text>
         </Pressable>
         <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/my-work`)}>
           <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Add bonus content (on website)</Text>
@@ -449,6 +490,11 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
           <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
             <LinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{copiedId === s.id ? 'Link copied!' : 'Copy public link'}</Text>
           </Pressable>
+          {!s.deletionRequested && !s.held && s.contentType !== 'bonus' ? (
+            <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'episode', id: s.id, title: s.title, sub: [s.contentType, s.runtime, s.seriesName].filter(Boolean).join(' · ') })}>
+              <Text style={[styles.sheetRowText, { color: colors.olive, fontWeight: '700' }]}>$</Text><Text style={styles.sheetRowText}>{pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell this title'}</Text>
+            </Pressable>
+          ) : null}
         </>
       ) : null}
       {!s.deletionRequested ? (
@@ -563,6 +609,7 @@ const styles = StyleSheet.create({
   rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '600', flexShrink: 1 },
   rowMeta: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
   rowRejection: { color: colors.danger, fontSize: 10, marginTop: 2 },
+  rowPrice: { fontSize: 10, fontWeight: '700', marginTop: 2 },
   rowRight: { alignItems: 'flex-end', gap: 3 },
   statusPill: { fontSize: 10, fontWeight: '700' },
   viewsRow: { flexDirection: 'row', alignItems: 'center' },

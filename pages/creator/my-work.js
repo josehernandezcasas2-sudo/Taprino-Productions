@@ -14,9 +14,11 @@ import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
+import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
 import Footer from '../../components/Footer';
-import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, CloseIcon, UndoIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, CloseIcon, UndoIcon, TicketIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { dollars } from '../../lib/purchaseRules';
 
 const STATUS_LABEL = {
   pending: { text: 'Pending review', color: 'var(--signal-amber)' },
@@ -78,6 +80,34 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [extractProgress, setExtractProgress] = useState(null);
   const [openDropdown, setOpenDropdown] = useState(null); // 'episode:<id>' | 'series:<id>' | null
   const [editRequestTarget, setEditRequestTarget] = useState(null); // { type, currentValues }
+  // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>"
+  // (/api/creator/pricing) and the title the Sell modal is open for.
+  const [pricing, setPricing] = useState({ prices: {}, settings: {} });
+  const [sellTarget, setSellTarget] = useState(null); // { type, id, title, sub }
+
+  async function loadPricing() {
+    try {
+      const res = await fetch('/api/creator/pricing');
+      if (res.ok) setPricing(await res.json());
+    } catch (err) {
+      // The rows just show no price.
+    }
+  }
+  useEffect(() => { loadPricing(); }, []);
+
+  // A short pill for a row: "On sale · $4.99", "In review", …
+  function pricePill(type, id) {
+    const row = pricing.prices[`${type}:${id}`];
+    if (!row) return null;
+    const state = priceState(row);
+    const live = row.price_cents ? dollars(row.price_cents) : null;
+    const sale = row.sale_percent && row.sale_ends_at && new Date(row.sale_ends_at) > new Date();
+    return (
+      <span className={`sell-state ${state}`} style={{ marginLeft: '0.4rem' }}>
+        {state === 'on' ? `On sale · ${live}${sale ? ` · ${row.sale_percent}% off` : ''}` : state === 'pending' ? `In review · ${dollars(row.pending_cents)}` : SELL_STATE_LABEL[state]}
+      </span>
+    );
+  }
 
   async function extractAudio(episodeId) {
     setExtractingId(episodeId);
@@ -362,6 +392,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
               </button>
             )
           )}
+          {s.status === 'approved' && pricePill('episode', s.id)}
           {s.status === 'rejected' && s.rejectionReason && (
             <p className="submission-rejection">Admin's note: {s.rejectionReason}</p>
           )}
@@ -396,6 +427,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           )}
           {!s.deletionRequested && s.contentType !== 'podcast' && (
             <button onClick={() => setCaptionSubmission(s)} title={s.captionsUrl ? 'Replace captions' : 'Add captions'}><ChatIcon size={14} src={iconOverrides.chat} /></button>
+          )}
+          {!s.deletionRequested && s.status === 'approved' && !s.held && s.contentType !== 'bonus' && (
+            <button
+              className={pricing.prices[`episode:${s.id}`] && priceState(pricing.prices[`episode:${s.id}`]) === 'on' ? 'sell-on' : ''}
+              onClick={() => setSellTarget({ type: 'episode', id: s.id, title: s.title, sub: [s.contentType, s.runtime, s.seriesName].filter(Boolean).join(' · ') })}
+              title={pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell this title'}
+            >
+              <TicketIcon size={14} src={iconOverrides.ticket} />
+            </button>
           )}
           {s.deletionRequested ? (
             <button onClick={() => cancelEpisodeDeletion(s.id)} title="Cancel deletion request"><UndoIcon size={14} src={iconOverrides.undo} /></button>
@@ -565,6 +605,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                                   >
                                     ＋ Add bonus content
                                   </button>
+                                  <button
+                                    className="dropdown-item"
+                                    onClick={() => {
+                                      setSellTarget({ type: 'series', id: group.key.replace('series:', ''), title: group.label, sub: `Whole series · ${group.items.length} episode${group.items.length === 1 ? '' : 's'}` });
+                                      setOpenDropdown(null);
+                                    }}
+                                  >
+                                    <TicketIcon size={12} src={iconOverrides.ticket} /> {pricing.prices[group.key] ? 'Series price and sales' : 'Sell the whole series'}
+                                  </button>
                                 </div>
                               )}
                             </span>
@@ -572,6 +621,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                         </div>
                         <div className="project-sub">
                           {group.items.length} episode{group.items.length === 1 ? '' : 's'}
+                          {group.isGrouped && pricePill('series', group.key.replace('series:', ''))}
                           {group.isGrouped && (() => {
                             const sid = group.key.replace('series:', '');
                             const sc = seriesChannel[sid];
@@ -691,6 +741,17 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           currentValues={editRequestTarget.currentValues}
           onClose={() => setEditRequestTarget(null)}
           onSubmitted={loadSubmissions}
+        />
+      )}
+
+      {sellTarget && (
+        <SellTitleModal
+          target={sellTarget}
+          price={pricing.prices[`${sellTarget.type}:${sellTarget.id}`] || null}
+          settings={pricing.settings}
+          isAdmin={isAdmin}
+          onClose={() => setSellTarget(null)}
+          onSaved={loadPricing}
         />
       )}
     </>

@@ -90,6 +90,7 @@ const GROUPS = {
       // The Membership card on /account: status + Manage subscription for
       // members, the Tapa + benefits + Join for everyone else.
       { href: '/account#membership', label: 'Membership' },
+      { href: '/account#purchases', label: 'Your purchases' },
       // Membership Artist Support: the creators a member's share goes to.
       { href: '/artist-support', label: 'Artist Support' },
       { href: '/wishlist', label: 'My List' },

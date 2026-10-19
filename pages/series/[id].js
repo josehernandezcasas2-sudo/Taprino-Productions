@@ -13,9 +13,10 @@ import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/Pla
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
 import { formatRuntimeLong } from '../../lib/videoMetadata';
+import { BundleCard, BuyChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
 
 import Footer from '../../components/Footer';
-export async function getServerSideProps({ req, params, res }) {
+export async function getServerSideProps({ req, params, res, query }) {
   // CDN caching, but ONLY for signed-out visitors.
   //
   // This page returns per-user props (email, wishlist, isAdmin,
@@ -42,12 +43,15 @@ export async function getServerSideProps({ req, params, res }) {
     return { notFound: true };
   }
 
-  return { props: data };
+  // Buy to own: ?bought=<id> is Checkout bringing a buyer back.
+  return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [] }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], bundle = null, episodeOffers = {}, bought = null }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
+  const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
+  const ownsEp = (ep) => Boolean(episodeOffers[ep.id] && episodeOffers[ep.id].owned);
 
   // Group by season — episodes without an explicit season default to 1, so
   // existing single-season series don't need every episode retagged.
@@ -119,6 +123,20 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
       <main className="library-stage">
         <BackButton fallbackHref="/stream" />
 
+        <BoughtBanner bought={bought} title={bought && bought !== 'cancelled' && bundle && bundle.owned ? `${seriesInfo.name} (the whole series)` : seriesInfo.name} email={email} />
+        {bundle && bundle.owned && (
+          <p className="own-fine" style={{ margin: '0.8rem 0 1rem' }}>You own this series: every episode plays ad-free, including ones added later.</p>
+        )}
+        <BundleCard
+          bundle={bundle}
+          series={seriesInfo}
+          creatorName={seriesArtist}
+          isSignedIn={isSignedIn}
+          isSubscriber={isSubscriber}
+          episodeTitles={Object.fromEntries(seriesEpisodes.map((e) => [e.id, e.seriesOrder ? `Episode ${e.seriesOrder}` : e.title]))}
+        />
+        {buyError && <p className="own-error">{buyError}</p>}
+
         <div className="series-tabs">
           <button className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>
           {bonusContent.length > 0 && (
@@ -154,7 +172,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                       <div className="episode-row-thumb">
                         {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
                         <span className="episode-row-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-                        {!ep.thumbnail && (ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
+                        {!ep.thumbnail && (ep.tier === 'premium' && !isSubscriber && !ownsEp(ep) ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> {ownsEp(ep) ? 'yours' : 'preview'}</>)}
                       </div>
                       <div className="episode-row-info">
                         <h4>{ep.title}</h4>
@@ -168,6 +186,9 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                         <p>{ep.desc}</p>
                       </div>
                     </Link>
+                    {/* Buy to own: the episode's own price, or Owned. A
+                        bought series covers every episode. */}
+                    <BuyChip offer={episodeOffers[ep.id]} onBuy={() => buyTitle('episode', ep.id)} busy={buyBusy} />
                   </div>
                 ))}
               </div>

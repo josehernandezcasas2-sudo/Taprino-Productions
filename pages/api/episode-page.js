@@ -42,12 +42,16 @@ export default async function handler(req, res) {
     return res.status(200).json({ ageRestricted: true, requiredRating: data.requiredRating, requiredAge: data.requiredAge ?? null, isSignedIn: data.isSignedIn });
   }
 
-  const entitled = data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin;
+  const entitled = data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin || Boolean(data.purchase && data.purchase.owned);
   return res.status(200).json({
     episode: stripForViewer(data.episode, entitled),
     isSignedIn: data.account.isSignedIn,
     isSubscriber: data.account.isSubscriber,
     adFree: data.account.adFree,
+    // Buy to own: the price (or ownership) of this title and its series.
+    purchase: data.purchase,
+    bundle: data.bundle,
+    withdrawn: Boolean(data.withdrawn),
     // Where to pick up (seconds), from the same Stripe-held progress the
     // website resumes from; 0 when there's nothing worth resuming.
     resumeSeconds: (data.account.watchProgress && Number(data.account.watchProgress[data.episode.id])) || 0,

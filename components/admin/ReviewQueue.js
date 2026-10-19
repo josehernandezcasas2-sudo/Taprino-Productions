@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminReviewAdModal from '../AdminReviewAdModal';
 
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place', price: 'Price' };
 
 // The merged "needs your review" list, fed by /api/admin/review-queue.
 // Used in two places: the dashboard (compact, `limit` rows, link to see
@@ -85,7 +85,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     <div>
       {!compact && (
         <div className="rq-filters">
-          {[['all', 'All', counts.total], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['series', 'Series', counts.series], ['channel', 'Channel uploads', counts.channel], ['location', 'Places', counts.location]].map(([k, label, n]) => (
+          {[['all', 'All', counts.total], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['series', 'Series', counts.series], ['channel', 'Channel uploads', counts.channel], ['location', 'Places', counts.location], ['price', 'Prices', counts.price]].map(([k, label, n]) => (
             <button key={k} type="button" className={`rq-chip ${filter === k ? 'is-active' : ''}`} onClick={() => setFilter(k)}>
               {label}{n ? ` ${n}` : ''}
             </button>

@@ -1,4 +1,5 @@
-import { findEpisode } from '../../lib/episodes';
+import { findEpisode, findEpisodeForOwner } from '../../lib/episodes';
+import { getOwnership, ownsEpisode } from '../../lib/purchases';
 import { getAccountContext } from '../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../lib/videoSigning';
 import { SITE } from '../../lib/siteConfig';
@@ -39,14 +40,26 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'episodeId is required' });
   }
 
-  const episode = await findEpisode(episodeId);
+  const account = await getAccountContext(req);
+
+  // Bought titles (lib/purchases.js) stay playable for their owners
+  // after a creator-side takedown, so an owner's lookup skips the
+  // catalogue's deletion/expiry filters; a moderation hold still hides it.
+  let episode = await findEpisode(episodeId);
+  const ownership = account.isSignedIn ? await getOwnership(account.userId) : null;
+  let owned = Boolean(episode && ownership && ownsEpisode(ownership, episode));
+  if (!episode && ownership && ownership.purchases.length) {
+    const forOwner = await findEpisodeForOwner(episodeId);
+    if (forOwner && ownsEpisode(ownership, forOwner)) {
+      episode = forOwner;
+      owned = true;
+    }
+  }
   if (!episode || episode.status === 'pending' || episode.status === 'rejected') {
     // Same response for "doesn't exist" and "not published" — no reason to
     // let anyone enumerate unreleased episode ids from this endpoint.
     return res.status(404).json({ error: 'Not found' });
   }
-
-  const account = await getAccountContext(req);
 
   // Same age gate as pages/episode/[id].js — without it, anything that asks
   // this endpoint for a src directly (the mobile app does) could play an
@@ -63,7 +76,7 @@ export default async function handler(req, res) {
   // Every answer below is a credential or per-viewer; never let a shared
   // cache keep one.
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  const entitled = episode.tier === 'free' || account.isSubscriber;
+  const entitled = episode.tier === 'free' || account.isSubscriber || owned;
   if (!entitled) {
     return res.status(403).json({ error: `This episode is for ${SITE.premiumTier} members.` });
   }
@@ -81,5 +94,5 @@ export default async function handler(req, res) {
 
   // Never let this response sit in a shared cache — it's a credential.
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  return res.status(200).json({ src: signed.src, expiresAt: signed.expiresAt, signed: true });
+  return res.status(200).json({ src: signed.src, expiresAt: signed.expiresAt, signed: true, owned });
 }

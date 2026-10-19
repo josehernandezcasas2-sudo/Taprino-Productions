@@ -13,6 +13,8 @@ import { useWatchProgress } from '../../lib/useWatchProgress';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
+import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
+import { dollars } from '../../lib/purchaseRules';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_COLOR = { movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -70,6 +72,8 @@ export default function Episode() {
   const [showPlayer, setShowPlayer] = useState(false);
   const [showingTrailer, setShowingTrailer] = useState(trailer === '1');
   const [playback, setPlayback] = useState({ loading: false, src: null, locked: false, error: null });
+  // Buy to own: bumping this reloads the page after Checkout closes.
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (!id) return undefined;
@@ -91,9 +95,17 @@ export default function Episode() {
       }
     })();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, reloadKey]);
 
   const episode = state.page && state.page.episode;
+  const purchase = state.page && state.page.purchase;
+  const owned = Boolean(purchase && purchase.owned);
+  const { buy, busy: buyBusy } = useBuy({
+    getToken: () => withTimeout(getToken().catch(() => null), 4000),
+    router,
+    isSignedIn: Boolean(state.page && state.page.isSignedIn),
+    onDone: () => setReloadKey((k) => k + 1)
+  });
 
   // Fetch the real (entitlement- and age-checked) src only once the player
   // is actually shown — never for the landing view.
@@ -207,8 +219,8 @@ export default function Episode() {
 
   const saved = isWishlisted(episode.id);
   const runtime = formatRuntimeLong(episode.runtime) || episode.runtime;
-  const tierChip = episode.tier === 'free' ? 'Free tier · ad-supported' : 'Tapa + · ad-free';
-  const eyebrow = showingTrailer ? 'Trailer' : episode.tier === 'premium' ? 'Now screening — Tapa + exclusive' : 'Now screening — free signal';
+  const tierChip = owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : 'Tapa + · ad-free';
+  const eyebrow = showingTrailer ? 'Trailer' : owned ? 'Now screening' : episode.tier === 'premium' ? 'Now screening — Tapa + exclusive' : 'Now screening — free signal';
   const { nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, bonusContent, parentSeriesName, isSignedIn } = page;
 
   return (
@@ -243,14 +255,30 @@ export default function Episode() {
         ) : (
           <View style={styles.playerWrap}>
             {playback.locked ? (
-              <View style={styles.lockPanel}>
-                <Text style={styles.lockGlyph}>{'◈'}</Text>
-                <Text style={styles.lockTitle}>Available to Tapa + members</Text>
-                <Text style={styles.lockBody}>This one only screens for people who&rsquo;ve joined the circle. Members get early drops, deleted scenes, and creator updates before anyone else.</Text>
-                <Pressable style={styles.unlockBtn} onPress={() => router.push('/account')}>
-                  <Text style={styles.unlockText}>Join Tapa +</Text>
-                </Pressable>
-              </View>
+              purchase && purchase.forSale ? (
+                <View style={styles.lockPanel}>
+                  <Text style={styles.lockGlyph}>{'◈'}</Text>
+                  <Text style={styles.lockTitle}>Two ways to watch</Text>
+                  <Text style={styles.lockBody}>Join Tapa + for everything on the site, or buy this one title and keep it.</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, `/episode/${episode.id}`)}>
+                      <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
+                    </Pressable>
+                    <Pressable style={[styles.unlockBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass }]} onPress={() => router.push('/account')}>
+                      <Text style={[styles.unlockText, { color: colors.brass }]}>Join Tapa +</Text>
+                    </Pressable>
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.lockPanel}>
+                  <Text style={styles.lockGlyph}>{'◈'}</Text>
+                  <Text style={styles.lockTitle}>Available to Tapa + members</Text>
+                  <Text style={styles.lockBody}>This one only screens for people who&rsquo;ve joined the circle. Members get early drops, deleted scenes, and creator updates before anyone else.</Text>
+                  <Pressable style={styles.unlockBtn} onPress={() => router.push('/account')}>
+                    <Text style={styles.unlockText}>Join Tapa +</Text>
+                  </Pressable>
+                </View>
+              )
             ) : activeSrc ? (
               <VideoView key={activeSrc} player={player} style={styles.player} contentFit="contain" nativeControls allowsFullscreen />
             ) : playback.error ? (
@@ -268,7 +296,10 @@ export default function Episode() {
 
           <View style={styles.playerCard}>
             <View style={styles.nowHeading}>
-              <Text style={styles.nowEyebrow}>{eyebrow}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <Text style={styles.nowEyebrow}>{eyebrow}</Text>
+                {owned && !showingTrailer ? <View style={{ marginBottom: 8 }}><OwnedChip /></View> : null}
+              </View>
               <Text style={styles.nowTitle}>{episode.title}</Text>
               {episode.desc ? <Text style={styles.nowDesc}>{episode.desc}</Text> : null}
               <View style={styles.creditLine}>
@@ -309,6 +340,24 @@ export default function Episode() {
                 <Pressable style={[styles.chip, { alignSelf: 'flex-start', marginBottom: 14 }]} onPress={() => setShowingTrailer(false)}>
                   <Text style={styles.chipText}>{'▶'} Back to full episode</Text>
                 </Pressable>
+              ) : null}
+              {page.withdrawn ? (
+                <View style={styles.withdrawn}><Text style={styles.withdrawnText}>No longer on Studio Tapa TV · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you.</Text></View>
+              ) : null}
+              {!showingTrailer ? (
+                <View style={{ marginBottom: 16 }}>
+                  <OwnTitleCard
+                    offer={purchase}
+                    bundle={page.bundle}
+                    episode={episode}
+                    creatorName={episode.artist}
+                    isSubscriber={page.isSubscriber}
+                    busy={buyBusy}
+                    onBuy={() => buy('episode', episode.id, `/episode/${episode.id}`)}
+                    onSeePlans={() => router.push('/account')}
+                    onSeries={() => router.push(`/series/${episode.seriesId}`)}
+                  />
+                </View>
               ) : null}
             </View>
           </View>
@@ -437,6 +486,8 @@ const styles = StyleSheet.create({
   resumeText: { fontFamily: fonts.mono, fontSize: 11, color: colors.brass },
   resumeTrack: { width: 100, height: 4, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.15)', overflow: 'hidden' },
   resumeFill: { height: '100%', backgroundColor: colors.brass },
+  withdrawn: { padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.4)', marginBottom: 14 },
+  withdrawnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.inkDim },
 
   // .episode-nav-sidebar (stacked below the card on phones)
   sidebar: { marginTop: 24 },

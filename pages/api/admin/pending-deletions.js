@@ -19,11 +19,13 @@ export default async function handler(req, res) {
       .from('episodes')
       .select('id, title, artist, deletion_reason, deletion_requested_at')
       .eq('deletion_requested', true)
+      .is('withdrawn_at', null)
       .order('deletion_requested_at', { ascending: true }),
     supabase
       .from('series')
       .select('id, name, deletion_reason, deletion_requested_at')
       .eq('deletion_requested', true)
+      .is('withdrawn_at', null)
       .order('deletion_requested_at', { ascending: true })
   ]);
 

@@ -10,7 +10,7 @@ import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://www.studiotapatv.site';
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place', price: 'Price' };
 const SWIPE_THRESHOLD = 90;
 
 // Review on the go (2026-10-08): one item at a time as a card. The video

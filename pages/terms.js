@@ -60,7 +60,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-10-18';
+const TEXT_UPDATED = '2026-10-19';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12 };
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const bonusSpan = (m) => (Number(m) > 0 ? `during its first ${m} months` : 'for as long as that membership lasts');
@@ -81,7 +81,7 @@ export default function Terms({ account, share }) {
           it</strong> — you&rsquo;re giving us permission to stream it, not signing it over. Don&rsquo;t
           upload things you don&rsquo;t have the rights to, and don&rsquo;t try to rip our video.
           We&rsquo;re in private testing, and these terms may still be revised before we open to the
-          public (section 15).
+          public (section 16).
         </>
       }
     >
@@ -333,7 +333,37 @@ export default function Terms({ account, share }) {
         location is used for distance and never shown.
       </p>
 
-      <h2>15. Changes</h2>
+      <h2 id="buying">15. Buying a title</h2>
+      <p>
+        Some films, episodes and series can be bought outright instead of, or as well as, a membership.
+        Buying a title gives you a personal, non-transferable licence to stream it on {SITE.name} and in
+        our app, without ads, for as long as the service exists. It is not a download and not a copy you
+        own; the creator keeps their copyright. The price is set by the creator and checked by us, and
+        a price change only applies to new buyers. Where a creator runs a sale, the sale price is the
+        price.
+      </p>
+      <p>
+        <strong>It stays yours.</strong> If a creator later takes a title down, or leaves {SITE.name},
+        the title leaves the catalogue but keeps playing for the people who bought it. The one
+        exception is a title we are legally required to remove (a copyright claim we uphold, a court
+        order, or content that breaks the law): then we refund every buyer in full and the title is
+        gone for everyone.
+      </p>
+      <p>
+        <strong>Refunds.</strong> You can refund a purchase yourself from your account page within 14
+        days of buying it, as long as you have watched less than 10% of it (for a series, 10% of the
+        episodes together). After that, write to {SITE.contactEmail}; those refunds are at our discretion
+        and final. A refunded title leaves your library. Payment is handled by Stripe, and sales tax is
+        added where the law requires it.
+      </p>
+      <p>
+        <strong>For creators.</strong> A creator who prices a title agrees that buyers keep it under this
+        section, receives their share of each sale as described in section 5, and sees that share
+        reversed when a sale is refunded. A creator can stop selling a title at any time; existing
+        buyers are unaffected.
+      </p>
+
+      <h2>16. Changes</h2>
       <p>
         We&rsquo;ll update the date at the top. Material changes get 30 days&rsquo; notice by email to
         account holders. Continuing to use the service after that means you accept the new terms.
@@ -345,7 +375,7 @@ export default function Terms({ account, share }) {
         reduces credits you&rsquo;ve already earned.
       </p>
 
-      <h2>16. Contact</h2>
+      <h2>17. Contact</h2>
       <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );

@@ -23,6 +23,7 @@ import PayoutsCard from '../../components/PayoutsCard';
 import ReferralCard from '../../components/ReferralCard';
 import { rememberStayInStream } from '../../lib/stayInStream';
 import MemberSupportCard from '../../components/MemberSupportCard';
+import SalesCard from '../../components/SalesCard';
 import ReferredByField from '../../components/ReferredByField';
 import { readVia } from '../../lib/referral';
 
@@ -829,6 +830,7 @@ export default function Account() {
         {/* Payouts — creators and admins only; same card as the web /account */}
         {(dashboard.isCreator || dashboard.isAdmin) ? <PayoutsCard /> : null}
         {(dashboard.isCreator || dashboard.isAdmin) ? <MemberSupportCard /> : null}
+        {(dashboard.isCreator || dashboard.isAdmin) ? <SalesCard /> : null}
         {(dashboard.isCreator || dashboard.isAdmin) ? <ReferralCard /> : null}
 
         {/* Security */}

@@ -6,6 +6,7 @@ import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/l
 import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
 import { recordAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
+import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFromCharge } from '../../lib/purchases';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 
@@ -113,6 +114,16 @@ export default async function handler(req, res) {
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'donation not recorded' });
         }
+      } else if (session.metadata?.type === 'title_purchase') {
+        // Buy to own: the pending row becomes the purchase that grants
+        // the title (lib/purchases.js).
+        try {
+          await completePurchaseFromSession(session);
+        } catch (err) {
+          console.error('completePurchaseFromSession from webhook failed:', err.message);
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'purchase not recorded' });
+        }
       } else if (session.metadata?.type === 'location_booking') {
         // A location booking was paid: the accepted request becomes a
         // confirmed booking and the address unlocks for the producer.
@@ -170,6 +181,14 @@ export default async function handler(req, res) {
           console.error('failDonationFromSession from webhook failed:', err.message);
         }
       }
+      // Buy to own: a Checkout the buyer walked away from.
+      if (session.metadata?.type === 'title_purchase') {
+        try {
+          await failPurchaseFromSession(session, 'checkout expired');
+        } catch (err) {
+          console.error('failPurchaseFromSession from webhook failed:', err.message);
+        }
+      }
       break;
     }
     case 'charge.refunded': {
@@ -185,6 +204,11 @@ export default async function handler(req, res) {
         await refundBookingFromCharge(event.data.object);
       } catch (err) {
         console.error('refundBookingFromCharge from webhook failed:', err.message);
+      }
+      try {
+        await refundPurchaseFromCharge(event.data.object);
+      } catch (err) {
+        console.error('refundPurchaseFromCharge from webhook failed:', err.message);
       }
       // A fully refunded membership payment: its unpaid creator credits
       // are reversed (a partial refund leaves them alone).

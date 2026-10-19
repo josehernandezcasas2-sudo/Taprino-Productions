@@ -7,6 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import { BundleCard, BuyChip, useBuy } from '../../components/BuyBits';
 
 function tierBadge(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
@@ -93,6 +94,14 @@ export default function SeriesHub() {
   const [activeSeason, setActiveSeason] = useState(null);
   const [wishlisted, setWishlisted] = useState(false);
   const tokenRef = useRef(null);
+  // Buy to own: bumping this reloads the hub after Checkout closes.
+  const [reloadKey, setReloadKey] = useState(0);
+  const { buy, busy: buyBusy } = useBuy({
+    getToken: () => withTimeout(getToken().catch(() => tokenRef.current), 4000),
+    router,
+    isSignedIn: Boolean(state.data && state.data.isSignedIn),
+    onDone: () => setReloadKey((k) => k + 1)
+  });
 
   useEffect(() => {
     if (!id) return undefined;
@@ -113,7 +122,7 @@ export default function SeriesHub() {
     }
     load();
     return () => { cancelled = true; };
-  }, [id]);
+  }, [id, reloadKey]);
 
   async function toggleWishlist() {
     if (!state.data) return;
@@ -143,7 +152,8 @@ export default function SeriesHub() {
     );
   }
 
-  const { seriesInfo, seriesEpisodes, bonusContent } = state.data;
+  const { seriesInfo, seriesEpisodes, bonusContent, bundle = null, episodeOffers = {} } = state.data;
+  const ownsEp = (ep) => Boolean(episodeOffers[ep.id] && episodeOffers[ep.id].owned);
   const seasonNumbers = [...new Set(seriesEpisodes.map((e) => e.season || 1))].sort((a, b) => a - b);
   const activeSeasonEpisodes = seriesEpisodes
     .filter((e) => (e.season || 1) === activeSeason)
@@ -189,6 +199,18 @@ export default function SeriesHub() {
           </View>
         </View>
 
+        {bundle && bundle.owned ? (
+          <Text style={styles.ownedSeries}>You own this series: every episode plays ad-free, including ones added later.</Text>
+        ) : null}
+        <BundleCard
+          bundle={bundle}
+          creatorName={seriesArtist}
+          isSubscriber={state.data.isSubscriber}
+          busy={buyBusy}
+          onBuy={() => buy('series', seriesInfo.id, `/series/${seriesInfo.id}`)}
+          ownedNames={(bundle && bundle.ownedEpisodeIds ? bundle.ownedEpisodeIds : []).map((eid) => { const e = seriesEpisodes.find((x) => x.id === eid); return e ? (e.seriesOrder ? `Episode ${e.seriesOrder}` : e.title) : null; }).filter(Boolean)}
+        />
+
         <View style={styles.tabs}>
           <Pressable style={[styles.tab, activeTab === 'episodes' && styles.tabOn]} onPress={() => setActiveTab('episodes')}>
             <Text style={[styles.tabText, activeTab === 'episodes' && styles.tabTextOn]}>Episodes</Text>
@@ -231,7 +253,7 @@ export default function SeriesHub() {
                       </View>
                       {!ep.thumbnail ? (
                         <View style={styles.episodeThumbIconRow}>
-                          {ep.tier === 'premium' ? <LockIcon size={13} /> : <PlayIcon size={13} />}
+                          {ep.tier === 'premium' && !ownsEp(ep) ? <LockIcon size={13} /> : <PlayIcon size={13} />}
                         </View>
                       ) : null}
                     </View>
@@ -243,6 +265,12 @@ export default function SeriesHub() {
                         {ep.rating ? <Text style={styles.metaPill}>{ep.rating}</Text> : null}
                       </View>
                       {ep.desc ? <Text style={styles.episodeDesc} numberOfLines={2}>{ep.desc}</Text> : null}
+                      {/* Buy to own: the episode's own price, or Owned. */}
+                      {episodeOffers[ep.id] ? (
+                        <View style={{ marginTop: 6 }}>
+                          <BuyChip offer={episodeOffers[ep.id]} busy={buyBusy} onBuy={() => buy('episode', ep.id, `/series/${seriesInfo.id}`)} />
+                        </View>
+                      ) : null}
                     </View>
                   </Pressable>
                 );
@@ -313,6 +341,7 @@ const styles = StyleSheet.create({
   saveBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
 
   tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
+  ownedSeries: { color: colors.inkFaint, fontSize: 12.5, lineHeight: 18, paddingHorizontal: 16, paddingTop: 14 },
   tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.surface2 },
   tabOn: { backgroundColor: colors.surface3 },
   tabText: { color: colors.inkDim, fontSize: 13, fontWeight: '600' },

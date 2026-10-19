@@ -5,6 +5,7 @@ import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
 import { invalidateCache } from '../../../lib/redis';
+import { hasBuyersIncludingSeries } from '../../../lib/purchases';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -79,6 +80,27 @@ export default async function handler(req, res) {
     if (count && count > 0) {
       return res.status(400).json({ error: `This series still has ${count} episode${count === 1 ? '' : 's'} attached — reassign or delete those first.` });
     }
+  }
+
+  // Buy to own: a title somebody paid for is never deleted. Confirming
+  // the request withdraws it instead — off the catalogue (the request
+  // flag keeps it hidden), video kept, still playable for its owners.
+  if (await hasBuyersIncludingSeries(type, id)) {
+    const nameCol = type === 'episode' ? 'title' : 'name';
+    const { data: kept } = await supabase.from(table).select(`${nameCol}${type === 'episode' ? ', submitted_by' : ''}`).eq('id', id).maybeSingle();
+    const { error: withdrawError } = await supabase.from(table).update({ withdrawn_at: new Date().toISOString() }).eq('id', id).eq('deletion_requested', true);
+    if (withdrawError) {
+      console.error('resolve-deletion withdraw error:', withdrawError.message);
+      return res.status(500).json({ error: 'Could not withdraw this title.' });
+    }
+    // Nobody new can buy a withdrawn title, so its price comes off too.
+    await supabase.from('title_prices').update({ status: 'off', pending_cents: null, sale_percent: null, sale_ends_at: null }).eq('target_type', type).eq('target_id', id);
+    await invalidateCache(type === 'episode' ? 'public_episodes_v1' : 'all_series_approved_v1');
+    await recordAudit({ adminId: userId, adminEmail: email, action: `withdraw_${type}`, targetType: type, targetId: id, details: kept ? `${kept[nameCol]} · has buyers, kept for them` : undefined });
+    if (type === 'episode' && kept) {
+      await notifyCreator({ userId: kept.submitted_by, type: 'deletion_confirmed', message: `"${kept.title}" is off Studio Tapa TV, as requested. People who bought it keep it, as the Terms say.`, episodeId: null });
+    }
+    return res.status(200).json({ ok: true, type, id, decision: 'confirm', withdrawn: true });
   }
 
   // Fetch what's about to be orphaned before the row itself is gone —

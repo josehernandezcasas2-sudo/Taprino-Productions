@@ -14,6 +14,8 @@ import ReferralCard from '../components/creator/ReferralCard';
 import MemberSupportCard from '../components/creator/MemberSupportCard';
 import MembershipPlans from '../components/MembershipPlans';
 import ReferredByField from '../components/ReferredByField';
+import PurchasesCard from '../components/PurchasesCard';
+import SalesCard from '../components/creator/SalesCard';
 import { cleanViaSlug } from '../lib/creatorShareRules';
 import { memberBadge } from '../lib/membershipTiers';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
@@ -468,6 +470,10 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                 )}
               </div>
 
+              {/* Buy to own: titles this account owns (components/PurchasesCard.js);
+                  shows once there's a purchase. id = the tab bar's row. */}
+              {isSignedIn && <PurchasesCard isSubscriber={isSubscriber} />}
+
 
               <div className="account-card">
                 <div className="account-card-head">
@@ -831,6 +837,7 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
 
               {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}
               {(isCreator || isAdmin) && <MemberSupportCard />}
+              {(isCreator || isAdmin) && <SalesCard />}
               {(isCreator || isAdmin) && <ReferralCard />}
 
               <div className="account-card">

@@ -23,6 +23,9 @@ import AccessibilityPanel from '../../components/AccessibilityPanel';
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
+import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../components/BuyBits';
+import { getPurchaseSettings } from '../../lib/purchases';
+import { dollars } from '../../lib/purchaseRules';
 
 import Footer from '../../components/Footer';
 export async function getServerSideProps({ req, params, query, res }) {
@@ -55,7 +58,11 @@ export async function getServerSideProps({ req, params, query, res }) {
   // object itself still reaches the browser as-is unless we strip it here,
   // server-side, before it's ever included in props. trailerSrc is exempt
   // from this by design — trailers are meant to be freely previewable.
-  const entitled = episode.tier === 'free' || account.isSubscriber;
+  // Buy to own: a buyer is entitled like a member, for this title only
+  // (lib/purchases.js getOffer; the same rule as /api/stream-token).
+  const owned = Boolean(data.purchase && data.purchase.owned);
+  const entitled = episode.tier === 'free' || account.isSubscriber || owned;
+  const purchaseSettings = data.purchase && data.purchase.forSale && !owned ? await getPurchaseSettings() : null;
 
   // Premium video is served through a short-lived Cloudflare signed URL
   // rather than its permanent public one. Free episodes stay on the plain
@@ -63,7 +70,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   let playbackSrc = entitled ? episode.src : null;
   let describedSrc = entitled ? episode.audioDescriptionSrc : null;
   let signedPlayback = false;
-  if (entitled && episode.tier === 'premium' && episode.src) {
+  if (entitled && (episode.tier === 'premium' || owned) && episode.src) {
     const signed = await signedSrcForStoredUrl(episode.src);
     if (signed) {
       playbackSrc = signed.src;
@@ -102,12 +109,19 @@ export async function getServerSideProps({ req, params, query, res }) {
       watchNext: data.watchNext,
       startOnTrailer: query.trailer === '1',
       startPlaying: query.autoplay === '1',
-      signedPlayback
+      signedPlayback,
+      // Buy to own
+      purchase: data.purchase || null,
+      bundle: data.bundle || null,
+      withdrawn: Boolean(data.withdrawn),
+      bought: typeof query.bought === 'string' ? query.bought : null,
+      refundDays: purchaseSettings ? purchaseSettings.refundDays : 14,
+      refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10
     }
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -134,6 +148,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
   const { openSignIn, openSignUp } = useClerk();
   const iconOverrides = usePlayerIconOverrides();
+  // Buy to own: owning the title unlocks it like a membership would, and
+  // turns the ads off (the buyer paid for it).
+  const owned = Boolean(purchase && purchase.owned);
+  const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
 
   // Safe here — every hook the component uses has already run above,
   // unconditionally, on every render. Nothing below this point is a hook,
@@ -188,7 +206,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   }
 
 
-  const locked = episode.tier === 'premium' && !isSubscriber && !showingTrailer;
+  const locked = episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer;
   const playingEpisode = showingTrailer
     ? { ...episode, src: episode.trailerSrc }
     : describedActive && episode.audioDescriptionSrc
@@ -342,23 +360,42 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       ) : (
         <div className="player-full-bleed">
           {locked ? (
-            <div className="lock-panel">
-              <div className="glyph">◈</div>
-              <h3>Available to {SITE.premiumTier} members</h3>
-              <p>
-                This one only screens for people who&rsquo;ve joined the circle. Members get early
-                drops, deleted scenes, and creator updates before anyone else.
-              </p>
-              <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
-                {checkoutLoading ? 'Opening…' : 'See plans'}
-              </button>
-            </div>
+            purchase && purchase.forSale ? (
+              <div className="lock-panel">
+                <div className="glyph">◈</div>
+                <h3>Two ways to watch</h3>
+                <p>
+                  Join {SITE.premiumTier} for everything on the site, or buy this one title and keep it.
+                </p>
+                <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  <button className="unlock-btn" onClick={() => buyTitle('episode', episode.id)} disabled={buyBusy}>
+                    {buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}
+                  </button>
+                  <button className="unlock-btn" style={{ background: 'transparent', border: '1px solid var(--brass)', color: 'var(--brass)' }} onClick={startCheckout} disabled={checkoutLoading}>
+                    {checkoutLoading ? 'Opening…' : 'See plans'}
+                  </button>
+                </div>
+                {buyError && <p className="own-error" style={{ marginTop: '0.6rem' }}>{buyError}</p>}
+              </div>
+            ) : (
+              <div className="lock-panel">
+                <div className="glyph">◈</div>
+                <h3>Available to {SITE.premiumTier} members</h3>
+                <p>
+                  This one only screens for people who&rsquo;ve joined the circle. Members get early
+                  drops, deleted scenes, and creator updates before anyone else.
+                </p>
+                <button className="unlock-btn" onClick={startCheckout} disabled={checkoutLoading}>
+                  {checkoutLoading ? 'Opening…' : 'See plans'}
+                </button>
+              </div>
+            )
           ) : (
             <VideoPlayer
               episode={playingEpisode}
               // Ads follow the membership tier, not "any member": Standard
               // still gets them (lib/membershipTiers.js adFree).
-              adsEnabled={!showingTrailer && !adFree && !isAdmin && episode.tier === 'free' && episode.adsEnabled !== false}
+              adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.tier === 'free' && episode.adsEnabled !== false}
               onEnded={handleEnded}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
@@ -380,15 +417,20 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             }
           />
 
+          <BoughtBanner bought={bought} title={episode.title} email={email} />
+
           <div className="player-info-row">
           <div className="player-card">
             <div className="now-heading">
-              <div className="eyebrow">
+              <div className="eyebrow" style={owned ? { display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' } : undefined}>
                 {showingTrailer
                   ? 'Trailer'
+                  : owned
+                  ? 'Now screening'
                   : episode.tier === 'premium'
                   ? `Now screening — ${SITE.premiumTier} exclusive`
                   : 'Now screening — free signal'}
+                {owned && !showingTrailer && <OwnedChip />}
               </div>
               <h1>{episode.title}</h1>
               <p>{episode.desc}</p>
@@ -413,8 +455,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                     repeated the runtime a second time — everything about
                     this episode's status now lives in this one row. */}
                 <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
-                  {episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
+                  {owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
                 </span>
+                {owned && purchase.boughtAt && (
+                  <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+                )}
                 {describedActive && (
                   <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>🔊 Audio described</span>
                 )}
@@ -450,7 +495,24 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                   ▶ Back to full episode
                 </button>
               )}
+              {withdrawn && (
+                <p className="own-withdrawn">No longer on {SITE.name} · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you here and in the app.</p>
+              )}
             </div>
+
+            {!showingTrailer && (
+              <OwnTitleCard
+                offer={purchase}
+                bundle={bundle}
+                episode={episode}
+                creatorName={episode.artist}
+                isSignedIn={isSignedIn}
+                isSubscriber={isSubscriber}
+                refundDays={refundDays}
+                refundWatchPercent={refundWatchPercent}
+                onSeePlans={startCheckout}
+              />
+            )}
 
             {!locked && (
               <AccessibilityPanel

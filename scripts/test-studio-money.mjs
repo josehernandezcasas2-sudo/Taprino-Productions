@@ -161,4 +161,20 @@ test('normalizeSettings clamps and defaults; dollars signs', () => {
   assert.equal(dollars(125018), '$1,250.18');
 });
 
+
+test('purchases lane (Buy to own): charges and their transfers by payment intent; expected = the studio share after Stripe', () => {
+  const pIds = { ...ids, purchaseIntents: new Set(['pi_p1']) };
+  const charge = { id: 'txn_p1', reporting_category: 'charge', amount: 499, fee: 44, net: 455, source: { id: 'ch_p1', payment_intent: 'pi_p1', transfer_data: { destination: 'acct_x' } } };
+  const transfer = { id: 'txn_p2', reporting_category: 'transfer', amount: -364, fee: 0, net: -364, source: { id: 'tr_p1', source_transaction: 'ch_p1' } };
+  assert.deepEqual(classifyTransaction(charge, pIds), { lane: 'purchases', matched: true });
+  const g = groupTransactions([charge, transfer], pIds);
+  assert.equal(g.lanes.purchases.count, 2);
+  assert.equal(g.lanes.purchases.netCents, 91);
+  assert.equal(expectedByLane({ purchases: { count: 1, grossCents: 499, cutCents: 91 } }).purchases, 91);
+  const rec = reconcile({ lanes: g.lanes, records: { purchases: { count: 1, grossCents: 499, cutCents: 91 } } });
+  assert.equal(rec.rows.find((r) => r.key === 'purchases').differenceCents, 0);
+  assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, purchasesKeptCents: 91, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 91);
+});
+
+
 console.log(`\n${passed} passed`);

@@ -1,5 +1,7 @@
 import Stripe from 'stripe';
+import { getAuth } from '@clerk/nextjs/server';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
+import { recordWatchedMax } from '../../lib/purchases';
 import { parseWatchProgress } from '../../lib/watchProgress';
 import { recordWatchSeconds } from '../../lib/redis';
 
@@ -67,6 +69,12 @@ export default async function handler(req, res) {
     if (watchedDelta > 0 && watchedDelta <= 30) {
       await recordWatchSeconds(episodeId, watchedDelta);
     }
+
+    // Buy to own: the furthest point reached decides whether the buyer
+    // can still refund themselves (lib/purchases.js). Awaited for the
+    // same serverless reason as the line above.
+    const { userId } = getAuth(req);
+    if (userId) await recordWatchedMax(userId, episodeId, position).catch(() => {});
 
     // Delete-then-reinsert so this episode moves to the "most recent" end —
     // object key order is insertion order for string keys in JS, which is
