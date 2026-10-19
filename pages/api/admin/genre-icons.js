@@ -37,7 +37,8 @@ export default async function handler(req, res) {
       imageUrl = await uploadArtworkImage({
         base64: imageBase64,
         fileName: imageFileName,
-        pathPrefix: `genre-icon-${genre.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+        pathPrefix: `genre-icon-${genre.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        allowSvg: true // admin-only icon sets
       });
     } catch (err) {
       return res.status(400).json({ error: err.message });

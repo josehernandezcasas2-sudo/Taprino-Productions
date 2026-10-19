@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import {
   BookmarkIcon, CheckIcon, DOOR_MS, DWELL_MS, ElevatorButton, ElevatorCab, ElevatorCard, HeartIcon, ShareIcon
 } from '../../components/PitchElevator';
-import { API_BASE_URL, apiDelete, apiGet, apiPost } from '../../lib/api';
+import { API_BASE_URL, apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { absoluteFill, colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 
@@ -105,7 +105,7 @@ export default function PitchDiscover() {
       let saved = null;
       if (signedIn) {
         try {
-          const data = await apiGet('/api/pitch-swipe-progress', tokenRef.current);
+          const data = await apiGet('/api/pitch-swipe-progress', await freshToken(getToken));
           saved = data.progress;
         } catch {
           // Falls through to a fresh ride — same as the web's try/catch.
@@ -152,7 +152,7 @@ export default function PitchDiscover() {
   useEffect(() => {
     if (loadingProgress || feedState.loading || !feedState.feed?.isSignedIn) return;
     if (finished) {
-      apiDelete('/api/pitch-swipe-progress', {}, tokenRef.current).catch(() => {});
+      freshToken(getToken).then((t) => apiDelete('/api/pitch-swipe-progress', {}, t)).catch(() => {});
       return;
     }
     const progress = {
@@ -162,7 +162,7 @@ export default function PitchDiscover() {
       likedIds: rideLiked.map((p) => p.id),
       floorIndex: floor
     };
-    apiPost('/api/pitch-swipe-progress', progress, tokenRef.current).catch(() => {});
+    freshToken(getToken).then((t) => apiPost('/api/pitch-swipe-progress', progress, t)).catch(() => {});
   }, [deck, held, round, rideLiked, floor, finished, loadingProgress, feedState.loading, feedState.feed]);
 
   useEffect(() => () => {
@@ -182,7 +182,7 @@ export default function PitchDiscover() {
 
   async function startOver() {
     if (isSignedIn) {
-      await apiDelete('/api/pitch-swipe-progress', {}, tokenRef.current).catch(() => {});
+      await freshToken(getToken).then((t) => apiDelete('/api/pitch-swipe-progress', {}, t)).catch(() => {});
     }
     setHeld([]);
     setRound(1);
@@ -276,7 +276,7 @@ export default function PitchDiscover() {
     apply(!wasSaved);
     showToast(wasSaved ? 'Removed from My List' : 'Saved to My List');
     try {
-      const data = await apiPost('/api/pitch-save', { pitchId: pitch.id }, tokenRef.current);
+      const data = await apiPost('/api/pitch-save', { pitchId: pitch.id }, await freshToken(getToken));
       apply(Boolean(data.saved));
     } catch {
       apply(wasSaved);
@@ -300,7 +300,7 @@ export default function PitchDiscover() {
     // light the lamp; they just aren't stored anywhere, as the banner says.
     if (!isSignedIn || !tokenRef.current) return;
     try {
-      const data = await apiPost('/api/pitch-like', { pitchId: pitch.id }, tokenRef.current);
+      const data = await apiPost('/api/pitch-like', { pitchId: pitch.id }, await freshToken(getToken));
       apply(Boolean(data.liked));
       if (typeof data.count === 'number') setLikeCounts((prev) => ({ ...prev, [pitch.id]: data.count }));
     } catch {

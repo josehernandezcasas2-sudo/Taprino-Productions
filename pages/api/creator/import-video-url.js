@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -37,7 +37,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { uid } = await createCloudflareVideoFromUrl({ url: check.url, fileName });
+    const { uid } = await createCloudflareVideoFromUrl({ url: check.url, fileName, creator: userId });
     return res.status(200).json({ uid });
   } catch (err) {
     console.error('import-video-url error:', err.message);

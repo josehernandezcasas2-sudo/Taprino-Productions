@@ -91,7 +91,9 @@ alter table crew_cards add column if not exists call_emails boolean not null def
 alter table notifications add column if not exists href text;
 
 -- Calls can be reported and flagged like titles and profiles.
+-- The full list of report/flag targets to date (later migrations added
+-- to it), so running this file again can't narrow it back down.
 alter table content_reports drop constraint if exists content_reports_target_type_check;
-alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call'));
+alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));
 alter table content_flags drop constraint if exists content_flags_target_type_check;
-alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call'));
+alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));

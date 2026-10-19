@@ -1,4 +1,4 @@
--- 093: Buy to own (Jose, 2026-10-19; mockup: the "Buy to own" canvas).
+-- 097: Buy to own (Jose, 2026-10-19; mockup: the "Buy to own" canvas).
 -- A viewer buys a film, an episode or a whole series outright and keeps
 -- it: ad-free, playable on the website and in the app, through any
 -- creator-side takedown, expiry or the creator leaving. The creator sets

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import Svg, { Path } from 'react-native-svg';
-import { apiGet } from '../../lib/api';
+import { apiGet, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 
@@ -81,8 +81,9 @@ function Bar({ pct, watch }) {
 export default function YourNumbers() {
   const router = useRouter();
   const { isLoaded, isSignedIn, getToken } = useAuth();
-  const tokenRef = useRef(null);
   const [days, setDays] = useState(30);
+  // Bumped by "Try again" so the load below runs again for the same range.
+  const [reloadKey, setReloadKey] = useState(0);
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [selectedId, setSelectedId] = useState(null);
   const [detail, setDetail] = useState({ loading: false, error: null, data: null });
@@ -95,15 +96,14 @@ export default function YourNumbers() {
     setState((s) => ({ ...s, loading: true, error: null }));
     (async () => {
       try {
-        tokenRef.current = await getToken();
-        const data = await apiGet(`/api/creator/analytics?days=${days}`, tokenRef.current);
+        const data = await apiGet(`/api/creator/analytics?days=${days}`, await freshToken(getToken));
         if (!cancelled) setState({ loading: false, error: null, data });
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });
       }
     })();
     return () => { cancelled = true; };
-  }, [isLoaded, isSignedIn, getToken, days]);
+  }, [isLoaded, isSignedIn, getToken, days, reloadKey]);
 
   const toggleEpisode = useCallback(async (episodeId) => {
     if (selectedId === episodeId) {
@@ -116,7 +116,7 @@ export default function YourNumbers() {
     setDetail({ loading: true, error: null, data: null });
     latestRef.current = episodeId;
     try {
-      const d = await apiGet(`/api/creator/episode-detail-analytics?episodeId=${encodeURIComponent(episodeId)}`, tokenRef.current);
+      const d = await apiGet(`/api/creator/episode-detail-analytics?episodeId=${encodeURIComponent(episodeId)}`, await freshToken(getToken));
       if (latestRef.current !== episodeId) return;
       setDetail({ loading: false, error: null, data: d });
     } catch (err) {
@@ -143,7 +143,7 @@ export default function YourNumbers() {
       <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
         <TopNav />
         <Text style={styles.p}>{needsRole ? 'Your numbers are for creators. Apply once and your account unlocks them.' : state.error}</Text>
-        <Pressable style={styles.btnPrimary} onPress={() => (needsRole ? router.push('/apply') : setDays((d) => d))}><Text style={styles.btnPrimaryText}>{needsRole ? 'Apply to be a creator' : 'Try again'}</Text></Pressable>
+        <Pressable style={styles.btnPrimary} onPress={() => (needsRole ? router.push('/apply') : setReloadKey((k) => k + 1))}><Text style={styles.btnPrimaryText}>{needsRole ? 'Apply to be a creator' : 'Try again'}</Text></Pressable>
       </SafeAreaView>
     );
   }

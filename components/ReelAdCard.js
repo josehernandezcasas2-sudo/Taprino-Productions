@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { isHttpUrl } from '../lib/safeUrl';
 
 // Sibling to ReelPlayer.js, not a variant of it — an ad card has no HLS
 // source (ad creatives are uploaded as direct MP4 files, never
@@ -58,7 +59,7 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute }) {
       <div className="reel-ad-badge">Ad</div>
       <div className="reel-caption">
         <div className="reel-caption-title">{ad.title}</div>
-        {ad.clickUrl && (
+        {isHttpUrl(ad.clickUrl) && (
           <a
             href={ad.clickUrl}
             target="_blank"

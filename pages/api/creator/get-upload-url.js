@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'The fallback upload method only supports files under 200MB — try the regular upload method for anything larger.' });
     }
     try {
-      const { uploadUrl, uid } = await createCloudflareBasicUploadUrl({});
+      const { uploadUrl, uid } = await createCloudflareBasicUploadUrl({ creator: userId });
       return res.status(200).json({ uploadUrl, uid, method: 'basic' });
     } catch (err) {
       console.error('get-upload-url (basic) error:', err.message);
@@ -51,7 +51,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName });
+    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId });
     return res.status(200).json({ uploadUrl, uid, method: 'tus' });
   } catch (err) {
     console.error('get-upload-url error:', err.message);

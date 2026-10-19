@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { LinearGradient } from 'expo-linear-gradient';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -110,7 +110,7 @@ export default function PitchRoom() {
       next.has(pitchId) ? next.delete(pitchId) : next.add(pitchId);
       return next;
     });
-    apiPost('/api/pitch-save', { pitchId }, token).catch(() => {});
+    freshToken(getToken).then((t) => apiPost('/api/pitch-save', { pitchId }, t)).catch(() => {});
   }
 
   const pitches = state.data ? state.data.pitches : [];

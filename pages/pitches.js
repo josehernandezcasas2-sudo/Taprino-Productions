@@ -260,8 +260,8 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                         <div className="pitch-progress-track"><div className="pitch-progress-fill" style={{ width: `${pct}%` }} /></div>
                         <div className="pitch-progress-label">
                           {p.funding_enabled
-                            ? `$${((p.liveRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of $${Number(p.funding_goal).toLocaleString()} goal`
-                            : `$${Number(p.funding_raised || 0).toLocaleString()} of $${Number(p.funding_goal).toLocaleString()} goal`}
+                            ? `$${((p.liveRaisedCents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} of $${Number(p.funding_goal).toLocaleString('en-US')} goal`
+                            : `$${Number(p.funding_raised || 0).toLocaleString('en-US')} of $${Number(p.funding_goal).toLocaleString('en-US')} goal`}
                         </div>
                       </>
                     )}

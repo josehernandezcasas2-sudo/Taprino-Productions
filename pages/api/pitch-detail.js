@@ -43,6 +43,8 @@ export default async function handler(req, res) {
     backerCount: data.backerCount,
     recentBackers: data.recentBackers,
     creatorAvatarUrl: data.creatorAvatarUrl,
+    creatorAvatarPosition: data.creatorAvatarPosition,
+    creatorAvatarZoom: data.creatorAvatarZoom,
     creatorDisplayName: data.creatorDisplayName
   });
 }

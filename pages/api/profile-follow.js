@@ -1,4 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
+import { checkRateLimit } from '../../lib/rateLimit';
 import { toggleFollow } from '../../lib/follows';
 import { looksLikeUserId } from '../../lib/userProfiles';
 
@@ -19,6 +20,10 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ error: 'Sign in to follow people.' });
+  }
+  // Per account, generous for people, a wall for scripts.
+  if (!(await checkRateLimit(`profile-follow:${userId}`, 120, 3600))) {
+    return res.status(429).json({ error: 'Slow down a little — try again in a bit.' });
   }
   const { followedId } = req.body || {};
   if (!looksLikeUserId(followedId)) return res.status(400).json({ error: 'followedId is required.' });

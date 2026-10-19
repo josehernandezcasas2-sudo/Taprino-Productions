@@ -20,6 +20,17 @@ export function feeCoverCents(amountCents) {
   return Math.max(0, total - amountCents);
 }
 
+// A chargeback on a booking (migration 096, lib/paymentDisputes.js), in
+// one line for both sides of the request page.
+export function disputeLine(d) {
+  if (!d) return '';
+  const state = d.status === 'won' ? 'Disputed by the producer’s bank; it ruled for us' : d.status === 'lost' ? 'Disputed by the producer’s bank; it ruled for the producer' : 'The producer’s bank is disputing this payment';
+  const decision = d.decision === 'clawback'
+    ? ` · ${dollars(d.clawbackCents)} taken back from the host${d.returnedCents ? `, ${dollars(d.returnedCents)} paid back` : ''}`
+    : d.decision === 'absorb' ? ' · Studio Tapa covered it' : '';
+  return state + decision;
+}
+
 export function dayCount(startsOn, endsOn) {
   if (!startsOn) return 0;
   const a = Date.parse(`${startsOn}T12:00:00Z`);
@@ -75,7 +86,8 @@ export function hoursBetween(from, to) {
   const [th, tm] = to.split(':').map(Number);
   let h = (th + tm / 60) - (fh + fm / 60);
   if (h <= 0) h += 24;
-  return Math.round(h * 2) / 2;
+  // Whole hours, the way the server prices a request (lib/locationRules.js).
+  return Math.max(1, Math.round(h));
 }
 
 export const STATUS_LABEL = { pending: 'In review', listed: 'Listed', paused: 'Paused', rejected: 'Not approved', removed: 'Removed' };

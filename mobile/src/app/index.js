@@ -3,7 +3,7 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, Vi
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../lib/api';
+import { apiGet, freshToken } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import TopNav from '../components/TopNav';
 import SmartImage from '../components/SmartImage';
@@ -37,9 +37,13 @@ export default function Home() {
     readStayInStream().then((on) => { if (on) router.replace('/stream'); });
   }, []);
 
+  // Signed in, the feed measures "Open to work near you" and the calls from
+  // the viewer's own Crew Call card, so send the token (null = the public
+  // feed; the 4 s guard keeps a slow Clerk from holding up the home page).
   useEffect(() => {
     let cancelled = false;
-    apiGet('/api/home-feed')
+    freshToken(getToken)
+      .then((token) => apiGet('/api/home-feed', token))
       .then((feed) => { if (!cancelled) setState({ loading: false, error: null, feed }); })
       .catch((err) => { if (!cancelled) setState({ loading: false, error: err.message, feed: null }); });
     return () => { cancelled = true; };
@@ -274,7 +278,7 @@ export default function Home() {
               {openToWork.map((p, i) => (
                 <Pressable key={p.userId} style={[styles.crewCard, { transform: [{ rotate: i % 2 ? '0.7deg' : '-0.6deg' }] }]} onPress={() => router.push(p.profilePath)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} size={32} />
+                    <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom || 1} size={32} />
                     <Text style={styles.crewName} numberOfLines={1}>{p.displayName}</Text>
                   </View>
                   {p.tier ? <TierChip person={p} /> : null}

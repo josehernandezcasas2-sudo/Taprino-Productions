@@ -188,7 +188,9 @@ alter table site_settings add column if not exists location_platform_cut_percent
 comment on column site_settings.location_platform_cut_percent is 'Platform cut (%) of a location booking, taken from the host''s side. Each request stores the rate it was priced at.';
 
 -- Listings can be reported and flagged like titles, calls and profiles.
+-- The full list of report/flag targets to date (later migrations added
+-- to it), so running this file again can't narrow it back down.
 alter table content_reports drop constraint if exists content_reports_target_type_check;
-alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location'));
+alter table content_reports add constraint content_reports_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));
 alter table content_flags drop constraint if exists content_flags_target_type_check;
-alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location'));
+alter table content_flags add constraint content_flags_target_type_check check (target_type in ('episode', 'series', 'channel_media', 'profile', 'call', 'location', 'tip'));

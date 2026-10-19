@@ -72,7 +72,7 @@ export function ElevatorButton({ icon, label, lit, variant, disabled, onClick, a
 function formatDeadline(dateStr) {
   if (!dateStr) return null;
   try {
-    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   } catch {
     return null;
   }
@@ -268,7 +268,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
             {pct != null && (
               <div className="elev-card-funding">
                 <div className="pitch-progress-track"><div className="pitch-progress-fill" style={{ width: `${pct}%` }} /></div>
-                <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
+                <span>${Number(pitch.funding_raised || 0).toLocaleString('en-US')} of ${Number(pitch.funding_goal).toLocaleString('en-US')} goal</span>
               </div>
             )}
             {deadline && <span className="elev-card-deadline">Funding closes {deadline}</span>}

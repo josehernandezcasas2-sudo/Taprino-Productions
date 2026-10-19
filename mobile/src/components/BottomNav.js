@@ -11,7 +11,7 @@ import { useOwnProfile, ownProfileHref } from './TopNav';
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
 // navigating directly, so the app's nav covers every page the site's
-// does even though most don't have a built screen yet (see ComingSoon).
+// does.
 const GROUPS = {
   home: {
     label: 'Home',

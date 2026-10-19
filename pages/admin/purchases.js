@@ -4,7 +4,7 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import { dollars } from '../../lib/purchaseRules';
 
-// Buy to own, the studio's view (migration 093). Prices are approved from
+// Buy to own, the studio's view (migration 097). Prices are approved from
 // the review queue (kind "Price"); this page is what happens after:
 // recent sales with the split, admin refunds (final; Stripe keeps its
 // processing fee, the platform absorbs it; the creator's share is
@@ -71,7 +71,7 @@ export default function PurchasesAdmin({ account, mainGenres, apiPath = '/api/ad
       {error && <div className="crew-status error" style={{ marginBottom: '0.8rem' }}>{error}</div>}
       {notice && <div className="crew-status ok" style={{ marginBottom: '0.8rem' }}>{notice}</div>}
       {!data && !error && <div className="crew-mono">Loading…</div>}
-      {data && !data.available && <div className="crew-panel">Run migration 093 (Buy to own) in Supabase first.</div>}
+      {data && !data.available && <div className="crew-panel">Run migration 097 (Buy to own) in Supabase first.</div>}
       {data && data.available && (
         <div style={{ display: 'grid', gap: '1.4rem' }}>
           <div className="nums" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.6rem' }}>

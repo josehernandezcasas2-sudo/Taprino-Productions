@@ -84,6 +84,17 @@ export default function Lesson() {
             <Text style={[uni.h1, { fontSize: 22, lineHeight: 26 }]}>{lesson.title}</Text>
 
             <Tabs tabs={tabs} active={tab} onPick={setTab} />
+            {/* A tapped video (file or example) plays here on any tab; it
+                used to render only inside Examples, so videos under
+                Overview / Files did nothing. */}
+            {playing ? (
+              <View style={[uni.box, { borderColor: 'rgba(147,208,164,0.35)' }]}>
+                <Text style={[uni.eyebrow, uni.eyebrowMint]}>{playing.role === 'example' ? 'Example' : 'Video'}</Text>
+                <Text style={uni.boxTitle}>{playing.title}</Text>
+                <LessonVideo fileId={playing.id} />
+                <Btn label="Close" small style={{ marginTop: 10 }} onPress={() => setPlaying(null)} />
+              </View>
+            ) : null}
             {tab === 'overview' && (
               <>
                 {lesson.description ? <Text style={uni.lead}>{lesson.description}</Text> : <Text style={uni.meta}>No notes for this lesson.</Text>}
@@ -99,19 +110,7 @@ export default function Lesson() {
               </>
             )}
             {tab === 'files' && data.files.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />)}
-            {tab === 'examples' && (
-              <>
-                {playing ? (
-                  <View style={[uni.box, { borderColor: 'rgba(147,208,164,0.35)' }]}>
-                    <Text style={[uni.eyebrow, uni.eyebrowMint]}>Example</Text>
-                    <Text style={uni.boxTitle}>{playing.title}</Text>
-                    <LessonVideo fileId={playing.id} />
-                    <Btn label="Close" small style={{ marginTop: 10 }} onPress={() => setPlaying(null)} />
-                  </View>
-                ) : null}
-                {data.examples.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />)}
-              </>
-            )}
+            {tab === 'examples' && data.examples.map((f) => <FileRow key={f.id} file={f} onPlay={setPlaying} />)}
             {tab === 'assignment' && lesson.assignment ? (
               <View style={[uni.box, uni.boxEx]}>
                 <Text style={[uni.eyebrow, uni.eyebrowOlive]}>Assignment{lesson.assignment.minutes ? ` · ${lesson.assignment.minutes} min` : ''}</Text>

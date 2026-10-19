@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Test Content Cleanup</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  /* The admin "Test content" page: list, confirm step, result, then the sign-off questions. Real rows from the live database (2026-10-18). Same tokens as the site and the other mockups. */
+  :root {
+    --surface-0:#0c131f; --surface-1:#121c2d; --surface-2:#18243c; --surface-3:#202f4e; --ocean-ink:#283c63;
+    --brass:#f85f73; --olive:#e7a255; --olive-bright:#f2bf88; --mint:#93d0a4; --sky:#8499dc; --ok:#84cd98; --danger:#d67c51; --plum:#b48ad6;
+    --ink:#fbe8d3; --ink-dim:#cab59e; --ink-faint:#b3a18c; --hair:rgba(251,232,211,.12);
+    --font-display:'Space Grotesk',sans-serif; --font-body:'Fraunces',serif; --font-mono:'IBM Plex Mono',monospace;
+    color-scheme:dark;
+  }
+  * { box-sizing:border-box; }
+  body { margin:0; background:#060a12; color:var(--ink); font-family:var(--font-body); padding-block:28px 80px; padding-left:max(16px, env(safe-area-inset-left, 0px)); padding-right:max(16px, env(safe-area-inset-right, 0px)); font-size:16px; }
+  .intro, .sec { max-width:1180px; margin:0 auto 28px; }
+  .sec { margin-bottom:56px; }
+  .intro h1 { font-family:var(--font-display); font-size:1.6rem; margin:0 0 6px; }
+  .note { color:var(--ink-dim); margin:0 0 16px; line-height:1.55; max-width:900px; }
+  .note b { color:var(--ink); }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin:0 0 10px; flex-wrap:wrap; }
+  .sec-head h2 { font-family:var(--font-display); font-size:1.15rem; margin:0; }
+  .tag { font-family:var(--font-mono); font-size:.78rem; color:var(--brass); letter-spacing:.06em; text-transform:uppercase; }
+  .eyebrow { font-family:var(--font-mono); font-size:.76rem; letter-spacing:.1em; text-transform:uppercase; color:var(--brass); display:block; }
+  .h1 { font-family:var(--font-display); font-weight:700; font-size:2rem; line-height:1.05; margin:6px 0 8px; }
+  .lead { font-size:1rem; line-height:1.55; color:var(--ink-dim); max-width:760px; margin:0 0 18px; }
+  .lead b { color:var(--ink); }
+  .btn { font-family:var(--font-mono); font-size:.8rem; padding:9px 16px; border-radius:999px; border:1px solid rgba(251,232,211,.3); color:var(--ink); background:transparent; white-space:nowrap; display:inline-block; }
+  .btn.sm { padding:6px 12px; font-size:.76rem; }
+  .btn.danger { background:var(--danger); border-color:var(--danger); color:#1f0f06; font-weight:700; }
+  .btn.dim { opacity:.45; }
+  .chip { font-family:var(--font-mono); font-size:.75rem; padding:4px 9px; border-radius:999px; background:var(--surface-2); color:var(--ink-dim); display:inline-block; line-height:1.4; white-space:nowrap; }
+  .chip.plum { color:var(--plum); background:rgba(180,138,214,.16); }
+  .chip.olive { color:var(--olive); background:rgba(231,162,85,.14); }
+  .chip.warn { color:var(--danger); background:rgba(214,124,81,.16); }
+  .chip.sky { color:var(--sky); background:rgba(132,153,220,.16); }
+  .chip.ok { color:var(--ok); background:rgba(132,205,152,.14); }
+  .meta { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); display:block; margin-top:3px; }
+
+  .shell { display:grid; grid-template-columns:200px 1fr; border:1px solid var(--hair); border-radius:16px; overflow:hidden; background:var(--surface-0); }
+  .shell nav { background:var(--surface-1); padding:16px 14px; border-right:1px solid var(--hair); font-family:var(--font-mono); font-size:.76rem; color:var(--ink-dim); }
+  .shell nav .g { color:#f6d65d; letter-spacing:.08em; text-transform:uppercase; font-size:.75rem; margin:14px 0 6px; }
+  .shell nav .g:first-child { margin-top:0; }
+  .shell nav div.l { padding:5px 8px; border-radius:8px; }
+  .shell nav div.l.on { background:rgba(248,95,115,.14); color:var(--brass); }
+  .shell main { padding:22px 24px 0; min-width:0; }
+  @media (max-width:860px) { .shell { grid-template-columns:1fr; } .shell nav { border-right:0; border-bottom:1px solid var(--hair); display:flex; gap:6px; flex-wrap:wrap; } .shell nav .g { display:none; } .shell nav div.l { border:1px solid var(--hair); } .shell main { padding:18px 14px 0; } }
+
+  .tiles { display:grid; grid-template-columns:repeat(4, 1fr); gap:10px; margin:0 0 16px; }
+  .tile { background:var(--surface-1); border:1px solid var(--hair); border-radius:10px; padding:12px 14px; }
+  .tile b { display:block; font-family:var(--font-display); font-size:1.35rem; line-height:1; }
+  .tile span { display:block; font-family:var(--font-mono); font-size:.75rem; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-faint); margin-top:6px; }
+  @media (max-width:860px) { .tiles { grid-template-columns:1fr 1fr; } }
+
+  .find { display:flex; gap:8px; margin:0 0 18px; flex-wrap:wrap; }
+  .find .input { flex:1 1 260px; background:var(--surface-2); border:1px solid var(--hair); border-radius:10px; padding:10px 12px; font-family:var(--font-mono); font-size:.78rem; color:var(--ink-faint); }
+
+  .group { border:1px solid var(--hair); border-radius:12px; margin:0 0 14px; overflow:hidden; }
+  .group-head { display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surface-1); flex-wrap:wrap; }
+  .group-head h3 { font-family:var(--font-display); font-size:1rem; margin:0; }
+  .group-head .count { font-family:var(--font-mono); font-size:.76rem; color:var(--ink-faint); }
+  .group-head .spacer { flex:1; }
+  .row { display:grid; grid-template-columns:22px minmax(0,1fr) auto; gap:12px; padding:10px 14px; border-top:1px solid rgba(251,232,211,.06); align-items:start; }
+  .row.child { padding-left:48px; background:rgba(24,36,60,.35); }
+  .row.blocked { opacity:.6; }
+  .row .t { font-size:.95rem; line-height:1.3; }
+  .row .chips { display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+  .box { width:18px; height:18px; border-radius:5px; border:1.5px solid rgba(251,232,211,.4); margin-top:2px; display:grid; place-items:center; font-size:.75rem; line-height:1; }
+  .box.on { background:var(--danger); border-color:var(--danger); color:#1f0f06; font-weight:700; }
+  .box.off { border-style:dashed; opacity:.5; }
+  @media (max-width:640px) { .row { grid-template-columns:22px minmax(0,1fr); } .row .chips { grid-column:2; justify-content:flex-start; } }
+
+  .bar { position:sticky; bottom:0; display:flex; align-items:center; gap:12px; padding:14px 0 18px; margin-top:6px; background:linear-gradient(transparent, var(--surface-0) 30%); flex-wrap:wrap; }
+  .bar .sum { font-family:var(--font-mono); font-size:.8rem; color:var(--ink-dim); flex:1 1 200px; }
+  .bar .sum b { color:var(--ink); }
+
+  .modal-wrap { background:rgba(6,10,18,.75); border:1px solid var(--hair); border-radius:16px; padding:40px 16px; display:grid; place-items:center; }
+  .modal { background:var(--surface-1); border:1px solid rgba(214,124,81,.45); border-radius:16px; padding:24px; width:100%; max-width:520px; }
+  .modal h3 { font-family:var(--font-display); font-size:1.3rem; margin:0 0 8px; }
+  .modal ul { margin:0 0 14px; padding-left:18px; color:var(--ink-dim); line-height:1.6; font-size:.93rem; }
+  .modal ul b { color:var(--ink); }
+  .modal .typed { background:var(--surface-2); border:1px solid var(--danger); border-radius:10px; padding:10px 12px; font-family:var(--font-mono); font-size:.86rem; margin:6px 0 16px; }
+  .modal .actions { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+  .done { background:rgba(132,205,152,.1); border:1px solid rgba(132,205,152,.35); border-radius:12px; padding:14px 16px; margin:0 0 16px; line-height:1.5; font-size:.95rem; }
+  .done b { color:var(--ok); }
+
+  .qs { margin:0; padding-left:20px; color:var(--ink-dim); line-height:1.6; }
+  .qs li { margin:0 0 12px; }
+  .qs b { color:var(--ink); }
+  .qs .rec { color:var(--ok); font-family:var(--font-mono); font-size:.76rem; display:block; margin-top:2px; }
+</style>
+</head>
+<body>
+
+<div class="intro">
+  <h1>Test content cleanup — mockup v1</h1>
+  <p class="note">A new admin page, <b>Content → Test content</b> (<code>/admin/test-content</code>), for clearing out everything that was only ever a test. The rows below are what's <b>actually in the database today</b>. Nothing is built yet; four questions at the bottom.</p>
+</div>
+
+<section class="sec">
+  <div class="sec-head"><span class="tag">1 · The page</span><h2>What it finds, grouped</h2></div>
+  <div class="shell">
+    <nav>
+      <div class="g">Content</div>
+      <div class="l">Review queue</div>
+      <div class="l">Library &amp; queues</div>
+      <div class="l">All content &amp; flags</div>
+      <div class="l on">Test content</div>
+      <div class="l">Lifecycle windows</div>
+      <div class="l">Curated rows</div>
+    </nav>
+    <main>
+      <span class="eyebrow">Content</span>
+      <div class="h1">Test content</div>
+      <p class="lead">Everything that looks like a test: <b>placeholders</b> the site generated, anything whose name says <b>test</b>, and anything you add by name. Tick what goes, then delete. Deleting is <b>for good</b> — the videos and images go to the Orphaned media list so they can be cleared from Cloudflare and Storage.</p>
+
+      <div class="tiles">
+        <div class="tile"><b>42</b><span>Found</span></div>
+        <div class="tile"><b>35</b><span>Placeholders</span></div>
+        <div class="tile"><b>7</b><span>Name says “test”</span></div>
+        <div class="tile"><b>0</b><span>Blocked (money attached)</span></div>
+      </div>
+
+      <div class="find">
+        <div class="input">Add something else by name — titles, series, pitches, places, calls…</div>
+        <span class="btn sm">Search</span>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="box on">✓</span><h3>Placeholders</h3><span class="count">35 · 25 titles + 10 shows, generated from Settings</span><span class="spacer"></span><span class="btn sm">Collapse</span></div>
+        <div class="row"><span class="box on">✓</span><div><div class="t">[Placeholder] The Long Signal <span class="meta">Series · 5 copies · each with “Pilot” and “Static”</span></div></div><div class="chips"><span class="chip plum">Placeholder</span><span class="chip">15 rows</span></div></div>
+        <div class="row"><span class="box on">✓</span><div><div class="t">[Placeholder] Placeholder Radio Hour <span class="meta">Podcast show · 5 copies · each with “Episode 1: Getting Started”</span></div></div><div class="chips"><span class="chip plum">Placeholder</span><span class="chip">10 rows</span></div></div>
+        <div class="row"><span class="box on">✓</span><div><div class="t">[Placeholder] Harbor Lights, Three Minutes to Sundown, Quick Take: Studio Notes <span class="meta">Movie / short / vertical · 5 copies each</span></div></div><div class="chips"><span class="chip plum">Placeholder</span><span class="chip">15 rows</span></div></div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="box">–</span><h3>Titles</h3><span class="count">5 · name says test, or deletion requested</span></div>
+        <div class="row"><span class="box on">✓</span><div><div class="t">test Premium <span class="meta">Movie · approved · the only premium title · deletion requested by its creator</span></div></div><div class="chips"><span class="chip warn">Deletion requested</span><span class="chip olive">Name says test</span></div></div>
+        <div class="row"><span class="box"></span><div><div class="t">Short Test <span class="meta">Short · approved · @creator</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+        <div class="row"><span class="box"></span><div><div class="t">Short film test <span class="meta">Movie · approved · @creator</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+        <div class="row"><span class="box"></span><div><div class="t">Vertical test <span class="meta">Vertical · approved · @creator</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="box"></span><h3>Series &amp; shows</h3><span class="count">1</span></div>
+        <div class="row"><span class="box"></span><div><div class="t">test series name <span class="meta">Series · approved · no owner on file</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+        <div class="row child"><span class="box off"></span><div><div class="t">First episode <span class="meta">Goes with the series — a series can't be deleted while episodes point at it</span></div></div><div class="chips"><span class="chip">Comes along</span></div></div>
+      </div>
+
+      <div class="group">
+        <div class="group-head"><span class="box"></span><h3>Pitches · Locations · Crew calls</h3><span class="count">2</span></div>
+        <div class="row"><span class="box"></span><div><div class="t">test <span class="meta">Pitch · approved · no backings · its likes, saves and comments go with it</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+        <div class="row"><span class="box"></span><div><div class="t">Test <span class="meta">Location · listed · no requests or bookings · photos go too</span></div></div><div class="chips"><span class="chip olive">Name says test</span></div></div>
+        <div class="row blocked"><span class="box off"></span><div><div class="t">(example) A pitch with paid backings <span class="meta">Can't be deleted here: refund the backings on Pitches &amp; comments first, so no money record disappears</span></div></div><div class="chips"><span class="chip warn">Blocked · 3 paid backings</span></div></div>
+      </div>
+
+      <div class="bar">
+        <span class="sum"><b>36 selected</b> · 35 placeholder rows + 1 title</span>
+        <span class="btn sm">Clear selection</span>
+        <span class="btn danger">Delete 36…</span>
+      </div>
+    </main>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><span class="tag">2 · Confirm</span><h2>One last look, then type DELETE</h2></div>
+  <div class="modal-wrap">
+    <div class="modal">
+      <span class="eyebrow">Can't be undone</span>
+      <h3>Delete 36 items for good?</h3>
+      <ul>
+        <li><b>25 titles</b> and <b>10 shows</b> (placeholders), <b>1 title</b> (test Premium)</li>
+        <li>Their schedule slots, curated-row spots, ad plans, likes and comments go too</li>
+        <li>Their <b>videos and images</b> are listed in Orphaned media for cleanup</li>
+        <li>Every delete is written to the Audit log</li>
+      </ul>
+      <span class="meta">Type DELETE to confirm</span>
+      <div class="typed">DELETE</div>
+      <div class="actions"><span class="btn sm">Cancel</span><span class="btn sm danger">Delete for good</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><span class="tag">3 · After</span><h2>The result line, then the list refreshes</h2></div>
+  <div class="done"><b>Deleted 36.</b> Their media files are waiting in Orphaned media (Library &amp; queues) — clear them there to stop paying for the storage.</div>
+</section>
+
+<section class="sec">
+  <div class="sec-head"><span class="tag">4 · Sign-off</span><h2>Four questions</h2></div>
+  <ol class="qs">
+    <li><b>What's ticked when the page opens?</b> Placeholders and titles with a deletion request ticked; anything that only <i>says</i> test left unticked, so a real film with “test” in its name can't go by accident.<span class="rec">Recommended as drawn</span></li>
+    <li><b>Who can use it?</b> Full admins only — sub-admins don't see it.<span class="rec">Recommended: full admins only</span></li>
+    <li><b>The old “Remove placeholder content” button in Settings?</b> Move removal here; Settings keeps “Generate placeholders”.<span class="rec">Recommended: move it here</span></li>
+    <li><b>Videos and images:</b> list them in Orphaned media (how deletions work today) or delete them from Cloudflare/Storage straight away?<span class="rec">Recommended: Orphaned media, same as every other delete</span></li>
+  </ol>
+  <p class="note">Not shown: “Ashton’s cut” and “Beyond .the bounds” don’t look like tests, so they only appear if you search for them. Real accounts aren’t touched.</p>
+</section>
+
+</body>
+</html>

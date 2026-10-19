@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
+import { isHttpUrl } from '../lib/safeUrl';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
 // the fallback needs `window.location.origin`, which doesn't exist during
@@ -1024,7 +1025,7 @@ export default function VideoPlayer({
           )}
         </div>
       )}
-      {adState && adState.pod && adState.clickUrl && (
+      {adState && adState.pod && isHttpUrl(adState.clickUrl) && (
         <a
           className="tp-pod-visit"
           href={adState.clickUrl}

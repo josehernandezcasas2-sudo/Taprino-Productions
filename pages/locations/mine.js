@@ -71,7 +71,8 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
       const res = await fetch(`/api/locations/${l.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not change that.');
-      setListings((list) => (status === 'removed' ? list.filter((x) => x.id !== l.id) : list.map((x) => (x.id === l.id ? { ...x, ...data.listing } : x))));
+      setListings((list) => (status === 'removed' ? list.filter((x) => x.id !== l.id) : // The PATCH answers with the listing itself (older code wrapped it).
+      list.map((x) => (x.id === l.id ? { ...x, ...(data.listing || data), status: (data.listing || data).status || status } : x))));
     } catch (err) {
       setError(err.message);
     } finally {

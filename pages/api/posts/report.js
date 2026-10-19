@@ -1,4 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
+import { checkRateLimit } from '../../../lib/rateLimit';
 import { reportPost, findPost } from '../../../lib/posts';
 
 // Mirrors pages/api/pitch-comment-report.js — flags a post for admin
@@ -19,6 +20,10 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ error: 'Sign in to report a post.' });
+  }
+  // Per account, generous for people, a wall for scripts.
+  if (!(await checkRateLimit(`post-report:${userId}`, 30, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of reports for one hour. Try again later.' });
   }
 
   const { postId, reason } = req.body || {};

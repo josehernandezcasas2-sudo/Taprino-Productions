@@ -23,28 +23,34 @@ import { SITE } from '../lib/siteConfig';
 // and what happens next. The first two are public; the form needs a
 // signed-in account so Accept can grant Creator Studio and the applicant
 // can come back here to see where it stands.
-export async function getServerSideProps({ req, res }) {
+export async function getServerSideProps({ req, res, query }) {
   const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
-  if (hasSession) {
+  if (hasSession || query.preview) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
   }
 
   const account = await getAccountContext(req);
+  // Admin preview (/admin/applications → Preview applicant page): the page
+  // as a new applicant sees it, which an admin otherwise never can (they
+  // count as a creator). visitor = signed out, as from an invite email;
+  // member = signed in with no application. Sending is off.
+  const preview = (account.isAdmin || account.canAccessAdmin) && ['visitor', 'member'].includes(query.preview) ? query.preview : null;
   const [episodes, application] = await Promise.all([
     getPublicEpisodes(),
-    account.isSignedIn ? getOwnApplication(account.userId) : Promise.resolve(null)
+    account.isSignedIn && !preview ? getOwnApplication(account.userId) : Promise.resolve(null)
   ]);
   return {
     props: {
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isCreator: account.isCreator,
-      application
+      isSignedIn: preview ? preview === 'member' : account.isSignedIn,
+      isSubscriber: preview ? false : account.isSubscriber,
+      email: preview ? null : account.email,
+      isAdmin: preview ? false : account.isAdmin,
+      isCreator: preview ? false : account.isCreator,
+      application,
+      preview
     }
   };
 }
@@ -62,14 +68,14 @@ const ATTEST = [
   { key: 'terms', text: null } // rendered inline: links to the terms
 ];
 
-const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+const fmtDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'America/Los_Angeles' });
 
-export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, application }) {
+export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, application, preview = null }) {
   const { isSignedIn: clerkSignedIn, user } = useUser();
   // The server knew at render time; Clerk's modal sign-in updates the
   // client without a reload, so trust either.
-  const signedIn = isSignedIn || Boolean(clerkSignedIn);
-  const shownEmail = email || (user && user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : null);
+  const signedIn = preview ? preview === 'member' : (isSignedIn || Boolean(clerkSignedIn));
+  const shownEmail = preview ? 'applicant@example.com' : (email || (user && user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : null));
 
   const [app, setApp] = useState(application);
   const [creator, setCreator] = useState(isCreator);
@@ -83,7 +89,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
   // Signed in through the modal after the page loaded: find out whether
   // this account already has an application or Creator Studio.
   useEffect(() => {
-    if (isSignedIn || !clerkSignedIn) return;
+    if (preview || isSignedIn || !clerkSignedIn) return;
     let cancelled = false;
     fetch('/api/apply').then((r) => r.json()).then((data) => {
       if (cancelled || !data) return;
@@ -91,7 +97,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
       if (data.isCreator) setCreator(true);
     }).catch(() => {});
     return () => { cancelled = true; };
-  }, [isSignedIn, clerkSignedIn]);
+  }, [isSignedIn, clerkSignedIn, preview]);
 
   const verdict = rightsVerdict(answers);
   const attested = attest.rights && attest.check && attest.terms;
@@ -103,6 +109,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
   else if (verdict.result === 'blocked') blocker = 'Only the rights holder can apply.';
   else if (!signedIn) blocker = 'Sign in (free) so we can attach this to your account.';
   else if (!attested) blocker = 'Tick the three rights statements.';
+  else if (preview) blocker = 'Preview: sending is off.';
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -144,6 +151,16 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
       </Head>
 
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={signedIn} email={shownEmail} isAdmin={isAdmin} isCreator={creator} isSubscriber={isSubscriber} />
+
+      {preview && (
+        <div className="apply-preview-bar" role="status">
+          <span><b>Preview</b> · what {preview === 'visitor' ? 'a signed-out visitor (someone opening an invite)' : 'a signed-in person with no application'} sees. Sending is off.</span>
+          <span className="apply-preview-links">
+            {preview === 'visitor' ? <Link href="/apply?preview=member">See it signed in</Link> : <Link href="/apply?preview=visitor">See it signed out</Link>}
+            <Link href="/admin/applications">Back to Applications</Link>
+          </span>
+        </div>
+      )}
 
       <main id="main-content" className="onboard">
 
@@ -259,7 +276,9 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
                   ) : (
                     <>
                       <span>You&rsquo;ll need a free account to send this.</span>
-                      <SignInButton mode="modal"><button type="button" className="onboard-btn-secondary small">Sign in or create one</button></SignInButton>
+                      {preview
+                        ? <button type="button" className="onboard-btn-secondary small" onClick={() => setError('Preview: this opens sign-in for a real visitor.')}>Sign in or create one</button>
+                        : <SignInButton mode="modal"><button type="button" className="onboard-btn-secondary small">Sign in or create one</button></SignInButton>}
                     </>
                   )}
                 </div>

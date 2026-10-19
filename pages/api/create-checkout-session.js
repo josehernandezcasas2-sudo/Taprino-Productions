@@ -4,6 +4,7 @@ import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
 import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
 import { resolveReferrer } from '../../lib/creatorShare';
+import { firstInWindow } from '../../lib/rateLimit';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
 //   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
@@ -53,9 +54,21 @@ export default async function handler(req, res) {
   try {
     // One subscription per person: a second Checkout would stack a second
     // charge. Switching plans is the Customer Portal's job.
-    const live = await stripe.subscriptions.list({ customer: existingCustomerId, status: 'active', limit: 1 });
-    if (live.data.length > 0) {
-      return res.status(409).json({ error: 'You already have a plan — switch or cancel it from Manage subscription.' });
+    // Any subscription that isn't over counts, not just an active one: a
+    // member whose card failed (past_due/unpaid) loses access and sees the
+    // plan picker, and a second plan would bill alongside the old one the
+    // moment their card recovers.
+    const subs = await stripe.subscriptions.list({ customer: existingCustomerId, status: 'all', limit: 20 });
+    const open = subs.data.find((s) => ['active', 'trialing', 'past_due', 'unpaid', 'incomplete', 'paused'].includes(s.status));
+    if (open) {
+      const behind = ['past_due', 'unpaid', 'incomplete'].includes(open.status);
+      return res.status(409).json({ error: behind
+        ? 'Your plan has a payment that didn’t go through. Update your card from Manage subscription and it picks up again — no need for a new plan.'
+        : 'You already have a plan — switch or cancel it from Manage subscription.' });
+    }
+    // Two quick clicks would open two Checkouts that could both be paid.
+    if (!(await firstInWindow(`member-checkout:${existingCustomerId}`, 20))) {
+      return res.status(429).json({ error: 'Checkout is already opening — give it a moment.' });
     }
 
     const back = body.returnTo === '/account' ? '/account' : '/';
@@ -88,7 +101,7 @@ export default async function handler(req, res) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back === '/account' ? '&to=account' : ''}`,
       // From the account page (web or app) land back on it; the in-app
       // browser then closes and the screen re-reads membership.
       cancel_url: `${origin}${back}?checkout=cancelled`,

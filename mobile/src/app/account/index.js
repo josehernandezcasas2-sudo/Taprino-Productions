@@ -121,6 +121,9 @@ export default function Account() {
     try {
       const token = await withToken();
       await apiPost('/api/account/profile', body, token);
+      // The header avatar draws from this cache; without it the header
+      // kept the old crop until the next launch.
+      if (which !== 'banner') updateOwnProfileCache(body);
       setStatus('saved');
       setTimeout(() => setStatus((st) => (st === 'saved' ? null : st)), 2500);
     } catch (err) {
@@ -189,7 +192,7 @@ export default function Account() {
     }
     setDashboard(dash);
     setProfile(profileData ? { ...profileData, savedHandle: profileData.handle || '' } : profileData);
-    if (profileData) updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, stayInStream: !!profileData.stayInStream });
+    if (profileData) updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, avatarPosition: profileData.avatarPosition || null, avatarZoom: profileData.avatarZoom || null, stayInStream: !!profileData.stayInStream });
     if (profileData) rememberStayInStream(!!profileData.stayInStream);
     setOriginalAge(profileData ? profileData.age ?? null : null);
   }

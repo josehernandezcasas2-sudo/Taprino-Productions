@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
+import { safeFetch } from '../../../lib/safeFetch';
 import { parsePodcastFeed } from '../../../lib/rssImport';
 
 const MAX_FEED_BYTES = 10 * 1024 * 1024; // 10MB — generous for even a very long-running show's feed XML
@@ -28,9 +29,9 @@ export default async function handler(req, res) {
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let response;
   try {
-    response = await fetch(check.url, {
+    // safeFetch: every hop must resolve to a public address.
+    response = await safeFetch(check.url, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: { 'User-Agent': 'StudioTapaRssImport/1.0', Accept: 'application/rss+xml, application/xml, text/xml' }
     });
   } catch (err) {

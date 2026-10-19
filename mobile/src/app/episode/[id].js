@@ -219,7 +219,7 @@ export default function Episode() {
 
   const saved = isWishlisted(episode.id);
   const runtime = formatRuntimeLong(episode.runtime) || episode.runtime;
-  const tierChip = owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : 'Tapa + · ad-free';
+  const tierChip = owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : 'Tapa + · members';
   const eyebrow = showingTrailer ? 'Trailer' : owned ? 'Now screening' : episode.tier === 'premium' ? 'Now screening — Tapa + exclusive' : 'Now screening — free signal';
   const { nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, bonusContent, parentSeriesName, isSignedIn } = page;
 

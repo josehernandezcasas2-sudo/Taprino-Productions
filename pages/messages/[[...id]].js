@@ -165,7 +165,9 @@ export default function MessagesPage({ mainGenres, isSignedIn, isSubscriber, ema
       if (!res.ok) throw new Error(data.error || 'Could not send that.');
       setDraft('');
       if (active) {
-        setActive((cur) => ({ ...cur, messages: [...cur.messages, data.message] }));
+        // A poll that was already on the wire can bring this same message
+        // back first, so only add it if it isn't there yet.
+        setActive((cur) => (cur.messages.some((x) => x.id === data.message.id) ? cur : { ...cur, messages: [...cur.messages, data.message] }));
         setThreads((list) => {
           const t = list.find((x) => x.id === active.thread.id);
           const updated = { ...(t || { id: active.thread.id, other: active.thread.other, context: active.thread.context, muted: active.thread.muted }), preview: body.slice(0, 120), lastMessageAt: data.message.createdAt, lastSenderId: viewerId, unread: false };

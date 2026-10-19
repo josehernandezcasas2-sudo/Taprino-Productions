@@ -2,6 +2,7 @@ import { getRoleContext } from '../../lib/roles';
 import { getSupabase } from '../../lib/supabase';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 import { sendEmail } from '../../lib/notify';
+import { isHttpUrl } from '../../lib/safeUrl';
 import {
   RIGHTS_QUESTIONS, ONBOARDING, APPLICATION_TYPES, APPLICATION_RATINGS, APPLICATION_STATUSES, APPLICATION_GENRES,
   normalizeRightsAnswers, rightsVerdict, getOwnApplication, toApplicantView, applicationEmails
@@ -74,6 +75,9 @@ export default async function handler(req, res) {
   if (!name || !name.trim()) return res.status(400).json({ error: 'Please tell us your name.' });
   if (!title || !title.trim()) return res.status(400).json({ error: 'What’s the work called?' });
   if (!logline || !logline.trim()) return res.status(400).json({ error: 'A one-line description is required.' });
+  // Links are shown to the reviewer as links, so only web addresses.
+  if (portfolioUrl.trim() && !isHttpUrl(portfolioUrl)) return res.status(400).json({ error: 'The portfolio link needs to be a web address starting with https://' });
+  if (mediaLink.trim() && !isHttpUrl(mediaLink)) return res.status(400).json({ error: 'The files link needs to be a web address starting with https://' });
 
   // The rights check is the point of the page: no sending around it.
   const answers = normalizeRightsAnswers(rightsAnswers);

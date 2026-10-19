@@ -45,7 +45,7 @@ function formatCommentDate(iso) {
   if (diffHours < 24) return `${diffHours}h ago`;
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 function countComments(list) {
@@ -443,7 +443,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               {pitch.funding_enabled ? (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
-                  <span>${((currentTotalRaisedCents || 0) / 100).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} raised so far</span>
+                  <span>${((currentTotalRaisedCents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} raised so far</span>
                   {backerCount > 0 && (
                     <>
                       <span className="hero-meta-dot">&bull;</span>
@@ -454,7 +454,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
               ) : pitch.funding_goal && (
                 <>
                   <span className="hero-meta-dot">&bull;</span>
-                  <span>${Number(pitch.funding_raised || 0).toLocaleString()} of ${Number(pitch.funding_goal).toLocaleString()} goal</span>
+                  <span>${Number(pitch.funding_raised || 0).toLocaleString('en-US')} of ${Number(pitch.funding_goal).toLocaleString('en-US')} goal</span>
                 </>
               )}
               {remaining !== null && (
@@ -623,7 +623,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-section-label">Project updates</div>
             {updates.map((u) => (
               <div key={u.id} className="pitch-update-card">
-                <div className="pitch-update-date">{new Date(u.created_at).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase()}</div>
+                <div className="pitch-update-date">{new Date(u.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }).toUpperCase()}</div>
                 <div style={{ fontWeight: 700, marginBottom: '0.4rem' }}>{u.title}</div>
                 <div style={{ color: 'var(--ink-dim)', fontSize: '0.86rem', lineHeight: 1.5 }}>{u.body}</div>
               </div>

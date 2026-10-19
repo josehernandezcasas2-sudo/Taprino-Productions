@@ -7,7 +7,7 @@ import { StatusChip, MoneyLine, HostAnswer, ProducerActions, OutcomeForm, Endors
 import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getRequest } from '../../../lib/locationRequests';
-import { CANCELLATION, dollars } from '../../../lib/locationRules';
+import { CANCELLATION, dollars, disputeLine } from '../../../lib/locationRules';
 
 // One booking request, both sides (mockups/locations-v1.html §3): what
 // was asked, the money, where it stands, and the next action for
@@ -128,6 +128,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
               <div><span>Producer pays</span><span><b>{dollars(r.totalChargedCents)}</b></span></div>
               <div><span>Host receives</span><span><b>{dollars(r.hostPayoutCents)}</b> after the {r.cutPercent}% cut</span></div>
               {r.refundCents != null && <div><span>Refunded</span><span>{dollars(r.refundCents)}{r.refundReason ? ` · ${r.refundReason}` : ''}</span></div>}
+              {r.dispute && <div><span>Payment dispute</span><span>{disputeLine(r.dispute)}</span></div>}
               {l && <div><span>Cancellation</span><span>{CANCELLATION[l.cancellation].label} · {CANCELLATION[l.cancellation].text}</span></div>}
             </div>
             <span className="crew-mono"><MoneyLine r={r} side={side === 'host' ? 'host' : 'producer'} /></span>

@@ -4,7 +4,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { apiGet, apiPost } from '../../lib/api';
+import * as WebBrowser from 'expo-web-browser';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -18,12 +19,13 @@ const SWIPE_THRESHOLD = 90;
 // (with a reason sheet) at the bottom, swipe left to skip to the next.
 // Ads and series need the web (billing rate, artwork), so their cards
 // deep-link there instead of approving blind.
-// ?kind=submission|channel|ad|series narrows the deck.
+// Places (Locations listings) approve here too; the host's proof opens in
+// the in-app browser when it's a web address.
+// ?kind=submission|channel|ad|series|location narrows the deck.
 export default function AdminReview() {
   const router = useRouter();
   const { kind } = useLocalSearchParams();
   const { getToken } = useAuth();
-  const tokenRef = useRef(null);
   const [state, setState] = useState({ loading: true, error: null, items: [] });
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -31,15 +33,11 @@ export default function AdminReview() {
   const [reason, setReason] = useState('');
   const [done, setDone] = useState(0);
 
-  async function withToken() {
-    const t = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
-    tokenRef.current = t;
-    return t;
-  }
-
+  // A fresh token for every request: one kept from when the queue opened
+  // has expired a minute later, and Approve/Reject then failed.
   async function load() {
     try {
-      const token = await withToken();
+      const token = await freshToken(getToken);
       const data = await apiGet('/api/admin/review-queue', token);
       const items = (data.items || []).filter((i) => !kind || i.kind === kind);
       setState({ loading: false, error: null, items });
@@ -58,7 +56,7 @@ export default function AdminReview() {
     if (!item || busy) return;
     setBusy(true);
     try {
-      await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' ? reason : undefined, tierOverride: item.kind === 'submission' ? item.meta.tier : undefined }, tokenRef.current);
+      await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' ? reason : undefined, tierOverride: item.kind === 'submission' ? item.meta.tier : undefined }, await freshToken(getToken));
       setRejecting(false);
       setReason('');
       setDone((d) => d + 1);
@@ -99,7 +97,7 @@ export default function AdminReview() {
         <ReviewCard
           key={`${item.kind}-${item.id}`}
           item={item}
-          token={tokenRef.current}
+          getToken={getToken}
           busy={busy}
           onApprove={() => decide('approve')}
           onReject={() => setRejecting(true)}
@@ -137,7 +135,7 @@ export default function AdminReview() {
   );
 }
 
-function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, dots }) {
+function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip, dots }) {
   const { width } = useWindowDimensions();
   const [previewSrc, setPreviewSrc] = useState(item.media.src || null);
   const needsWeb = item.kind === 'ad' || item.kind === 'series';
@@ -146,7 +144,8 @@ function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, d
   useEffect(() => {
     if (item.kind !== 'channel' || !item.media.previewId) return undefined;
     let cancelled = false;
-    apiGet(`/api/admin/channel-media?preview=${encodeURIComponent(item.media.previewId)}`, token)
+    freshToken(getToken)
+      .then((t) => apiGet(`/api/admin/channel-media?preview=${encodeURIComponent(item.media.previewId)}`, t))
       .then((d) => { if (!cancelled && d.src) setPreviewSrc(d.src); })
       .catch(() => {});
     return () => { cancelled = true; };
@@ -194,7 +193,13 @@ function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, d
                 {meta.map(([k, v]) => (
                   <View key={k} style={styles.kvRow}>
                     <Text style={styles.kvKey}>{labelFor(k)}</Text>
-                    <Text style={styles.kvVal}>{fmtValue(k, v)}</Text>
+                    {k === 'proofUrl' && isWebUrl(v) ? (
+                      <Pressable style={{ flex: 1 }} onPress={() => WebBrowser.openBrowserAsync(String(v)).catch(() => {})} accessibilityRole="link">
+                        <Text style={[styles.kvVal, styles.kvLink]}>Open the proof ↗</Text>
+                      </Pressable>
+                    ) : (
+                      <Text style={styles.kvVal}>{fmtValue(k, v)}</Text>
+                    )}
                   </View>
                 ))}
               </View>
@@ -221,7 +226,7 @@ function ReviewCard({ item, token, busy, onApprove, onReject, onSkip, canSkip, d
 }
 
 function labelFor(k) {
-  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser' }[k]
+  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing' }[k]
     || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 function fmtValue(k, v) {
@@ -229,6 +234,11 @@ function fmtValue(k, v) {
   if (k === 'durationSeconds') return fmtDuration(v);
   if (k === 'budgetTotalCents') return `$${(v / 100).toFixed(2)}`;
   return String(v);
+}
+// Only a real web address becomes a link (the proof field can also read
+// "no proof attached").
+function isWebUrl(v) {
+  return /^https?:\/\//i.test(String(v || ''));
 }
 function fmtDuration(s) {
   return `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, '0')}`;
@@ -268,6 +278,7 @@ const styles = StyleSheet.create({
   kvRow: { flexDirection: 'row', gap: 10 },
   kvKey: { fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint, width: 90 },
   kvVal: { fontFamily: fonts.mono, fontSize: 12, color: colors.ink, flex: 1 },
+  kvLink: { color: colors.brass, textDecorationLine: 'underline' },
   decide: { flexDirection: 'row', gap: 8, marginTop: 8 },
   btnOk: { flex: 1, backgroundColor: colors.ok, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   btnOkText: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.onBrass },

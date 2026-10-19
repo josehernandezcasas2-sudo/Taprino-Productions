@@ -154,7 +154,7 @@ export default function Home({
                 return (
                   <Tag key={a.id} {...tagProps} className="zine-brief-card">
                     <div className="zine-brief-date">
-                      {new Date(a.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }).toUpperCase()}
+                      {new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }).toUpperCase()}
                     </div>
                     <h4>{a.title}</h4>
                     {a.body && <p>{a.body}</p>}
@@ -267,7 +267,7 @@ export default function Home({
                     )
                   )}
                   {p.fundingRaised != null && (
-                    <div className="zine-flyer-raised">${Number(p.fundingRaised).toLocaleString()} raised</div>
+                    <div className="zine-flyer-raised">${Number(p.fundingRaised).toLocaleString('en-US')} raised</div>
                   )}
                 </Link>
               ))}
@@ -287,7 +287,7 @@ export default function Home({
               {newCalls.map((c) => (
                 <Link key={c.id} href={`/crew/calls/${c.id}`} className="zine-flyer">
                   <h4>{c.title}</h4>
-                  <p>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''} · {c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}{c.startsOn ? ` · ${new Date(`${c.startsOn}T12:00:00`).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{c.projectTitle ? ` · ${c.projectTitle}` : ''}</p>
+                  <p>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''} · {c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}{c.startsOn ? ` · ${new Date(`${c.startsOn}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}` : ''}{c.projectTitle ? ` · ${c.projectTitle}` : ''}</p>
                   <div className="zine-flyer-tier">by {c.posterName} {c.posterTier && <TierChip person={{ tier: c.posterTier, done: c.posterDone }} />}</div>
                   <div className="zine-flyer-pay">{c.payLabel}{c.payNote ? ` · ${c.payNote}` : ''} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</div>
                 </Link>

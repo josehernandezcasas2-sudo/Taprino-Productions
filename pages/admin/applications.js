@@ -3,6 +3,14 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import { SITE } from '../../lib/siteConfig';
+import { isHttpUrl } from '../../lib/safeUrl';
+
+// Applicants typed these. Only a web address becomes a link; anything
+// else (a javascript: URL above all) shows as plain text.
+function ApplicantLink({ url }) {
+  if (!isHttpUrl(url)) return <span>{url} <em>(not a web link)</em></span>;
+  return <a href={url} target="_blank" rel="noopener noreferrer">{url}</a>;
+}
 
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, { caps: ['manage_applications'] });
@@ -22,6 +30,40 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
   const [openId, setOpenId] = useState(null);
   const [notes, setNotes] = useState({});
   const [flash, setFlash] = useState({});
+  // "Invite to apply" (top of the page): emails someone the /apply link.
+  const [inviteOpen, setInviteOpen] = useState(false);
+  const [invite, setInvite] = useState({ email: '', name: '', note: '' });
+  const [inviteBusy, setInviteBusy] = useState(false);
+  const [inviteMsg, setInviteMsg] = useState(null);
+  const [copied, setCopied] = useState(false);
+  const applyUrl = `${SITE.productionDomain}/apply`;
+
+  async function sendInvite(e) {
+    e.preventDefault();
+    setInviteBusy(true);
+    setInviteMsg(null);
+    try {
+      const res = await fetch('/api/admin/application-invite', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(invite) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not send the invite.');
+      setInviteMsg({ ok: true, text: `Invite sent to ${data.email}.` });
+      setInvite({ email: '', name: '', note: '' });
+    } catch (err) {
+      setInviteMsg({ ok: false, text: err.message });
+    } finally {
+      setInviteBusy(false);
+    }
+  }
+
+  async function copyApplyLink() {
+    try {
+      await navigator.clipboard.writeText(applyUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      window.prompt('Copy the apply link:', applyUrl);
+    }
+  }
 
   async function load() {
     try {
@@ -82,8 +124,29 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
               and emails them; they upload the master there and it lands in <Link href="/admin/review">Review</Link>.
             </p>
           </div>
-          <Link href="/admin" className="library-back">← Back to admin</Link>
+          <div className="ap-invite-actions">
+            <a className="account-btn-secondary" href="/apply?preview=visitor" target="_blank" rel="noopener noreferrer">Preview applicant page</a>
+            <button type="button" className="account-btn-secondary" onClick={copyApplyLink}>{copied ? 'Link copied' : 'Copy apply link'}</button>
+            <button type="button" className="account-btn-primary" onClick={() => { setInviteOpen((o) => !o); setInviteMsg(null); }} aria-expanded={inviteOpen}>Invite to apply</button>
+          </div>
         </div>
+
+        {inviteOpen && (
+          <form className="account-card ap-invite" onSubmit={sendInvite}>
+            <div className="account-eyebrow">Invite to apply</div>
+            <p>They get an email from {SITE.studio} with a link to <a href={applyUrl} target="_blank" rel="noopener noreferrer">{applyUrl.replace(/^https?:\/\//, '')}</a>. Nothing is created until they apply.</p>
+            <div className="ap-invite-row">
+              <label><span className="account-field-label">Email</span><input type="email" required value={invite.email} onChange={(e) => setInvite((v) => ({ ...v, email: e.target.value }))} placeholder="name@example.com" /></label>
+              <label><span className="account-field-label">Name (optional)</span><input type="text" maxLength={80} value={invite.name} onChange={(e) => setInvite((v) => ({ ...v, name: e.target.value }))} placeholder="Used in “Hi …”" /></label>
+            </div>
+            <label><span className="account-field-label">A note from you (optional)</span><textarea rows={3} maxLength={1000} value={invite.note} onChange={(e) => setInvite((v) => ({ ...v, note: e.target.value }))} placeholder="Saw your short at the festival and loved it…" /></label>
+            {inviteMsg && <p className={inviteMsg.ok ? 'ap-invite-ok' : 'ap-invite-err'}>{inviteMsg.text}</p>}
+            <div className="ap-invite-actions">
+              <button type="button" className="account-btn-secondary" onClick={() => setInviteOpen(false)}>Close</button>
+              <button type="submit" className="account-btn-primary" disabled={inviteBusy || !invite.email.trim()}>{inviteBusy ? 'Sending…' : 'Send invite'}</button>
+            </div>
+          </form>
+        )}
 
         {error && <div className="house-ad-error" style={{ marginTop: '1rem' }}>{error}</div>}
 
@@ -141,10 +204,10 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
                     <div className="app-detail">
                       {app.description && <p>{app.description}</p>}
                       {app.portfolio_url && (
-                        <p><strong>Portfolio:</strong> <a href={app.portfolio_url} target="_blank" rel="noopener noreferrer">{app.portfolio_url}</a></p>
+                        <p><strong>Portfolio:</strong> <ApplicantLink url={app.portfolio_url} /></p>
                       )}
                       {app.media_link && (
-                        <p><strong>Files:</strong> <a href={app.media_link} target="_blank" rel="noopener noreferrer">{app.media_link}</a></p>
+                        <p><strong>Files:</strong> <ApplicantLink url={app.media_link} /></p>
                       )}
                       {app.media_notes && <p><strong>Notes from them:</strong> {app.media_notes}</p>}
                       {app.user_id && <p><strong>Account:</strong> <Link href={`/profile/${app.user_id}`}>{app.user_id}</Link>{app.role_granted_at ? ' · Creator Studio granted' : ''}</p>}

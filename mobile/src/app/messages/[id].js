@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPatch, apiPost } from '../../lib/api';
+import { apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { bumpUnread } from '../../lib/useUnread';
 import { Avatar, Chip } from '../../components/CrewBits';
@@ -15,7 +15,7 @@ import { Avatar, Chip } from '../../components/CrewBits';
 const POLL_MS = 10000;
 const MAX_CHARS = 2000;
 const REASONS = { copyright: 'Stolen or copyrighted', sexual: 'Sexual content', violence: 'Violence or graphic', hate: 'Hate or harassment', spam: 'Spam or misleading', broken: "Won't play or broken" };
-const CTX_LABEL = { gear: 'About gear', call: 'About a call', card: 'From a card', profile: 'From a profile' };
+const CTX_LABEL = { gear: 'About gear', call: 'About a call', card: 'From a card', profile: 'From a profile', location: 'About a place' };
 
 function fmtTime(iso) {
   const d = new Date(iso);
@@ -30,18 +30,36 @@ export default function Conversation() {
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const isNew = id === 'new';
-  const tokenRef = useRef(null);
   const scrollRef = useRef(null);
+  // The poll reads these instead of state, so a new message doesn't tear
+  // the timer down and reload the whole thread: the newest message's time
+  // (the poll's `since`), whether the first load has landed, and whether a
+  // poll is still on the wire.
+  const lastAtRef = useRef(null);
+  const loadedRef = useRef(false);
+  const pollingRef = useRef(false);
   const [state, setState] = useState({ loading: true, error: null, thread: null, messages: [] });
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [sendError, setSendError] = useState(null);
   const [note, setNote] = useState(null);
+  // The composer keeps room for the floating bottom nav, which the
+  // keyboard covers: while it's up, that room would just be a gap.
+  const [keyboardUp, setKeyboardUp] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', () => setKeyboardUp(true));
+    const hide = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide', () => setKeyboardUp(false));
+    return () => { show.remove(); hide.remove(); };
+  }, []);
 
-  const token = async () => {
-    tokenRef.current = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
-    return tokenRef.current;
-  };
+  // A fresh token for every request (poll, send, mute, block, report): one
+  // kept from when the thread opened expires after about a minute.
+  const token = () => freshToken(getToken);
+
+  useEffect(() => {
+    const m = state.messages;
+    lastAtRef.current = m.length ? m[m.length - 1].createdAt : null;
+  }, [state.messages]);
 
   const load = useCallback(async () => {
     if (!signedIn) { setState((s) => ({ ...s, loading: false })); return; }
@@ -55,6 +73,7 @@ export default function Conversation() {
       } else {
         const data = await apiGet(`/api/messages/${id}`, t);
         setState({ loading: false, error: null, thread: data.thread, messages: data.messages });
+        loadedRef.current = true;
         bumpUnread(getToken);
       }
     } catch (err) {
@@ -62,21 +81,27 @@ export default function Conversation() {
     }
   }, [signedIn, id, to, kind, label]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Load once per focus, then poll for anything newer than the last
+  // message we have. Only focus/sign-in/thread changes restart this.
   useFocusEffect(useCallback(() => {
+    loadedRef.current = false;
     load();
-    if (isNew) return undefined;
+    if (isNew || !signedIn) return undefined;
     const timer = setInterval(async () => {
-      if (!tokenRef.current) return;
+      if (!loadedRef.current || pollingRef.current) return;
+      pollingRef.current = true;
       try {
-        const last = state.messages.length ? state.messages[state.messages.length - 1].createdAt : null;
-        const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, tokenRef.current);
+        const last = lastAtRef.current;
+        const data = await apiGet(`/api/messages/${id}${last ? `?since=${encodeURIComponent(last)}` : ''}`, await token());
         if (data.messages && data.messages.length) {
           setState((s) => ({ ...s, messages: [...s.messages, ...data.messages.filter((m) => !s.messages.some((x) => x.id === m.id))] }));
         }
-      } catch (err) { /* next tick */ }
+      } catch (err) { /* next tick */ } finally {
+        pollingRef.current = false;
+      }
     }, POLL_MS);
     return () => clearInterval(timer);
-  }, [load, id, isNew, state.messages.length])); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [load, id, isNew, signedIn])); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (scrollRef.current) setTimeout(() => scrollRef.current && scrollRef.current.scrollToEnd({ animated: true }), 50);
@@ -88,10 +113,12 @@ export default function Conversation() {
     setBusy(true);
     setSendError(null);
     try {
-      const t = tokenRef.current || (await token());
+      const t = await token();
       if (state.thread.id) {
         const data = await apiPost(`/api/messages/${state.thread.id}`, { body }, t);
-        setState((s) => ({ ...s, messages: [...s.messages, data.message] }));
+        // A poll that was already on the wire can bring this same message
+        // back first, so only add it if it isn't there yet.
+        setState((s) => (s.messages.some((x) => x.id === data.message.id) ? s : { ...s, messages: [...s.messages, data.message] }));
       } else {
         const data = await apiPost('/api/messages', { toUserId: state.thread.other.userId, body, context: state.thread.context }, t);
         router.replace(`/messages/${data.threadId}`);
@@ -112,7 +139,7 @@ export default function Conversation() {
   async function toggleMute() {
     const muted = !state.thread.muted;
     try {
-      await apiPatch(`/api/messages/${state.thread.id}`, { muted }, tokenRef.current);
+      await apiPatch(`/api/messages/${state.thread.id}`, { muted }, await token());
       setState((s) => ({ ...s, thread: { ...s.thread, muted } }));
       flash(muted ? 'Muted. No emails or badge for this conversation.' : 'Unmuted.');
     } catch (err) { flash(err.message); }
@@ -122,7 +149,7 @@ export default function Conversation() {
     const blocked = !state.thread.iBlocked;
     const go = async () => {
       try {
-        await apiPost('/api/messages/block', { userId: state.thread.other.userId, blocked }, tokenRef.current);
+        await apiPost('/api/messages/block', { userId: state.thread.other.userId, blocked }, await token());
         setState((s) => ({ ...s, thread: { ...s.thread, iBlocked: blocked } }));
         flash(blocked ? 'Blocked.' : 'Unblocked.');
       } catch (err) { flash(err.message); }
@@ -140,7 +167,7 @@ export default function Conversation() {
         text: v,
         onPress: async () => {
           try {
-            await apiPost('/api/messages/report', { threadId: state.thread.id, reason: k }, tokenRef.current);
+            await apiPost('/api/messages/report', { threadId: state.thread.id, reason: k }, await token());
             flash('Reported to Studio Tapa.');
           } catch (err) { flash(err.message); }
         }
@@ -213,12 +240,12 @@ export default function Conversation() {
             {note ? <Text style={styles.note}>{note}</Text> : null}
             {sendError ? <Text style={styles.error}>{sendError}</Text> : null}
             {blockedEither ? (
-              <View style={styles.composer}>
+              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
                 <Text style={[styles.muted, { flex: 1 }]}>{t.iBlocked ? `You blocked ${t.other.displayName}.` : 'This person isn’t taking messages right now.'}</Text>
                 {t.iBlocked ? <Pressable style={styles.btn} onPress={toggleBlock}><Text style={styles.btnText}>Unblock</Text></Pressable> : null}
               </View>
             ) : (
-              <View style={styles.composer}>
+              <View style={[styles.composer, keyboardUp && styles.composerKeyboard]}>
                 <TextInput
                   style={styles.input}
                   value={draft}
@@ -258,6 +285,7 @@ const styles = StyleSheet.create({
   msgText: { fontFamily: fonts.body, fontSize: 14.5, color: colors.ink, lineHeight: 20 },
   msgTime: { fontFamily: fonts.mono, fontSize: 9.5, color: colors.inkFaint, marginTop: 3 },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 8, padding: 12, borderTopWidth: 1, borderTopColor: colors.hairline, backgroundColor: colors.surface1, paddingBottom: 90 },
+  composerKeyboard: { paddingBottom: 12 },
   input: { flex: 1, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, color: colors.ink, borderRadius: 18, paddingVertical: 9, paddingHorizontal: 14, fontFamily: fonts.body, fontSize: 14.5, maxHeight: 120 },
   btn: { backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 18, paddingVertical: 10, paddingHorizontal: 16 },
   btnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },

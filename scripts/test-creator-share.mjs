@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
-  standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue
+  standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
+  fitShareToPayment
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -217,6 +218,20 @@ test('reminderDue: 60, 30 and 7 days before the end, once each, the most urgent 
   assert.equal(reminderDue(left, new Date('2026-12-31T00:00:00Z')), null);
   assert.equal(reminderDue({ ...left, forfeited_at: '2026-12-31T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
   assert.equal(reminderDue({ collect_until: '2026-12-30T00:00:00Z' }, new Date('2026-12-25T00:00:00Z')), null);
+});
+
+test('fitShareToPayment: a paid month only, and never more than was paid', () => {
+  // A normal month: the full share and bonus.
+  assert.deepEqual(fitShareToPayment({ amountCents: 1299, billingReason: 'subscription_cycle', shareCents: 350, bonusCents: 150 }), { shareCents: 350, bonusCents: 150 });
+  assert.deepEqual(fitShareToPayment({ amountCents: 799, billingReason: 'subscription_create', shareCents: 200, bonusCents: 0 }), { shareCents: 200, bonusCents: 0 });
+  // A plan switch's proration top-up, a one-off invoice, nothing paid: no share.
+  assert.deepEqual(fitShareToPayment({ amountCents: 40, billingReason: 'subscription_update', shareCents: 350, bonusCents: 150 }), { shareCents: 0, bonusCents: 0 });
+  assert.deepEqual(fitShareToPayment({ amountCents: 1299, billingReason: 'manual', shareCents: 350, bonusCents: 150 }), { shareCents: 0, bonusCents: 0 });
+  assert.deepEqual(fitShareToPayment({ amountCents: 0, billingReason: 'subscription_cycle', shareCents: 350, bonusCents: 150 }), { shareCents: 0, bonusCents: 0 });
+  // A heavy discount: both shrink to fit what was paid, in proportion.
+  assert.deepEqual(fitShareToPayment({ amountCents: 100, billingReason: 'subscription_create', shareCents: 350, bonusCents: 150 }), { shareCents: 70, bonusCents: 30 });
+  // Older invoices without billing_reason count as a month.
+  assert.deepEqual(fitShareToPayment({ amountCents: 1299, shareCents: 350, bonusCents: 0 }), { shareCents: 350, bonusCents: 0 });
 });
 
 console.log(`\n${passed} passed`);

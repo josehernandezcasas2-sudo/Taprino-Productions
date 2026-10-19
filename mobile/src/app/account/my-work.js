@@ -1,13 +1,14 @@
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import {
   ChatIcon, ClapperboardIcon, ClockIcon, CloseIcon, EyeIcon, ExternalLinkIcon,
   HeadphonesIcon, ImageIcon, LinkIcon, PencilIcon, SettingsIcon, TrashIcon, UndoIcon, WarningIcon
 } from '../../components/WorkIcons';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
@@ -33,13 +34,13 @@ const CF_STATE_LABEL = {
 
 const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
 
-function withTimeout(promise, ms) {
-  return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+// The same path is a native screen in the app (episode/[id], podcasts/[id])
+// and the public page on the site (for "Copy public link").
+function publicPathFor(s) {
+  return s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
 }
-
 function publicUrlFor(s) {
-  const path = s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
-  return `${SITE_ORIGIN}${path}`;
+  return `${SITE_ORIGIN}${publicPathFor(s)}`;
 }
 
 // Mirrors pages/creator/my-work.js — same stats dashboard, same grouped/
@@ -50,7 +51,10 @@ function publicUrlFor(s) {
 // modal all open the website instead — each of those is really its own
 // file-picker + upload flow (or, for the admin modal, a dense multi-field
 // form) that deserves its own pass rather than being squeezed in here.
+// Numbers and the public page are native screens; submitting a new
+// episode has no app screen yet, so that still opens the website.
 export default function MyWork() {
+  const router = useRouter();
   const { getToken } = useAuth();
   const [feedState, setFeedState] = useState({ loading: true, error: null, forbidden: false, submissions: null });
   const [statusFilter, setStatusFilter] = useState('all');
@@ -70,20 +74,21 @@ export default function MyWork() {
   // (/api/creator/pricing) and the title the Sell sheet is open for.
   const [pricing, setPricing] = useState({ prices: {}, settings: {} });
   const [sellModal, setSellModal] = useState(null); // { type, id, title, sub }
-  const tokenRef = useRef(null);
 
   async function loadPricing() {
     try {
-      setPricing(await apiGet('/api/creator/pricing', tokenRef.current));
+      setPricing(await apiGet('/api/creator/pricing', await freshToken(getToken)));
     } catch (err) {
       // The rows just show no price.
     }
   }
 
+  // Every request asks Clerk for a fresh token: a token kept from when the
+  // screen opened has expired a minute later (edits/deletion requests then
+  // failed as "signed out").
   async function loadSubmissions() {
     try {
-      const token = tokenRef.current !== null ? tokenRef.current : await withTimeout(getToken().catch(() => null), 4000);
-      tokenRef.current = token;
+      const token = await freshToken(getToken);
       const data = await apiGet('/api/creator/my-submissions', token);
       setFeedState({ loading: false, error: null, forbidden: false, submissions: data.submissions });
       loadPricing();
@@ -117,7 +122,7 @@ export default function MyWork() {
       const body = isEpisode
         ? { episodeId: editModal.currentValues.id, title: nameValue, description }
         : { seriesId: editModal.currentValues.id, name: nameValue, description };
-      await apiPost(endpoint, body, tokenRef.current);
+      await apiPost(endpoint, body, await freshToken(getToken));
       setEditModal(null);
     } catch (err) {
       setEditError(err.message);
@@ -134,7 +139,7 @@ export default function MyWork() {
     setDeleteSaving(true);
     setDeleteError(null);
     try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, tokenRef.current);
+      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, await freshToken(getToken));
       setDeleteModal(null);
       setDeleteReason('');
       loadSubmissions();
@@ -148,7 +153,7 @@ export default function MyWork() {
   async function cancelDeletion(episodeId) {
     setActionError(null);
     try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId, action: 'cancel' }, tokenRef.current);
+      await apiPost('/api/creator/request-episode-deletion', { episodeId, action: 'cancel' }, await freshToken(getToken));
       loadSubmissions();
     } catch (err) {
       setActionError(err.message);
@@ -244,7 +249,7 @@ export default function MyWork() {
           </Pressable>
         </View>
 
-        <Pressable onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/analytics`)}>
+        <Pressable onPress={() => router.push('/creator/numbers')}>
           <Text style={styles.analyticsLink}>Want to see how they're doing? View your numbers →</Text>
         </Pressable>
 
@@ -382,6 +387,7 @@ export default function MyWork() {
               onDelete={(item) => { setActionSheet(null); setDeleteModal(item); setDeleteReason(''); setDeleteError(null); }}
               onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
               onCopyLink={copyPublicLink}
+              onOpenPublic={(item) => { setActionSheet(null); router.push(publicPathFor(item)); }}
               copiedId={copiedId}
               pricing={pricing}
               onSell={(target) => { setActionSheet(null); setSellModal(target); }}
@@ -398,7 +404,7 @@ export default function MyWork() {
               target={sellModal}
               price={pricing.prices[`${sellModal.type}:${sellModal.id}`] || null}
               settings={pricing.settings}
-              getToken={() => withTimeout(getToken().catch(() => tokenRef.current), 4000)}
+              getToken={() => freshToken(getToken)}
               onClose={() => setSellModal(null)}
               onSaved={loadPricing}
             /> : null}
@@ -458,7 +464,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, copiedId, pricing, onSell }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, copiedId, pricing, onSell }) {
   const { type, item } = actionSheet;
   if (type === 'series') {
     return (
@@ -484,7 +490,7 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
       <Text style={styles.sheetTitle} numberOfLines={1}>{s.title}</Text>
       {s.status === 'approved' ? (
         <>
-          <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(publicUrlFor(s))}>
+          <Pressable style={styles.sheetRow} onPress={() => onOpenPublic(s)}>
             <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>View public page</Text>
           </Pressable>
           <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>

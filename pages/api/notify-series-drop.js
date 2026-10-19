@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 import { findSeries } from '../../lib/series';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
+import { mailFrom } from '../../lib/notify';
+import { SITE } from '../../lib/siteConfig';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -27,7 +29,8 @@ async function sendDropEmail(email, seriesName, seriesUrl) {
       'Content-Type': 'application/json'
     },
     body: JSON.stringify({
-      from: process.env.RESEND_FROM_EMAIL || 'Taprino Transmission <onboarding@resend.dev>',
+      from: mailFrom(),
+      reply_to: SITE.contactEmail,
       to: email,
       subject: `New episode of ${seriesName} just dropped`,
       html: `<p>A new episode of <strong>${seriesName}</strong> is up — you saved this series to get notified.</p><p><a href="${seriesUrl}">${seriesUrl}</a></p>`

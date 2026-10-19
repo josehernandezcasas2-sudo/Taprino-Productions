@@ -94,7 +94,7 @@ export async function getServerSideProps({ req, res }) {
       personalUnitKeys,
       // Tapa+ members and admins get no ad slides (the feed used to insert
       // them for everyone).
-      adsOn: !(account.isSubscriber || account.isAdmin)
+      adsOn: !(account.adFree || account.isAdmin)
     }
   };
 }

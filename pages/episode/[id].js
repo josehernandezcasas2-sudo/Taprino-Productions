@@ -393,9 +393,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
           ) : (
             <VideoPlayer
               episode={playingEpisode}
-              // Ads follow the membership tier, not "any member": Standard
-              // still gets them (lib/membershipTiers.js adFree).
-              adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.tier === 'free' && episode.adsEnabled !== false}
+              // Ads follow the membership tier, not the title: Standard members
+              // get them on premium titles too; only Premium/Sponsor are
+              // ad-free (lib/membershipTiers.js adFree). A buyer paid for this
+              // title, so it plays ad-free for them (Buy to own).
+              adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
               onEnded={handleEnded}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
@@ -455,7 +457,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                     repeated the runtime a second time — everything about
                     this episode's status now lives in this one row. */}
                 <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
-                  {owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · ad-free`}
+                  {owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · members`}
                 </span>
                 {owned && purchase.boughtAt && (
                   <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>

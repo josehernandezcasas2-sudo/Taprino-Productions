@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../lib/api';
+import { apiGet, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, WITHIN_CHOICES } from '../../components/CrewBits';
@@ -73,7 +73,8 @@ export default function LocationsDirectory() {
       if (isDate(from)) p.push(`from=${from}`, `to=${isDate(to) && to >= from ? to : from}`);
       p.push(`sort=${sort}`);
       try {
-        const d = await apiGet(`/api/locations?${p.join('&')}`, tokenRef.current);
+        // Fresh each search: a token from when the screen opened has expired a minute later.
+        const d = await apiGet(`/api/locations?${p.join('&')}`, tokenRef.current ? await freshToken(getToken) : null);
         if (id !== reqId.current) return;
         setData(d);
         if (d.rules) setRules(d.rules);
