@@ -31,10 +31,11 @@ export function isStreamRoute(pathname) {
 }
 
 // Site settings are the same for every screen, so fetch them once per app
-// session, not per screen.
+// session, not per screen. PrivateBetaGate reads the same copy for its
+// `privateBeta` flag.
 let settingsCache = null;
 let settingsPromise = null;
-function loadSettings() {
+export function loadSettings() {
   if (settingsCache) return Promise.resolve(settingsCache);
   if (!settingsPromise) {
     settingsPromise = apiGet('/api/site-settings')

@@ -9859,3 +9859,41 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .tp-advisory-text { font-size: clamp(0.95rem, 2.2vw, 1.15rem); line-height: 1.4; }
 .tp-advisory-sub { margin-top: 0.5rem; font-size: 0.72rem; color: var(--ink-dim); }
 @media (max-width: 600px) { .tp-advisory-box { max-width: 86%; } }
+
+/* ---- Private beta door (pages/welcome.js) ---- */
+.welcome { min-height: 100vh; display: flex; flex-direction: column; background: var(--surface-0); color: var(--ink); }
+.welcome-bar { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 0.85rem 1rem; background: var(--surface-1); border-bottom: 1px solid var(--ocean-ink); }
+.welcome-brand { font-family: var(--font-display); font-weight: 700; letter-spacing: 0.12em; font-size: 0.92rem; }
+.welcome-pill { font-family: var(--font-mono); font-size: 0.68rem; color: var(--olive); border: 1px solid rgba(var(--olive-rgb), 0.5); border-radius: 999px; padding: 0.15rem 0.55rem; white-space: nowrap; }
+.welcome-main { flex: 1; width: 100%; max-width: 560px; margin: 0 auto; padding: 1.6rem 1rem 2rem; display: grid; gap: 1.4rem; align-content: start; }
+.welcome-preview { margin: 0; padding: 0.6rem 0.8rem; border-radius: 10px; background: var(--olive); color: var(--olive-shadow); font-family: var(--font-mono); font-size: 0.78rem; }
+.welcome-preview code { font-family: inherit; font-weight: 700; }
+.welcome-hero { display: grid; gap: 0.6rem; }
+.welcome-mark { display: block; }
+.welcome-kicker { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--olive); margin-top: 0.3rem; }
+.welcome-hero h1 { margin: 0; font-family: var(--font-display); font-size: clamp(1.6rem, 5vw, 2.1rem); line-height: 1.1; font-weight: 700; }
+.welcome-hero p { margin: 0; font-size: 0.98rem; line-height: 1.5; color: var(--ink-dim); }
+.welcome-cta { display: grid; gap: 0.6rem; margin-top: 0.6rem; }
+.welcome-btn { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; border-radius: 999px; border: 1px solid var(--brass); background: var(--brass); color: #241a05; font-family: var(--font-display); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.welcome-btn:hover { filter: brightness(1.08); }
+.welcome-btn.ghost { background: transparent; border-color: var(--olive); color: var(--olive); font-weight: 600; font-size: 0.95rem; min-height: 46px; }
+.welcome-btn.ghost:hover { background: rgba(var(--olive-rgb), 0.12); }
+.welcome-btn:disabled { opacity: 0.6; cursor: default; }
+.welcome-note { font-size: 0.84rem; line-height: 1.45; color: var(--ink-faint); text-align: center; margin: 0; }
+.welcome-linkbtn { background: none; border: 0; padding: 0; color: var(--olive); font: inherit; text-decoration: underline; cursor: pointer; }
+.welcome-request { display: grid; gap: 0.6rem; padding: 1rem; border-radius: 12px; background: var(--surface-1); border: 1px solid var(--ocean-ink); }
+.welcome-request > b { font-family: var(--font-display); font-size: 1.05rem; font-weight: 700; }
+.welcome-request > span { font-size: 0.88rem; line-height: 1.45; color: var(--ink-dim); }
+.welcome-form { display: grid; gap: 0.6rem; }
+.welcome-ok { margin: 0; color: var(--ok); font-size: 0.92rem; }
+.welcome-err { margin: 0; color: var(--danger); font-size: 0.86rem; }
+.welcome-makers { display: grid; gap: 0.35rem; padding-top: 1rem; border-top: 1px solid var(--ocean-ink); }
+.welcome-makers > b { font-family: var(--font-display); font-size: 0.98rem; font-weight: 600; }
+.welcome-makers > span { font-size: 0.88rem; line-height: 1.5; color: var(--ink-dim); }
+.welcome-makers a { color: var(--brass); text-decoration: underline; }
+.welcome-signup { margin-top: 0.4rem; }
+.welcome-signup .cl-rootBox { width: 100%; }
+.welcome-signup .cl-card { width: 100%; max-width: none; }
+.welcome-foot { display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center; padding: 1.2rem 1rem 1.4rem; font-family: var(--font-mono); font-size: 0.72rem; }
+.welcome-foot a { color: var(--ink-faint); text-decoration: none; }
+.welcome-foot a:hover { color: var(--ink); }

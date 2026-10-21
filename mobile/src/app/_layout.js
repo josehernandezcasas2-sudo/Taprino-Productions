@@ -11,6 +11,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from '../components/BottomNav';
+import PrivateBetaGate from '../components/PrivateBetaGate';
 import { colors } from '../lib/theme';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -101,6 +102,9 @@ export default function RootLayout() {
           <Stack.Screen name="admin/review" options={{ headerShown: false }} />
         </Stack>
         <BottomNav />
+        {/* The private beta door: covers everything for a signed-out
+            person while the website's PRIVATE_BETA switch is on. */}
+        <PrivateBetaGate />
       </SafeAreaProvider>
     </ClerkProvider>
     </GestureHandlerRootView>

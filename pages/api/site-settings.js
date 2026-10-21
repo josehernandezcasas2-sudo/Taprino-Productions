@@ -1,4 +1,5 @@
 import { getSiteSettings } from '../../lib/siteSettings';
+import { privateBetaOn } from '../../lib/privateBetaRules';
 
 // Deliberately public and read-only — this is how HeaderNav (used on
 // every page) learns whether to show the Shop link, without needing every
@@ -13,5 +14,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   const settings = await getSiteSettings();
-  return res.status(200).json(settings);
+  // Private beta: the app reads this before anything else and shows its
+  // own door while it's on (mobile/src/components/PrivateBetaGate.js).
+  return res.status(200).json({ ...settings, privateBeta: privateBetaOn() });
 }
