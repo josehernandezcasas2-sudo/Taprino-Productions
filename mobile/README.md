@@ -124,6 +124,10 @@ Roughly in order of what unlocks the most:
    profile, creator dashboard — whichever order matters most.
 5. **App Store / Play Store accounts**, once there's something worth shipping:
    an Apple Developer account ($99/year) for iOS, a Google Play Developer account
-   ($25 one-time) for Android. Not needed yet — Expo Go covers all testing until
-   then. Building and signing the actual store binaries happens through EAS
-   (Expo's cloud build service) and doesn't require a Mac even for iOS.
+   ($25 one-time) for Android. Building and signing the store binaries happens
+   through EAS (Expo's cloud build service) and doesn't require a Mac even for
+   iOS. **Android is wired up**: `.github/workflows/mobile-android-build.yml`
+   builds the signed app bundle (and uploads it to Internal testing once the
+   app exists in the Play Console); `PLAY_STORE.md` has the steps, the store
+   listing copy and the policy-form answers. The package name is
+   `site.studiotapatv.app`. iOS waits on the Apple account.

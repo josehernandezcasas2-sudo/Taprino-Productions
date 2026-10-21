@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Google Play service account key (written by the Android build workflow, never committed)
+google-service-account.json

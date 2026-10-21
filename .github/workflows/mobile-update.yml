@@ -14,6 +14,12 @@ on:
       - 'mobile/**'
       - '.github/workflows/mobile-update.yml'
   workflow_dispatch:
+    inputs:
+      branch:
+        description: 'EAS Update branch. preview = Expo Go; production = the Google Play build (mobile/PLAY_STORE.md).'
+        type: choice
+        options: [preview, production]
+        default: preview
 
 concurrency:
   group: mobile-update
@@ -50,11 +56,15 @@ jobs:
       # the bundle. With --environment, EAS CLI ignores .env files and
       # takes variables from expo.dev instead, which is why the first
       # publishes came out without the key; no --environment here.
-      - name: Publish to the preview branch
+      # Pushes go to the preview branch (Expo Go). A manual run can pick
+      # production, which the Google Play build is on: only publish there
+      # on purpose, since installed apps pick it up on their next launch.
+      - name: Publish the update
         working-directory: mobile
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual run' }}
+          BRANCH: ${{ inputs.branch || 'preview' }}
         run: |
           set -a; . ./.env; set +a
           MSG="${COMMIT_MESSAGE%%$'\n'*}"
-          eas update --branch preview --message "${MSG:0:120}" --non-interactive
+          eas update --branch "$BRANCH" --message "${MSG:0:120}" --non-interactive

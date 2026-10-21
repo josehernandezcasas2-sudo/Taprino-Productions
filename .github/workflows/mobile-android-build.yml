@@ -1,0 +1,75 @@
+# The Android app for Google Play, built in the cloud by EAS Build from
+# this repo (no Android Studio needed anywhere). Run it by hand from the
+# Actions tab: pick the profile (production = the signed app bundle for
+# the Play Console; preview = an installable APK for a phone or emulator)
+# and, once the app exists in the Play Console, tick "submit" to upload
+# the finished bundle to the Internal testing track.
+#
+# Secrets: EXPO_TOKEN (same one mobile-update.yml uses) and, for submit,
+# GOOGLE_SERVICE_ACCOUNT_JSON (the Play Console service account's JSON
+# key, pasted whole). Steps and store listing: mobile/PLAY_STORE.md.
+name: Mobile · Android build
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile (mobile/eas.json)'
+        type: choice
+        options: [production, preview]
+        default: production
+      submit:
+        description: 'Upload the build to Google Play (Internal testing). Production only.'
+        type: boolean
+        default: false
+
+concurrency:
+  group: mobile-android-build
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: eas build (android, ${{ inputs.profile }})
+    runs-on: ubuntu-latest
+    if: ${{ github.repository_owner == 'josehernandezcasas2-sudo' }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: EAS CLI
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Install
+        working-directory: mobile
+        run: npm ci --no-audit --no-fund
+
+      # The build itself runs on Expo's servers from the committed files
+      # (mobile/.env with the Clerk key included), so nothing has to be
+      # sourced here. --wait keeps this job open until the build finishes,
+      # so the submit step below can pick it up.
+      - name: Build
+        working-directory: mobile
+        run: eas build --platform android --profile ${{ inputs.profile }} --non-interactive --wait
+
+      - name: Submit to Google Play (Internal testing)
+        if: ${{ inputs.submit && inputs.profile == 'production' }}
+        working-directory: mobile
+        env:
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: |
+          if [ -z "$GOOGLE_SERVICE_ACCOUNT_JSON" ]; then
+            echo "GOOGLE_SERVICE_ACCOUNT_JSON secret is not set — see mobile/PLAY_STORE.md"; exit 1
+          fi
+          printf '%s' "$GOOGLE_SERVICE_ACCOUNT_JSON" > google-service-account.json
+          eas submit --platform android --profile production --latest --non-interactive
+          rm -f google-service-account.json
