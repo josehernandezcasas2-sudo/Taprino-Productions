@@ -9848,3 +9848,14 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .apply-preview-bar b { font-weight: 700; }
 .apply-preview-links { display: flex; gap: 1rem; flex-wrap: wrap; }
 .apply-preview-links a { color: var(--olive-shadow); font-weight: 600; }
+
+/* ---- Content advisory: the network-style card over the first seconds of playback (components/ContentAdvisory.js) ---- */
+.tp-advisory { position: absolute; inset: 0; z-index: 3; display: flex; align-items: center; justify-content: center; background: rgba(6, 10, 18, 0.72); backdrop-filter: blur(3px); cursor: pointer; opacity: 1; transition: opacity 0.6s ease; }
+.tp-advisory.fade { opacity: 0; pointer-events: none; }
+.tp-advisory-box { text-align: center; max-width: 72%; color: var(--ink); }
+.tp-advisory-rating { display: inline-block; font-family: var(--font-display); font-weight: 700; font-size: clamp(1.4rem, 4vw, 2.2rem); letter-spacing: 0.06em; border: 2px solid var(--ink); padding: 0.2em 0.5em; border-radius: 6px; margin-bottom: 0.7rem; }
+.tp-advisory-bug { height: clamp(40px, 9vw, 64px); width: auto; margin-bottom: 0.7rem; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.6)); }
+.tp-advisory-kicker { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--olive); margin-bottom: 0.5rem; }
+.tp-advisory-text { font-size: clamp(0.95rem, 2.2vw, 1.15rem); line-height: 1.4; }
+.tp-advisory-sub { margin-top: 0.5rem; font-size: 0.72rem; color: var(--ink-dim); }
+@media (max-width: 600px) { .tp-advisory-box { max-width: 86%; } }

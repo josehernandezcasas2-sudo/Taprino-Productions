@@ -4,9 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEvent } from 'expo';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
 import { readViewingTerms, saveViewingTerms, withTerms, TERMS_URL } from '../../lib/viewingTerms';
+import { advisoryFor, useContentRatings } from '../../lib/contentAdvisory';
+import ContentAdvisory from '../../components/ContentAdvisory';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
@@ -131,6 +134,10 @@ export default function Episode() {
 
   const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
+  // Content advisory over the first seconds (mobile/src/lib/contentAdvisory.js).
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const ratingsList = useContentRatings();
+  const advisoryInfo = episode && !showingTrailer ? advisoryFor(episode, ratingsList) : null;
   const resumeSeconds = (state.page && state.page.resumeSeconds) || 0;
   useWatchProgress({
     player,
@@ -310,7 +317,10 @@ export default function Episode() {
                 </View>
               )
             ) : activeSrc ? (
-              <VideoView key={activeSrc} player={player} style={styles.player} contentFit="contain" nativeControls allowsFullscreen />
+              <View style={styles.player}>
+                <VideoView key={activeSrc} player={player} style={absoluteFill} contentFit="contain" nativeControls allowsFullscreen />
+                <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
+              </View>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>
             ) : (

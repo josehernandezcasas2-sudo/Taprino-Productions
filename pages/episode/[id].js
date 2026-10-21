@@ -443,6 +443,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               // title, so it plays ad-free for them (Buy to own).
               adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
               onEnded={handleEnded}
+              advisory={!showingTrailer}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
               onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
