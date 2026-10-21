@@ -8,6 +8,7 @@ import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import { withTerms } from '../../lib/viewingTerms';
 
 function PlayIcon({ size = 15, color = colors.ink }) {
   return (
@@ -100,7 +101,7 @@ export default function PodcastShow() {
         ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))])
         : null;
       try {
-        const data = await apiGet(`/api/podcast-show?id=${encodeURIComponent(id)}`, token);
+        const data = await apiGet(await withTerms(`/api/podcast-show?id=${encodeURIComponent(id)}`), token);
         if (!cancelled) setState({ loading: false, error: null, data });
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });

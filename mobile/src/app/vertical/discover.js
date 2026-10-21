@@ -9,6 +9,7 @@ import ReelPlayer from '../../components/ReelPlayer';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import { buildPersonalUnitKeys, buildVerticalUnits, createDiscoverPicker, expandUnitToSlides, unitKey } from '../../lib/verticalFeed';
+import { withTerms } from '../../lib/viewingTerms';
 
 function HeartIcon({ active, size = 22 }) {
   return active ? (
@@ -88,7 +89,7 @@ export default function VerticalDiscover() {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
         tokenRef.current = token;
-        const data = await apiGet('/api/vertical-discover-feed', token);
+        const data = await apiGet(await withTerms('/api/vertical-discover-feed'), token);
         if (cancelled) return;
         setFeedState({ loading: false, error: null, feed: data });
         setWishlistSet(new Set(data.wishlist || []));
@@ -141,7 +142,7 @@ export default function VerticalDiscover() {
     const toFetch = [deck[activeIndex], deck[activeIndex + 1]]
       .filter((s) => s && s.kind === 'episode' && !srcByEpisodeId[s.episode.id]);
     toFetch.forEach((slide) => {
-      getToken().catch(() => tokenRef.current).then((t) => apiGet(`/api/vertical/playback?episodeId=${slide.episode.id}`, t))
+      getToken().catch(() => tokenRef.current).then(async (t) => apiGet(await withTerms(`/api/vertical/playback?episodeId=${slide.episode.id}`), t))
         .then((data) => {
           if (data.src) setSrcByEpisodeId((m) => ({ ...m, [slide.episode.id]: data.src }));
         })

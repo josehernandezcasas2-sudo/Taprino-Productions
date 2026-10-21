@@ -7,6 +7,7 @@ import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
+import { withTerms } from '../../lib/viewingTerms';
 
 // Mirrors pages/vertical/browse.js: a grid of vertical series, via
 // lib/verticalSeriesBrowse.js's entitlement-filtered list (subscribers/
@@ -29,7 +30,7 @@ export default function Vertical() {
           getToken().catch(() => null),
           new Promise((r) => setTimeout(() => r(null), 4000))
         ]);
-        const data = await apiGet('/api/vertical-series', token);
+        const data = await apiGet(await withTerms('/api/vertical-series'), token);
         if (!cancelled) setState({ loading: false, error: null, series: data.series || [] });
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, series: [] });

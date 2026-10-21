@@ -48,7 +48,7 @@ export default async function handler(req, res) {
   const account = await getAccountContext(req);
   // Same age gate as stream-token: the feed filters by rating for the
   // viewer, but an id can be requested directly.
-  const age = await getViewerAgeContext(account);
+  const age = await getViewerAgeContext(account, req);
   if (!age.allows(episode.rating)) return res.status(403).json({ error: 'This title is age-restricted.', ageRestricted: true });
   const entitled = episode.tier === 'free' || account.isSubscriber || account.isAdmin;
   if (!entitled) return res.status(403).json({ error: 'Subscription required.' });

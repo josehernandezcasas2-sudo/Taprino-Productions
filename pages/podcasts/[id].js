@@ -12,6 +12,8 @@ import Footer from '../../components/Footer';
 import { PlayIcon, PauseIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { formatRuntimeLong } from '../../lib/videoMetadata';
+import { useRouter } from 'next/router';
+import { takeViewingTerms } from '../../lib/viewingTerms';
 
 export async function getServerSideProps({ req, res, params }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -27,6 +29,7 @@ function formatDate(iso) {
 
 export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes }) {
   const player = usePodcastPlayer();
+  const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const firstEpisode = episodes[0];
   const host = firstEpisode ? firstEpisode.artist : null;
@@ -87,6 +90,12 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
 
       <main className="library-stage">
         <BackButton fallbackHref="/podcasts" />
+        {episodes.some((ep) => ep.termsWouldUnlock) && (
+          <div className="fund-banner" role="status" style={{ marginBottom: '1rem', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 10 }}>
+            <span>Some episodes are rated {episodes.find((ep) => ep.termsWouldUnlock).rating}. Confirm you’re old enough for the ratings shown and they play.</span>
+            <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => { takeViewingTerms(); router.replace(router.asPath); }}>Confirm and listen</button>
+          </div>
+        )}
 
         <div className="show-header">
           <div className="show-header-art" style={(show.poster || show.thumbnail) ? { backgroundImage: `url(${show.poster || show.thumbnail})` } : {}} />

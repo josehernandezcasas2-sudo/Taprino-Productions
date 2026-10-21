@@ -35,7 +35,7 @@ export async function getServerSideProps({ req, res }) {
 
   const entitled = account.isSubscriber || account.isAdmin;
   // Rating filter for the viewer (the feed used to skip the age gate).
-  const age = await getViewerAgeContext(account);
+  const age = await getViewerAgeContext(account, req);
   const catalogVertical = age.filter(filterEntitledVertical(episodes, entitled));
 
   // User-posted videos (lib/posts.js) — admin test feature — are woven
