@@ -25,12 +25,15 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
     SDK that matters is the one Expo Go on the phone reports under
     **Settings → App Info → Supported SDK**, not npm's newest `expo` release:
     SDK 58 was on npm from 2026-09-29, but Expo Go on the iOS App Store was
-    still 57.0.9 on 2026-10-18, so the app is on **SDK 57** until Expo Go
-    moves. When Expo Go updates and the project won't open ("incompatible with
-    this version of Expo Go"), move the app to the SDK it now reports:
-    `npx expo install expo@<version> --fix` from `mobile/` (the exact SDK, not
-    `expo@latest`), `npm install`, and `npx expo export --platform ios` to
-    prove it still bundles before testing on the phone.
+    still 57.0.9 on 2026-10-18 (a bump to 58 that day broke every route with
+    "incompatible with this version of Expo Go" and was undone). By
+    2026-10-21 the phone's Expo Go had moved to 58 and the SDK 57 app rendered
+    red "Unimplemented component: <RNSScreenStack>" screens instead, so the
+    app is on **SDK 58** now. When Expo Go moves again and the project won't
+    open, move the app to the SDK it now reports: `npx expo install
+    expo@<version> --fix` from `mobile/` (the exact SDK, not `expo@latest`),
+    `npm install`, and `npx expo export --platform ios` to prove it still
+    bundles before testing on the phone.
   - **Same Expo account on both ends.** `npx expo whoami` on the PC and the
     account signed into Expo Go must match (studiotapa237). If not:
     `npx expo logout`, `npx expo login`, and sign Expo Go in again.
