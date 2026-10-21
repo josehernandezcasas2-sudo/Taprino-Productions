@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
+import { useContentRatings } from './RatingOptions';
+import ContentAdvisory from './ContentAdvisory';
+import { advisoryFor, ADVISORY_MS } from '../lib/contentAdvisory';
 import { isHttpUrl } from '../lib/safeUrl';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
@@ -48,7 +51,10 @@ export default function VideoPlayer({
   // Where that fresh token comes from. Defaults to /api/stream-token (an
   // episode); anything that isn't an episode — a Film University lesson —
   // passes its own async () => src-or-null.
-  refreshSrc = null
+  refreshSrc = null,
+  // The content advisory card over the first seconds of playback
+  // (lib/contentAdvisory.js); the page turns it off for trailers.
+  advisory = true
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -752,6 +758,34 @@ export default function VideoPlayer({
     showControlsTemporarily();
   }, [showControlsTemporarily]);
 
+  // Content advisory (Jose, 2026-10-20): a network-style card once the
+  // programme itself is playing (after any pre-roll), once per title;
+  // it fades on its own and a tap dismisses it.
+  const ratingsList = useContentRatings();
+  const advisoryInfo = useMemo(
+    () => (advisory ? advisoryFor({ id: episode.id, rating: episode.rating, contentType: episode.contentType }, ratingsList) : null),
+    [advisory, episode.id, episode.rating, episode.contentType, ratingsList]
+  );
+  const [advisoryState, setAdvisoryState] = useState(null); // null | 'on' | 'fading'
+  const advisoryShownFor = useRef(null);
+  const advisoryTimers = useRef([]);
+  const dismissAdvisory = useCallback(() => {
+    advisoryTimers.current.forEach(clearTimeout);
+    advisoryTimers.current = [];
+    setAdvisoryState(null);
+  }, []);
+  useEffect(() => {
+    if (!advisoryInfo || isYouTube || !started || !playing || adState) return;
+    if (advisoryShownFor.current === episode.id) return;
+    advisoryShownFor.current = episode.id;
+    setAdvisoryState('on');
+    advisoryTimers.current = [
+      setTimeout(() => setAdvisoryState('fading'), ADVISORY_MS),
+      setTimeout(() => setAdvisoryState(null), ADVISORY_MS + 700)
+    ];
+  }, [advisoryInfo, isYouTube, started, playing, adState, episode.id]);
+  useEffect(() => () => { advisoryTimers.current.forEach(clearTimeout); }, [episode.id]);
+
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
@@ -1067,6 +1101,8 @@ export default function VideoPlayer({
           <span className="tp-adbar-note">Your episode resumes right after</span>
         </div>
       )}
+
+      <ContentAdvisory info={advisoryInfo} state={advisoryState} onDismiss={dismissAdvisory} />
 
       {started && !adState && (
         <div className="tp-controls" onMouseEnter={handleControlsMouseEnter} onMouseLeave={handleControlsMouseLeave}>

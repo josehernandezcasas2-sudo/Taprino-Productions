@@ -291,6 +291,12 @@ export default function Terms({ account, share }) {
         for you instead. Live channels can include live broadcasts, ads and bumpers, and work from other
         creators, and what airs can change at any time.
       </p>
+      <p>
+        The same confirmation covers titles in the library rated under 17+ (PG-13, TV-14 and the like): without an
+        age on your account you can watch them once you have confirmed you are old enough for the rating shown.
+        Titles rated 17+ (R, NC-17, TV-MA) and unrated titles, which we treat as 17+ until a creator or admin rates
+        them, always need an account with your age.
+      </p>
 
       <h2 id="pitch-room">13. Pitch Room</h2>
       <p>

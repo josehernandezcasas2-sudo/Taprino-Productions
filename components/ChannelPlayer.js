@@ -5,6 +5,7 @@ import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './Playe
 import LiveVideoPlayer from './LiveVideoPlayer';
 import { useContentRatings } from './RatingOptions';
 import { airToEpisode, episodeToAir } from '../lib/adPlanRules';
+import { viewingTermsTaken, takeViewingTerms } from '../lib/viewingTerms';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
@@ -12,8 +13,9 @@ const SAFETY_POLL_MS = 45000; // catches drift if the precise end-timer is throt
 const MIN_BREAK_GAP_MS = 10 * 60 * 1000; // no between-program ad break sooner than this after the last one (or tuning in)
 const BUG_SHOW_MS = 6000; // the rating bug holds this long, then fades out over a second
 const CONTROLS_HIDE_MS = 2500; // the controls get out of the way this long after the mouse stops
-const LIVE_TERMS_KEY = 'live-tv-terms-accepted'; // this browser took the live TV terms (viewers without an age on file)
-const liveTermsTaken = () => { try { return window.localStorage.getItem(LIVE_TERMS_KEY) === '1'; } catch (err) { return false; } };
+// One acceptance covers the live channels and library titles under 17+
+// (lib/viewingTerms.js keeps it in localStorage and a cookie).
+const liveTermsTaken = viewingTermsTaken;
 
 function formatClock(seconds) {
   const s = Math.max(0, Math.floor(seconds));
@@ -511,7 +513,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     if (v) v.muted = !v.muted;
   }
   function acceptLiveTerms() {
-    try { window.localStorage.setItem(LIVE_TERMS_KEY, '1'); } catch (err) { /* private mode: the gate shows again next time */ }
+    takeViewingTerms();
     tune(nowRef.current);
   }
   function changeVolume(val) {

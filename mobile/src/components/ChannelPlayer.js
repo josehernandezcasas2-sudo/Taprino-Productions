@@ -9,29 +9,17 @@ import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { apiGet, apiPost } from '../lib/api';
+import { readViewingTerms, saveViewingTerms, TERMS_URL } from '../lib/viewingTerms';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 
 const SAFETY_POLL_MS = 45000;
-// Viewers without an age on file take the live TV terms once; the player
-// remembers it on the device and sends it with every play request.
-const LIVE_TERMS_KEY = 'live_tv_terms_accepted';
-const TERMS_URL = 'https://www.studiotapatv.site/terms#live-tv';
-async function readLiveTerms() {
-  try {
-    if (Platform.OS === 'web') return window.localStorage.getItem(LIVE_TERMS_KEY) === '1';
-    return (await SecureStore.getItemAsync(LIVE_TERMS_KEY)) === '1';
-  } catch (err) {
-    return false;
-  }
-}
-async function saveLiveTerms() {
-  try {
-    if (Platform.OS === 'web') window.localStorage.setItem(LIVE_TERMS_KEY, '1');
-    else await SecureStore.setItemAsync(LIVE_TERMS_KEY, '1');
-  } catch (err) { /* the gate shows again next time */ }
-}
+// Viewers without an age on file take the viewing terms once; the device
+// remembers it and sends it with every play request. One acceptance covers
+// the live channels and library titles under 17+ (mobile/src/lib/viewingTerms.js).
+const readLiveTerms = readViewingTerms;
+const saveLiveTerms = saveViewingTerms;
 const CONTROLS_HIDE_MS = 3000;
 const { OrientationLock, Orientation } = ScreenOrientation;
 

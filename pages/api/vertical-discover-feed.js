@@ -46,7 +46,7 @@ export default async function handler(req, res) {
 
   const entitled = account.isSubscriber || account.isAdmin;
   // Rating filter for the viewer (the feed used to skip the age gate).
-  const age = await getViewerAgeContext(account);
+  const age = await getViewerAgeContext(account, req);
   const verticalEpisodes = age.filter(filterEntitledVertical(episodes, entitled));
 
   const seriesNameById = {};

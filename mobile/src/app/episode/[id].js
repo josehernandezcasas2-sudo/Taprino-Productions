@@ -4,8 +4,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useEvent } from 'expo';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
+import { readViewingTerms, saveViewingTerms, withTerms, TERMS_URL } from '../../lib/viewingTerms';
+import { advisoryFor, useContentRatings } from '../../lib/contentAdvisory';
+import ContentAdvisory from '../../components/ContentAdvisory';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
@@ -72,7 +76,8 @@ export default function Episode() {
   const [showPlayer, setShowPlayer] = useState(false);
   const [showingTrailer, setShowingTrailer] = useState(trailer === '1');
   const [playback, setPlayback] = useState({ loading: false, src: null, locked: false, error: null });
-  // Buy to own: bumping this reloads the page after Checkout closes.
+  // Bumping this reloads the page: after Buy to own's Checkout closes, or
+  // after the viewing terms are taken.
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -83,7 +88,7 @@ export default function Episode() {
     (async () => {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        const page = await apiGet(`/api/episode-page?id=${encodeURIComponent(id)}`, token);
+        const page = await apiGet(await withTerms(`/api/episode-page?id=${encodeURIComponent(id)}`), token);
         if (cancelled) return;
         setState({ loading: false, error: null, page });
         if (page.episode) {
@@ -116,7 +121,7 @@ export default function Episode() {
     (async () => {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        const res = await apiPost('/api/stream-token', { episodeId: episode.id }, token);
+        const res = await apiPost('/api/stream-token', { episodeId: episode.id, terms: await readViewingTerms() }, token);
         if (!cancelled) setPlayback({ loading: false, src: res.src, locked: false, error: null });
       } catch (err) {
         if (cancelled) return;
@@ -129,6 +134,10 @@ export default function Episode() {
 
   const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
+  // Content advisory over the first seconds (mobile/src/lib/contentAdvisory.js).
+  const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
+  const ratingsList = useContentRatings();
+  const advisoryInfo = episode && !showingTrailer ? advisoryFor(episode, ratingsList) : null;
   const resumeSeconds = (state.page && state.page.resumeSeconds) || 0;
   useWatchProgress({
     player,
@@ -183,6 +192,34 @@ export default function Episode() {
   }
 
   const page = state.page;
+
+  if (page.ageRestricted && page.termsRequired) {
+    const requiredAge = page.requiredAge ?? 13;
+    return (
+      <SafeAreaView style={styles.screen} edges={['bottom']}>
+        <Stack.Screen options={{ title: 'A quick confirmation' }} />
+        <ScrollView contentContainerStyle={styles.restrictedWrap}>
+          <View style={styles.accountCard}>
+            <Text style={styles.accountEyebrow}>Rated {page.requiredRating}</Text>
+            <Text style={styles.restrictedTitle}>A quick confirmation before this plays</Text>
+            <Text style={styles.restrictedBody}>
+              This title is rated {page.requiredRating} ({requiredAge}+). By continuing you confirm you’re old enough for the ratings shown and accept the viewing terms. Titles rated 17+ still need an account with your age.
+            </Text>
+            <Pressable style={styles.primaryBtn} onPress={async () => { await saveViewingTerms(); setReloadKey((k) => k + 1); }}>
+              <Text style={styles.primaryBtnText}>Confirm and watch</Text>
+            </Pressable>
+            <Text style={styles.restrictedSmall}>
+              <Text style={styles.linkText} onPress={() => Linking.openURL(TERMS_URL).catch(() => {})}>Read the viewing terms</Text>
+              {page.isSignedIn ? ' · or add your age on your account and skip this next time.' : ' · signed-in viewers with an age on their account skip this.'}
+            </Text>
+            <Pressable style={[styles.backBtn, { alignSelf: 'center', marginTop: 16, marginBottom: 0 }]} onPress={goBack}>
+              <BackArrowIcon /><Text style={styles.backText}>Back</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (page.ageRestricted) {
     const requiredAge = page.requiredAge ?? MIN_AGE_BY_RATING[page.requiredRating] ?? 17;
@@ -280,7 +317,10 @@ export default function Episode() {
                 </View>
               )
             ) : activeSrc ? (
-              <VideoView key={activeSrc} player={player} style={styles.player} contentFit="contain" nativeControls allowsFullscreen />
+              <View style={styles.player}>
+                <VideoView key={activeSrc} player={player} style={absoluteFill} contentFit="contain" nativeControls allowsFullscreen />
+                <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
+              </View>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>
             ) : (

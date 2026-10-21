@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -28,6 +28,7 @@ import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
 
 import Footer from '../../components/Footer';
+import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   // View count, age gate, next/previous, Watch next and bonus content all
@@ -39,10 +40,13 @@ export async function getServerSideProps({ req, params, query, res }) {
     return { notFound: true };
   }
   if (data.ageRestricted) {
-    res.statusCode = 403;
+    // A title the viewing terms would unlock is a normal page with a
+    // confirmation on it, not a refusal.
+    res.statusCode = data.termsRequired ? 200 : 403;
     return {
       props: {
         ageRestricted: true,
+        termsRequired: Boolean(data.termsRequired),
         requiredRating: data.requiredRating,
         requiredAge: data.requiredAge ?? null,
         isSignedIn: data.isSignedIn
@@ -121,7 +125,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -157,6 +161,46 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // unconditionally, on every render. Nothing below this point is a hook,
   // so branching on ageRestricted from here on doesn't violate the Rules
   // of Hooks the way returning before those calls would have.
+  // A browser that took the terms on the live channels carries them in
+  // localStorage but not yet in the cookie the server reads: set it and
+  // let the page render for real.
+  useEffect(() => {
+    if (ageRestricted && termsRequired && viewingTermsTaken()) {
+      takeViewingTerms();
+      router.replace(router.asPath);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ageRestricted, termsRequired]);
+  function acceptViewingTerms() {
+    takeViewingTerms();
+    router.replace(router.asPath);
+  }
+
+  if (ageRestricted && termsRequired) {
+    const requiredAge = requiredAgeProp ?? 13;
+    return (
+      <>
+        <Head><title>A quick confirmation — {SITE.name}</title></Head>
+        <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
+          <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
+            <div className="account-eyebrow">Rated {requiredRating}</div>
+            <h1 style={{ fontSize: '1.4rem', marginBottom: '0.6rem' }}>A quick confirmation before this plays</h1>
+            <p style={{ color: 'var(--ink-dim)', marginBottom: '1.2rem' }}>
+              This title is rated {requiredRating} ({requiredAge}+). By continuing you confirm you’re old enough for the ratings shown and accept the <Link href="/terms#live-tv" target="_blank" rel="noopener">viewing terms</Link>. Titles rated 17+ still need an account with your age.
+            </p>
+            <button className="account-btn-primary" onClick={acceptViewingTerms}>Confirm and watch</button>
+            <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '0.9rem' }}>
+              {isSignedIn ? <>Or add your age on your <Link href="/account">account page</Link> and skip this next time.</> : <>Signed-in viewers with an age on their account skip this.</>}
+            </p>
+            <div style={{ marginTop: '1rem' }}>
+              <BackButton fallbackHref="/stream" />
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
   if (ageRestricted) {
     // The live ratings list decides the number (custom ratings carry their own).
     const requiredAge = requiredAgeProp ?? MIN_AGE_BY_RATING[requiredRating] ?? 17;
@@ -399,6 +443,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               // title, so it plays ad-free for them (Buy to own).
               adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
               onEnded={handleEnded}
+              advisory={!showingTrailer}
               signedPlayback={!showingTrailer && signedPlayback}
               initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
               onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}

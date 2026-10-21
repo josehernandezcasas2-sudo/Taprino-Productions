@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   const data = await getEpisodePageData(id, req);
   if (data.notFound) return res.status(404).json({ error: 'Not found' });
   if (data.ageRestricted) {
-    return res.status(200).json({ ageRestricted: true, requiredRating: data.requiredRating, requiredAge: data.requiredAge ?? null, isSignedIn: data.isSignedIn });
+    return res.status(200).json({ ageRestricted: true, termsRequired: Boolean(data.termsRequired), requiredRating: data.requiredRating, requiredAge: data.requiredAge ?? null, isSignedIn: data.isSignedIn });
   }
 
   const entitled = data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin || Boolean(data.purchase && data.purchase.owned);

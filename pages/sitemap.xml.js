@@ -1,5 +1,5 @@
 import { getPublicEpisodes } from '../lib/publicEpisodes';
-import { meetsAgeRequirement } from '../lib/ageGate';
+import { termsWouldClear } from '../lib/ageGate';
 import { getRatings } from '../lib/ratings';
 import { getAllSeries } from '../lib/series';
 import { episodeHref } from '../lib/episodeLinks';
@@ -70,10 +70,10 @@ export async function getServerSideProps({ req, res }) {
   try {
     let ratings;
     [episodes, series, ratings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getRatings().catch(() => null)]);
-    // Only pages a signed-out visitor can open: an age-restricted episode
-    // answers a crawler with the age gate (403), and half the sitemap
-    // used to be exactly that.
-    episodes = episodes.filter((e) => meetsAgeRequirement(null, e.rating, ratings));
+    // Only pages a signed-out visitor can open: titles under 17+ (the
+    // viewing terms unlock them); a 17+ or unrated episode answers a
+    // crawler with the age gate (403).
+    episodes = episodes.filter((e) => termsWouldClear(e.rating, ratings));
   } catch (err) {
     // A sitemap that 500s is worse than a sparse one — crawlers back off
     // from a site that errors. Fall through with whatever we have.
