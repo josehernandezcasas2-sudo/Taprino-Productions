@@ -98,7 +98,7 @@ export default function PurchasesAdmin({ account, mainGenres, apiPath = '/api/ad
                     <span className={`payouts-pill ${p.status === 'refunded' ? 'failed' : 'paid'}`}>{p.status === 'refunded' ? `Refunded ${fmt(p.refundedAt)} · ${p.refundKind}` : 'Paid'}</span>
                   </div>
                   <div className="crew-mono">
-                    Paid {dollars(p.paidCents)} · Stripe fee {dollars(p.feeCents)} · creator {dollars(p.creatorCents)} · studio {dollars(p.platformCents - p.feeCents)}
+                    Paid {dollars(p.paidCents)}{p.taxCents > 0 ? ` + ${dollars(p.taxCents)} sales tax` : ''} · Stripe fee {dollars(p.feeCents)} · creator {dollars(p.creatorCents)} · studio {dollars(p.platformCents - p.feeCents)}
                     {Object.keys(p.watchedMax || {}).length ? ` · watched ${Object.values(p.watchedMax).map((s) => `${Math.round(s / 60)} min`).join(', ')}` : ' · not started'}
                     {p.refundReason ? ` · ${p.refundReason}` : ''}
                   </div>

@@ -71,7 +71,7 @@ export default function PurchasesCard({ apiPath = '/api/purchases', forceOpen = 
               <span className="purch-text">
                 <b>{it.title}{it.type === 'series' ? ' · the series' : ''}</b>
                 <span>{[it.creatorName, it.type === 'series' ? `${it.episodeCount} episode${it.episodeCount === 1 ? '' : 's'} · new ones included` : (KIND[it.contentType] || it.contentType), it.type !== 'series' ? mins(it.runtimeSeconds) : null].filter(Boolean).join(' · ')}</span>
-                <small className={it.withdrawn ? 'gone' : ''}>{it.withdrawn ? `No longer on ${SITE.name} · still yours` : `Bought ${fmtDate(it.boughtAt)} · ${dollars(it.paidCents)}`}</small>
+                <small className={it.withdrawn ? 'gone' : ''}>{it.withdrawn ? `No longer on ${SITE.name} · still yours` : `Bought ${fmtDate(it.boughtAt)} · ${dollars(it.paidCents)}${it.taxCents > 0 ? ` + ${dollars(it.taxCents)} tax` : ''}`}</small>
               </span>
             </Link>
             <div className="purch-foot">

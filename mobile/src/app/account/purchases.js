@@ -77,7 +77,7 @@ export default function Purchases() {
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={styles.rowTitle}>{it.title}{it.type === 'series' ? ' · the series' : ''}</Text>
                 <Text style={styles.rowSub}>{[it.creatorName, it.type === 'series' ? `${it.episodeCount} episode${it.episodeCount === 1 ? '' : 's'} · new ones included` : (KIND[it.contentType] || it.contentType), it.type !== 'series' && it.runtimeSeconds ? `${Math.round(it.runtimeSeconds / 60)} min` : null].filter(Boolean).join(' · ')}</Text>
-                <Text style={[styles.rowSmall, it.withdrawn && { color: colors.olive }]}>{it.withdrawn ? 'No longer on Studio Tapa TV · still yours' : `Bought ${fmtDate(it.boughtAt)} · ${dollars(it.paidCents)}`}</Text>
+                <Text style={[styles.rowSmall, it.withdrawn && { color: colors.olive }]}>{it.withdrawn ? 'No longer on Studio Tapa TV · still yours' : `Bought ${fmtDate(it.boughtAt)} · ${dollars(it.paidCents)}${it.taxCents > 0 ? ` + ${dollars(it.taxCents)} tax` : ''}`}</Text>
               </View>
             </Pressable>
             <View style={styles.rowFoot}>

@@ -171,6 +171,8 @@ test('purchases lane (Buy to own): charges and their transfers by payment intent
   assert.equal(g.lanes.purchases.count, 2);
   assert.equal(g.lanes.purchases.netCents, 91);
   assert.equal(expectedByLane({ purchases: { count: 1, grossCents: 499, cutCents: 91 } }).purchases, 91);
+  // Stripe Tax (migration 099): the tax collected lands in the balance too.
+  assert.equal(expectedByLane({ purchases: { count: 1, grossCents: 499, cutCents: 91, taxCents: 41 } }).purchases, 132);
   const rec = reconcile({ lanes: g.lanes, records: { purchases: { count: 1, grossCents: 499, cutCents: 91 } } });
   assert.equal(rec.rows.find((r) => r.key === 'purchases').differenceCents, 0);
   assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, purchasesKeptCents: 91, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 91);
