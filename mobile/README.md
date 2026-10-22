@@ -34,6 +34,13 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
   - **Same Expo account on both ends.** `npx expo whoami` on the PC and the
     account signed into Expo Go must match (studiotapa237). If not:
     `npx expo logout`, `npx expo login`, and sign Expo Go in again.
+  - **After pulling a dependency change, `npm install` before `npx expo start`.**
+    Stale `node_modules` on the PC (2026-10-22: left over from a bump to SDK
+    58 that was undone) made Expo Go draw every screen over a red
+    "Unimplemented component: <RNSScreenStack>" box. `npm install` then
+    `npx expo start -c` fixed it; nothing in the repo was wrong. The SDK stays
+    on 57 until the phone's Expo Go reports a newer Supported SDK — not when
+    npm or Expo's changelog says 58 exists.
 
   Other quick fixes when the QR won't connect: `npx expo start -c` (clears
   Metro's cache), and `npx expo start --tunnel` when the phone and PC can't
