@@ -31,6 +31,8 @@ export default async function handler(req, res) {
   return res.status(200).json({
     show: data.show,
     episodes: data.episodes,
+    // episodeId -> seconds to pick up from (signed-in listeners only).
+    resume: data.resume || {},
     isSignedIn: data.isSignedIn,
     isSubscriber: data.isSubscriber
   });

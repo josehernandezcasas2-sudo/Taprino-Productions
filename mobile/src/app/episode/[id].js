@@ -19,6 +19,7 @@ import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
 import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
 import { dollars } from '../../lib/purchaseRules';
+import { formatOpensAt } from '../../lib/earlyAccess';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_COLOR = { movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -125,8 +126,11 @@ export default function Episode() {
         if (!cancelled) setPlayback({ loading: false, src: res.src, locked: false, error: null });
       } catch (err) {
         if (cancelled) return;
+        // Early screenings (the website's lib/earlyAccess.js): the first
+        // day after release is Premium's; the server says so in the message.
+        const earlyLock = /early screening/i.test(err.message || '');
         const premiumLock = episode.tier === 'premium' && /member/i.test(err.message || '');
-        setPlayback({ loading: false, src: null, locked: premiumLock, error: premiumLock ? null : err.message });
+        setPlayback({ loading: false, src: null, locked: earlyLock ? 'early' : premiumLock, error: earlyLock || premiumLock ? null : err.message });
       }
     })();
     return () => { cancelled = true; };
@@ -292,7 +296,31 @@ export default function Episode() {
         ) : (
           <View style={styles.playerWrap}>
             {playback.locked ? (
-              purchase && purchase.forSale ? (
+              playback.locked === 'early' ? (
+                <View style={styles.lockPanel}>
+                  <Text style={styles.lockGlyph}>{'◈'}</Text>
+                  <Text style={styles.lockTitle}>Early screening</Text>
+                  <Text style={styles.lockBody}>
+                    Tapa + members are watching this now. It opens for {state.page.isSubscriber ? 'your plan' : 'everyone'} {formatOpensAt(state.page.earlyAccess && state.page.earlyAccess.opensAt)}
+                    {purchase && purchase.forSale ? ', or buy it and watch right away.' : '.'}
+                  </Text>
+                  <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
+                    {purchase && purchase.forSale ? (
+                      <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, `/episode/${episode.id}`)}>
+                        <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
+                      </Pressable>
+                    ) : null}
+                    <Pressable style={[styles.unlockBtn, purchase && purchase.forSale ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass } : null]} onPress={() => router.push('/account')}>
+                      <Text style={[styles.unlockText, purchase && purchase.forSale ? { color: colors.brass } : null]}>{state.page.isSubscriber ? 'Switch to Tapa +' : 'See plans'}</Text>
+                    </Pressable>
+                    {episode.trailerSrc ? (
+                      <Pressable style={[styles.unlockBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.inkDim }]} onPress={() => setShowingTrailer(true)}>
+                        <Text style={[styles.unlockText, { color: colors.ink }]}>Watch the trailer</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              ) : purchase && purchase.forSale ? (
                 <View style={styles.lockPanel}>
                   <Text style={styles.lockGlyph}>{'◈'}</Text>
                   <Text style={styles.lockTitle}>Two ways to watch</Text>

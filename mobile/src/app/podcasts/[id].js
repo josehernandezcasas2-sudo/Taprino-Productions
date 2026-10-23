@@ -9,6 +9,7 @@ import { apiGet } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import { withTerms } from '../../lib/viewingTerms';
+import { useWatchProgress } from '../../lib/useWatchProgress';
 
 function PlayIcon({ size = 15, color = colors.ink }) {
   return (
@@ -58,6 +59,15 @@ function parseRuntimeToSeconds(runtime) {
   }
   return seconds > 0 ? seconds : null;
 }
+// 754 → "12:34", 3725 → "1:02:05" (a resume point).
+function formatClock(totalSeconds) {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const hours = Math.floor(s / 3600);
+  const minutes = Math.floor((s % 3600) / 60);
+  const seconds = s % 60;
+  if (hours > 0) return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  return `${minutes}:${String(seconds).padStart(2, '0')}`;
+}
 function formatRuntimeLong(runtime) {
   const totalSeconds = parseRuntimeToSeconds(runtime);
   if (totalSeconds == null) return null;
@@ -89,6 +99,19 @@ export default function PodcastShow() {
   const [audioSrc, setAudioSrc] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const player = useVideoPlayer(audioSrc, () => {});
+  const tokenWithTimeout = () => Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+
+  // Same progress as the episode screen (mobile/src/lib/useWatchProgress.js):
+  // picks up where this listener left the episode (`resume` from
+  // /api/podcast-show) and saves as it plays. Signed in only, like the web.
+  const resume = (state.data && state.data.resume) || {};
+  useWatchProgress({
+    player,
+    episodeId: playingId,
+    enabled: Boolean(isSignedIn && playingId && audioSrc),
+    startAt: (playingId && resume[playingId]) || 0,
+    getToken: tokenWithTimeout
+  });
 
   // With the sign-in token the server knows the viewer's membership and
   // age; without it every premium episode showed as locked, even for a
@@ -174,6 +197,7 @@ export default function PodcastShow() {
           const hasAudio = !!ep.audioUrl;
           const hasVideo = !!ep.src;
           const playing = playingId === ep.id && isPlaying;
+          const resumeAt = hasAudio && !ep.locked && playingId !== ep.id ? resume[ep.id] || 0 : 0;
           return (
             <View key={ep.id} style={styles.row}>
               {ep.locked ? (
@@ -195,6 +219,7 @@ export default function PodcastShow() {
                 <View style={styles.rowMetaLine}>
                   <Text style={styles.rowMeta}>{formatDate(ep.createdAt)}</Text>
                   {ep.runtime ? <Text style={styles.rowMeta}> · {formatRuntimeLong(ep.runtime) || ep.runtime}</Text> : null}
+                  {resumeAt > 0 ? <Text style={styles.rowMeta}> · Resume at {formatClock(resumeAt)}</Text> : null}
                 </View>
                 {hasVideo && !ep.locked ? (
                   <Pressable onPress={() => router.push(`/episode/${ep.id}`)}>

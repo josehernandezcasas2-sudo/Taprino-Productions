@@ -7,6 +7,7 @@ import { getOwnProfile } from '../../lib/userProfiles';
 import { clearsGate, termsWouldClear } from '../../lib/ageGate';
 import { termsAcceptedFrom } from '../../lib/viewerAge';
 import { getRatings } from '../../lib/ratings';
+import { earlyAccessState, formatOpensAt } from '../../lib/earlyAccess';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.
 //
@@ -80,6 +81,19 @@ export default async function handler(req, res) {
   // Every answer below is a credential or per-viewer; never let a shared
   // cache keep one.
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+
+  // Early screenings (lib/earlyAccess.js): the same rule as the episode
+  // page. The app matches "Early screening" in this message.
+  const early = earlyAccessState(episode, {
+    tier: account.tier || 'basic',
+    isAdmin: account.isAdmin,
+    isCreator: Boolean(account.userId && episode.submittedBy === account.userId),
+    owned
+  });
+  if (early.locked) {
+    return res.status(403).json({ error: `Early screening: Premium members are watching this now. It opens for your plan ${formatOpensAt(early.opensAt)}.`, earlyAccess: true, opensAt: early.opensAt });
+  }
+
   const entitled = episode.tier === 'free' || account.isSubscriber || owned;
   if (!entitled) {
     return res.status(403).json({ error: `This episode is for ${SITE.premiumTier} members.` });

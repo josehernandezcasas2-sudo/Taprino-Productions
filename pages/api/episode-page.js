@@ -52,6 +52,9 @@ export default async function handler(req, res) {
     purchase: data.purchase,
     bundle: data.bundle,
     withdrawn: Boolean(data.withdrawn),
+    // Early screenings (lib/earlyAccess.js): { early, locked, opensAt }.
+    // /api/stream-token refuses a locked one with earlyAccess: true.
+    earlyAccess: data.earlyAccess || null,
     // Where to pick up (seconds), from the same Stripe-held progress the
     // website resumes from; 0 when there's nothing worth resuming.
     resumeSeconds: (data.account.watchProgress && Number(data.account.watchProgress[data.episode.id])) || 0,

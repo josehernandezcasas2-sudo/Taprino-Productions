@@ -26,6 +26,7 @@ import { contentTypeTag } from '../../lib/contentTypeTags';
 import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../components/BuyBits';
 import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
+import { formatOpensAt } from '../../lib/earlyAccess';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
@@ -65,7 +66,10 @@ export async function getServerSideProps({ req, params, query, res }) {
   // Buy to own: a buyer is entitled like a member, for this title only
   // (lib/purchases.js getOffer; the same rule as /api/stream-token).
   const owned = Boolean(data.purchase && data.purchase.owned);
-  const entitled = episode.tier === 'free' || account.isSubscriber || owned;
+  // Early screenings (lib/earlyAccess.js): for the first day only
+  // Premium/Sponsor, admins, the creator and buyers get the file.
+  const earlyAccess = data.earlyAccess || { early: false, locked: false, opensAt: null };
+  const entitled = (episode.tier === 'free' || account.isSubscriber || owned) && !earlyAccess.locked;
   const purchaseSettings = data.purchase && data.purchase.forSale && !owned ? await getPurchaseSettings() : null;
 
   // Premium video is served through a short-lived Cloudflare signed URL
@@ -118,6 +122,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       purchase: data.purchase || null,
       bundle: data.bundle || null,
       withdrawn: Boolean(data.withdrawn),
+      earlyAccess,
       bought: typeof query.bought === 'string' ? query.bought : null,
       refundDays: purchaseSettings ? purchaseSettings.refundDays : 14,
       refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10
@@ -125,7 +130,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -250,7 +255,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   }
 
 
-  const locked = episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer;
+  // Early screenings: the first day after release is Premium's. The server
+  // already withheld the file (entitled is false), so this only picks the
+  // panel; trailers still play.
+  const earlyLocked = Boolean(earlyAccess && earlyAccess.locked) && !showingTrailer;
+  const locked = (episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer) || earlyLocked;
   const playingEpisode = showingTrailer
     ? { ...episode, src: episode.trailerSrc }
     : describedActive && episode.audioDescriptionSrc
@@ -404,7 +413,33 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       ) : (
         <div className="player-full-bleed">
           {locked ? (
-            purchase && purchase.forSale ? (
+            earlyLocked ? (
+              <div className="lock-panel">
+                <div className="glyph">◈</div>
+                <h3>Early screening</h3>
+                <p>
+                  {SITE.premiumTier} members are watching this now. It opens for
+                  {isSubscriber ? ' your plan' : ' everyone'} {formatOpensAt(earlyAccess.opensAt)}
+                  {purchase && purchase.forSale ? ', or buy it and watch right away.' : '.'}
+                </p>
+                <div style={{ display: 'flex', gap: '0.6rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                  {purchase && purchase.forSale && (
+                    <button className="unlock-btn" onClick={() => buyTitle('episode', episode.id)} disabled={buyBusy}>
+                      {buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}
+                    </button>
+                  )}
+                  <button className="unlock-btn" style={purchase && purchase.forSale ? { background: 'transparent', border: '1px solid var(--brass)', color: 'var(--brass)' } : undefined} onClick={startCheckout} disabled={checkoutLoading}>
+                    {checkoutLoading ? 'Opening…' : isSubscriber ? `Switch to ${SITE.premiumTier}` : 'See plans'}
+                  </button>
+                  {episode.trailerSrc && (
+                    <button className="unlock-btn" style={{ background: 'transparent', border: '1px solid var(--ink-dim)', color: 'var(--ink)' }} onClick={() => setShowingTrailer(true)}>
+                      Watch the trailer
+                    </button>
+                  )}
+                </div>
+                {buyError && <p className="own-error" style={{ marginTop: '0.6rem' }}>{buyError}</p>}
+              </div>
+            ) : purchase && purchase.forSale ? (
               <div className="lock-panel">
                 <div className="glyph">◈</div>
                 <h3>Two ways to watch</h3>

@@ -11,9 +11,10 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { PlayIcon, PauseIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
-import { formatRuntimeLong } from '../../lib/videoMetadata';
+import { formatRuntimeLong, formatRuntime } from '../../lib/videoMetadata';
 import { useRouter } from 'next/router';
 import { takeViewingTerms } from '../../lib/viewingTerms';
+import { useWatchProgress } from '../../lib/useWatchProgress';
 
 export async function getServerSideProps({ req, res, params }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -27,13 +28,17 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
-export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes }) {
+export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes, resume = {} }) {
   const player = usePodcastPlayer();
   const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const firstEpisode = episodes[0];
   const host = firstEpisode ? firstEpisode.artist : null;
   const [expandedVideoId, setExpandedVideoId] = useState(null);
+  // Where each episode was left: the account's progress for a signed-in
+  // listener (`resume`, from lib/podcastShowHub.js), localStorage
+  // otherwise. The persistent player saves as it goes.
+  const { getPosition } = useWatchProgress(isSignedIn, resume);
 
   function playAudio(ep) {
     // Same episode already loaded: this is the pause/resume button.
@@ -52,7 +57,8 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
       showId: show.id,
       showTitle: show.name,
       showArt: show.poster || show.thumbnail,
-      audioUrl: ep.audioUrl
+      audioUrl: ep.audioUrl,
+      startAt: getPosition(ep.id)
     });
   }
 
@@ -120,6 +126,8 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
           const hasAudio = !!ep.audioUrl;
           const hasVideo = !!ep.src;
           const playing = isCurrentlyPlaying(ep);
+          const loaded = player && player.currentEpisode && player.currentEpisode.id === ep.id;
+          const resumeAt = hasAudio && !ep.locked && !loaded ? getPosition(ep.id) : 0;
           return (
             <Fragment key={ep.id}>
             <div className="podcast-episode-row">
@@ -141,6 +149,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
               <div className="podcast-episode-row-meta">
                 <span className="date">{formatDate(ep.createdAt)}</span>
                 <span className="dur">{formatRuntimeLong(ep.runtime) || ep.runtime}</span>
+                {resumeAt > 0 && <span className="date">Resume at {formatRuntime(resumeAt)}</span>}
                 {hasVideo && !ep.locked && (
                   <button className="podcast-inline-watch-btn" onClick={() => watchInline(ep)}>
                     {expandedVideoId === ep.id ? 'Hide video ✕' : hasAudio ? 'Watch instead →' : 'Watch →'}

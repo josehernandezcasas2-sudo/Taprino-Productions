@@ -11,7 +11,7 @@ export default function LegalLayout({ title, updated, summary, children, account
   return (
     <>
       <Head>
-        <title>{title} — {SITE.name}</title>
+        <title>{`${title} — ${SITE.name}`}</title>
         <meta name="description" content={`${title} for ${SITE.name}, a ${SITE.studio} project.`} />
       </Head>
 
