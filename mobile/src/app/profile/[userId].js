@@ -11,6 +11,7 @@ import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
+import { TipButton } from '../../components/TipSheet';
 import { rememberVia } from '../../lib/referral';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -160,7 +161,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -237,6 +238,21 @@ export default function PublicProfile() {
                 >
                   <Text style={styles.actionBtnText}>Message</Text>
                 </Pressable>
+              ) : null}
+              {/* Tips: gold like the creator badge, only once this creator's
+                  Stripe account can take charges (the server decides). */}
+              {!isOwnProfile ? (
+                <TipButton
+                  tipping={tipping}
+                  isSignedIn={isSignedIn}
+                  router={router}
+                  getToken={() => freshToken(getToken)}
+                  returnTo={canonicalPath || `/profile/${profile.userId}`}
+                  style={[styles.actionBtn, styles.actionBtnTip]}
+                  textStyle={[styles.actionBtnText, styles.actionBtnTextTip]}
+                >
+                  Tip {profile.displayName.split(/\s+/)[0]}
+                </TipButton>
               ) : null}
               <Pressable style={styles.shareBtn} onPress={() => share(profile, canonicalPath)} accessibilityLabel="Share profile">
                 <ShareIconSvg size={16} />
@@ -555,6 +571,8 @@ const styles = StyleSheet.create({
   actionBtn: { paddingVertical: 9, paddingHorizontal: 18, borderRadius: 999, borderWidth: 1, borderColor: colors.hairline },
   actionBtnPrimary: { backgroundColor: colors.brass, borderColor: colors.brass },
   actionBtnFollowing: { borderColor: colors.brass },
+  actionBtnTip: { borderColor: 'rgba(242,193,78,0.6)' },
+  actionBtnTextTip: { color: colors.olive },
   actionBtnText: { color: colors.ink, fontSize: 13, fontWeight: '700' },
   actionBtnTextPrimary: { color: colors.onBrass },
   actionBtnTextFollowing: { color: colors.brass },

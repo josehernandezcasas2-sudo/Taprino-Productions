@@ -13,8 +13,10 @@ import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creat
 // The creator's Money page, stacked (mockup signed off 2026-10-23):
 // mirrors pages/creator/money.js. Reads /api/creator/money for the
 // chosen month; the lane rows open the screens that already exist.
-const LANE_COLORS = { member_support: colors.brass, sales: colors.olive, backing: colors.mint, bookings: colors.sky, payouts: colors.inkFaint };
-const LANE_ROUTES = { member_support: null, sales: '/account/my-work', backing: '/creator/pitches', bookings: '/locations/mine' };
+// Tips take the gold (the Tip button's colour); Title sales moved to a
+// cream stripe so the lanes stay apart (mockup 2026-10-24).
+const LANE_COLORS = { member_support: colors.brass, tips: colors.olive, sales: colors.inkDim, backing: colors.mint, bookings: colors.sky, payouts: colors.inkFaint };
+const LANE_ROUTES = { member_support: null, tips: null, sales: '/account/my-work', backing: '/creator/pitches', bookings: '/locations/mine' };
 const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '');
 const fmtDayOnly = (ymd) => (ymd ? new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '');
 
@@ -33,6 +35,7 @@ export default function CreatorMoneyScreen() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [noteBusy, setNoteBusy] = useState(null);
 
   const load = useCallback(async (key) => {
     if (!isLoaded) return;
@@ -47,6 +50,19 @@ export default function CreatorMoneyScreen() {
   }, [isLoaded, isSignedIn, getToken]);
 
   useFocusEffect(useCallback(() => { load(period); }, [load, period]));
+
+  // Tips: hide a note from your own view (or show it again).
+  async function toggleNote(line) {
+    setNoteBusy(line.tipId);
+    try {
+      await apiPost('/api/tips/note', { tipId: line.tipId, hidden: !line.noteHidden }, await freshToken(getToken));
+      await load(period);
+    } catch (err) {
+      setState((s) => ({ ...s, error: err.message }));
+    } finally {
+      setNoteBusy(null);
+    }
+  }
 
   async function openStripe() {
     setBusy(true);
@@ -159,6 +175,8 @@ export default function CreatorMoneyScreen() {
           const route = LANE_ROUTES[k];
           const sub = k === 'member_support'
             ? `share ${dollars(lane.shareCents)} · referrals ${dollars(lane.referralCents)} · owed ${dollars(lane.owedCents)}`
+            : k === 'tips'
+              ? (lane.count ? `${lane.count} tip${lane.count === 1 ? '' : 's'} · ${lane.people} ${lane.people === 1 ? 'person' : 'people'} · ${lane.noteCount} with a note${lane.refunds ? ` · ${lane.refunds} refunded` : ''}` : (data.payouts.state === 'ready' ? 'no tips this period' : 'set up payouts and the Tip button turns on'))
             : k === 'sales'
               ? `${lane.sold} sold${lane.refunds ? ` · ${lane.refunds} refund${lane.refunds === 1 ? '' : 's'}` : ''} · in your balance`
               : k === 'backing'
@@ -197,6 +215,7 @@ export default function CreatorMoneyScreen() {
             <Text style={styles.inlineStat}><Text style={styles.strong}>{data.supporters.watching}</Text> by watching</Text>
             <Text style={styles.inlineStat}><Text style={styles.strong}>{data.supporters.backers}</Text> backers</Text>
             <Text style={styles.inlineStat}><Text style={styles.strong}>{data.supporters.buyers}</Text> buyers</Text>
+            {data.supporters.tippers > 0 ? <Text style={styles.inlineStat}><Text style={styles.strong}>{data.supporters.tippers}</Text> tipped you</Text> : null}
           </View>
           <Text style={styles.fineprint}>
             {data.supporters.names.length
@@ -222,6 +241,11 @@ export default function CreatorMoneyScreen() {
               <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={styles.hLabel} numberOfLines={2}>{l.label}{l.detail ? ` · ${l.detail}` : ''}</Text>
                 <Text style={[styles.hMeta, { color: LANE_COLORS[l.lane] || colors.inkFaint }]}>{l.kind.replace('_', ' ')} · {fmtDay(l.at)} · <Text style={{ color: colors.inkFaint }}>{l.where}</Text></Text>
+                {l.kind === 'tip' && l.note ? (
+                  <Pressable style={[styles.btnSmall, { alignSelf: 'flex-start', marginTop: 6 }, noteBusy === l.tipId && { opacity: 0.6 }]} disabled={noteBusy === l.tipId} onPress={() => toggleNote(l)}>
+                    <Text style={styles.btnSmallText}>{noteBusy === l.tipId ? '…' : l.noteHidden ? 'Show note' : 'Hide note'}</Text>
+                  </Pressable>
+                ) : null}
               </View>
               <Text style={[styles.hAmt, l.cents < 0 && { color: colors.danger }]}>{signed(l.cents, l.lane)}</Text>
             </View>
@@ -234,7 +258,7 @@ export default function CreatorMoneyScreen() {
         ) : null}
 
         <Text style={[styles.fineprint, { marginTop: 18 }]}>
-          Member support transfers on the 1st once you are owed {dollars(data.top.minimumCents)}. Sales, backing and bookings land in your Stripe balance when the card clears. Stripe pays your bank on your schedule and files your 1099. The CSV of every line is on the website's Money page.
+          Member support transfers on the 1st once you are owed {dollars(data.top.minimumCents)}. Tips, sales, backing and bookings land in your Stripe balance when the card clears. Stripe pays your bank on your schedule and files your 1099. The CSV of every line is on the website's Money page.
         </Text>
       </ScrollView>
     </SafeAreaView>

@@ -17,6 +17,11 @@ export default function PurchasesCard({ apiPath = '/api/purchases', forceOpen = 
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [done, setDone] = useState({});
+  // Tips you've sent (lib/tips.js getTipsSent): lines, not titles.
+  const [tips, setTips] = useState([]);
+  useEffect(() => {
+    fetch('/api/tips?mine=1').then((r) => r.json()).then((d) => setTips(Array.isArray(d.tips) ? d.tips : [])).catch(() => {});
+  }, []);
   // The tab bar's "Your purchases" row lands on #purchases: open the card
   // even when it's empty, so the link never leads nowhere. Read after
   // mount, so the server and the first client render agree.
@@ -52,7 +57,7 @@ export default function PurchasesCard({ apiPath = '/api/purchases', forceOpen = 
   }
 
   const items = data ? data.items : [];
-  if (!forceOpen && !hashOpen && (!data || items.length === 0) && !Object.keys(done).length) return null;
+  if (!forceOpen && !hashOpen && (!data || items.length === 0) && !Object.keys(done).length && tips.length === 0) return null;
   const days = data && data.refundDays ? data.refundDays : 14;
   const pct = data && data.refundWatchPercent ? data.refundWatchPercent : 10;
 
@@ -86,6 +91,22 @@ export default function PurchasesCard({ apiPath = '/api/purchases', forceOpen = 
           </div>
         ))}
       </div>
+      {tips.length > 0 && (
+        <>
+          <div className="account-subheading" style={{ marginTop: '0.4rem' }}>Tips you&rsquo;ve sent</div>
+          <div className="tip-sent-list">
+            {tips.map((t) => (
+              <div key={t.id} className="tip-sent-row">
+                <span className="when">{fmtDate(t.completedAt || t.createdAt)}</span>
+                <span><b>{t.creatorName}</b> · {dollars(t.amountCents)} tip · you paid {dollars(t.totalCents)}{t.showName ? '' : ' · as “a fan”'}</span>
+                {t.status === 'refunded' ? <span className="tip-tag">refunded</span> : <span />}
+                {t.note && <small>&ldquo;{t.note}&rdquo;</small>}
+              </div>
+            ))}
+          </div>
+          <p className="account-fineprint" style={{ marginBottom: '0.8rem' }}>A tip is a thank-you, not a purchase: it buys nothing and is final. If something went wrong, email {SITE.contactEmail} and we&rsquo;ll look.</p>
+        </>
+      )}
       <div className="purch-help">
         <b>Receipts and refunds</b>
         <span>Stripe emailed a receipt for each purchase. Changed your mind? Refund yourself from this page within {days} days, as long as you&rsquo;ve watched less than {pct}% of the title. After that, email {SITE.contactEmail}; those refunds are at our discretion and final.</span>

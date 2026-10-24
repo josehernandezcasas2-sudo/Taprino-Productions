@@ -178,5 +178,19 @@ test('purchases lane (Buy to own): charges and their transfers by payment intent
   assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, purchasesKeptCents: 91, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 91);
 });
 
+test('tips lane: a destination charge by payment intent; expected = the cut; kept adds to the share', () => {
+  const tIds = { tipIntents: new Set(['pi_tip1']) };
+  const charge = { id: 'txn_t1', reporting_category: 'charge', amount: 546, fee: 46, net: 500, source: { id: 'ch_t1', payment_intent: 'pi_tip1', transfer_data: { destination: 'acct_x' } } };
+  const transfer = { id: 'txn_t2', reporting_category: 'transfer', amount: -475, fee: 0, net: -475, source: { id: 'tr_t1', source_transaction: 'ch_t1' } };
+  assert.deepEqual(classifyTransaction(charge, tIds), { lane: 'tips', matched: true });
+  const g = groupTransactions([charge, transfer], tIds);
+  assert.equal(g.lanes.tips.count, 2);
+  assert.equal(g.lanes.tips.netCents, 25);
+  assert.equal(expectedByLane({ tips: { count: 1, grossCents: 500, cutCents: 25, coverCents: 46 } }).tips, 25);
+  const rec = reconcile({ lanes: g.lanes, records: { tips: { count: 1, grossCents: 500, cutCents: 25, coverCents: 46 } } });
+  assert.equal(rec.rows.find((r) => r.key === 'tips').differenceCents, 0);
+  assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, purchasesKeptCents: 0, tipsKeptCents: 25, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 25);
+});
+
 
 console.log(`\n${passed} passed`);

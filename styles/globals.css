@@ -9775,6 +9775,66 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .sell-agree b { font-family: var(--font-display); color: var(--ink); }
 .sell-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
 .sell-actions .own-btn { flex: 1; }
+/* Tips (components/TipSheet.js; mockup 2026-10-24): the sheet, the gold
+   buttons on the profile hero and the episode credit line, the
+   end-of-episode card, the banner back from Checkout, Tips you've sent. */
+.tip-modal { max-width: 480px; border-radius: 16px; display: grid; gap: 1rem; }
+.tip-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; margin: 0; }
+.tip-head-id { display: flex; align-items: center; gap: 0.8rem; min-width: 0; }
+.tip-avatar { width: 44px; height: 44px; border-radius: 50%; background: var(--surface-3); display: inline-flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; flex-shrink: 0; overflow: hidden; }
+.tip-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.tip-kicker { display: block; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--olive); }
+.tip-title { font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; margin: 0; line-height: 1.2; }
+.tip-presets { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0.5rem; }
+.tip-preset { min-height: 48px; border-radius: 12px; border: 1px solid rgba(251, 232, 211, 0.18); background: var(--surface-2); color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.tip-preset.on { border-color: var(--brass); background: rgba(var(--brass-rgb), 0.16); color: var(--brass); }
+.tip-field { display: grid; gap: 0.35rem; font-size: 0.84rem; color: var(--ink-dim); }
+.tip-field input, .tip-field textarea { font: inherit; color: var(--ink); background: var(--void); border: 1px solid rgba(251, 232, 211, 0.18); border-radius: 10px; padding: 0.7rem 0.85rem; min-height: 44px; box-sizing: border-box; width: 100%; }
+.tip-field input { font-family: var(--font-mono); font-size: 1rem; }
+.tip-field textarea { resize: none; }
+.tip-field input:focus, .tip-field textarea:focus { outline: none; border-color: var(--olive); }
+.tip-count { display: flex; justify-content: space-between; gap: 0.6rem; }
+.tip-count small { font-family: var(--font-mono); font-size: 0.68rem; }
+.tip-math { display: grid; gap: 0.4rem; padding: 0.85rem 1rem; background: var(--void); border-radius: 12px; font-size: 0.86rem; color: var(--ink-dim); }
+.tip-math div { display: flex; justify-content: space-between; gap: 0.6rem; }
+.tip-math b { color: var(--ink); }
+.tip-math div.total { border-top: 1px solid rgba(251, 232, 211, 0.12); padding-top: 0.5rem; margin-top: 0.1rem; font-family: var(--font-display); font-weight: 700; color: var(--ink); }
+.tip-check { display: flex; justify-content: space-between; align-items: center; gap: 0.8rem; font-size: 0.86rem; color: var(--ink-dim); min-height: 44px; cursor: pointer; }
+.tip-check input { width: 22px; height: 22px; accent-color: var(--brass); margin: 0; flex-shrink: 0; }
+.tip-go { min-height: 48px; border: 0; border-radius: 999px; background: var(--brass); color: #241a05; font-family: var(--font-display); font-weight: 700; font-size: 1rem; cursor: pointer; }
+.tip-go:disabled { opacity: 0.6; cursor: default; }
+.tip-fine { font-size: 0.78rem; line-height: 1.5; color: var(--ink-faint); margin: 0; }
+.tip-fine a { color: var(--olive); }
+.tip-error { color: var(--danger); font-size: 0.82rem; margin: 0; }
+.profile-action-btn-tip { border-color: rgba(var(--olive-rgb), 0.6); color: var(--olive); }
+.profile-action-btn-tip:hover { border-color: var(--olive); background: rgba(var(--olive-rgb), 0.1); color: var(--olive); }
+.credit-line .tip-link { border-color: rgba(var(--olive-rgb), 0.6); color: var(--olive); background: rgba(var(--olive-rgb), 0.08); cursor: pointer; }
+.credit-line .tip-link:hover { background: rgba(var(--olive-rgb), 0.16); }
+.tipped-banner { margin: 0.8rem 0 0; padding: 0.9rem 1rem; border-radius: 12px; background: rgba(var(--olive-rgb), 0.1); border: 1px solid rgba(var(--olive-rgb), 0.5); }
+.tipped-banner b { font-family: var(--font-display); font-size: 1.05rem; }
+.tipped-banner p { margin: 0.2rem 0 0; font-size: 0.86rem; line-height: 1.45; color: var(--ink-dim); }
+.tipped-banner p a { color: var(--olive); }
+.tipped-banner.cancelled { font-size: 0.86rem; color: var(--ink-dim); border-color: rgba(251, 232, 211, 0.18); background: var(--surface-2); }
+.tip-end-wrap { position: relative; }
+.tip-end-card { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(12, 19, 31, 0.86); z-index: 5; padding: 1rem; }
+.tip-end-inner { max-width: 440px; width: 100%; background: var(--surface-3); border-radius: 16px; padding: 1.6rem; display: grid; gap: 0.8rem; position: relative; }
+.tip-end-inner .tip-kicker { color: var(--ink-dim); }
+.tip-end-inner h3 { margin: 0; font-family: var(--font-display); font-size: 1.4rem; }
+.tip-end-inner p { margin: 0; font-size: 0.9rem; line-height: 1.5; color: var(--ink-dim); }
+.tip-end-actions { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+.tip-end-btn { min-height: 44px; padding: 0.6rem 1.1rem; border-radius: 999px; border: 0; background: var(--olive); color: #241a05; font-family: var(--font-display); font-weight: 600; font-size: 0.88rem; cursor: pointer; }
+.tip-end-btn.ghost { background: transparent; border: 1px solid var(--ink); color: var(--ink); }
+.tip-end-close { position: absolute; top: 0.6rem; right: 0.6rem; }
+.tip-sent-list { display: grid; gap: 0.5rem; margin: 0.4rem 0 0.8rem; }
+.tip-sent-row { display: grid; grid-template-columns: auto 1fr auto; gap: 0.3rem 0.8rem; align-items: baseline; padding: 0.6rem 0.75rem; border-radius: 10px; background: var(--surface-2); font-size: 0.86rem; }
+.tip-sent-row .when { font-family: var(--font-mono); font-size: 0.7rem; color: var(--ink-dim); }
+.tip-sent-row small { grid-column: 2 / -1; color: var(--ink-dim); }
+.tip-sent-row .tip-tag { font-family: var(--font-mono); font-size: 0.66rem; color: var(--danger); border: 1px solid rgba(var(--danger-rgb), 0.5); border-radius: 999px; padding: 0.1rem 0.5rem; white-space: nowrap; }
+@media (max-width: 520px) {
+  .tip-presets { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .tip-end-inner { padding: 1.1rem; }
+  .tip-end-inner h3 { font-size: 1.15rem; }
+}
 .sales-rows { display: grid; }
 .sales-row { display: flex; justify-content: space-between; align-items: center; gap: 0.6rem; padding: 0.6rem 0; border-bottom: 1px solid rgba(251, 232, 211, 0.1); }
 .sales-row:last-child { border-bottom: 0; }
@@ -9924,12 +9984,19 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .money-lanes { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1rem; margin-bottom: 1.4rem; }
 .money-lane { background: var(--surface-1); border: 1px solid var(--ocean-ink); border-top: 3px solid var(--ink-faint); border-radius: 14px; padding: 1.1rem 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; }
 .money-lane.lane-member_support { border-top-color: var(--brass); }
-.money-lane.lane-sales { border-top-color: var(--olive); }
+/* Tips take the gold (the Tip button's colour); Title sales moved to a
+   cream stripe so the five lanes stay apart (mockup 2026-10-24). */
+.money-lane.lane-tips { border-top-color: var(--olive); }
+.money-lane.lane-sales { border-top-color: var(--ink-dim); }
 .money-lane.lane-backing { border-top-color: var(--mint); }
 .money-lane.lane-bookings { border-top-color: var(--sky); }
 .money-lane-eyebrow { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); }
 .lane-member_support > .money-lane-eyebrow { color: var(--brass); }
-.lane-sales > .money-lane-eyebrow { color: var(--olive); }
+.lane-tips > .money-lane-eyebrow { color: var(--olive); }
+.lane-sales > .money-lane-eyebrow { color: var(--ink-dim); }
+.money-note-btn { margin-left: 0.6rem; font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-dim); background: transparent; border: 1px solid rgba(251, 232, 211, 0.22); border-radius: 999px; padding: 0.15rem 0.55rem; cursor: pointer; vertical-align: middle; }
+.money-note-btn:hover { border-color: var(--olive); color: var(--olive); }
+.money-note-btn:disabled { opacity: 0.6; cursor: default; }
 .lane-backing > .money-lane-eyebrow { color: var(--mint); }
 .lane-bookings > .money-lane-eyebrow { color: var(--sky); }
 .money-lane-amount { font-family: var(--font-display); font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -9967,7 +10034,8 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .money-detail { color: var(--ink-dim); }
 .money-tag { font-family: var(--font-mono); font-size: 0.66rem; border: 1px solid var(--ocean-ink); border-radius: 999px; padding: 2px 8px; white-space: nowrap; color: var(--ink); }
 .money-tag.lane-member_support { color: var(--brass); border-color: rgba(var(--brass-rgb), 0.5); }
-.money-tag.lane-sales { color: var(--olive); border-color: rgba(var(--olive-rgb), 0.5); }
+.money-tag.lane-tips { color: var(--olive); border-color: rgba(var(--olive-rgb), 0.5); }
+.money-tag.lane-sales { color: var(--ink-dim); border-color: rgba(251, 232, 211, 0.35); }
 .money-tag.lane-backing { color: var(--mint); border-color: rgba(147, 208, 164, 0.5); }
 .money-tag.lane-bookings { color: var(--sky); border-color: rgba(132, 153, 220, 0.5); }
 .money-empty { margin: 0; font-size: 0.9rem; color: var(--ink-dim); }
@@ -9976,7 +10044,8 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .money-summary-lanes { display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.9rem; color: var(--ink-dim); margin: 0.2rem 0 1rem; }
 .money-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--ink-faint); margin-right: 0.5rem; vertical-align: middle; }
 .money-dot.lane-member_support { background: var(--brass); }
-.money-dot.lane-sales { background: var(--olive); }
+.money-dot.lane-tips { background: var(--olive); }
+.money-dot.lane-sales { background: var(--ink-dim); }
 .money-dot.lane-backing { background: var(--mint); }
 .money-dot.lane-bookings { background: var(--sky); }
 .money-summary-btn { display: inline-flex; width: auto; text-decoration: none; }

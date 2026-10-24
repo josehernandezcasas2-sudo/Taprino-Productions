@@ -344,6 +344,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr><td className="op">+</td><td>Pitch Room cut kept<span className="sm-sub">after transfers and the fee gap</span></td><td className="pos">{dollars(share.together.backingKeptCents)}</td></tr>
                 <tr><td className="op">+</td><td>Location cut kept</td><td className="pos">{dollars(share.together.bookingsKeptCents)}</td></tr>
                 <tr><td className="op">+</td><td>Title sales kept<span className="sm-sub">Buy to own · the studio’s share after Stripe and the creator’s transfer</span></td><td className="pos">{dollars(share.together.purchasesKeptCents || 0)}</td></tr>
+                <tr><td className="op">+</td><td>Tips kept<span className="sm-sub">the cut of each tip · the fan covers the card fee</span></td><td className="pos">{dollars(share.together.tipsKeptCents || 0)}</td></tr>
                 <tr><td className="op">+</td><td>Ads served<span className="sm-sub">impressions delivered · unserved credits stay a liability</span></td><td className="pos">{dollars(share.together.adsServedCents)}</td></tr>
                 <tr><td className="op">−</td><td>Unexplained differences carried</td><td className="neg">{dollars(Math.max(0, -share.together.unexplainedCents))}</td></tr>
                 <tr className="total"><td className="op">=</td><td>Studio share this period<span className="sm-sub">for maintenance and other projects · before the reserve and earmarks you keep in Stripe</span></td><td>{dollars(share.together.shareCents)}</td></tr>

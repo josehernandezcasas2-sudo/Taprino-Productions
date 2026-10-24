@@ -4,6 +4,7 @@ import LegalLayout from '../components/LegalLayout';
 import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 import { getShareSettings } from '../lib/artistSupport';
 import { dollars } from '../lib/artistSupportRules';
+import { getTipSettings } from '../lib/tips';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -33,9 +34,11 @@ export async function getServerSideProps({ req, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [account, episodes, share] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null)]);
+  const [account, episodes, share, tipSettings] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null), getTipSettings().catch(() => null)]);
   return {
     props: {
+      // Section 16 (Tips) reads the studio's cut live from Settings.
+      tipCutPercent: tipSettings ? tipSettings.cutPercent : 5,
       // The Creator Share numbers in sections 4 and 5 are whatever
       // /admin/creator-money has in force, plus any change it scheduled.
       share: share ? {
@@ -60,12 +63,12 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-10-19';
+const TEXT_UPDATED = '2026-10-24';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12 };
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const bonusSpan = (m) => (Number(m) > 0 ? `during its first ${m} months` : 'for as long as that membership lasts');
 
-export default function Terms({ account, share }) {
+export default function Terms({ account, share, tipCutPercent = 5 }) {
   const n = share || FALLBACK_SHARE;
   const next = share && share.scheduled ? share.scheduled.numbers : null;
   const updated = [TEXT_UPDATED, share && share.changedAt, share && share.scheduled && share.scheduled.setAt].filter(Boolean).sort().pop();
@@ -369,7 +372,32 @@ export default function Terms({ account, share }) {
         buyers are unaffected.
       </p>
 
-      <h2>16. Changes</h2>
+      <h2 id="tips">16. Tips</h2>
+      <p>
+        You can tip a creator from their profile or a title&rsquo;s page. A tip is a thank-you, sent
+        through Stripe to the creator&rsquo;s own account. It is not a purchase: it buys nothing and
+        unlocks nothing. It is also not a donation. {SITE.name} and its creators are not charities and
+        a tip is not tax-deductible. The one exception is a creator who links a fiscal sponsor on their
+        profile: giving through that sponsor&rsquo;s own page is a donation to the sponsor under the
+        sponsor&rsquo;s terms, and that money never passes through us.
+      </p>
+      <p>
+        <strong>What the creator gets.</strong> We keep {tipCutPercent}% of the tip. The card
+        processing fee is added on top of the tip and paid by you, not taken out of it, so the
+        creator keeps more of what you meant to give; the amounts are shown before you pay. The
+        creator&rsquo;s share lands in their Stripe account when the card clears. Tips are final. We
+        refund a tip only when something went wrong (a mistaken amount, a card used without
+        permission), at our discretion, and a refunded or disputed tip is taken back from the creator.
+      </p>
+      <p>
+        <strong>Notes and names.</strong> A note sent with a tip is shown to the creator, who can hide
+        it; we can hide or remove it too, and abusive notes get the account removed. Your name is shown
+        to the creator only if you choose; otherwise you appear as &ldquo;a fan&rdquo;. For creators:
+        tips count as income that Stripe reports, and section 5&rsquo;s rules on unearned credits
+        apply to tips that turn out to be fraudulent.
+      </p>
+
+      <h2>17. Changes</h2>
       <p>
         We&rsquo;ll update the date at the top. Material changes get 30 days&rsquo; notice by email to
         account holders. Continuing to use the service after that means you accept the new terms.
@@ -381,7 +409,7 @@ export default function Terms({ account, share }) {
         reduces credits you&rsquo;ve already earned.
       </p>
 
-      <h2>17. Contact</h2>
+      <h2>18. Contact</h2>
       <p>{SITE.contactEmail}</p>
     </LegalLayout>
   );

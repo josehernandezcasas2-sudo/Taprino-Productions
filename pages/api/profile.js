@@ -51,6 +51,9 @@ export default async function handler(req, res) {
     posts: data.posts,
     savedSnippets: data.savedSnippets,
     isSignedIn: data.isSignedIn,
-    viewerId: data.viewerId
+    viewerId: data.viewerId,
+    // Tips (lib/tips.js getTipping): the app's Tip button shows only when
+    // this creator's Stripe account can take charges.
+    tipping: data.tipping || null
   });
 }

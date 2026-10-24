@@ -11,8 +11,8 @@ import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creat
 // shown comes from the server; nothing here moves money.
 const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '');
 const fmtDayOnly = (ymd) => (ymd ? new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '');
-const LANE_LINKS = { member_support: '#supporters', sales: '/creator/my-work', backing: '/creator/pitch/dashboard', bookings: '/locations/mine' };
-const LANE_LINK_TEXT = { member_support: 'Who supports you →', sales: 'Prices and sales →', backing: 'Your pitches →', bookings: 'Your places →' };
+const LANE_LINKS = { member_support: '#supporters', tips: '#history', sales: '/creator/my-work', backing: '/creator/pitch/dashboard', bookings: '/locations/mine' };
+const LANE_LINK_TEXT = { member_support: 'Who supports you →', tips: 'Read the notes →', sales: 'Prices and sales →', backing: 'Your pitches →', bookings: 'Your places →' };
 
 function Row({ label, value }) {
   return <span className="money-row"><span>{label}</span><b>{value}</b></span>;
@@ -26,6 +26,8 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
   const [filter, setFilter] = useState('all');
   const [stripeBusy, setStripeBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [noteBusy, setNoteBusy] = useState(null);
+  const [tick, setTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -40,7 +42,23 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
       .catch((err) => { if (!cancelled) setError(err.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [period]);
+  }, [period, tick]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Tips: hide a note from your own view (or show it again). The note
+  // stays on the record; reporting it is the usual Report path.
+  async function toggleNote(line) {
+    setNoteBusy(line.tipId);
+    try {
+      const res = await fetch('/api/tips/note', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tipId: line.tipId, hidden: !line.noteHidden }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(d.error || 'Could not change the note.');
+      setTick((t) => t + 1);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setNoteBusy(null);
+    }
+  }
 
   async function openStripe() {
     setStripeBusy(true);
@@ -163,6 +181,15 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                       <Row label="Owed to you" value={dollars(lane.owedCents)} />
                     </>
                   )}
+                  {k === 'tips' && (
+                    <>
+                      {lane.count > 0 && <Row label={`${lane.count} tip${lane.count === 1 ? '' : 's'} · ${lane.people} ${lane.people === 1 ? 'person' : 'people'}`} value={dollars(lane.grossCents)} />}
+                      {lane.cutCents > 0 && <Row label={`Studio cut${lane.cutPercent != null ? ` ${lane.cutPercent}%` : ''}`} value={`−${dollars(lane.cutCents)}`} />}
+                      {lane.count > 0 && <Row label="With a note" value={lane.noteCount} />}
+                      {lane.refunds > 0 && <Row label={`${lane.refunds} refund${lane.refunds === 1 ? '' : 's'}`} value={`−${dollars(lane.refundCents)}`} />}
+                      {lane.count === 0 && lane.refunds === 0 && <Row label="No tips this period" value="" />}
+                    </>
+                  )}
                   {k === 'sales' && (
                     <>
                       {lane.titles.map((t) => <Row key={t.key} label={`${t.title}${t.type === 'series' ? ' · series' : ''} · ${t.sold} sold`} value={dollars(t.cents)} />)}
@@ -197,6 +224,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                 </div>
                 <span className="money-lane-note">
                   {k === 'member_support' && `Pays by transfer on the 1st once you are owed ${dollars(data.top.minimumCents)}.`}
+                  {k === 'tips' && (ready ? 'In your Stripe balance the moment the card clears. The fan covers the card fee.' : 'Set up payouts and the Tip button turns on for your fans.')}
                   {k === 'sales' && 'Your share lands in your Stripe balance at the sale.'}
                   {k === 'backing' && 'In your Stripe balance the moment a backer pays.'}
                   {k === 'bookings' && 'In your Stripe balance when the producer pays.'}
@@ -236,6 +264,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
               <Row label="By watching" value={data.supporters.watching} />
               <Row label="Backed a pitch" value={data.supporters.backers} />
               <Row label="Bought a title" value={data.supporters.buyers} />
+              {data.supporters.tippers > 0 && <Row label="Tipped you" value={data.supporters.tippers} />}
             </div>
             <span className="money-lane-note">
               {data.supporters.names.length
@@ -245,7 +274,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
           </div>
         </div>
 
-        <div className="account-card money-history">
+        <div className="account-card money-history" id="history">
           <div className="money-card-head">
             <h2>History</h2>
             <div className="money-chips" role="tablist" aria-label="Lane">
@@ -270,7 +299,14 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                     <tr key={l.id}>
                       <td className="money-date">{fmtDay(l.at)}</td>
                       <td><span className={`money-tag lane-${l.lane}`}>{l.kind.replace('_', ' ')}</span></td>
-                      <td>{l.href ? <Link href={l.href}>{l.label}</Link> : l.label}{l.detail ? <span className="money-detail"> · {l.detail}</span> : null}</td>
+                      <td>
+                        {l.href ? <Link href={l.href}>{l.label}</Link> : l.label}{l.detail ? <span className="money-detail"> · {l.detail}</span> : null}
+                        {l.kind === 'tip' && l.note && (
+                          <button type="button" className="money-note-btn" onClick={() => toggleNote(l)} disabled={noteBusy === l.tipId}>
+                            {noteBusy === l.tipId ? '…' : l.noteHidden ? 'Show note' : 'Hide note'}
+                          </button>
+                        )}
+                      </td>
                       <td className="money-where">{l.where}</td>
                       <td className={`num ${l.cents < 0 ? 'neg' : ''}`}>{signed(l.cents, l.lane)}</td>
                     </tr>
@@ -292,7 +328,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
         <div className="money-two">
           <div className="account-card money-card">
             <span className="account-subheading">How the money moves</span>
-            <p className="money-copy">Member support is the studio&rsquo;s revenue shared with you: it adds up through the month and goes to your Stripe account by transfer on the 1st once you are owed {dollars(data.top.minimumCents)}. Sales, backing and bookings are the fan&rsquo;s money: your share lands in your Stripe balance when the card clears. Stripe then pays your bank on your Express schedule.</p>
+            <p className="money-copy">Member support is the studio&rsquo;s revenue shared with you: it adds up through the month and goes to your Stripe account by transfer on the 1st once you are owed {dollars(data.top.minimumCents)}. Tips, sales, backing and bookings are the fan&rsquo;s money: your share lands in your Stripe balance when the card clears. Stripe then pays your bank on your Express schedule.</p>
           </div>
           <div className="account-card money-card">
             <span className="account-subheading">Tax season</span>

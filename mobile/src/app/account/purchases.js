@@ -19,13 +19,16 @@ export default function Purchases() {
   const { getToken, isSignedIn } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [busy, setBusy] = useState(null);
+  // Tips you've sent (lib/tips.js getTipsSent): lines, not titles.
+  const [tips, setTips] = useState([]);
 
   const load = useCallback(async () => {
     try {
       const token = await getToken().catch(() => null);
       if (!token) { setState({ loading: false, error: 'Sign in to see what you own.', data: null }); return; }
-      const data = await apiGet('/api/purchases', token);
+      const [data, sent] = await Promise.all([apiGet('/api/purchases', token), apiGet('/api/tips?mine=1', token).catch(() => ({ tips: [] }))]);
       setState({ loading: false, error: null, data });
+      setTips(Array.isArray(sent.tips) ? sent.tips : []);
     } catch (err) {
       setState({ loading: false, error: err.message, data: null });
     }
@@ -91,6 +94,20 @@ export default function Purchases() {
           </View>
         ))}
 
+        {tips.length > 0 ? (
+          <View style={{ gap: 8, marginTop: 8 }}>
+            <Text style={styles.sectionTitle}>Tips you&rsquo;ve sent</Text>
+            {tips.map((t) => (
+              <View key={t.id} style={styles.tipRow}>
+                <Text style={styles.rowSmall}>{fmtDate(t.completedAt || t.createdAt)}</Text>
+                <Text style={styles.tipText}><Text style={styles.strong}>{t.creatorName}</Text> · {dollars(t.amountCents)} tip · you paid {dollars(t.totalCents)}{t.showName ? '' : ' · as “a fan”'}{t.status === 'refunded' ? ' · refunded' : ''}</Text>
+                {t.note ? <Text style={styles.rowSub}>&ldquo;{t.note}&rdquo;</Text> : null}
+              </View>
+            ))}
+            <Text style={styles.fine}>A tip is a thank-you, not a purchase: it buys nothing and is final. If something went wrong, email info@studiotapa.com.</Text>
+          </View>
+        ) : null}
+
         {state.data ? (
           <View style={styles.help}>
             <Text style={styles.helpTitle}>Receipts and refunds</Text>
@@ -120,6 +137,10 @@ const styles = StyleSheet.create({
   footText: { flex: 1, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17, color: colors.inkDim },
   refundBtn: { minHeight: 36, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.4)', alignItems: 'center', justifyContent: 'center' },
   refundText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.ink },
+  sectionTitle: { fontFamily: fonts.displaySemi, fontSize: 16, color: colors.ink },
+  tipRow: { padding: 12, borderRadius: 10, backgroundColor: colors.surface1, gap: 3 },
+  tipText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim },
+  strong: { color: colors.ink, fontFamily: fonts.displaySemi },
   help: { padding: 14, borderRadius: 10, backgroundColor: colors.surface2, gap: 6, marginTop: 8 },
   helpTitle: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
   helpBody: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 20, color: colors.inkDim },

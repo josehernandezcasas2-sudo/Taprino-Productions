@@ -7,6 +7,7 @@ import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInv
 import { recordAdCreditPurchase, reverseAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFromCharge } from '../../lib/purchases';
+import { completeTipFromSession, failTipFromSession, refundTipFromCharge } from '../../lib/tips';
 import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
@@ -97,7 +98,7 @@ export default async function handler(req, res) {
       // once the money is actually in. Cards are paid on completion; a
       // delayed method completes as "unpaid" and arrives later as
       // async_payment_succeeded, which lands here too.
-      const oneOff = ['ad_credits', 'pitch_donation', 'location_booking'].includes(session.metadata?.type);
+      const oneOff = ['ad_credits', 'pitch_donation', 'location_booking', 'title_purchase', 'tip'].includes(session.metadata?.type);
       if (oneOff && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
         console.log(`checkout ${session.id} (${session.metadata.type}) completed unpaid; waiting for the money`);
         break;
@@ -160,6 +161,16 @@ export default async function handler(req, res) {
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'booking not recorded' });
         }
+      } else if (session.metadata?.type === 'tip') {
+        // A tip was paid (lib/tips.js): the pending row becomes the tip
+        // that counts, and the creator hears about it.
+        try {
+          await completeTipFromSession(session);
+        } catch (err) {
+          console.error('completeTipFromSession from webhook failed:', err.message);
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'tip not recorded' });
+        }
       } else {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
         // Creator Share: remember which member this Stripe customer is,
@@ -216,6 +227,9 @@ export default async function handler(req, res) {
           console.error('failPurchaseFromSession from webhook failed:', err.message);
         }
       }
+      if (session.metadata?.type === 'tip') {
+        await run('failTipFromSession', () => failTipFromSession(session, 'checkout expired'));
+      }
       break;
     }
     case 'charge.refunded': {
@@ -224,6 +238,7 @@ export default async function handler(req, res) {
       // a no-op for those.
       await run('refundDonationFromCharge', () => refundDonationFromCharge(event.data.object));
       await run('refundBookingFromCharge', () => refundBookingFromCharge(event.data.object));
+      await run('refundTipFromCharge', () => refundTipFromCharge(event.data.object));
       // An ad-credit purchase refunded (fully or partly): that much credit
       // comes off the balance.
       {

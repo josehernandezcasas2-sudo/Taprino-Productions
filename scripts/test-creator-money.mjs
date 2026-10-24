@@ -35,8 +35,17 @@ const rows = {
     { id: 'p1', period: '2026-09', cents: 2280, status: 'paid', stripe_transfer_id: 'tr_1', paid_at: '2026-10-01T09:00:00Z', created_at: '2026-10-01T09:00:00Z', reversed_cents: 0 },
     { id: 'p0', period: '2026-07', cents: 3000, status: 'paid', stripe_transfer_id: 'tr_0', paid_at: '2026-08-01T09:00:00Z', created_at: '2026-08-01T09:00:00Z', reversed_cents: 1000, reversed_at: '2026-08-15T09:00:00Z' }
   ],
+  // Tips: Anika shows her name; the $10 tipper didn't; Jose's note is hidden; one refunded.
+  tips: [
+    { id: 't1', tipper_id: 'user_anika', show_name: true, amount_cents: 500, creator_payout_cents: 475, platform_cut_cents: 25, note: 'the sound design in Low Tide!!', status: 'completed', completed_at: '2026-10-16T12:00:00Z', stripe_payment_intent_id: 'pi_t1' },
+    { id: 't2', tipper_id: 'user_x', show_name: false, amount_cents: 1000, creator_payout_cents: 950, platform_cut_cents: 50, note: null, status: 'completed', completed_at: '2026-10-15T12:00:00Z', stripe_payment_intent_id: 'pi_t2' },
+    { id: 't3', tipper_id: 'user_jose', show_name: true, amount_cents: 300, creator_payout_cents: 285, platform_cut_cents: 15, note: 'rude thing', note_hidden: true, status: 'completed', completed_at: '2026-10-09T12:00:00Z', stripe_payment_intent_id: 'pi_t3' },
+    { id: 't4', tipper_id: 'user_x', show_name: false, amount_cents: 500, creator_payout_cents: 475, platform_cut_cents: 25, note: 'oops', status: 'refunded', completed_at: '2026-10-03T12:00:00Z', refunded_at: '2026-10-04T12:00:00Z', refund_reason: 'wrong amount', stripe_payment_intent_id: 'pi_t4' },
+    { id: 't5', tipper_id: 'user_x', show_name: false, amount_cents: 500, creator_payout_cents: 475, platform_cut_cents: 25, status: 'pending', created_at: '2026-10-20T12:00:00Z' }
+  ],
   names,
   memberNames,
+  tipperNames: { user_anika: 'Anika K.', user_jose: 'J. Hernandez', user_x: 'Should Not Show' },
   pitchTitles: { pitch1: 'Fawns' },
   locationTitles: { loc1: 'The Glass House' }
 };
@@ -94,6 +103,26 @@ t('history: one line per thing that happened, newest first, names only where all
   assert.equal(lines.find((l) => l.id === 'payout:p0').status, 'partly_reversed');
 });
 
+t('tips: the note is the line, names only where the fan chose, hidden notes stay hidden', () => {
+  const t1 = lines.find((l) => l.id === 'tip:t1');
+  assert.equal(t1.lane, 'tips');
+  assert.equal(t1.label, 'Anika K.');
+  assert.equal(t1.detail, '“the sound design in Low Tide!!”');
+  assert.equal(t1.cents, 475);
+  assert.equal(t1.tipId, 't1');
+  assert.equal(t1.noteHidden, false);
+  const t2 = lines.find((l) => l.id === 'tip:t2');
+  assert.equal(t2.label, 'A fan', 'show_name off hides the name even when we know it');
+  assert.equal(t2.detail, 'no note');
+  const t3 = lines.find((l) => l.id === 'tip:t3');
+  assert.equal(t3.detail, 'note hidden by you');
+  assert.equal(t3.noteHidden, true);
+  const refund = lines.find((l) => l.id === 'tip-refund:t4');
+  assert.equal(refund.cents, -475);
+  assert.equal(refund.detail, 'Refunded by the studio · wrong amount');
+  assert.ok(!lines.find((l) => l.id === 'tip:t5'), 'a pending tip is not a line');
+});
+
 t('lane totals for October: refunds net out, payouts never count', () => {
   const o = laneTotals(lines, monthRange('2026-10'));
   assert.equal(o.member_support, 700);
@@ -103,9 +132,11 @@ t('lane totals for October: refunds net out, payouts never count', () => {
   assert.equal(o.backing, 9025);
   assert.equal(o.bookings, 61025);
   assert.equal(o.payouts, 2280);
-  assert.equal(o.total, 700 + 357 + 9025 + 61025);
-  assert.equal(o.refunds, -226);
+  assert.equal(o.tips, 475 + 950 + 285); // t4's tip and refund net out
+  assert.equal(o.total, 700 + 357 + 9025 + 61025 + 1710);
+  assert.equal(o.refunds, -226 - 475);
   assert.equal(o.count.sales, 3);
+  assert.equal(o.count.tips, 5);
 });
 
 t('owed: unpaid earnings lines, whatever the month', () => {
@@ -116,7 +147,7 @@ t('paid this year: transfers that went through less what came back, plus the car
   const paid = paidInYearCents(lines, '2026');
   const transfers = 2280 + 3000 - 1000;
   // d2's $50 backing came in (+4750) and was disputed (−4750); b2's booking came in and was partly refunded.
-  const card = 357 - 226 + 226 + 9025 + 4750 - 4750 + 61025 + 61025 - Math.round(34900 * 61025 / 69800);
+  const card = 357 - 226 + 226 + 9025 + 4750 - 4750 + 61025 + 61025 - Math.round(34900 * 61025 / 69800) + 1710;
   assert.equal(paid, transfers + card);
   assert.equal(paidInYearCents(lines, '2025'), 0);
 });

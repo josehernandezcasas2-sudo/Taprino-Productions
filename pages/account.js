@@ -731,6 +731,30 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                       </button>
                     )}
 
+                    {(isCreator || isAdmin) && (
+                      <>
+                        <label style={{ marginTop: '0.6rem' }}>Fiscal sponsor <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
+                        <div className="admin-field-row" style={{ marginBottom: '0.4rem' }}>
+                          <input
+                            type="text"
+                            value={profile.fiscalSponsorName || ''}
+                            placeholder="Sponsor’s name"
+                            maxLength={80}
+                            onChange={(e) => setProfile((p) => ({ ...p, fiscalSponsorName: e.target.value }))}
+                          />
+                          <input
+                            type="text"
+                            value={profile.fiscalSponsorUrl || ''}
+                            placeholder="https://…/donate"
+                            onChange={(e) => setProfile((p) => ({ ...p, fiscalSponsorUrl: e.target.value }))}
+                          />
+                        </div>
+                        <p className="account-fineprint" style={{ marginBottom: '0.6rem' }}>
+                          If a nonprofit sponsors your work, add its donation link. Your tip sheet sends fans who want a tax-deductible donation there. Tips themselves are a thank-you, never a donation.
+                        </p>
+                      </>
+                    )}
+
                     <button className="account-btn-primary" type="submit" disabled={profileSaving} style={{ width: 'auto', marginTop: '0.8rem' }}>
                       {profileSaving ? 'Saving…' : 'Save profile'}
                     </button>

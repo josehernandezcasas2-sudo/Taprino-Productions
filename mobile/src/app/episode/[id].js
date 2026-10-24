@@ -18,6 +18,7 @@ import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/Hero
 import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
 import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
+import { TipButton, TipEndCard, tipChipStyles, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
 
@@ -106,6 +107,9 @@ export default function Episode() {
   const episode = state.page && state.page.episode;
   const purchase = state.page && state.page.purchase;
   const owned = Boolean(purchase && purchase.owned);
+  // Tips: the end-of-episode card, once per title (components/TipSheet.js).
+  const tipping = state.page && state.page.tipping;
+  const [tipEndCard, setTipEndCard] = useState(false);
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => null), 4000),
     router,
@@ -163,8 +167,16 @@ export default function Episode() {
 
   useEffect(() => {
     if (!player) return undefined;
-    const sub = player.addListener('playToEnd', () => {
+    const sub = player.addListener('playToEnd', async () => {
       if (showingTrailer) { setShowingTrailer(false); return; }
+      // Tips: the first time a title plays out, "Liked it? Tip …" comes up
+      // over the player; in a series it counts down to the next episode.
+      const t = state.page && state.page.tipping;
+      if (t && t.enabled && episode && !(await tipEndCardSeen(episode.id))) {
+        markTipEndCardSeen(episode.id);
+        setTipEndCard(true);
+        return;
+      }
       const next = state.page && state.page.nextEpisode;
       if (episode && episode.contentType === 'series' && next) router.replace(`/episode/${next.id}?autoplay=1`);
     });
@@ -348,6 +360,18 @@ export default function Episode() {
               <View style={styles.player}>
                 <VideoView key={activeSrc} player={player} style={absoluteFill} contentFit="contain" nativeControls allowsFullscreen />
                 <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
+                {tipEndCard && !showingTrailer ? (
+                  <TipEndCard
+                    tipping={tipping}
+                    title={episode.title}
+                    isSignedIn={Boolean(state.page.isSignedIn)}
+                    router={router}
+                    getToken={() => withTimeout(getToken().catch(() => null), 4000)}
+                    returnTo={`/episode/${episode.id}`}
+                    onNext={episode.contentType === 'series' && state.page.nextEpisode ? () => router.replace(`/episode/${state.page.nextEpisode.id}?autoplay=1`) : null}
+                    onClose={() => setTipEndCard(false)}
+                  />
+                ) : null}
               </View>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>
@@ -395,6 +419,18 @@ export default function Episode() {
                     <Text style={styles.chipText}>{'🎬'} Watch trailer</Text>
                   </Pressable>
                 ) : null}
+                {/* Tips: only once the maker's Stripe account can take charges. */}
+                <TipButton
+                  tipping={tipping}
+                  isSignedIn={isSignedIn}
+                  router={router}
+                  getToken={() => withTimeout(getToken().catch(() => null), 4000)}
+                  returnTo={`/episode/${episode.id}`}
+                  style={tipChipStyles.chip}
+                  textStyle={tipChipStyles.chipText}
+                >
+                  {'◆'} Tip the maker
+                </TipButton>
               </View>
               {!showingTrailer && resumeSeconds > 0 ? (
                 <View style={styles.resumeNote}>

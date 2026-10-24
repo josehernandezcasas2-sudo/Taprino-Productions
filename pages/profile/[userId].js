@@ -17,6 +17,7 @@ import PositionedPhoto from '../../components/PositionedPhoto';
 import ReportButton from '../../components/ReportButton';
 import { CrewCardView } from '../../components/crew/CrewBits';
 import TierChip from '../../components/crew/TierChip';
+import { TipButton, TippedBanner } from '../../components/TipSheet';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -63,7 +64,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator, tipping = null }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -383,6 +384,13 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                   ? <Link href={`/messages?to=${encodeURIComponent(profile.userId)}&kind=profile&label=${encodeURIComponent(profile.displayName)}`} className="profile-action-btn">Message</Link>
                   : <SignInButton mode="modal"><button type="button" className="profile-action-btn">Message</button></SignInButton>
               )}
+              {/* Tips: gold like the creator badge, only once this creator's
+                  Stripe account can take charges (lib/tips.js getTipping). */}
+              {!isOwnProfile && (
+                <TipButton tipping={tipping} isSignedIn={isSignedIn} className="profile-action-btn profile-action-btn-tip">
+                  Tip {profile.displayName.split(/\s+/)[0]}
+                </TipButton>
+              )}
               <div className="pitch-share-wrap">
                 <button className="wishlist-btn wishlist-btn-large" onClick={share} aria-label="Share profile" title="Share profile">
                   {shareCopied ? <CheckIcon size={17} /> : <ShareIcon src={iconOverrides.share} size={17} />}
@@ -395,6 +403,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
             </div>
           </div>
           {followError && <div className="profile-follow-error" role="alert">{followError}</div>}
+          <TippedBanner email={email} />
 
           {profile.isPlaceholder && (
             <p className="profile-placeholder-note">

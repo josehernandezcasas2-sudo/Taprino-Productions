@@ -27,6 +27,7 @@ import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../compon
 import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
+import { TipButton, TipEndCard, TippedBanner, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
@@ -123,6 +124,8 @@ export async function getServerSideProps({ req, params, query, res }) {
       bundle: data.bundle || null,
       withdrawn: Boolean(data.withdrawn),
       earlyAccess,
+      // Tips (lib/tips.js): { enabled, … } when the maker can be tipped.
+      tipping: data.tipping || null,
       bought: typeof query.bought === 'string' ? query.bought : null,
       refundDays: purchaseSettings ? purchaseSettings.refundDays : 14,
       refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10
@@ -130,7 +133,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -161,6 +164,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // turns the ads off (the buyer paid for it).
   const owned = Boolean(purchase && purchase.owned);
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
+  // Tips: the end-of-episode card, once per title (components/TipSheet.js).
+  const [tipEndCard, setTipEndCard] = useState(false);
 
   // Safe here — every hook the component uses has already run above,
   // unconditionally, on every render. Nothing below this point is a hook,
@@ -271,9 +276,22 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     router.push(t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`);
   }
 
+  function goToNextEpisode() {
+    if (nextEpisode) router.push(`/episode/${nextEpisode.id}`);
+  }
+
   function handleEnded() {
     if (showingTrailer) {
       setShowingTrailer(false);
+      return;
+    }
+    // Tips: the first time a title plays out, the "Liked it? Tip …" card
+    // comes up over the player (never on trailers). In a series it counts
+    // down to the next episode, so autoplay still happens, ten seconds
+    // later; a title with no next episode just stops with the card up.
+    if (tipping && tipping.enabled && !tipEndCardSeen(episode.id)) {
+      markTipEndCardSeen(episode.id);
+      setTipEndCard(true);
       return;
     }
     // Autoplay now only ever continues within the SAME series — it used
@@ -470,19 +488,30 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               </div>
             )
           ) : (
-            <VideoPlayer
-              episode={playingEpisode}
-              // Ads follow the membership tier, not the title: Standard members
-              // get them on premium titles too; only Premium/Sponsor are
-              // ad-free (lib/membershipTiers.js adFree). A buyer paid for this
-              // title, so it plays ad-free for them (Buy to own).
-              adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
-              onEnded={handleEnded}
-              advisory={!showingTrailer}
-              signedPlayback={!showingTrailer && signedPlayback}
-              initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
-              onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
-            />
+            <div className="tip-end-wrap">
+              <VideoPlayer
+                episode={playingEpisode}
+                // Ads follow the membership tier, not the title: Standard members
+                // get them on premium titles too; only Premium/Sponsor are
+                // ad-free (lib/membershipTiers.js adFree). A buyer paid for this
+                // title, so it plays ad-free for them (Buy to own).
+                adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
+                onEnded={handleEnded}
+                advisory={!showingTrailer}
+                signedPlayback={!showingTrailer && signedPlayback}
+                initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
+                onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+              />
+              {tipEndCard && (
+                <TipEndCard
+                  tipping={tipping}
+                  title={episode.title}
+                  isSignedIn={isSignedIn}
+                  onNext={episode.contentType === 'series' && nextEpisode ? goToNextEpisode : null}
+                  onClose={() => setTipEndCard(false)}
+                />
+              )}
+            </div>
           )}
         </div>
       )}
@@ -500,6 +529,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
           />
 
           <BoughtBanner bought={bought} title={episode.title} email={email} />
+          <TippedBanner email={email} />
 
           <div className="player-info-row">
           <div className="player-card">
@@ -555,6 +585,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 {!showingTrailer && episode.trailerSrc && (
                   <button className="trailer-link" onClick={() => setShowingTrailer(true)}>🎬 Watch trailer</button>
                 )}
+                {/* Tips: only once the maker's Stripe account can take charges. */}
+                <TipButton tipping={tipping} isSignedIn={isSignedIn} className="trailer-link tip-link" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
+                  ◆ Tip the maker
+                </TipButton>
                 <ReportButton targetType="episode" targetId={episode.id} title={episode.title} />
               </div>
               {!showingTrailer && getPosition(episode.id) > 0 && (() => {

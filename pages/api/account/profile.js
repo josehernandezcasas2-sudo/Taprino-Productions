@@ -49,12 +49,26 @@ export default async function handler(req, res) {
       bannerPosition: profile ? profile.banner_position || null : null,
       bannerZoom: profile && profile.banner_zoom ? Number(profile.banner_zoom) : null,
       socialLinks: profile && Array.isArray(profile.social_links) ? profile.social_links : [],
-      stayInStream: profile ? Boolean(profile.stay_in_stream) : false
+      stayInStream: profile ? Boolean(profile.stay_in_stream) : false,
+      // Tips (migration 101): the creator's fiscal sponsor, if any.
+      fiscalSponsorName: profile ? profile.fiscal_sponsor_name || null : null,
+      fiscalSponsorUrl: profile ? profile.fiscal_sponsor_url || null : null
     });
   }
 
   if (req.method === 'POST') {
-    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream } = req.body || {};
+    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream, fiscalSponsorName, fiscalSponsorUrl } = req.body || {};
+    // Tips: a fiscal sponsor is a link (http(s)) with an optional name;
+    // a name on its own means nothing, so it needs the link.
+    if (fiscalSponsorUrl !== undefined && fiscalSponsorUrl !== null && String(fiscalSponsorUrl).trim() && !/^https?:\/\//i.test(String(fiscalSponsorUrl).trim())) {
+      return res.status(400).json({ error: 'The fiscal sponsor link needs to start with http:// or https://.' });
+    }
+    if (fiscalSponsorName && String(fiscalSponsorName).trim().length > 80) {
+      return res.status(400).json({ error: 'The fiscal sponsor name is limited to 80 characters.' });
+    }
+    if (fiscalSponsorName && String(fiscalSponsorName).trim() && !(fiscalSponsorUrl && String(fiscalSponsorUrl).trim())) {
+      return res.status(400).json({ error: 'Add the fiscal sponsor’s link as well as the name.' });
+    }
     if (bannerColor !== undefined && bannerColor !== null && bannerColor !== '' && !BANNER_COLOR_PATTERN.test(String(bannerColor))) {
       return res.status(400).json({ error: 'Banner color needs to be a hex color like #283c63.' });
     }
@@ -135,7 +149,9 @@ export default async function handler(req, res) {
         bannerPosition: removeBanner ? null : bannerPosition,
         avatarPosition: removeAvatar ? null : avatarPosition,
         bannerZoom: removeBanner ? null : bannerZoom,
-        avatarZoom: removeAvatar ? null : avatarZoom
+        avatarZoom: removeAvatar ? null : avatarZoom,
+        fiscalSponsorName,
+        fiscalSponsorUrl
       });
       // The focal points ride back so the page (and the header, via the
       // own-profile-updated event) show the saved crop without a reload.
