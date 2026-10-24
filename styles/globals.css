@@ -10061,3 +10061,13 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
   .money-title-row h1 { font-size: 1.8rem; }
 }
 .money-lane-rows .money-row b { white-space: normal; text-align: right; }
+
+/* ===== /suspended (pages/suspended.js): the bounced card ===== */
+.suspended-card { padding: 1.6rem 1.7rem; border-radius: 16px; background: var(--surface-1); border: 1px solid var(--ocean-ink); gap: 1rem; }
+.suspended-card h1 { font-size: clamp(1.5rem, 4.6vw, 1.9rem); }
+.suspended-why { display: grid; gap: 0.3rem; padding: 0.8rem 1rem; border-radius: 12px; background: var(--surface-0); border-left: 3px solid var(--danger); font-size: 1rem; line-height: 1.5; }
+.suspended-block { display: grid; gap: 0.4rem; font-size: 0.94rem; line-height: 1.55; color: var(--ink-dim); }
+.suspended-block a { color: var(--brass); }
+.suspended-label { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.suspended-card .welcome-btn { text-decoration: none; }
+@media (max-width: 520px) { .suspended-card .welcome-cta { grid-template-columns: 1fr !important; } .suspended-card { padding: 1.2rem 1.1rem; } }

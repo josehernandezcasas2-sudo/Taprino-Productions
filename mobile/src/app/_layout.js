@@ -12,6 +12,8 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import BottomNav from '../components/BottomNav';
 import PrivateBetaGate from '../components/PrivateBetaGate';
+import SuspendedGate from '../components/SuspendedGate';
+import PushListener from '../components/PushListener';
 import { colors } from '../lib/theme';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -105,6 +107,11 @@ export default function RootLayout() {
         {/* The private beta door: covers everything for a signed-out
             person while the website's PRIVATE_BETA switch is on. */}
         <PrivateBetaGate />
+        {/* The suspension gate (migration 102): covers everything for a
+            signed-in person whose account is suspended. */}
+        <SuspendedGate />
+        {/* Push: keeps the token fresh, opens what a tapped push points at. */}
+        <PushListener />
       </SafeAreaProvider>
     </ClerkProvider>
     </GestureHandlerRootView>

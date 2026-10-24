@@ -9,7 +9,17 @@
 // reached the server anonymous (sign-in "worked" but the app still showed
 // you as signed out, hearts/Continue Watching/premium playback never knew
 // who you were).
+import { reportSuspension } from './suspensionStore';
+
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.studiotapatv.site';
+
+// A failed request's body. A 403 { suspended } (middleware.js, migration
+// 102) is reported so the gate shows at once, whatever screen asked.
+async function failed(res) {
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 403 && data && data.suspended) reportSuspension(data.suspended);
+  return new Error(data.error || `Request failed (${res.status})`);
+}
 
 // A Clerk session token lasts about a minute, so a token fetched when a
 // screen opened is stale by the time someone taps Save or a poll fires,
@@ -27,10 +37,7 @@ export function freshToken(getToken, ms = 4000) {
 export async function apiGet(path, token) {
   const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
   const res = await fetch(`${API_BASE_URL}${path}`, { headers });
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}));
-    throw new Error(body.error || `Request failed (${res.status})`);
-  }
+  if (!res.ok) throw await failed(res);
   return res.json();
 }
 
@@ -46,10 +53,7 @@ export async function apiPost(path, body, token) {
     headers,
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
+  if (!res.ok) throw await failed(res);
   return res.json();
 }
 
@@ -63,10 +67,7 @@ export async function apiPatch(path, body, token) {
     headers,
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
+  if (!res.ok) throw await failed(res);
   return res.json();
 }
 
@@ -80,9 +81,6 @@ export async function apiDelete(path, body, token) {
     headers,
     body: JSON.stringify(body)
   });
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}));
-    throw new Error(data.error || `Request failed (${res.status})`);
-  }
+  if (!res.ok) throw await failed(res);
   return res.json();
 }

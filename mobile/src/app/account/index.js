@@ -23,6 +23,7 @@ import PayoutsCard from '../../components/PayoutsCard';
 import MoneySummaryCard from '../../components/MoneySummaryCard';
 import { rememberStayInStream } from '../../lib/stayInStream';
 import ReferredByField from '../../components/ReferredByField';
+import { PushPrompt, PushRow } from '../../components/PushPrompt';
 import { readVia } from '../../lib/referral';
 
 const GENDERS = [
@@ -539,6 +540,10 @@ export default function Account() {
           ) : null}
         </LinearGradient>
 
+        {/* Push notifications (2026-10-24): our own ask, once; the switch
+            lives under Preferences. */}
+        <PushPrompt getToken={getToken} />
+
         {/* Public profile */}
         <View style={styles.card}>
           <CardHead title="Public profile" visibility="Visible to anyone on Studio Tapa TV" color={colors.ok} />
@@ -853,6 +858,9 @@ export default function Account() {
               />
             </Row>
           ) : null}
+          {/* Push notifications (2026-10-24): the switch; the card above
+              the cards asks first. */}
+          <PushRow getToken={getToken} Row={Row} />
         </View>
 
         {/* Payouts — creators and admins only; same card as the web /account */}

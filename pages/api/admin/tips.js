@@ -1,10 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { listTipsForAdmin, refundTip, adminHideTipNote, adminDismissTipReports } from '../../../lib/tips';
+import { blockTipperFromTip } from '../../../lib/suspensions';
 import { recordAudit } from '../../../lib/auditLog';
 
 // /admin/tips: recent tips, reported notes, refunds. Full admins only —
 // refunds move real money. POST { action: 'refund', tipId, reason } |
-// { action: 'hide_note', tipId } | { action: 'dismiss', tipId }.
+// { action: 'hide_note', tipId } | { action: 'dismiss', tipId } |
+// { action: 'block_tipper', tipId, reason } (a tips-only suspension for
+// the fan, lib/suspensions.js; lifted on /admin/accounts).
 export default async function handler(req, res) {
   const rc = await getRoleContext(req);
   if (!rc.isAdmin) return res.status(403).json({ error: 'Admin access required.' });
@@ -31,6 +34,11 @@ export default async function handler(req, res) {
     if (body.action === 'dismiss') {
       await adminDismissTipReports({ tipId, adminId: rc.userId });
       return res.status(200).json({ ok: true });
+    }
+    if (body.action === 'block_tipper') {
+      const out = await blockTipperFromTip({ tipId, publicReason: body.reason, actorId: rc.userId, actorEmail: rc.email || null });
+      recordAudit({ adminId: rc.userId, adminEmail: rc.email || null, action: 'tips_blocked', targetType: 'user', targetId: out.tipperId, details: `${String(body.reason || '').slice(0, 300)} · tip ${tipId}` }).catch(() => {});
+      return res.status(200).json({ ok: true, tipperId: out.tipperId });
     }
     return res.status(400).json({ error: 'Unknown action.' });
   } catch (err) {

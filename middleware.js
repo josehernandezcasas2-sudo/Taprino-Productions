@@ -1,6 +1,7 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { privateBetaOn, isOpenPath, doorPath } from './lib/privateBetaRules';
+import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from './lib/suspensionGate';
 
 // Normally this deliberately does NOT protect any routes — free browsing
 // (homepage, episode pages, genre/series/type pages) stays open to
@@ -24,22 +25,47 @@ import { privateBetaOn, isOpenPath, doorPath } from './lib/privateBetaRules';
 //    sign-up mode is Restricted) see the whole site as usual. Every
 //    response also carries X-Robots-Tag: noindex, belt and braces over
 //    robots.txt. Off = this block never runs.
+//
+// 3. Account suspensions (lib/suspensionGate.js; migration 102, Jose
+//    2026-10-24): a signed-in person with a whole-account suspension in
+//    force is sent to /suspended from any page but the card itself and
+//    the legal/contact pages, and every API write (anything but GET,
+//    HEAD, OPTIONS) answers 403 { suspended } so the app can show its
+//    gate. Reads pass: the shells need them to draw the card. One small
+//    PostgREST read per person per minute per isolate; a database
+//    hiccup fails open.
 const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
+const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 export default clerkMiddleware(async (auth, req) => {
   const { pathname, search, searchParams } = req.nextUrl;
   const beta = privateBetaOn();
+  const isApi = pathname.startsWith('/api/');
+  let userId;
+  const who = async () => {
+    if (userId === undefined) ({ userId } = await auth());
+    return userId;
+  };
 
   let res = null;
   if (beta && !isOpenPath(pathname)) {
-    const { userId } = await auth();
-    if (!userId) {
-      if (pathname.startsWith('/api/')) {
+    if (!(await who())) {
+      if (isApi) {
         res = NextResponse.json({ error: 'Studio Tapa TV is in private beta. Sign in with an invited account.', privateBeta: true }, { status: 401 });
       } else {
         res = NextResponse.redirect(new URL(doorPath(pathname, search), req.url), 307);
       }
+    }
+  }
+
+  const gated = isApi ? !READ_METHODS.has(req.method) && !isSuspensionOpenApiWrite(pathname) : !isSuspensionOpenPath(pathname);
+  if (!res && gated && (await who())) {
+    const suspended = await suspensionFor(userId);
+    if (suspended && suspended.scope === 'all') {
+      res = isApi
+        ? NextResponse.json({ error: 'Your account is suspended.', suspended }, { status: 403 })
+        : NextResponse.redirect(new URL('/suspended', req.url), 307);
     }
   }
 

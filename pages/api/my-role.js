@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../lib/roles';
 import { getOwnProfile } from '../../lib/userProfiles';
+import { getSuspensionFor } from '../../lib/suspensions';
 
 // Self-fetched by MobileTabBar so it can gate "My Work" to creators/admins
 // without requiring every single page that renders <MobileTabBar /> to
@@ -20,9 +21,13 @@ export default async function handler(req, res) {
   // The tab bar's "View profile" row needs the public URL, which is the
   // @handle when one is set. Same rule as HeaderNav's ownProfileHref.
   let profileHref = null;
+  // Suspensions (migration 102): the app's gate reads this on sign-in
+  // and when it comes to the foreground; null when nothing is in force.
+  let suspended = null;
   if (userId) {
-    const profile = await getOwnProfile(userId).catch(() => null);
+    const [profile, s] = await Promise.all([getOwnProfile(userId).catch(() => null), getSuspensionFor(userId)]);
     profileHref = `/profile/${(profile && profile.handle) || userId}`;
+    suspended = s;
   }
   return res.status(200).json({
     isSignedIn: !!userId,
@@ -31,6 +36,7 @@ export default async function handler(req, res) {
     isContentScheduler: !!isContentScheduler,
     // Sub-admins too — HeaderNav shows the Admin Portal link on this.
     canAccessAdmin: !!canAccessAdmin,
-    profileHref
+    profileHref,
+    suspended
   });
 }

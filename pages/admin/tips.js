@@ -9,9 +9,10 @@ import { dollars } from '../../lib/purchaseRules';
 // reported notes with Hide / Dismiss, and refunds. A refund is final:
 // reverse_transfer + refund_application_fee like a backing, Stripe keeps
 // its fee and the studio absorbs it; fan and creator each get a
-// notification. Full admins only: refunds move real money. There is no
-// account ban in the codebase, so "block tipper" from the mockup is not
-// here; a report on the tipper's profile is the path.
+// notification. Full admins only: refunds move real money. "Block from
+// tipping" (2026-10-24, migration 102) is a tips-only suspension for the
+// fan, lifted on /admin/accounts; "Suspend account" opens that page with
+// the person picked.
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx);
 }
@@ -62,6 +63,17 @@ export default function TipsAdmin({ account, mainGenres, apiPath = '/api/admin/t
     act(`hide:${t.id}`, { action: 'hide_note', tipId: t.id }, 'Note hidden.');
   };
   const dismiss = (t) => act(`dismiss:${t.id}`, { action: 'dismiss', tipId: t.id }, 'Report dismissed.');
+  const blockTipper = (t) => {
+    const reason = window.prompt(`Block ${t.tipperName} from tipping anyone? The Tip button disappears for them and they get an email with this line (what they'll read):`, 'Abusive notes sent with tips.');
+    if (reason === null) return;
+    act(`block:${t.id}`, { action: 'block_tipper', tipId: t.id, reason }, `${t.tipperName} can’t tip any more. Lift it on Accounts.`);
+  };
+  const BlockButtons = ({ t }) => (
+    <>
+      <button type="button" className="crew-btn sm" style={{ borderColor: 'rgba(var(--olive-rgb), 0.6)', color: 'var(--olive)' }} disabled={busy !== null} onClick={() => blockTipper(t)}>{busy === `block:${t.id}` ? 'Blocking…' : 'Block from tipping'}</button>
+      <Link href={`/admin/accounts?user=${encodeURIComponent(t.tipperId)}`} className="crew-btn sm ghost">Suspend account →</Link>
+    </>
+  );
 
   const rows = data ? data.recent : [];
   const needle = q.trim().toLowerCase();
@@ -98,6 +110,7 @@ export default function TipsAdmin({ account, mainGenres, apiPath = '/api/admin/t
                     {/* The creator may have hidden it already: upholding keeps it hidden and closes the report. */}
                     <button type="button" className="crew-btn sm" disabled={busy !== null} onClick={() => hide(r.tip)}>{busy === `hide:${r.tip.id}` ? 'Hiding…' : r.tip.noteHidden ? 'Uphold (keep hidden)' : 'Hide note'}</button>
                     <button type="button" className="crew-btn sm ghost" disabled={busy !== null} onClick={() => dismiss(r.tip)}>{busy === `dismiss:${r.tip.id}` ? '…' : 'Dismiss'}</button>
+                    <BlockButtons t={r.tip} />
                   </div>
                 </div>
               ))}
@@ -134,6 +147,7 @@ export default function TipsAdmin({ account, mainGenres, apiPath = '/api/admin/t
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       <button type="button" className="crew-btn sm" disabled={busy !== null} onClick={() => refund(t)}>{busy === t.id ? 'Refunding…' : 'Refund (final)'}</button>
                       {t.note && !t.noteHidden && <button type="button" className="crew-btn sm ghost" disabled={busy !== null} onClick={() => hide(t)}>Hide note</button>}
+                      <BlockButtons t={t} />
                     </div>
                   )}
                 </div>
