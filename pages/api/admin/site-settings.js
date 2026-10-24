@@ -138,6 +138,20 @@ export default async function handler(req, res) {
     if (![5, 10, 15, 30, 60].includes(r)) return res.status(400).json({ error: 'Round breaks to 5, 10, 15, 30 or 60 seconds.' });
     updates.ad_break_round_seconds = r;
   }
+  // Tips (migration 088 columns): the studio's cut and the ceiling. The
+  // cut applies to the next tip; tips already paid keep the cut they were
+  // priced with (creator_tips.platform_cut_percent).
+  const { tipPlatformCutPercent, tipMaxCents } = req.body || {};
+  if (tipPlatformCutPercent !== undefined) {
+    const pct = Math.round(Number(tipPlatformCutPercent) * 10) / 10;
+    if (!Number.isFinite(pct) || pct < 0 || pct > 30) return res.status(400).json({ error: 'The tip cut has to be between 0% and 30%.' });
+    updates.tip_platform_cut_percent = pct;
+  }
+  if (tipMaxCents !== undefined) {
+    const max = Math.round(Number(tipMaxCents));
+    if (!Number.isFinite(max) || max < 500 || max > 100000) return res.status(400).json({ error: 'The biggest tip has to be between $5 and $1,000.' });
+    updates.tip_max_cents = max;
+  }
   if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';
   if (streamLabel !== undefined) updates.stream_label = streamLabel && streamLabel.trim() ? streamLabel.trim() : 'Stream';
 

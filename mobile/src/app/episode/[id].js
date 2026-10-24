@@ -428,8 +428,9 @@ export default function Episode() {
                   returnTo={`/episode/${episode.id}`}
                   style={tipChipStyles.chip}
                   textStyle={tipChipStyles.chipText}
+                  iconSize={12}
                 >
-                  {'◆'} Tip the maker
+                  Tip the maker
                 </TipButton>
               </View>
               {!showingTrailer && resumeSeconds > 0 ? (

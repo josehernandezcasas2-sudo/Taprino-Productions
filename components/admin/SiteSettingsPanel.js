@@ -61,6 +61,8 @@ export default function SiteSettingsPanel() {
           adSectionSizes: siteSettings.adSectionSizes,
           adHourCapSeconds: siteSettings.adHourCapSeconds,
           adBreakRoundSeconds: siteSettings.adBreakRoundSeconds,
+          tipPlatformCutPercent: siteSettings.tipPlatformCutPercent,
+          tipMaxCents: siteSettings.tipMaxCents,
           connectLabel: siteSettings.connectLabel,
           streamLabel: siteSettings.streamLabel,
           ...overrides
@@ -221,6 +223,23 @@ export default function SiteSettingsPanel() {
               <select value={siteSettings.adBreakRoundSeconds || 15} onChange={(e) => setSiteSettings((s) => ({ ...s, adBreakRoundSeconds: Number(e.target.value) }))} style={{ maxWidth: '140px' }}>
                 {[5, 10, 15, 30, 60].map((r) => <option key={r} value={r}>{r} seconds</option>)}
               </select>
+            </label>
+          </div>
+        </div>
+
+        <div style={rowStyle}>
+          <label style={{ display: 'block', marginBottom: '0.4rem' }}>Tips — the studio&rsquo;s cut and the biggest tip</label>
+          <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
+            The fan covers the card fee on top, so the creator keeps the tip minus this cut. The cut applies to the next tip (paid tips keep theirs) and the Terms print it live. Presets stay $3 / $5 / $10; the ceiling is what Custom allows.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+              Cut (%)
+              <input type="number" min="0" max="30" step="0.5" value={siteSettings.tipPlatformCutPercent ?? 5} onChange={(e) => setSiteSettings((s) => ({ ...s, tipPlatformCutPercent: Number(e.target.value) }))} style={{ maxWidth: '120px' }} />
+            </label>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+              Biggest tip (dollars)
+              <input type="number" min="5" max="1000" step="1" value={Math.round((siteSettings.tipMaxCents || 10000) / 100)} onChange={(e) => setSiteSettings((s) => ({ ...s, tipMaxCents: Math.round(Number(e.target.value) * 100) }))} style={{ maxWidth: '140px' }} />
             </label>
           </div>
         </div>

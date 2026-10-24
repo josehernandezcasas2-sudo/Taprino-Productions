@@ -6,7 +6,7 @@ const STRIPE_FEE_FIXED_CENTS = 30;
 
 export const TIP_PRESETS_CENTS = [300, 500, 1000];
 export const MIN_TIP_CENTS = 100;
-export const DEFAULT_TIP_MAX_CENTS = 50000;
+export const DEFAULT_TIP_MAX_CENTS = 10000;
 export const DEFAULT_TIP_CUT_PERCENT = 5;
 export const MAX_NOTE_CHARS = 140;
 

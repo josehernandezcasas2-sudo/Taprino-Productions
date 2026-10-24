@@ -270,6 +270,19 @@ export function DiamondIcon({ src, size = 18 }) {
   );
 }
 
+// Tips (2026-10-24): a coin, so a tip never shares backing's diamond or
+// the wishlist's heart. mobile/src/components/TipSheet.js draws the same.
+export function TipIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v10" />
+      <path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6" />
+    </svg>
+  );
+}
+
 export function SeriesListIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (

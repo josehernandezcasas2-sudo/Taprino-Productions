@@ -3,7 +3,7 @@ import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
-import { PlayIcon, HeartIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { PlayIcon, HeartIcon, TipIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
@@ -587,7 +587,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 )}
                 {/* Tips: only once the maker's Stripe account can take charges. */}
                 <TipButton tipping={tipping} isSignedIn={isSignedIn} className="trailer-link tip-link" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
-                  ◆ Tip the maker
+                  <TipIcon size={14} src={iconOverrides.tip} /> Tip the maker
                 </TipButton>
                 <ReportButton targetType="episode" targetId={episode.id} title={episode.title} />
               </div>

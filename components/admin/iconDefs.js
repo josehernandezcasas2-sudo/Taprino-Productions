@@ -1,4 +1,4 @@
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon, TicketIcon, BrowserTabIcon, SwipeDeckIcon } from '../PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon, TicketIcon, BrowserTabIcon, SwipeDeckIcon, TipIcon } from '../PlayerIcons';
 
 // Every replaceable icon on the site, grouped for Styles & Guides →
 // Icons (components/admin/StylesGuides.js). Was pages/admin/player-icons.js's
@@ -36,6 +36,7 @@ export const PLAYER_ICON_GROUPS = [
       { key: 'sparkle', label: 'Recs / upgrade', Default: () => <SparkleIcon size={22} /> },
       { key: 'target', label: 'Pitch Room', Default: () => <TargetIcon size={22} /> },
       { key: 'pitch_swipe', label: 'Pitch Discover swipe', Default: () => <SwipeDeckIcon size={22} /> },
+      { key: 'tip', label: 'Tip a creator (the coin)', Default: () => <TipIcon size={22} /> },
       { key: 'card', label: 'Manage subscription', Default: () => <CardIcon size={22} /> },
       { key: 'clapperboard', label: 'Submit / become a creator', Default: () => <ClapperboardIcon size={22} /> },
       { key: 'folder', label: 'Your work', Default: () => <FolderIcon size={22} /> },

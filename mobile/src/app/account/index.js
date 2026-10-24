@@ -743,6 +743,33 @@ export default function Account() {
                 </Pressable>
               ) : null}
 
+              {/* Tips: the fiscal sponsor (website account page has the same
+                  two fields). The tip sheet sends fans who want a
+                  tax-deductible donation to this link. */}
+              {(dashboard.isCreator || dashboard.isAdmin) ? (
+                <>
+                  <Label>Fiscal sponsor <Text style={styles.labelNote}>optional</Text></Label>
+                  <TextInput
+                    style={styles.input}
+                    value={profile.fiscalSponsorName || ''}
+                    placeholder="Sponsor’s name"
+                    placeholderTextColor={colors.inkFaint}
+                    maxLength={80}
+                    onChangeText={(v) => setProfile((p) => ({ ...p, fiscalSponsorName: v }))}
+                  />
+                  <TextInput
+                    style={styles.input}
+                    value={profile.fiscalSponsorUrl || ''}
+                    placeholder="https://…/donate"
+                    placeholderTextColor={colors.inkFaint}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    onChangeText={(v) => setProfile((p) => ({ ...p, fiscalSponsorUrl: v }))}
+                  />
+                  <Text style={styles.bannerNote}>If a nonprofit sponsors your work, add its donation link. Your tip sheet sends fans who want a tax-deductible donation there. Tips themselves are a thank-you, never a donation.</Text>
+                </>
+              ) : null}
+
               {/* Repeated by the button too — the copy at the top of the card
                   is off-screen by the time you've scrolled down to save. */}
               {profileError ? <Text style={styles.errorInline}>{profileError}</Text> : null}

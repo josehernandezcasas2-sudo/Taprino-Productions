@@ -32,3 +32,10 @@ create index if not exists creator_tips_dispute_idx on creator_tips (dispute_sta
 alter table user_profiles add column if not exists fiscal_sponsor_name text;
 alter table user_profiles add column if not exists fiscal_sponsor_url text;
 comment on column user_profiles.fiscal_sponsor_url is 'Optional link to the creator''s fiscal sponsor; the only way a payment through the site counts as a donation (Terms, Tips).';
+
+-- Jose, 2026-10-24: the studio's cut stays 5%; the ceiling comes down from
+-- $500 to $100 (Patreon pledges average $5-7 a month, Ko-fi's default
+-- "coffee" is $3, YouTube's Super Thanks tops out at $50; nobody tips
+-- $500). Both are edited on /admin/settings from here on.
+alter table site_settings alter column tip_max_cents set default 10000;
+update site_settings set tip_platform_cut_percent = 5, tip_max_cents = 10000 where id = 1;

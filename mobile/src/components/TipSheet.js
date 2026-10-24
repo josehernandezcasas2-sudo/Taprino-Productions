@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as SecureStore from 'expo-secure-store';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
 import { colors, fonts, oliveTint, brassTint, absoluteFill } from '../lib/theme';
 import { Avatar } from './CrewBits';
@@ -19,6 +20,18 @@ import { tipQuote, parseTipAmount, validateTipInput, MAX_NOTE_CHARS, MIN_TIP_CEN
 
 const short = (name) => (name || 'the creator').trim().split(/\s+/)[0];
 const whole = (cents) => dollars(cents).replace(/\.00$/, '');
+
+// The tip coin (components/PlayerIcons.js TipIcon): never backing's
+// diamond or the wishlist's heart.
+export function TipGlyph({ size = 14, color = colors.olive }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="9" />
+      <Path d="M12 7v10" />
+      <Path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6" />
+    </Svg>
+  );
+}
 
 export function promptTipSignIn(router) {
   Alert.alert('Sign in to tip', 'Tips go straight to the creator through their Stripe account.', [
@@ -81,7 +94,7 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
             <View style={styles.head}>
               <Avatar userId={tipping.creatorId} name={tipping.creatorName} src={tipping.creatorAvatar ? tipping.creatorAvatar.url : null} position={tipping.creatorAvatar ? tipping.creatorAvatar.position : null} zoom={tipping.creatorAvatar ? tipping.creatorAvatar.zoom : 1} size={40} />
               <View style={{ flex: 1 }}>
-                <Text style={styles.kicker}>Fan support</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><TipGlyph size={11} /><Text style={styles.kicker}>Fan support</Text></View>
                 <Text style={styles.title}>Tip {tipping.creatorName}</Text>
               </View>
               <Pressable onPress={onClose} accessibilityLabel="Close" hitSlop={10} style={styles.close}><Text style={styles.closeText}>×</Text></Pressable>
@@ -142,14 +155,16 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
 }
 
 // A button that opens the sheet. `style`/`textStyle` come from the screen
-// (the profile's action pill, the episode's credit chip). Renders nothing
-// when the creator can't be tipped.
-export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, children, presetCents = 500, onDone }) {
+// (the profile's action pill, the episode's credit chip); the coin sits
+// before the label in `iconColor`. Renders nothing when the creator
+// can't be tipped.
+export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, iconColor = colors.olive, iconSize = 13, children, presetCents = 500, onDone }) {
   const [open, setOpen] = useState(false);
   if (!tipping || !tipping.enabled) return null;
   return (
     <>
-      <Pressable style={style} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
+      <Pressable style={[style, { flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
+        <TipGlyph size={iconSize} color={iconColor} />
         <Text style={textStyle}>{children || `Tip ${short(tipping.creatorName)}`}</Text>
       </Pressable>
       <TipSheet tipping={tipping} visible={open} initialAmountCents={presetCents} onClose={() => setOpen(false)} getToken={getToken} returnTo={returnTo} onDone={onDone} />
@@ -203,8 +218,8 @@ export function TipEndCard({ tipping, title, isSignedIn, router, getToken, retur
         <Text style={styles.endTitle}>Liked it? Tip {name}.</Text>
         <Text style={styles.endBody}>Tips go straight to {name}’s Stripe account. $3 covers a coffee; $10 covers a hard drive’s worth of footage.</Text>
         <View style={styles.endActions}>
-          <Pressable style={styles.endBtn} onPress={() => tip(300)}><Text style={styles.endBtnText}>Tip $3</Text></Pressable>
-          <Pressable style={styles.endBtn} onPress={() => tip(500)}><Text style={styles.endBtnText}>Tip $5</Text></Pressable>
+          <Pressable style={styles.endBtn} onPress={() => tip(300)}><TipGlyph size={14} color={colors.onBrass} /><Text style={styles.endBtnText}>Tip $3</Text></Pressable>
+          <Pressable style={styles.endBtn} onPress={() => tip(500)}><TipGlyph size={14} color={colors.onBrass} /><Text style={styles.endBtnText}>Tip $5</Text></Pressable>
           {onNext ? (
             <Pressable style={[styles.endBtn, styles.endBtnGhost]} onPress={onNext}><Text style={[styles.endBtnText, { color: colors.ink }]}>Next episode{left != null && !sheet ? ` in ${left}s` : ''} →</Text></Pressable>
           ) : null}
@@ -249,7 +264,7 @@ const styles = StyleSheet.create({
   endTitle: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink, paddingRight: 36 },
   endBody: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.inkDim },
   endActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  endBtn: { minHeight: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.olive, alignItems: 'center', justifyContent: 'center' },
+  endBtn: { minHeight: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.olive, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   endBtnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.ink },
   endBtnText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.onBrass }
 });

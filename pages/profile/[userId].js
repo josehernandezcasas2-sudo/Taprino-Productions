@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { SignInButton } from '@clerk/nextjs';
 import BackButton from '../../components/BackButton';
-import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, TipIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
 import PostViewerModal from '../../components/PostViewerModal';
 import { getProfileHubData } from '../../lib/profileHub';
@@ -388,7 +388,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                   Stripe account can take charges (lib/tips.js getTipping). */}
               {!isOwnProfile && (
                 <TipButton tipping={tipping} isSignedIn={isSignedIn} className="profile-action-btn profile-action-btn-tip">
-                  Tip {profile.displayName.split(/\s+/)[0]}
+                  <TipIcon size={15} src={iconOverrides.tip} /> Tip {profile.displayName.split(/\s+/)[0]}
                 </TipButton>
               )}
               <div className="pitch-share-wrap">

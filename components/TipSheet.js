@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
-import { CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { CloseIcon, TipIcon, usePlayerIconOverrides } from './PlayerIcons';
 import AvatarPhoto from './AvatarPhoto';
 import { tipQuote, parseTipAmount, validateTipInput, MAX_NOTE_CHARS, MIN_TIP_CENTS, DEFAULT_TIP_MAX_CENTS, TIP_PRESETS_CENTS } from '../lib/tipRules';
 import { dollars } from '../lib/purchaseRules';
@@ -81,7 +81,7 @@ export function TipSheet({ tipping, initialAmountCents = 500, onClose }) {
               {initial}
             </AvatarPhoto>
             <div>
-              <span className="tip-kicker">Fan support</span>
+              <span className="tip-kicker"><TipIcon size={11} src={iconOverrides.tip} /> Fan support</span>
               <h3 className="tip-title" id="tip-sheet-title">Tip {tipping.creatorName}</h3>
             </div>
           </div>
@@ -203,8 +203,8 @@ export function TipEndCard({ tipping, title, isSignedIn, onNext, nextSeconds = 1
         <h3>Liked it? Tip {name}.</h3>
         <p>Tips go straight to {name}&rsquo;s Stripe account. $3 covers a coffee; $10 covers a hard drive&rsquo;s worth of footage.</p>
         <div className="tip-end-actions">
-          <button type="button" className="tip-end-btn" onClick={() => tip(300)}>Tip $3</button>
-          <button type="button" className="tip-end-btn" onClick={() => tip(500)}>Tip $5</button>
+          <button type="button" className="tip-end-btn" onClick={() => tip(300)}><TipIcon size={14} src={iconOverrides.tip} /> Tip $3</button>
+          <button type="button" className="tip-end-btn" onClick={() => tip(500)}><TipIcon size={14} src={iconOverrides.tip} /> Tip $5</button>
           {onNext && (
             <button type="button" className="tip-end-btn ghost" onClick={onNext}>Next episode{left != null && !sheet ? ` in ${left}s` : ''} →</button>
           )}

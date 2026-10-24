@@ -82,7 +82,7 @@ export default function TipsAdmin({ account, mainGenres, apiPath = '/api/admin/t
             <Stat n={rows.filter((t) => t.status === 'refunded').length} label="refunded (last 100)" />
           </div>
           <p className="crew-muted" style={{ margin: 0, maxWidth: '70ch' }}>
-            A tip goes to the creator&rsquo;s Stripe account the moment the card clears; the fan covers the card fee and the studio keeps its cut of the tip. The Tip button shows only once a creator&rsquo;s payouts are ready. Refunds here are final and the only refunds there are. The cut and the ceiling are the site settings <code>tip_platform_cut_percent</code> and <code>tip_max_cents</code> (5% and $500 unless changed in Supabase); the Terms read the cut live.
+            A tip goes to the creator&rsquo;s Stripe account the moment the card clears; the fan covers the card fee and the studio keeps its cut of the tip. The Tip button shows only once a creator&rsquo;s payouts are ready. Refunds here are final and the only refunds there are. The cut and the biggest tip are in <Link href="/admin/settings">Settings</Link> (5% and $100 to start); the Terms read the cut live.
           </p>
 
           {data.reported.length > 0 && (
