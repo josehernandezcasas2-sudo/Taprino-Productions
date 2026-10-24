@@ -3,10 +3,12 @@ import Image from 'next/image';
 import Link from 'next/link';
 
 // Site configuration: header labels and links, feature toggles, recs
-// closeness, default ad CPM, logo, placeholder content, newsletter
-// export. Moved out of the old pages/admin.js hub (2026-10-08); rendered
-// by pages/admin/settings.js. The search icon upload moved to Styles &
-// Guides → Icons (it's the player-icons `search` key).
+// closeness, default ad CPM, the tip numbers, logo, placeholder content,
+// newsletter export. Moved out of the old pages/admin.js hub (2026-10-08);
+// rendered by pages/admin/settings.js. The search icon upload moved to
+// Styles & Guides → Icons (it's the player-icons `search` key).
+const dollarsFromCents = (cents) => `$${(Math.round(Number(cents) || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 })}`;
+
 export default function SiteSettingsPanel() {
   const [siteSettings, setSiteSettings] = useState(null);
   const [confirmedSiteSettings, setConfirmedSiteSettings] = useState(null);
@@ -62,6 +64,7 @@ export default function SiteSettingsPanel() {
           adHourCapSeconds: siteSettings.adHourCapSeconds,
           adBreakRoundSeconds: siteSettings.adBreakRoundSeconds,
           tipPlatformCutPercent: siteSettings.tipPlatformCutPercent,
+          tipCutMaxCents: siteSettings.tipCutMaxCents,
           tipMaxCents: siteSettings.tipMaxCents,
           connectLabel: siteSettings.connectLabel,
           streamLabel: siteSettings.streamLabel,
@@ -228,9 +231,9 @@ export default function SiteSettingsPanel() {
         </div>
 
         <div style={rowStyle}>
-          <label style={{ display: 'block', marginBottom: '0.4rem' }}>Tips — the studio&rsquo;s cut and the biggest tip</label>
+          <label style={{ display: 'block', marginBottom: '0.4rem' }}>Tips — the studio&rsquo;s cut, the most it keeps from one tip, the biggest tip</label>
           <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
-            The fan covers the card fee on top, so the creator keeps the tip minus this cut. The cut applies to the next tip (paid tips keep theirs) and the Terms print it live. Presets stay $3 / $5 / $10; the ceiling is what Custom allows.
+            The fan covers the card fee on top, so the creator keeps the tip minus the cut; the cut is the percentage but never more than the cap. Changes apply to the next tip (paid tips keep the cut they were priced with) and the Terms print these live. Presets stay $3 / $5 / $10; the biggest tip is what Custom allows.
           </p>
           <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
             <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
@@ -238,10 +241,17 @@ export default function SiteSettingsPanel() {
               <input type="number" min="0" max="30" step="0.5" value={siteSettings.tipPlatformCutPercent ?? 5} onChange={(e) => setSiteSettings((s) => ({ ...s, tipPlatformCutPercent: Number(e.target.value) }))} style={{ maxWidth: '120px' }} />
             </label>
             <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+              Most kept from one tip (dollars)
+              <input type="number" min="1" max="10000" step="1" value={Math.round((siteSettings.tipCutMaxCents ?? 10000) / 100)} onChange={(e) => setSiteSettings((s) => ({ ...s, tipCutMaxCents: Math.round(Number(e.target.value) * 100) }))} style={{ maxWidth: '140px' }} />
+            </label>
+            <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
               Biggest tip (dollars)
-              <input type="number" min="5" max="1000" step="1" value={Math.round((siteSettings.tipMaxCents || 10000) / 100)} onChange={(e) => setSiteSettings((s) => ({ ...s, tipMaxCents: Math.round(Number(e.target.value) * 100) }))} style={{ maxWidth: '140px' }} />
+              <input type="number" min="5" max="10000" step="1" value={Math.round((siteSettings.tipMaxCents || 50000) / 100)} onChange={(e) => setSiteSettings((s) => ({ ...s, tipMaxCents: Math.round(Number(e.target.value) * 100) }))} style={{ maxWidth: '140px' }} />
             </label>
           </div>
+          <p style={{ fontSize: '0.74rem', color: 'var(--ink-faint)', marginTop: '0.5rem', marginBottom: 0 }}>
+            With these numbers the cap starts to matter at a {dollarsFromCents(Math.round((siteSettings.tipCutMaxCents ?? 10000) * 100 / Math.max(0.1, siteSettings.tipPlatformCutPercent ?? 5)))} tip{(siteSettings.tipCutMaxCents ?? 10000) * 100 / Math.max(0.1, siteSettings.tipPlatformCutPercent ?? 5) > (siteSettings.tipMaxCents || 50000) ? ', above the biggest tip allowed, so it never applies' : ''}. A disputed tip is taken back from the creator, so the biggest tip is also the studio&rsquo;s exposure if that account is empty by then.
+          </p>
         </div>
 
         <button className="account-btn-primary" style={{ width: 'auto', marginTop: '0.4rem' }} onClick={() => saveSiteSettings()} disabled={siteSettingsSaving}>

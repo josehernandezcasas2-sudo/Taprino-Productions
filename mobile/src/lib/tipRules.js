@@ -6,8 +6,9 @@ const STRIPE_FEE_FIXED_CENTS = 30;
 
 export const TIP_PRESETS_CENTS = [300, 500, 1000];
 export const MIN_TIP_CENTS = 100;
-export const DEFAULT_TIP_MAX_CENTS = 10000;
+export const DEFAULT_TIP_MAX_CENTS = 50000;
 export const DEFAULT_TIP_CUT_PERCENT = 5;
+export const DEFAULT_TIP_CUT_MAX_CENTS = 10000;
 export const MAX_NOTE_CHARS = 140;
 
 export function feeCoverCents(amountCents) {
@@ -15,12 +16,15 @@ export function feeCoverCents(amountCents) {
   return Math.max(0, total - amountCents);
 }
 
-// What a tip of `amountCents` costs and where it goes.
-export function tipQuote(amountCents, cutPercent = DEFAULT_TIP_CUT_PERCENT) {
+// What a tip of `amountCents` costs and where it goes. The studio's cut
+// is `cutPercent` of the tip, never more than `cutMaxCents`.
+export function tipQuote(amountCents, cutPercent = DEFAULT_TIP_CUT_PERCENT, cutMaxCents = DEFAULT_TIP_CUT_MAX_CENTS) {
   const cut = Number.isFinite(Number(cutPercent)) ? Number(cutPercent) : 0;
-  const cutCents = Math.floor((amountCents * cut) / 100);
+  const cap = Number.isFinite(Number(cutMaxCents)) && Number(cutMaxCents) >= 0 ? Math.round(Number(cutMaxCents)) : DEFAULT_TIP_CUT_MAX_CENTS;
+  const uncapped = Math.floor((amountCents * cut) / 100);
+  const cutCents = Math.min(uncapped, cap);
   const feeCents = feeCoverCents(amountCents);
-  return { amountCents, creatorCents: amountCents - cutCents, cutCents, feeCents, totalCents: amountCents + feeCents, cutPercent: cut };
+  return { amountCents, creatorCents: amountCents - cutCents, cutCents, feeCents, totalCents: amountCents + feeCents, cutPercent: cut, cutMaxCents: cap, capped: uncapped > cutCents };
 }
 
 // "5", "5.00" or "$5" → cents; NaN when it isn't a number.

@@ -64,7 +64,7 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
   const minCents = tipping.minCents || MIN_TIP_CENTS;
   const cents = custom ? parseTipAmount(customInput) : amountCents;
   const check = validateTipInput({ amountCents: cents, note, showName }, { maxCents });
-  const quote = check.ok ? tipQuote(check.amountCents, tipping.cutPercent) : null;
+  const quote = check.ok ? tipQuote(check.amountCents, tipping.cutPercent, tipping.cutMaxCents) : null;
 
   async function send() {
     if (!check.ok) { setError(check.error); return; }
@@ -127,7 +127,7 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
 
             <View style={styles.math}>
               <View style={styles.mathRow}><Text style={styles.mathLabel}>{name} receives</Text><Text style={styles.mathValue}>{quote ? dollars(quote.creatorCents) : '—'}</Text></View>
-              <View style={styles.mathRow}><Text style={styles.mathLabel}>Studio Tapa TV ({tipping.cutPercent}%)</Text><Text style={styles.mathValue}>{quote ? dollars(quote.cutCents) : '—'}</Text></View>
+              <View style={styles.mathRow}><Text style={styles.mathLabel}>Studio Tapa TV ({tipping.cutPercent}%{quote && quote.capped ? `, capped at ${dollars(quote.cutMaxCents)}` : ''})</Text><Text style={styles.mathValue}>{quote ? dollars(quote.cutCents) : '—'}</Text></View>
               <View style={styles.mathRow}><Text style={[styles.mathLabel, { flex: 1 }]}>Card processing, covered by you so {name} keeps more</Text><Text style={styles.mathValue}>{quote ? dollars(quote.feeCents) : '—'}</Text></View>
               <View style={[styles.mathRow, styles.mathTotal]}><Text style={styles.mathTotalText}>You pay</Text><Text style={styles.mathTotalText}>{quote ? dollars(quote.totalCents) : '—'}</Text></View>
             </View>

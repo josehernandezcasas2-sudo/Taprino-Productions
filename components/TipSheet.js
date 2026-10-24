@@ -40,7 +40,7 @@ export function TipSheet({ tipping, initialAmountCents = 500, onClose }) {
   const minCents = tipping.minCents || MIN_TIP_CENTS;
   const cents = custom ? parseTipAmount(customInput) : amountCents;
   const check = validateTipInput({ amountCents: cents, note, showName }, { maxCents });
-  const quote = check.ok ? tipQuote(check.amountCents, tipping.cutPercent) : null;
+  const quote = check.ok ? tipQuote(check.amountCents, tipping.cutPercent, tipping.cutMaxCents) : null;
 
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') onClose(); };
@@ -110,7 +110,7 @@ export function TipSheet({ tipping, initialAmountCents = 500, onClose }) {
 
         <div className="tip-math" aria-live="polite">
           <div><span>{name} receives</span><b>{quote ? dollars(quote.creatorCents) : '—'}</b></div>
-          <div><span>{SITE.name} ({tipping.cutPercent}%)</span><b>{quote ? dollars(quote.cutCents) : '—'}</b></div>
+          <div><span>{SITE.name} ({tipping.cutPercent}%{quote && quote.capped ? `, capped at ${dollars(quote.cutMaxCents)}` : ''})</span><b>{quote ? dollars(quote.cutCents) : '—'}</b></div>
           <div><span>Card processing, covered by you so {name} keeps more</span><b>{quote ? dollars(quote.feeCents) : '—'}</b></div>
           <div className="total"><span>You pay</span><b>{quote ? dollars(quote.totalCents) : '—'}</b></div>
         </div>

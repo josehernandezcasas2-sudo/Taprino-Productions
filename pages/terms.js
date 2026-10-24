@@ -37,8 +37,9 @@ export async function getServerSideProps({ req, res }) {
   const [account, episodes, share, tipSettings] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null), getTipSettings().catch(() => null)]);
   return {
     props: {
-      // Section 16 (Tips) reads the studio's cut live from Settings.
+      // Section 16 (Tips) reads the studio's cut and its cap live from Settings.
       tipCutPercent: tipSettings ? tipSettings.cutPercent : 5,
+      tipCutMaxCents: tipSettings ? tipSettings.cutMaxCents : 10000,
       // The Creator Share numbers in sections 4 and 5 are whatever
       // /admin/creator-money has in force, plus any change it scheduled.
       share: share ? {
@@ -68,7 +69,7 @@ const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const bonusSpan = (m) => (Number(m) > 0 ? `during its first ${m} months` : 'for as long as that membership lasts');
 
-export default function Terms({ account, share, tipCutPercent = 5 }) {
+export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCents = 10000 }) {
   const n = share || FALLBACK_SHARE;
   const next = share && share.scheduled ? share.scheduled.numbers : null;
   const updated = [TEXT_UPDATED, share && share.changedAt, share && share.scheduled && share.scheduled.setAt].filter(Boolean).sort().pop();
@@ -382,7 +383,8 @@ export default function Terms({ account, share, tipCutPercent = 5 }) {
         sponsor&rsquo;s terms, and that money never passes through us.
       </p>
       <p>
-        <strong>What the creator gets.</strong> We keep {tipCutPercent}% of the tip. The card
+        <strong>What the creator gets.</strong> We keep {tipCutPercent}% of the tip, and never more
+        than {dollars(tipCutMaxCents)} from any one tip. The card
         processing fee is added on top of the tip and paid by you, not taken out of it, so the
         creator keeps more of what you meant to give; the amounts are shown before you pay. The
         creator&rsquo;s share lands in their Stripe account when the card clears. Tips are final. We

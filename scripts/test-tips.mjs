@@ -6,12 +6,27 @@ let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
 
 t('quote: the fan covers the card fee, the creator keeps 95%', () => {
-  assert.deepEqual(tipQuote(500, 5), { amountCents: 500, creatorCents: 475, cutCents: 25, feeCents: 46, totalCents: 546, cutPercent: 5 });
-  assert.deepEqual(tipQuote(300, 5), { amountCents: 300, creatorCents: 285, cutCents: 15, feeCents: 40, totalCents: 340, cutPercent: 5 });
+  assert.deepEqual(tipQuote(500, 5), { amountCents: 500, creatorCents: 475, cutCents: 25, feeCents: 46, totalCents: 546, cutPercent: 5, cutMaxCents: 10000, capped: false });
+  assert.deepEqual(tipQuote(300, 5), { amountCents: 300, creatorCents: 285, cutCents: 15, feeCents: 40, totalCents: 340, cutPercent: 5, cutMaxCents: 10000, capped: false });
   assert.equal(tipQuote(1000, 5).totalCents, 1061);
   assert.equal(tipQuote(2500, 5).creatorCents, 2375);
   assert.equal(tipQuote(500, 0).creatorCents, 500);
   assert.deepEqual(TIP_PRESETS_CENTS, [300, 500, 1000]);
+});
+
+t('quote: the studio never keeps more than the cap from one tip (Jose, 2026-10-24: $100)', () => {
+  // 5% of $2,000 is exactly the cap; above that the creator gets everything else.
+  assert.deepEqual([tipQuote(200000, 5).cutCents, tipQuote(200000, 5).capped], [10000, false]);
+  const big = tipQuote(500000, 5);
+  assert.equal(big.cutCents, 10000);
+  assert.equal(big.creatorCents, 490000);
+  assert.equal(big.capped, true);
+  // The cap is a setting: $0.25 makes a $10 tip hit it.
+  const small = tipQuote(1000, 5, 25);
+  assert.deepEqual([small.cutCents, small.creatorCents, small.capped, small.cutMaxCents], [25, 975, true, 25]);
+  assert.equal(tipQuote(1000, 5, 0).cutCents, 0, 'a zero cap means the studio keeps nothing');
+  assert.equal(tipQuote(1000, 5, undefined).cutCents, 50, 'no cap passed → the $100 default');
+  assert.equal(tipQuote(1000, 5, 'nope').cutMaxCents, 10000, 'garbage → the default');
 });
 
 t('parse: dollars typed any which way', () => {

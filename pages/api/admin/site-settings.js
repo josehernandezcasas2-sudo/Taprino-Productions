@@ -141,15 +141,20 @@ export default async function handler(req, res) {
   // Tips (migration 088 columns): the studio's cut and the ceiling. The
   // cut applies to the next tip; tips already paid keep the cut they were
   // priced with (creator_tips.platform_cut_percent).
-  const { tipPlatformCutPercent, tipMaxCents } = req.body || {};
+  const { tipPlatformCutPercent, tipCutMaxCents, tipMaxCents } = req.body || {};
   if (tipPlatformCutPercent !== undefined) {
     const pct = Math.round(Number(tipPlatformCutPercent) * 10) / 10;
     if (!Number.isFinite(pct) || pct < 0 || pct > 30) return res.status(400).json({ error: 'The tip cut has to be between 0% and 30%.' });
     updates.tip_platform_cut_percent = pct;
   }
+  if (tipCutMaxCents !== undefined) {
+    const cap = Math.round(Number(tipCutMaxCents));
+    if (!Number.isFinite(cap) || cap < 100 || cap > 1000000) return res.status(400).json({ error: 'The most kept from one tip has to be between $1 and $10,000.' });
+    updates.tip_cut_max_cents = cap;
+  }
   if (tipMaxCents !== undefined) {
     const max = Math.round(Number(tipMaxCents));
-    if (!Number.isFinite(max) || max < 500 || max > 100000) return res.status(400).json({ error: 'The biggest tip has to be between $5 and $1,000.' });
+    if (!Number.isFinite(max) || max < 500 || max > 1000000) return res.status(400).json({ error: 'The biggest tip has to be between $5 and $10,000.' });
     updates.tip_max_cents = max;
   }
   if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';

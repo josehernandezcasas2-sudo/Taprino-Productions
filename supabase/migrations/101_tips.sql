@@ -33,9 +33,9 @@ alter table user_profiles add column if not exists fiscal_sponsor_name text;
 alter table user_profiles add column if not exists fiscal_sponsor_url text;
 comment on column user_profiles.fiscal_sponsor_url is 'Optional link to the creator''s fiscal sponsor; the only way a payment through the site counts as a donation (Terms, Tips).';
 
--- Jose, 2026-10-24: the studio's cut stays 5%; the ceiling comes down from
--- $500 to $100 (Patreon pledges average $5-7 a month, Ko-fi's default
--- "coffee" is $3, YouTube's Super Thanks tops out at $50; nobody tips
--- $500). Both are edited on /admin/settings from here on.
-alter table site_settings alter column tip_max_cents set default 10000;
-update site_settings set tip_platform_cut_percent = 5, tip_max_cents = 10000 where id = 1;
+-- Jose, 2026-10-24: the studio keeps 5% of a tip but never more than
+-- $100 from any one tip (tip_cut_max_cents, new here); the biggest tip
+-- a fan can send stays $500 (tip_max_cents, from 088). All three numbers
+-- are edited on /admin/settings from here on.
+alter table site_settings add column if not exists tip_cut_max_cents integer not null default 10000;
+update site_settings set tip_platform_cut_percent = 5, tip_cut_max_cents = 10000, tip_max_cents = 50000 where id = 1;
