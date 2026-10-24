@@ -10071,3 +10071,9 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .suspended-label { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
 .suspended-card .welcome-btn { text-decoration: none; }
 @media (max-width: 520px) { .suspended-card .welcome-cta { grid-template-columns: 1fr !important; } .suspended-card { padding: 1.2rem 1.1rem; } }
+
+/* Ad share lane on the Money page (migration 103) */
+.money-lane.lane-ad_share { border-top-color: var(--warn); }
+.lane-ad_share > .money-lane-eyebrow { color: var(--warn); }
+.money-tag.lane-ad_share { color: var(--warn); border-color: rgba(237, 181, 63, 0.5); }
+.money-dot.lane-ad_share { background: var(--warn); }

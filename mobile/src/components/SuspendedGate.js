@@ -46,7 +46,7 @@ export default function SuspendedGate() {
           {suspended.cancelMembership ? ' Your membership won’t renew while this lasts.' : ''}
         </Text>
         <Text style={styles.text}>You can’t watch, tip, back, buy, message or post. Nothing is deleted: everything is still here when it lifts.</Text>
-        <Text style={styles.text}>To appeal, write to <Text style={styles.link} onPress={() => Linking.openURL(mailto)}>{CONTACT_EMAIL}</Text> from the email on your account and tell us what happened. A person reads every one; we answer within a few days.</Text>
+        <Text style={styles.text}>To appeal, write to <Text style={styles.link} onPress={() => Linking.openURL(mailto)}>{CONTACT_EMAIL}</Text> from the email on your account and tell us what happened. A person reads every one.</Text>
         <Pressable style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]} onPress={() => Linking.openURL(mailto)} accessibilityRole="button">
           <Text style={styles.btnText}>Email us</Text>
         </Pressable>

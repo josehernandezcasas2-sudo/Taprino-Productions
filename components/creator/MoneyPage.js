@@ -11,8 +11,8 @@ import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creat
 // shown comes from the server; nothing here moves money.
 const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '');
 const fmtDayOnly = (ymd) => (ymd ? new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '');
-const LANE_LINKS = { member_support: '#supporters', tips: '#history', sales: '/creator/my-work', backing: '/creator/pitch/dashboard', bookings: '/locations/mine' };
-const LANE_LINK_TEXT = { member_support: 'Who supports you →', tips: 'Read the notes →', sales: 'Prices and sales →', backing: 'Your pitches →', bookings: 'Your places →' };
+const LANE_LINKS = { member_support: '#supporters', ad_share: '#history', tips: '#history', sales: '/creator/my-work', backing: '/creator/pitch/dashboard', bookings: '/locations/mine' };
+const LANE_LINK_TEXT = { member_support: 'Who supports you →', ad_share: 'Every title →', tips: 'Read the notes →', sales: 'Prices and sales →', backing: 'Your pitches →', bookings: 'Your places →' };
 
 function Row({ label, value }) {
   return <span className="money-row"><span>{label}</span><b>{value}</b></span>;
@@ -181,6 +181,13 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                       <Row label="Owed to you" value={dollars(lane.owedCents)} />
                     </>
                   )}
+                  {k === 'ad_share' && (
+                    <>
+                      {lane.titles.map((t) => <Row key={t.episodeId || t.title} label={`${t.title} · ${Number(t.units || 0).toLocaleString('en-US')} ad${t.units === 1 ? '' : 's'}`} value={dollars(t.cents)} />)}
+                      {lane.owedCents > 0 && <Row label="Owed to you" value={dollars(lane.owedCents)} />}
+                      {lane.titles.length === 0 && <Row label="No ads inside your titles this period" value="" />}
+                    </>
+                  )}
                   {k === 'tips' && (
                     <>
                       {lane.count > 0 && <Row label={`${lane.count} tip${lane.count === 1 ? '' : 's'} · ${lane.people} ${lane.people === 1 ? 'person' : 'people'}`} value={dollars(lane.grossCents)} />}
@@ -224,6 +231,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                 </div>
                 <span className="money-lane-note">
                   {k === 'member_support' && `Pays by transfer on the 1st once you are owed ${dollars(data.top.minimumCents)}.`}
+                  {k === 'ad_share' && `${lane.percent == null ? 'Your share' : `${lane.percent}%`} of what advertisers paid for the ads inside your titles, credited on the 1st for the month before and paid with member support.`}
                   {k === 'tips' && (ready ? 'In your Stripe balance the moment the card clears. The fan covers the card fee.' : 'Set up payouts and the Tip button turns on for your fans.')}
                   {k === 'sales' && 'Your share lands in your Stripe balance at the sale.'}
                   {k === 'backing' && 'In your Stripe balance the moment a backer pays.'}

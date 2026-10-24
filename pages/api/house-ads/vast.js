@@ -40,13 +40,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { placement } = req.query;
+    const { placement, episode } = req.query;
     const ad = await pickActiveHouseAd(typeof placement === 'string' ? placement : undefined);
     if (!ad) {
       return res.status(200).send(emptyVast());
     }
     const origin = siteOriginFromRequest(req);
-    return res.status(200).send(buildHouseAdVast(ad, origin));
+    // The player says which title the ad plays before (ad share, 103).
+    const episodeId = typeof episode === 'string' && /^[0-9a-f-]{36}$/i.test(episode) ? episode : null;
+    return res.status(200).send(buildHouseAdVast(ad, origin, { episodeId, surface: placement === 'live_tv' ? 'live' : 'preroll' }));
   } catch (err) {
     console.error('house-ads/vast error:', err.message);
     // A broken ad tag must never be why an episode fails to play — the

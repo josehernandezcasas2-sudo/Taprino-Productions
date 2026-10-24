@@ -15,8 +15,8 @@ import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creat
 // chosen month; the lane rows open the screens that already exist.
 // Tips take the gold (the Tip button's colour); Title sales moved to a
 // cream stripe so the lanes stay apart (mockup 2026-10-24).
-const LANE_COLORS = { member_support: colors.brass, tips: colors.olive, sales: colors.inkDim, backing: colors.mint, bookings: colors.sky, payouts: colors.inkFaint };
-const LANE_ROUTES = { member_support: null, tips: null, sales: '/account/my-work', backing: '/creator/pitches', bookings: '/locations/mine' };
+const LANE_COLORS = { member_support: colors.brass, ad_share: colors.warn, tips: colors.olive, sales: colors.inkDim, backing: colors.mint, bookings: colors.sky, payouts: colors.inkFaint };
+const LANE_ROUTES = { member_support: null, ad_share: null, tips: null, sales: '/account/my-work', backing: '/creator/pitches', bookings: '/locations/mine' };
 const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' }) : '');
 const fmtDayOnly = (ymd) => (ymd ? new Date(`${ymd}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' }) : '');
 
@@ -175,6 +175,8 @@ export default function CreatorMoneyScreen() {
           const route = LANE_ROUTES[k];
           const sub = k === 'member_support'
             ? `share ${dollars(lane.shareCents)} · referrals ${dollars(lane.referralCents)} · owed ${dollars(lane.owedCents)}`
+            : k === 'ad_share'
+              ? (lane.titles && lane.titles.length ? `${Number(lane.units || 0).toLocaleString('en-US')} ads inside ${lane.titles.length} title${lane.titles.length === 1 ? '' : 's'}${lane.owedCents ? ` · owed ${dollars(lane.owedCents)}` : ''}` : `no ads inside your titles this period${lane.owedCents ? ` · owed ${dollars(lane.owedCents)}` : ''}`)
             : k === 'tips'
               ? (lane.count ? `${lane.count} tip${lane.count === 1 ? '' : 's'} · ${lane.people} ${lane.people === 1 ? 'person' : 'people'} · ${lane.noteCount} with a note${lane.refunds ? ` · ${lane.refunds} refunded` : ''}` : (data.payouts.state === 'ready' ? 'no tips this period' : 'set up payouts and the Tip button turns on'))
             : k === 'sales'

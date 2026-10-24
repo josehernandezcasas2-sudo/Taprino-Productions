@@ -20,13 +20,15 @@ const numbersForm = (n) => ({
   bonus: Object.fromEntries(TIERS.map(([t]) => [t, toDollars(n.bonusCents[t])])),
   minimum: toDollars(n.payoutMinimumCents),
   months: String(n.referralBonusMonths),
+  ads: String(n.adSharePercent == null ? 50 : n.adSharePercent),
   effective: ''
 });
 const formNumbers = (f) => ({
   shareCents: Object.fromEntries(TIERS.map(([t]) => [t, toCents(f.share[t])])),
   bonusCents: Object.fromEntries(TIERS.map(([t]) => [t, toCents(f.bonus[t])])),
   payoutMinimumCents: toCents(f.minimum),
-  referralBonusMonths: f.months
+  referralBonusMonths: f.months,
+  adSharePercent: f.ads
 });
 
 export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money' }) {
@@ -163,6 +165,11 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
           <div>
             <div className="account-eyebrow" style={{ marginBottom: 2 }}>Next payout batch</div>
             <div className="cm-sub">Runs on the 1st at 9:00 UTC. Pays every creator at or over {dollars(plan.minimumCents)} whose Stripe account can take money; the rest carries over.</div>
+            {data.adShare && data.adShare.available && (
+              <div className="cm-sub" id="cm-ad-share">
+                Ads inside titles this month so far: {Number(data.adShare.impressions).toLocaleString('en-US')} play{data.adShare.impressions === 1 ? '' : 's'} in {data.adShare.titles} title{data.adShare.titles === 1 ? '' : 's'} · {dollars(data.adShare.creditCents)} of advertiser credit served · up to {dollars(data.adShare.shareCents)} for creators at {data.numbers ? data.numbers.adSharePercent : 50}% (podcasts and studio-owned titles earn nothing), credited by the batch on the 1st.
+              </div>
+            )}
           </div>
           <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} disabled={running || payNow.length === 0} onClick={run}>
             {running ? 'Paying…' : `Run now · ${dollars(payNowCents)}`}
@@ -366,7 +373,7 @@ function NumbersCard({ data, nums, setNums, busy, onSave, onCancel }) {
         {data.changedAt && <span className="cm-sub">last changed {fmtDate(data.changedAt)}</span>}
       </div>
       <p className="cm-sub">
-        What every paid membership shares with creators each month, the referral bonus, and when payouts go out. The Terms page (sections 4 and 5) always shows these numbers. A change that pays creators less takes effect 30 days after you save it at the earliest, and creators get an email; anything in their favour can start today.
+        What every paid membership shares with creators each month, the referral bonus, the ad share (credited on the 1st for the month before, by the title each ad played in; podcasts, house ads and studio-owned titles earn nothing), and when payouts go out. The Terms page (sections 4 and 5) always shows these numbers. A change that pays creators less takes effect 30 days after you save it at the earliest, and creators get an email; anything in their favour can start today.
       </p>
       {!data.migrated && <p className="rq-error">Migration 088 hasn’t been run, so these are the built-in defaults and can’t be saved yet.</p>}
       {sched && (
@@ -400,6 +407,7 @@ function NumbersCard({ data, nums, setNums, busy, onSave, onCancel }) {
         <div className="sm-form">
           <label><span>Payout minimum ($)</span><input id="cm-n-minimum" className="sm-input" type="number" min="1" step="0.01" value={nums.minimum} onChange={(e) => setNums({ ...nums, minimum: e.target.value })} /></label>
           <label><span>Bonus paid for (months, 0 = no limit)</span><input id="cm-n-months" className="sm-input" type="number" min="0" max="120" step="1" value={nums.months} onChange={(e) => setNums({ ...nums, months: e.target.value })} /></label>
+          <label><span>Ad share (% of what advertisers paid for ads inside a title)</span><input id="cm-n-ads" className="sm-input" type="number" min="0" max="100" step="1" value={nums.ads} onChange={(e) => setNums({ ...nums, ads: e.target.value })} /></label>
           <label><span>Takes effect (optional)</span><input id="cm-n-effective" className="sm-input" type="date" value={nums.effective} onChange={(e) => setNums({ ...nums, effective: e.target.value })} /></label>
           <div className="sm-form-actions"><button type="submit" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} disabled={Boolean(busy) || !changes.changed || errors.length > 0}>{busy === 'numbers' ? 'Saving…' : earliest || nums.effective ? 'Schedule change' : 'Save numbers'}</button></div>
         </div>

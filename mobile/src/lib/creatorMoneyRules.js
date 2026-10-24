@@ -3,13 +3,14 @@
 // (/api/creator/money); the screen renders what it sends.
 export const LANES = {
   member_support: { label: 'Member support', short: 'Member support' },
+  ad_share: { label: 'Ad share', short: 'Ads' },
   tips: { label: 'Tips', short: 'Tips' },
   sales: { label: 'Title sales', short: 'Sales' },
   backing: { label: 'Backing', short: 'Backing' },
   bookings: { label: 'Bookings', short: 'Bookings' },
   payouts: { label: 'Payouts', short: 'Payouts' }
 };
-export const LANE_ORDER = ['member_support', 'tips', 'sales', 'backing', 'bookings', 'payouts'];
+export const LANE_ORDER = ['member_support', 'ad_share', 'tips', 'sales', 'backing', 'bookings', 'payouts'];
 
 export function dollars(cents) {
   const v = (Number(cents) || 0) / 100;

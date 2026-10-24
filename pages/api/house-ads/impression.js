@@ -2,6 +2,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 import { recordDailyAdImpression } from '../../../lib/redis';
 import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { normalizeSurface } from '../../../lib/adShareRules';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -30,7 +31,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Vary', 'Origin');
 
-  const { ad } = req.query;
+  const { ad, episode, surface } = req.query;
   if (ad && typeof ad === 'string' && UUID_RE.test(ad)) {
     try {
       // This pixel spends the advertiser's paid credit, and ad ids are
@@ -42,6 +43,14 @@ export default async function handler(req, res) {
         const supabase = getSupabase();
         await supabase.rpc('increment_house_ad_impression', { target_id: ad });
         await recordDailyAdImpression(ad);
+        // Ad share (migration 103): which title the ad played inside,
+        // and where (the pre-roll, an on-demand break, a live break), so
+        // the month's credit can be shared with that title's creator.
+        // Reels and a live loop send no episode and earn nothing.
+        if (typeof episode === 'string' && UUID_RE.test(episode)) {
+          const { error } = await supabase.rpc('record_ad_impression', { p_ad: ad, p_episode: episode, p_surface: normalizeSurface(typeof surface === 'string' ? surface : '') });
+          if (error && !/could not find the function|does not exist/i.test(error.message || '')) console.error('record_ad_impression:', error.message);
+        }
       }
     } catch (err) {
       // A missed count is not worth breaking playback over — this must

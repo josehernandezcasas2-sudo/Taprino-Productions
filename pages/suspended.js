@@ -66,7 +66,7 @@ export default function Suspended({ reason, until, cancelMembership, email, prev
 
             <div className="suspended-block">
               <span className="suspended-label">To appeal</span>
-              <span>Write to <a href={`mailto:${SITE.contactEmail}?subject=${encodeURIComponent(`${SITE.name} account suspension`)}`}>{SITE.contactEmail}</a> from the email on your account and tell us what happened. A person reads every one; we answer within a few days.</span>
+              <span>Write to <a href={`mailto:${SITE.contactEmail}?subject=${encodeURIComponent(`${SITE.name} account suspension`)}`}>{SITE.contactEmail}</a> from the email on your account and tell us what happened. A person reads every one.</span>
             </div>
 
             <div className="welcome-cta" style={{ gridTemplateColumns: '1fr 1fr' }}>

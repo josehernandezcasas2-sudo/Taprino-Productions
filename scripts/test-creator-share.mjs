@@ -180,7 +180,7 @@ test('forfeitLines: the balance leaves the creator and is split across the pool,
   assert.deepEqual(forfeitLines({ creatorId: 'gone', cents: 500, pool: { gone: 3 } }), []);
 });
 
-const NOW_NUMBERS = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12 };
+const NOW_NUMBERS = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 
 test('normalizeShareNumbers: rounds, bounds and explains', () => {
   const ok = normalizeShareNumbers({ shareCents: { standard: '200', premium: 350.4, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: '2500', referralBonusMonths: '12' });
@@ -188,6 +188,19 @@ test('normalizeShareNumbers: rounds, bounds and explains', () => {
   assert.deepEqual(ok.numbers, NOW_NUMBERS);
   const bad = normalizeShareNumbers({ shareCents: { standard: -1, premium: 9000, sponsor: 'x' }, bonusCents: {}, payoutMinimumCents: 50, referralBonusMonths: 200 });
   assert.equal(bad.errors.length, 8); // three bad shares, three missing bonuses, the minimum, the months
+  // Ad share (migration 103): a whole percent 0–100; an older form that
+  // leaves it out keeps the default.
+  assert.equal(normalizeShareNumbers({ ...NOW_NUMBERS, adSharePercent: '40.4' }).numbers.adSharePercent, 40);
+  assert.equal(normalizeShareNumbers({ ...NOW_NUMBERS, adSharePercent: 101 }).errors.length, 1);
+  assert.equal(normalizeShareNumbers({ ...NOW_NUMBERS, adSharePercent: '' }).numbers.adSharePercent, 50);
+});
+
+test('shareChanges: a lower ad share is adverse, a higher one is in creators’ favour', () => {
+  assert.deepEqual(shareChanges(NOW_NUMBERS, { ...NOW_NUMBERS, adSharePercent: 40 }).adverse, ['Ad share 50% → 40%']);
+  assert.deepEqual(shareChanges(NOW_NUMBERS, { ...NOW_NUMBERS, adSharePercent: 55 }).favourable, ['Ad share 50% → 55%']);
+  // Numbers saved before 103 carry no percent: read as the default, so no change is reported.
+  const { adSharePercent: _old, ...older } = NOW_NUMBERS;
+  assert.equal(shareChanges(older, NOW_NUMBERS).changed, false);
 });
 
 test('shareChanges + earliestEffective: anything against creators waits 30 days; the rest applies now', () => {

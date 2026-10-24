@@ -190,6 +190,13 @@ test('tips lane: a destination charge by payment intent; expected = the cut; kep
   const rec = reconcile({ lanes: g.lanes, records: { tips: { count: 1, grossCents: 500, cutCents: 25, coverCents: 46 } } });
   assert.equal(rec.rows.find((r) => r.key === 'tips').differenceCents, 0);
   assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, purchasesKeptCents: 0, tipsKeptCents: 25, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 25);
+  // Ad share (migration 103): what creators were credited for the ads
+  // inside their titles comes out of the ads served, not the margin.
+  const ads = studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, adsServedCents: 7000, adShareCents: 3500, unexplainedCents: 0 });
+  assert.equal(ads.together.adsKeptCents, 3500);
+  assert.equal(ads.together.adShareCents, 3500);
+  assert.equal(ads.together.shareCents, 3500);
+  assert.equal(ads.membership.marginCents, 0);
 });
 
 

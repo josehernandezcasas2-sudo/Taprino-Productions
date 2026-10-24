@@ -234,7 +234,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // Plays house ads back to back until `untilMs`, or once if untilMs is
   // null (the short break between two programs). Falls back to a plain
   // "ad break" card with a countdown if no ad can be shown.
-  function runAds(untilMs, onDone) {
+  // `episodeId` (ad share, migration 103): the program the break sits in,
+  // so the pre-roll's impression credits its creator; null for the loop.
+  function runAds(untilMs, onDone, episodeId = null) {
     const v = videoRef.current;
     detachVideo();
     setScreen('ad');
@@ -279,7 +281,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         }, false);
         loader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => { if (!untilMs) { clearInterval(tick); finish(); } }, false);
         const req = new google.ima.AdsRequest();
-        req.adTagUrl = process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}`;
+        req.adTagUrl = process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}${episodeId ? `&episode=${encodeURIComponent(episodeId)}` : ''}`;
         req.linearAdSlotWidth = v.clientWidth || 640;
         req.linearAdSlotHeight = v.clientHeight || 360;
         loader.requestAds(req);
@@ -360,7 +362,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     // The short between-programs break is the plan's job once there is one.
     if (withBreak && !plan) {
       lastBreakAt.current = Date.now();
-      runAds(null, go);
+      runAds(null, go, play.episodeId || null);
     } else {
       go();
     }

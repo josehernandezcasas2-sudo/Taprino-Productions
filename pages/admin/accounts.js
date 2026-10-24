@@ -103,12 +103,12 @@ export default function AccountsAdmin({ account, mainGenres, apiPath = '/api/adm
     const who = card.displayName;
     const what = form.scope === 'all' ? `Suspend ${who}'s whole account` : `Block ${who} from tipping`;
     if (!window.confirm(`${what} ${form.untilAt ? `until ${form.untilAt}` : 'until lifted'}? They get an email now with the line you wrote.`)) return;
-    const out = await act('suspend', { action: 'suspend', userId: card.userId, ...form }, (o) => (o.suspension.scope === 'all' ? `${who} is suspended.${o.membership && o.membership.changed ? ' Their membership stops at the end of the period.' : ''}` : `${who} can’t tip any more.`));
+    const out = await act('suspend', { action: 'suspend', userId: card.userId, ...form }, (o) => (o.suspension.scope === 'all' ? `${who} is suspended.${o.membership && o.membership.changed ? ' Their membership stops at the end of the period.' : ''}${o.payoutsHeld ? ' Their payouts are on hold.' : ''}` : `${who} can’t tip any more.`));
     if (out) setForm({ scope: 'all', publicReason: '', note: '', untilAt: '', cancelMembership: true });
   }
   const lift = () => {
     if (!card || !window.confirm(`Lift everything in force for ${card.displayName}? They get an email.`)) return;
-    act('lift', { action: 'lift', userId: card.userId, note: liftNote }, `Lifted. ${card.displayName} is back.`);
+    act('lift', { action: 'lift', userId: card.userId, note: liftNote }, (o) => `Lifted. ${card.displayName} is back.${o.payoutsReleased ? ' Their payouts are back on.' : ''}`);
   };
 
   const counts = card ? card.counts : null;
@@ -146,7 +146,10 @@ export default function AccountsAdmin({ account, mainGenres, apiPath = '/api/adm
                     {card.handle ? `@${card.handle} · ` : ''}{card.email ? `${card.email} · ` : ''}{card.userId} · {card.role || 'viewer'}{card.joinedAt ? ` · joined ${fmt(card.joinedAt)}` : ''}{card.payoutsReady ? ' · payouts ready' : ''}
                   </div>
                 </div>
-                {statePill(card.current)}
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {statePill(card.current)}
+                  {card.payoutHold && <span className="payouts-pill held" title={card.payoutHold.reason || ''}>Payouts on hold{card.payoutHold.until ? ` · to ${fmt(card.payoutHold.until)}` : ''}</span>}
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(110px, 1fr))', gap: '0.5rem' }}>
                 <Stat n={counts.tipsSent} label="tips sent" />
@@ -192,6 +195,9 @@ export default function AccountsAdmin({ account, mainGenres, apiPath = '/api/adm
                       <input type="checkbox" checked={form.cancelMembership} onChange={(e) => setForm((f) => ({ ...f, cancelMembership: e.target.checked }))} />
                       Stop the membership renewing while it lasts <span className="crew-mono">(Stripe: cancel at period end)</span>
                     </label>
+                  )}
+                  {form.scope === 'all' && (card.role === 'creator' || card.role === 'content_scheduler') && (
+                    <span className="crew-mono">A creator&rsquo;s Creator Share payouts go on hold with the suspension (90 days at most) and come back when it lifts.</span>
                   )}
                   <div style={{ display: 'flex', gap: '0.8rem', alignItems: 'center', flexWrap: 'wrap' }}>
                     <button type="submit" className="crew-btn" style={{ background: 'var(--danger)', borderColor: 'var(--danger)', color: '#2a0909', fontWeight: 700 }} disabled={busy !== null || form.publicReason.trim().length < 8}>{busy === 'suspend' ? 'Suspending…' : form.scope === 'all' ? `Suspend ${card.displayName.split(' ')[0]}` : `Block ${card.displayName.split(' ')[0]} from tipping`}</button>

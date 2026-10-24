@@ -69,7 +69,7 @@ export default async function handler(req, res) {
         action: 'creator_payouts_run',
         targetType: 'creator_share',
         targetId: result.period,
-        details: `${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held`
+        details: `${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held${result.adShare ? ` · ad share ${result.adShare.error ? `failed: ${result.adShare.error}` : `${dollars(result.adShare.totalCents)} to ${result.adShare.creators || 0} creators for ${result.adShare.period}`}` : ''}`
       }).catch(() => {});
       return res.status(200).json(result);
     }
