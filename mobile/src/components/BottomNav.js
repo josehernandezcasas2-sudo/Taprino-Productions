@@ -69,6 +69,7 @@ const GROUPS = {
       { href: '/account/my-work', label: 'My Work' },
       { href: '/locations/mine', label: 'My locations' },
       ...(role.isCreator || role.canAccessAdmin ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
+      ...(role.isCreator || role.isAdmin ? [{ href: '/creator/money', label: 'Money' }] : []),
       ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ],
     match: (p) => p.startsWith('/account') || p.startsWith('/messages')

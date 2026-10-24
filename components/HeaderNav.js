@@ -464,6 +464,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 </Link>
                 {isCreator && <div className="dropdown-divider" />}
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item"><BarChartIcon size={15} src={iconOverrides.bar_chart} /> Your numbers</Link>}
+                {(isCreator || isAdmin) && <Link href="/creator/money" className="dropdown-item"><CardIcon size={15} src={iconOverrides.card} /> Money</Link>}
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}
                 {(isCreator || isAdmin) && <Link href="/creator" className="dropdown-item"><ClapperboardIcon size={15} src={iconOverrides.clapperboard} /> Submit your work</Link>}
                 {(isCreator || isAdmin) && <Link href="/creator/my-work" className="dropdown-item"><FolderIcon size={15} src={iconOverrides.folder} /> Your work</Link>}

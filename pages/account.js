@@ -10,12 +10,10 @@ import { SITE } from '../lib/siteConfig';
 import { BANNER_COLORS } from '../lib/profileBanner';
 import Footer from '../components/Footer';
 import PayoutsCard from '../components/creator/PayoutsCard';
-import ReferralCard from '../components/creator/ReferralCard';
-import MemberSupportCard from '../components/creator/MemberSupportCard';
+import MoneySummaryCard from '../components/creator/MoneySummaryCard';
 import MembershipPlans from '../components/MembershipPlans';
 import ReferredByField from '../components/ReferredByField';
 import PurchasesCard from '../components/PurchasesCard';
-import SalesCard from '../components/creator/SalesCard';
 import { cleanViaSlug } from '../lib/creatorShareRules';
 import { memberBadge } from '../lib/membershipTiers';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
@@ -836,9 +834,10 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
               </div>
 
               {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}
-              {(isCreator || isAdmin) && <MemberSupportCard />}
-              {(isCreator || isAdmin) && <SalesCard />}
-              {(isCreator || isAdmin) && <ReferralCard />}
+              {/* Money (2026-10-23): one summary card in place of the Member
+                  support, Sales and Bring your people cards; the detail is
+                  on /creator/money. */}
+              {(isCreator || isAdmin) && <MoneySummaryCard />}
 
               <div className="account-card">
                 <div className="account-subheading">Security</div>

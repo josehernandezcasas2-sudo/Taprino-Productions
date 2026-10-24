@@ -20,10 +20,8 @@ import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import CropWindow from '../../components/CropWindow';
 import PayoutsCard from '../../components/PayoutsCard';
-import ReferralCard from '../../components/ReferralCard';
+import MoneySummaryCard from '../../components/MoneySummaryCard';
 import { rememberStayInStream } from '../../lib/stayInStream';
-import MemberSupportCard from '../../components/MemberSupportCard';
-import SalesCard from '../../components/SalesCard';
 import ReferredByField from '../../components/ReferredByField';
 import { readVia } from '../../lib/referral';
 
@@ -832,9 +830,10 @@ export default function Account() {
 
         {/* Payouts — creators and admins only; same card as the web /account */}
         {(dashboard.isCreator || dashboard.isAdmin) ? <PayoutsCard /> : null}
-        {(dashboard.isCreator || dashboard.isAdmin) ? <MemberSupportCard /> : null}
-        {(dashboard.isCreator || dashboard.isAdmin) ? <SalesCard /> : null}
-        {(dashboard.isCreator || dashboard.isAdmin) ? <ReferralCard /> : null}
+        {/* Money (2026-10-23): one summary card in place of the Member
+            support, Sales and Bring your people cards; the detail is on
+            the creator/money screen. */}
+        {(dashboard.isCreator || dashboard.isAdmin) ? <MoneySummaryCard /> : null}
 
         {/* Security */}
         <View style={styles.card}>

@@ -99,6 +99,7 @@ const GROUPS = {
       { href: '/#continue-watching', label: 'Continue Watching' },
       ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
       ...(roles.isCreator || roles.canAccessAdmin ? [{ href: '/creator/analytics', label: 'Your Numbers' }] : []),
+      ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/money', label: 'Money' }] : []),
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
     ],
     match: (p) => p === '/account' || p === '/artist-support' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'
