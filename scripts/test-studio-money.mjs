@@ -23,6 +23,39 @@ test('can leave: available minus everything that stays, never negative', () => {
   assert.deepEqual(short, { cents: 0, stayCents: 120000, shortfallCents: 20000 });
   // a creator's negative balance never offsets what others are owed
   assert.equal(canLeaveCents({ availableCents: 1000, owedCents: -500, adCreditsCents: 0, reserveCents: 0, earmarkCents: 0 }).cents, 1000);
+  // crew pay held for booked people (migration 110) stays, whole charge
+  const held = canLeaveCents({ availableCents: 100000, owedCents: 10000, adCreditsCents: 0, reserveCents: 30000, earmarkCents: 0, crewPayHeldCents: 38960 });
+  assert.deepEqual(held, { cents: 21040, stayCents: 78960, shortfallCents: 0 });
+  // held crew pay alone can make the balance short: nothing leaves
+  assert.equal(canLeaveCents({ availableCents: 38000, owedCents: 0, adCreditsCents: 0, reserveCents: 0, earmarkCents: 0, crewPayHeldCents: 38960 }).cents, 0);
+  // omitted = 0, so older callers are unchanged
+  assert.equal(canLeaveCents({ availableCents: 1000, owedCents: 0, adCreditsCents: 0, reserveCents: 0, earmarkCents: 0 }).cents, 1000);
+});
+
+test('crew pay lane (migration 110): the charge by intent or charge id, the release by transfer id or its charge; expected = charges less fee less releases; only the fee is kept', () => {
+  const cIds = { crewPayIntents: new Set(['pi_cp1', 'ch_cp1']), crewPayTransfers: new Set(['tr_cp1']) };
+  const charge = { id: 'txn_c1', reporting_category: 'charge', amount: 38960, fee: 1160, net: 37800, source: { id: 'ch_cp1', payment_intent: 'pi_cp1' } };
+  const byTransferId = { id: 'txn_c2', reporting_category: 'transfer', amount: -35000, fee: 0, net: -35000, source: { id: 'tr_cp1' } };
+  const byCharge = { id: 'txn_c3', reporting_category: 'transfer', amount: -35000, fee: 0, net: -35000, source: { id: 'tr_cp9', source_transaction: 'ch_cp1' } };
+  assert.deepEqual(classifyTransaction(charge, cIds), { lane: 'crewPay', matched: true });
+  assert.deepEqual(classifyTransaction(byTransferId, cIds), { lane: 'crewPay', matched: true });
+  assert.deepEqual(classifyTransaction(byCharge, cIds), { lane: 'crewPay', matched: true });
+  // a plain refund of a crew charge is a refund like any other
+  assert.deepEqual(classifyTransaction({ id: 'txn_c4', reporting_category: 'refund', amount: -38960, fee: 0, net: -38960, source: { id: 're_cp1', charge: 'ch_cp1' } }, cIds), { lane: 'refunds', matched: true });
+  const g = groupTransactions([charge, byTransferId], cIds);
+  assert.equal(g.lanes.crewPay.count, 2);
+  assert.equal(g.lanes.crewPay.netCents, 2800);
+  assert.equal(g.unmatched.length, 0);
+  // held in the window (funded, not yet released): the charge less the planned fee
+  const heldOnly = { crewPay: { count: 1, grossCents: 38960, amounts: [38960], cutCents: 2800, coverCents: 1160, releasedCents: 0 } };
+  assert.equal(expectedByLane(heldOnly).crewPay, 38960 - assumedFeeCents(38960));
+  // funded and released in the same window: what's left is the fee (and the cover less Stripe's real fee)
+  const released = { crewPay: { count: 1, grossCents: 38960, amounts: [38960], cutCents: 2800, coverCents: 1160, releasedCents: 35000 } };
+  assert.equal(expectedByLane(released).crewPay, 38960 - assumedFeeCents(38960) - 35000);
+  const rec = reconcile({ lanes: g.lanes, records: released });
+  assert.equal(rec.rows.find((r) => r.key === 'crewPay').differenceCents, 2800 - (38960 - assumedFeeCents(38960) - 35000));
+  // the share counts the fee, never the held money
+  assert.equal(studioShare({ membershipGrossCents: 0, membershipFeeCents: 0, creditedCents: 0, reversedCreditCents: 0, refundedCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, crewPayKeptCents: 2800, adsServedCents: 0, unexplainedCents: 0 }).together.shareCents, 2800);
 });
 
 test('tolerance: the larger of fixed and a share of the period', () => {
