@@ -10222,3 +10222,30 @@ a.prod-day:hover { background: var(--surface-3); }
 .shot-pending-row { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; flex-wrap: wrap; font-size: 0.9rem; }
 .shot-pending-row a { color: var(--ink); }
 .shot-claim { display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px dashed var(--ocean-ink); border-radius: 10px; }
+/* ---- Resources & partners (/resources, migration 108) ---- */
+.res-find { grid-template-columns: 260px minmax(0, 1fr); }
+.res-kinds { margin-bottom: 0.3rem; }
+.res-kinds .crew-tab { cursor: pointer; }
+.res-gates .cc-rules li { color: var(--ink-faint); }
+.res-gates .cc-rules li.on { color: var(--ink); }
+.res-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 0.7rem; }
+.res-card { display: grid; gap: 0.6rem; align-content: start; }
+.res-card.featured { border-color: rgba(var(--brass-rgb), 0.6); }
+.res-card-top { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 0.7rem; align-items: start; }
+.res-logo { width: 52px; height: 52px; border-radius: 10px; object-fit: cover; background: var(--surface-2); }
+.res-logo.sm { width: 36px; height: 36px; border-radius: 8px; font-size: 0.7rem; }
+.res-logo-ph { display: grid; place-items: center; font-family: var(--font-display); font-weight: 700; color: var(--ink-dim); }
+.res-name { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; display: flex; gap: 0.4rem; align-items: center; flex-wrap: wrap; }
+.res-name a { color: var(--ink); text-decoration: none; }
+.res-name a:hover { color: var(--olive); }
+.res-blurb { margin: 0; }
+.res-deal { display: grid; gap: 0.15rem; padding: 0.5rem 0.7rem; border-radius: 8px; background: rgba(var(--olive-rgb), 0.08); border: 1px solid rgba(var(--olive-rgb), 0.3); }
+.res-deal b { font-family: var(--font-display); font-size: 1rem; }
+.res-code { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+.res-code-val { font-family: var(--font-mono); font-size: 1rem; letter-spacing: 0.08em; color: var(--olive); background: var(--surface-2); padding: 0.3rem 0.6rem; border-radius: 6px; }
+.res-locked { display: grid; gap: 0.2rem; }
+.res-locked a { color: var(--olive); }
+.res-admin-row { align-items: center; }
+.res-admin-main { display: flex; gap: 0.6rem; align-items: center; min-width: 0; }
+.res-admin-main b { font-family: var(--font-display); }
+@media (max-width: 900px) { .res-find { grid-template-columns: 1fr; } }

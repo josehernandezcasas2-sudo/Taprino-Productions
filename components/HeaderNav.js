@@ -187,6 +187,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         { href: '/crew', label: 'Crew Call', match: currentPath.startsWith('/crew') },
         { href: '/locations', label: 'Locations', match: currentPath.startsWith('/locations') },
         { href: '/productions', label: 'Productions', match: currentPath.startsWith('/productions') },
+        { href: '/resources', label: 'Resources', match: currentPath.startsWith('/resources') },
         ...(isSignedIn ? [{ href: '/messages', label: 'Messages', match: currentPath.startsWith('/messages'), badge: messagesUnread }] : []),
         ...(siteSettings && siteSettings.verticalEnabled !== false
           ? [{ href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }]

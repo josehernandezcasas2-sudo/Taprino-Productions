@@ -33,7 +33,8 @@ const GROUPS = {
       { href: '/vertical/discover', label: 'Vertical Discover' },
       { href: '/crew', label: 'Crew Call' },
       { href: '/locations', label: 'Locations' },
-      { href: '/productions', label: 'Productions' }
+      { href: '/productions', label: 'Productions' },
+      { href: '/resources', label: 'Resources' }
     ],
     match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew') || p.startsWith('/locations')
   },
