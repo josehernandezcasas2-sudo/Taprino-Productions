@@ -144,11 +144,17 @@ export function shrinkImage(file, max = 1600, quality = 0.85) {
 }
 
 export async function uploadImage(file, purpose = 'photo') {
+  return (await uploadImageFull(file, purpose)).url;
+}
+
+// The whole answer: `url` is what the listing stores (for a proof, a
+// private reference, not a link) and `preview` is what the form can show.
+export async function uploadImageFull(file, purpose = 'photo') {
   const base64 = await shrinkImage(file, purpose === 'proof' ? 2000 : 1600);
   const res = await fetch('/api/locations/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64, fileName: file.name.replace(/\.[^.]+$/, '') + '.jpg', purpose }) });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Upload failed.');
-  return data.url;
+  return { url: data.url, preview: data.preview || data.url };
 }
 
 // The listing's photo strip with the cover first.

@@ -7,6 +7,7 @@ import { getSiteSettings } from '../../lib/siteSettings';
 import { getRecommendations } from '../../lib/recommendations';
 import { getWatchHistory } from '../../lib/watchHistory';
 import { filterEntitledVertical, buildPersonalUnitKeys } from '../../lib/verticalFeed';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/vertical/discover.js's
 // getServerSideProps — same entitlement filter, same personalization
@@ -34,6 +35,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'vertical-discover'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const account = await getAccountContext(req);

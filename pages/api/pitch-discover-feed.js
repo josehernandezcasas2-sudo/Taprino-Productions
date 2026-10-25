@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches, getLikedPitchIds, getPitchLikeCounts, getSavedPitchIds } from '../../lib/pitches';
 import { getSiteSettings } from '../../lib/siteSettings';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/pitches/discover.js's
 // getServerSideProps — same gate (elevatorPitchEnabled, with an admin
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'pitch-discover'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const account = await getAccountContext(req);

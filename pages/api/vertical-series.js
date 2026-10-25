@@ -1,4 +1,5 @@
 import { getVerticalSeriesBrowseData } from '../../lib/verticalSeriesBrowse';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/vertical/browse.js — same
 // entitlement-filtered series list, shared via lib/verticalSeriesBrowse.js.
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'vertical-series'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { series } = await getVerticalSeriesBrowseData(req);

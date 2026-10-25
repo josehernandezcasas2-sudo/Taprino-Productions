@@ -8,6 +8,7 @@ import { clearsGate, termsWouldClear } from '../../lib/ageGate';
 import { termsAcceptedFrom } from '../../lib/viewerAge';
 import { getRatings } from '../../lib/ratings';
 import { earlyAccessState, formatOpensAt } from '../../lib/earlyAccess';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // Mints a fresh Cloudflare Stream playback token for a single episode.
 //
@@ -43,6 +44,13 @@ export default async function handler(req, res) {
   }
 
   const account = await getAccountContext(req);
+
+  // This is the one route that hands out playable video, so it has a
+  // ceiling: a binge is a handful of tokens an hour, a script walking
+  // the catalogue is hundreds. Signed-out callers (free titles after
+  // the viewing terms) get a smaller budget per IP.
+  const budget = account.isSignedIn ? { max: 240, windowSeconds: 3600, userId: account.userId } : { max: 60, windowSeconds: 3600 };
+  if (!(await limitPublicRead(req, res, 'stream-token', budget))) return undefined;
 
   // Bought titles (lib/purchases.js) stay playable for their owners
   // after a creator-side takedown, so an owner's lookup skips the

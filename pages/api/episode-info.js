@@ -1,4 +1,5 @@
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // Public episode metadata for external clients (the mobile app) — reuses
 // getPublicEpisodes()'s already-safe field set, which never includes a
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!(await limitPublicRead(req, res, 'episode-info'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
   const episodes = await getPublicEpisodes();

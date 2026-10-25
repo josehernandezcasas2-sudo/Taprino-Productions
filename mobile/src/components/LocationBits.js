@@ -134,8 +134,14 @@ export async function pickImage(width = 1600) {
 
 // Sends a picked image up. Returns the stored URL.
 export async function uploadPicked(picked, purpose, token) {
+  return (await uploadPickedFull(picked, purpose, token)).url;
+}
+
+// `url` is what the listing stores (a proof's is a private reference, not
+// a link); `preview` is a signed link the form can show for an hour.
+export async function uploadPickedFull(picked, purpose, token) {
   const data = await apiPost('/api/locations/upload', { base64: picked.base64, fileName: 'photo.jpg', purpose }, await resolveToken(token));
-  return data.url;
+  return { url: data.url, preview: data.preview || data.url };
 }
 
 export async function requestAction(id, body, token) {

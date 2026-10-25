@@ -1,4 +1,5 @@
 import { getPitchComments, getPitchById } from '../../lib/pitches';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -15,6 +16,7 @@ export default async function handler(req, res) {
   if (!pitchId) {
     return res.status(400).json({ error: 'pitchId is required.' });
   }
+  if (!(await limitPublicRead(req, res, 'pitch-comments'))) return undefined;
   // Same gate as the pitch page: a pending or rejected project has no
   // public discussion.
   const pitch = await getPitchById(String(pitchId));

@@ -8,7 +8,7 @@ import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 import { crew, Chip, PlaceBox } from '../../components/CrewBits';
-import { pickImage, uploadPicked, resolveToken, loc, Req } from '../../components/LocationBits';
+import { pickImage, uploadPicked, uploadPickedFull, resolveToken, loc, Req } from '../../components/LocationBits';
 import { splitBooking, dollars, DEFAULT_CUT_PERCENT, MAX_PHOTOS } from '../../lib/locationRules';
 
 // List a place (pages/locations/new on the web), or edit one
@@ -20,7 +20,7 @@ const EMPTY = {
   sqFt: '', outdoorSqFt: '', rooms: '', ceilingFt: '', crewMax: '', hoursFrom: '07:00', hoursTo: '22:00', features: [], windowsFace: '', bestLight: '', power: '', sound: '',
   hourly: '', minHours: '4', halfDay: '', day: '', dayHours: '10', overtime: '', cleaning: '', weekendPct: '0', dealsOk: true,
   cancellation: 'moderate', rules: '', permitHelp: 'you_handle', coiRequired: false,
-  ownership: 'owner', proofUrl: null, proofNote: ''
+  ownership: 'owner', proofUrl: null, proofPreview: null, proofNote: ''
 };
 const d = (c) => (c == null ? '' : String(c / 100));
 function fromListing(l) {
@@ -31,7 +31,7 @@ function fromListing(l) {
     hoursFrom: l.hoursFrom || '', hoursTo: l.hoursTo || '', features: l.features, windowsFace: l.windowsFace, bestLight: l.bestLight, power: l.power, sound: l.sound,
     hourly: d(l.hourlyCents), minHours: String(l.minHours), halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: String(l.dayHours), overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: String(l.weekendPct), dealsOk: l.dealsOk,
     cancellation: l.cancellation, rules: l.rules, permitHelp: l.permitHelp, coiRequired: l.coiRequired,
-    ownership: l.ownership, proofUrl: l.proofUrl, proofNote: l.proofNote
+    ownership: l.ownership, proofUrl: l.proofUrl, proofPreview: l.proofPreview || null, proofNote: l.proofNote
   };
 }
 
@@ -88,8 +88,8 @@ export default function ListAPlace() {
     setPending({ uri: picked.uri, purpose: 'proof' });
     setUploading(true);
     try {
-      const url = await uploadPicked(picked, 'proof', getToken);
-      set({ proofUrl: url, proofLocalUri: picked.uri });
+      const proof = await uploadPickedFull(picked, 'proof', getToken);
+      set({ proofUrl: proof.url, proofPreview: proof.preview, proofLocalUri: picked.uri });
     } catch (err) { setError(`Proof upload failed: ${err.message}`); } finally { setUploading(false); setPending(null); }
   }
   async function save() {
@@ -242,11 +242,11 @@ export default function ListAPlace() {
               <View style={[crew.row, { alignItems: 'flex-start' }]}>
                 {pending && pending.purpose === 'proof' ? (
                   <View style={[loc.photo, { alignItems: 'center', justifyContent: 'center' }]}><SmartImage uri={pending.uri} style={[StyleSheet.absoluteFill, { opacity: 0.5 }]} /><ActivityIndicator color={colors.brass} /></View>
-                ) : form.proofUrl ? <View style={loc.photo}><SmartImage uri={form.proofLocalUri || form.proofUrl} style={StyleSheet.absoluteFill} /><Text style={[loc.k, { top: 6, bottom: undefined }]}>Proof</Text></View> : null}
+                ) : form.proofUrl ? <View style={loc.photo}><SmartImage uri={form.proofLocalUri || form.proofPreview || form.proofUrl} style={StyleSheet.absoluteFill} /><Text style={[loc.k, { top: 6, bottom: undefined }]}>Proof</Text></View> : null}
                 <View style={{ flex: 1, gap: 6 }}>
                   <View style={crew.row}>
                     <Pressable style={crew.btnSm} disabled={uploading} onPress={addProof}><Text style={crew.btnSmText}>{form.proofUrl ? 'Replace proof' : uploading ? 'Uploading…' : 'Upload proof'}</Text></Pressable>
-                    {form.proofUrl ? <Pressable style={[crew.btnSm, crew.btnGhost]} onPress={() => set({ proofUrl: null, proofLocalUri: null })}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>Remove</Text></Pressable> : null}
+                    {form.proofUrl ? <Pressable style={[crew.btnSm, crew.btnGhost]} onPress={() => set({ proofUrl: null, proofPreview: null, proofLocalUri: null })}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>Remove</Text></Pressable> : null}
                   </View>
                   <Text style={crew.mono}>A deed or tax bill, a lease, a utility bill in your name, or a letter from the owner. Only admins see it.</Text>
                 </View>

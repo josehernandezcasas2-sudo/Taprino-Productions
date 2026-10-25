@@ -3,6 +3,16 @@ import { findPost } from '../../../lib/posts';
 import { getAccountContext } from '../../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 import { getViewerAgeContext } from '../../../lib/viewerAge';
+import { limitPublicRead } from '../../../lib/rateLimit';
+
+// Signs whatever stored src a deck item has (free, premium, or a user
+// post). A video that doesn't demand signed URLs yet plays either way;
+// one that does (lib/streamProtection.js) needs this. The stored URL is
+// the answer only for self-hosted mp4s and local runs without Cloudflare.
+async function playable(storedSrc) {
+  const signed = await signedSrcForStoredUrl(storedSrc);
+  return signed ? signed.src : storedSrc;
+}
 
 // Server-only playback source lookup for the vertical discover feed. The
 // feed's own deck-building already filters premium episodes out for
@@ -27,6 +37,11 @@ export default async function handler(req, res) {
   const { episodeId } = req.query;
   if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
 
+  const account = await getAccountContext(req);
+  // A reel swipe is a call, so the budget is wide for a person and still
+  // far below a script walking the whole deck.
+  if (!(await limitPublicRead(req, res, 'vertical-playback', { max: 600, windowSeconds: 3600, userId: account.userId }))) return undefined;
+
   // User-posted videos (lib/posts.js) are woven into the same deck as real
   // episodes (see pages/vertical/discover.js), prefixed "post:" so this
   // endpoint can tell them apart — they live in a separate table with no
@@ -34,7 +49,7 @@ export default async function handler(req, res) {
   if (episodeId.startsWith('post:')) {
     const post = await findPost(episodeId.slice(5));
     if (!post || post.kind !== 'video') return res.status(404).json({ error: 'Not found.' });
-    return res.status(200).json({ src: post.videoSrc });
+    return res.status(200).json({ src: await playable(post.videoSrc) });
   }
 
   const episode = await findEpisode(episodeId);
@@ -44,8 +59,6 @@ export default async function handler(req, res) {
     // it shouldn't become a generic "get me any episode's src" backdoor.
     return res.status(400).json({ error: 'Not a vertical episode.' });
   }
-
-  const account = await getAccountContext(req);
   // Same age gate as stream-token: the feed filters by rating for the
   // viewer, but an id can be requested directly.
   const age = await getViewerAgeContext(account, req);
@@ -53,15 +66,6 @@ export default async function handler(req, res) {
   const entitled = episode.tier === 'free' || account.isSubscriber || account.isAdmin;
   if (!entitled) return res.status(403).json({ error: 'Subscription required.' });
 
-  let playbackSrc = episode.src;
-  if (episode.tier === 'premium' && episode.src) {
-    // signedSrcForStoredUrl returns { src, expiresAt } (or null when the
-    // provider isn't configured). This used to hand the whole object to
-    // the player, which crashed the web feed and played nothing in the app.
-    const signed = await signedSrcForStoredUrl(episode.src);
-    if (!signed) return res.status(503).json({ error: 'Playback isn’t available right now.' });
-    playbackSrc = signed.src;
-  }
-
-  return res.status(200).json({ src: playbackSrc });
+  if (!episode.src) return res.status(404).json({ error: 'No video attached.' });
+  return res.status(200).json({ src: await playable(episode.src) });
 }

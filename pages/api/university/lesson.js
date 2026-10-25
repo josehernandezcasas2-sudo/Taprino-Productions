@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getLessonPage } from '../../../lib/university';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // One lesson (?course=writing-101&slug=scenes-that-turn): the lesson, its
 // files and examples, the assignment, the course syllabus in miniature,
@@ -18,6 +19,7 @@ export default async function handler(req, res) {
   const course = typeof req.query.course === 'string' ? req.query.course : '';
   const slug = typeof req.query.slug === 'string' ? req.query.slug : '';
   if (!course || !slug) return res.status(400).json({ error: 'course and slug are required.' });
+  if (!(await limitPublicRead(req, res, 'uni-lesson'))) return undefined;
   try {
     const { userId } = getAuth(req);
     const page = await getLessonPage(course, slug, { userId: userId || null });

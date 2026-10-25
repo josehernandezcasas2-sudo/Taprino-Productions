@@ -73,13 +73,14 @@ export async function getServerSideProps({ req, params, query, res }) {
   const entitled = (episode.tier === 'free' || account.isSubscriber || owned) && !earlyAccess.locked;
   const purchaseSettings = data.purchase && data.purchase.forSale && !owned ? await getPurchaseSettings() : null;
 
-  // Premium video is served through a short-lived Cloudflare signed URL
-  // rather than its permanent public one. Free episodes stay on the plain
-  // URL: they're meant to be shareable.
+  // Every video is served through a short-lived Cloudflare signed URL
+  // rather than its permanent one, free titles included (Jose,
+  // 2026-10-25; lib/streamProtection.js): the page a visitor can share
+  // is this one, never the file behind it.
   let playbackSrc = entitled ? episode.src : null;
   let describedSrc = entitled ? episode.audioDescriptionSrc : null;
   let signedPlayback = false;
-  if (entitled && (episode.tier === 'premium' || owned) && episode.src) {
+  if (entitled && episode.src) {
     const signed = await signedSrcForStoredUrl(episode.src);
     if (signed) {
       playbackSrc = signed.src;

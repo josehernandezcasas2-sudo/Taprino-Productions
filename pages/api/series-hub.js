@@ -1,4 +1,5 @@
 import { getSeriesHubData } from '../../lib/seriesHub';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/series/[id].js's getServerSideProps
 // — same lib/seriesHub.js, same shape, minus the fields that only exist
@@ -28,6 +29,7 @@ export default async function handler(req, res) {
   if (!data) return res.status(404).json({ error: 'Not found' });
 
   const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || Boolean(req.headers.authorization);
+  if (!(await limitPublicRead(req, res, 'series-hub'))) return undefined;
   res.setHeader('Cache-Control', hasSession ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=300, stale-while-revalidate=600');
 
   return res.status(200).json({

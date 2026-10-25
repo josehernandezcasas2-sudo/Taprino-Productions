@@ -1,4 +1,5 @@
 import { getProfileHubData } from '../../lib/profileHub';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/profile/[userId].js's
 // getServerSideProps — same lib/profileHub.js. Forwards posts/
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'profile'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { userId } = req.query;

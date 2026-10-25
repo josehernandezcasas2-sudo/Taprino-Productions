@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { getListing, updateListing, setListingStatus } from '../../../../lib/locations';
+import { limitPublicRead } from '../../../../lib/rateLimit';
 
 // One place.
 //   GET                      → { listing } (public shape unless host/admin)
@@ -10,6 +11,7 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (!(await limitPublicRead(req, res, 'location'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const id = String(req.query.id || '');
   const rc = await getRoleContext(req);

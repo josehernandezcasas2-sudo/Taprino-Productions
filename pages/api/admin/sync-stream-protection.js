@@ -1,23 +1,18 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import {
-  cloudflareUidFromUrl,
-  enableSignedUrlsForVideo,
-  disableSignedUrlsForVideo
-} from '../../../lib/cloudflareUpload';
+import { cloudflareUidFromUrl, enableSignedUrlsForVideo } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
 
-// Brings Cloudflare's protection flags in line with the tier column in the
-// database: every premium episode gets requireSignedURLs on, every free one
-// gets it off.
+// Turns requireSignedURLs on for every Cloudflare Stream video attached
+// to an episode, whatever its tier (lib/streamProtection.js has the
+// reasoning; Jose, 2026-10-25). Run from the Protection card on
+// /admin/settings after the change ships, and any time a video was
+// attached while Cloudflare was unreachable. Safe to run as often as you
+// like: setting a flag to the value it already has is a no-op.
 //
-// Both directions matter. Protecting premium video is the obvious half. The
-// other half is just as important operationally — an episode moved back down
-// to the free tier with protection still on plays as a black box for every
-// free viewer, and that failure is silent.
-//
-// Safe to run as often as you like: Cloudflare treats setting a flag to the
-// value it already has as a no-op. Run it after changing any episode's tier.
+// It also reports episodes whose poster or thumbnail still points at
+// Cloudflare's own frame grab: once a video demands signed URLs, that
+// image URL stops working, so those titles need a real poster uploaded.
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -36,34 +31,36 @@ export default async function handler(req, res) {
   }
 
   const supabase = getSupabase();
-  const { data: episodes, error } = await supabase.from('episodes').select('id, title, tier, src');
+  const { data: episodes, error } = await supabase.from('episodes').select('id, title, tier, src, audio_description_src, poster, thumbnail');
   if (error) {
     return res.status(500).json({ error: error.message });
   }
 
   const protectedIds = [];
-  const unprotectedIds = [];
   const skipped = [];
   const failures = [];
+  const cloudflarePosters = [];
+  const seen = new Set();
 
   for (const ep of episodes || []) {
-    const uid = cloudflareUidFromUrl(ep.src);
-    if (!uid) {
+    const uids = [ep.src, ep.audio_description_src].map((u) => cloudflareUidFromUrl(u)).filter(Boolean);
+    if (!uids.length) {
       // Self-hosted mp4, YouTube-backed, or no video attached yet — there's
       // nothing on Cloudflare to protect.
       skipped.push({ id: ep.id, title: ep.title, reason: 'not a Cloudflare Stream video' });
-      continue;
     }
-    try {
-      if (ep.tier === 'premium') {
+    for (const uid of uids) {
+      if (seen.has(uid)) continue;
+      seen.add(uid);
+      try {
         await enableSignedUrlsForVideo(uid);
-        protectedIds.push(ep.id);
-      } else {
-        await disableSignedUrlsForVideo(uid);
-        unprotectedIds.push(ep.id);
+        if (!protectedIds.includes(ep.id)) protectedIds.push(ep.id);
+      } catch (err) {
+        failures.push({ id: ep.id, title: ep.title, error: err.message });
       }
-    } catch (err) {
-      failures.push({ id: ep.id, title: ep.title, error: err.message });
+    }
+    if (/cloudflarestream\.com\/[^/]+\/thumbnails\//.test(`${ep.poster || ''} ${ep.thumbnail || ''}`)) {
+      cloudflarePosters.push({ id: ep.id, title: ep.title });
     }
   }
 
@@ -73,13 +70,14 @@ export default async function handler(req, res) {
     action: 'sync_stream_protection',
     targetType: 'episode',
     targetId: 'all',
-    details: `Protected ${protectedIds.length} premium, unprotected ${unprotectedIds.length} free, ${failures.length} failed.`
+    details: `Protected ${protectedIds.length} episodes (${seen.size} videos), ${skipped.length} without Cloudflare video, ${failures.length} failed, ${cloudflarePosters.length} with a Cloudflare frame as poster.`
   });
 
   return res.status(200).json({
     protected: protectedIds.length,
-    unprotected: unprotectedIds.length,
+    videos: seen.size,
     skipped: skipped.length,
-    failures
+    failures,
+    cloudflarePosters
   });
 }

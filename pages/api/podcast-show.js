@@ -1,4 +1,5 @@
 import { getPodcastShowHubData } from '../../lib/podcastShowHub';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/podcasts/[id].js's
 // getServerSideProps — same lib/podcastShowHub.js, same per-viewer
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'podcast-show'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { id } = req.query;

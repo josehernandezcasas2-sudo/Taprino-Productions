@@ -1,4 +1,5 @@
 import { getStreamFeedData } from '../../lib/streamFeed';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/stream.js's getServerSideProps —
 // same shared computation (lib/streamFeed.js). Mixes public data
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'stream-feed'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const feed = await getStreamFeedData(req);

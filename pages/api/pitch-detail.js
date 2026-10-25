@@ -1,4 +1,5 @@
 import { getPitchDetailData } from '../../lib/pitchDetailHub';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/pitches/[id].js's
 // getServerSideProps — same lib/pitchDetailHub.js, same shape minus the
@@ -20,6 +21,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'pitch-detail'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { id } = req.query;

@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
 import { SignInButton } from '@clerk/nextjs';
 import PlaceSearch from '../../components/crew/PlaceSearch';
-import { LocationShell, Crumbs, PhotoStrip, uploadImage } from '../../components/locations/LocationBits';
+import { LocationShell, Crumbs, PhotoStrip, uploadImage, uploadImageFull } from '../../components/locations/LocationBits';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getListing } from '../../lib/locations';
@@ -46,7 +46,7 @@ const EMPTY = {
   sqFt: '', outdoorSqFt: '', rooms: '', ceilingFt: '', crewMax: '', hoursFrom: '07:00', hoursTo: '22:00', features: [], windowsFace: '', bestLight: '', power: '', sound: '',
   hourly: '', minHours: 4, halfDay: '', day: '', dayHours: 10, overtime: '', cleaning: '', weekendPct: 0, dealsOk: true,
   cancellation: 'moderate', rules: '', permitHelp: 'you_handle', coiRequired: false,
-  ownership: 'owner', proofUrl: null, proofNote: ''
+  ownership: 'owner', proofUrl: null, proofPreview: null, proofNote: ''
 };
 
 function fromListing(l) {
@@ -59,7 +59,7 @@ function fromListing(l) {
     features: l.features, windowsFace: l.windowsFace, bestLight: l.bestLight, power: l.power, sound: l.sound,
     hourly: d(l.hourlyCents), minHours: l.minHours, halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: l.dayHours, overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: l.weekendPct, dealsOk: l.dealsOk,
     cancellation: l.cancellation, rules: l.rules, permitHelp: l.permitHelp, coiRequired: l.coiRequired,
-    ownership: l.ownership, proofUrl: l.proofUrl, proofNote: l.proofNote
+    ownership: l.ownership, proofUrl: l.proofUrl, proofPreview: l.proofPreview || null, proofNote: l.proofNote
   };
 }
 
@@ -107,7 +107,8 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
     setUploading(true);
     setError(null);
     try {
-      set({ proofUrl: await uploadImage(file, 'proof') });
+      const proof = await uploadImageFull(file, 'proof');
+      set({ proofUrl: proof.url, proofPreview: proof.preview });
     } catch (err) {
       setError(err.message);
     } finally {
@@ -147,7 +148,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
     );
   }
 
-  const proofIsPdf = form.proofUrl && /\.pdf($|\?)/i.test(form.proofUrl);
+  const proofShown = form.proofPreview || (form.proofUrl && /^https?:/.test(form.proofUrl) ? form.proofUrl : null);
 
   return (
     <LocationShell title={editing ? 'Edit your place' : 'List a place'} {...shell}>
@@ -280,9 +281,9 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
             <div className="crew-row2">
               <div className="crew-field"><span>Proof (a photo or scan)</span>
                 <div className="loc-proof">
-                  {form.proofUrl && (proofIsPdf ? <a href={form.proofUrl} target="_blank" rel="noreferrer" className="crew-btn sm">Open the file ↗</a> : <img src={form.proofUrl} alt="Proof" />)}
+                  {form.proofUrl && (proofShown ? <img src={proofShown} alt="Proof" /> : <span className="crew-mono">Proof attached</span>)}
                   <label className="crew-btn sm"><input type="file" accept="image/*" style={{ display: 'none' }} onChange={addProof} disabled={uploading} />{form.proofUrl ? 'Replace' : uploading ? 'Uploading…' : 'Upload proof'}</label>
-                  {form.proofUrl && <button type="button" className="crew-btn sm ghost" onClick={() => set({ proofUrl: null })}>Remove</button>}
+                  {form.proofUrl && <button type="button" className="crew-btn sm ghost" onClick={() => set({ proofUrl: null, proofPreview: null })}>Remove</button>}
                 </div>
                 <span className="crew-mono">A deed or tax bill, a lease, a utility bill in your name, or a letter from the owner. Only admins see it; it’s never shown on the site.</span>
               </div>

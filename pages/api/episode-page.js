@@ -1,4 +1,5 @@
 import { getEpisodePageData } from '../../lib/episodePage';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // Trim an episode record down to what a card/sidebar needs — and never a
 // playable URL. The app gets the real src from POST /api/stream-token,
@@ -31,6 +32,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!(await limitPublicRead(req, res, 'episode-page'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { id } = req.query;

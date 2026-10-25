@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getCoursePage } from '../../../lib/university';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // One course (?slug=writing-101): syllabus grouped by module, materials,
 // examples, and (signed in) the viewer's ticks and where to continue.
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
   }
   const slug = typeof req.query.slug === 'string' ? req.query.slug : '';
   if (!slug) return res.status(400).json({ error: 'slug is required.' });
+  if (!(await limitPublicRead(req, res, 'uni-course'))) return undefined;
   try {
     const { userId } = getAuth(req);
     const page = await getCoursePage(slug, { userId: userId || null });

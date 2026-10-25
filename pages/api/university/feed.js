@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getUniversityFeed } from '../../../lib/university';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // Film University's catalogue for the mobile app — the same data
 // pages/university/index.js renders: departments, courses, the library
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!(await limitPublicRead(req, res, 'uni-feed'))) return undefined;
   try {
     const { userId } = getAuth(req);
     const feed = await getUniversityFeed({ userId: userId || null });

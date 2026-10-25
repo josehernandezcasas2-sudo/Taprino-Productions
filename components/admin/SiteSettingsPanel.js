@@ -305,6 +305,8 @@ export default function SiteSettingsPanel() {
         </a>
       </div>
 
+      <ProtectionCard />
+
       <div className="account-card">
         <div className="account-eyebrow">Quick links</div>
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
@@ -328,5 +330,56 @@ export default function SiteSettingsPanel() {
         </div>
       </div>
     </>
+  );
+}
+
+// Keeping creators' work off the open web (Jose, 2026-10-25). Every
+// Cloudflare Stream video is meant to demand a signed URL whatever its
+// tier (lib/streamProtection.js); this button brings every video already
+// uploaded in line and lists the titles whose poster is still Cloudflare's
+// own frame grab, which stops loading once its video is protected.
+function ProtectionCard() {
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+
+  async function protectAll() {
+    setBusy(true);
+    setError(null);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/sync-stream-protection', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not protect the videos.');
+      setResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="account-card" data-testid="protection-card">
+      <div className="account-eyebrow">Protection</div>
+      <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginBottom: '0.75rem' }}>
+        Every video plays through a short-lived signed link, free titles included, so no permanent file URL ever reaches a browser or a crawler. New uploads are protected as they are approved; press this once after the change ships, and again if Cloudflare was unreachable during an approval.
+      </p>
+      <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={protectAll} disabled={busy}>
+        {busy ? 'Protecting…' : 'Protect every video'}
+      </button>
+      {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.6rem' }}>{error}</p>}
+      {result && (
+        <div style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '0.6rem' }}>
+          <p style={{ margin: 0 }}>Protected {result.videos} video{result.videos === 1 ? '' : 's'} across {result.protected} title{result.protected === 1 ? '' : 's'}; {result.skipped} without a Cloudflare video; {result.failures.length} failed.</p>
+          {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f) => <li key={f.id}>{f.title}: {f.error}</li>)}</ul>}
+          {result.cloudflarePosters.length > 0 && (
+            <p style={{ margin: '0.5rem 0 0', color: 'var(--warn)' }}>
+              {result.cloudflarePosters.length} title{result.cloudflarePosters.length === 1 ? ' uses' : 's use'} Cloudflare&rsquo;s frame grab as a poster and need{result.cloudflarePosters.length === 1 ? 's' : ''} a real one uploaded: {result.cloudflarePosters.map((p) => p.title).join(', ')}.
+            </p>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

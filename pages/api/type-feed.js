@@ -1,4 +1,5 @@
 import { getTypeFeedData } from '../../lib/typeFeed';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/type/[type].js — public, content-
 // type-scoped browse data (Series, Movies, Shorts, Vertical, Podcasts).
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
   }
 
   res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!(await limitPublicRead(req, res, 'type-feed'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 
   const feed = await getTypeFeedData(type);

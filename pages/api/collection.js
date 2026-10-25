@@ -1,4 +1,5 @@
 import { getCollectionFeedData } from '../../lib/collectionFeed';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/collection/[slug].js's
 // getServerSideProps — same lib/collectionFeed.js, same two valid slugs
@@ -19,6 +20,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'collection'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { slug } = req.query;

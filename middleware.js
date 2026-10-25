@@ -2,6 +2,7 @@ import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
 import { privateBetaOn, isOpenPath, doorPath } from './lib/privateBetaRules';
 import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from './lib/suspensionGate';
+import { robotsTag } from './lib/robotsRules';
 
 // Normally this deliberately does NOT protect any routes — free browsing
 // (homepage, episode pages, genre/series/type pages) stays open to
@@ -34,6 +35,12 @@ import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from '.
 //    gate. Reads pass: the shells need them to draw the card. One small
 //    PostgREST read per person per minute per isolate; a database
 //    hiccup fails open.
+//
+// 4. Every response carries X-Robots-Tag: noai, noimageai (lib/robotsRules.js;
+//    Jose, 2026-10-25): a request to AI crawlers not to use the page or its
+//    images, with noindex, nofollow added while the beta door is shut. It
+//    lives here, not in next.config.js, so the two values never fight
+//    over the same header.
 const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -73,9 +80,8 @@ export default clerkMiddleware(async (auth, req) => {
   const via = raw ? raw.trim().replace(/^@+/, '').slice(0, 64) : '';
   const setVia = via && /^[A-Za-z0-9_.-]+$/.test(via);
 
-  if (!res && !setVia && !beta) return undefined;
   if (!res) res = NextResponse.next();
-  if (beta) res.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  res.headers.set('X-Robots-Tag', robotsTag({ privateBeta: beta }));
   if (setVia) {
     res.cookies.set(VIA_COOKIE, via, {
       maxAge: VIA_MAX_AGE,

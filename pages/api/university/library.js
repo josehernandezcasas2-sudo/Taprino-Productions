@@ -1,4 +1,5 @@
 import { getLibrary } from '../../../lib/university';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // Every downloadable file across every course, for the Library page and
 // the app's Library screen.
@@ -11,6 +12,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  if (!(await limitPublicRead(req, res, 'uni-library'))) return undefined;
   try {
     const library = await getLibrary();
     res.setHeader('Cache-Control', 'public, s-maxage=120, stale-while-revalidate=600');

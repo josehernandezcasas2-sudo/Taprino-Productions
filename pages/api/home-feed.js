@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getHomeFeedData } from '../../lib/homeFeed';
 import { getOwnCard } from '../../lib/crewCards';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // Public, read-only feed for external clients (the mobile app) — the same
 // content the website's homepage shows an anonymous visitor, minus any
@@ -29,6 +30,7 @@ export default async function handler(req, res) {
       if (card && card.place) near = { label: card.place.label, lat: card.place.lat, lng: card.place.lng };
     } catch (err) { /* no card */ }
   }
+  if (!(await limitPublicRead(req, res, 'home-feed'))) return undefined;
   res.setHeader('Cache-Control', userId ? 'private, no-store, max-age=0' : 'public, s-maxage=60, stale-while-revalidate=300');
   const feed = await getHomeFeedData({ userId: userId || null, near });
   return res.status(200).json(feed);

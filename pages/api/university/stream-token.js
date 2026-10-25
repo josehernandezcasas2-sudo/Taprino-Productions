@@ -1,4 +1,6 @@
+import { getAuth } from '@clerk/nextjs/server';
 import { getLessonPlayback, getFilePlayback } from '../../../lib/university';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // Mints a fresh signed playback URL for one video lesson ({ lessonId }) or
 // one video example ({ fileId }), the lesson-side twin of
@@ -17,6 +19,10 @@ export default async function handler(req, res) {
   if ((!lessonId || typeof lessonId !== 'string') && (!fileId || typeof fileId !== 'string')) {
     return res.status(400).json({ error: 'lessonId or fileId is required' });
   }
+  // Lessons are free, so this is the ceiling that separates a student
+  // from a script collecting every lesson video (lib/rateLimit.js).
+  const { userId } = getAuth(req);
+  if (!(await limitPublicRead(req, res, 'university-token', { max: userId ? 240 : 60, windowSeconds: 3600, userId }))) return undefined;
   try {
     const playback = lessonId ? await getLessonPlayback(lessonId) : await getFilePlayback(fileId);
     if (!playback) return res.status(404).json({ error: 'Not found' });

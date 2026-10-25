@@ -1,4 +1,5 @@
 import { getGenreFeedData } from '../../lib/genreFeed';
+import { limitPublicRead } from '../../lib/rateLimit';
 
 // The mobile app's equivalent of pages/genre/[genre].js — deliberately
 // NOT sharing that page's own getServerSideProps (same reasoning as
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
   }
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (!(await limitPublicRead(req, res, 'genre-feed'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
 
   const { genre } = req.query;

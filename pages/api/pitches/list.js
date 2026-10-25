@@ -1,5 +1,6 @@
 import { getApprovedPitches } from '../../../lib/pitches';
 import { getSiteSettings } from '../../../lib/siteSettings';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // Public, read-only feed of approved pitches for external clients (the
 // mobile app) — same data /pitches/discover shows a signed-out visitor,
@@ -17,6 +18,7 @@ export default async function handler(req, res) {
   if (!siteSettings.elevatorPitchEnabled) {
     return res.status(200).json({ pitches: [] });
   }
+  if (!(await limitPublicRead(req, res, 'pitches-list'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   const pitches = await getApprovedPitches();
   return res.status(200).json({ pitches });
