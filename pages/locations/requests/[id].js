@@ -113,6 +113,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
               {r.crewSize && <div><span>Crew</span><span>{r.crewSize}</span></div>}
               {r.vehicles != null && <div><span>Vehicles</span><span>{r.vehicles}</span></div>}
               {r.projectTitle && <div><span>Project</span><span>{r.projectId ? <Link href={r.projectType === 'pitch' ? `/pitches/${r.projectId}` : `/series/${r.projectId}`}>{r.projectTitle}</Link> : r.projectTitle}</span></div>}
+              {r.productionTitle && <div><span>Production</span><span><Link href={`/productions/${r.productionId}`}>{r.productionTitle}</Link></span></div>}
               <div><span>Shooting</span><span>{r.shooting}</span></div>
             </div>
             {r.message && <p className="loc-reqcard-msg" style={{ marginTop: '0.6rem' }}>“{r.message}”</p>}

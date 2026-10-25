@@ -20,7 +20,7 @@ export default function MyLocations() {
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);
-  const [state, setState] = useState({ loading: true, error: null, listings: [], requests: [] });
+  const [state, setState] = useState({ loading: true, error: null, listings: [], requests: [], pendingCredits: [] });
   const [busy, setBusy] = useState(null);
   const [blocking, setBlocking] = useState(null);
   const [showPast, setShowPast] = useState(false);
@@ -30,7 +30,7 @@ export default function MyLocations() {
     try {
       tokenRef.current = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
       const [m, r] = await Promise.all([apiGet('/api/locations/mine', tokenRef.current), apiGet('/api/locations/requests', tokenRef.current)]);
-      setState({ loading: false, error: null, listings: m.listings, requests: r.asHost });
+      setState({ loading: false, error: null, listings: m.listings, requests: r.asHost, pendingCredits: m.pendingCredits || [] });
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }));
     }
@@ -87,6 +87,21 @@ export default function MyLocations() {
             {open.map((r) => <RequestCard key={r.id} r={r} side="host" token={getToken} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />)}
             {past.length > 0 ? <Pressable onPress={() => setShowPast((v) => !v)}><Text style={[crew.mono, { marginBottom: 8 }]}>{showPast ? '▾' : '▸'} {past.length} past {past.length === 1 ? 'request' : 'requests'}</Text></Pressable> : null}
             {showPast ? past.map((r) => <RequestCard key={r.id} r={r} side="host" token={getToken} userId={userId} onChange={updateRequest} onPay={onPay} onOpen={() => router.push(`/locations/requests/${r.id}`)} onMessage={() => router.push(`/messages/${r.threadId}`)} />) : null}
+
+            {(state.pendingCredits || []).length ? (
+              <View style={[crew.panel, { marginTop: 8 }]}>
+                <Text style={crew.h3}>“Shot here” to confirm · {state.pendingCredits.length}</Text>
+                {state.pendingCredits.map((c) => (
+                  <View key={c.id} style={{ gap: 4 }}>
+                    <Text style={crew.rowText}>{c.title} <Text style={crew.mono}>· at {c.locationTitle} · says {c.claimedBy.displayName}{c.note ? ` · “${c.note}”` : ''}</Text></Text>
+                    <View style={crew.row}>
+                      <Pressable style={[crew.btnSm, crew.btnPrimary]} onPress={async () => { try { await apiPatch(`/api/locations/credits/${c.id}`, { decision: 'approve' }, await resolveToken(getToken)); load(); } catch (err) { Alert.alert('Could not do that', err.message); } }}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Yes, shot here</Text></Pressable>
+                      <Pressable style={crew.btnSm} onPress={async () => { try { await apiPatch(`/api/locations/credits/${c.id}`, { decision: 'decline' }, await resolveToken(getToken)); load(); } catch (err) { Alert.alert('Could not do that', err.message); } }}><Text style={crew.btnSmText}>No</Text></Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            ) : null}
 
             <Text style={[crew.h3, { marginTop: 8 }]}>Your places · {listings.length} of 10</Text>
             {listings.map((l) => (

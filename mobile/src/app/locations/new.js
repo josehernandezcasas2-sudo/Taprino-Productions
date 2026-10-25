@@ -18,7 +18,7 @@ const EMPTY = {
   title: '', kind: 'home', description: '', place: null, address: '', accessNotes: '',
   photos: [],
   sqFt: '', outdoorSqFt: '', rooms: '', ceilingFt: '', crewMax: '', hoursFrom: '07:00', hoursTo: '22:00', features: [], windowsFace: '', bestLight: '', power: '', sound: '',
-  hourly: '', minHours: '4', halfDay: '', day: '', dayHours: '10', overtime: '', cleaning: '', weekendPct: '0', dealsOk: true,
+  hourly: '', minHours: '4', halfDay: '', day: '', dayHours: '10', overtime: '', cleaning: '', weekendPct: '0', dealsOk: true, studioRate: '', studioRateNote: '',
   cancellation: 'moderate', rules: '', permitHelp: 'you_handle', coiRequired: false,
   ownership: 'owner', proofUrl: null, proofPreview: null, proofNote: ''
 };
@@ -29,7 +29,7 @@ function fromListing(l) {
     photos: l.photos.map((p) => ({ url: p.url, caption: p.caption || '' })),
     sqFt: l.sqFt == null ? '' : String(l.sqFt), outdoorSqFt: l.outdoorSqFt == null ? '' : String(l.outdoorSqFt), rooms: l.rooms, ceilingFt: l.ceilingFt == null ? '' : String(l.ceilingFt), crewMax: l.crewMax == null ? '' : String(l.crewMax),
     hoursFrom: l.hoursFrom || '', hoursTo: l.hoursTo || '', features: l.features, windowsFace: l.windowsFace, bestLight: l.bestLight, power: l.power, sound: l.sound,
-    hourly: d(l.hourlyCents), minHours: String(l.minHours), halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: String(l.dayHours), overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: String(l.weekendPct), dealsOk: l.dealsOk,
+    hourly: d(l.hourlyCents), minHours: String(l.minHours), halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: String(l.dayHours), overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: String(l.weekendPct), dealsOk: l.dealsOk, studioRate: d(l.studioRateCents), studioRateNote: l.studioRateNote || '',
     cancellation: l.cancellation, rules: l.rules, permitHelp: l.permitHelp, coiRequired: l.coiRequired,
     ownership: l.ownership, proofUrl: l.proofUrl, proofPreview: l.proofPreview || null, proofNote: l.proofNote
   };
@@ -208,6 +208,11 @@ export default function ListAPlace() {
               <View style={crew.row}>
                 <Switch value={form.dealsOk} onValueChange={(v) => set({ dealsOk: v })} trackColor={{ true: colors.brass }} />
                 <Text style={[crew.rowText, { flex: 1 }]}>Open to deals — producers can send their own number</Text>
+              </View>
+              <View style={{ gap: 6, padding: 8, borderRadius: 8, borderWidth: 1, borderStyle: 'dashed', borderColor: 'rgba(242,193,78,0.5)' }}>
+                <Text style={crew.label}>Studio Tapa rate ($/day) · optional</Text>
+                <View style={crew.row}>{num('studioRate', '350')}<TextInput style={[crew.input, { flex: 2 }]} value={form.studioRateNote} onChangeText={(v) => set({ studioRateNote: v })} placeholder="Fine print (weekdays, crews up to 8)" placeholderTextColor={colors.inkFaint} maxLength={200} /></View>
+                <Text style={crew.mono}>A deal for productions on Studio Tapa: a request linked to a production is quoted at this flat day rate, and the listing shows it.</Text>
               </View>
               <View style={loc.money}>
                 <Text style={loc.moneyText}>{preview ? `A 10-hour Saturday shows producers ${dollars(preview.bookingCents)}${preview.cleaningCents ? ` incl. ${dollars(preview.cleaningCents)} cleaning` : ''}, plus the card fee. You receive ${dollars(preview.hostPayoutCents)} after Studio Tapa’s ${DEFAULT_CUT_PERCENT}% cut.` : `No rates: every request will be an offer you accept, counter or decline. Studio Tapa keeps ${DEFAULT_CUT_PERCENT}% of whatever you agree.`}</Text>

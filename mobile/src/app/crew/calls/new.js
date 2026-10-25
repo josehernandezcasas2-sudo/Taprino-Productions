@@ -7,22 +7,27 @@ import { apiGet, apiPost, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip, PlaceBox } from '../../../components/CrewBits';
+import { UNION } from '../../../components/CastingBits';
 
 // Post a call (pages/crew/calls/new on the web). Everyone whose working
 // card lists the role and whose place + travel radius reaches it gets told.
 const PAY = { paid: 'Paid', union: 'Union', deferred: 'Deferred', unpaid: 'Unpaid', other: 'Other' };
 const PAY_HINT = { paid: '$350/day', union: 'SAG-AFTRA micro-budget, IATSE scale…', deferred: 'deferred + credit, points…', unpaid: 'meals + credit', other: 'say what the deal is' };
+// Pay secured (migration 110, lib/crewPayRules.js on the web): from $25 per person.
+const MIN_SECURED_DOLLARS = 25;
 
 export default function PostCall() {
   const router = useRouter();
-  const { project: preselect } = useLocalSearchParams();
+  const { project: preselect, production: preselectProduction } = useLocalSearchParams();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);
   const [roles, setRoles] = useState([]);
+  const [castRoles, setCastRoles] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', details: '' });
+  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', paySecured: false, payRateDollars: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '', kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -33,13 +38,14 @@ export default function PostCall() {
       tokenRef.current = signedIn ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]) : null;
       try {
         const o = await apiGet('/api/crew/options');
-        if (alive) { setRoles(o.roles); setForm((f) => ({ ...f, role: f.role || o.roles[0] })); }
+        if (alive) { setRoles(o.roles); setCastRoles(o.castRoles || []); setForm((f) => ({ ...f, role: f.role || o.roles[0] })); }
       } catch (err) { /* keep going */ }
       if (tokenRef.current) {
         try {
           const [p, card] = await Promise.all([apiGet('/api/crew/my-projects', tokenRef.current), apiGet('/api/crew/card', tokenRef.current)]);
           if (alive) {
             setProjects(p.projects || []);
+            setProductions(p.productions || []);
             if (card.card && card.card.place) setForm((f) => ({ ...f, place: f.place || card.card.place }));
           }
         } catch (err) { /* optional */ }
@@ -54,7 +60,9 @@ export default function PostCall() {
     setError(null);
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null }, await freshToken(getToken));
+      const neededBy = form.urgent && form.neededBy ? new Date(form.neededBy.trim().replace(' ', 'T')) : null;
+      if (form.urgent && (!neededBy || Number.isNaN(neededBy.getTime()))) throw new Error('Needed by needs a date and time like 2026-11-02 18:00.');
+      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null, production: form.production || null, neededBy: neededBy ? neededBy.toISOString() : null }, await freshToken(getToken));
       router.replace(`/crew/calls/${data.call.id}`);
     } catch (err) {
       setError(err.message);
@@ -77,11 +85,58 @@ export default function PostCall() {
           </View>
         ) : loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : (
           <>
+            <View style={[crew.panel, form.urgent && { borderColor: 'rgba(239,91,91,0.6)' }]}>
+              <View style={crew.row}>
+                <Switch value={form.urgent} onValueChange={(v) => set({ urgent: v })} trackColor={{ true: colors.danger }} />
+                <Text style={[crew.rowText, { flex: 1 }]}>⚡ This is urgent — someone dropped. Needed within 48 hours.</Text>
+              </View>
+              <Text style={crew.mono}>Goes to the top of the board; people who said they’re free right now hear first; closes itself once the time passes.</Text>
+              {form.urgent ? (
+                <>
+                  <Text style={[crew.label, { marginTop: 6 }]}>Needed by (YYYY-MM-DD HH:MM)</Text>
+                  <TextInput style={crew.input} value={form.neededBy} onChangeText={(v) => set({ neededBy: v })} placeholder="2026-11-02 18:00" placeholderTextColor={colors.inkFaint} autoCapitalize="none" />
+                </>
+              ) : null}
+            </View>
+
             <View style={crew.panel}>
-              <Text style={crew.label}>Title</Text>
-              <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder="Gaffer for two nights" placeholderTextColor={colors.inkFaint} maxLength={80} />
-              <Text style={[crew.label, { marginTop: 6 }]}>Role needed</Text>
-              <View style={crew.chips}>{roles.map((r) => <Chip key={r} label={r} on={form.role === r} onPress={() => set({ role: r })} />)}</View>
+              <View style={crew.toggle}>
+                {[['crew', 'Crew call'], ['cast', '🎭 Casting call']].map(([k, l]) => (
+                  <Pressable key={k} style={[crew.toggleBtn, form.kind === k && crew.toggleOn]} onPress={() => set({ kind: k, role: k === 'cast' ? (castRoles.includes(form.role) ? form.role : castRoles[0] || 'Actor') : (castRoles.includes(form.role) ? roles[0] : form.role) })}>
+                    <Text style={[crew.toggleText, form.kind === k && crew.toggleTextOn]}>{l}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {form.kind === 'cast' ? (
+                <View style={{ gap: 6, padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.07)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.3)' }}>
+                  <Text style={crew.label}>Character</Text>
+                  <TextInput style={crew.input} value={form.characterName} onChangeText={(v) => set({ characterName: v })} placeholder="MARTA, the night-shift nurse — or “Background, diner”" placeholderTextColor={colors.inkFaint} maxLength={60} />
+                  <Text style={crew.label}>Who they are</Text>
+                  <TextInput style={[crew.input, { minHeight: 70, textAlignVertical: 'top' }]} value={form.characterDesc} onChangeText={(v) => set({ characterDesc: v })} placeholder="A line or three on the character and what you’re looking for." placeholderTextColor={colors.inkFaint} multiline maxLength={1000} />
+                  <Text style={crew.label}>Playing age</Text>
+                  <View style={crew.row}>
+                    <TextInput style={[crew.input, { flex: 1 }]} value={form.playingAgeMin} onChangeText={(v) => set({ playingAgeMin: v.replace(/[^0-9]/g, '') })} placeholder="from" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+                    <TextInput style={[crew.input, { flex: 1 }]} value={form.playingAgeMax} onChangeText={(v) => set({ playingAgeMax: v.replace(/[^0-9]/g, '') })} placeholder="to" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+                  </View>
+                  <Text style={crew.label}>Union</Text>
+                  <View style={crew.chips}><Chip label="Either" on={!form.unionStatus} onPress={() => set({ unionStatus: '' })} />{Object.entries(UNION).map(([k, v]) => <Chip key={k} label={v} on={form.unionStatus === k} onPress={() => set({ unionStatus: k })} />)}</View>
+                  <Text style={crew.label}>Sides (optional)</Text>
+                  <TextInput style={crew.input} value={form.sidesUrl} onChangeText={(v) => set({ sidesUrl: v })} placeholder="https:// link to the pages" placeholderTextColor={colors.inkFaint} autoCapitalize="none" autoCorrect={false} />
+                  <View style={crew.row}>
+                    <Switch value={form.selfTapeWanted} onValueChange={(v) => set({ selfTapeWanted: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>Ask for a self-tape</Text>
+                  </View>
+                  {form.selfTapeWanted ? <TextInput style={crew.input} value={form.selfTapeDue} onChangeText={(v) => set({ selfTapeDue: v })} placeholder="Tape due (YYYY-MM-DD)" placeholderTextColor={colors.inkFaint} autoCapitalize="none" /> : null}
+                  <View style={crew.row}>
+                    <Switch value={form.minorsOk} onValueChange={(v) => set({ minorsOk: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>Performers under 18 may apply (a guardian’s name and contact is required on their response)</Text>
+                  </View>
+                </View>
+              ) : null}
+              <Text style={[crew.label, { marginTop: 6 }]}>Title</Text>
+              <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder={form.kind === 'cast' ? 'Lead for a 12-minute short, two days in Echo Park' : 'Gaffer for two nights'} placeholderTextColor={colors.inkFaint} maxLength={80} />
+              <Text style={[crew.label, { marginTop: 6 }]}>{form.kind === 'cast' ? 'Performer type' : 'Role needed'}</Text>
+              <View style={crew.chips}>{(form.kind === 'cast' ? castRoles : roles).map((r) => <Chip key={r} label={r} on={form.role === r} onPress={() => set({ role: r })} />)}</View>
               <Text style={[crew.label, { marginTop: 6 }]}>Spots</Text>
               <TextInput style={[crew.input, { width: 90 }]} value={form.spots} onChangeText={(v) => set({ spots: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="1" placeholderTextColor={colors.inkFaint} />
             </View>
@@ -91,6 +146,21 @@ export default function PostCall() {
               <View style={crew.chips}>{Object.entries(PAY).map(([k, v]) => <Chip key={k} label={v} on={form.payType === k} onPress={() => set({ payType: k })} />)}</View>
               <Text style={[crew.label, { marginTop: 6 }]}>Pay details</Text>
               <TextInput style={crew.input} value={form.payNote} onChangeText={(v) => set({ payNote: v })} placeholder={PAY_HINT[form.payType]} placeholderTextColor={colors.inkFaint} maxLength={120} />
+              {form.payType === 'paid' ? (
+                <View style={[styles.securebox, form.paySecured && styles.secureboxOn]}>
+                  <View style={crew.row}>
+                    <Switch value={form.paySecured} onValueChange={(v) => set({ paySecured: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>🔒 Secure the pay through Studio Tapa — you fund each person after you book them; it’s held and sent to them when you confirm they worked.</Text>
+                  </View>
+                  {form.paySecured ? (
+                    <>
+                      <Text style={[crew.label, { marginTop: 4 }]}>Rate per person, for the whole job (dollars)</Text>
+                      <TextInput style={[crew.input, { width: 140 }]} value={form.payRateDollars} onChangeText={(v) => set({ payRateDollars: v.replace(/[^0-9.]/g, '') })} keyboardType="decimal-pad" placeholder="350" placeholderTextColor={colors.inkFaint} />
+                      <Text style={crew.mono}>From ${MIN_SECURED_DOLLARS} per person. The Studio Tapa fee and card processing are added on top, so they get the full rate. Nothing is charged until you fund someone. “Didn’t happen” refunds you in full; unbooking someone you funded refunds everything but the card fee.</Text>
+                    </>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             <View style={crew.panel}>
@@ -118,6 +188,17 @@ export default function PostCall() {
               </View>
             ) : null}
 
+            {productions.length > 0 || form.production ? (
+              <View style={crew.panel}>
+                <Text style={crew.label}>Production (optional)</Text>
+                <View style={crew.chips}>
+                  <Chip label="None — just this call" on={!form.production} onPress={() => set({ production: '' })} />
+                  {productions.map((p) => <Chip key={p.value} label={p.label} on={form.production === p.value} onPress={() => set({ production: p.value })} />)}
+                </View>
+                <Text style={crew.mono}>Booked people join the production’s crew list; “worked it” becomes their credit when it’s released.</Text>
+              </View>
+            ) : null}
+
             <View style={crew.panel}>
               <Text style={crew.label}>Details</Text>
               <TextInput style={[crew.input, { minHeight: 110, textAlignVertical: 'top' }]} value={form.details} onChangeText={(v) => set({ details: v })} placeholder="What the days look like, what you have already, what they should bring." placeholderTextColor={colors.inkFaint} multiline maxLength={2000} />
@@ -136,4 +217,6 @@ export default function PostCall() {
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  securebox: { gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.oceanInk, marginTop: 8 },
+  secureboxOn: { borderColor: 'rgba(242,193,78,0.6)', backgroundColor: 'rgba(242,193,78,0.06)' },});

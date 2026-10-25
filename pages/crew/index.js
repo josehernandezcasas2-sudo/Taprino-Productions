@@ -12,7 +12,8 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard, searchCards } from '../../lib/crewCards';
 import { getTrackRecords } from '../../lib/crewCalls';
 import TierChip from '../../components/crew/TierChip';
-import { CREW_ROLES, GEAR_CATEGORIES, WITHIN_CHOICES } from '../../lib/crewOptions';
+import { CREW_ROLES, GEAR_CATEGORIES, WITHIN_CHOICES, UNION_STATUS } from '../../lib/crewOptions';
+import { CastCard } from '../../components/crew/CastingBits';
 import { SITE } from '../../lib/siteConfig';
 
 // Crew Call — the Connect side's network (mockup signed off 2026-10-09).
@@ -73,13 +74,18 @@ async function withRecords(people) {
 const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} miles`);
 
 export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, near: initialNear, hasCard, initial, loadError }) {
-  const [tab, setTab] = useState(() => (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('tab') === 'gear' ? 'gear' : 'people'));
+  const [tab, setTab] = useState(() => { const t = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('tab') : null; return t === 'gear' || t === 'cast' ? t : 'people'; });
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
+  const [union, setUnion] = useState('');
+  const [cast, setCast] = useState(null);
   const [q, setQ] = useState('');
   const [roles, setRoles] = useState([]);
   const [gearCat, setGearCat] = useState('');
   const [near, setNear] = useState(initialNear);
   const [within, setWithin] = useState(initialNear ? DEFAULT_WITHIN : 0);
   const [openOnly, setOpenOnly] = useState(false);
+  const [freeNow, setFreeNow] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [people, setPeople] = useState(initial);
   const [gear, setGear] = useState(null);
@@ -88,7 +94,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
   const first = useRef(true);
   const reqId = useRef(0);
 
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || verifiedOnly || (near && within));
+  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly || (near && within) || ageMin || ageMax || union);
 
   useEffect(() => {
     // The first people list came with the page.
@@ -102,14 +108,16 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
       if (gearCat) params.set('gear', gearCat);
       if (near) { params.set('lat', String(near.lat)); params.set('lng', String(near.lng)); params.set('within', String(within)); }
       if (openOnly) params.set('open', '1');
+      if (freeNow) params.set('free', '1');
       if (verifiedOnly) params.set('verified', '1');
       if (tab === 'gear') params.set('view', 'gear');
+      if (tab === 'cast') { params.set('cast', '1'); if (ageMin) params.set('ageMin', ageMin); if (ageMax) params.set('ageMax', ageMax); if (union) params.set('union', union); }
       try {
         const res = await fetch(`/api/crew/people?${params.toString()}`);
         const data = await res.json();
         if (id !== reqId.current) return;
         if (!res.ok) throw new Error(data.error || 'Could not load Crew Call.');
-        if (tab === 'gear') setGear(data); else setPeople(data);
+        if (tab === 'gear') setGear(data); else if (tab === 'cast') setCast(data); else setPeople(data);
         setError(null);
       } catch (err) {
         if (id === reqId.current) setError(err.message);
@@ -118,13 +126,13 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [tab, q, roles, gearCat, near, within, openOnly, verifiedOnly]);
+  }, [tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly, ageMin, ageMax, union]);
 
   function toggleRole(r) {
     setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
   }
   function clearFilters() {
-    setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setVerifiedOnly(false);
+    setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false); setAgeMin(''); setAgeMax(''); setUnion('');
     if (!initialNear) setNear(null);
   }
   function changeNear(p) {
@@ -158,6 +166,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
 
         <div className="crew-subnav" role="tablist">
           <button type="button" role="tab" aria-selected={tab === 'people'} onClick={() => setTab('people')}>Find people{people.total ? ` · ${people.total}` : ''}</button>
+          <button type="button" role="tab" aria-selected={tab === 'cast'} onClick={() => setTab('cast')}>Cast{cast && cast.total ? ` · ${cast.total}` : ''}</button>
           <button type="button" role="tab" aria-selected={tab === 'gear'} onClick={() => setTab('gear')}>Gear{gear && gear.total ? ` · ${gear.total}` : ''}</button>
           <Link href="/crew/calls" className="crew-tab">Calls</Link>
         </div>
@@ -167,7 +176,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
             <input
               type="search"
               className="crew-input"
-              placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : 'Name, role, gear, city…'}
+              placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : tab === 'cast' ? 'Name, skill, city…' : 'Name, role, gear, city…'}
               value={q}
               onChange={(e) => setQ(e.target.value)}
               aria-label={tab === 'gear' ? 'Search gear' : 'Search people'}
@@ -183,13 +192,29 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
                   </div>
                 </div>
               )}
-              <label className="crew-field">
+              {tab === 'cast' && (
+                <>
+                  <div className="crew-field"><span>Playing age</span>
+                    <div className="crew-row2">
+                      <input type="number" className="crew-input" min="0" max="110" placeholder="from" value={ageMin} onChange={(e) => setAgeMin(e.target.value)} aria-label="Playing age from" />
+                      <input type="number" className="crew-input" min="0" max="110" placeholder="to" value={ageMax} onChange={(e) => setAgeMax(e.target.value)} aria-label="Playing age to" />
+                    </div>
+                  </div>
+                  <label className="crew-field"><span>Union</span>
+                    <select className="crew-select" value={union} onChange={(e) => setUnion(e.target.value)}>
+                      <option value="">Any</option>
+                      {Object.entries(UNION_STATUS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                    </select>
+                  </label>
+                </>
+              )}
+              {tab !== 'cast' && <label className="crew-field">
                 <span>{tab === 'gear' ? 'Category' : 'Has gear'}</span>
                 <select className="crew-select" value={gearCat} onChange={(e) => setGearCat(e.target.value)}>
                   <option value="">{tab === 'gear' ? 'All gear' : 'Any gear'}</option>
                   {GEAR_CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
                 </select>
-              </label>
+              </label>}
               <div className="crew-field">
                 <span>Near</span>
                 <PlaceSearch value={near} onChange={changeNear} placeholder="City, or use your location" compact />
@@ -199,9 +224,10 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
                   </select>
                 )}
               </div>
-              {tab === 'people' && (
+              {tab !== 'gear' && (
                 <div className="crew-chips">
                   <button type="button" className={`crew-btn sm${openOnly ? ' on' : ''}`} onClick={() => setOpenOnly((v) => !v)} aria-pressed={openOnly}>● Open to work</button>
+                  <button type="button" className={`crew-btn sm${freeNow ? ' on' : ''}`} onClick={() => setFreeNow((v) => !v)} aria-pressed={freeNow} title="Said they can jump in today">⚡ Free right now</button>
                   <button type="button" className={`crew-btn sm${verifiedOnly ? ' on' : ''}`} onClick={() => setVerifiedOnly((v) => !v)} aria-pressed={verifiedOnly}>✓ Verified creators</button>
                 </div>
               )}
@@ -232,6 +258,17 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
                   </div>
                 )}
                 {people.people.map((p) => <PersonCard key={p.userId} p={p} signedIn={isSignedIn} />)}
+              </>
+            ) : tab === 'cast' ? (
+              <>
+                <div className="crew-rhead">
+                  <span className="crew-mono">{cast ? `${cast.total} ${cast.total === 1 ? 'performer' : 'performers'}` : 'Loading…'}{loading ? ' · updating…' : ''}</span>
+                  <span className="crew-mono">{sortNote}</span>
+                </div>
+                {cast && cast.people.length === 0 && !error && (
+                  <div className="crew-panel crew-empty">{hasFilters ? 'Nobody matches yet. Widen the age range or clear a filter.' : isSignedIn ? <>No performers listed yet. Turn on <b>Performer</b> on <Link href="/crew/card">your card</Link> and you’ll be first.</> : 'No performers listed yet. Sign in and turn on Performer on your card.'}</div>
+                )}
+                {cast && cast.people.length > 0 && <div className="cast-grid">{cast.people.map((p) => <CastCard key={p.userId} p={p} signedIn={isSignedIn} MessageLink={MessageLink} />)}</div>}
               </>
             ) : (
               <>
@@ -270,6 +307,7 @@ function PersonCard({ p, signedIn }) {
           <Link href={p.profilePath}>{p.displayName}</Link>
           {p.verified && <span className="crew-ver">✓ creator</span>}
           {p.tier && <TierChip person={p} />}
+          {p.freeNow && <span className="crew-chip urgent">⚡ free right now</span>}
           {p.handle && <span className="crew-handle">@{p.handle}</span>}
         </div>
         <div className="crew-pmeta">

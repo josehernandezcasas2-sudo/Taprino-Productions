@@ -9,6 +9,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { RequestCard } from '../../components/locations/RequestBits';
 import { getOwnListings } from '../../lib/locations';
 import { listMyRequests } from '../../lib/locationRequests';
+import { pendingClaimsForHost } from '../../lib/locationCredits';
 import { CANCELLATION } from '../../lib/locationRules';
 
 // Your locations (/locations/mine): every place you've listed with its
@@ -19,12 +20,14 @@ export async function getServerSideProps({ req, res }) {
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   let listings = [];
   let requests = [];
+  let pendingCredits = [];
   let loadError = null;
   if (account.isSignedIn) {
     try {
-      const [own, mine] = await Promise.all([getOwnListings(account.userId), listMyRequests(account.userId)]);
+      const [own, mine, claims] = await Promise.all([getOwnListings(account.userId), listMyRequests(account.userId), pendingClaimsForHost(account.userId).catch(() => [])]);
       listings = JSON.parse(JSON.stringify(own));
       requests = JSON.parse(JSON.stringify(mine.asHost));
+      pendingCredits = JSON.parse(JSON.stringify(claims));
     } catch (err) {
       loadError = err.message;
     }
@@ -38,6 +41,7 @@ export async function getServerSideProps({ req, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       viewerId: account.userId || null,
+      pendingCredits,
       listings,
       requests,
       loadError
@@ -55,6 +59,18 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
   const pastRequests = requests.filter((r) => !openRequests.includes(r));
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(loadError);
+
+  // "Shot here" claims (migration 107): the host confirms or not.
+  async function decideCredit(id, decision) {
+    try {
+      const res = await fetch(`/api/locations/credits/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ decision }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Could not do that.');
+      router.replace(router.asPath, undefined, { scroll: false });
+    } catch (err) {
+      setError(err.message);
+    }
+  }
   const [note, setNote] = useState(null);
   const [blocking, setBlocking] = useState(null); // listing id with the calendar open
 
@@ -120,6 +136,21 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
             {openRequests.map((r) => <RequestCard key={r.id} r={r} side="host" viewerId={viewerId} onChange={updateRequest} />)}
             {pastRequests.length > 0 && <details className="loc-past"><summary className="crew-mono">{pastRequests.length} past {pastRequests.length === 1 ? 'request' : 'requests'}</summary>{pastRequests.map((r) => <RequestCard key={r.id} r={r} side="host" viewerId={viewerId} onChange={updateRequest} />)}</details>}
           </section>
+
+          {pendingCredits.length > 0 && (
+            <section className="crew-panel">
+              <h3>“Shot here” to confirm <small>{pendingCredits.length}</small></h3>
+              {pendingCredits.map((c) => (
+                <div key={c.id} className="shot-pending-row">
+                  <span><Link href={c.href}>{c.title}</Link> <small className="crew-mono">· at {c.locationTitle} · says {c.claimedBy.displayName}{c.note ? ` · “${c.note}”` : ''}</small></span>
+                  <span className="crew-actions">
+                    <button type="button" className="crew-btn sm primary" onClick={() => decideCredit(c.id, 'approve')}>Yes, shot here</button>
+                    <button type="button" className="crew-btn sm ghost" onClick={() => decideCredit(c.id, 'decline')}>No</button>
+                  </span>
+                </div>
+              ))}
+            </section>
+          )}
 
           <section className="crew-panel">
             <h3>Your places <small>{listings.length} of 10</small></h3>

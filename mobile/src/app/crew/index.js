@@ -7,6 +7,7 @@ import { apiGet, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, PersonCard, GearCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '../../components/CrewBits';
+import { CastCard, UNION } from '../../components/CastingBits';
 
 // Crew Call (pages/crew/index.js on the web): find people by role, gear
 // and distance, browse the gear, keep your own card. Fed by
@@ -30,9 +31,14 @@ export default function CrewCall() {
   const [near, setNear] = useState(null);
   const [within, setWithin] = useState(DEFAULT_WITHIN);
   const [openOnly, setOpenOnly] = useState(false);
+  const [freeNow, setFreeNow] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [people, setPeople] = useState(null);
   const [gear, setGear] = useState(null);
+  const [cast, setCast] = useState(null);
+  const [ageMin, setAgeMin] = useState('');
+  const [ageMax, setAgeMax] = useState('');
+  const [union, setUnion] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -70,14 +76,16 @@ export default function CrewCall() {
       if (gearCat) params.push(`gear=${encodeURIComponent(gearCat)}`);
       if (near) params.push(`lat=${near.lat}`, `lng=${near.lng}`, `within=${within}`);
       if (openOnly) params.push('open=1');
+      if (freeNow) params.push('free=1');
       if (verifiedOnly) params.push('verified=1');
       if (tab === 'gear') params.push('view=gear');
+      if (tab === 'cast') { params.push('cast=1'); if (ageMin) params.push(`ageMin=${ageMin}`); if (ageMax) params.push(`ageMax=${ageMax}`); if (union) params.push(`union=${union}`); }
       try {
         // Fresh each search (a token from when the screen opened has expired
         // a minute later, and day rates quietly disappear).
         const data = await apiGet(`/api/crew/people?${params.join('&')}`, tokenRef.current ? await freshToken(getToken) : null);
         if (id !== reqId.current) return;
-        if (tab === 'gear') setGear(data); else setPeople(data);
+        if (tab === 'gear') setGear(data); else if (tab === 'cast') setCast(data); else setPeople(data);
         setError(null);
       } catch (err) {
         if (id === reqId.current) setError(err.message);
@@ -86,9 +94,9 @@ export default function CrewCall() {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, verifiedOnly]);
+  }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly, ageMin, ageMax, union]);
 
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || verifiedOnly);
+  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly || ageMin || ageMax || union);
   // "Message" / "Ask about it": the conversation screen, with what it's
   // about attached; signed out goes to the Account tab to sign in.
   const message = (userId, kind, label) => {
@@ -97,7 +105,7 @@ export default function CrewCall() {
   };
   const toggleRole = (r) => setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
   const sortNote = near ? `nearest to ${near.label}` : 'newest first';
-  const list = tab === 'gear' ? gear : people;
+  const list = tab === 'gear' ? gear : tab === 'cast' ? cast : people;
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
@@ -112,6 +120,7 @@ export default function CrewCall() {
 
         <View style={[crew.chips, { marginBottom: 12 }]}>
           <Chip label={`Find people${people && people.total ? ` · ${people.total}` : ''}`} on={tab === 'people'} onPress={() => setTab('people')} />
+          <Chip label={`Cast${cast && cast.total ? ` · ${cast.total}` : ''}`} on={tab === 'cast'} onPress={() => setTab('cast')} />
           <Chip label={`Gear${gear && gear.total ? ` · ${gear.total}` : ''}`} on={tab === 'gear'} onPress={() => setTab('gear')} />
           <Chip label="Calls →" onPress={() => router.push('/crew/calls')} />
         </View>
@@ -120,7 +129,7 @@ export default function CrewCall() {
           style={[crew.input, { marginBottom: 10 }]}
           value={q}
           onChangeText={setQ}
-          placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : 'Name, role, gear, city…'}
+          placeholder={tab === 'gear' ? 'Camera, light, lens, van…' : tab === 'cast' ? 'Name, skill, city…' : 'Name, role, gear, city…'}
           placeholderTextColor={colors.inkFaint}
           autoCorrect={false}
           returnKeyType="search"
@@ -135,13 +144,27 @@ export default function CrewCall() {
               </ScrollView>
             </View>
           ) : null}
-          <View>
+          {tab === 'cast' ? (
+            <View style={{ gap: 6 }}>
+              <Text style={crew.label}>Playing age</Text>
+              <View style={crew.row}>
+                <TextInput style={[crew.input, { flex: 1 }]} value={ageMin} onChangeText={(v) => setAgeMin(v.replace(/[^0-9]/g, ''))} placeholder="from" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+                <TextInput style={[crew.input, { flex: 1 }]} value={ageMax} onChangeText={(v) => setAgeMax(v.replace(/[^0-9]/g, ''))} placeholder="to" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+              </View>
+              <Text style={crew.label}>Union</Text>
+              <View style={crew.chips}>
+                <Chip label="Any" on={!union} onPress={() => setUnion('')} />
+                {Object.entries(UNION).map(([k, v]) => <Chip key={k} label={v} on={union === k} onPress={() => setUnion(union === k ? '' : k)} />)}
+              </View>
+            </View>
+          ) : null}
+          {tab !== 'cast' ? <View>
             <Text style={crew.label}>{tab === 'gear' ? 'Category' : 'Has gear'}</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.hrow} keyboardShouldPersistTaps="handled">
               <Chip label={tab === 'gear' ? 'All gear' : 'Any gear'} on={!gearCat} onPress={() => setGearCat('')} />
               {options.gearCategories.map((c) => <Chip key={c} label={c} on={gearCat === c} onPress={() => setGearCat(c)} />)}
             </ScrollView>
-          </View>
+          </View> : null}
           <View>
             <Text style={[crew.label, { marginBottom: 6 }]}>Near</Text>
             <PlaceBox value={near} onChange={(p) => { setNear(p); if (p && within === 0) setWithin(DEFAULT_WITHIN); }} placeholder="City, or use your location" />
@@ -151,14 +174,15 @@ export default function CrewCall() {
               </ScrollView>
             ) : null}
           </View>
-          {tab === 'people' ? (
+          {tab !== 'gear' ? (
             <View style={crew.chips}>
               <Chip label="● Open to work" on={openOnly} onPress={() => setOpenOnly((v) => !v)} />
+              <Chip label="⚡ Free right now" on={freeNow} onPress={() => setFreeNow((v) => !v)} />
               <Chip label="✓ Verified creators" on={verifiedOnly} onPress={() => setVerifiedOnly((v) => !v)} />
             </View>
           ) : null}
           {hasFilters ? (
-            <Pressable onPress={() => { setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setVerifiedOnly(false); }}>
+            <Pressable onPress={() => { setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false); setAgeMin(''); setAgeMax(''); setUnion(''); }}>
               <Text style={[crew.mono, { color: colors.inkDim }]}>Clear filters</Text>
             </Pressable>
           ) : null}
@@ -166,7 +190,7 @@ export default function CrewCall() {
 
         <View style={styles.rhead}>
           <Text style={crew.mono}>
-            {list ? (tab === 'gear' ? `${list.total} ${list.total === 1 ? 'item' : 'items'}` : `${list.total} ${list.total === 1 ? 'person' : 'people'}`) : 'Loading…'}
+            {list ? (tab === 'gear' ? `${list.total} ${list.total === 1 ? 'item' : 'items'}` : tab === 'cast' ? `${list.total} ${list.total === 1 ? 'performer' : 'performers'}` : `${list.total} ${list.total === 1 ? 'person' : 'people'}`) : 'Loading…'}
             {loading && list ? ' · updating…' : ''}
           </Text>
           <Text style={crew.mono}>{sortNote}</Text>
@@ -182,6 +206,14 @@ export default function CrewCall() {
             </Text>
           ) : (
             people.people.map((p) => <PersonCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} onMessage={() => message(p.userId, 'card', `${p.displayName}’s card`)} />)
+          )
+        ) : null}
+
+        {tab === 'cast' && cast ? (
+          cast.people.length === 0 && !error ? (
+            <Text style={crew.empty}>{hasFilters || near ? 'Nobody matches yet. Widen the age range or clear a filter.' : 'No performers listed yet. Turn on Performer on your card and you’ll be first.'}</Text>
+          ) : (
+            cast.people.map((p) => <CastCard key={p.userId} p={p} onOpen={() => router.push(p.profilePath)} onMessage={() => message(p.userId, 'card', `${p.displayName}’s card`)} />)
           )
         ) : null}
 

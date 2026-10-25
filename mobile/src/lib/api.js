@@ -71,6 +71,20 @@ export async function apiPatch(path, body, token) {
   return res.json();
 }
 
+// Same shape as apiPost, for routes that PUT a whole record (a shoot day
+// on a production's call sheet).
+export async function apiPut(path, body, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw await failed(res);
+  return res.json();
+}
+
 // Same shape as apiPost, for the handful of routes (watch-progress,
 // watch-history, pitch-comment) that use DELETE to remove one saved item.
 export async function apiDelete(path, body, token) {

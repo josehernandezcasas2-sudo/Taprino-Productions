@@ -112,6 +112,8 @@ export async function getServerSideProps({ req, params, query, res }) {
       // ride along in __NEXT_DATA__ on every episode view.
       mainGenres: [...new Set(data.publicEpisodes.map((e) => e.mainGenre).filter(Boolean))],
       bonusContent: data.bonusContent,
+      crew: data.crew || [],
+      shotAt: data.shotAt || [],
       parentSeriesName: data.parentSeriesName,
       nextEpisode: data.nextEpisode,
       previousEpisode: data.previousEpisode,
@@ -134,7 +136,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -549,6 +551,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               <p>{episode.desc}</p>
               <div className="credit-line">
                 {episode.artist && <span>Made by {episode.artist}</span>}
+                {shotAt.length > 0 && <span className="credit-crew">Shot at {shotAt.map((s, i) => <span key={s.locationId}>{i > 0 ? ', ' : ''}<Link href={s.href}>{s.title}</Link>{s.city ? <small> ({s.city})</small> : null}</span>)}</span>}
+                {crew.length > 0 && <span className="credit-crew">With {crew.slice(0, 6).map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small>({c.role})</small></span>)}{crew.length > 6 ? ` and ${crew.length - 6} more` : ''}</span>}
                 <span>{formatRuntimeLong(episode.runtime) || episode.runtime}</span>
                 {episode.genre && <span>{episode.genre}</span>}
                 {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}

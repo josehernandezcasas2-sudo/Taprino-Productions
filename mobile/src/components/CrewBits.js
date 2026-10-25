@@ -180,6 +180,7 @@ export function PersonCard({ p, onOpen, onMessage }) {
             <Text style={crew.name}>{p.displayName}</Text>
             {p.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}
             <TierChip person={p} />
+            {p.freeNow ? <View style={[crew.chip, crew.chipUrgent]}><Text style={[crew.chipText, { color: colors.danger }]}>⚡ free right now</Text></View> : null}
             {p.handle ? <Text style={crew.handle}>@{p.handle}</Text> : null}
           </View>
           <View style={crew.metaRow}>
@@ -266,7 +267,9 @@ export function CreditRows({ auto = [], manual = [], onRemove, onOpenWork }) {
 }
 
 // The read-only card on a profile screen.
-export function CrewCardView({ card, creditedWork = [], isOwn = false, onEdit, onFind, onOpenWork }) {
+// `performerFacts`: the <PerformerFacts card> element from CastingBits
+// (passed in so this file and CastingBits don't import each other).
+export function CrewCardView({ card, creditedWork = [], isOwn = false, onEdit, onFind, onOpenWork, performerFacts = null }) {
   const facts = [];
   if (card.place) facts.push(`Based in ${card.place.label}${card.travelMiles ? ` · travels ${card.travelMiles} mi` : ''}`);
   if (card.remoteOk) facts.push('Remote OK');
@@ -279,6 +282,7 @@ export function CrewCardView({ card, creditedWork = [], isOwn = false, onEdit, o
         {facts.map((f) => <Text key={f} style={crew.meta}>{f}</Text>)}
       </View>
       {card.roles.length ? <View style={crew.chips}>{card.roles.map((r) => <Chip key={r} label={r} tone="role" />)}</View> : <Text style={crew.muted}>{isOwn ? 'No roles yet — add some on your card.' : 'No roles listed.'}</Text>}
+      {card.performer && performerFacts ? <><Text style={crew.h4}>Performer</Text>{performerFacts}</> : null}
       <Text style={crew.h4}>Gear</Text>
       <GearRows gear={card.gear} />
       <Text style={crew.h4}>Credits</Text>
@@ -320,6 +324,7 @@ export const crew = StyleSheet.create({
   chipGear: { backgroundColor: 'rgba(242,193,78,0.16)', color: colors.olive },
   chipOk: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
   chipMute: { backgroundColor: colors.surface3, color: colors.inkFaint },
+  chipUrgent: { backgroundColor: 'rgba(239,91,91,0.16)', color: colors.danger },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   name: { fontFamily: fonts.displaySemi, fontSize: 15.5, color: colors.ink },
   handle: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint },
@@ -367,8 +372,11 @@ export function CallCard({ c, onOpen }) {
   return (
     <Pressable style={crew.panel} onPress={onOpen}>
       <View style={[crew.nameRow, { gap: 6 }]}>
+        {c.urgent ? <View style={[crew.chip, crew.chipUrgent]}><Text style={[crew.chipText, { color: colors.danger }]}>⚡ URGENT{c.neededLabel ? ` · ${c.neededLabel}` : ''}</Text></View> : null}
+        {c.kind === 'cast' ? <Chip label={`🎭 Casting${c.characterName ? ` · ${c.characterName}` : ''}`} tone="gear" /> : null}
         <Text style={crew.name}>{c.title}</Text>
         <View style={[crew.chip, payStyle(c.payType)]}><Text style={[crew.chipText, { color: payStyle(c.payType).color }]}>{c.payLabel.toLowerCase()}</Text></View>
+        {c.paySecured && c.payRateCents ? <Chip label={`🔒 $${Math.round(c.payRateCents / 100).toLocaleString('en-US')} secured`} tone="gear" /> : null}
         {c.projectTitle ? <Chip label={`${c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${c.projectTitle}`} tone="ok" /> : null}
         {c.matches ? <Chip label="matches your card" tone="ok" /> : null}
         {c.mine ? <Chip label="yours" tone="role" /> : null}

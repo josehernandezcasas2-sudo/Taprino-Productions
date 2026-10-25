@@ -470,6 +470,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                     <div className="n"><b>{crewRecord.titles}</b><small>released titles</small></div>
                     <div className="n"><b>{crewRecord.posted}</b><small>calls posted · {crewRecord.filled} filled</small></div>
                     <div className="n"><b>{crewRecord.wouldAgain}</b><small>“would work again”</small></div>
+                    {(crewRecord.cameThrough > 0 || crewRecord.noShows > 0) && <div className="n"><b>{crewRecord.cameThrough}</b><small>came through on urgent calls{crewRecord.noShows ? ` · ${crewRecord.noShows} no-show${crewRecord.noShows === 1 ? '' : 's'}` : ''}</small></div>}
                   </div>
                   {crewRecord.recentJobs.length > 0 && (
                     <div className="crew-cardview-block">
@@ -593,7 +594,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                     <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
                       <div className="profile-work-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined} />
                       <div className="profile-work-title">{item.title}</div>
-                      <div className="profile-work-type">{workTypeLabel(item)}</div>
+                      <div className="profile-work-type">{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</div>
                     </Link>
                   ))}
                 </div>

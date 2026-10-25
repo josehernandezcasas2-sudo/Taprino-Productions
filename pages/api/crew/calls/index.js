@@ -4,9 +4,9 @@ import { crewCallRules } from '../../../../lib/crewCallRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../../lib/rateLimit';
 
 // The Crew Call board.
-//   GET  ?q=&role=&pay=paid,union&remote=1&lat=&lng=&within=50&matches=1&project=pitch:<id>&mine=1&closed=1
+//   GET  ?q=&role=&pay=paid,union&remote=1&lat=&lng=&within=50&matches=1&project=pitch:<id>&production=<id>&urgent=1&kind=cast|crew&mine=1&closed=1
 //        → { calls, total, hasCard, rules }
-//   POST { title, role, spots, payType, payNote, startsOn, endsOn, remote, place, project, details }
+//   POST { title, role, spots, payType, payNote, startsOn, endsOn, remote, place, project, production, details, urgent, neededBy }
 //        → the new call (same shape as GET /api/crew/calls/<id>)
 // Public to read; posting needs a signed-in account.
 export default async function handler(req, res) {
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       if (!(await checkRateLimit(rateLimitKeyForRequest(req, 'crew-calls'), 120, 60))) return res.status(429).json({ error: 'Slow down a little.' });
-      const { q, role, pay, remote, lat, lng, within, matches, project, mine, closed } = req.query;
+      const { q, role, pay, remote, lat, lng, within, matches, project, production, urgent, kind, mine, closed } = req.query;
       const result = await listCalls({
         q: q || '',
         role: role || null,
@@ -30,6 +30,9 @@ export default async function handler(req, res) {
         withinMiles: within,
         matches: matches === '1',
         project: project || null,
+        production: production || null,
+        urgentOnly: urgent === '1',
+        kind: kind || null,
         mine: mine === '1',
         includeClosed: closed === '1'
       }, { viewerId: userId || null });

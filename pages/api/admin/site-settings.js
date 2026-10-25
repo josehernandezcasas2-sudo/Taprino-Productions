@@ -157,6 +157,14 @@ export default async function handler(req, res) {
     if (!Number.isFinite(max) || max < 500 || max > 1000000) return res.status(400).json({ error: 'The biggest tip has to be between $5 and $10,000.' });
     updates.tip_max_cents = max;
   }
+  // Crew pay (migration 110): the service fee on secured pay. Applies to
+  // the next payment; held ones keep the fee they were priced with.
+  const { crewPayCutPercent } = req.body || {};
+  if (crewPayCutPercent !== undefined) {
+    const pct = Math.round(Number(crewPayCutPercent) * 10) / 10;
+    if (!Number.isFinite(pct) || pct < 0 || pct > 30) return res.status(400).json({ error: 'The crew pay fee has to be between 0% and 30%.' });
+    updates.crew_pay_cut_percent = pct;
+  }
   if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';
   if (streamLabel !== undefined) updates.stream_label = streamLabel && streamLabel.trim() ? streamLabel.trim() : 'Stream';
 

@@ -44,7 +44,7 @@ const EMPTY = {
   title: '', kind: 'home', description: '', place: null, address: '', accessNotes: '',
   photos: [],
   sqFt: '', outdoorSqFt: '', rooms: '', ceilingFt: '', crewMax: '', hoursFrom: '07:00', hoursTo: '22:00', features: [], windowsFace: '', bestLight: '', power: '', sound: '',
-  hourly: '', minHours: 4, halfDay: '', day: '', dayHours: 10, overtime: '', cleaning: '', weekendPct: 0, dealsOk: true,
+  hourly: '', minHours: 4, halfDay: '', day: '', dayHours: 10, overtime: '', cleaning: '', weekendPct: 0, dealsOk: true, studioRate: '', studioRateNote: '',
   cancellation: 'moderate', rules: '', permitHelp: 'you_handle', coiRequired: false,
   ownership: 'owner', proofUrl: null, proofPreview: null, proofNote: ''
 };
@@ -57,7 +57,7 @@ function fromListing(l) {
     photos: l.photos.map((p) => ({ url: p.url, caption: p.caption || '' })),
     sqFt: l.sqFt ?? '', outdoorSqFt: l.outdoorSqFt ?? '', rooms: l.rooms, ceilingFt: l.ceilingFt ?? '', crewMax: l.crewMax ?? '', hoursFrom: l.hoursFrom || '', hoursTo: l.hoursTo || '',
     features: l.features, windowsFace: l.windowsFace, bestLight: l.bestLight, power: l.power, sound: l.sound,
-    hourly: d(l.hourlyCents), minHours: l.minHours, halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: l.dayHours, overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: l.weekendPct, dealsOk: l.dealsOk,
+    hourly: d(l.hourlyCents), minHours: l.minHours, halfDay: d(l.halfDayCents), day: d(l.dayCents), dayHours: l.dayHours, overtime: d(l.overtimeCents), cleaning: d(l.cleaningCents), weekendPct: l.weekendPct, dealsOk: l.dealsOk, studioRate: d(l.studioRateCents), studioRateNote: l.studioRateNote || '',
     cancellation: l.cancellation, rules: l.rules, permitHelp: l.permitHelp, coiRequired: l.coiRequired,
     ownership: l.ownership, proofUrl: l.proofUrl, proofPreview: l.proofPreview || null, proofNote: l.proofNote
   };
@@ -244,6 +244,13 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
               <label className="crew-field"><span>Weekend / night (+%)</span><input type="number" className="crew-input" min="0" max="100" value={form.weekendPct} onChange={(e) => set({ weekendPct: e.target.value })} /></label>
             </div>
             <label className="crew-check"><input type="checkbox" checked={form.dealsOk} onChange={(e) => set({ dealsOk: e.target.checked })} /><span>Open to deals — producers can send their own number (students, no-budget shorts). With no rates set, every request is an offer.</span></label>
+            <div className="loc-studio-box">
+              <div className="crew-row2">
+                <label className="crew-field"><span>Studio Tapa rate ($/day) <small>optional</small></span><input type="number" className="crew-input" min="0" step="1" value={form.studioRate} onChange={(e) => set({ studioRate: e.target.value })} placeholder="350" /></label>
+                <label className="crew-field"><span>Fine print</span><input type="text" className="crew-input" value={form.studioRateNote} onChange={(e) => set({ studioRateNote: e.target.value })} placeholder="weekdays, crews up to 8" maxLength={200} /></label>
+              </div>
+              <span className="crew-mono">A deal for productions on Studio Tapa: a request linked to a production is quoted at this flat day rate instead of your posted rates, and the listing shows it. The title gets credited to your place when it’s released.</span>
+            </div>
             {preview ? (
               <div className="loc-money">A 10-hour Saturday ({preview.how}{Number(form.weekendPct) ? `, +${form.weekendPct}% weekend` : ''}) shows producers <b>{dollars(preview.bookingCents)}</b>{preview.cleaningCents ? ` including ${dollars(preview.cleaningCents)} cleaning` : ''}, plus the card fee. You receive <b>{dollars(preview.hostPayoutCents)}</b> after {SITE_NAME}’s {DEFAULT_CUT_PERCENT}% cut.</div>
             ) : (

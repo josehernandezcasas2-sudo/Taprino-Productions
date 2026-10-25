@@ -1,9 +1,11 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
+import { ownerProductions } from '../../../lib/productions';
 
 // The signed-in person's Pitch Room projects and series, for the
 // "Project (optional)" picker when posting a call (the app; the website
-// loads the same list server-side).
+// loads the same list server-side) — and their live productions
+// (migration 104) for the "Production" picker next to it.
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -17,14 +19,16 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   const supabase = getSupabase();
-  const [pitches, series] = await Promise.all([
+  const [pitches, series, productions] = await Promise.all([
     supabase.from('pitches').select('id, title').eq('created_by', userId).order('created_at', { ascending: false }).limit(50),
-    supabase.from('series').select('id, name').eq('creator_id', userId).order('created_at', { ascending: false }).limit(50)
+    supabase.from('series').select('id, name').eq('creator_id', userId).order('created_at', { ascending: false }).limit(50),
+    ownerProductions(userId).catch(() => [])
   ]);
   return res.status(200).json({
     projects: [
       ...(pitches.data || []).map((p) => ({ value: `pitch:${p.id}`, label: `Pitch Room · ${p.title}` })),
       ...(series.data || []).map((s) => ({ value: `series:${s.id}`, label: `Series · ${s.name}` }))
-    ]
+    ],
+    productions
   });
 }

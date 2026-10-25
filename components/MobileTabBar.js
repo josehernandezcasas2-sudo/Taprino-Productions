@@ -51,9 +51,11 @@ const GROUPS = {
       { href: '/pitches/discover', label: 'Pitch Discover' },
       { href: '/vertical/discover', label: 'Vertical Discover' },
       { href: '/crew', label: 'Crew Call' },
-      { href: '/locations', label: 'Locations' }
+      { href: '/locations', label: 'Locations' },
+      { href: '/productions', label: 'Productions' },
+      { href: '/resources', label: 'Resources' }
     ],
-    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew') || p.startsWith('/locations')
+    match: (p) => p === '/pitches/discover' || p === '/vertical/discover' || p.startsWith('/crew') || p.startsWith('/locations') || p.startsWith('/productions') || p.startsWith('/resources')
   },
   watch: {
     label: 'Watch',

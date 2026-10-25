@@ -7,6 +7,10 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import PlaceSearch from '../../components/crew/PlaceSearch';
 import { Avatar, GearRows, CreditRows } from '../../components/crew/CrewBits';
+import { PerformerEditor } from '../../components/crew/CastingBits';
+import PayoutsCard from '../../components/creator/PayoutsCard';
+import { listMyCrewPay } from '../../lib/crewPay';
+import { payDollars } from '../../lib/crewPayRules';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard } from '../../lib/crewCards';
@@ -25,12 +29,14 @@ export async function getServerSideProps({ req, res }) {
   let creditedWork = [];
   let profile = null;
   let loadError = null;
+  let myPay = [];
   if (account.isSignedIn) {
     try {
-      [card, creditedWork, profile] = await Promise.all([
+      [card, creditedWork, profile, myPay] = await Promise.all([
         getOwnCard(account.userId),
         getCreditedWork(account.userId),
-        getPublicProfile(account.userId)
+        getPublicProfile(account.userId),
+        listMyCrewPay(account.userId).catch(() => [])
       ]);
     } catch (err) {
       console.error('crew card page:', err.message);
@@ -49,14 +55,16 @@ export async function getServerSideProps({ req, res }) {
       card,
       creditedWork,
       profile,
-      loadError
+      loadError,
+      myPay
     }
   };
 }
 
 const EMPTY = {
   roles: [], place: null, travelMiles: DEFAULT_TRAVEL_MILES, remoteOk: false, availability: 'open', bookedUntil: '',
-  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: []
+  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: [],
+  performer: false, playingAgeMin: '', playingAgeMax: '', unionStatus: '', skills: [], reelUrl: '', headshots: []
 };
 
 function fromCard(card) {
@@ -74,11 +82,18 @@ function fromCard(card) {
     listed: card.listed,
     callEmails: card.callEmails !== false,
     gear: card.gear.map((g) => ({ category: g.category, name: g.name, flag: g.flag })),
-    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year || '' }))
+    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year || '' })),
+    performer: Boolean(card.performer),
+    playingAgeMin: card.playingAgeMin == null ? '' : String(card.playingAgeMin),
+    playingAgeMax: card.playingAgeMax == null ? '' : String(card.playingAgeMax),
+    unionStatus: card.unionStatus || '',
+    skills: card.skills || [],
+    reelUrl: card.reelUrl || '',
+    headshots: (card.headshots || []).map((h) => ({ url: h.url }))
   };
 }
 
-export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, card: initialCard, creditedWork, profile, loadError }) {
+export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, card: initialCard, creditedWork, profile, loadError, myPay = [] }) {
   const [form, setForm] = useState(() => fromCard(initialCard));
   const [saved, setSaved] = useState(initialCard);
   const [busy, setBusy] = useState(false);
@@ -232,6 +247,8 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
                   </div>
                 </section>
 
+                <PerformerEditor form={form} set={set} onError={(text) => setStatus({ kind: 'error', text })} />
+
                 <section className="crew-panel">
                   <h3>Gear <small>what you have — brings it, lends it, or ask</small></h3>
                   <GearRows gear={form.gear} onRemove={(i) => set({ gear: form.gear.filter((_, j) => j !== i) })} />
@@ -316,6 +333,28 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
               {!status && dirty && <span className="crew-mono">Unsaved changes</span>}
               {saved && <button type="button" className="crew-btn ghost sm crew-remove" onClick={remove} disabled={busy}>Remove card</button>}
             </div>
+
+            {/* Pay secured (migration 110): where the money from a call marked
+                🔒 lands. The same Stripe account creators and hosts use. */}
+            <section className="crew-paybox">
+              <div className="crew-paybox-head">
+                <span className="crew-eyebrow">Get paid</span>
+                <h2>Secured pay from calls</h2>
+                <p className="crew-muted">On a call marked <b>🔒 pay secured</b>, the poster funds your rate through {SITE.name} once you’re booked. It’s held until they confirm you worked, then sent to the payout account below — set it up once and every secured job lands there.</p>
+              </div>
+              <PayoutsCard returnTo="/crew/card" />
+              {myPay.length > 0 && (
+                <div className="crew-panel crew-paylist">
+                  <h3>Your secured pay</h3>
+                  {myPay.map((p) => (
+                    <div key={p.id} className="crew-rhead">
+                      <span><b>{payDollars(p.amountCents)}</b> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link></span>
+                      <span className={`crew-chip ${p.status === 'released' ? 'ok' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
       </main>

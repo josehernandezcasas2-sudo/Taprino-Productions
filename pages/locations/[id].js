@@ -10,12 +10,13 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getListing } from '../../lib/locations';
 import { getOwnCard } from '../../lib/crewCards';
 import { getSupabase } from '../../lib/supabase';
+import { ownerProductions, ownReleaseOptions } from '../../lib/productions';
 import { FEATURES, CANCELLATION, PERMIT_HELP, quoteFor, splitBooking, dollars, dayCount, hoursBetween, MIN_BOOKING_CENTS, MAX_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
 
 // One place (mockups/locations-v1.html §2): gallery, the facts a scout
 // wants, availability, the host, and the request panel. The host sees
 // the same page with an edit bar on top.
-export async function getServerSideProps({ req, res, params }) {
+export async function getServerSideProps({ req, res, params, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   const base = {
@@ -42,6 +43,7 @@ export async function getServerSideProps({ req, res, params }) {
     else throw err;
   }
   let projects = [];
+  let productions = [];
   if (account.isSignedIn && listing && !listing.mine) {
     const supabase = getSupabase();
     const [pitches, series] = await Promise.all([
@@ -52,8 +54,11 @@ export async function getServerSideProps({ req, res, params }) {
       ...(pitches.data || []).map((p) => ({ value: `pitch:${p.id}`, label: `Pitch Room · ${p.title}` })),
       ...(series.data || []).map((s) => ({ value: `series:${s.id}`, label: `Series · ${s.name}` }))
     ];
+    productions = await ownerProductions(account.userId).catch(() => []);
   }
-  return { props: { ...base, listing, notFound, setupError, projects } };
+  // "Shot here" claims: the viewer's own live titles (migration 107).
+  const releases = account.isSignedIn && listing ? await ownReleaseOptions(account.userId).catch(() => []) : [];
+  return { props: { ...base, listing, notFound, setupError, projects, productions, releases, openTab: query && query.tab === 'shot' ? 5 : 0 } };
 }
 
 const TABS = ['The space', 'Light, power, sound', 'Logistics', 'Rules', 'Permits & insurance', 'Shot here'];
@@ -61,10 +66,10 @@ const has = (l, k) => l.features.includes(k);
 const yesNo = (l, k, yes, no) => (has(l, k) ? yes : no);
 
 export default function ListingPage(props) {
-  const { listing: l, notFound, setupError, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, projects } = props;
+  const { listing: l, notFound, setupError, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, projects, productions = [], releases = [], openTab = 0 } = props;
   const shell = { mainGenres, isSignedIn, email, isAdmin, isCreator, isSubscriber };
   const [photo, setPhoto] = useState(0);
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(openTab);
   const [month, setMonth] = useState(thisMonth());
   const [copied, setCopied] = useState(false);
   const [dates, setDates] = useState({ from: '', to: '' });
@@ -145,12 +150,7 @@ export default function ListingPage(props) {
               {kv[tab].filter(([, v]) => v != null && v !== '').map(([k, v]) => <div key={k}><span>{k}</span><span>{String(v)}</span></div>)}
             </div>
           ) : (
-            <div className="crew-chips">
-              {l.credits.length === 0 && <span className="crew-muted">No credits yet. A shoot that goes as agreed adds the production here.</span>}
-              {l.credits.map((c, i) => c.projectId
-                ? <Link key={i} href={c.projectType === 'pitch' ? `/pitches/${c.projectId}` : `/series/${c.projectId}`} className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.title}</Link>
-                : <span key={i} className="crew-chip">{c.title}</span>)}
-            </div>
+            <ShotHere l={l} isSignedIn={isSignedIn} viewerId={viewerId} isAdmin={isAdmin} releases={releases} />
           )}
 
           <div className="crew-field" style={{ marginTop: '1.2rem' }}>
@@ -168,12 +168,13 @@ export default function ListingPage(props) {
             {l.overtimeCents && <div><span>Overtime <small>past booked hours</small></span><b>{dollars(l.overtimeCents, { whole: true })}/hr</b></div>}
             {l.cleaningCents && <div><span>Cleaning</span><b>{dollars(l.cleaningCents, { whole: true })}</b></div>}
             {l.weekendPct > 0 && <div><span>Weekends / nights</span><b>+{l.weekendPct}%</b></div>}
-            {!l.hourlyCents && !l.dayCents && <div><span>No posted rate</span><b>Make a deal</b></div>}
+            {l.studioRateCents && <div className="loc-studio"><span>Studio Tapa rate <small>{l.studioRateNote || 'for productions on Studio Tapa'}</small></span><b>{dollars(l.studioRateCents, { whole: true })}/day</b></div>}
+            {!l.hourlyCents && !l.dayCents && !l.studioRateCents && <div><span>No posted rate</span><b>Make a deal</b></div>}
             <span className="crew-mono">{l.dealsOk ? 'Also open to a deal — send your own number in the request.' : 'Posted rates only.'} {CANCELLATION[l.cancellation].label} cancellation.</span>
           </div>
 
           {!l.mine && (isSignedIn
-            ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} />
+            ? <RequestPanel listing={l} projects={projects} productions={productions} dates={dates} setDates={setDates} />
             : (
               <div className="crew-panel loc-req">
                 <span className="crew-eyebrow">Request to book</span>
@@ -212,14 +213,17 @@ export default function ListingPage(props) {
 
 /* ---------------- the request panel ---------------- */
 
-function RequestPanel({ listing: l, projects, dates, setDates }) {
+function RequestPanel({ listing: l, projects, productions = [], dates, setDates }) {
   const router = useRouter();
-  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
+  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', production: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
-  const hasRates = Boolean(l.hourlyCents || l.dayCents);
+  // A request for a production on Studio Tapa is quoted at the host's
+  // Studio Tapa rate when they've set one (migration 107).
+  const studio = Boolean(form.production && l.studioRateCents);
+  const hasRates = Boolean(l.hourlyCents || l.dayCents || studio);
   const endsOn = dates.to || dates.from;
   const days = dayCount(dates.from, endsOn);
   const hoursPerDay = hoursBetween(form.hoursFrom, form.hoursTo) || l.dayHours;
@@ -229,15 +233,15 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
     let subtotal = null;
     let how = '';
     if (form.pricing === 'posted' && hasRates) {
-      const q = quoteFor(l, { startsOn: dates.from, endsOn, hoursPerDay });
-      if (q) { subtotal = q.subtotalCents; how = q.lines.every((x) => x.how === 'day') ? `${days} × day rate` : q.lines.map((x) => x.how).join(' + '); }
+      const q = quoteFor(l, { startsOn: dates.from, endsOn, hoursPerDay, studio });
+      if (q) { subtotal = q.subtotalCents; how = q.studio ? `${days} × Studio Tapa rate` : q.lines.every((x) => x.how === 'day') ? `${days} × day rate` : q.lines.map((x) => x.how).join(' + '); }
     } else {
       const cents = Math.round(Number(form.offer) * 100);
       if (cents > 0) { subtotal = cents; how = 'your offer'; }
     }
     if (subtotal == null) return null;
     return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: l.cutPercent ?? DEFAULT_CUT_PERCENT }), how };
-  }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, l, days]);
+  }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, studio, l, days]);
 
   async function submit(e) {
     e.preventDefault();
@@ -248,7 +252,7 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
       const res = await fetch(`/api/locations/${l.id}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id } : null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer })
+        body: JSON.stringify({ startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id } : null, production: form.production || null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not send that.');
@@ -294,6 +298,15 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
           {projects.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
       </label>
+      {productions.length > 0 && (
+        <label className="crew-field"><span>Production (optional)</span>
+          <select className="crew-select" value={form.production} onChange={(e) => set({ production: e.target.value })}>
+            <option value="">None</option>
+            {productions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          <span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>Once paid, the dates land on the production’s call sheet with this place attached.{l.studioRateCents ? ` A production here is quoted at the Studio Tapa rate, ${dollars(l.studioRateCents, { whole: true })}/day.` : ''}</span>
+        </label>
+      )}
       <label className="crew-field"><span>What you’re shooting</span><input type="text" className="crew-input" value={form.shooting} onChange={(e) => set({ shooting: e.target.value })} placeholder="Narrative short, dialogue in the living room + yard, one night exterior" maxLength={200} required /></label>
       <div className="crew-field"><span>Pay</span>
         <div className="crew-toggle" role="group" aria-label="Pay">
@@ -317,5 +330,99 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
       <button type="submit" className="crew-btn primary" style={{ width: '100%' }} disabled={busy || !dates.from || days > MAX_DAYS || (form.pricing === 'offer' && !(Number(form.offer) > 0))}>{busy ? 'Sending…' : 'Send request'}</button>
       <span className="crew-mono" style={{ textAlign: 'center' }}>{fmtRange(dates.from, endsOn) || 'No dates yet'}{dates.from ? ` · ${hoursPerDay} hrs a day` : ''}</span>
     </form>
+  );
+}
+
+
+/* ---- "Shot here" (migration 107): titles credited to this place ---- */
+
+function ShotHere({ l, isSignedIn, viewerId, isAdmin, releases }) {
+  const router = useRouter();
+  const [pick, setPick] = useState('');
+  const [note, setNote] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const credits = l.shotHere || [];
+  const approved = credits.filter((c) => c.status === 'approved');
+  const pending = credits.filter((c) => c.status === 'pending');
+  const projectCredits = (l.credits || []).filter((c) => !c.creditId);
+  const already = new Set(credits.map((c) => `${c.type}:${c.releaseId}`));
+  const options = releases.filter((r) => !already.has(r.value));
+
+  async function call(url, method, body) {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Something went wrong.');
+      router.replace(`${router.asPath.split('?')[0]}?tab=shot`, undefined, { scroll: false });
+      return data;
+    } catch (err) {
+      setMsg(err.message);
+      return null;
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function claim(e) {
+    e.preventDefault();
+    const [type, id] = pick.split(':');
+    const r = await call(`/api/locations/${l.id}/credits`, 'POST', { release: { type, id }, note });
+    if (r) { setPick(''); setNote(''); setMsg(r.status === 'approved' ? 'Added.' : `Sent to ${l.host.displayName.split(' ')[0]} to confirm.`); }
+  }
+
+  return (
+    <div className="shot-here">
+      {approved.length === 0 && projectCredits.length === 0 && <span className="crew-muted">No titles credited yet. A shoot that goes as agreed for a released production adds it; the title’s maker can claim it too and the host confirms.</span>}
+      {approved.length > 0 && (
+        <div className="shot-grid">
+          {approved.map((c) => (
+            <Link key={c.id} href={c.href} className="shot-tile">
+              <span className="shot-tile-poster" style={c.poster ? { backgroundImage: `url(${c.poster})` } : undefined} />
+              <span className="shot-tile-title">{c.title}</span>
+              <span className="crew-mono">{c.contentType === 'series' ? 'Series' : c.contentType === 'movie' ? 'Film' : c.contentType === 'podcast' ? 'Podcast' : 'Short'}{c.year ? ` · ${c.year}` : ''}{c.viaBooking ? ' · booked here' : ''}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+      {projectCredits.length > 0 && (
+        <div className="crew-chips">
+          {projectCredits.map((c, i) => c.projectId
+            ? <Link key={i} href={c.projectType === 'pitch' ? `/pitches/${c.projectId}` : `/series/${c.projectId}`} className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.title}</Link>
+            : <span key={i} className="crew-chip">{c.title}</span>)}
+        </div>
+      )}
+      {pending.length > 0 && (l.mine || isAdmin || pending.some((c) => c.claimedBy.userId === viewerId)) && (
+        <div className="shot-pending">
+          <span className="crew-eyebrow">Waiting on the host</span>
+          {pending.map((c) => (
+            <div key={c.id} className="shot-pending-row">
+              <span><Link href={c.href}>{c.title}</Link> <small className="crew-mono">· says {c.claimedBy.displayName}{c.note ? ` · “${c.note}”` : ''}</small></span>
+              {(l.mine || isAdmin) ? (
+                <span className="crew-actions">
+                  <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => call(`/api/locations/credits/${c.id}`, 'PATCH', { decision: 'approve' })}>Yes, shot here</button>
+                  <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => call(`/api/locations/credits/${c.id}`, 'PATCH', { decision: 'decline' })}>No</button>
+                </span>
+              ) : <span className="crew-chip mute">pending</span>}
+            </div>
+          ))}
+        </div>
+      )}
+      {isSignedIn && options.length > 0 && (
+        <form className="shot-claim" onSubmit={claim}>
+          <label className="crew-field"><span>{l.mine ? 'Add a title shot here' : 'Shot one of your titles here?'}</span>
+            <select className="crew-select" value={pick} onChange={(e) => setPick(e.target.value)}>
+              <option value="">Pick the title…</option>
+              {options.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </label>
+          {!l.mine && <input type="text" className="crew-input" value={note} onChange={(e) => setNote(e.target.value)} placeholder="When, roughly — helps the host remember" maxLength={300} />}
+          <div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || !pick}>{l.mine ? 'Add it' : 'Ask the host to confirm'}</button>{msg && <span className="crew-mono">{msg}</span>}</div>
+        </form>
+      )}
+      {!isSignedIn && <span className="crew-mono">Made something here? Sign in and claim it from the title’s maker account; the host confirms.</span>}
+      {msg && !(isSignedIn && options.length > 0) && <span className="crew-mono">{msg}</span>}
+    </div>
   );
 }

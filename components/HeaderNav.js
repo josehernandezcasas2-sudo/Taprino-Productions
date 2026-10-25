@@ -186,6 +186,8 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         { href: '/pitches/discover', label: 'Pitch Discover', match: currentPath === '/pitches/discover' },
         { href: '/crew', label: 'Crew Call', match: currentPath.startsWith('/crew') },
         { href: '/locations', label: 'Locations', match: currentPath.startsWith('/locations') },
+        { href: '/productions', label: 'Productions', match: currentPath.startsWith('/productions') },
+        { href: '/resources', label: 'Resources', match: currentPath.startsWith('/resources') },
         ...(isSignedIn ? [{ href: '/messages', label: 'Messages', match: currentPath.startsWith('/messages'), badge: messagesUnread }] : []),
         ...(siteSettings && siteSettings.verticalEnabled !== false
           ? [{ href: '/vertical/discover', label: 'Vertical Discover', match: currentPath === '/vertical/discover' }]
@@ -448,6 +450,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 <Link href="/crew/card" className="dropdown-item"><AccountIcon size={15} /> My working card</Link>
                 <Link href="/locations/mine" className="dropdown-item"><AccountIcon size={15} /> My locations</Link>
                 <Link href="/locations/requests" className="dropdown-item"><AccountIcon size={15} /> Location requests</Link>
+                <Link href="/productions#mine" className="dropdown-item"><AccountIcon size={15} /> My productions</Link>
                 <Link href="/messages" className="dropdown-item"><ChatIcon size={15} /> Messages{messagesUnread > 0 && <span className="nav-badge">{messagesUnread > 9 ? '9+' : messagesUnread}</span>}</Link>
                 <Link href="/recs" className="dropdown-item"><SparkleIcon size={15} src={iconOverrides.sparkle} /> My Recs</Link>
                 {siteSettings && siteSettings.elevatorPitchEnabled && (

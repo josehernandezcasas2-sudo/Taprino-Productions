@@ -71,7 +71,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
     if (!data) return;
     const ok = window.confirm(
       `Send ${dollars(data.canLeave.cents)} to the bank now?\n\n` +
-      `Stays in Stripe: ${dollars(data.canLeave.stayCents)} (creators ${dollars(data.obligations.owedCents)}, advertisers ${dollars(data.obligations.adCreditsCents)}, reserve ${dollars(data.obligations.reserve.cents)}, earmarks ${dollars(data.obligations.earmarkCents)}).\n\n` +
+      `Stays in Stripe: ${dollars(data.canLeave.stayCents)} (creators ${dollars(data.obligations.owedCents)}, advertisers ${dollars(data.obligations.adCreditsCents)}, crew pay held ${dollars(data.obligations.crewPayHeldCents || 0)}, reserve ${dollars(data.obligations.reserve.cents)}, earmarks ${dollars(data.obligations.earmarkCents)}).\n\n` +
       'This creates one Stripe payout to the studio’s bank and closes this period. It can’t be undone from here.'
     );
     if (!ok) return;
@@ -140,6 +140,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr><td className="op" /><td>Available in Stripe<span className="sm-sub">Stripe balance · pending money is never counted</span></td><td>{dollars(stripe.availableCents)}</td></tr>
                 <tr><td className="op">−</td><td>Owed to creators<span className="sm-sub">Creator Share ledger, unpaid lines · {obligations.owedCreators} creator{obligations.owedCreators === 1 ? '' : 's'}</span></td><td className="neg">{dollars(obligations.owedCents)}</td></tr>
                 <tr><td className="op">−</td><td>Advertisers’ credits not yet served<span className="sm-sub">prepaid, refundable until the impressions run</span></td><td className="neg">{dollars(obligations.adCreditsCents)}</td></tr>
+                <tr><td className="op">−</td><td>Crew pay held for booked people<span className="sm-sub">{obligations.crewPayHeld || 0} payment{(obligations.crewPayHeld || 0) === 1 ? '' : 's'} funded by posters · {dollars(obligations.crewPayHeldWorkerCents || 0)} of it is the workers’ · goes to them on “worked it” or back to the poster, never to the bank</span></td><td className="neg">{dollars(obligations.crewPayHeldCents || 0)}</td></tr>
                 <tr><td className="op">−</td><td>Refund &amp; dispute reserve<span className="sm-sub">{obligations.reserve.percent}% of the last {obligations.reserve.days} days’ card volume ({dollars(obligations.reserve.volumeCents)}), floor {dollars(obligations.reserve.floorCents)}</span></td><td className="neg">{dollars(obligations.reserve.cents)}</td></tr>
                 <tr><td className="op">−</td><td>Earmarked for films and matches<span className="sm-sub">{obligations.earmarks.length} earmark{obligations.earmarks.length === 1 ? '' : 's'}, below · the studio’s own money kept in Stripe on purpose</span></td><td className="neg">{dollars(obligations.earmarkCents)}</td></tr>
                 <tr className="total"><td className="op">=</td><td>Can leave to the bank{canLeave.shortfallCents > 0 && <span className="sm-sub">the balance is {dollars(canLeave.shortfallCents)} short of what has to stay</span>}</td><td>{dollars(canLeave.cents)}</td></tr>
@@ -345,6 +346,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr><td className="op">+</td><td>Location cut kept</td><td className="pos">{dollars(share.together.bookingsKeptCents)}</td></tr>
                 <tr><td className="op">+</td><td>Title sales kept<span className="sm-sub">Buy to own · the studio’s share after Stripe and the creator’s transfer</span></td><td className="pos">{dollars(share.together.purchasesKeptCents || 0)}</td></tr>
                 <tr><td className="op">+</td><td>Tips kept<span className="sm-sub">the cut of each tip · the fan covers the card fee</span></td><td className="pos">{dollars(share.together.tipsKeptCents || 0)}</td></tr>
+                <tr><td className="op">+</td><td>Crew pay fee kept<span className="sm-sub">the service fee on secured pay funded this period, less fees on payments refunded · the held money itself is above, never here</span></td><td className="pos">{dollars(share.together.crewPayKeptCents || 0)}</td></tr>
                 <tr><td className="op">+</td><td>Ads served<span className="sm-sub">impressions delivered · unserved credits stay a liability</span></td><td className="pos">{dollars(share.together.adsServedCents)}</td></tr>
                 {(share.together.adShareCents || 0) > 0 && <tr><td className="op">−</td><td>Ad share to creators<span className="sm-sub">credited this period for the ads inside their titles · paid in the Creator Share batch</span></td><td className="neg">{dollars(share.together.adShareCents)}</td></tr>}
                 <tr><td className="op">−</td><td>Unexplained differences carried</td><td className="neg">{dollars(Math.max(0, -share.together.unexplainedCents))}</td></tr>
