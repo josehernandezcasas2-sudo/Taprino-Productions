@@ -120,7 +120,7 @@ function Shell({ title, children, mainGenres, isSignedIn, email, isAdmin, isCrea
 
 function PersonLine({ p, prefix }) {
   return (
-    <span className="cl-person">
+    <span className="cc-person">
       <Avatar userId={p.userId} name={p.displayName} src={p.avatarUrl} position={p.avatarPosition} zoom={p.avatarZoom} size="sm" />
       <span>
         {prefix}<Link href={p.profilePath}>{p.displayName}</Link>
@@ -192,7 +192,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
         <span className="crew-tab on" aria-current="page">Calls{board.total ? ` · ${board.total}` : ''}</span>
       </div>
 
-      <div className={`crew-find cl-board${active || notFound ? ' has-detail' : ''}`}>
+      <div className={`crew-find cc-board${active || notFound ? ' has-detail' : ''}`}>
         <aside className="crew-filters">
           <input type="search" className="crew-input" placeholder="Role, title, place, project…" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search calls" />
           <div className="crew-panel crew-filter-panel">
@@ -224,7 +224,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
           <div className="crew-panel crew-muted">Calls close themselves a week after the last day. Pay is always labelled — <b>paid, union, deferred, unpaid, other</b> — and no money moves through the site.</div>
         </aside>
 
-        <div className="cl-list">
+        <div className="cc-list">
           <div className="crew-rhead">
             <span className="crew-mono">{board.total} open {board.total === 1 ? 'call' : 'calls'}{loading ? ' · updating…' : ''}</span>
             <span className="crew-mono">{near ? `nearest to ${near.label} + remote` : 'newest first'}</span>
@@ -235,18 +235,18 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
             </div>
           )}
           {board.calls.map((c) => (
-            <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cl-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
-              <div className="cl-title">{c.title}<span className={`cl-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
-              <div className="cl-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
-              <div className="cl-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
+            <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cc-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
+              <div className="cc-title">{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
+              <div className="cc-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
+              <div className="cc-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
             </Link>
           ))}
         </div>
 
-        <aside className="cl-detail">
+        <aside className="cc-detail">
           {notFound && <div className="crew-panel crew-empty">That call isn't here any more.<br /><Link href="/crew/calls" className="crew-btn sm" style={{ marginTop: '0.6rem' }}>Back to the board</Link></div>}
           {active && <CallDetail key={active.call.id} data={active} viewerId={viewerId} isSignedIn={isSignedIn} isAdmin={isAdmin} onChange={setActive} />}
-          {!active && !notFound && <div className="crew-panel crew-empty cl-pick">Pick a call.</div>}
+          {!active && !notFound && <div className="crew-panel crew-empty cc-pick">Pick a call.</div>}
         </aside>
       </div>
     </Shell>
@@ -308,21 +308,21 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   const spotsLeft = Math.max(0, call.spots - booked);
 
   return (
-    <div className="crew-panel cl-detail-panel">
-      <div className="cl-detail-top">
-        <Link href="/crew/calls" className="crew-btn sm ghost cl-back" aria-label="Back to the board">‹</Link>
+    <div className="crew-panel cc-detail-panel">
+      <div className="cc-detail-top">
+        <Link href="/crew/calls" className="crew-btn sm ghost cc-back" aria-label="Back to the board">‹</Link>
         <span className="crew-eyebrow">{call.status === 'open' ? 'Open call' : 'Closed'}{call.projectTitle ? ` · from a ${call.projectType === 'pitch' ? 'Pitch Room project' : 'series'}` : ''}</span>
       </div>
-      <h2 className="cl-h2">{call.title}</h2>
-      <div className="cl-kv">
+      <h2 className="cc-h2">{call.title}</h2>
+      <div className="cc-kv">
         <span>Role</span><span>{call.role}{call.spots > 1 ? ` · ${call.spots} spots` : ''}{isPoster ? ` · ${booked} booked` : spotsLeft === 0 && call.spots > 0 ? ' · filled' : ''}</span>
         <span>When</span><span>{fmtRange(call.startsOn, call.endsOn)}</span>
         <span>Where</span><span>{call.remote ? 'Remote — anyone with the role, anywhere' : call.place}{call.miles != null ? ` · ${call.miles} mi from you` : ''}</span>
-        <span>Pay</span><span><span className={`cl-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.payNote}</span>
+        <span>Pay</span><span><span className={`cc-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.payNote}</span>
         {call.projectTitle && <><span>Project</span><span><Link href={call.projectType === 'pitch' ? `/pitches/${call.projectId}` : `/series/${call.projectId}`} className="crew-chip pitch">{call.projectTitle}</Link></span></>}
         <span>Posted by</span><span><PersonLine p={call.poster} /></span>
       </div>
-      {call.details && <p className="cl-details">{call.details}</p>}
+      {call.details && <p className="cc-details">{call.details}</p>}
       <div className="crew-mono">{call.poster.displayName.split(' ')[0]} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked</div>
 
       {note && <div className="crew-status ok" role="status">{note}</div>}
@@ -333,7 +333,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         <div className="crew-actions"><SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to respond</button></SignInButton></div>
       )}
       {!isPoster && canRespond && (
-        <form className="cl-form" onSubmit={respond}>
+        <form className="cc-form" onSubmit={respond}>
           <label className="crew-field"><span>Respond</span>
             <textarea className="crew-input" rows={4} value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Say when you're free, what you bring, and your rate." maxLength={2000} />
           </label>
@@ -341,7 +341,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         </form>
       )}
       {!isPoster && viewerResponse && (
-        <div className="cl-form">
+        <div className="cc-form">
           <div className="crew-chips">
             {viewerResponse.status === 'booked' && <span className="crew-chip ok">You're booked</span>}
             {viewerResponse.status === 'declined' && <span className="crew-chip mute">Not this time</span>}
@@ -360,22 +360,22 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
       {/* ----- poster side ----- */}
       {isPoster && (
-        <div className="cl-form">
+        <div className="cc-form">
           <div className="crew-actions">
             {call.status === 'open'
               ? <button type="button" className="crew-btn sm" disabled={busy} onClick={() => setStatus('closed')}>Close the call</button>
               : <button type="button" className="crew-btn sm" disabled={busy} onClick={() => setStatus('open')}>Reopen</button>}
             <span className="crew-mono">{booked} of {call.spots} {call.spots === 1 ? 'spot' : 'spots'} booked{call.status === 'open' ? ' · closing tells the others' : ''}</span>
           </div>
-          <h4 className="cl-h4">Responses{responses && responses.length ? ` · ${responses.length}` : ''}</h4>
+          <h4 className="cc-h4">Responses{responses && responses.length ? ` · ${responses.length}` : ''}</h4>
           {(!responses || responses.length === 0) && <div className="crew-muted">No responses yet. Matching people were told when you posted.</div>}
           {responses && responses.map((r) => (
-            <div key={r.id} className={`cl-resp${r.status === 'booked' || r.outcome === 'worked' ? ' booked' : ''}`}>
+            <div key={r.id} className={`cc-resp${r.status === 'booked' || r.outcome === 'worked' ? ' booked' : ''}`}>
               <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} position={r.person.avatarPosition} zoom={r.person.avatarZoom} size="sm" />
               <div style={{ minWidth: 0 }}>
                 <div className="crew-pname"><Link href={r.person.profilePath}>{r.person.displayName}</Link>{r.person.verified && <span className="crew-ver">✓ creator</span>}<TierChip person={r.person} /></div>
                 <div className="crew-mono">{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} on Crew Call · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}</div>
-                <p className="cl-resp-msg">“{r.message}”</p>
+                <p className="cc-resp-msg">“{r.message}”</p>
                 <div className="crew-chips">
                   {r.status === 'booked' && !r.outcome && <span className="crew-chip ok">Booked</span>}
                   {r.status === 'declined' && <span className="crew-chip mute">Declined</span>}
@@ -384,14 +384,14 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                   {r.outcome === 'cancelled' && <span className="crew-chip mute">Cancelled</span>}
                 </div>
                 {r.status === 'booked' && !r.outcome && pastEnd && (
-                  <div className="cl-outcome">
+                  <div className="cc-outcome">
                     <span className="crew-mono">Did they work the job?</span>
                     <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => outcome(r.id, 'worked')}>Yes, worked it</button>
                     <button type="button" className="crew-btn sm" disabled={busy} onClick={() => outcome(r.id, 'no_show')}>Didn't happen</button>
                   </div>
                 )}
                 {endorsing === r.id && (
-                  <form className="cl-endorse" onSubmit={endorse}>
+                  <form className="cc-endorse" onSubmit={endorse}>
                     <input type="text" className="crew-input" value={line} onChange={(e) => setLine(e.target.value)} maxLength={MAX_ENDORSEMENT_CHARS} placeholder={`One line about working with ${r.person.displayName.split(' ')[0]}`} />
                     <button type="submit" className="crew-btn sm primary" disabled={busy || !line.trim()}>Post it</button>
                     <button type="button" className="crew-btn sm ghost" onClick={() => setEndorsing(null)}>Skip</button>
@@ -399,7 +399,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                 )}
                 {r.outcome === 'worked' && !r.endorsedByPoster && endorsing !== r.id && <button type="button" className="crew-btn sm ghost" onClick={() => setEndorsing(r.id)}>Leave a line</button>}
               </div>
-              <div className="cl-resp-acts">
+              <div className="cc-resp-acts">
                 {r.threadId && <Link href={`/messages/${r.threadId}`} className="crew-btn sm">Message</Link>}
                 {r.status === 'sent' && call.status === 'open' && <button type="button" className="crew-btn sm primary" disabled={busy || spotsLeft === 0} onClick={() => book(r.id, 'book')}>{spotsLeft === 0 ? 'Full' : 'Book'}</button>}
                 {r.status === 'sent' && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => book(r.id, 'decline')}>Decline</button>}
@@ -412,14 +412,14 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
       {/* responder's endorsement form */}
       {!isPoster && endorsing && (
-        <form className="cl-endorse" onSubmit={endorse}>
+        <form className="cc-endorse" onSubmit={endorse}>
           <input type="text" className="crew-input" value={line} onChange={(e) => setLine(e.target.value)} maxLength={MAX_ENDORSEMENT_CHARS} placeholder={`One line about working with ${call.poster.displayName.split(' ')[0]}`} />
           <button type="submit" className="crew-btn sm primary" disabled={busy || !line.trim()}>Post it</button>
           <button type="button" className="crew-btn sm ghost" onClick={() => setEndorsing(null)}>Skip</button>
         </form>
       )}
 
-      <div className="crew-actions cl-foot">
+      <div className="crew-actions cc-foot">
         {!isPoster && isSignedIn && <ReportButton targetType="call" targetId={call.id} title={call.title} className="crew-mono" />}
         {isAdmin && !isPoster && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => { if (window.confirm('Remove this call from the board?')) setStatus('removed').then(() => router.push('/crew/calls')); }}>Remove (admin)</button>}
       </div>
@@ -465,7 +465,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
         </div>
       ) : (
         <div className="crew-card-grid">
-          <form className="crew-panel cl-postform" onSubmit={submit}>
+          <form className="crew-panel cc-postform" onSubmit={submit}>
             <span className="crew-eyebrow">Post a call</span>
             <label className="crew-field"><span>Title</span><input type="text" className="crew-input" value={form.title} onChange={(e) => set({ title: e.target.value })} placeholder="Gaffer for two nights" maxLength={80} required /></label>
             <div className="crew-row2">
@@ -505,7 +505,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
             </div>
             <div className="crew-panel crew-wc-side">
               <h3>Rules</h3>
-              <ul className="cl-rules">
+              <ul className="cc-rules">
                 <li>Pay is labelled — paid, union, deferred, unpaid, other. No money moves through the site.</li>
                 <li>Responses land in your Messages with the call attached. Book from the call page.</li>
                 <li>After the last day you'll be asked who worked it — that's what builds people's track record.</li>

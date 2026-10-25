@@ -193,7 +193,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
           )}
           <section className="crew-panel crew-wc-side">
             <h3>How this works</h3>
-            <ul className="cl-rules">
+            <ul className="cc-rules">
               <li>The host has 48 hours to accept, counter or decline.</li>
               <li>Paying confirms the dates and unlocks the address and access notes.</li>
               <li>Cancelling a paid booking refunds under the listing’s policy; a host cancelling refunds everything.</li>

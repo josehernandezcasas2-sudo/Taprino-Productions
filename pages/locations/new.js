@@ -294,7 +294,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
         <aside className="crew-aside">
           <section className="crew-panel crew-wc-side">
             <h3>How it works</h3>
-            <ul className="cl-rules">
+            <ul className="cc-rules">
               <li>Admin checks the proof, then the place is public. The street address never is: only a paid booking sees it.</li>
               <li>A producer asks for dates at your rate or makes an offer. You have 48 hours to accept, counter or decline.</li>
               <li>They pay through the site to confirm; you get your share through Stripe, minus {DEFAULT_CUT_PERCENT}%.</li>

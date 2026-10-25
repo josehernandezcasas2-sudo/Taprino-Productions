@@ -162,7 +162,7 @@ export function EndorseForm({ r, viewerId, onChange }) {
   };
   return (
     <div className="loc-answer">
-      <div className="cl-endorse">
+      <div className="cc-endorse">
         <input type="text" className="crew-input" value={line} onChange={(e) => setLine(e.target.value)} maxLength={MAX_ENDORSEMENT_CHARS} placeholder={`One line about ${other.displayName.split(' ')[0]} — it shows on their profile`} />
         <button type="button" className="crew-btn sm primary" disabled={busy || !line.trim()} onClick={run}>Post it</button>
       </div>

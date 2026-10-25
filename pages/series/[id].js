@@ -212,12 +212,12 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
 
         {/* Crew Call posts linked to this series (migration 082). */}
         {activeTab === 'about' && crewCalls.length > 0 && (
-          <div className="cl-list" style={{ maxWidth: 760, marginBottom: '1.4rem' }}>
+          <div className="cc-list" style={{ maxWidth: 760, marginBottom: '1.4rem' }}>
             <div className="crew-eyebrow">Crew needed</div>
             {crewCalls.map((c) => (
-              <Link key={c.id} href={`/crew/calls/${c.id}`} className="crew-panel cl-call">
-                <div className="cl-title">{c.title}<span className={`cl-pay ${c.payType === 'paid' || c.payType === 'union' ? 'paid' : c.payType === 'deferred' ? 'deferred' : 'unpaid'}`}>{c.payLabel}</span></div>
-                <div className="cl-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{c.remote ? 'Remote' : c.place}</span><span>{c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
+              <Link key={c.id} href={`/crew/calls/${c.id}`} className="crew-panel cc-call">
+                <div className="cc-title">{c.title}<span className={`cc-pay ${c.payType === 'paid' || c.payType === 'union' ? 'paid' : c.payType === 'deferred' ? 'deferred' : 'unpaid'}`}>{c.payLabel}</span></div>
+                <div className="cc-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{c.remote ? 'Remote' : c.place}</span><span>{c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
               </Link>
             ))}
           </div>

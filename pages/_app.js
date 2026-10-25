@@ -78,8 +78,15 @@ export default function App({ Component, pageProps }) {
   return (
     <ClerkProvider
       appearance={{
+        // Clerk derives its borders, hover fills and outline-button text from
+        // colorNeutral at low alpha (black unless set), so on our dark cards
+        // they vanished (the "Continue with Google" button read as a floating
+        // "Last used" tag). Ink as the neutral keeps every derived shade light.
+        // Gold buttons carry dark text like every other gold button on the site.
         variables: {
           colorPrimary: 'var(--olive)',
+          colorPrimaryForeground: '#241a05',
+          colorNeutral: 'var(--ink)',
           colorBackground: 'var(--surface-1)',
           colorInputBackground: 'var(--surface-0)',
           colorInputText: 'var(--ink)',

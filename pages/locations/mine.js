@@ -150,7 +150,7 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
           {listings.length > 0 && <PayoutsCard returnTo="/locations/mine" />}
           <section className="crew-panel crew-wc-side">
             <h3>The rules</h3>
-            <ul className="cl-rules">
+            <ul className="cc-rules">
               <li>A place is public once an admin has checked you can let a crew in. The street address stays private until a booking is paid.</li>
               <li>You have 48 hours to answer a request. Three unanswered in a row pause the listing until you check in.</li>
               <li>Studio Tapa keeps 10% of a booking; the producer covers the card fee. Your share goes to the bank account on your Payouts card.</li>
