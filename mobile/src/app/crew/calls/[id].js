@@ -85,10 +85,11 @@ export default function CallScreen() {
         {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
         {call ? (
           <>
-            <Text style={[crew.eyebrow, { marginTop: 10 }]}>{call.status === 'open' ? 'Open call' : 'Closed'}{call.projectTitle ? ` · ${call.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${call.projectTitle}` : ''}{call.productionTitle ? ` · for ${call.productionTitle}` : ''}</Text>
+            <Text style={[crew.eyebrow, { marginTop: 10 }, call.urgent && { color: colors.danger }]}>{call.urgent ? `⚡ Urgent call${call.status !== 'open' ? ' · closed' : ''}${call.neededLabel ? ` · ${call.neededLabel}` : ''}` : call.status === 'open' ? 'Open call' : 'Closed'}{call.projectTitle ? ` · ${call.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${call.projectTitle}` : ''}{call.productionTitle ? ` · for ${call.productionTitle}` : ''}</Text>
             <Text style={crew.h1}>{call.title}</Text>
             <View style={crew.panel}>
               <KV k="Role" v={`${call.role}${call.spots > 1 ? ` · ${call.spots} spots` : ''}${isPoster ? ` · ${data.booked} booked` : ''}`} />
+              {call.urgent && call.neededBy ? <KV k="Needed by" v={new Date(call.neededBy).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} /> : null}
               <KV k="When" v={fmtRange(call.startsOn, call.endsOn)} />
               <KV k="Where" v={call.remote ? 'Remote — anyone with the role, anywhere' : `${call.place}${call.miles != null ? ` · ${call.miles} mi from you` : ''}`} />
               <View style={crew.row}>
@@ -103,7 +104,7 @@ export default function CallScreen() {
                 <TierChip person={call.poster} />
               </Pressable>
               {call.details ? <Text style={[crew.rowText, { color: colors.inkDim, lineHeight: 20 }]}>{call.details}</Text> : null}
-              <Text style={crew.mono}>{first(call.poster.displayName)} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked</Text>
+              <Text style={crew.mono}>{first(call.poster.displayName)} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked{isPoster && data.firstResponseMinutes ? ` · first response after ${data.firstResponseMinutes < 60 ? `${data.firstResponseMinutes} min` : `${Math.round(data.firstResponseMinutes / 60)} h`}` : ''}</Text>
             </View>
 
             {note ? <Text style={[crew.mono, { color: colors.ok, marginBottom: 8 }]}>{note}</Text> : null}
@@ -124,6 +125,7 @@ export default function CallScreen() {
               <View style={crew.panel}>
                 <View style={crew.chips}>
                   {data.viewerResponse.status === 'booked' ? <Chip label="You're booked" tone="ok" /> : null}
+                  {data.viewerResponse.status === 'backup' ? <Chip label="On the bench — first in line if someone drops" tone="gear" /> : null}
                   {data.viewerResponse.status === 'declined' ? <Chip label="Not this time" tone="mute" /> : null}
                   {data.viewerResponse.status === 'sent' ? <Chip label="You responded" /> : null}
                   {data.viewerResponse.outcome === 'worked' ? <Chip label="✓ Confirmed job — on your track record" tone="ok" /> : null}
@@ -141,7 +143,7 @@ export default function CallScreen() {
               <View style={crew.panel}>
                 <View style={crew.row}>
                   <Pressable style={crew.btnSm} onPress={() => setStatus(call.status === 'open' ? 'closed' : 'open')} disabled={busy}><Text style={crew.btnSmText}>{call.status === 'open' ? 'Close the call' : 'Reopen'}</Text></Pressable>
-                  <Text style={crew.mono}>{data.booked} of {call.spots} booked</Text>
+                  <Text style={crew.mono}>{data.booked} of {call.spots} booked{data.benched ? ` · ${data.benched} on the bench` : ''}</Text>
                 </View>
                 <Text style={crew.h4}>Responses{data.responses && data.responses.length ? ` · ${data.responses.length}` : ''}</Text>
                 {!data.responses || data.responses.length === 0 ? <Text style={crew.muted}>No responses yet. Matching people were told when you posted.</Text> : null}
@@ -151,12 +153,13 @@ export default function CallScreen() {
                       <Avatar userId={r.person.userId} name={r.person.displayName} src={r.person.avatarUrl} position={r.person.avatarPosition} zoom={r.person.avatarZoom || 1} size={30} />
                       <View style={{ flex: 1 }}>
                         <View style={crew.nameRow}><Text style={crew.name}>{r.person.displayName}</Text>{r.person.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}<TierChip person={r.person} /></View>
-                        <Text style={crew.mono}>{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}</Text>
+                        <Text style={crew.mono}>{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}{r.person.cameThrough ? ` · came through on ${r.person.cameThrough} urgent` : ''}{r.person.noShows ? ` · ${r.person.noShows} no-show${r.person.noShows === 1 ? '' : 's'}` : ''}</Text>
                       </View>
                     </Pressable>
                     <Text style={[crew.bio, { color: colors.inkDim }]}>“{r.message}”</Text>
                     <View style={crew.chips}>
                       {r.status === 'booked' && !r.outcome ? <Chip label="Booked" tone="ok" /> : null}
+                      {r.status === 'backup' ? <Chip label="On the bench" tone="gear" /> : null}
                       {r.status === 'declined' ? <Chip label="Declined" tone="mute" /> : null}
                       {r.outcome === 'worked' ? <Chip label="✓ Worked it" tone="ok" /> : null}
                       {r.outcome === 'no_show' ? <Chip label="Didn't happen" tone="mute" /> : null}
@@ -174,7 +177,10 @@ export default function CallScreen() {
                     <View style={[crew.row, { flexWrap: 'wrap' }]}>
                       {r.threadId ? <Pressable style={crew.btnSm} onPress={() => router.push(`/messages/${r.threadId}`)}><Text style={crew.btnSmText}>Message</Text></Pressable> : null}
                       {r.status === 'sent' && call.status === 'open' ? <Pressable style={[crew.btnSm, crew.btnPrimary]} disabled={busy} onPress={() => book(r.id, 'book')}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Book</Text></Pressable> : null}
+                      {r.status === 'sent' && call.status === 'open' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'bench')}><Text style={crew.btnSmText}>Bench</Text></Pressable> : null}
                       {r.status === 'sent' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'decline')}><Text style={crew.btnSmText}>Decline</Text></Pressable> : null}
+                      {r.status === 'backup' ? <Pressable style={[crew.btnSm, crew.btnPrimary]} disabled={busy} onPress={() => book(r.id, 'promote')}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Promote</Text></Pressable> : null}
+                      {r.status === 'backup' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'unbench')}><Text style={crew.btnSmText}>Off the bench</Text></Pressable> : null}
                       {r.status === 'booked' && !r.outcome ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'unbook')}><Text style={crew.btnSmText}>Unbook</Text></Pressable> : null}
                       {r.outcome === 'worked' && !r.endorsedByPoster && endorsing !== r.id ? <Pressable style={crew.btnSm} onPress={() => setEndorsing(r.id)}><Text style={crew.btnSmText}>Leave a line</Text></Pressable> : null}
                     </View>

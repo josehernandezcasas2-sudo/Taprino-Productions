@@ -30,6 +30,7 @@ export default function CrewCall() {
   const [near, setNear] = useState(null);
   const [within, setWithin] = useState(DEFAULT_WITHIN);
   const [openOnly, setOpenOnly] = useState(false);
+  const [freeNow, setFreeNow] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [people, setPeople] = useState(null);
   const [gear, setGear] = useState(null);
@@ -70,6 +71,7 @@ export default function CrewCall() {
       if (gearCat) params.push(`gear=${encodeURIComponent(gearCat)}`);
       if (near) params.push(`lat=${near.lat}`, `lng=${near.lng}`, `within=${within}`);
       if (openOnly) params.push('open=1');
+      if (freeNow) params.push('free=1');
       if (verifiedOnly) params.push('verified=1');
       if (tab === 'gear') params.push('view=gear');
       try {
@@ -86,9 +88,9 @@ export default function CrewCall() {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, verifiedOnly]);
+  }, [refreshKey, tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly]);
 
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || verifiedOnly);
+  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly);
   // "Message" / "Ask about it": the conversation screen, with what it's
   // about attached; signed out goes to the Account tab to sign in.
   const message = (userId, kind, label) => {
@@ -154,11 +156,12 @@ export default function CrewCall() {
           {tab === 'people' ? (
             <View style={crew.chips}>
               <Chip label="● Open to work" on={openOnly} onPress={() => setOpenOnly((v) => !v)} />
+              <Chip label="⚡ Free right now" on={freeNow} onPress={() => setFreeNow((v) => !v)} />
               <Chip label="✓ Verified creators" on={verifiedOnly} onPress={() => setVerifiedOnly((v) => !v)} />
             </View>
           ) : null}
           {hasFilters ? (
-            <Pressable onPress={() => { setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setVerifiedOnly(false); }}>
+            <Pressable onPress={() => { setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false); }}>
               <Text style={[crew.mono, { color: colors.inkDim }]}>Clear filters</Text>
             </Pressable>
           ) : null}

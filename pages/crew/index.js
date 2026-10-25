@@ -80,6 +80,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
   const [near, setNear] = useState(initialNear);
   const [within, setWithin] = useState(initialNear ? DEFAULT_WITHIN : 0);
   const [openOnly, setOpenOnly] = useState(false);
+  const [freeNow, setFreeNow] = useState(false);
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [people, setPeople] = useState(initial);
   const [gear, setGear] = useState(null);
@@ -88,7 +89,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
   const first = useRef(true);
   const reqId = useRef(0);
 
-  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || verifiedOnly || (near && within));
+  const hasFilters = Boolean(q.trim() || roles.length || gearCat || openOnly || freeNow || verifiedOnly || (near && within));
 
   useEffect(() => {
     // The first people list came with the page.
@@ -102,6 +103,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
       if (gearCat) params.set('gear', gearCat);
       if (near) { params.set('lat', String(near.lat)); params.set('lng', String(near.lng)); params.set('within', String(within)); }
       if (openOnly) params.set('open', '1');
+      if (freeNow) params.set('free', '1');
       if (verifiedOnly) params.set('verified', '1');
       if (tab === 'gear') params.set('view', 'gear');
       try {
@@ -118,13 +120,13 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [tab, q, roles, gearCat, near, within, openOnly, verifiedOnly]);
+  }, [tab, q, roles, gearCat, near, within, openOnly, freeNow, verifiedOnly]);
 
   function toggleRole(r) {
     setRoles((list) => (list.includes(r) ? list.filter((x) => x !== r) : [...list, r]));
   }
   function clearFilters() {
-    setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setVerifiedOnly(false);
+    setQ(''); setRoles([]); setGearCat(''); setOpenOnly(false); setFreeNow(false); setVerifiedOnly(false);
     if (!initialNear) setNear(null);
   }
   function changeNear(p) {
@@ -202,6 +204,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
               {tab === 'people' && (
                 <div className="crew-chips">
                   <button type="button" className={`crew-btn sm${openOnly ? ' on' : ''}`} onClick={() => setOpenOnly((v) => !v)} aria-pressed={openOnly}>● Open to work</button>
+                  <button type="button" className={`crew-btn sm${freeNow ? ' on' : ''}`} onClick={() => setFreeNow((v) => !v)} aria-pressed={freeNow} title="Said they can jump in today">⚡ Free right now</button>
                   <button type="button" className={`crew-btn sm${verifiedOnly ? ' on' : ''}`} onClick={() => setVerifiedOnly((v) => !v)} aria-pressed={verifiedOnly}>✓ Verified creators</button>
                 </div>
               )}
@@ -270,6 +273,7 @@ function PersonCard({ p, signedIn }) {
           <Link href={p.profilePath}>{p.displayName}</Link>
           {p.verified && <span className="crew-ver">✓ creator</span>}
           {p.tier && <TierChip person={p} />}
+          {p.freeNow && <span className="crew-chip urgent">⚡ free right now</span>}
           {p.handle && <span className="crew-handle">@{p.handle}</span>}
         </div>
         <div className="crew-pmeta">

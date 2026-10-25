@@ -23,7 +23,7 @@ export default function PostCall() {
   const [projects, setProjects] = useState([]);
   const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '' });
+  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -56,7 +56,9 @@ export default function PostCall() {
     setError(null);
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null, production: form.production || null }, await freshToken(getToken));
+      const neededBy = form.urgent && form.neededBy ? new Date(form.neededBy.trim().replace(' ', 'T')) : null;
+      if (form.urgent && (!neededBy || Number.isNaN(neededBy.getTime()))) throw new Error('Needed by needs a date and time like 2026-11-02 18:00.');
+      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null, production: form.production || null, neededBy: neededBy ? neededBy.toISOString() : null }, await freshToken(getToken));
       router.replace(`/crew/calls/${data.call.id}`);
     } catch (err) {
       setError(err.message);
@@ -79,6 +81,20 @@ export default function PostCall() {
           </View>
         ) : loading ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : (
           <>
+            <View style={[crew.panel, form.urgent && { borderColor: 'rgba(239,91,91,0.6)' }]}>
+              <View style={crew.row}>
+                <Switch value={form.urgent} onValueChange={(v) => set({ urgent: v })} trackColor={{ true: colors.danger }} />
+                <Text style={[crew.rowText, { flex: 1 }]}>⚡ This is urgent — someone dropped. Needed within 48 hours.</Text>
+              </View>
+              <Text style={crew.mono}>Goes to the top of the board; people who said they’re free right now hear first; closes itself once the time passes.</Text>
+              {form.urgent ? (
+                <>
+                  <Text style={[crew.label, { marginTop: 6 }]}>Needed by (YYYY-MM-DD HH:MM)</Text>
+                  <TextInput style={crew.input} value={form.neededBy} onChangeText={(v) => set({ neededBy: v })} placeholder="2026-11-02 18:00" placeholderTextColor={colors.inkFaint} autoCapitalize="none" />
+                </>
+              ) : null}
+            </View>
+
             <View style={crew.panel}>
               <Text style={crew.label}>Title</Text>
               <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder="Gaffer for two nights" placeholderTextColor={colors.inkFaint} maxLength={80} />

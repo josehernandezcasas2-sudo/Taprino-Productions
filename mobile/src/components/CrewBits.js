@@ -180,6 +180,7 @@ export function PersonCard({ p, onOpen, onMessage }) {
             <Text style={crew.name}>{p.displayName}</Text>
             {p.verified ? <Text style={crew.ver}>✓ CREATOR</Text> : null}
             <TierChip person={p} />
+            {p.freeNow ? <View style={[crew.chip, crew.chipUrgent]}><Text style={[crew.chipText, { color: colors.danger }]}>⚡ free right now</Text></View> : null}
             {p.handle ? <Text style={crew.handle}>@{p.handle}</Text> : null}
           </View>
           <View style={crew.metaRow}>
@@ -320,6 +321,7 @@ export const crew = StyleSheet.create({
   chipGear: { backgroundColor: 'rgba(242,193,78,0.16)', color: colors.olive },
   chipOk: { backgroundColor: 'rgba(132,205,152,0.16)', color: colors.ok },
   chipMute: { backgroundColor: colors.surface3, color: colors.inkFaint },
+  chipUrgent: { backgroundColor: 'rgba(239,91,91,0.16)', color: colors.danger },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 },
   name: { fontFamily: fonts.displaySemi, fontSize: 15.5, color: colors.ink },
   handle: { fontFamily: fonts.mono, fontSize: 11, color: colors.inkFaint },
@@ -367,6 +369,7 @@ export function CallCard({ c, onOpen }) {
   return (
     <Pressable style={crew.panel} onPress={onOpen}>
       <View style={[crew.nameRow, { gap: 6 }]}>
+        {c.urgent ? <View style={[crew.chip, crew.chipUrgent]}><Text style={[crew.chipText, { color: colors.danger }]}>⚡ URGENT{c.neededLabel ? ` · ${c.neededLabel}` : ''}</Text></View> : null}
         <Text style={crew.name}>{c.title}</Text>
         <View style={[crew.chip, payStyle(c.payType)]}><Text style={[crew.chipText, { color: payStyle(c.payType).color }]}>{c.payLabel.toLowerCase()}</Text></View>
         {c.projectTitle ? <Chip label={`${c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${c.projectTitle}`} tone="ok" /> : null}

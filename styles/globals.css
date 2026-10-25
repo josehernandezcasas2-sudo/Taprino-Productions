@@ -10169,3 +10169,13 @@ a.prod-day:hover { background: var(--surface-3); }
 }
 .credit-line .credit-crew a { color: inherit; text-decoration: underline dotted; }
 .credit-line .credit-crew small { color: var(--ink-faint); }
+/* ---- Emergency Call + the bench (migration 105) ---- */
+.cc-urgent { display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.14rem 0.5rem; border-radius: 4px; background: rgba(239, 91, 91, 0.16); color: var(--danger); white-space: nowrap; }
+.cc-urgent-eye { color: var(--danger); }
+.crew-chip.urgent { background: rgba(239, 91, 91, 0.16); color: var(--danger); }
+.cc-urgentbox { display: grid; gap: 0.6rem; padding: 0.7rem; border: 1px dashed var(--ocean-ink); border-radius: 10px; }
+.cc-urgentbox.on { border-color: rgba(239, 91, 91, 0.6); background: rgba(239, 91, 91, 0.06); }
+.cc-urgentbox .crew-check b { color: var(--ink); }
+.crew-freenow { display: grid; gap: 0.1rem; }
+.crew-freenow.on { border-color: rgba(var(--brass-rgb), 0.6); background: linear-gradient(135deg, rgba(var(--brass-rgb), 0.12), var(--surface-1)); }
+.cc-call .cc-title .cc-urgent { order: -1; }

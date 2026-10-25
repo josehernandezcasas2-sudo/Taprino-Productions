@@ -7,7 +7,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 // Discover → Crew Call. Public; day rates come back only for a signed-in
 // viewer, which is why the answer is never shared-cached.
 //
-//   GET /api/crew/people?q=&roles=DP,Gaffer&gear=Lighting&lat=&lng=&within=50&open=1&verified=1
+//   GET /api/crew/people?q=&roles=DP,Gaffer&gear=Lighting&lat=&lng=&within=50&open=1&free=1&verified=1
 //     → { people: [...], total }
 //   GET /api/crew/people?view=gear&q=&gear=Camera&lat=&lng=&within=50
 //     → { items: [...], total }
@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Slow down a little.' });
   }
 
-  const { q, roles, gear, lat, lng, within, open, verified, view } = req.query;
+  const { q, roles, gear, lat, lng, within, open, free, verified, view } = req.query;
   const filters = {
     q: q || '',
     roles: roles ? String(roles).split(',').map((r) => r.trim()).filter(Boolean) : [],
@@ -35,6 +35,7 @@ export default async function handler(req, res) {
     lng,
     withinMiles: within,
     openOnly: open === '1' || open === 'true',
+    freeNow: free === '1' || free === 'true',
     verifiedOnly: verified === '1' || verified === 'true'
   };
   try {

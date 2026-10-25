@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, freshToken } from '../../../lib/api';
+import { apiGet, apiPost, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip, PlaceBox, CallCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '../../../components/CrewBits';
@@ -13,6 +13,7 @@ import { crew, Chip, PlaceBox, CallCard, WITHIN_CHOICES, DEFAULT_WITHIN } from '
 // place on their card starts out near it.
 const PAY = { paid: 'Paid', union: 'Union', deferred: 'Deferred', unpaid: 'Unpaid', other: 'Other' };
 const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} mi`);
+const FREE_CHOICES = [4, 8, 12, 24];
 
 export default function CallsBoard() {
   const router = useRouter();
@@ -29,6 +30,9 @@ export default function CallsBoard() {
   const [near, setNear] = useState(null);
   const [within, setWithin] = useState(DEFAULT_WITHIN);
   const [hasCard, setHasCard] = useState(false);
+  const [urgentOnly, setUrgentOnly] = useState(false);
+  const [freeUntil, setFreeUntil] = useState(null);
+  const [freeBusy, setFreeBusy] = useState(false);
   const [board, setBoard] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -43,7 +47,7 @@ export default function CallsBoard() {
       if (tokenRef.current) {
         try {
           const d = await apiGet('/api/crew/card', tokenRef.current);
-          if (alive) { setHasCard(Boolean(d.card)); if (d.card && d.card.place) setNear((n) => n || d.card.place); }
+          if (alive) { setHasCard(Boolean(d.card)); if (d.card && d.card.place) setNear((n) => n || d.card.place); setFreeUntil(d.card ? d.card.availableNowUntil || null : null); }
         } catch (err) { /* no card */ }
       }
       if (alive) setRefreshKey((k) => k + 1);
@@ -62,6 +66,7 @@ export default function CallsBoard() {
       if (pay.length) params.push(`pay=${pay.join(',')}`);
       if (remoteOnly) params.push('remote=1');
       if (matches) params.push('matches=1');
+      if (urgentOnly) params.push('urgent=1');
       if (near) params.push(`lat=${near.lat}`, `lng=${near.lng}`, `within=${within}`);
       try {
         // Fresh each search, or "Matches my card" stops matching after a minute.
@@ -76,10 +81,15 @@ export default function CallsBoard() {
       }
     }, 250);
     return () => clearTimeout(timer);
-  }, [refreshKey, q, role, pay, remoteOnly, matches, near, within]);
+  }, [refreshKey, q, role, pay, remoteOnly, matches, near, within, urgentOnly]);
 
   const togglePay = (k) => setPay((list) => (list.includes(k) ? list.filter((x) => x !== k) : [...list, k]));
-  const hasFilters = Boolean(q.trim() || role || pay.length || remoteOnly || matches);
+  const hasFilters = Boolean(q.trim() || role || pay.length || remoteOnly || matches || urgentOnly);
+  const freeOn = Boolean(freeUntil) && Date.parse(freeUntil) > Date.now();
+  async function setFree(hours) {
+    setFreeBusy(true);
+    try { const d = await apiPost('/api/crew/available-now', { hours }, await freshToken(getToken)); setFreeUntil(d.availableNowUntil); } catch (err) { /* leave as is */ } finally { setFreeBusy(false); }
+  }
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
@@ -121,13 +131,24 @@ export default function CallsBoard() {
           <View style={crew.chips}>
             {hasCard ? <Chip label="● Matches my card" on={matches} onPress={() => setMatches((v) => !v)} /> : null}
             <Chip label="Remote" on={remoteOnly} onPress={() => setRemoteOnly((v) => !v)} />
+            <Chip label={`⚡ Urgent${board && board.urgentCount ? ` · ${board.urgentCount}` : ''}`} on={urgentOnly} onPress={() => setUrgentOnly((v) => !v)} />
           </View>
           {hasFilters ? (
-            <Pressable onPress={() => { setQ(''); setRole(''); setPay([]); setRemoteOnly(false); setMatches(false); }}>
+            <Pressable onPress={() => { setQ(''); setRole(''); setPay([]); setRemoteOnly(false); setMatches(false); setUrgentOnly(false); }}>
               <Text style={[crew.mono, { color: colors.inkDim }]}>Clear filters</Text>
             </Pressable>
           ) : null}
         </View>
+
+        {hasCard ? (
+          <View style={[crew.panel, freeOn && { borderColor: colors.brass }]}>
+            <Text style={crew.eyebrow}>{freeOn ? '● Free right now' : 'Free right now?'}</Text>
+            <Text style={crew.muted}>{freeOn ? `Until ${new Date(freeUntil).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} you’re first in line for urgent calls nearby and on top of the directory.` : 'Someone always bails. Say you can jump in and urgent calls nearby reach you first.'}</Text>
+            <View style={crew.chips}>
+              {freeOn ? <Chip label="Turn off" onPress={() => !freeBusy && setFree(0)} /> : FREE_CHOICES.map((h) => <Chip key={h} label={`${h} h`} onPress={() => !freeBusy && setFree(h)} />)}
+            </View>
+          </View>
+        ) : null}
 
         <View style={styles.rhead}>
           <Text style={crew.mono}>{board ? `${board.total} open ${board.total === 1 ? 'call' : 'calls'}` : 'Loading…'}{loading && board ? ' · updating…' : ''}</Text>
