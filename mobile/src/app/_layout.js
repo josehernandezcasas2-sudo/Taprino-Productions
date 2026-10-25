@@ -77,6 +77,7 @@ export default function RootLayout() {
           <Stack.Screen name="crew/calls/index" options={{ headerShown: false }} />
           <Stack.Screen name="crew/calls/new" options={{ headerShown: false }} />
           <Stack.Screen name="crew/calls/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="crew/tape" options={{ headerShown: false }} />
           <Stack.Screen name="locations/index" options={{ headerShown: false }} />
           <Stack.Screen name="locations/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="locations/new" options={{ headerShown: false }} />

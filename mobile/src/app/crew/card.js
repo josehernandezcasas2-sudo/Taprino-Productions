@@ -7,13 +7,15 @@ import { apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, GearRows, CreditRows, GEAR_FLAGS } from '../../components/CrewBits';
+import { PerformerEditor } from '../../components/CastingBits';
 
 // Your Crew Call working card (pages/crew/card.js on the web): roles,
 // where you're based and how far you'll go, availability, gear, outside
 // credits, rate. Loads and saves through /api/crew/card.
 const EMPTY = {
   roles: [], place: null, travelMiles: '25', remoteOk: false, availability: 'open', bookedUntil: '',
-  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: []
+  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: [],
+  performer: false, playingAgeMin: '', playingAgeMax: '', unionStatus: '', skills: [], reelUrl: '', headshots: []
 };
 const FALLBACK_OPTIONS = { roles: [], gearCategories: [], maxRoles: 6, maxTravelMiles: 500 };
 
@@ -32,7 +34,14 @@ function fromCard(card) {
     listed: card.listed,
     callEmails: card.callEmails !== false,
     gear: card.gear.map((g) => ({ category: g.category, name: g.name, flag: g.flag })),
-    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year ? String(c.year) : '' }))
+    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year ? String(c.year) : '' })),
+    performer: Boolean(card.performer),
+    playingAgeMin: card.playingAgeMin == null ? '' : String(card.playingAgeMin),
+    playingAgeMax: card.playingAgeMax == null ? '' : String(card.playingAgeMax),
+    unionStatus: card.unionStatus || '',
+    skills: card.skills || [],
+    reelUrl: card.reelUrl || '',
+    headshots: (card.headshots || []).map((h) => ({ url: h.url }))
   };
 }
 
@@ -185,6 +194,8 @@ export default function CrewCardScreen() {
             </>
           ) : null}
         </View>
+
+        <PerformerEditor form={form} set={set} token={getToken} onError={(text) => setStatus({ kind: 'error', text })} />
 
         <View style={crew.panel}>
           <Text style={crew.h3}>Gear · brings it, lends it, or ask</Text>

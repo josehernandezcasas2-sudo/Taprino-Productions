@@ -7,6 +7,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import PlaceSearch from '../../components/crew/PlaceSearch';
 import { Avatar, GearRows, CreditRows } from '../../components/crew/CrewBits';
+import { PerformerEditor } from '../../components/crew/CastingBits';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard } from '../../lib/crewCards';
@@ -56,7 +57,8 @@ export async function getServerSideProps({ req, res }) {
 
 const EMPTY = {
   roles: [], place: null, travelMiles: DEFAULT_TRAVEL_MILES, remoteOk: false, availability: 'open', bookedUntil: '',
-  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: []
+  rateMin: '', rateMax: '', languages: [], listed: true, callEmails: true, gear: [], credits: [],
+  performer: false, playingAgeMin: '', playingAgeMax: '', unionStatus: '', skills: [], reelUrl: '', headshots: []
 };
 
 function fromCard(card) {
@@ -74,7 +76,14 @@ function fromCard(card) {
     listed: card.listed,
     callEmails: card.callEmails !== false,
     gear: card.gear.map((g) => ({ category: g.category, name: g.name, flag: g.flag })),
-    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year || '' }))
+    credits: card.credits.map((c) => ({ title: c.title, role: c.role || '', year: c.year || '' })),
+    performer: Boolean(card.performer),
+    playingAgeMin: card.playingAgeMin == null ? '' : String(card.playingAgeMin),
+    playingAgeMax: card.playingAgeMax == null ? '' : String(card.playingAgeMax),
+    unionStatus: card.unionStatus || '',
+    skills: card.skills || [],
+    reelUrl: card.reelUrl || '',
+    headshots: (card.headshots || []).map((h) => ({ url: h.url }))
   };
 }
 
@@ -231,6 +240,8 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
                     )}
                   </div>
                 </section>
+
+                <PerformerEditor form={form} set={set} onError={(text) => setStatus({ kind: 'error', text })} />
 
                 <section className="crew-panel">
                   <h3>Gear <small>what you have — brings it, lends it, or ask</small></h3>

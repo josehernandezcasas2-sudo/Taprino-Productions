@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import AvatarPhoto from '../AvatarPhoto';
 import { GEAR_FLAGS } from '../../lib/crewOptions';
+import { PerformerFacts } from './CastingBits';
 
 // Small pieces shared by /crew, /crew/card and the profile page's
 // "Working card" section. Styles are the .crew-* block in globals.css.
@@ -104,6 +105,7 @@ export function CrewCardView({ card, creditedWork = [], isOwn = false }) {
         {facts.map((f) => <span key={f}>{f}</span>)}
       </div>
       <RoleChips roles={card.roles} empty={isOwn ? 'No roles yet — add some on your card.' : 'No roles listed.'} />
+      {card.performer && <div className="crew-cardview-block"><h4>Performer</h4><PerformerFacts card={card} /></div>}
       <div className="crew-cardview-block">
         <h4>Gear</h4>
         <GearRows gear={card.gear} />

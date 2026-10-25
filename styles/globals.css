@@ -10179,3 +10179,33 @@ a.prod-day:hover { background: var(--surface-3); }
 .crew-freenow { display: grid; gap: 0.1rem; }
 .crew-freenow.on { border-color: rgba(var(--brass-rgb), 0.6); background: linear-gradient(135deg, rgba(var(--brass-rgb), 0.12), var(--surface-1)); }
 .cc-call .cc-title .cc-urgent { order: -1; }
+/* ---- Casting (migration 106): performer cards, casting calls, self-tapes ---- */
+.cc-cast { display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.06em; text-transform: uppercase; padding: 0.14rem 0.5rem; border-radius: 4px; background: rgba(var(--olive-rgb), 0.16); color: var(--olive); white-space: nowrap; }
+.cast-block { display: grid; gap: 0.4rem; padding: 0.7rem 0.8rem; border-radius: 10px; background: rgba(var(--olive-rgb), 0.07); border: 1px solid rgba(var(--olive-rgb), 0.3); }
+.cast-block.edit { gap: 0.6rem; }
+.cast-block-name { font-family: var(--font-display); font-weight: 700; font-size: 1.1rem; }
+.cast-block .crew-pmeta a { color: var(--olive); }
+.cast-facts { display: grid; gap: 0.45rem; }
+.cast-shots { display: flex; gap: 0.4rem; flex-wrap: wrap; }
+.cast-shots img { width: 84px; height: 108px; object-fit: cover; border-radius: 8px; background: var(--surface-2); }
+.cast-shots-edit { align-items: flex-start; }
+.cast-shot-edit { position: relative; }
+.cast-shot-edit .crew-btn { position: absolute; top: 2px; right: 2px; padding: 0.1rem 0.35rem; background: rgba(0, 0, 0, 0.55); color: #fff; }
+.cast-shot-add { width: 84px; height: 108px; border: 1px dashed var(--ocean-ink); border-radius: 8px; display: grid; place-items: center; cursor: pointer; color: var(--ink-dim); font-size: 0.82rem; position: relative; }
+.cast-shot-add input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.cast-shot-add.busy { opacity: 0.6; }
+.cast-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0.7rem; }
+.cast-card { padding: 0; overflow: hidden; display: grid; grid-template-rows: auto 1fr; }
+.cast-card-shot { position: relative; display: block; aspect-ratio: 4 / 5; background: var(--surface-2); }
+.cast-card-shot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cast-card-ph { width: 100%; height: 100%; display: grid; place-items: center; }
+.cast-card-free { position: absolute; left: 8px; bottom: 8px; }
+.cast-card-body { display: grid; gap: 0.4rem; padding: 0.7rem 0.8rem 0.8rem; align-content: start; }
+.cast-card-body .crew-pname a { color: var(--ink); text-decoration: none; }
+.cast-tape { display: grid; gap: 0.4rem; }
+.cast-tape-or { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.cast-tape-or input[type='file'] { font-size: 0.8rem; color: var(--ink-dim); }
+.cast-minor { display: grid; gap: 0.5rem; padding: 0.6rem 0.7rem; border-radius: 8px; background: rgba(224, 134, 60, 0.08); border: 1px solid rgba(224, 134, 60, 0.35); }
+.cast-resp { display: grid; gap: 0.4rem; margin-top: 0.3rem; }
+.cc-resp.shortlisted { outline: 1px solid rgba(var(--olive-rgb), 0.55); }
+.cast-player { margin-top: 0.3rem; }

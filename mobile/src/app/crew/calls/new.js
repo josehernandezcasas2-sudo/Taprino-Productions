@@ -7,6 +7,7 @@ import { apiGet, apiPost, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip, PlaceBox } from '../../../components/CrewBits';
+import { UNION } from '../../../components/CastingBits';
 
 // Post a call (pages/crew/calls/new on the web). Everyone whose working
 // card lists the role and whose place + travel radius reaches it gets told.
@@ -20,10 +21,11 @@ export default function PostCall() {
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);
   const [roles, setRoles] = useState([]);
+  const [castRoles, setCastRoles] = useState([]);
   const [projects, setProjects] = useState([]);
   const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '' });
+  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '', kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -34,7 +36,7 @@ export default function PostCall() {
       tokenRef.current = signedIn ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]) : null;
       try {
         const o = await apiGet('/api/crew/options');
-        if (alive) { setRoles(o.roles); setForm((f) => ({ ...f, role: f.role || o.roles[0] })); }
+        if (alive) { setRoles(o.roles); setCastRoles(o.castRoles || []); setForm((f) => ({ ...f, role: f.role || o.roles[0] })); }
       } catch (err) { /* keep going */ }
       if (tokenRef.current) {
         try {
@@ -96,10 +98,43 @@ export default function PostCall() {
             </View>
 
             <View style={crew.panel}>
-              <Text style={crew.label}>Title</Text>
-              <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder="Gaffer for two nights" placeholderTextColor={colors.inkFaint} maxLength={80} />
-              <Text style={[crew.label, { marginTop: 6 }]}>Role needed</Text>
-              <View style={crew.chips}>{roles.map((r) => <Chip key={r} label={r} on={form.role === r} onPress={() => set({ role: r })} />)}</View>
+              <View style={crew.toggle}>
+                {[['crew', 'Crew call'], ['cast', '🎭 Casting call']].map(([k, l]) => (
+                  <Pressable key={k} style={[crew.toggleBtn, form.kind === k && crew.toggleOn]} onPress={() => set({ kind: k, role: k === 'cast' ? (castRoles.includes(form.role) ? form.role : castRoles[0] || 'Actor') : (castRoles.includes(form.role) ? roles[0] : form.role) })}>
+                    <Text style={[crew.toggleText, form.kind === k && crew.toggleTextOn]}>{l}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              {form.kind === 'cast' ? (
+                <View style={{ gap: 6, padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.07)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.3)' }}>
+                  <Text style={crew.label}>Character</Text>
+                  <TextInput style={crew.input} value={form.characterName} onChangeText={(v) => set({ characterName: v })} placeholder="MARTA, the night-shift nurse — or “Background, diner”" placeholderTextColor={colors.inkFaint} maxLength={60} />
+                  <Text style={crew.label}>Who they are</Text>
+                  <TextInput style={[crew.input, { minHeight: 70, textAlignVertical: 'top' }]} value={form.characterDesc} onChangeText={(v) => set({ characterDesc: v })} placeholder="A line or three on the character and what you’re looking for." placeholderTextColor={colors.inkFaint} multiline maxLength={1000} />
+                  <Text style={crew.label}>Playing age</Text>
+                  <View style={crew.row}>
+                    <TextInput style={[crew.input, { flex: 1 }]} value={form.playingAgeMin} onChangeText={(v) => set({ playingAgeMin: v.replace(/[^0-9]/g, '') })} placeholder="from" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+                    <TextInput style={[crew.input, { flex: 1 }]} value={form.playingAgeMax} onChangeText={(v) => set({ playingAgeMax: v.replace(/[^0-9]/g, '') })} placeholder="to" placeholderTextColor={colors.inkFaint} keyboardType="number-pad" />
+                  </View>
+                  <Text style={crew.label}>Union</Text>
+                  <View style={crew.chips}><Chip label="Either" on={!form.unionStatus} onPress={() => set({ unionStatus: '' })} />{Object.entries(UNION).map(([k, v]) => <Chip key={k} label={v} on={form.unionStatus === k} onPress={() => set({ unionStatus: k })} />)}</View>
+                  <Text style={crew.label}>Sides (optional)</Text>
+                  <TextInput style={crew.input} value={form.sidesUrl} onChangeText={(v) => set({ sidesUrl: v })} placeholder="https:// link to the pages" placeholderTextColor={colors.inkFaint} autoCapitalize="none" autoCorrect={false} />
+                  <View style={crew.row}>
+                    <Switch value={form.selfTapeWanted} onValueChange={(v) => set({ selfTapeWanted: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>Ask for a self-tape</Text>
+                  </View>
+                  {form.selfTapeWanted ? <TextInput style={crew.input} value={form.selfTapeDue} onChangeText={(v) => set({ selfTapeDue: v })} placeholder="Tape due (YYYY-MM-DD)" placeholderTextColor={colors.inkFaint} autoCapitalize="none" /> : null}
+                  <View style={crew.row}>
+                    <Switch value={form.minorsOk} onValueChange={(v) => set({ minorsOk: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>Performers under 18 may apply (a guardian’s name and contact is required on their response)</Text>
+                  </View>
+                </View>
+              ) : null}
+              <Text style={[crew.label, { marginTop: 6 }]}>Title</Text>
+              <TextInput style={crew.input} value={form.title} onChangeText={(v) => set({ title: v })} placeholder={form.kind === 'cast' ? 'Lead for a 12-minute short, two days in Echo Park' : 'Gaffer for two nights'} placeholderTextColor={colors.inkFaint} maxLength={80} />
+              <Text style={[crew.label, { marginTop: 6 }]}>{form.kind === 'cast' ? 'Performer type' : 'Role needed'}</Text>
+              <View style={crew.chips}>{(form.kind === 'cast' ? castRoles : roles).map((r) => <Chip key={r} label={r} on={form.role === r} onPress={() => set({ role: r })} />)}</View>
               <Text style={[crew.label, { marginTop: 6 }]}>Spots</Text>
               <TextInput style={[crew.input, { width: 90 }]} value={form.spots} onChangeText={(v) => set({ spots: v.replace(/[^0-9]/g, '') })} keyboardType="number-pad" placeholder="1" placeholderTextColor={colors.inkFaint} />
             </View>

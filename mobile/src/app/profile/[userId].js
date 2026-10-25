@@ -11,6 +11,7 @@ import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
+import { PerformerFacts } from '../../components/CastingBits';
 import { TipButton } from '../../components/TipSheet';
 import { rememberVia } from '../../lib/referral';
 
@@ -315,6 +316,7 @@ export default function PublicProfile() {
                 onEdit={() => router.push('/crew/card')}
                 onFind={() => router.push('/crew')}
                 onOpenWork={(w) => router.push(workHref(w))}
+                performerFacts={<PerformerFacts card={crewCard} />}
               />
             ) : (
               <Pressable onPress={() => router.push('/crew/card')}>
