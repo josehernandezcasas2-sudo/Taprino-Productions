@@ -41,6 +41,7 @@ export default function LegalLayout({ title, updated, summary, children, account
           <Link href="/terms">Terms of Service</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/cookies">Cookies</Link>
+          <Link href="/ai-policy">AI policy</Link>
         </nav>
       </main>
 

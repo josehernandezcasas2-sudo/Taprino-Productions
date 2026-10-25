@@ -53,12 +53,14 @@ export default async function handler(req, res) {
       stayInStream: profile ? Boolean(profile.stay_in_stream) : false,
       // Tips (migration 101): the creator's fiscal sponsor, if any.
       fiscalSponsorName: profile ? profile.fiscal_sponsor_name || null : null,
-      fiscalSponsorUrl: profile ? profile.fiscal_sponsor_url || null : null
+      fiscalSponsorUrl: profile ? profile.fiscal_sponsor_url || null : null,
+      // The "Not for AI training" seal (migration 111): on unless switched off.
+      aiSeal: profile ? profile.ai_seal !== false : true
     });
   }
 
   if (req.method === 'POST') {
-    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream, fiscalSponsorName, fiscalSponsorUrl } = req.body || {};
+    const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream, fiscalSponsorName, fiscalSponsorUrl, aiSeal } = req.body || {};
     // Tips: a fiscal sponsor is a link (http(s)) with an optional name;
     // a name on its own means nothing, so it needs the link.
     if (fiscalSponsorUrl !== undefined && fiscalSponsorUrl !== null && String(fiscalSponsorUrl).trim() && !/^https?:\/\//i.test(String(fiscalSponsorUrl).trim())) {
@@ -152,7 +154,8 @@ export default async function handler(req, res) {
         bannerZoom: removeBanner ? null : bannerZoom,
         avatarZoom: removeAvatar ? null : avatarZoom,
         fiscalSponsorName,
-        fiscalSponsorUrl
+        fiscalSponsorUrl,
+        aiSeal: aiSeal === undefined ? undefined : Boolean(aiSeal)
       });
       // The focal points ride back so the page (and the header, via the
       // own-profile-updated event) show the saved crop without a reload.

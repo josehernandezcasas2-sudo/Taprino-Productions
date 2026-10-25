@@ -57,6 +57,8 @@ export default async function handler(req, res) {
     viewerId: data.viewerId,
     // Tips (lib/tips.js getTipping): the app's Tip button shows only when
     // this creator's Stripe account can take charges.
-    tipping: data.tipping || null
+    tipping: data.tipping || null,
+    // The "Not for AI training" seal (lib/aiPolicyRules.js).
+    aiSeal: data.aiSeal !== false
   });
 }

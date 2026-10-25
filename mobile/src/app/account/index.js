@@ -430,6 +430,20 @@ export default function Account() {
     setNewsletterLoading(false);
   }
 
+  // The "Not for AI training" seal (migration 111): whether the mark shows
+  // on this creator's work; the policy applies either way. Saves at once,
+  // like the stream switch below.
+  async function toggleAiSeal() {
+    const next = !(profile && profile.aiSeal !== false);
+    setProfile((p) => ({ ...p, aiSeal: next }));
+    try {
+      const token = await withToken();
+      await apiPost('/api/account/profile', { aiSeal: next }, token);
+    } catch {
+      setProfile((p) => ({ ...p, aiSeal: !next }));
+    }
+  }
+
   async function toggleStayInStream() {
     const next = !(profile && profile.stayInStream);
     setProfile((p) => ({ ...p, stayInStream: next }));
@@ -861,6 +875,23 @@ export default function Account() {
           {/* Push notifications (2026-10-24): the switch; the card above
               the cards asks first. */}
           <PushRow getToken={getToken} Row={Row} />
+          {/* The "Not for AI training" seal (2026-10-25), creators and admins. */}
+          {profile && (dashboard.isCreator || dashboard.isAdmin) ? (
+            <Row
+              label="Show the “Not for AI training” seal on my work"
+              detail="On your titles, series and profile. The policy covers your work either way; this is only whether the mark shows."
+              divider
+            >
+              <Switch
+                value={profile.aiSeal !== false}
+                onValueChange={toggleAiSeal}
+                trackColor={{ false: colors.surface3, true: colors.brass }}
+                thumbColor={colors.ink}
+                ios_backgroundColor={colors.surface3}
+                accessibilityLabel="Show the seal on my work"
+              />
+            </Row>
+          ) : null}
         </View>
 
         {/* Payouts — creators and admins only; same card as the web /account */}

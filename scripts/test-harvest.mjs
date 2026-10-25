@@ -6,6 +6,7 @@ import { buildRobotsTxt, robotsTag, tdmrepJson, AI_TRAINING_AGENTS, AI_SEARCH_AG
 import { isOpenPath } from '../lib/privateBetaRules.js';
 import { limitPublicRead } from '../lib/rateLimit.js';
 import { corsOriginAllowed, applyCors } from '../lib/cors.js';
+import { AI_POLICY_PATH, SEAL_LABEL, sealShown } from '../lib/aiPolicyRules.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -69,8 +70,18 @@ test('tdmrep.json reserves the whole site and points at the policy', () => {
   assert.deepEqual(tdmrepJson(`${origin}/terms`), [{ location: '/', 'tdm-reservation': 1, 'tdm-policy': `${origin}/terms` }]);
 });
 
-test('the TDM file is reachable while the beta door is shut', () => {
+test('the seal: on unless switched off, and the policy page is what it links to', () => {
+  assert.equal(AI_POLICY_PATH, '/ai-policy');
+  assert.equal(SEAL_LABEL, 'Not for AI training');
+  assert.equal(sealShown(true), true);
+  assert.equal(sealShown(undefined), true, 'no column yet, or no profile row');
+  assert.equal(sealShown(null), true);
+  assert.equal(sealShown(false), false, 'the creator switched it off');
+});
+
+test('the TDM file and the policy page are reachable while the beta door is shut', () => {
   assert.equal(isOpenPath('/.well-known/tdmrep.json'), true);
+  assert.equal(isOpenPath('/ai-policy'), true);
   assert.equal(isOpenPath('/robots.txt'), true);
   assert.equal(isOpenPath('/sitemap.xml'), false);
   assert.equal(isOpenPath('/api/home-feed'), false);

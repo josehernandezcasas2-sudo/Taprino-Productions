@@ -8,6 +8,7 @@ import { apiGet, apiPost } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import { BundleCard, BuyChip, useBuy } from '../../components/BuyBits';
+import { AiSealChip } from '../../components/AiSeal';
 
 function tierBadge(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
@@ -185,6 +186,8 @@ export default function SeriesHub() {
                 {seasonNumbers.length > 1 ? `${seasonNumbers.length} seasons · ` : ''}{seriesEpisodes.length} episode{seriesEpisodes.length === 1 ? '' : 's'}
               </Text>
             </View>
+            {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
+            {state.data.aiSeal !== false ? <AiSealChip style={{ alignSelf: 'flex-start', marginBottom: 10 }} /> : null}
             <View style={styles.heroActions}>
               {heroEpisode ? (
                 <Pressable style={styles.playBtn} onPress={() => router.push(`/episode/${heroEpisode.id}`)}>

@@ -65,6 +65,8 @@ export default async function handler(req, res) {
     // maxCents, minCents, presets, fiscalSponsor } when the maker can be
     // tipped; { enabled: false } otherwise.
     tipping: data.tipping || null,
+    // The maker's "Not for AI training" seal (lib/aiPolicyRules.js).
+    aiSeal: data.aiSeal !== false,
     // Where to pick up (seconds), from the same Stripe-held progress the
     // website resumes from; 0 when there's nothing worth resuming.
     resumeSeconds: (data.account.watchProgress && Number(data.account.watchProgress[data.episode.id])) || 0,

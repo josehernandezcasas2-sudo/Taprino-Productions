@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { PlayIcon, PauseIcon, VolumeIcon, HeartIcon, usePlayerIconOverrides } from './PlayerIcons';
 
-export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave }) {
+import { AiSealChip } from './AiSeal';
+
+export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave, aiSeal = false }) {
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const hlsRef = useRef(null);
@@ -120,6 +122,8 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, image
               </span>
             ) : null}
             {artist && <span>Made by {artist}</span>}
+            {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
+            {aiSeal && <AiSealChip />}
           </div>
           <div className="hero-actions">
             <button className="hero-play" onClick={onPlay}>▶ {playLabel || 'Play first episode'}</button>

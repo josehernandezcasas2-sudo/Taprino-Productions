@@ -28,6 +28,7 @@ import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
 import { TipButton, TipEndCard, TippedBanner, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
+import { AiSealChip } from '../../components/AiSeal';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
@@ -140,6 +141,8 @@ export async function getServerSideProps({ req, params, query, res }) {
       earlyAccess,
       // Tips (lib/tips.js): { enabled, … } when the maker can be tipped.
       tipping: data.tipping || null,
+      // The maker's "Not for AI training" seal (components/AiSeal.js).
+      aiSeal: data.aiSeal !== false,
       bought: typeof query.bought === 'string' ? query.bought : null,
       refundDays: purchaseSettings ? purchaseSettings.refundDays : 14,
       refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10
@@ -147,7 +150,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -585,6 +588,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
                   {owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · members`}
                 </span>
+                {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
+                {aiSeal && <AiSealChip />}
                 {owned && purchase.boughtAt && (
                   <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                 )}

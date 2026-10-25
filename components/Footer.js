@@ -83,6 +83,7 @@ export default function Footer() {
           <Link href="/terms">Terms of Service</Link>
           <Link href="/privacy">Privacy Policy</Link>
           <Link href="/cookies">Cookies</Link>
+          <Link href="/ai-policy">AI policy</Link>
           <Link href="/contact">Contact</Link>
         </div>
       </div>

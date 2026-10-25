@@ -53,6 +53,22 @@ export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId
   const [deck, setDeck] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
+  // Signed playback src per snippet (post:<id>), fetched for the active
+  // slide and the next one as the viewer moves — the feed itself carries
+  // no video address (lib/snippetsFeed.js, 2026-10-25).
+  const [srcByEpisodeId, setSrcByEpisodeId] = useState({});
+  useEffect(() => {
+    const toFetch = [deck[activeIndex], deck[activeIndex + 1]]
+      .filter((s) => s && s.kind === 'episode' && !srcByEpisodeId[s.episode.id]);
+    toFetch.forEach((slide) => {
+      fetch(`/api/vertical/playback?episodeId=${encodeURIComponent(slide.episode.id)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.src) setSrcByEpisodeId((m) => ({ ...m, [slide.episode.id]: data.src }));
+        })
+        .catch(() => {});
+    });
+  }, [activeIndex, deck, srcByEpisodeId]);
   const seenSeriesIds = useRef(new Set());
   const unitsRef = useRef([]);
   const contentSlideCountRef = useRef(0);
@@ -197,7 +213,7 @@ export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId
               {slide.kind === 'episode' ? (
                 <>
                   <ReelPlayer
-                    src={slide.episode.videoSrc}
+                    src={srcByEpisodeId[slide.episode.id] || null}
                     active={i === activeIndex}
                     muted={muted}
                     onToggleMute={() => setMuted((m) => !m)}

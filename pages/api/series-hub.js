@@ -41,6 +41,8 @@ export default async function handler(req, res) {
     wishlist: data.wishlist,
     // Buy to own: the series bundle and each episode's price for this viewer.
     bundle: data.bundle,
-    episodeOffers: data.episodeOffers
+    episodeOffers: data.episodeOffers,
+    // The maker's "Not for AI training" seal (lib/aiPolicyRules.js).
+    aiSeal: data.aiSeal !== false
   });
 }

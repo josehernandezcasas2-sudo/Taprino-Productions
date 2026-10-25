@@ -308,10 +308,21 @@ export default function SnippetsDiscover() {
 
 function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onShare, shareCopied, onOpenMenu, onOpenAuthor, insets }) {
   const authorName = slide.episode.authorName || 'A viewer';
+  // Signed playback src, asked for as the slide comes into view — the feed
+  // carries no video address (the website's lib/snippetsFeed.js, 2026-10-25).
+  const [src, setSrc] = useState(slide.episode.videoSrc || null);
+  useEffect(() => {
+    if (src || !active) return undefined;
+    let cancelled = false;
+    apiGet(`/api/vertical/playback?episodeId=${encodeURIComponent(slide.episode.id)}`)
+      .then((data) => { if (!cancelled && data && data.src) setSrc(data.src); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [active, src, slide.episode.id]);
   return (
     <View style={absoluteFill}>
       <ReelPlayer
-        src={slide.episode.videoSrc}
+        src={src}
         active={active}
         muted={muted}
         onToggleMute={onToggleMute}

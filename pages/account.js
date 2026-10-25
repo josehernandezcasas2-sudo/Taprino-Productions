@@ -18,6 +18,7 @@ import { cleanViaSlug } from '../lib/creatorShareRules';
 import { memberBadge } from '../lib/membershipTiers';
 import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
 import PositionedPhoto from '../components/PositionedPhoto';
+import { AiSealGlyph } from '../components/AiSeal';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -752,6 +753,27 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
                         <p className="account-fineprint" style={{ marginBottom: '0.6rem' }}>
                           If a nonprofit sponsors your work, add its donation link. Your tip sheet sends fans who want a tax-deductible donation there. Tips themselves are a thank-you, never a donation.
                         </p>
+
+                        {/* The "Not for AI training" seal (migration 111): whether the
+                            mark shows on this creator's work; the policy applies either way. */}
+                        <div className="seal-switch-row">
+                          <div>
+                            <label htmlFor="ai-seal-switch" style={{ marginTop: 0 }}>Show the &ldquo;Not for AI training&rdquo; seal on my work</label>
+                            <p className="account-fineprint" style={{ marginBottom: '0.5rem' }}>
+                              On your titles, your series and your profile. The <Link href="/ai-policy">policy</Link> covers your work either way; this is only whether the mark shows.
+                            </p>
+                            <span className="ai-seal-chip" aria-hidden="true"><AiSealGlyph /> Not for AI training</span>
+                          </div>
+                          <button
+                            id="ai-seal-switch"
+                            type="button"
+                            role="switch"
+                            aria-checked={profile.aiSeal !== false}
+                            aria-label="Show the seal on my work"
+                            className={`seal-switch ${profile.aiSeal !== false ? 'on' : ''}`}
+                            onClick={() => setProfile((p) => ({ ...p, aiSeal: !(p.aiSeal !== false) }))}
+                          />
+                        </div>
                       </>
                     )}
 

@@ -11,6 +11,7 @@ import ReportSheet from '../../components/ReportSheet';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
+import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { PerformerFacts } from '../../components/CastingBits';
 import { TipButton } from '../../components/TipSheet';
 import { rememberVia } from '../../lib/referral';
@@ -162,7 +163,7 @@ export default function PublicProfile() {
     );
   }
 
-  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping } = state.data;
+  const { profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, totalViews, knownForGenres, roleBadge, memberBadge, posts, savedSnippets, viewerId, isSignedIn, tipping, aiSeal } = state.data;
   const initial = profile.displayName && profile.displayName[0] ? profile.displayName[0].toUpperCase() : '?';
   const joinedLabel = profile.joinedAt
     ? new Date(profile.joinedAt).toLocaleDateString(undefined, { month: 'long', year: 'numeric' })
@@ -208,10 +209,13 @@ export default function PublicProfile() {
               {roleBadge ? <View style={styles.roleBadge}><Text style={styles.roleBadgeText}>{roleBadge}</Text></View> : null}
               {memberBadge ? <View style={[styles.roleBadge, { backgroundColor: colors.brassDeep }]}><Text style={[styles.roleBadgeText, { color: colors.ink }]}>{memberBadge}</Text></View> : null}
               {crewRecord ? <TierChip person={crewRecord} /> : null}
+              {/* The "Not for AI training" seal (components/AiSeal.js). */}
+              {aiSeal !== false ? <AiSealChip /> : null}
             </View>
             {profile.handle ? <Text style={styles.handle}>@{profile.handle}</Text> : null}
             {joinedLabel ? <Text style={styles.joined}>On Studio Tapa TV since {joinedLabel}</Text> : null}
             {statParts.length > 0 ? <Text style={styles.statsText}>{statParts.join(' · ')}</Text> : null}
+            {aiSeal !== false ? <AiSealCard name={profile.displayName} style={{ marginTop: 12, marginBottom: 4 }} /> : null}
 
             <View style={styles.actionsRow}>
               {isOwnProfile ? (

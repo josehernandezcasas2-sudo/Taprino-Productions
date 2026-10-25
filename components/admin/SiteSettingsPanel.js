@@ -371,6 +371,9 @@ function ProtectionCard() {
           <>
             <p style={{ margin: 0 }}>Protected {result.videos} video{result.videos === 1 ? '' : 's'} across {result.protected} title{result.protected === 1 ? '' : 's'}; {result.skipped} without a Cloudflare video; {result.failures.length} failed.</p>
             {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f) => <li key={f.id}>{f.title}: {f.error}</li>)}</ul>}
+            {result.university && (
+              <p style={{ margin: '0.4rem 0 0' }}>Film University: {result.university.videos} video{result.university.videos === 1 ? '' : 's'} protected, {result.university.framesReplaced} Cloudflare frame{result.university.framesReplaced === 1 ? '' : 's'} stored as real thumbnails{result.university.failures.length ? `, ${result.university.failures.length} failed: ${result.university.failures.map((f) => `${f.title} (${f.error})`).join('; ')}` : ''}.</p>
+            )}
             {result.cloudflarePosters.length > 0 && (
               <p style={{ margin: '0.5rem 0 0', color: 'var(--warn)' }}>
                 {result.cloudflarePosters.length} title{result.cloudflarePosters.length === 1 ? ' uses' : 's use'} Cloudflare&rsquo;s frame grab as a poster and need{result.cloudflarePosters.length === 1 ? 's' : ''} a real one uploaded: {result.cloudflarePosters.map((p) => p.title).join(', ')}.

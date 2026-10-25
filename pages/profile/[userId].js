@@ -17,6 +17,7 @@ import PositionedPhoto from '../../components/PositionedPhoto';
 import ReportButton from '../../components/ReportButton';
 import { CrewCardView } from '../../components/crew/CrewBits';
 import TierChip from '../../components/crew/TierChip';
+import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { TipButton, TippedBanner } from '../../components/TipSheet';
 
 export async function getServerSideProps({ req, res, params }) {
@@ -64,7 +65,7 @@ function formatViews(n) {
   return String(n);
 }
 
-export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator, tipping = null }) {
+export default function PublicProfile({ profile, canonicalPath, creditedWork, pitches, backedPitches, crewCard, crewRecord, locations, posts: initialPosts, savedSnippets: initialSavedSnippets, totalViews, knownForGenres, followerCount: initialFollowerCount, followingCount, viewerFollows: initialViewerFollows, roleBadge, memberBadge: memberBadgeLabel = null, mainGenres, isSignedIn, viewerId, isSubscriber, email, isAdmin, isCreator, tipping = null, aiSeal = true }) {
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopied, setShareCopied] = useState(false);
   const [following, setFollowing] = useState(Boolean(initialViewerFollows));
@@ -340,6 +341,8 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
                 {memberBadgeLabel && <span className="account-tier-badge">{memberBadgeLabel}</span>}
                 {crewRecord && <TierChip person={crewRecord} />}
+                {/* The "Not for AI training" seal (lib/aiPolicyRules.js). */}
+                {aiSeal && <AiSealChip />}
               </div>
               {profile.handle && <div className="profile-handle">@{profile.handle}</div>}
               {joinedLabel && <div className="profile-joined">On {SITE.name} since {joinedLabel}</div>}
@@ -420,6 +423,8 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
             {sections.map((s) => (
               <a key={s.id} href={`#${s.id}`} className="profile-side-nav-link">{s.label}</a>
             ))}
+            {/* The "Not for AI training" stamp, under the jump list (lib/aiPolicyRules.js). */}
+            {aiSeal && <AiSealCard name={profile.displayName} />}
           </nav>
 
           {/* Center: the latest post big, then everything else in order. */}

@@ -65,7 +65,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-10-24';
+const TEXT_UPDATED = '2026-10-25';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -241,6 +241,19 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         anything, and we&rsquo;ll tell you why. This is editorial judgement, not a guarantee that
         published work has been legally cleared.
       </p>
+      <h3 id="ai">Your work is not for AI training</h3>
+      <p>
+        The licence you give us is for running and promoting {SITE.name}, as described above. We will
+        not license your work to anyone for training, fine-tuning or evaluating machine-learning or
+        artificial-intelligence models, or for text-and-data mining, and we don&rsquo;t train models
+        on it ourselves. If that ever changed, it would need your separate written agreement first,
+        for that use and that work.
+      </p>
+      <p>
+        You can show or hide the &ldquo;Not for AI training&rdquo; seal on your titles and profile
+        from your account. The policy applies either way. Our <a href="/ai-policy">AI policy</a> says
+        what we do to keep the work off training sets and what we can&rsquo;t promise.
+      </p>
 
       <h2>6. What you may not do</h2>
       <ul>
@@ -249,7 +262,19 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         <li>Share your account so people can watch premium content without subscribing</li>
         <li>Upload anything unlawful, hateful, harassing, or sexually explicit involving minors</li>
         <li>Upload work you don&rsquo;t have the rights to</li>
-        <li>Scrape the site, or hit it with automated traffic that degrades it for others</li>
+        <li>
+          Collect anything from the platform by automated means, including crawlers, scrapers, bots,
+          headless browsers, downloaders and screen recorders, or hit it with automated traffic that
+          degrades it for others
+        </li>
+        <li>
+          Use anything on the platform, or anything derived from it, to train, fine-tune, evaluate,
+          ground or prompt a machine-learning or artificial-intelligence model, or for text-and-data
+          mining, whether or not for commercial purposes. We expressly reserve our rights under
+          Article 4(3) of Directive (EU) 2019/790 and signal that reservation in machine-readable
+          form on every page. Permission for a search engine to index the public pages does not
+          include any of the above.
+        </li>
       </ul>
 
       <h2>7. Copyright complaints</h2>

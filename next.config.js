@@ -44,7 +44,7 @@ const nextConfig = {
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
           { key: 'TDM-Reservation', value: '1' },
-          { key: 'TDM-Policy', value: `${SITE_ORIGIN}/terms` },
+          { key: 'TDM-Policy', value: `${SITE_ORIGIN}/ai-policy` },
           { key: 'Content-Usage', value: 'train-ai=n, ai-use=n' }
         ]
       }

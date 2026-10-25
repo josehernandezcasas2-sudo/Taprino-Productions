@@ -20,6 +20,7 @@ import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
 import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
 import { TipButton, TipEndCard, tipChipStyles, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
+import { AiSealChip } from '../../components/AiSeal';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
 
@@ -414,6 +415,8 @@ export default function Episode() {
                   </View>
                 )}
                 <View style={[styles.chip, { borderColor: 'rgba(251,232,211,0.18)' }]}><Text style={styles.chipText}>{tierChip}</Text></View>
+                {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
+                {state.page && state.page.aiSeal !== false ? <AiSealChip /> : null}
                 <Pressable style={[styles.chip, styles.chipRow, { borderColor: 'rgba(179,73,47,0.4)' }]} onPress={() => toggleWishlist(episode.id)}>
                   <HeartIcon active={saved} color={saved ? colors.danger : colors.inkDim} />
                   <Text style={[styles.chipText, { color: saved ? colors.danger : colors.inkDim }]}>{saved ? 'Saved to wishlist' : 'Add to wishlist'}</Text>

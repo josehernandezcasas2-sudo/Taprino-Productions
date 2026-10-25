@@ -47,7 +47,7 @@ export async function getServerSideProps({ req, params, res, query }) {
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
@@ -118,6 +118,7 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         isOriginal={isOriginal}
         isSaved={isWishlisted(seriesInfo.id)}
         onToggleSave={() => toggleWishlist(seriesInfo.id)}
+        aiSeal={aiSeal}
       />
 
       <main className="library-stage">
