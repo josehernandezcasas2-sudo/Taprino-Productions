@@ -103,6 +103,7 @@ export default function ProductionScreen() {
                   <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push({ pathname: '/crew/calls/new', params: { production: id } })}><Text style={[crew.btnText, crew.btnPrimaryText]}>+ Post a call</Text></Pressable>
                   <Pressable style={crew.btn} onPress={() => router.push('/locations')}><Text style={crew.btnText}>Book a place</Text></Pressable>
                   <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/distribution`)}><Text style={crew.btnText}>Distribution & screeners</Text></Pressable>
+                  <Pressable style={crew.btn} onPress={() => router.push({ pathname: '/resources', params: { kind: 'paperwork' } })}><Text style={crew.btnText}>Paperwork templates</Text></Pressable>
                 </View>
               </View>
             ) : null}
@@ -114,6 +115,7 @@ export default function ProductionScreen() {
                 <Text style={crew.mono}>{data.members.filter((m) => m.worked).length} confirmed worked</Text>
               </View>
               {data.members.length === 0 ? <Text style={crew.muted}>Nobody on it yet.{data.isOwner ? ' Book people through a call posted for this production, or add them below.' : ''}</Text> : null}
+              {data.isOwner || data.isMember ? <Pressable onPress={() => router.push({ pathname: '/resources', params: { kind: 'paperwork' } })}><Text style={crew.mono}>Release forms, deal memos, NDAs, location agreements: Paperwork & legal in Resources ›</Text></Pressable> : null}
               {Object.entries(byDept).map(([dept, list]) => (
                 <View key={dept} style={{ gap: 6 }}>
                   <Text style={crew.h4}>{dept}</Text>

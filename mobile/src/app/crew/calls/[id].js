@@ -141,6 +141,7 @@ export default function CallScreen() {
               </Pressable>
               {call.details ? <Text style={[crew.rowText, { color: colors.inkDim, lineHeight: 20 }]}>{call.details}</Text> : null}
               {call.paySecured ? <Text style={crew.mono}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the Studio Tapa fee + card processing); held until you confirm they worked, then sent to their payout account. “Didn’t happen” refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through Studio Tapa once you’re booked; held until they confirm you worked, then sent to your payout account.`}</Text> : null}
+              {!isPoster && data.workedWithPoster ? <Chip label={`✓ you’ve worked together ${data.workedWithPoster}×`} tone="ok" style={{ alignSelf: 'flex-start' }} /> : null}
               <Text style={crew.mono}>{first(call.poster.displayName)} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked{isPoster && data.firstResponseMinutes ? ` · first response after ${data.firstResponseMinutes < 60 ? `${data.firstResponseMinutes} min` : `${Math.round(data.firstResponseMinutes / 60)} h`}` : ''}</Text>
             </View>
 
@@ -235,6 +236,7 @@ export default function CallScreen() {
                         <Text style={crew.mono}>{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}{r.person.cameThrough ? ` · came through on ${r.person.cameThrough} urgent` : ''}{r.person.noShows ? ` · ${r.person.noShows} no-show${r.person.noShows === 1 ? '' : 's'}` : ''}</Text>
                       </View>
                     </Pressable>
+                    {r.workedTogether ? <Chip label={`✓ worked with you ${r.workedTogether}× before`} tone="ok" style={{ alignSelf: 'flex-start' }} /> : null}
                     <Text style={[crew.bio, { color: colors.inkDim }]}>“{r.message}”</Text>
                     {call.kind === 'cast' ? (
                       <View style={{ gap: 6 }}>

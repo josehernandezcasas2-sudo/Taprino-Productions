@@ -415,7 +415,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         {call.paySecured && <><span /><span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the ${SITE.name} fee + card processing); it's held until you confirm they worked, then sent to their payout account. "Didn't happen" refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through ${SITE.name} once you're booked; it's held until they confirm you worked, then sent to your payout account.`}</span></>}
         {call.projectTitle && <><span>Project</span><span><Link href={call.projectType === 'pitch' ? `/pitches/${call.projectId}` : `/series/${call.projectId}`} className="crew-chip pitch">{call.projectTitle}</Link></span></>}
         {call.productionTitle && <><span>Production</span><span><Link href={`/productions/${call.productionId}`} className="crew-chip olive">{call.productionTitle}</Link> <span className="crew-mono">booked people join its crew list</span></span></>}
-        <span>Posted by</span><span><PersonLine p={call.poster} /></span>
+        <span>Posted by</span><span><PersonLine p={call.poster} />{!isPoster && data.workedWithPoster ? <span className="crew-chip ok" style={{ marginLeft: '0.4rem' }}>✓ you’ve worked together {data.workedWithPoster}×</span> : null}</span>
       </div>
       {call.details && <p className="cc-details">{call.details}</p>}
       <div className="crew-mono">{call.poster.displayName.split(' ')[0]} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked{isPoster && firstResponseMinutes ? ` · first response after ${firstResponseMinutes < 60 ? `${firstResponseMinutes} min` : `${Math.round(firstResponseMinutes / 60)} h`}` : ''}</div>
@@ -506,6 +506,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
               <div style={{ minWidth: 0 }}>
                 <div className="crew-pname"><Link href={r.person.profilePath}>{r.person.displayName}</Link>{r.person.verified && <span className="crew-ver">✓ creator</span>}<TierChip person={r.person} /></div>
                 <div className="crew-mono">{r.person.jobs} confirmed {r.person.jobs === 1 ? 'job' : 'jobs'} on Crew Call · {r.person.titles} released {r.person.titles === 1 ? 'title' : 'titles'}{r.person.wouldAgain ? ` · ${r.person.wouldAgain} would work again` : ''}{r.person.cameThrough ? ` · came through on ${r.person.cameThrough} urgent ${r.person.cameThrough === 1 ? 'call' : 'calls'}` : ''}{r.person.noShows ? ` · ${r.person.noShows} no-show${r.person.noShows === 1 ? '' : 's'}` : ''}</div>
+                {r.workedTogether ? <div className="crew-chips"><span className="crew-chip ok">✓ worked with you {r.workedTogether}× before</span></div> : null}
                 <p className="cc-resp-msg">“{r.message}”</p>
                 {call.kind === 'cast' && (
                   <div className="cast-resp">

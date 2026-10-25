@@ -118,6 +118,7 @@ export default function ProductionPage(props) {
                 <Link href={`/crew/calls/new?production=${p.id}`} className="crew-btn sm primary">+ Post a call</Link>
                 <Link href="/locations" className="crew-btn sm">Book a place</Link>
                 <Link href={`/productions/${p.id}/distribution`} className="crew-btn sm">Distribution & screeners</Link>
+                <Link href="/resources?kind=paperwork" className="crew-btn sm ghost" title="Release forms, deal memos, NDAs, location agreements — from the Resources directory">Paperwork templates</Link>
               </div>
             </>
           )}
@@ -140,6 +141,7 @@ export default function ProductionPage(props) {
               <span className="crew-mono">{confirmed} confirmed worked{p.release ? ' · credited on the release' : ''}</span>
             </div>
             {members.length === 0 && <div className="crew-muted">Nobody on it yet.{isOwner ? ' Book people through a call posted for this production, or add them below.' : ''}</div>}
+            {(isOwner || isMember) && <div className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>Release forms, deal memos, NDAs, location agreements: <Link href="/resources?kind=paperwork">Paperwork &amp; legal</Link> in Resources.</div>}
             {Object.entries(byDept).map(([dept, list]) => (
               <div key={dept} className="prod-dept">
                 <h4 className="cc-h4">{dept}</h4>

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
@@ -17,12 +17,14 @@ const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} mi`);
 
 export default function ResourcesScreen() {
   const router = useRouter();
+  // ?kind=paperwork opens one shelf (the production screen links here).
+  const params = useLocalSearchParams();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const reqId = useRef(0);
   const [refreshKey, setRefreshKey] = useState(0);
   const [q, setQ] = useState('');
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useState(typeof params.kind === 'string' ? params.kind : '');
   const [ships, setShips] = useState(false);
   const [near, setNear] = useState(null);
   const [within, setWithin] = useState(DEFAULT_WITHIN);

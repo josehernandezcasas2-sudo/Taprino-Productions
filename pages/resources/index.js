@@ -18,8 +18,10 @@ import { SITE } from '../../lib/siteConfig';
 // behind a gate. Admins keep the list on /admin/partners.
 const DEFAULT_WITHIN = 50;
 
-export async function getServerSideProps({ req, res }) {
+export async function getServerSideProps({ req, res, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // ?kind=paperwork opens one shelf (the production page links here).
+  const initialKind = typeof query.kind === 'string' && PARTNER_KINDS[query.kind] ? query.kind : '';
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   let near = null;
   if (account.isSignedIn) {
@@ -27,7 +29,7 @@ export async function getServerSideProps({ req, res }) {
   }
   let initial = { partners: [], total: 0, counts: {}, rank: 0 };
   try {
-    initial = await listPartners({ lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 }, { viewerId: account.userId || null });
+    initial = await listPartners({ kind: initialKind || undefined, lat: near ? near.lat : undefined, lng: near ? near.lng : undefined, withinMiles: near ? DEFAULT_WITHIN : 0 }, { viewerId: account.userId || null });
   } catch (err) {
     console.error('resources page:', err.message);
   }
@@ -35,16 +37,16 @@ export async function getServerSideProps({ req, res }) {
     props: {
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn, isSubscriber: account.isSubscriber, email: account.email, isAdmin: account.isAdmin, isCreator: account.isCreator,
-      near, initial
+      near, initial, initialKind
     }
   };
 }
 
 const withinLabel = (n) => (n === 0 ? 'Anywhere' : `Within ${n} miles`);
 
-export default function ResourcesPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, near: initialNear, initial }) {
+export default function ResourcesPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, near: initialNear, initial, initialKind = '' }) {
   const [q, setQ] = useState('');
-  const [kind, setKind] = useState('');
+  const [kind, setKind] = useState(initialKind);
   const [ships, setShips] = useState(false);
   const [near, setNear] = useState(initialNear);
   const [within, setWithin] = useState(initialNear ? DEFAULT_WITHIN : 0);
