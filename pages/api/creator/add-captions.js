@@ -2,10 +2,28 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadCaptionFile } from '../../../lib/captionUpload';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
+import { isPrivateRef, removePrivate } from '../../../lib/privateStorage';
+import { captionsHref } from '../../../lib/episodes';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } }
 };
+
+// A track in the private bucket is deleted outright (the orphan queue
+// only cleans the public artwork bucket); one uploaded before the private
+// bucket existed is recorded as orphaned so it shows up in the admin
+// cleanup queue, matching how replaced artwork and video are handled.
+async function discardOldTrack(existing, reason) {
+  if (!existing.captions_url) return;
+  if (isPrivateRef(existing.captions_url)) {
+    await removePrivate(existing.captions_url).catch(() => {});
+    return;
+  }
+  const path = storagePathFromUrl(existing.captions_url);
+  if (path) {
+    await recordOrphan({ kind: 'storage_image', reference: path, reason }).catch(() => {});
+  }
+}
 
 // Captions apply immediately rather than going through review, unlike
 // artwork. Artwork is staged because it changes what the public sees on the
@@ -45,16 +63,7 @@ export default async function handler(req, res) {
 
   // Removing captions.
   if (remove) {
-    if (existing.captions_url) {
-      const path = storagePathFromUrl(existing.captions_url);
-      if (path) {
-        await recordOrphan({
-          kind: 'storage_image',
-          reference: path,
-          reason: `Caption track removed from "${existing.title}"`
-        }).catch(() => {});
-      }
-    }
+    await discardOldTrack(existing, `Caption track removed from "${existing.title}"`);
     const { error: updateError } = await supabase
       .from('episodes')
       .update({ captions_url: null })
@@ -82,19 +91,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: err.message });
   }
 
-  // The previous file isn't deleted outright — it's recorded as orphaned so
-  // it shows up in the admin cleanup queue, matching how replaced artwork
-  // and video are already handled.
-  if (existing.captions_url) {
-    const path = storagePathFromUrl(existing.captions_url);
-    if (path) {
-      await recordOrphan({
-        kind: 'storage_image',
-        reference: path,
-        reason: `Replaced caption track for "${existing.title}"`
-      }).catch(() => {});
-    }
-  }
+  await discardOldTrack(existing, `Replaced caption track for "${existing.title}"`);
 
   const { error: updateError } = await supabase
     .from('episodes')
@@ -111,7 +108,8 @@ export default async function handler(req, res) {
 
   return res.status(200).json({
     ok: true,
-    url: uploaded.url,
+    // Where the track plays from (the gated route), never the stored reference.
+    url: captionsHref({ id: episodeId, captions_url: uploaded.url }),
     cueCount: uploaded.cueCount,
     converted: uploaded.converted
   });

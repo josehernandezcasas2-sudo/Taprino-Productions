@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
+import { applyCors } from '../../../lib/cors';
 
 // Everything a creator can see about how their own work is performing.
 //
@@ -11,7 +12,7 @@ import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 export default async function handler(req, res) {
   // The app's Your numbers screen reads this too (its web preview sends a
   // pre-check first).
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

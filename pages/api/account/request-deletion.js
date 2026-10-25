@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getAccountContext } from '../../../lib/accountContext';
 import { sendEmail } from '../../../lib/notify';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Deliberately a request, not an instant delete — deleting a signed-in
 // user's row(s) directly from an API route triggered by that same user
@@ -9,7 +10,7 @@ import { checkRateLimit } from '../../../lib/rateLimit';
 // account, regret, a support case in progress). An admin actions the
 // request by hand, same as any other account-affecting support ticket.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

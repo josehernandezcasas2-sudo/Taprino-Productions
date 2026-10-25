@@ -2,11 +2,12 @@ import { getAuth } from '@clerk/nextjs/server';
 import { checkRateLimit } from '../../lib/rateLimit';
 import { getSupabase } from '../../lib/supabase';
 import { getPitchById } from '../../lib/pitches';
+import { applyCors } from '../../lib/cors';
 
 const MAX_LENGTH = 1000;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {

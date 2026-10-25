@@ -1,11 +1,12 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { decideCredit, removeCredit } from '../../../../lib/locationCredits';
+import { applyCors } from '../../../../lib/cors';
 
 // One "Shot here" credit (migration 107).
 //   PATCH  { decision: 'approve' | 'decline' } → { id, status }   host (or admin)
 //   DELETE → { ok }                                                host, claimant or admin
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

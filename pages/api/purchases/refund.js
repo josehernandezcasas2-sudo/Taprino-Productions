@@ -1,12 +1,13 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { refundPurchase } from '../../../lib/purchases';
 import { recordAudit } from '../../../lib/auditLog';
+import { applyCors } from '../../../lib/cors';
 
 // POST { purchaseId }: the buyer refunds themselves — within the window
 // and under the watch limit (lib/purchaseRules.js refundEligibility);
 // anything else is refused with the reason.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

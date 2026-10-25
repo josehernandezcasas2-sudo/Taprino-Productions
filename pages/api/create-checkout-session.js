@@ -5,6 +5,7 @@ import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
 import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
 import { resolveReferrer } from '../../lib/creatorShare';
 import { firstInWindow } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
 //   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
@@ -15,7 +16,7 @@ export default async function handler(req, res) {
   // The app calls this too (the Account screen's plan picker, with a
   // Bearer token), so it answers preflights like the other app-facing
   // routes.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

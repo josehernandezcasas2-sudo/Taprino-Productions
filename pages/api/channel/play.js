@@ -7,6 +7,7 @@ import { meetsAgeRequirement } from '../../../lib/ageGate';
 import { getRatings } from '../../../lib/ratings';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 import { airToEpisode } from '../../../lib/adPlanRules';
+import { applyCors } from '../../../lib/cors';
 
 // Hands one viewer a playable URL for whatever is airing on a channel right
 // now — and only that. This is what lets premium titles air on channels
@@ -14,7 +15,7 @@ import { airToEpisode } from '../../../lib/adPlanRules';
 // only for the program on air at this moment and expires shortly after it
 // ends. The request only says WHICH channel; what to play is decided here.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

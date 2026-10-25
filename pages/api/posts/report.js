@@ -1,12 +1,13 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { reportPost, findPost } from '../../../lib/posts';
+import { applyCors } from '../../../lib/cors';
 
 // Mirrors pages/api/pitch-comment-report.js — flags a post for admin
 // review without hiding it. A single report shouldn't be able to
 // silently take something down before a person looks at it.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

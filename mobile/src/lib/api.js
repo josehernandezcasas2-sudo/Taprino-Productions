@@ -13,6 +13,14 @@ import { reportSuspension } from './suspensionStore';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.studiotapatv.site';
 
+// A site-relative path (a Film University file's `/api/university/file?…`
+// link, say) as something the in-app browser can open. Absolute URLs pass
+// through untouched.
+export function absoluteUrl(path) {
+  if (!path) return path;
+  return /^https?:\/\//i.test(path) ? path : `${API_BASE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+}
+
 // A failed request's body. A 403 { suspended } (middleware.js, migration
 // 102) is reported so the gate shows at once, whatever screen asked.
 async function failed(res) {

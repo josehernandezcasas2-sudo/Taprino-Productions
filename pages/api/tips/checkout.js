@@ -2,13 +2,14 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getClerkUser } from '../../../lib/clerkUser';
 import { createTipCheckout } from '../../../lib/tips';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // POST { creatorId, amountCents, note, showName, returnTo } → { url }:
 // a Stripe Checkout session for a tip (lib/tips.js). Signed in only;
 // the server re-checks every rule (amount, note, who can be tipped).
 // CORS-open for the app, which opens the URL in expo-web-browser.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -1,12 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { listReviewQueue, decideReviewItem } from '../../../lib/reviewQueue';
+import { applyCors } from '../../../lib/cors';
 
 // GET  → { items, counts }           the merged review queue
 // POST → { kind, id, decision, reason?, tierOverride? }
 // CORS/OPTIONS so the mobile app (Bearer token) can call it, same as the
 // public API routes it already uses.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

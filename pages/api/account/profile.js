@@ -3,6 +3,7 @@ import { getOwnProfile, upsertOwnProfile, isDisplayNameTaken, normalizeHandle, h
 import { getRoleContext } from '../../../lib/roles';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeImagePosition, normalizeZoom } from '../../../lib/profileBanner';
+import { applyCors } from '../../../lib/cors';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 const MAX_SOCIAL_LINKS = 6;
@@ -20,7 +21,7 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') {

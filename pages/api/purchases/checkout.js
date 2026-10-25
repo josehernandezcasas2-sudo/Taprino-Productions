@@ -1,11 +1,12 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { createPurchaseCheckout } from '../../../lib/purchases';
+import { applyCors } from '../../../lib/cors';
 
 // POST { type: 'episode' | 'series', id, returnTo? } → { url }: a Stripe
 // Checkout page for buying the title outright. The app opens the url in
 // its browser, like a membership.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

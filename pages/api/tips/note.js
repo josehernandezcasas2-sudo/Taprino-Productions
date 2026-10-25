@@ -1,10 +1,11 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setTipNoteHidden } from '../../../lib/tips';
+import { applyCors } from '../../../lib/cors';
 
 // POST { tipId, hidden } — the creator hides (or shows again) a note on a
 // tip they received, from their Money page. CORS-open for the app.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

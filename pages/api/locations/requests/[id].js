@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { isStripeConfigured, requestOrigin } from '../../../../lib/stripe';
 import { getRequest, answerRequest, acceptCounter, cancelRequest, createBookingCheckout, setOutcome, endorse } from '../../../../lib/locationRequests';
+import { applyCors } from '../../../../lib/cors';
 
 // One booking request, for either party (or an admin).
 //   GET → { request }
@@ -10,7 +11,7 @@ import { getRequest, answerRequest, acceptCounter, cancelRequest, createBookingC
 //   PATCH { action: 'outcome', outcome, note }                                    host (or admin) after the last day
 //   PATCH { action: 'endorse', line, wouldAgain }                                 either, after as_agreed
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

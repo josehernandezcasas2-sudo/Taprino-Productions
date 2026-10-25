@@ -3,11 +3,12 @@ import { hasCapability } from '../../../lib/capabilities';
 import { getSupabase } from '../../../lib/supabase';
 import { listReviewQueue } from '../../../lib/reviewQueue';
 import { getModerationState } from '../../../lib/moderation';
+import { applyCors } from '../../../lib/cors';
 
 // Badge numbers for the admin nav (components/AdminShell.js) and the
 // mobile admin home. Cheap-ish; everything fails soft to 0.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   res.setHeader('Cache-Control', 'private, no-store');

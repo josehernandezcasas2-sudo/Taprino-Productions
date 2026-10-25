@@ -1,12 +1,13 @@
 import { getChannelNow } from '../../../lib/channelEngine';
 import { resolvePublicChannel } from '../../../lib/channelRequest';
+import { applyCors } from '../../../lib/cors';
 
 // Public, no auth: what's airing on a channel right now. Same answer for
 // every viewer and never contains a playable URL (see /api/channel/play),
 // so a short CDN cache is safe. Polled by the channel player, and fired
 // right as the current program is due to end.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   try {
     const channel = await resolvePublicChannel(req.query.channel);
     if (!channel) return res.status(404).json({ error: 'No such channel.' });

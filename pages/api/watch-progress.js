@@ -6,6 +6,7 @@ import { parseWatchProgress } from '../../lib/watchProgress';
 import { recordWatchSeconds } from '../../lib/redis';
 import { firstInWindow } from '../../lib/rateLimit';
 import { findEpisode } from '../../lib/episodes';
+import { applyCors } from '../../lib/cors';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -15,7 +16,7 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 const MAX_TRACKED_EPISODES = 12;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') {

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Line, Polygon, Path } from 'react-native-svg';
 import { colors, absoluteFill } from '../lib/theme';
+import { useCaptureBlock } from '../lib/captureBlock';
 import SmartImage from './SmartImage';
 
 // Minimal reel player, mirroring components/ReelPlayer.js's own scope cut
@@ -30,6 +31,8 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
   const player = useVideoPlayer(src || null, (p) => {
     p.loop = false;
   });
+  // No screenshots or recording while a reel plays (mobile/src/lib/captureBlock.js).
+  useCaptureBlock(Boolean(active && src));
 
   useEffect(() => {
     if (!player) return;

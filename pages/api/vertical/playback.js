@@ -4,6 +4,7 @@ import { getAccountContext } from '../../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 import { getViewerAgeContext } from '../../../lib/viewerAge';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Signs whatever stored src a deck item has (free, premium, or a user
 // post). A video that doesn't demand signed URLs yet plays either way;
@@ -22,7 +23,7 @@ async function playable(storedSrc) {
 // the same entitled-or-not check pages/episode/[id].js uses rather than
 // trusting the client's own filtering.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');

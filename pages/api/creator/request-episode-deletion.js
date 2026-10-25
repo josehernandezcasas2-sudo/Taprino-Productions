@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { applyCors } from '../../../lib/cors';
 
 // This never deletes a row — it only flags one for an admin to act on
 // (see pages/api/admin/resolve-deletion.js). Setting deletion_requested
@@ -8,7 +9,7 @@ import { getSupabase } from '../../../lib/supabase';
 // their own content to come down shouldn't have to wait on a review
 // cycle for that part — only the permanent row removal waits on an admin.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

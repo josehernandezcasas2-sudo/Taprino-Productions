@@ -1,12 +1,13 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { getOffer } from '../../../lib/purchases';
+import { applyCors } from '../../../lib/cors';
 
 // GET ?type=episode|series&id=…: what this viewer would pay for the title
 // now (list price, a sale, a bundle credit) and whether they own it. The
 // app's episode and series screens ask here; the website gets the same
 // from getServerSideProps.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

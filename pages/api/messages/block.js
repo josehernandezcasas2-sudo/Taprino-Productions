@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setBlock, listBlocked } from '../../../lib/messages';
+import { applyCors } from '../../../lib/cors';
 
 // Blocking (migration 080's user_blocks).
 //   GET  → { blocked: [people] }
@@ -7,7 +8,7 @@ import { setBlock, listBlocked } from '../../../lib/messages';
 // A blocked person can't message you and no longer sees your Crew Call
 // card; nothing is announced to them.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

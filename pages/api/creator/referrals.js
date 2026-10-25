@@ -1,11 +1,12 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getReferralStats } from '../../../lib/creatorShare';
+import { applyCors } from '../../../lib/cors';
 
 // The creator's "Bring your people" card: their link, the bonus it earns,
 // and what it has done so far (lib/creatorShare.js getReferralStats). Same
 // gate as the Payouts card: creators and admins. CORS-open for the app.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

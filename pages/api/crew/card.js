@@ -3,6 +3,7 @@ import { getOwnCard, saveCard, deleteCard } from '../../../lib/crewCards';
 import { crewOptions } from '../../../lib/crewOptions';
 import { getCreditedWork } from '../../../lib/userProfiles';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // The signed-in person's own Crew Call working card.
 //   GET    → { card | null, creditedWork, options }
@@ -11,7 +12,7 @@ import { checkRateLimit } from '../../../lib/rateLimit';
 // Same CORS shape as the other account routes so the app can call it
 // with a Bearer token.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -14,6 +14,7 @@ import { colors, fonts, absoluteFill } from '../../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
+import { useCaptureBlock } from '../../lib/captureBlock';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import { CardRow } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
@@ -154,6 +155,9 @@ export default function Episode() {
     startAt: resumeSeconds,
     getToken: () => withTimeout(getToken().catch(() => null), 4000)
   });
+  // No screenshots or recording while the title itself plays; trailers
+  // are promotional and stay capturable (mobile/src/lib/captureBlock.js).
+  useCaptureBlock(Boolean(showPlayer && !showingTrailer && playback.src));
 
   // Same reason as HeroSpotlight's trailer: a play() issued before the
   // stream has loaded can be dropped, so start again once it's ready.

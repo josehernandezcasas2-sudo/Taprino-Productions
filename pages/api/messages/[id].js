@@ -1,12 +1,13 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getConversation, sendMessage, setMuted } from '../../../lib/messages';
+import { applyCors } from '../../../lib/cors';
 
 // One conversation.
 //   GET   ?since=<iso> → { thread, messages } (only { messages } with since)
 //   POST  { body }     → { threadId, message }
 //   PATCH { muted }    → { muted }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

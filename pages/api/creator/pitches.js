@@ -3,6 +3,7 @@ import { getPitchesForCreator } from '../../../lib/pitches';
 import { getEarningsForCreator } from '../../../lib/pitchDonations';
 import { getPayoutAccount, payoutState } from '../../../lib/creatorPayouts';
 import { isStripeConfigured } from '../../../lib/stripe';
+import { applyCors } from '../../../lib/cors';
 
 // The app's "Your pitches" screen (mobile/src/app/creator/pitches.js):
 // the same data pages/creator/pitch/dashboard.js assembles in
@@ -10,7 +11,7 @@ import { isStripeConfigured } from '../../../lib/stripe';
 // project, and where their Stripe payout setup stands. Creator-only; the
 // rows are the owner's own, so nothing is stripped.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -4,13 +4,14 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getWatchHistory } from '../../lib/watchHistory';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getRecommendations } from '../../lib/recommendations';
+import { applyCors } from '../../lib/cors';
 
 // The app's My Recs screen (mobile/src/app/recs.js): the same recipe as
 // pages/recs.js getServerSideProps — taste from the wishlist and watch
 // history, the site's closeness setting, 24 picks — trimmed to card
 // fields. Personal, so never cached.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -1,13 +1,14 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getLessonPlayback, getFilePlayback } from '../../../lib/university';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Mints a fresh signed playback URL for one video lesson ({ lessonId }) or
 // one video example ({ fileId }), the lesson-side twin of
 // /api/stream-token. Lessons are free, so the only gate is that the row
 // exists and is published — no tier, no age check.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

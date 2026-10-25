@@ -2,11 +2,12 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getOwnListings } from '../../../lib/locations';
 import { locationRules } from '../../../lib/locationRules';
 import { pendingClaimsForHost } from '../../../lib/locationCredits';
+import { applyCors } from '../../../lib/cors';
 
 // The host's own places, every status (the app's Your locations screen).
 //   GET → { listings, rules, pendingCredits }   (pendingCredits: "Shot here" claims waiting on the host, migration 107)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

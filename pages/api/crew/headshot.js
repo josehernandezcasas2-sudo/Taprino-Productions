@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { uploadHeadshot } from '../../../lib/crewCards';
+import { applyCors } from '../../../lib/cors';
 
 // One headshot for a performer card (migration 106): POST { base64,
 // fileName } → { url }. The card save then references the URL. The
@@ -7,7 +8,7 @@ import { uploadHeadshot } from '../../../lib/crewCards';
 export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

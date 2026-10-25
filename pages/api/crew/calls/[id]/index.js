@@ -1,11 +1,12 @@
 import { getRoleContext } from '../../../../../lib/roles';
 import { getCall, updateCall } from '../../../../../lib/crewCalls';
+import { applyCors } from '../../../../../lib/cors';
 
 // One call.
 //   GET   → { call, viewerResponse, canRespond, booked, pastEnd, responses (poster/admin only) }
 //   PATCH → edit fields, or { status: 'closed' | 'open' | 'removed' } — poster (or admin)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

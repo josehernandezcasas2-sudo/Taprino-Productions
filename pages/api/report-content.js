@@ -1,13 +1,14 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { submitReport } from '../../lib/moderation';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // POST { targetType: 'episode' | 'series' | 'channel_media', targetId, reason }
 // Signed-in viewers only, one report per account per title. Reports add up
 // toward review tiers (see lib/moderation.js); a single report never takes
 // anything down by itself.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

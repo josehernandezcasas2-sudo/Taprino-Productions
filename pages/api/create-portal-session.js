@@ -1,10 +1,11 @@
 import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
+import { applyCors } from '../../lib/cors';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

@@ -1,10 +1,11 @@
 import { listChannels, getChannelNow, channelToPublic } from '../../../lib/channelEngine';
+import { applyCors } from '../../../lib/cors';
 
 // Public: every public channel, in number order, with what's on each right
 // now. The website gets this from getServerSideProps (lib/livePageProps.js);
 // the mobile app's Live screen calls this instead.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   try {
     const channels = await listChannels();
     const at = new Date();

@@ -1,11 +1,12 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { getDistribution, updateDistribution } from '../../../../lib/distribution';
+import { applyCors } from '../../../../lib/cors';
 
 // A production's distribution page (migration 109), owner or admin.
 //   GET   → { production, release, festivals, notes, pressKitUrl, trailerUrl, premiereOn, premiereNote, screeners, episodes, partners, checklist }
 //   PATCH { festivals?, notes?, pressKitUrl?, trailerUrl?, premiereOn?, premiereNote? } → the same
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

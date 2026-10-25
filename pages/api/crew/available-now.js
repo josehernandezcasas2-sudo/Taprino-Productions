@@ -1,13 +1,14 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setAvailableNow } from '../../../lib/crewCards';
 import { AVAILABLE_NOW_CHOICES } from '../../../lib/crewCallRules';
+import { applyCors } from '../../../lib/cors';
 
 // "I'm free right now" (migration 105): flag the signed-in person's card
 // for a few hours so urgent calls nearby reach them first and the
 // directory shows them on top.
 //   POST { hours: 4 | 8 | 12 | 24 | 0 } → { availableNowUntil, freeNow }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

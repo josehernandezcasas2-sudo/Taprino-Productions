@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { addMember, setMemberWorked, removeMember, leaveProduction } from '../../../../lib/productions';
+import { applyCors } from '../../../../lib/cors';
 
 // Who's on a production.
 //   POST   { userId | handle, role }        owner adds someone
@@ -7,7 +8,7 @@ import { addMember, setMemberWorked, removeMember, leaveProduction } from '../..
 //   PATCH  { memberId, worked: true|false }  owner (or admin) confirms the work
 //   DELETE { memberId }                      owner removes someone
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

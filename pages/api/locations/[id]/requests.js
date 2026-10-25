@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { createRequest } from '../../../../lib/locationRequests';
+import { applyCors } from '../../../../lib/cors';
 
 // Producer: ask for dates at one place.
 //   POST { startsOn, endsOn, hoursFrom, hoursTo, crewSize, vehicles, project: {type,id}|null, shooting, message, pricing: 'posted'|'offer', offer }
 //        → { request }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

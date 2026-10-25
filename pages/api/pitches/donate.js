@@ -2,6 +2,7 @@ import { getAuth, clerkClient } from '@clerk/nextjs/server';
 import { createDonationCheckout, MIN_DONATION_CENTS, MAX_DONATION_CENTS } from '../../../lib/pitchDonations';
 import { requestOrigin } from '../../../lib/stripe';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Back a Pitch Room project: POST { pitchId, amountDollars } → { url }
 // — a Stripe Checkout page to send the person to. The donation is
@@ -9,7 +10,7 @@ import { checkRateLimit } from '../../../lib/rateLimit';
 // shape as the other account routes so the app can call it with a
 // Bearer token and open the URL in its in-app browser.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

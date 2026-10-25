@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getOwnListings } from '../../../lib/locations';
 import { getCreatorMoneyPage, getCreatorMoneyCsv } from '../../../lib/creatorMoney';
+import { applyCors } from '../../../lib/cors';
 
 // The creator's Money page (lib/creatorMoney.js): GET ?period=YYYY-MM
 // (default this month; a bare YYYY gives the whole year) → everything the
@@ -8,7 +9,7 @@ import { getCreatorMoneyPage, getCreatorMoneyCsv } from '../../../lib/creatorMon
 // admins, plus anyone who hosts a place (the Bookings lane is theirs
 // too, like /api/creator/payouts). CORS-open for the app.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getCoursePage } from '../../../lib/university';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // One course (?slug=writing-101): syllabus grouped by module, materials,
 // examples, and (signed in) the viewer's ticks and where to continue.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

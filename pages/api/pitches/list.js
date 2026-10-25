@@ -1,6 +1,7 @@
 import { getApprovedPitches } from '../../../lib/pitches';
 import { getSiteSettings } from '../../../lib/siteSettings';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Public, read-only feed of approved pitches for external clients (the
 // mobile app) — same data /pitches/discover shows a signed-out visitor,
@@ -13,7 +14,7 @@ export default async function handler(req, res) {
   // Public data with no auth/cookies involved, so it's safe to open up to
   // any origin — this route exists specifically for the mobile app (and
   // its web preview) to call cross-origin.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   const siteSettings = await getSiteSettings();
   if (!siteSettings.elevatorPitchEnabled) {
     return res.status(200).json({ pitches: [] });

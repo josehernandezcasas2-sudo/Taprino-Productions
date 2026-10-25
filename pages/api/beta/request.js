@@ -1,12 +1,13 @@
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { privateBetaOn } from '../../../lib/privateBetaRules';
 import { saveRequest } from '../../../lib/betaInvites';
+import { applyCors } from '../../../lib/cors';
 
 // The door's "Request an invite" form (pages/welcome.js; the app points
 // people at the website). POST { email, kind, note? }. Open to everyone,
 // which is the point, so: rate limited per address, one row per email.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

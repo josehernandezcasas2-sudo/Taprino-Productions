@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { listMyRequests } from '../../../../lib/locationRequests';
 import { locationRules } from '../../../../lib/locationRules';
+import { applyCors } from '../../../../lib/cors';
 
 // Every request the signed-in person is part of.
 //   GET → { asHost: [...], asProducer: [...], rules }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

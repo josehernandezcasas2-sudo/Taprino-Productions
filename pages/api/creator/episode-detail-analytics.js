@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, getDailyWatchSeconds, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
+import { applyCors } from '../../../lib/cors';
 
 // The full picture for exactly one episode, from the day it was uploaded
 // through today — a separate call rather than folding into the main
@@ -11,7 +12,7 @@ import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 // would ever look at. This is fetched once, on demand, only when a
 // creator actually clicks into one episode's row.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

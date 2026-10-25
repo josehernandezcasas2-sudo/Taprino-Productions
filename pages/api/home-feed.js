@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getHomeFeedData } from '../../lib/homeFeed';
 import { getOwnCard } from '../../lib/crewCards';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // Public, read-only feed for external clients (the mobile app) — the same
 // content the website's homepage shows an anonymous visitor, minus any
@@ -11,7 +12,7 @@ import { limitPublicRead } from '../../lib/rateLimit';
 // are measured from the viewer's own card, and that answer isn't cached.
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    applyCors(req, res);
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     return res.status(204).end();
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   const { userId } = getAuth(req);
   let near = null;

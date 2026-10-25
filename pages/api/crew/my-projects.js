@@ -1,13 +1,14 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { ownerProductions } from '../../../lib/productions';
+import { applyCors } from '../../../lib/cors';
 
 // The signed-in person's Pitch Room projects and series, for the
 // "Project (optional)" picker when posting a call (the app; the website
 // loads the same list server-side) — and their live productions
 // (migration 104) for the "Production" picker next to it.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

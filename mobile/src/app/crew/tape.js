@@ -6,6 +6,7 @@ import { useAuth } from '@clerk/expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiGet, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
+import { useCaptureBlock } from '../../lib/captureBlock';
 import { crew } from '../../components/CrewBits';
 
 // An uploaded self-tape (migration 106), played from its signed URL.
@@ -31,6 +32,8 @@ export default function TapeScreen() {
   }, [call, response]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const player = useVideoPlayer(src || null, (p) => { if (src) p.play(); });
+  // A self-tape is a performer's private audition: no screenshots or recording while it plays.
+  useCaptureBlock(Boolean(src));
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>

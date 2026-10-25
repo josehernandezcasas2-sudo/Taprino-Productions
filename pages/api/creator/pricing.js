@@ -1,13 +1,14 @@
 import { getRoleContext } from '../../../lib/roles';
 import { endSale, getPricesForCreator, getPurchaseSettings, requestPrice, setSale, startSelling, stopSelling } from '../../../lib/purchases';
 import { recordAudit } from '../../../lib/auditLog';
+import { applyCors } from '../../../lib/cors';
 
 // The creator's half of Buy to own (My Work's "Sell this title" card and
 // the app's equivalent). GET: every price of theirs plus the rules.
 // POST { action, type, id, … }: set (cents) · stop · start · sale
 // (percent, endsAt, membersOnly) · end_sale.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

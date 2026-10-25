@@ -1,12 +1,13 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { getProduction, updateProduction } from '../../../../lib/productions';
+import { applyCors } from '../../../../lib/cors';
 
 // One production.
 //   GET    → { production, members, days, calls, isOwner, isMember, canEdit, canConfirm, confirmHint }
 //   PATCH  → edit fields; or { status }; or { release: { type, id } | null } — owner (or admin)
 //   DELETE → archive it (owner)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, PATCH, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

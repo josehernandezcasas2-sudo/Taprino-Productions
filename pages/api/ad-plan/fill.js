@@ -1,13 +1,14 @@
 import { fillForBreak } from '../../../lib/adPlans';
 import { siteOriginFromRequest } from '../../../lib/houseAds';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // What plays in one break of a ready ad plan, decided the moment the break
 // starts: GET ?episode=<id>&break=<index>&surface=live|vod. Public (the
 // channel player asks without signing in), never cached, rate limited per
 // viewer. Answers { fill: null } when the episode has no ready plan.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Cache-Control', 'no-store');
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');

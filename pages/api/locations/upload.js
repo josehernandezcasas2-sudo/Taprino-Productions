@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { uploadListingImage } from '../../../lib/locations';
+import { applyCors } from '../../../lib/cors';
 
 // One image at a time (the form uploads each photo as it's picked, so no
 // request carries the whole gallery): a listing photo, or the proof an
@@ -10,7 +11,7 @@ import { uploadListingImage } from '../../../lib/locations';
 export const config = { api: { bodyParser: { sizeLimit: '4mb' } } };
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

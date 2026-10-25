@@ -2,12 +2,14 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { getCloudflareVideoStatus, cloudflareUidFromUrl } from '../../../lib/cloudflareUpload';
 import { getViewCounts } from '../../../lib/redis';
+import { captionsHref } from '../../../lib/episodes';
+import { applyCors } from '../../../lib/cors';
 
 // Extracts the Cloudflare video uid from an episode's stored src URL
 // (https://customer-XXXX.cloudflarestream.com/{uid}/manifest/video.m3u8) —
 // there's no separate column for this, so it's parsed back out here.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') {
@@ -92,7 +94,7 @@ export default async function handler(req, res) {
         // include either way, and saves the dashboard a second round-trip
         // the moment something does go live.
         viewCount: viewCounts[ep.id] || 0,
-        captionsUrl: ep.captions_url || null,
+        captionsUrl: captionsHref(ep),
         captionsLanguage: ep.captions_language || 'en',
         captionsLabel: ep.captions_label || 'English',
         // The creator's own uploaded artwork wins if present — Cloudflare's

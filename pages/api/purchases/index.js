@@ -1,10 +1,11 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { getLibrary } from '../../../lib/purchases';
+import { applyCors } from '../../../lib/cors';
 
 // GET: everything the signed-in viewer owns (Buy to own), for the
 // account page's "Your purchases" and the app's Purchases screen.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

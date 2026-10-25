@@ -1,12 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, signedSrcForStoredUrl } from '../../../lib/cloudflareUpload';
+import { applyCors } from '../../../lib/cors';
 
 // A signed playback URL for an uploaded self-tape (migration 106). Only
 // the call's poster, the performer who sent it, or an admin can open it.
 //   GET ?callId=&responseId= → { url, expiresAt }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

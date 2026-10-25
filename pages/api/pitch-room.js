@@ -1,4 +1,5 @@
 import { getPitchRoomData } from '../../lib/pitchRoom';
+import { applyCors } from '../../lib/cors';
 
 // The mobile app's equivalent of pages/pitches.js's getServerSideProps —
 // same lib/pitchRoom.js, so the app's Pitch Room has the website's save
@@ -6,7 +7,7 @@ import { getPitchRoomData } from '../../lib/pitchRoom';
 // public /api/pitches/list has none of those). Personalized when a Bearer
 // token is sent, so never shared-cached.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

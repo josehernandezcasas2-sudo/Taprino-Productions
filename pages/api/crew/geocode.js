@@ -1,5 +1,6 @@
 import { geocode, reverseGeocode } from '../../../lib/geocode';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // GET ?q=long beach        → { places: [{ label, city, region, country, lat, lng }] }
 // GET ?lat=33.77&lng=-118.19 → { places: [the one place that point is in] }
@@ -11,7 +12,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   // Nominatim allows about one lookup a second per server; a scripted run
   // of unique queries would get the whole site's IP banned.
   if (!(await checkRateLimit(rateLimitKeyForRequest(req, 'geocode'), 60, 600))) {

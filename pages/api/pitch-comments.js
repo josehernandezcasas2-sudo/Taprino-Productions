@@ -1,8 +1,9 @@
 import { getPitchComments, getPitchById } from '../../lib/pitches';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') {

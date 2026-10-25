@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { searchListings, createListing } from '../../../lib/locations';
 import { locationRules } from '../../../lib/locationRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Locations directory + listing a place.
 //   GET  ?q=&kind=&features=quiet,driveway&lat=&lng=&within=25&maxHourly=100&deals=1&verified=1&from=YYYY-MM-DD&to=YYYY-MM-DD&sort=near|booked|cheap|new
@@ -9,7 +10,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 //   POST { title, kind, place, address, photos: [{url, caption}], ... } → the new listing (pending review)
 // Public to read; listing needs a signed-in account.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

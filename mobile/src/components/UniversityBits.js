@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, absoluteFill } from '../lib/theme';
+import { absoluteUrl } from '../lib/api';
 import SmartImage from './SmartImage';
 
 // Shared pieces for the Film University screens (mobile/src/app/university/*),
@@ -53,7 +54,7 @@ const FILE_BG = { xlsx: '#d7efe0', csv: '#d7efe0', docx: '#dfe6f7', txt: '#dfe6f
 export function FileRow({ file, showCourse = false, onPlay }) {
   const t = file.kind === 'video' ? 'video' : file.fileType || 'other';
   const meta = [showCourse ? file.topicName : null, file.meta, file.lessonTitle ? `“${file.lessonTitle}”` : null].filter(Boolean).join(' · ');
-  const press = () => (file.kind === 'video' ? onPlay && onPlay(file) : WebBrowser.openBrowserAsync(file.fileUrl));
+  const press = () => (file.kind === 'video' ? onPlay && onPlay(file) : WebBrowser.openBrowserAsync(absoluteUrl(file.fileUrl)));
   return (
     <Pressable style={styles.file} onPress={press}>
       {file.thumbnailUrl

@@ -1,6 +1,7 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { ArtistSupportError, getArtistSupportPayload, saveLineup } from '../../../lib/artistSupport';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Membership Artist Support — the member's lineup. GET answers with
 // everything the card draws (tier, share, picks, split); POST replaces the
@@ -8,7 +9,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 // answers with the fresh state. Same CORS/OPTIONS shape as the other
 // routes the app calls with a Bearer token.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

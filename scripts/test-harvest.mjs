@@ -5,6 +5,7 @@ import assert from 'node:assert/strict';
 import { buildRobotsTxt, robotsTag, tdmrepJson, AI_TRAINING_AGENTS, AI_SEARCH_AGENTS, ALLOWED_AGENTS, CONTENT_SIGNAL } from '../lib/robotsRules.js';
 import { isOpenPath } from '../lib/privateBetaRules.js';
 import { limitPublicRead } from '../lib/rateLimit.js';
+import { corsOriginAllowed, applyCors } from '../lib/cors.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -100,6 +101,37 @@ await testAsync('limitPublicRead: the budget is per user when signed in, per IP 
   // Another scope is another budget.
   res = fakeRes();
   assert.equal(await limitPublicRead(req, res, `${scope}-b`, { max: 1, windowSeconds: 60 }), true);
+});
+
+test('CORS: the site, this deployment, named extras and (outside production) localhost may read the API; nobody else', () => {
+  const prod = { production: true, env: {} };
+  assert.equal(corsOriginAllowed('https://www.studiotapatv.site', prod), true);
+  assert.equal(corsOriginAllowed('https://studiotapatv.site', prod), true);
+  assert.equal(corsOriginAllowed('https://evil.example', prod), false);
+  assert.equal(corsOriginAllowed('https://www.studiotapatv.site.evil.example', prod), false);
+  assert.equal(corsOriginAllowed('http://www.studiotapatv.site', prod), false, 'http is not the site');
+  assert.equal(corsOriginAllowed(undefined, prod), false);
+  assert.equal(corsOriginAllowed('null', prod), false);
+  assert.equal(corsOriginAllowed('http://localhost:8081', prod), false, 'localhost only while developing');
+  assert.equal(corsOriginAllowed('http://localhost:8081', { production: false, env: {} }), true);
+  assert.equal(corsOriginAllowed('http://127.0.0.1:3000', { production: false, env: {} }), true);
+  assert.equal(corsOriginAllowed('https://taprino-abc123-jose.vercel.app', prod), false, 'another Vercel app is not us');
+  assert.equal(corsOriginAllowed('https://taprino-abc123-jose.vercel.app', { production: true, env: { VERCEL_URL: 'taprino-abc123-jose.vercel.app' } }), true, 'this deployment is');
+  assert.equal(corsOriginAllowed('https://partner.example', { production: true, env: { CORS_EXTRA_ORIGINS: 'https://partner.example, https://two.example' } }), true);
+  assert.equal(corsOriginAllowed('https://two.example', { production: true, env: { CORS_EXTRA_ORIGINS: 'https://partner.example, https://two.example' } }), true);
+});
+
+test('applyCors echoes an allowed origin with Vary and sets nothing otherwise', () => {
+  let res = fakeRes();
+  applyCors({ headers: { origin: 'https://www.studiotapatv.site' } }, res);
+  assert.equal(res.headers['Access-Control-Allow-Origin'], 'https://www.studiotapatv.site');
+  assert.equal(res.headers.Vary, 'Origin');
+  res = fakeRes();
+  applyCors({ headers: { origin: 'https://evil.example' } }, res);
+  assert.deepEqual(res.headers, {});
+  res = fakeRes();
+  applyCors({ headers: {} }, res);
+  assert.deepEqual(res.headers, {}, 'the native app sends no Origin and needs no header');
 });
 
 console.log(`${passed} passed`);

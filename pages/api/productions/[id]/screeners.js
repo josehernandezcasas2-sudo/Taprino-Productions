@@ -1,11 +1,12 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { createScreener, revokeScreener } from '../../../../lib/distribution';
+import { applyCors } from '../../../../lib/cors';
 
 // Screeners on a production (migration 109), owner or admin.
 //   POST   { episodeId, label, recipientEmail?, days (3|7|14|30|60), maxViews } → { screener }
 //   DELETE { screenerId } → { ok }   (revokes; the link stops working at once)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, DELETE, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

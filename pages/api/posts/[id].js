@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { findPost, deletePost, updatePostCaption } from '../../../lib/posts';
+import { applyCors } from '../../../lib/cors';
 
 const MAX_CAPTION_LENGTH = 2200;
 
@@ -9,7 +10,7 @@ const MAX_CAPTION_LENGTH = 2200;
 // review in the first place — there's nothing to preserve an audit trail
 // of.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'DELETE, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') {

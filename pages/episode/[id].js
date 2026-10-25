@@ -95,7 +95,18 @@ export async function getServerSideProps({ req, params, query, res }) {
 
   // audioUrl (podcast audio, in a public bucket) used to pass through
   // untouched, so anyone could lift a premium episode's audio link.
-  const safeEpisode = { ...episode, src: playbackSrc, audioDescriptionSrc: describedSrc, audioUrl: entitled ? episode.audioUrl || null : null };
+  // Captions and transcripts are the title's dialogue in text: they go to
+  // the browser only with the video (the lock screen used to carry them),
+  // and never the stored reference, only the gated route.
+  const safeEpisode = {
+    ...episode,
+    src: playbackSrc,
+    audioDescriptionSrc: describedSrc,
+    audioUrl: entitled ? episode.audioUrl || null : null,
+    captionsUrl: entitled ? episode.captionsUrl || null : null,
+    transcriptUrl: entitled ? episode.transcriptUrl || null : null,
+    captionsRef: null
+  };
 
   return {
     props: {

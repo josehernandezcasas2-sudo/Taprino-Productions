@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { unregisterPushToken } from '../../../lib/push';
+import { applyCors } from '../../../lib/cors';
 
 // POST { token } → { ok }: the app switched push off (lib/push.js). A
 // suspended person may still call this (lib/suspensionGate.js open
 // list): switching nudges off is always allowed.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

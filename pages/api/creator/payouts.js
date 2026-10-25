@@ -4,6 +4,7 @@ import { getPayoutAccount, refreshPayoutAccount, createOnboardingLink, createDas
 import { getOwnListings } from '../../../lib/locations';
 import { getOwnCard } from '../../../lib/crewCards';
 import { hasCrewPayInterest } from '../../../lib/crewPay';
+import { applyCors } from '../../../lib/cors';
 
 // The creator's Payouts card (components/creator/PayoutsCard.js, on
 // /account and /creator/pitch/dashboard; the app's
@@ -13,7 +14,7 @@ import { hasCrewPayInterest } from '../../../lib/crewPay';
 //   POST { action: 'onboard', returnTo } → { url } Stripe-hosted onboarding, back to returnTo
 //   POST { action: 'dashboard' }   → { url } Stripe Express dashboard
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

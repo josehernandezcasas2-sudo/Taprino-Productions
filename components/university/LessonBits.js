@@ -97,7 +97,7 @@ export function FileRow({ file, showCourse = false, onPlay, compact = false }) {
     );
   }
   return (
-    <a className="uni-file" href={file.fileUrl} target="_blank" rel="noopener" download>
+    <a className="uni-file" href={file.fileUrl && file.fileUrl.includes('?') ? `${file.fileUrl}&download=1` : file.fileUrl} target="_blank" rel="noopener" download>
       {body}
       <span className="uni-btn sm">Download</span>
     </a>

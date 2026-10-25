@@ -13,6 +13,7 @@ import { readViewingTerms, saveViewingTerms, TERMS_URL } from '../lib/viewingTer
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
+import { useCaptureBlock } from '../lib/captureBlock';
 
 const SAFETY_POLL_MS = 45000;
 // Viewers without an age on file take the viewing terms once; the device
@@ -47,6 +48,8 @@ const CAN_ROTATE = Platform.OS === 'ios' || Platform.OS === 'android';
 // screen goes fullscreen, turning it back comes out. The rest of the app
 // stays locked to portrait (src/app/_layout.js).
 export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) {
+  // No screenshots or recording while the channel is on screen (mobile/src/lib/captureBlock.js).
+  useCaptureBlock(true);
   const router = useRouter();
   const { getToken } = useAuth();
   const nowRef = useRef(initialNow);

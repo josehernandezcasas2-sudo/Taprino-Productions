@@ -1,10 +1,11 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setShortlist } from '../../../../../lib/crewCalls';
+import { applyCors } from '../../../../../lib/cors';
 
 // Casting (migration 106). Poster shortlists a performer / sets a callback:
 //   POST { responseId, shortlisted?: boolean, callbackAt?: ISO | null } → the call (poster's view)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

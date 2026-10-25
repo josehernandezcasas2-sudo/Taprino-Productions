@@ -1,22 +1,26 @@
 import { getEpisodePageData } from '../../lib/episodePage';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // Trim an episode record down to what a card/sidebar needs — and never a
 // playable URL. The app gets the real src from POST /api/stream-token,
 // which re-checks entitlement (and the age gate) on every call.
 function stripPlayable(e) {
   if (!e) return e;
-  const { src, audioDescriptionSrc, audioUrl, ...rest } = e;
+  const { src, audioDescriptionSrc, audioUrl, captionsUrl, captionsRef, transcriptUrl, ...rest } = e;
   return rest;
 }
 
-// The episode being viewed keeps its podcast audio URL only when the
-// viewer is entitled to it (same rule as pages/episode/[id].js) — the
-// audio lives in a public bucket, so the link is permanent once seen.
+// The episode being viewed keeps its podcast audio URL, captions and
+// transcript only when the viewer is entitled to it (same rule as
+// pages/episode/[id].js) — the dialogue of a title is not for the lock
+// screen, and the stored caption reference never leaves the server.
 function stripForViewer(e, entitled) {
   if (!e) return e;
   const out = stripPlayable(e);
   if (entitled && e.audioUrl) out.audioUrl = e.audioUrl;
+  if (entitled && e.captionsUrl) out.captionsUrl = e.captionsUrl;
+  if (entitled && e.transcriptUrl) out.transcriptUrl = e.transcriptUrl;
   return out;
 }
 
@@ -24,7 +28,7 @@ function stripForViewer(e, entitled) {
 // — same lib/episodePage.js, so loading this records the view and applies
 // the age gate exactly like opening the episode on the website.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

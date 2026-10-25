@@ -347,24 +347,78 @@ export default function SiteSettingsPanel() {
   );
 }
 
-// Keeping creators' work off the open web (Jose, 2026-10-25). Every
-// Cloudflare Stream video is meant to demand a signed URL whatever its
-// tier (lib/streamProtection.js); this button brings every video already
-// uploaded in line and lists the titles whose poster is still Cloudflare's
-// own frame grab, which stops loading once its video is protected.
+// Keeping creators' work off the open web (Jose, 2026-10-25). What new
+// uploads do by themselves, applied once to what was uploaded before:
+// every Cloudflare Stream video demands a signed URL whatever its tier
+// (lib/streamProtection.js), caption tracks live in the private bucket
+// and play through /api/captions/<id> (lib/captionUpload.js), and Film
+// University files open through one-hour signed links from a private
+// bucket (lib/universityDocs.js). Each button is safe to press again.
 function ProtectionCard() {
+  const dim = { fontSize: '0.8rem', color: 'var(--ink-dim)' };
+  return (
+    <div className="account-card" data-testid="protection-card">
+      <div className="account-eyebrow">Protection</div>
+      <p style={{ ...dim, marginBottom: '0.75rem' }}>
+        Creators&rsquo; work stays off permanent public URLs: videos play through short-lived signed links, captions through a gated route, course files through one-hour links. New uploads are handled as they land; these buttons bring what was uploaded before in line, and can be pressed again any time.
+      </p>
+      <ProtectionAction
+        label="Protect every video"
+        busyLabel="Protecting…"
+        url="/api/admin/sync-stream-protection"
+        blurb="Turns signed URLs on for every Cloudflare Stream video, free titles included. Press again if Cloudflare was unreachable during an approval."
+        render={(result) => (
+          <>
+            <p style={{ margin: 0 }}>Protected {result.videos} video{result.videos === 1 ? '' : 's'} across {result.protected} title{result.protected === 1 ? '' : 's'}; {result.skipped} without a Cloudflare video; {result.failures.length} failed.</p>
+            {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f) => <li key={f.id}>{f.title}: {f.error}</li>)}</ul>}
+            {result.cloudflarePosters.length > 0 && (
+              <p style={{ margin: '0.5rem 0 0', color: 'var(--warn)' }}>
+                {result.cloudflarePosters.length} title{result.cloudflarePosters.length === 1 ? ' uses' : 's use'} Cloudflare&rsquo;s frame grab as a poster and need{result.cloudflarePosters.length === 1 ? 's' : ''} a real one uploaded: {result.cloudflarePosters.map((p) => p.title).join(', ')}.
+              </p>
+            )}
+          </>
+        )}
+      />
+      <ProtectionAction
+        label="Move captions to private storage"
+        busyLabel="Moving…"
+        url="/api/admin/protect-media"
+        body={{ what: 'captions' }}
+        blurb="A caption track is the title's dialogue as text. New tracks go straight to the private bucket; this moves the ones uploaded before and removes their public copies."
+        render={(result) => (
+          <>
+            <p style={{ margin: 0 }}>Moved {result.moved}; {result.alreadyPrivate} already private; {result.skipped.length} hosted elsewhere; {result.failures.length} failed.</p>
+            {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f) => <li key={f.id}>{f.title}: {f.error}</li>)}</ul>}
+          </>
+        )}
+      />
+      <ProtectionAction
+        label="Lock University files"
+        busyLabel="Locking…"
+        url="/api/admin/protect-media"
+        body={{ what: 'university' }}
+        blurb="Makes the Film University bucket private. Readings and course files keep working: pages open them through one-hour signed links."
+        render={(result) => (
+          <p style={{ margin: 0 }}>{result.wasPublic ? 'The bucket was public and is now private.' : result.existed ? 'The bucket was already private.' : 'Created the bucket private.'}</p>
+        )}
+      />
+    </div>
+  );
+}
+
+function ProtectionAction({ label, busyLabel, url, body, blurb, render }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
 
-  async function protectAll() {
+  async function run() {
     setBusy(true);
     setError(null);
     setResult(null);
     try {
-      const res = await fetch('/api/admin/sync-stream-protection', { method: 'POST' });
+      const res = await fetch(url, { method: 'POST', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not protect the videos.');
+      if (!res.ok) throw new Error(data.error || 'Could not finish.');
       setResult(data);
     } catch (err) {
       setError(err.message);
@@ -374,26 +428,13 @@ function ProtectionCard() {
   }
 
   return (
-    <div className="account-card" data-testid="protection-card">
-      <div className="account-eyebrow">Protection</div>
-      <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginBottom: '0.75rem' }}>
-        Every video plays through a short-lived signed link, free titles included, so no permanent file URL ever reaches a browser or a crawler. New uploads are protected as they are approved; press this once after the change ships, and again if Cloudflare was unreachable during an approval.
-      </p>
-      <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={protectAll} disabled={busy}>
-        {busy ? 'Protecting…' : 'Protect every video'}
+    <div style={{ borderTop: '1px solid var(--line)', paddingTop: '0.75rem', marginTop: '0.75rem' }}>
+      <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', margin: '0 0 0.5rem' }}>{blurb}</p>
+      <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={run} disabled={busy}>
+        {busy ? busyLabel : label}
       </button>
       {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.6rem' }}>{error}</p>}
-      {result && (
-        <div style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '0.6rem' }}>
-          <p style={{ margin: 0 }}>Protected {result.videos} video{result.videos === 1 ? '' : 's'} across {result.protected} title{result.protected === 1 ? '' : 's'}; {result.skipped} without a Cloudflare video; {result.failures.length} failed.</p>
-          {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f) => <li key={f.id}>{f.title}: {f.error}</li>)}</ul>}
-          {result.cloudflarePosters.length > 0 && (
-            <p style={{ margin: '0.5rem 0 0', color: 'var(--warn)' }}>
-              {result.cloudflarePosters.length} title{result.cloudflarePosters.length === 1 ? ' uses' : 's use'} Cloudflare&rsquo;s frame grab as a poster and need{result.cloudflarePosters.length === 1 ? 's' : ''} a real one uploaded: {result.cloudflarePosters.map((p) => p.title).join(', ')}.
-            </p>
-          )}
-        </div>
-      )}
+      {result && <div style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '0.6rem' }}>{render(result)}</div>}
     </div>
   );
 }

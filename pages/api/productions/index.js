@@ -2,13 +2,14 @@ import { getAuth } from '@clerk/nextjs/server';
 import { listProductions, createProduction } from '../../../lib/productions';
 import { productionRules } from '../../../lib/productionRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Productions (migration 104).
 //   GET  ?q=&kind=&status=&owner=   → { productions, total, rules }   (public ones)
 //   POST { title, logline, kind, startsOn, endsOn, place, project, notes, visibility }
 //        → the new production (same shape as GET /api/productions/<id>)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

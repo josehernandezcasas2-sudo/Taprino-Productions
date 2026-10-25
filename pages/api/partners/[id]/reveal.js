@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { revealCode } from '../../../../lib/partners';
+import { applyCors } from '../../../../lib/cors';
 
 // Open a partner's code (migration 108): the gate is checked here, and
 // the first reveal per person is logged for the partner.
 //   POST { productionId? } → { code, note, url, deal }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

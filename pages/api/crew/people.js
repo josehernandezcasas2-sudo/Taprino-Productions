@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { searchCards, searchGear } from '../../../lib/crewCards';
 import { getTrackRecords } from '../../../lib/crewCalls';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Crew Call directory, for the website's /crew page and the app's
 // Discover → Crew Call. Public; day rates come back only for a signed-in
@@ -13,7 +14,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 //   GET /api/crew/people?view=gear&q=&gear=Camera&lat=&lng=&within=50
 //     → { items: [...], total }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

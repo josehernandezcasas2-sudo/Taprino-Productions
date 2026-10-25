@@ -1,13 +1,14 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { creditsForLocation, claimCredit } from '../../../../lib/locationCredits';
 import { getSupabase } from '../../../../lib/supabase';
+import { applyCors } from '../../../../lib/cors';
 
 // "Shot here" credits on one place (migration 107).
 //   GET  → { credits }   approved ones; pending too for the host / claimant / admin
 //   POST { release: { type: 'episode'|'series', id }, note?, productionId? } → { id, status }
 //        a maker's claim (pending until the host approves; the host's own is approved at once)
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -1,10 +1,11 @@
 import { getRoleContext } from '../../../../lib/roles';
 import { getCallSheet } from '../../../../lib/productions';
+import { applyCors } from '../../../../lib/cors';
 
 // One day's call sheet — the crew on the production, the owner, admins.
 //   GET ?day=<n> → { production, day, days, departments, crewCount, listing, requestHref, canEdit }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

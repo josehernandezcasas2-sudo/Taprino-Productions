@@ -1,5 +1,6 @@
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // Public episode metadata for external clients (the mobile app) — reuses
 // getPublicEpisodes()'s already-safe field set, which never includes a
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'id is required' });
   }
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   if (!(await limitPublicRead(req, res, 'episode-info'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 

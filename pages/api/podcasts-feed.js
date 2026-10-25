@@ -1,5 +1,6 @@
 import { getPodcastShows } from '../../lib/podcastShow';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // The mobile app's equivalent of pages/podcasts.js — same lib function,
 // same safe fields (no audio_url/src, just presence booleans), already
@@ -9,7 +10,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   if (!(await limitPublicRead(req, res, 'podcasts-feed'))) return undefined;
   res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
 

@@ -59,7 +59,7 @@ export default function LessonPage(props) {
                 <>
                   <iframe src={`${lesson.documentUrl}#view=FitH`} title={lesson.title} className="uni-pdf" />
                   <div className="uni-actions" style={{ marginTop: '0.7rem' }}>
-                    <a href={lesson.documentUrl} className="uni-btn primary sm" target="_blank" rel="noopener" download>Download PDF</a>
+                    <a href={`${lesson.documentUrl}&download=1`} className="uni-btn primary sm" target="_blank" rel="noopener" download>Download PDF</a>
                     <a href={lesson.documentUrl} className="uni-btn ghost sm" target="_blank" rel="noopener">Open in a new tab</a>
                   </div>
                 </>

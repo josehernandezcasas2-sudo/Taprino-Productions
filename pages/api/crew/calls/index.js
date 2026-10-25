@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { listCalls, createCall } from '../../../../lib/crewCalls';
 import { crewCallRules } from '../../../../lib/crewCallRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../../lib/rateLimit';
+import { applyCors } from '../../../../lib/cors';
 
 // The Crew Call board.
 //   GET  ?q=&role=&pay=paid,union&remote=1&lat=&lng=&within=50&matches=1&project=pitch:<id>&production=<id>&urgent=1&kind=cast|crew&mine=1&closed=1
@@ -10,7 +11,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../../lib/rateLimi
 //        → the new call (same shape as GET /api/crew/calls/<id>)
 // Public to read; posting needs a signed-in account.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

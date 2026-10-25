@@ -3,6 +3,7 @@ import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
 import { listChannelMedia, reviewChannelMedia, getChannelMediaSrc } from '../../../lib/channelMedia';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
+import { applyCors } from '../../../lib/cors';
 
 // Review queue for channel-only uploads. Same permission as reviewing
 // creator submissions.
@@ -10,7 +11,7 @@ import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 // GET ?preview=<id>           a short-lived playable URL for one upload
 // POST { id, action: approve | reject, reason? }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   const roleContext = await getRoleContext(req);

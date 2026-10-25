@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { respondToCall, updateSelfTape } from '../../../../../lib/crewCalls';
+import { applyCors } from '../../../../../lib/cors';
 
 // Respond to a call: POST { message, selfTapeUrl?, selfTapeUid?, minor?,
 // guardianName?, guardianContact? } → { responseId, threadId }. The
@@ -7,7 +8,7 @@ import { respondToCall, updateSelfTape } from '../../../../../lib/crewCalls';
 // casting extras (migration 106) sit on the response.
 // PATCH { selfTapeUrl | selfTapeUid } → attach or replace your self-tape.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, PATCH, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

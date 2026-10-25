@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getProgress, setProgress, mergeProgress } from '../../../lib/university';
+import { applyCors } from '../../../lib/cors';
 
 // The viewer's ticks, synced to their account.
 //   GET                                  → { doneIds }
@@ -9,7 +10,7 @@ import { getProgress, setProgress, mergeProgress } from '../../../lib/university
 // Signed-out viewers never reach here: their ticks stay on the device
 // (lib/universityProgress.js) until they sign in.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

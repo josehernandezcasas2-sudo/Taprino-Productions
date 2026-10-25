@@ -1,13 +1,14 @@
 import { getRoleContext } from '../../../../../lib/roles';
 import { setOutcome } from '../../../../../lib/crewCalls';
 import { recordAudit } from '../../../../../lib/auditLog';
+import { applyCors } from '../../../../../lib/cors';
 
 // After the last day — did they work it?
 //   POST { responseId, outcome: 'worked' | 'no_show' | 'cancelled' } → the call
 // The poster, or an admin when the poster has gone quiet. "worked" is a
 // confirmed job on the person's track record.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -4,6 +4,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
+import { applyCors } from '../../../lib/cors';
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
 // 33% larger than the original file) plus the rest of the JSON payload
@@ -16,7 +17,7 @@ export const config = {
 
 export default async function handler(req, res) {
   // The app's Submit a project screen posts here too.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

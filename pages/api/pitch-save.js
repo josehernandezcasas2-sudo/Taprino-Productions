@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { checkRateLimit } from '../../lib/rateLimit';
 import { togglePitchSave } from '../../lib/pitches';
+import { applyCors } from '../../lib/cors';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

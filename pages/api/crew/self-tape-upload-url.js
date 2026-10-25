@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { createCloudflareTusUploadUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Self-tapes for casting calls (migration 106), uploaded straight from the
 // browser to Cloudflare Stream like episodes are.
@@ -9,7 +10,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 const MAX_BYTES = 2 * 1024 * 1024 * 1024;
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

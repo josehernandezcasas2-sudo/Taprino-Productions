@@ -1,12 +1,13 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { reportThread } from '../../../lib/messages';
 import { REPORT_REASONS } from '../../../lib/reportReasons';
+import { applyCors } from '../../../lib/cors';
 
 // Report a conversation: POST { threadId, reason } → { ok }. Snapshots
 // the last messages for the admin (dm_reports) and files a profile
 // report on the other person through lib/moderation.js.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

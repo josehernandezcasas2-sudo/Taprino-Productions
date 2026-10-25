@@ -1,12 +1,13 @@
 import { planChannelDays, channelClock } from '../../../lib/channelEngine';
 import { addDays, mergeForGuide } from '../../../lib/channelPlan';
 import { resolvePublicChannel } from '../../../lib/channelRequest';
+import { applyCors } from '../../../lib/cors';
 
 // Public TV guide for one channel and one day (channel time). Scheduled
 // live broadcasts show up here even though, if nobody actually goes live,
 // the loop plays in their place.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   try {
     const channel = await resolvePublicChannel(req.query.channel);
     if (!channel) return res.status(404).json({ error: 'No such channel.' });

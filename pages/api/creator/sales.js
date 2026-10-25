@@ -1,10 +1,11 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSalesForCreator } from '../../../lib/purchases';
+import { applyCors } from '../../../lib/cors';
 
 // GET: the creator's Sales card (Buy to own): this month, all time, by
 // title, refunds. Web (components/creator/SalesCard.js) and app.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -2,12 +2,13 @@ import { getAuth } from '@clerk/nextjs/server';
 import { checkRateLimit } from '../../lib/rateLimit';
 import { toggleFollow } from '../../lib/follows';
 import { looksLikeUserId } from '../../lib/userProfiles';
+import { applyCors } from '../../lib/cors';
 
 // Toggle following a person (migration 075's user_follows). Same CORS/
 // OPTIONS shape as pitch-save.js so the mobile app can call it with a
 // Bearer token. Returns the fresh { following, followers } state.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') {

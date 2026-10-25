@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getLessonPage } from '../../../lib/university';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // One lesson (?course=writing-101&slug=scenes-that-turn): the lesson, its
 // files and examples, the assignment, the course syllabus in miniature,
@@ -8,7 +9,7 @@ import { limitPublicRead } from '../../../lib/rateLimit';
 // short-lived signed src; when it expires the app asks
 // /api/university/stream-token for a new one.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

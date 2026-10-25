@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../lib/roles';
 import { getOwnProfile } from '../../lib/userProfiles';
 import { getSuspensionFor } from '../../lib/suspensions';
+import { applyCors } from '../../lib/cors';
 
 // Self-fetched by MobileTabBar so it can gate "My Work" to creators/admins
 // without requiring every single page that renders <MobileTabBar /> to
@@ -9,7 +10,7 @@ import { getSuspensionFor } from '../../lib/suspensions';
 // everyone) — never cache this response, and never expose anything here
 // beyond the three booleans a nav actually needs to decide what to show.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') {

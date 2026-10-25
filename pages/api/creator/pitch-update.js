@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { postPitchUpdate } from '../../../lib/pitches';
+import { applyCors } from '../../../lib/cors';
 
 export default async function handler(req, res) {
   // The app's Your pitches screen posts here too (its web preview sends a
   // pre-check first).
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

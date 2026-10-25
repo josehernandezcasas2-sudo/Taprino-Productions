@@ -3,6 +3,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getApprovedPitches, getLikedPitchIds, getPitchLikeCounts, getSavedPitchIds } from '../../lib/pitches';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { limitPublicRead } from '../../lib/rateLimit';
+import { applyCors } from '../../lib/cors';
 
 // The mobile app's equivalent of pages/pitches/discover.js's
 // getServerSideProps — same gate (elevatorPitchEnabled, with an admin
@@ -12,7 +13,7 @@ export default async function handler(req, res) {
   // Browsers send an OPTIONS pre-check before any request carrying an
   // Authorization header (the app's web preview does); answer it.
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', '*');
+    applyCors(req, res);
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     return res.status(204).end();
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (!(await limitPublicRead(req, res, 'pitch-discover'))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');

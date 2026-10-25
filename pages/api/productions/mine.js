@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { listMyProductions, bookedPlacesFor, ownReleaseOptions } from '../../../lib/productions';
+import { applyCors } from '../../../lib/cors';
 
 // The signed-in person's productions: the ones they own and the ones
 // they're on the crew of, plus the places they've paid to book (for the
@@ -7,7 +8,7 @@ import { listMyProductions, bookedPlacesFor, ownReleaseOptions } from '../../../
 // production's release).
 //   GET → { owned, crewOn, bookedPlaces, releases }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -2,13 +2,14 @@ import { getAuth } from '@clerk/nextjs/server';
 import { listPartners } from '../../../lib/partners';
 import { partnerRules } from '../../../lib/partnerRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { applyCors } from '../../../lib/cors';
 
 // Partners & resources (migration 108), public.
 //   GET ?q=&kind=&lat=&lng=&within=50&ships=1 → { partners, total, counts, rank, rules }
 // `rank` is where the signed-in viewer stands on the code gate ladder;
 // each partner's canReveal says whether they can open its code.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

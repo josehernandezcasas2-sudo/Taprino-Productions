@@ -1,11 +1,12 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setBooking } from '../../../../../lib/crewCalls';
+import { applyCors } from '../../../../../lib/cors';
 
 // Poster books / unbooks / declines a response:
 //   POST { responseId, action: 'book' | 'unbook' | 'decline' | 'bench' | 'promote' | 'unbench' } → the call (poster's view)
 // bench/promote (migration 105): the backup for a spot, and moving them up when the booked person drops.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

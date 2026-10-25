@@ -2,13 +2,14 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getUserEmail } from '../../../../../lib/messages';
 import { createCrewPayCheckout } from '../../../../../lib/crewPay';
 import { requestOrigin } from '../../../../../lib/stripe';
+import { applyCors } from '../../../../../lib/cors';
 
 // Pay secured (migration 110): the poster funds one booked person.
 //   POST { responseId } → { url, paymentId, quote } — Stripe Checkout for the
 //   rate + the studio's fee + card processing; back to the call afterwards
 //   (?funded=<id> or ?funded=cancelled). The webhook marks it held.
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

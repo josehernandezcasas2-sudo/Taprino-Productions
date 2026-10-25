@@ -1,12 +1,13 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { normalizeHandle, handleError, isHandleTaken } from '../../../lib/userProfiles';
+import { applyCors } from '../../../lib/cors';
 
 // Live "@name is available / taken" under the handle field on the
 // account page (web and app). Advisory only: saving still runs the same
 // checks and the database's unique index has the final say.
 //   GET ?handle=<name> → { handle, ok, reason }
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();

@@ -3,6 +3,7 @@ import { ActivityIndicator, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiPost } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
+import { useCaptureBlock } from '../lib/captureBlock';
 
 // Plays one Film University video — a lesson ({ lessonId }) or an example
 // clip ({ fileId }) — over signed Cloudflare HLS, the same expo-video
@@ -24,6 +25,8 @@ export default function LessonVideo({ lessonId, fileId, initialPlayback }) {
 
   const src = playback ? playback.src : null;
   const player = useVideoPlayer(src || null);
+  // No screenshots or recording while a lesson plays (mobile/src/lib/captureBlock.js).
+  useCaptureBlock(Boolean(src));
 
   if (error) {
     return (

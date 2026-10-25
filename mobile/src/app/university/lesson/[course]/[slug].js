@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import * as WebBrowser from 'expo-web-browser';
-import { apiGet } from '../../../../lib/api';
+import { apiGet, absoluteUrl } from '../../../../lib/api';
 import { colors } from '../../../../lib/theme';
 import { useProgress } from '../../../../lib/universityProgress';
 import LessonVideo from '../../../../components/LessonVideo';
@@ -75,7 +75,7 @@ export default function Lesson() {
             {lesson.kind === 'video' ? (
               lesson.hasVideo ? <LessonVideo lessonId={lesson.id} initialPlayback={data.playback} /> : <Text style={uni.empty}>This video is still being prepared — check back in a few minutes.</Text>
             ) : lesson.documentUrl ? (
-              <Btn label="¶ Open the reading (PDF)" primary block onPress={() => WebBrowser.openBrowserAsync(lesson.documentUrl)} />
+              <Btn label="¶ Open the reading (PDF)" primary block onPress={() => WebBrowser.openBrowserAsync(absoluteUrl(lesson.documentUrl))} />
             ) : (
               <Text style={uni.empty}>This reading isn't uploaded yet.</Text>
             )}

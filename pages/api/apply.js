@@ -7,6 +7,7 @@ import {
   RIGHTS_QUESTIONS, ONBOARDING, APPLICATION_TYPES, APPLICATION_RATINGS, APPLICATION_STATUSES, APPLICATION_GENRES,
   normalizeRightsAnswers, rightsVerdict, getOwnApplication, toApplicantView, applicationEmails
 } from '../../lib/creatorApplications';
+import { applyCors } from '../../lib/cors';
 
 // Creator applications. Signed-in only, since /apply's redesign: the
 // application is tied to the account so accepting it grants Creator
@@ -19,7 +20,7 @@ import {
 //          account already has Creator Studio.
 export default async function handler(req, res) {
   // The mobile app calls this with a Bearer token; answer its pre-check.
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   if (req.method === 'OPTIONS') return res.status(204).end();
