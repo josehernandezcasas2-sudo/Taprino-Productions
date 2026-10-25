@@ -10209,3 +10209,16 @@ a.prod-day:hover { background: var(--surface-3); }
 .cast-resp { display: grid; gap: 0.4rem; margin-top: 0.3rem; }
 .cc-resp.shortlisted { outline: 1px solid rgba(var(--olive-rgb), 0.55); }
 .cast-player { margin-top: 0.3rem; }
+/* ---- "Shot here" + Studio Tapa rate (migration 107) ---- */
+.loc-studio { background: rgba(var(--olive-rgb), 0.08); border-radius: 8px; padding: 0.35rem 0.5rem; margin: 0.2rem -0.5rem; }
+.loc-studio-line { color: var(--olive); }
+.loc-studio-box { display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px dashed rgba(var(--olive-rgb), 0.5); border-radius: 10px; background: rgba(var(--olive-rgb), 0.05); }
+.shot-here { display: grid; gap: 0.8rem; }
+.shot-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 0.6rem; }
+.shot-tile { display: grid; gap: 0.25rem; text-decoration: none; color: var(--ink); }
+.shot-tile-poster { display: block; aspect-ratio: 2 / 3; border-radius: 8px; background: var(--surface-2) center / cover no-repeat; }
+.shot-tile-title { font-family: var(--font-display); font-weight: 600; font-size: 0.9rem; line-height: 1.2; }
+.shot-pending { display: grid; gap: 0.4rem; padding: 0.6rem 0.7rem; border-radius: 8px; background: rgba(var(--olive-rgb), 0.08); border: 1px solid rgba(var(--olive-rgb), 0.3); }
+.shot-pending-row { display: flex; justify-content: space-between; gap: 0.6rem; align-items: center; flex-wrap: wrap; font-size: 0.9rem; }
+.shot-pending-row a { color: var(--ink); }
+.shot-claim { display: grid; gap: 0.5rem; padding: 0.7rem; border: 1px dashed var(--ocean-ink); border-radius: 10px; }

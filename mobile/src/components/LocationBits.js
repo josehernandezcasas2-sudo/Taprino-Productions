@@ -55,7 +55,8 @@ export function ListingCard({ l, from, onOpen }) {
         <Text style={crew.mono}>{l.kindLabel.toUpperCase()} · {l.place ? l.place.label.split(',')[0].toUpperCase() : ''}{l.miles != null ? ` · ${l.miles} MI` : ''}</Text>
         <Text style={loc.cardT}>{l.title}</Text>
         {facts.length ? <Text style={crew.mono}>{facts.join(' · ')}</Text> : null}
-        <Text style={loc.rate}><Text style={{ color: colors.olive }}>{l.rateLine}</Text>{l.hourlyCents ? ` · ${l.minHours} hr min` : ''}</Text>
+        <Text style={loc.rate}><Text style={{ color: colors.olive }}>{l.rateLine}</Text>{l.hourlyCents ? ` · ${l.minHours} hr min` : ''}{l.studioRateLine ? ` · ${l.studioRateLine}` : ''}</Text>
+        {l.titlesShotHere > 0 ? <Text style={crew.mono}>🎬 {l.titlesShotHere} {l.titlesShotHere === 1 ? 'title' : 'titles'} shot here</Text> : null}
         <View style={[crew.row, { marginTop: 4, flexWrap: 'wrap' }]}>
           <Avatar userId={l.host.userId} name={l.host.displayName} src={l.host.avatarUrl} position={l.host.avatarPosition} zoom={l.host.avatarZoom || 1} size={24} />
           <Text style={crew.meta}>{l.host.displayName}</Text>

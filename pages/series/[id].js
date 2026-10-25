@@ -47,7 +47,7 @@ export async function getServerSideProps({ req, params, res, query }) {
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], bundle = null, episodeOffers = {}, bought = null }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
@@ -232,6 +232,12 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
               <div className="label">Creator</div>
               <div className="value">{seriesArtist || '—'}</div>
             </div>
+            {shotAt.length > 0 && (
+              <div className="series-about-box">
+                <div className="label">Shot at</div>
+                <div className="value">{shotAt.map((s, i) => <span key={s.locationId}>{i > 0 ? ', ' : ''}<Link href={s.href}>{s.title}</Link>{s.city ? <small style={{ color: 'var(--ink-faint)' }}> ({s.city})</small> : null}</span>)}</div>
+              </div>
+            )}
             {crew.length > 0 && (
               <div className="series-about-box">
                 <div className="label">Crew</div>

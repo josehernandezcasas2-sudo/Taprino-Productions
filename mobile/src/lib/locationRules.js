@@ -54,11 +54,14 @@ export function isWeekend(iso) {
 // Same rule as the server: day rate when the hours reach day_hours (or
 // there's no hourly rate), else hours × hourly never under min_hours,
 // weekends uplifted.
-export function quoteFor(listing, { startsOn, endsOn, hoursPerDay }) {
+// `studio`: the host's Studio Tapa day rate (migration 107), for a request
+// linked to a production on Studio Tapa.
+export function quoteFor(listing, { startsOn, endsOn, hoursPerDay, studio = false }) {
   const days = dayCount(startsOn, endsOn);
   if (!days) return null;
-  const hourly = listing.hourlyCents || 0;
-  const day = listing.dayCents || 0;
+  const studioDay = studio && listing.studioRateCents ? listing.studioRateCents : 0;
+  const hourly = studioDay ? 0 : listing.hourlyCents || 0;
+  const day = studioDay || listing.dayCents || 0;
   if (!hourly && !day) return null;
   const hours = Math.max(1, Math.round(Number(hoursPerDay) || listing.dayHours || 10));
   let subtotal = 0;
@@ -70,7 +73,7 @@ export function quoteFor(listing, { startsOn, endsOn, hoursPerDay }) {
     const uplift = isWeekend(iso) && listing.weekendPct ? Math.round((base * listing.weekendPct) / 100) : 0;
     subtotal += base + uplift;
   }
-  return { days, hours, subtotalCents: subtotal, allDay };
+  return { days, hours, subtotalCents: subtotal, allDay, studio: Boolean(studioDay) };
 }
 
 export function splitBooking({ subtotalCents, cleaningCents = 0, cutPercent = DEFAULT_CUT_PERCENT }) {

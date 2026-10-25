@@ -188,7 +188,8 @@ function ListingCard({ l, from }) {
         <span className="crew-eyebrow loc-card-eye">{l.kindLabel} · {l.place ? l.place.label.split(',')[0] : ''}{l.miles != null ? ` · ${l.miles} mi` : ''}</span>
         <span className="loc-card-t">{l.title}</span>
         {facts.length > 0 && <span className="crew-mono">{facts.join(' · ')}</span>}
-        <span className="loc-card-rate"><b>{l.rateLine}</b>{l.hourlyCents ? ` · ${l.minHours} hr min` : ''}{!l.hourlyCents && !l.dayCents && l.dealsOk ? ' · send an offer' : ''}</span>
+        <span className="loc-card-rate"><b>{l.rateLine}</b>{l.hourlyCents ? ` · ${l.minHours} hr min` : ''}{!l.hourlyCents && !l.dayCents && l.dealsOk ? ' · send an offer' : ''}{l.studioRateLine ? <> · <span className="loc-studio-line">{l.studioRateLine}</span></> : null}</span>
+        {l.titlesShotHere > 0 && <span className="crew-mono">🎬 {l.titlesShotHere} {l.titlesShotHere === 1 ? 'title' : 'titles'} shot here</span>}
         <span className="loc-card-foot">
           <span className="loc-card-host"><Avatar userId={l.host.userId} name={l.host.displayName} src={l.host.avatarUrl} position={l.host.avatarPosition} zoom={l.host.avatarZoom} size="sm" />{l.host.displayName} <HostedChip host={l.host} />{l.verified && <span className="crew-chip ok">✓</span>}</span>
           <span className="crew-btn sm">View</span>

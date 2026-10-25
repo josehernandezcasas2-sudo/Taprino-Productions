@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet, apiPost } from '../../lib/api';
+import { apiGet, apiPost, apiPatch } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import ReportSheet from '../../components/ReportSheet';
@@ -19,12 +19,13 @@ const TABS = ['Space', 'Light & sound', 'Logistics', 'Rules', 'Permits', 'Shot h
 export default function ListingScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
-  const { isLoaded, isSignedIn, getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);
   const [state, setState] = useState({ loading: true, error: null, listing: null, rules: null });
   const [projects, setProjects] = useState([]);
   const [productions, setProductions] = useState([]);
+  const [releases, setReleases] = useState([]);
   const [photo, setPhoto] = useState(0);
   const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(thisMonth());
@@ -37,6 +38,7 @@ export default function ListingScreen() {
       setState({ loading: false, error: null, listing: d.listing, rules: r ? r.rules : null });
       if (tokenRef.current && !d.listing.mine) {
         try { const p = await apiGet('/api/crew/my-projects', tokenRef.current); setProjects(p.projects || []); setProductions(p.productions || []); } catch (err) { /* optional */ }
+        try { const m = await apiGet('/api/productions/mine', tokenRef.current); setReleases(m.releases || []); } catch (err) { /* optional */ }
       }
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: s.listing ? null : err.message }));
@@ -93,7 +95,8 @@ export default function ListingScreen() {
               {TABS.map((t, i) => <Chip key={t} label={i === 5 ? `${t} · ${l.credits.length}` : t} on={tab === i} onPress={() => setTab(i)} />)}
             </ScrollView>
             <View style={[crew.panel, { paddingVertical: 4 }]}>
-              <TabBody l={l} tab={tab} rules={rules} onOpenProject={(c) => router.push(c.projectType === 'pitch' ? `/pitches/${c.projectId}` : `/series/${c.projectId}`)} />
+              <TabBody l={l} tab={tab} rules={rules} onOpenProject={(c) => router.push(c.href || (c.projectType === 'pitch' ? `/pitches/${c.projectId}` : `/series/${c.projectId}`))} />
+              {tab === 5 ? <ShotHereBox l={l} releases={releases} signedIn={signedIn} userId={userId} token={getToken} onChanged={load} /> : null}
             </View>
 
             <View style={crew.panel}>
@@ -104,7 +107,8 @@ export default function ListingScreen() {
               {l.overtimeCents ? <KV k="Overtime" v={`${dollars(l.overtimeCents, { whole: true })}/hr`} /> : null}
               {l.cleaningCents ? <KV k="Cleaning" v={dollars(l.cleaningCents, { whole: true })} /> : null}
               {l.weekendPct > 0 ? <KV k="Weekends" v={`+${l.weekendPct}%`} /> : null}
-              {!l.hourlyCents && !l.dayCents ? <KV k="No posted rate" v="Make a deal" /> : null}
+              {l.studioRateCents ? <KV k="Studio Tapa rate" v={`${dollars(l.studioRateCents, { whole: true })}/day${l.studioRateNote ? ` · ${l.studioRateNote}` : ' · for productions on Studio Tapa'}`} /> : null}
+              {!l.hourlyCents && !l.dayCents && !l.studioRateCents ? <KV k="No posted rate" v="Make a deal" /> : null}
               <Text style={crew.mono}>{l.dealsOk ? 'Also open to a deal — send your own number.' : 'Posted rates only.'} {rules && rules.cancellation[l.cancellation] ? `${rules.cancellation[l.cancellation].label} cancellation.` : ''}</Text>
             </View>
 
@@ -180,7 +184,7 @@ function TabBody({ l, tab, rules, onOpenProject }) {
   return (
     <View style={[crew.chips, { paddingVertical: 6 }]}>
       {l.credits.length === 0 ? <Text style={crew.muted}>No credits yet. A shoot that goes as agreed adds the production here.</Text> : null}
-      {l.credits.map((c, i) => <Chip key={i} label={`${c.projectType === 'pitch' ? 'Pitch Room · ' : c.projectType === 'series' ? 'Series · ' : ''}${c.title}`} tone={c.projectId ? 'ok' : undefined} onPress={c.projectId ? () => onOpenProject(c) : undefined} />)}
+      {l.credits.map((c, i) => <Chip key={i} label={`${c.href ? '🎬 ' : c.projectType === 'pitch' ? 'Pitch Room · ' : c.projectType === 'series' ? 'Series · ' : ''}${c.title}${c.year ? ` · ${c.year}` : ''}`} tone={c.projectId ? 'ok' : undefined} onPress={c.projectId ? () => onOpenProject(c) : undefined} />)}
     </View>
   );
 }
@@ -190,7 +194,8 @@ function RequestPanel({ listing: l, projects, productions = [], dates, setDates,
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
-  const hasRates = Boolean(l.hourlyCents || l.dayCents);
+  const studio = Boolean(form.production && l.studioRateCents);
+  const hasRates = Boolean(l.hourlyCents || l.dayCents || studio);
   const endsOn = dates.to || dates.from;
   const days = dayCount(dates.from, endsOn);
   const hoursPerDay = hoursBetween(form.hoursFrom, form.hoursTo) || l.dayHours;
@@ -200,15 +205,15 @@ function RequestPanel({ listing: l, projects, productions = [], dates, setDates,
     let subtotal = null;
     let how = '';
     if (form.pricing === 'posted' && hasRates) {
-      const q = quoteFor(l, { startsOn: dates.from, endsOn, hoursPerDay });
-      if (q) { subtotal = q.subtotalCents; how = q.allDay ? `${days} × day rate` : `${q.hours} hrs × hourly`; }
+      const q = quoteFor(l, { startsOn: dates.from, endsOn, hoursPerDay, studio });
+      if (q) { subtotal = q.subtotalCents; how = q.studio ? `${days} × Studio Tapa rate` : q.allDay ? `${days} × day rate` : `${q.hours} hrs × hourly`; }
     } else {
       const cents = Math.round(Number(form.offer) * 100);
       if (cents > 0) { subtotal = cents; how = 'your offer'; }
     }
     if (subtotal == null) return null;
     return { ...splitBooking({ subtotalCents: subtotal, cleaningCents: l.cleaningCents || 0, cutPercent: l.cutPercent ?? DEFAULT_CUT_PERCENT }), how };
-  }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, l, days]);
+  }, [dates.from, endsOn, hoursPerDay, form.pricing, form.offer, hasRates, studio, l, days]);
 
   async function submit() {
     setBusy(true);
@@ -283,3 +288,52 @@ const styles = StyleSheet.create({
   hrow: { flexDirection: 'row', gap: 6, paddingVertical: 6 },
   main: { aspectRatio: 16 / 10, borderRadius: 12, backgroundColor: colors.surface2, overflow: 'hidden', borderWidth: 1, borderColor: colors.oceanInk }
 });
+
+
+// "Shot here" (migration 107): claim one of your titles, or as the host
+// confirm the claims waiting on you. Approved titles show in the tab above.
+function ShotHereBox({ l, releases, signedIn, userId, token, onChanged }) {
+  const [pick, setPick] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState(null);
+  const credits = l.shotHere || [];
+  const pending = credits.filter((c) => c.status === 'pending');
+  const already = new Set(credits.map((c) => `${c.type}:${c.releaseId}`));
+  const options = releases.filter((r) => !already.has(r.value));
+  async function run(fn, okMsg) {
+    setBusy(true);
+    setMsg(null);
+    try { await fn(await resolveToken(token)); setMsg(okMsg); onChanged(); } catch (err) { setMsg(err.message); } finally { setBusy(false); }
+  }
+  const claim = () => { const [type, id] = pick.split(':'); run((t) => apiPost(`/api/locations/${l.id}/credits`, { release: { type, id } }, t), l.mine ? 'Added.' : 'Sent to the host to confirm.'); setPick(''); };
+  const decide = (c, decision) => run((t) => apiPatch(`/api/locations/credits/${c.id}`, { decision }, t), decision === 'approve' ? 'Added to Shot here.' : 'Declined.');
+  if (!signedIn) return <Text style={[crew.mono, { marginTop: 6 }]}>Made something here? Sign in and claim it; the host confirms.</Text>;
+  return (
+    <View style={{ gap: 8, marginTop: 6 }}>
+      {pending.length && (l.mine || pending.some((c) => c.claimedBy.userId === userId)) ? (
+        <View style={[loc.money, { gap: 6 }]}>
+          <Text style={crew.label}>Waiting on the host</Text>
+          {pending.map((c) => (
+            <View key={c.id} style={{ gap: 4 }}>
+              <Text style={crew.rowText}>{c.title} <Text style={crew.mono}>· says {c.claimedBy.displayName}{c.note ? ` · “${c.note}”` : ''}</Text></Text>
+              {l.mine ? (
+                <View style={crew.row}>
+                  <Pressable style={[crew.btnSm, crew.btnPrimary]} disabled={busy} onPress={() => decide(c, 'approve')}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Yes, shot here</Text></Pressable>
+                  <Pressable style={crew.btnSm} disabled={busy} onPress={() => decide(c, 'decline')}><Text style={crew.btnSmText}>No</Text></Pressable>
+                </View>
+              ) : <Chip label="pending" tone="mute" />}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {options.length ? (
+        <View style={{ gap: 6 }}>
+          <Text style={crew.label}>{l.mine ? 'Add a title shot here' : 'Shot one of your titles here?'}</Text>
+          <View style={crew.chips}>{options.map((r) => <Chip key={r.value} label={r.label} on={pick === r.value} onPress={() => setPick(pick === r.value ? '' : r.value)} />)}</View>
+          <Pressable style={[crew.btnSm, crew.btnPrimary, { alignSelf: 'flex-start' }, (!pick || busy) && { opacity: 0.5 }]} disabled={!pick || busy} onPress={claim}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{l.mine ? 'Add it' : 'Ask the host to confirm'}</Text></Pressable>
+        </View>
+      ) : null}
+      {msg ? <Text style={crew.mono}>{msg}</Text> : null}
+    </View>
+  );
+}
