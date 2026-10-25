@@ -102,6 +102,7 @@ export default function ProductionScreen() {
                   <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/edit`)}><Text style={crew.btnText}>Edit details</Text></Pressable>
                   <Pressable style={[crew.btn, crew.btnPrimary]} onPress={() => router.push({ pathname: '/crew/calls/new', params: { production: id } })}><Text style={[crew.btnText, crew.btnPrimaryText]}>+ Post a call</Text></Pressable>
                   <Pressable style={crew.btn} onPress={() => router.push('/locations')}><Text style={crew.btnText}>Book a place</Text></Pressable>
+                  <Pressable style={crew.btn} onPress={() => router.push(`/productions/${id}/distribution`)}><Text style={crew.btnText}>Distribution & screeners</Text></Pressable>
                 </View>
               </View>
             ) : null}

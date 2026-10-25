@@ -117,6 +117,7 @@ export default function ProductionPage(props) {
                 <Link href={`/productions/${p.id}/edit`} className="crew-btn sm">Edit details</Link>
                 <Link href={`/crew/calls/new?production=${p.id}`} className="crew-btn sm primary">+ Post a call</Link>
                 <Link href="/locations" className="crew-btn sm">Book a place</Link>
+                <Link href={`/productions/${p.id}/distribution`} className="crew-btn sm">Distribution & screeners</Link>
               </div>
             </>
           )}

@@ -88,6 +88,7 @@ export default function RootLayout() {
           <Stack.Screen name="productions/new" options={{ headerShown: false }} />
           <Stack.Screen name="productions/[id]/index" options={{ headerShown: false }} />
           <Stack.Screen name="productions/[id]/edit" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/[id]/distribution" options={{ headerShown: false }} />
           <Stack.Screen name="productions/[id]/day/[n]" options={{ headerShown: false }} />
           <Stack.Screen name="resources/index" options={{ headerShown: false }} />
           <Stack.Screen name="messages/index" options={{ headerShown: false }} />
