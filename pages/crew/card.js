@@ -8,6 +8,9 @@ import Footer from '../../components/Footer';
 import PlaceSearch from '../../components/crew/PlaceSearch';
 import { Avatar, GearRows, CreditRows } from '../../components/crew/CrewBits';
 import { PerformerEditor } from '../../components/crew/CastingBits';
+import PayoutsCard from '../../components/creator/PayoutsCard';
+import { listMyCrewPay } from '../../lib/crewPay';
+import { payDollars } from '../../lib/crewPayRules';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnCard } from '../../lib/crewCards';
@@ -26,12 +29,14 @@ export async function getServerSideProps({ req, res }) {
   let creditedWork = [];
   let profile = null;
   let loadError = null;
+  let myPay = [];
   if (account.isSignedIn) {
     try {
-      [card, creditedWork, profile] = await Promise.all([
+      [card, creditedWork, profile, myPay] = await Promise.all([
         getOwnCard(account.userId),
         getCreditedWork(account.userId),
-        getPublicProfile(account.userId)
+        getPublicProfile(account.userId),
+        listMyCrewPay(account.userId).catch(() => [])
       ]);
     } catch (err) {
       console.error('crew card page:', err.message);
@@ -50,7 +55,8 @@ export async function getServerSideProps({ req, res }) {
       card,
       creditedWork,
       profile,
-      loadError
+      loadError,
+      myPay
     }
   };
 }
@@ -87,7 +93,7 @@ function fromCard(card) {
   };
 }
 
-export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, card: initialCard, creditedWork, profile, loadError }) {
+export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, card: initialCard, creditedWork, profile, loadError, myPay = [] }) {
   const [form, setForm] = useState(() => fromCard(initialCard));
   const [saved, setSaved] = useState(initialCard);
   const [busy, setBusy] = useState(false);
@@ -327,6 +333,28 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
               {!status && dirty && <span className="crew-mono">Unsaved changes</span>}
               {saved && <button type="button" className="crew-btn ghost sm crew-remove" onClick={remove} disabled={busy}>Remove card</button>}
             </div>
+
+            {/* Pay secured (migration 110): where the money from a call marked
+                🔒 lands. The same Stripe account creators and hosts use. */}
+            <section className="crew-paybox">
+              <div className="crew-paybox-head">
+                <span className="crew-eyebrow">Get paid</span>
+                <h2>Secured pay from calls</h2>
+                <p className="crew-muted">On a call marked <b>🔒 pay secured</b>, the poster funds your rate through {SITE.name} once you’re booked. It’s held until they confirm you worked, then sent to the payout account below — set it up once and every secured job lands there.</p>
+              </div>
+              <PayoutsCard returnTo="/crew/card" />
+              {myPay.length > 0 && (
+                <div className="crew-panel crew-paylist">
+                  <h3>Your secured pay</h3>
+                  {myPay.map((p) => (
+                    <div key={p.id} className="crew-rhead">
+                      <span><b>{payDollars(p.amountCents)}</b> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link></span>
+                      <span className={`crew-chip ${p.status === 'released' ? 'ok' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
           </>
         )}
       </main>

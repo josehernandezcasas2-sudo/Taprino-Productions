@@ -8,6 +8,7 @@ import { recordAdCreditPurchase, reverseAdCreditPurchase, syncSweepFromPayout } 
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFromCharge } from '../../lib/purchases';
 import { completeTipFromSession, failTipFromSession, refundTipFromCharge } from '../../lib/tips';
+import { completeCrewPayFromSession, failCrewPayFromSession, refundCrewPayFromCharge, releasePendingCrewPay } from '../../lib/crewPay';
 import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
@@ -88,7 +89,10 @@ export default async function handler(req, res) {
       // A creator's Connect onboarding moved: details submitted, charges
       // enabled, or Stripe asking for more. Mirror it so the Get paid
       // card and the admin funding switch see the same thing Stripe does.
-      await run('syncAccountFromStripe', () => syncAccountFromStripe(event.data.object));
+      const synced = await run('syncAccountFromStripe', () => syncAccountFromStripe(event.data.object));
+      // Crew pay (migration 110): a worker whose account just became able
+      // to take money gets whatever confirmed jobs were waiting on it.
+      if (synced && synced.chargesEnabled && synced.userId) await run('releasePendingCrewPay', () => releasePendingCrewPay(synced.userId));
       break;
     }
     case 'checkout.session.completed':
@@ -98,7 +102,7 @@ export default async function handler(req, res) {
       // once the money is actually in. Cards are paid on completion; a
       // delayed method completes as "unpaid" and arrives later as
       // async_payment_succeeded, which lands here too.
-      const oneOff = ['ad_credits', 'pitch_donation', 'location_booking', 'title_purchase', 'tip'].includes(session.metadata?.type);
+      const oneOff = ['ad_credits', 'pitch_donation', 'location_booking', 'title_purchase', 'tip', 'crew_pay'].includes(session.metadata?.type);
       if (oneOff && session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') {
         console.log(`checkout ${session.id} (${session.metadata.type}) completed unpaid; waiting for the money`);
         break;
@@ -171,6 +175,16 @@ export default async function handler(req, res) {
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'tip not recorded' });
         }
+      } else if (session.metadata?.type === 'crew_pay') {
+        // Pay secured on a crew call (lib/crewPay.js): the poster's money
+        // is now held for the booked person until "worked it".
+        try {
+          await completeCrewPayFromSession(session);
+        } catch (err) {
+          console.error('completeCrewPayFromSession from webhook failed:', err.message);
+          await getSupabase().from('stripe_events').delete().eq('id', event.id);
+          return res.status(500).json({ error: 'crew pay not recorded' });
+        }
       } else {
         console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
         // Creator Share: remember which member this Stripe customer is,
@@ -230,6 +244,9 @@ export default async function handler(req, res) {
       if (session.metadata?.type === 'tip') {
         await run('failTipFromSession', () => failTipFromSession(session, 'checkout expired'));
       }
+      if (session.metadata?.type === 'crew_pay') {
+        await run('failCrewPayFromSession', () => failCrewPayFromSession(session, 'checkout expired'));
+      }
       break;
     }
     case 'charge.refunded': {
@@ -239,6 +256,7 @@ export default async function handler(req, res) {
       await run('refundDonationFromCharge', () => refundDonationFromCharge(event.data.object));
       await run('refundBookingFromCharge', () => refundBookingFromCharge(event.data.object));
       await run('refundTipFromCharge', () => refundTipFromCharge(event.data.object));
+      await run('refundCrewPayFromCharge', () => refundCrewPayFromCharge(event.data.object));
       // An ad-credit purchase refunded (fully or partly): that much credit
       // comes off the balance.
       {

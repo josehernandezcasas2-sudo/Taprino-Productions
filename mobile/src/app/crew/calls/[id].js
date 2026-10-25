@@ -3,6 +3,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
+import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
@@ -13,6 +14,10 @@ import { playingAge } from '../../../components/CastingBits';
 // One call (pages/crew/calls/<id> on the web). Respond = a message to the
 // poster with the call attached. The poster books people here and, after
 // the last day, says who worked it — the confirmed job on their record.
+// Pay secured (migration 110): the poster funds a booked person through
+// Stripe Checkout in the in-app browser; the call is re-read when it closes.
+const payDollars = (cents) => `$${((cents || 0) / 100).toLocaleString('en-US', { minimumFractionDigits: (cents || 0) % 100 ? 2 : 0, maximumFractionDigits: 2 })}`;
+
 export default function CallScreen() {
   const router = useRouter();
   const { id } = useLocalSearchParams();
@@ -74,6 +79,15 @@ export default function CallScreen() {
     return d;
   });
   const setStatus = (status) => act(async () => apiPatch(`/api/crew/calls/${id}`, { status }, await freshToken(getToken)));
+  const fund = (responseId) => act(async () => {
+    const d = await apiPost(`/api/crew/calls/${id}/fund`, { responseId }, await freshToken(getToken));
+    if (d && d.url) {
+      await WebBrowser.openBrowserAsync(d.url);
+      // The webhook marks it held a moment after Stripe says paid.
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+    return null;
+  });
   const endorse = () => act(async () => {
     await apiPost('/api/crew/endorse', { responseId: endorsing, line, wouldAgain: true }, await freshToken(getToken));
     setEndorsing(null);
@@ -116,6 +130,7 @@ export default function CallScreen() {
               <View style={crew.row}>
                 <Text style={crew.label}>Pay</Text>
                 <View style={[crew.chip, payStyle(call.payType)]}><Text style={[crew.chipText, { color: payStyle(call.payType).color }]}>{call.payLabel.toLowerCase()}</Text></View>
+                {call.paySecured ? <Chip label={`🔒 ${payDollars(call.payRateCents)} per person · secured`} tone="gear" /> : null}
                 <Text style={crew.rowText}>{call.payNote}</Text>
               </View>
               <Pressable style={[crew.row, { marginTop: 4 }]} onPress={() => router.push(call.poster.profilePath)}>
@@ -125,6 +140,7 @@ export default function CallScreen() {
                 <TierChip person={call.poster} />
               </Pressable>
               {call.details ? <Text style={[crew.rowText, { color: colors.inkDim, lineHeight: 20 }]}>{call.details}</Text> : null}
+              {call.paySecured ? <Text style={crew.mono}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the Studio Tapa fee + card processing); held until you confirm they worked, then sent to their payout account. “Didn’t happen” refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through Studio Tapa once you’re booked; held until they confirm you worked, then sent to your payout account.`}</Text> : null}
               <Text style={crew.mono}>{first(call.poster.displayName)} has posted {call.poster.posted} {call.poster.posted === 1 ? 'call' : 'calls'} · {call.poster.filled} filled · {call.poster.jobs} confirmed {call.poster.jobs === 1 ? 'job' : 'jobs'} worked{isPoster && data.firstResponseMinutes ? ` · first response after ${data.firstResponseMinutes < 60 ? `${data.firstResponseMinutes} min` : `${Math.round(data.firstResponseMinutes / 60)} h`}` : ''}</Text>
             </View>
 
@@ -172,7 +188,14 @@ export default function CallScreen() {
                   {data.viewerResponse.callbackAt ? <Chip label={`Callback ${new Date(data.viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`} tone="gear" /> : null}
                   {data.viewerResponse.selfTapeUrl || data.viewerResponse.selfTapeUid ? <Chip label="✓ Self-tape attached" tone="ok" /> : null}
                   {data.viewerResponse.outcome === 'worked' ? <Chip label="✓ Confirmed job — on your track record" tone="ok" /> : null}
+                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(data.viewerResponse.pay.amountCents)} secured for you${data.viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms'}`} tone="gear" /> : null}
+                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'released' ? <Chip label={`💸 ${payDollars(data.viewerResponse.pay.amountCents)} sent to your payout account`} tone="ok" /> : null}
+                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'refunded' ? <Chip label="The secured pay went back to the poster" tone="mute" /> : null}
+                  {call.paySecured && data.viewerResponse.status === 'booked' && !data.viewerResponse.pay ? <Chip label={`🔒 ${payDollars(call.payRateCents)} secured pay — not funded yet`} tone="mute" /> : null}
                 </View>
+                {data.viewerResponse.pay && ['held', 'released'].includes(data.viewerResponse.pay.status) && data.viewerResponse.payoutReady === false ? (
+                  <Pressable style={[crew.btnSm, { alignSelf: 'flex-start' }]} onPress={() => router.push('/crew/card')}><Text style={crew.btnSmText}>Set up payouts on your working card →</Text></Pressable>
+                ) : null}
                 {call.kind === 'cast' && call.status === 'open' ? (
                   <View style={{ gap: 6 }}>
                     <Text style={crew.label}>{data.viewerResponse.selfTapeUrl || data.viewerResponse.selfTapeUid ? 'Replace your self-tape (link)' : 'Add a self-tape (link)'}</Text>
@@ -195,8 +218,9 @@ export default function CallScreen() {
               <View style={crew.panel}>
                 <View style={crew.row}>
                   <Pressable style={crew.btnSm} onPress={() => setStatus(call.status === 'open' ? 'closed' : 'open')} disabled={busy}><Text style={crew.btnSmText}>{call.status === 'open' ? 'Close the call' : 'Reopen'}</Text></Pressable>
-                  <Text style={crew.mono}>{data.booked} of {call.spots} booked{data.benched ? ` · ${data.benched} on the bench` : ''}</Text>
+                  <Text style={crew.mono}>{data.booked} of {call.spots} booked{data.benched ? ` · ${data.benched} on the bench` : ''}{call.paySecured ? ` · ${data.funded || 0} funded` : ''}</Text>
                 </View>
+                {data.payWarning ? <Text style={crew.error}>{data.payWarning}</Text> : null}
                 <View style={[crew.row, { justifyContent: 'space-between' }]}>
                   <Text style={crew.h4}>Responses{data.responses && data.responses.length ? ` · ${data.responses.length}` : ''}{call.kind === 'cast' && data.shortlisted ? ` · ${data.shortlisted} shortlisted` : ''}</Text>
                   {call.kind === 'cast' && data.responses && data.responses.length ? <Chip label="★ Shortlisted only" on={shortOnly} onPress={() => setShortOnly((v) => !v)} /> : null}
@@ -237,6 +261,10 @@ export default function CallScreen() {
                       {r.status === 'declined' ? <Chip label="Declined" tone="mute" /> : null}
                       {r.outcome === 'worked' ? <Chip label="✓ Worked it" tone="ok" /> : null}
                       {r.outcome === 'no_show' ? <Chip label="Didn't happen" tone="mute" /> : null}
+                      {r.pay && r.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
+                      {r.pay && r.pay.status === 'released' ? <Chip label={`💸 ${payDollars(r.pay.amountCents)} paid out`} tone="ok" /> : null}
+                      {r.pay && r.pay.status === 'refunded' ? <Chip label={`↩ ${payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you`} tone="mute" /> : null}
+                      {r.pay && r.pay.status === 'pending_payment' ? <Chip label="Payment not finished" tone="mute" /> : null}
                     </View>
                     {r.status === 'booked' && !r.outcome && data.pastEnd ? (
                       <View style={styles.outcome}>
@@ -255,6 +283,7 @@ export default function CallScreen() {
                       {r.status === 'sent' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'decline')}><Text style={crew.btnSmText}>Decline</Text></Pressable> : null}
                       {r.status === 'backup' ? <Pressable style={[crew.btnSm, crew.btnPrimary]} disabled={busy} onPress={() => book(r.id, 'promote')}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Promote</Text></Pressable> : null}
                       {r.status === 'backup' ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'unbench')}><Text style={crew.btnSmText}>Off the bench</Text></Pressable> : null}
+                      {call.paySecured && r.status === 'booked' && (!r.outcome || r.outcome === 'worked') && (!r.pay || !['held', 'released'].includes(r.pay.status)) ? <Pressable style={[crew.btnSm, crew.btnPrimary]} disabled={busy} onPress={() => fund(r.id)}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{r.pay && r.pay.status === 'pending_payment' ? 'Finish paying' : `🔒 Fund ${payDollars(call.payRateCents)}`}</Text></Pressable> : null}
                       {r.status === 'booked' && !r.outcome ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => book(r.id, 'unbook')}><Text style={crew.btnSmText}>Unbook</Text></Pressable> : null}
                       {r.outcome === 'worked' && !r.endorsedByPoster && endorsing !== r.id ? <Pressable style={crew.btnSm} onPress={() => setEndorsing(r.id)}><Text style={crew.btnSmText}>Leave a line</Text></Pressable> : null}
                     </View>

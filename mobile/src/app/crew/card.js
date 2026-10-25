@@ -8,6 +8,7 @@ import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import { crew, Chip, PlaceBox, GearRows, CreditRows, GEAR_FLAGS } from '../../components/CrewBits';
 import { PerformerEditor } from '../../components/CastingBits';
+import PayoutsCard from '../../components/PayoutsCard';
 
 // Your Crew Call working card (pages/crew/card.js on the web): roles,
 // where you're based and how far you'll go, availability, gear, outside
@@ -267,6 +268,15 @@ export default function CrewCardScreen() {
           {status ? <Text style={[crew.muted, { color: status.kind === 'ok' ? colors.ok : colors.danger, flex: 1 }]}>{status.text}</Text> : <View style={{ flex: 1 }} />}
           {state.card ? <Pressable onPress={remove} disabled={busy}><Text style={[crew.mono, { color: colors.danger }]}>Remove card</Text></Pressable> : null}
         </View>
+
+        {/* Pay secured (migration 110): where money from a 🔒 call lands —
+            the same Stripe account creators and hosts use. */}
+        <View style={styles.paybox}>
+          <Text style={crew.eyebrow}>Get paid</Text>
+          <Text style={crew.h4}>Secured pay from calls</Text>
+          <Text style={crew.muted}>On a call marked 🔒 pay secured, the poster funds your rate through Studio Tapa once you’re booked. It’s held until they confirm you worked, then sent to the payout account below — set it up once and every secured job lands there.</Text>
+          <PayoutsCard showEarningsLink={false} />
+        </View>
       </>
     );
   };
@@ -286,5 +296,6 @@ export default function CrewCardScreen() {
 
 const styles = StyleSheet.create({
   hrow: { flexDirection: 'row', gap: 6, paddingVertical: 4 },
-  savebar: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 12, padding: 12, marginTop: 4 }
+  savebar: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 12, padding: 12, marginTop: 4 },
+  paybox: { gap: 8, marginTop: 18, paddingTop: 14, borderTopWidth: 1, borderTopColor: colors.oceanInk }
 });

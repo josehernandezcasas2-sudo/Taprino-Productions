@@ -376,6 +376,7 @@ export function CallCard({ c, onOpen }) {
         {c.kind === 'cast' ? <Chip label={`🎭 Casting${c.characterName ? ` · ${c.characterName}` : ''}`} tone="gear" /> : null}
         <Text style={crew.name}>{c.title}</Text>
         <View style={[crew.chip, payStyle(c.payType)]}><Text style={[crew.chipText, { color: payStyle(c.payType).color }]}>{c.payLabel.toLowerCase()}</Text></View>
+        {c.paySecured && c.payRateCents ? <Chip label={`🔒 $${Math.round(c.payRateCents / 100).toLocaleString('en-US')} secured`} tone="gear" /> : null}
         {c.projectTitle ? <Chip label={`${c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${c.projectTitle}`} tone="ok" /> : null}
         {c.matches ? <Chip label="matches your card" tone="ok" /> : null}
         {c.mine ? <Chip label="yours" tone="role" /> : null}

@@ -2,11 +2,13 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
+import { payDollars } from '../../lib/crewPayRules';
 
-// The Crew Call board, admin side (migration 082). Three lists: jobs
-// waiting on a poster who's gone quiet (settle them here — a "worked" is
-// a confirmed job on the person's track record), calls people reported,
-// and every open call (remove one from the board).
+// The Crew Call board, admin side (migration 082). Jobs waiting on a
+// poster who's gone quiet (settle them here — a "worked" is a confirmed
+// job on the person's track record), secured crew pay (migration 110:
+// what's held, released, refunded; refund or re-release), calls people
+// reported, reported productions, and every open call.
 export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, { caps: ['handle_flags'] });
 }
@@ -56,6 +58,35 @@ export default function CrewAdmin({ account, mainGenres }) {
                 </div>
               ))}
             </div>
+          </section>
+
+          <section>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-faint)', margin: '0 0 0.5rem' }}>Secured crew pay · {data.pay && data.pay.payments ? data.pay.payments.length : 0}</h3>
+            {data.pay && !data.pay.ready && <div className="crew-panel crew-empty">Secured pay isn’t set up yet — run migration 110.{data.pay.error ? ` (${data.pay.error})` : ''}</div>}
+            {data.pay && data.pay.ready && (
+              <>
+                <p className="crew-muted" style={{ margin: '0 0 0.6rem', maxWidth: '70ch' }}>
+                  Money posters put up for booked people (migration 110). <b>{payDollars(data.pay.heldCents)}</b> held right now{data.pay.waiting ? `, ${data.pay.waiting} confirmed ${data.pay.waiting === 1 ? 'job' : 'jobs'} waiting on the worker’s payout account` : ''} · {payDollars(data.pay.cutCents)} in service fees on held and paid-out jobs. A held payment is released when the job is settled as “worked” (here or by the poster); refund one only when both sides agree the job is off. Released money is reversed from the Stripe dashboard, not here.
+                </p>
+                {data.pay.payments.length === 0 && <div className="crew-panel crew-empty">Nobody has secured pay yet.</div>}
+                <div className="crew-results">
+                  {data.pay.payments.map((p) => (
+                    <div key={p.id} className="crew-panel crew-rhead">
+                      <span>
+                        <b>{payDollars(p.amountCents)}</b> <span className={`crew-chip ${p.status === 'held' ? 'olive' : p.status === 'released' ? 'ok' : 'mute'}`}>{p.statusLabel}{p.status === 'held' && p.releaseRequestedAt ? ' · waiting on payout account' : ''}</span> <Link href={p.poster.profilePath}>{p.poster.displayName}</Link> → <Link href={p.worker.profilePath}>{p.worker.displayName}</Link> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link>
+                        <span className="crew-mono"> · charged {payDollars(p.totalCents)} (fee {payDollars(p.cutCents)} + card {payDollars(p.feeCents)}) · job {p.outcome || 'not settled'}{p.call.endsOn ? ` · ended ${fmt(p.call.endsOn)}` : ''}{p.refundedCents != null ? ` · refunded ${payDollars(p.refundedCents)}${p.refundReason ? ` (${p.refundReason})` : ''}` : ''}{p.failedReason ? ` · ${p.failedReason}` : ''}</span>
+                      </span>
+                      {p.status === 'held' && account.isAdmin && (
+                        <span className="crew-actions">
+                          {p.outcome === 'worked' && <button type="button" className="crew-btn sm primary" disabled={busy === p.id} onClick={() => act(p.id, { op: 'release_pay', paymentId: p.id })}>Release again</button>}
+                          <button type="button" className="crew-btn sm" disabled={busy === p.id} onClick={() => { const reason = window.prompt(`Refund ${payDollars(p.totalCents)} to ${p.poster.displayName}? Say why (both sides are told):`); if (reason != null) act(p.id, { op: 'refund_pay', paymentId: p.id, reason }); }}>Refund</button>
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </section>
 
           <section>

@@ -10287,3 +10287,16 @@ a.prod-day:hover { background: var(--surface-3); }
 .scr-card h1 { font-family: var(--font-display); margin: 0; }
 .scr-card p { margin: 0; color: var(--ink-dim); }
 @media (max-width: 700px) { .dist-check li { grid-template-columns: 1fr; } }
+
+/* ---------- Crew pay through Stripe (migration 110) ---------- */
+.cc-secured { display: inline-flex; align-items: center; gap: 0.25rem; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.04em; padding: 0.14rem 0.5rem; border-radius: 4px; background: rgba(var(--brass-rgb), 0.16); color: var(--brass); white-space: nowrap; text-transform: none; }
+.cc-securebox { display: grid; gap: 0.6rem; padding: 0.7rem; border: 1px dashed var(--ocean-ink); border-radius: 10px; }
+.cc-securebox.on { border-color: rgba(var(--brass-rgb), 0.6); background: rgba(var(--brass-rgb), 0.06); }
+.cc-securebox .crew-check b { color: var(--ink); }
+.cc-securebox .crew-field input { max-width: 220px; }
+.crew-paybox { display: grid; gap: 0.9rem; margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--ocean-ink); }
+.crew-paybox-head h2 { font-family: var(--font-display); font-size: 1.35rem; margin: 0.2rem 0 0.4rem; }
+.crew-paybox-head p { margin: 0; max-width: 70ch; }
+.crew-paybox .account-card { margin: 0; }
+.crew-paylist { display: grid; gap: 0.5rem; }
+.crew-paylist h3 { margin: 0 0 0.2rem; font-size: 0.95rem; }

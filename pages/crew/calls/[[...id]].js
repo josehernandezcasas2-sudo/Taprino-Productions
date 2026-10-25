@@ -19,6 +19,8 @@ import { ownerProductions } from '../../../lib/productions';
 import { CREW_ROLES, CAST_ROLES, UNION_STATUS, WITHIN_CHOICES } from '../../../lib/crewOptions';
 import { SelfTapeField, TapePlayer, playingAge } from '../../../components/crew/CastingBits';
 import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS, URGENT_WITHIN_HOURS, AVAILABLE_NOW_CHOICES } from '../../../lib/crewCallRules';
+import { payDollars, crewPayQuote, MIN_CREW_PAY_CENTS, MAX_CREW_PAY_CENTS } from '../../../lib/crewPayRules';
+import { getCrewPayCutPercent } from '../../../lib/crewPay';
 import { SITE } from '../../../lib/siteConfig';
 
 // The Crew Call board (step 3, mockup signed off 2026-10-10).
@@ -53,16 +55,17 @@ export async function getServerSideProps({ req, res, params, query }) {
   if (slug === 'new') {
     if (!account.isSignedIn) return { props: { ...base, mode: 'new', projects: [], productions: [], preselect: null, preselectProduction: null, near } };
     const supabase = getSupabase();
-    const [pitches, series, productions] = await Promise.all([
+    const [pitches, series, productions, crewPayCutPercent] = await Promise.all([
       supabase.from('pitches').select('id, title').eq('created_by', account.userId).order('created_at', { ascending: false }).limit(50),
       supabase.from('series').select('id, name').eq('creator_id', account.userId).order('created_at', { ascending: false }).limit(50),
-      ownerProductions(account.userId).catch(() => [])
+      ownerProductions(account.userId).catch(() => []),
+      getCrewPayCutPercent().catch(() => 8)
     ]);
     const projects = [
       ...(pitches.data || []).map((p) => ({ value: `pitch:${p.id}`, label: `Pitch Room · ${p.title}` })),
       ...(series.data || []).map((s) => ({ value: `series:${s.id}`, label: `Series · ${s.name}` }))
     ];
-    return { props: { ...base, mode: 'new', projects, productions, preselect: query.project ? String(query.project) : null, preselectProduction: query.production ? String(query.production) : null, near } };
+    return { props: { ...base, mode: 'new', projects, productions, preselect: query.project ? String(query.project) : null, preselectProduction: query.production ? String(query.production) : null, near, crewPayCutPercent } };
   }
 
   let board = { calls: [], total: 0, hasCard: false };
@@ -261,7 +264,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
               </div>
             </div>
           )}
-          <div className="crew-panel crew-muted">Calls close themselves a week after the last day. Pay is always labelled — <b>paid, union, deferred, unpaid, other</b> — and no money moves through the site.</div>
+          <div className="crew-panel crew-muted">Calls close themselves a week after the last day. Pay is always labelled — <b>paid, union, deferred, unpaid, other</b>. On a call marked <b>🔒 pay secured</b> the poster has agreed to fund each booked person through {SITE.name}: held until they confirm you worked, then sent to your payout account. Everything else is settled between you.</div>
         </aside>
 
         <div className="cc-list">
@@ -276,7 +279,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
           )}
           {board.calls.map((c) => (
             <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cc-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
-              <div className="cc-title">{c.urgent && <span className="cc-urgent">⚡ Urgent{c.neededLabel ? ` · ${c.neededLabel}` : ''}</span>}{c.kind === 'cast' && <span className="cc-cast">🎭 Casting{c.characterName ? ` · ${c.characterName}` : ''}</span>}{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.productionTitle && <span className="crew-chip olive">for {c.productionTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
+              <div className="cc-title">{c.urgent && <span className="cc-urgent">⚡ Urgent{c.neededLabel ? ` · ${c.neededLabel}` : ''}</span>}{c.kind === 'cast' && <span className="cc-cast">🎭 Casting{c.characterName ? ` · ${c.characterName}` : ''}</span>}{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.paySecured && <span className="cc-secured" title={`${payDollars(c.payRateCents)} per person, funded through ${SITE.name} and released when the poster confirms the job`}>🔒 {payDollars(c.payRateCents)} secured</span>}{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.productionTitle && <span className="crew-chip olive">for {c.productionTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
               <div className="cc-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
               <div className="cc-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
             </Link>
@@ -297,8 +300,24 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
 
 function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
   const router = useRouter();
-  const { call, viewerResponse, canRespond, booked, benched = 0, pastEnd, responses, firstResponseMinutes = null } = data;
+  const { call, viewerResponse, canRespond, booked, benched = 0, pastEnd, responses, firstResponseMinutes = null, funded = 0, payWarning = null } = data;
   const [reply, setReply] = useState('');
+  // Back from Stripe Checkout (pay secured, migration 110): the webhook
+  // marks it held a moment later, so re-read the call once.
+  const fundedQ = router.query.funded ? String(router.query.funded) : null;
+  const [refreshed, setRefreshed] = useState(false);
+  useEffect(() => {
+    if (!fundedQ || fundedQ === 'cancelled' || refreshed) return undefined;
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/crew/calls/${call.id}`);
+        const json = await res.json();
+        if (res.ok && json.call) onChange(json);
+      } catch (err) { /* keep what we have */ }
+      setRefreshed(true);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [fundedQ, refreshed, call.id, onChange]);
   const [tape, setTape] = useState({ url: '', uid: null });
   const [minor, setMinor] = useState(false);
   const [guardian, setGuardian] = useState({ name: '', contact: '' });
@@ -346,6 +365,10 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
     const r = await api(`/api/crew/calls/${call.id}/book`, { responseId, action });
     if (r) onChange(r);
   }
+  async function fund(responseId) {
+    const r = await api(`/api/crew/calls/${call.id}/fund`, { responseId });
+    if (r && r.url) window.location.assign(r.url);
+  }
   async function outcome(responseId, value) {
     const r = await api(`/api/crew/calls/${call.id}/outcome`, { responseId, outcome: value });
     if (r) { onChange(r); if (value === 'worked') setEndorsing(responseId); }
@@ -388,7 +411,8 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         {call.urgent && call.neededBy && <><span>Needed by</span><span><b>{new Date(call.neededBy).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</b></span></>}
         <span>When</span><span>{fmtRange(call.startsOn, call.endsOn)}</span>
         <span>Where</span><span>{call.remote ? 'Remote — anyone with the role, anywhere' : call.place}{call.miles != null ? ` · ${call.miles} mi from you` : ''}</span>
-        <span>Pay</span><span><span className={`cc-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.payNote}</span>
+        <span>Pay</span><span><span className={`cc-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.paySecured && <span className="cc-secured">🔒 {payDollars(call.payRateCents)} per person · secured</span>} {call.payNote}</span>
+        {call.paySecured && <><span /><span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>{isPoster ? `You fund each booked person (${payDollars(call.payRateCents)} + the ${SITE.name} fee + card processing); it's held until you confirm they worked, then sent to their payout account. "Didn't happen" refunds you in full.` : `The poster funds your ${payDollars(call.payRateCents)} through ${SITE.name} once you're booked; it's held until they confirm you worked, then sent to your payout account.`}</span></>}
         {call.projectTitle && <><span>Project</span><span><Link href={call.projectType === 'pitch' ? `/pitches/${call.projectId}` : `/series/${call.projectId}`} className="crew-chip pitch">{call.projectTitle}</Link></span></>}
         {call.productionTitle && <><span>Production</span><span><Link href={`/productions/${call.productionId}`} className="crew-chip olive">{call.productionTitle}</Link> <span className="crew-mono">booked people join its crew list</span></span></>}
         <span>Posted by</span><span><PersonLine p={call.poster} /></span>
@@ -439,7 +463,14 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
             {viewerResponse.callbackAt && <span className="crew-chip olive">Callback {new Date(viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
             {(viewerResponse.selfTapeUrl || viewerResponse.selfTapeUid) && <span className="crew-chip ok">✓ Self-tape attached</span>}
             {viewerResponse.outcome === 'worked' && <span className="crew-chip ok">✓ Confirmed job — on your track record</span>}
+            {viewerResponse.pay && viewerResponse.pay.status === 'held' && <span className="crew-chip olive">🔒 {payDollars(viewerResponse.pay.amountCents)} secured for you{viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms you worked'}</span>}
+            {viewerResponse.pay && viewerResponse.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(viewerResponse.pay.amountCents)} sent to your payout account</span>}
+            {viewerResponse.pay && viewerResponse.pay.status === 'refunded' && <span className="crew-chip mute">The secured pay went back to the poster</span>}
+            {call.paySecured && viewerResponse.status === 'booked' && !viewerResponse.pay && <span className="crew-chip mute">🔒 {payDollars(call.payRateCents)} secured pay — not funded yet</span>}
           </div>
+          {viewerResponse.pay && ['held', 'released'].includes(viewerResponse.pay.status) && viewerResponse.payoutReady === false && (
+            <div className="crew-status" role="status">Your pay needs somewhere to go: <Link href="/crew/card">set up payouts on your working card</Link> (a few minutes with Stripe). {SITE.name} sends it the moment your account is ready.</div>
+          )}
           {call.kind === 'cast' && call.status === 'open' && (
             replacing
               ? <form className="cc-form" onSubmit={replaceTape}><SelfTapeField value={tape} onChange={setTape} due={call.selfTapeDue} /><div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || (!tape.url && !tape.uid)}>Save tape</button><button type="button" className="crew-btn sm ghost" onClick={() => setReplacing(false)}>Cancel</button></div></form>
@@ -462,8 +493,11 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
             {call.status === 'open'
               ? <button type="button" className="crew-btn sm" disabled={busy} onClick={() => setStatus('closed')}>Close the call</button>
               : <button type="button" className="crew-btn sm" disabled={busy} onClick={() => setStatus('open')}>Reopen</button>}
-            <span className="crew-mono">{booked} of {call.spots} {call.spots === 1 ? 'spot' : 'spots'} booked{benched ? ` · ${benched} on the bench` : ''}{call.status === 'open' ? ' · closing tells the others' : ''}</span>
+            <span className="crew-mono">{booked} of {call.spots} {call.spots === 1 ? 'spot' : 'spots'} booked{benched ? ` · ${benched} on the bench` : ''}{call.paySecured ? ` · ${funded} of ${booked} funded` : ''}{call.status === 'open' ? ' · closing tells the others' : ''}</span>
           </div>
+          {fundedQ && fundedQ !== 'cancelled' && <div className="crew-status ok" role="status">Payment received — it’s held until you confirm the job{refreshed ? '' : '…'}</div>}
+          {fundedQ === 'cancelled' && <div className="crew-status" role="status">No charge was made. Fund them whenever you’re ready.</div>}
+          {payWarning && <div className="crew-status error" role="alert">{payWarning}</div>}
           <div className="crew-rhead"><h4 className="cc-h4">Responses{responses && responses.length ? ` · ${responses.length}` : ''}{call.kind === 'cast' && data.shortlisted ? ` · ${data.shortlisted} shortlisted` : ''}</h4>{call.kind === 'cast' && responses && responses.length > 0 && <button type="button" className={`crew-btn sm${shortOnly ? ' on' : ''}`} aria-pressed={shortOnly} onClick={() => setShortOnly((v) => !v)}>★ Shortlisted only</button>}</div>
           {(!responses || responses.length === 0) && <div className="crew-muted">No responses yet. Matching people were told when you posted.</div>}
           {responses && responses.filter((r) => !shortOnly || r.shortlisted).map((r) => (
@@ -499,6 +533,10 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                   {r.outcome === 'worked' && <span className="crew-chip ok">✓ Worked it</span>}
                   {r.outcome === 'no_show' && <span className="crew-chip warn">Didn't happen</span>}
                   {r.outcome === 'cancelled' && <span className="crew-chip mute">Cancelled</span>}
+                  {r.pay && r.pay.status === 'held' && <span className="crew-chip olive" title={`You paid ${payDollars(r.pay.totalCents)} (${payDollars(r.pay.cutCents)} ${SITE.name} fee + ${payDollars(r.pay.feeCents)} card processing)`}>🔒 {payDollars(r.pay.amountCents)} held{r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}</span>}
+                  {r.pay && r.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(r.pay.amountCents)} paid out</span>}
+                  {r.pay && r.pay.status === 'refunded' && <span className="crew-chip mute">↩ {payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you</span>}
+                  {r.pay && r.pay.status === 'pending_payment' && <span className="crew-chip warn">Payment not finished</span>}
                 </div>
                 {r.status === 'booked' && !r.outcome && pastEnd && (
                   <div className="cc-outcome">
@@ -523,6 +561,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                 {r.status === 'sent' && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => book(r.id, 'decline')}>Decline</button>}
                 {r.status === 'backup' && <button type="button" className="crew-btn sm primary" disabled={busy || spotsLeft === 0} onClick={() => book(r.id, 'promote')}>{spotsLeft === 0 ? 'Spots full' : 'Promote'}</button>}
                 {r.status === 'backup' && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => book(r.id, 'unbench')}>Off the bench</button>}
+                {call.paySecured && r.status === 'booked' && (!r.outcome || r.outcome === 'worked') && (!r.pay || !['held', 'released'].includes(r.pay.status)) && <button type="button" className="crew-btn sm primary" disabled={busy} title={`${payDollars(call.payRateCents)} to them + ${SITE.name} fee + card processing, held until you confirm the job`} onClick={() => fund(r.id)}>{r.pay && r.pay.status === 'pending_payment' ? 'Finish paying' : `🔒 Fund ${payDollars(call.payRateCents)}`}</button>}
                 {r.status === 'booked' && !r.outcome && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={() => book(r.id, 'unbook')}>Unbook</button>}
               </div>
             </div>
@@ -549,9 +588,9 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
 /* ---------------- post a call ---------------- */
 
-function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, projects, productions = [], preselect, preselectProduction, near }) {
+function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, projects, productions = [], preselect, preselectProduction, near, crewPayCutPercent = 8 }) {
   const router = useRouter();
-  const [form, setForm] = useState({ kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false, title: '', role: CREW_ROLES[0], spots: 1, payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, urgent: false, neededBy: '', place: near ? { label: near.label, lat: near.lat, lng: near.lng } : null, project: preselect || '', production: preselectProduction && productions.some((p) => p.value === preselectProduction) ? preselectProduction : '', details: '' });
+  const [form, setForm] = useState({ kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false, title: '', role: CREW_ROLES[0], spots: 1, payType: 'paid', payNote: '', paySecured: false, payRateDollars: '', startsOn: '', endsOn: '', remote: false, urgent: false, neededBy: '', place: near ? { label: near.label, lat: near.lat, lng: near.lng } : null, project: preselect || '', production: preselectProduction && productions.some((p) => p.value === preselectProduction) ? preselectProduction : '', details: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -626,6 +665,27 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
               </label>
               <label className="crew-field"><span>Pay details</span><input type="text" className="crew-input" value={form.payNote} onChange={(e) => set({ payNote: e.target.value })} placeholder={PAY_HINT[form.payType]} maxLength={120} /></label>
             </div>
+            {form.payType === 'paid' && (
+              <div className={`cc-securebox${form.paySecured ? ' on' : ''}`}>
+                <label className="crew-check">
+                  <input type="checkbox" checked={form.paySecured} onChange={(e) => set({ paySecured: e.target.checked })} />
+                  <span><b>🔒 Secure the pay through {SITE.name}</b> — you fund each person after you book them; it’s held and sent to them when you confirm they worked.</span>
+                </label>
+                {form.paySecured && (() => {
+                  const cents = Math.round(Number(String(form.payRateDollars).replace(/[$,\s]/g, '')) * 100);
+                  const q = Number.isFinite(cents) && cents > 0 ? crewPayQuote(cents, crewPayCutPercent) : null;
+                  return (
+                    <>
+                      <label className="crew-field"><span>Rate per person, for the whole job (dollars)</span><input type="number" className="crew-input" min={MIN_CREW_PAY_CENTS / 100} max={MAX_CREW_PAY_CENTS / 100} step="1" value={form.payRateDollars} onChange={(e) => set({ payRateDollars: e.target.value })} placeholder="350" required /></label>
+                      <span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>
+                        {q ? <>Each person you fund costs you <b>{payDollars(q.totalCents)}</b>: {payDollars(q.amountCents)} to them + {payDollars(q.cutCents)} {SITE.name} fee ({crewPayCutPercent}%) + {payDollars(q.feeCents)} card processing. They get the full {payDollars(q.amountCents)}. Nothing is charged until you fund someone.</> : <>From {payDollars(MIN_CREW_PAY_CENTS)} per person. The {SITE.name} fee ({crewPayCutPercent}%) and card processing are added on top, so they get the full rate. Nothing is charged until you fund someone.</>}
+                        {' '}“Didn’t happen” refunds you in full; unbooking someone you funded refunds everything but the card fee.
+                      </span>
+                    </>
+                  );
+                })()}
+              </div>
+            )}
             <div className="crew-row2">
               <label className="crew-field"><span>First day</span><input type="date" className="crew-input" value={form.startsOn} onChange={(e) => set({ startsOn: e.target.value })} /></label>
               <label className="crew-field"><span>Last day</span><input type="date" className="crew-input" value={form.endsOn} onChange={(e) => set({ endsOn: e.target.value })} min={form.startsOn || undefined} /></label>

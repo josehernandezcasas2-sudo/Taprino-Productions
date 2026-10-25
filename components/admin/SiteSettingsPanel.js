@@ -254,6 +254,20 @@ export default function SiteSettingsPanel() {
           </p>
         </div>
 
+        <div style={rowStyle}>
+          <label style={{ display: 'block', marginBottom: '0.4rem' }}>Crew pay — the studio&rsquo;s service fee on secured pay</label>
+          <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', marginBottom: '0.5rem' }}>
+            On a paid crew call with &ldquo;pay secured&rdquo;, the poster funds each booked person at the posted rate; the fee and the card processing are added on top, so the crew member gets the full rate. Held by the studio until the poster confirms they worked. Changes apply to the next payment.
+          </p>
+          <label style={{ display: 'grid', gap: '0.2rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>
+            Fee (%)
+            <input type="number" min="0" max="30" step="0.5" value={siteSettings.crewPayCutPercent ?? 8} onChange={(e) => setSiteSettings((s) => ({ ...s, crewPayCutPercent: Number(e.target.value) }))} style={{ maxWidth: '120px' }} />
+          </label>
+          <p style={{ fontSize: '0.74rem', color: 'var(--ink-faint)', marginTop: '0.5rem', marginBottom: 0 }}>
+            A $350 job costs the poster {dollarsFromCents(Math.round(35000 * (1 + (siteSettings.crewPayCutPercent ?? 8) / 100)))} plus card processing; the crew member receives $350. Refunds (no-show, cancelled) go back to the poster from the held money; the studio eats Stripe&rsquo;s processing fee on a full refund.
+          </p>
+        </div>
+
         <button className="account-btn-primary" style={{ width: 'auto', marginTop: '0.4rem' }} onClick={() => saveSiteSettings()} disabled={siteSettingsSaving}>
           {siteSettingsSaving ? 'Saving…' : 'Save'}
         </button>

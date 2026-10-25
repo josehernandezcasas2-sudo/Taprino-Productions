@@ -13,6 +13,8 @@ import { UNION } from '../../../components/CastingBits';
 // card lists the role and whose place + travel radius reaches it gets told.
 const PAY = { paid: 'Paid', union: 'Union', deferred: 'Deferred', unpaid: 'Unpaid', other: 'Other' };
 const PAY_HINT = { paid: '$350/day', union: 'SAG-AFTRA micro-budget, IATSE scale…', deferred: 'deferred + credit, points…', unpaid: 'meals + credit', other: 'say what the deal is' };
+// Pay secured (migration 110, lib/crewPayRules.js on the web): from $25 per person.
+const MIN_SECURED_DOLLARS = 25;
 
 export default function PostCall() {
   const router = useRouter();
@@ -25,7 +27,7 @@ export default function PostCall() {
   const [projects, setProjects] = useState([]);
   const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '', kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false });
+  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', paySecured: false, payRateDollars: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '', urgent: false, neededBy: '', kind: 'crew', characterName: '', characterDesc: '', playingAgeMin: '', playingAgeMax: '', unionStatus: '', sidesUrl: '', selfTapeWanted: true, selfTapeDue: '', minorsOk: false });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -144,6 +146,21 @@ export default function PostCall() {
               <View style={crew.chips}>{Object.entries(PAY).map(([k, v]) => <Chip key={k} label={v} on={form.payType === k} onPress={() => set({ payType: k })} />)}</View>
               <Text style={[crew.label, { marginTop: 6 }]}>Pay details</Text>
               <TextInput style={crew.input} value={form.payNote} onChangeText={(v) => set({ payNote: v })} placeholder={PAY_HINT[form.payType]} placeholderTextColor={colors.inkFaint} maxLength={120} />
+              {form.payType === 'paid' ? (
+                <View style={[styles.securebox, form.paySecured && styles.secureboxOn]}>
+                  <View style={crew.row}>
+                    <Switch value={form.paySecured} onValueChange={(v) => set({ paySecured: v })} trackColor={{ true: colors.brass }} />
+                    <Text style={[crew.rowText, { flex: 1 }]}>🔒 Secure the pay through Studio Tapa — you fund each person after you book them; it’s held and sent to them when you confirm they worked.</Text>
+                  </View>
+                  {form.paySecured ? (
+                    <>
+                      <Text style={[crew.label, { marginTop: 4 }]}>Rate per person, for the whole job (dollars)</Text>
+                      <TextInput style={[crew.input, { width: 140 }]} value={form.payRateDollars} onChangeText={(v) => set({ payRateDollars: v.replace(/[^0-9.]/g, '') })} keyboardType="decimal-pad" placeholder="350" placeholderTextColor={colors.inkFaint} />
+                      <Text style={crew.mono}>From ${MIN_SECURED_DOLLARS} per person. The Studio Tapa fee and card processing are added on top, so they get the full rate. Nothing is charged until you fund someone. “Didn’t happen” refunds you in full; unbooking someone you funded refunds everything but the card fee.</Text>
+                    </>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             <View style={crew.panel}>
@@ -200,4 +217,6 @@ export default function PostCall() {
   );
 }
 
-const styles = StyleSheet.create({});
+const styles = StyleSheet.create({
+  securebox: { gap: 8, padding: 10, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.oceanInk, marginTop: 8 },
+  secureboxOn: { borderColor: 'rgba(242,193,78,0.6)', backgroundColor: 'rgba(242,193,78,0.06)' },});
