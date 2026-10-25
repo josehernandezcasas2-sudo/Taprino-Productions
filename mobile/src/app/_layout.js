@@ -83,6 +83,11 @@ export default function RootLayout() {
           <Stack.Screen name="locations/mine" options={{ headerShown: false }} />
           <Stack.Screen name="locations/requests/index" options={{ headerShown: false }} />
           <Stack.Screen name="locations/requests/[id]" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/index" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/new" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/[id]/index" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/[id]/edit" options={{ headerShown: false }} />
+          <Stack.Screen name="productions/[id]/day/[n]" options={{ headerShown: false }} />
           <Stack.Screen name="messages/index" options={{ headerShown: false }} />
           <Stack.Screen name="messages/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="vertical/discover" options={{ title: 'Vertical Discover' }} />

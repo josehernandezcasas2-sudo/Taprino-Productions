@@ -47,7 +47,7 @@ export async function getServerSideProps({ req, params, res, query }) {
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], bundle = null, episodeOffers = {}, bought = null }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], bundle = null, episodeOffers = {}, bought = null }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
@@ -232,6 +232,12 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
               <div className="label">Creator</div>
               <div className="value">{seriesArtist || '—'}</div>
             </div>
+            {crew.length > 0 && (
+              <div className="series-about-box">
+                <div className="label">Crew</div>
+                <div className="value">{crew.map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small style={{ color: 'var(--ink-faint)' }}>({c.role})</small></span>)}</div>
+              </div>
+            )}
             <div className="series-about-box">
               <div className="label">Rating</div>
               <div className="value">{representativeRating || 'Not rated'}</div>

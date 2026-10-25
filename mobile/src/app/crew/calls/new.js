@@ -15,14 +15,15 @@ const PAY_HINT = { paid: '$350/day', union: 'SAG-AFTRA micro-budget, IATSE scale
 
 export default function PostCall() {
   const router = useRouter();
-  const { project: preselect } = useLocalSearchParams();
+  const { project: preselect, production: preselectProduction } = useLocalSearchParams();
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);
   const [roles, setRoles] = useState([]);
   const [projects, setProjects] = useState([]);
+  const [productions, setProductions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', details: '' });
+  const [form, setForm] = useState({ title: '', role: '', spots: '1', payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: null, project: preselect ? String(preselect) : '', production: preselectProduction ? String(preselectProduction) : '', details: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -40,6 +41,7 @@ export default function PostCall() {
           const [p, card] = await Promise.all([apiGet('/api/crew/my-projects', tokenRef.current), apiGet('/api/crew/card', tokenRef.current)]);
           if (alive) {
             setProjects(p.projects || []);
+            setProductions(p.productions || []);
             if (card.card && card.card.place) setForm((f) => ({ ...f, place: f.place || card.card.place }));
           }
         } catch (err) { /* optional */ }
@@ -54,7 +56,7 @@ export default function PostCall() {
     setError(null);
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null }, await freshToken(getToken));
+      const data = await apiPost('/api/crew/calls', { ...form, project: type ? { type, id } : null, production: form.production || null }, await freshToken(getToken));
       router.replace(`/crew/calls/${data.call.id}`);
     } catch (err) {
       setError(err.message);
@@ -115,6 +117,17 @@ export default function PostCall() {
                   {projects.map((p) => <Chip key={p.value} label={p.label} on={form.project === p.value} onPress={() => set({ project: p.value })} />)}
                 </View>
                 <Text style={crew.mono}>Linking a project puts "Crew needed" on its page.</Text>
+              </View>
+            ) : null}
+
+            {productions.length > 0 || form.production ? (
+              <View style={crew.panel}>
+                <Text style={crew.label}>Production (optional)</Text>
+                <View style={crew.chips}>
+                  <Chip label="None — just this call" on={!form.production} onPress={() => set({ production: '' })} />
+                  {productions.map((p) => <Chip key={p.value} label={p.label} on={form.production === p.value} onPress={() => set({ production: p.value })} />)}
+                </View>
+                <Text style={crew.mono}>Booked people join the production’s crew list; “worked it” becomes their credit when it’s released.</Text>
               </View>
             ) : null}
 

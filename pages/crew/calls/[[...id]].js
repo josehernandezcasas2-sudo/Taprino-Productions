@@ -15,6 +15,7 @@ import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getOwnCard } from '../../../lib/crewCards';
 import { listCalls, getCall } from '../../../lib/crewCalls';
 import { getSupabase } from '../../../lib/supabase';
+import { ownerProductions } from '../../../lib/productions';
 import { CREW_ROLES, WITHIN_CHOICES } from '../../../lib/crewOptions';
 import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS } from '../../../lib/crewCallRules';
 import { SITE } from '../../../lib/siteConfig';
@@ -22,7 +23,7 @@ import { SITE } from '../../../lib/siteConfig';
 // The Crew Call board (step 3, mockup signed off 2026-10-10).
 //   /crew/calls           the board: filters on the left, calls, one open
 //   /crew/calls/<id>      that call open (on a phone: just the call)
-//   /crew/calls/new       post a call (?project=pitch:<id> preselects)
+//   /crew/calls/new       post a call (?project=pitch:<id> or ?production=<id> preselects)
 // Respond = a message to the poster with the call attached. The poster
 // books people, and after the last day says who worked it — that is
 // where the track record (TierChip) comes from.
@@ -49,17 +50,18 @@ export async function getServerSideProps({ req, res, params, query }) {
   const near = own && own.place ? { label: own.place.label, lat: own.place.lat, lng: own.place.lng } : null;
 
   if (slug === 'new') {
-    if (!account.isSignedIn) return { props: { ...base, mode: 'new', projects: [], preselect: null, near } };
+    if (!account.isSignedIn) return { props: { ...base, mode: 'new', projects: [], productions: [], preselect: null, preselectProduction: null, near } };
     const supabase = getSupabase();
-    const [pitches, series] = await Promise.all([
+    const [pitches, series, productions] = await Promise.all([
       supabase.from('pitches').select('id, title').eq('created_by', account.userId).order('created_at', { ascending: false }).limit(50),
-      supabase.from('series').select('id, name').eq('creator_id', account.userId).order('created_at', { ascending: false }).limit(50)
+      supabase.from('series').select('id, name').eq('creator_id', account.userId).order('created_at', { ascending: false }).limit(50),
+      ownerProductions(account.userId).catch(() => [])
     ]);
     const projects = [
       ...(pitches.data || []).map((p) => ({ value: `pitch:${p.id}`, label: `Pitch Room · ${p.title}` })),
       ...(series.data || []).map((s) => ({ value: `series:${s.id}`, label: `Series · ${s.name}` }))
     ];
-    return { props: { ...base, mode: 'new', projects, preselect: query.project ? String(query.project) : null, near } };
+    return { props: { ...base, mode: 'new', projects, productions, preselect: query.project ? String(query.project) : null, preselectProduction: query.production ? String(query.production) : null, near } };
   }
 
   let board = { calls: [], total: 0, hasCard: false };
@@ -236,7 +238,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
           )}
           {board.calls.map((c) => (
             <Link key={c.id} href={`/crew/calls/${c.id}`} className={`crew-panel cc-call${active && active.call.id === c.id ? ' sel' : ''}`} scroll={false}>
-              <div className="cc-title">{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
+              <div className="cc-title">{c.title}<span className={`cc-pay ${payClass(c.payType)}`}>{c.payLabel}</span>{c.projectTitle && <span className="crew-chip pitch">{c.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · {c.projectTitle}</span>}{c.productionTitle && <span className="crew-chip olive">for {c.productionTitle}</span>}{c.matches && <span className="crew-chip ok">matches your card</span>}{c.mine && <span className="crew-chip pink">yours</span>}</div>
               <div className="cc-when"><span>{c.role}{c.spots > 1 ? ` · ${c.spots} spots` : ''}</span><span>{fmtRange(c.startsOn, c.endsOn)}</span><span>{c.remote ? 'Remote' : c.place}{c.miles != null ? ` · ${c.miles} mi` : ''}</span>{c.payNote && <span>{c.payNote}</span>}</div>
               <div className="cc-owner"><Avatar userId={c.poster.userId} name={c.poster.displayName} src={c.poster.avatarUrl} position={c.poster.avatarPosition} zoom={c.poster.avatarZoom} size="sm" /><span>{c.poster.displayName} <TierChip person={c.poster} /> · {ago(c.createdAt)} · {c.responsesCount} {c.responsesCount === 1 ? 'response' : 'responses'}</span></div>
             </Link>
@@ -320,6 +322,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
         <span>Where</span><span>{call.remote ? 'Remote — anyone with the role, anywhere' : call.place}{call.miles != null ? ` · ${call.miles} mi from you` : ''}</span>
         <span>Pay</span><span><span className={`cc-pay ${payClass(call.payType)}`}>{call.payLabel}</span> {call.payNote}</span>
         {call.projectTitle && <><span>Project</span><span><Link href={call.projectType === 'pitch' ? `/pitches/${call.projectId}` : `/series/${call.projectId}`} className="crew-chip pitch">{call.projectTitle}</Link></span></>}
+        {call.productionTitle && <><span>Production</span><span><Link href={`/productions/${call.productionId}`} className="crew-chip olive">{call.productionTitle}</Link> <span className="crew-mono">booked people join its crew list</span></span></>}
         <span>Posted by</span><span><PersonLine p={call.poster} /></span>
       </div>
       {call.details && <p className="cc-details">{call.details}</p>}
@@ -429,9 +432,9 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
 /* ---------------- post a call ---------------- */
 
-function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, projects, preselect, near }) {
+function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, projects, productions = [], preselect, preselectProduction, near }) {
   const router = useRouter();
-  const [form, setForm] = useState({ title: '', role: CREW_ROLES[0], spots: 1, payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: near ? { label: near.label, lat: near.lat, lng: near.lng } : null, project: preselect || '', details: '' });
+  const [form, setForm] = useState({ title: '', role: CREW_ROLES[0], spots: 1, payType: 'paid', payNote: '', startsOn: '', endsOn: '', remote: false, place: near ? { label: near.label, lat: near.lat, lng: near.lng } : null, project: preselect || '', production: preselectProduction && productions.some((p) => p.value === preselectProduction) ? preselectProduction : '', details: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -442,7 +445,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
     setError(null);
     try {
       const [type, id] = form.project ? form.project.split(':') : [null, null];
-      const body = { ...form, project: type ? { type, id } : null };
+      const body = { ...form, project: type ? { type, id } : null, production: form.production || null };
       const res = await fetch('/api/crew/calls', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not post that.');
@@ -493,6 +496,13 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
                 <option value="">Independent — no project page</option>
                 {projects.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
               </select>
+            </label>
+            <label className="crew-field"><span>Production (optional)</span>
+              <select className="crew-select" value={form.production} onChange={(e) => set({ production: e.target.value })}>
+                <option value="">None — just this call</option>
+                {productions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+              <span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>Booked people join the production’s crew list; “worked it” becomes their credit when it’s released. <Link href="/productions/new">Start a production</Link>.</span>
             </label>
             <label className="crew-field"><span>Details</span><textarea className="crew-input" rows={6} value={form.details} onChange={(e) => set({ details: e.target.value })} placeholder="What the days look like, what you have already, what they should bring." maxLength={2000} /></label>
             {error && <div className="crew-status error" role="alert">{error}</div>}

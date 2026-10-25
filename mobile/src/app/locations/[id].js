@@ -24,6 +24,7 @@ export default function ListingScreen() {
   const tokenRef = useRef(null);
   const [state, setState] = useState({ loading: true, error: null, listing: null, rules: null });
   const [projects, setProjects] = useState([]);
+  const [productions, setProductions] = useState([]);
   const [photo, setPhoto] = useState(0);
   const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(thisMonth());
@@ -35,7 +36,7 @@ export default function ListingScreen() {
       const [d, r] = await Promise.all([apiGet(`/api/locations/${id}`, tokenRef.current), apiGet('/api/locations?sort=new').catch(() => null)]);
       setState({ loading: false, error: null, listing: d.listing, rules: r ? r.rules : null });
       if (tokenRef.current && !d.listing.mine) {
-        try { const p = await apiGet('/api/crew/my-projects', tokenRef.current); setProjects(p.projects || []); } catch (err) { /* optional */ }
+        try { const p = await apiGet('/api/crew/my-projects', tokenRef.current); setProjects(p.projects || []); setProductions(p.productions || []); } catch (err) { /* optional */ }
       }
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: s.listing ? null : err.message }));
@@ -113,7 +114,7 @@ export default function ListingScreen() {
             </View>
 
             {!l.mine ? (signedIn
-              ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} token={getToken} onDone={(r) => router.push(`/locations/requests/${r.id}`)} />
+              ? <RequestPanel listing={l} projects={projects} productions={productions} dates={dates} setDates={setDates} token={getToken} onDone={(r) => router.push(`/locations/requests/${r.id}`)} />
               : (
                 <View style={[crew.panel, { borderColor: 'rgba(255,140,66,0.45)' }]}>
                   <Text style={crew.label}>Request to book</Text>
@@ -184,8 +185,8 @@ function TabBody({ l, tab, rules, onOpenProject }) {
   );
 }
 
-function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) {
-  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
+function RequestPanel({ listing: l, projects, productions = [], dates, setDates, token, onDone }) {
+  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', production: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
@@ -214,7 +215,7 @@ function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) 
     setError(null);
     try {
       const [type, pid] = form.project ? form.project.split(':') : [null, null];
-      const data = await apiPost(`/api/locations/${l.id}/requests`, { startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id: pid } : null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer }, await resolveToken(token));
+      const data = await apiPost(`/api/locations/${l.id}/requests`, { startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id: pid } : null, production: form.production || null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer }, await resolveToken(token));
       onDone(data.request);
     } catch (err) {
       setError(err.message);
@@ -246,6 +247,16 @@ function RequestPanel({ listing: l, projects, dates, setDates, token, onDone }) 
             {projects.map((p) => <Chip key={p.value} label={p.label} on={form.project === p.value} onPress={() => set({ project: p.value })} />)}
           </View>
         </>
+      ) : null}
+      {productions.length > 0 ? (
+        <View style={{ gap: 6 }}>
+          <Text style={crew.label}>Production (optional)</Text>
+          <View style={crew.chips}>
+            <Chip label="None" on={!form.production} onPress={() => set({ production: '' })} />
+            {productions.map((p) => <Chip key={p.value} label={p.label} on={form.production === p.value} onPress={() => set({ production: p.value })} />)}
+          </View>
+          <Text style={crew.mono}>Once paid, the dates land on the production’s call sheet with this place attached.</Text>
+        </View>
       ) : null}
       <TextInput style={crew.input} value={form.shooting} onChangeText={(v) => set({ shooting: v })} placeholder="What you’re shooting" placeholderTextColor={colors.inkFaint} maxLength={200} />
       <Text style={crew.label}>Pay</Text>

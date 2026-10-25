@@ -73,7 +73,7 @@ export function CreditRows({ auto = [], manual = [], onRemove }) {
     <div className="crew-credits">
       {auto.map((w) => (
         <Link key={`${w.type}-${w.id}`} href={w.type === 'series' ? `/series/${w.id}` : `/episode/${w.id}`} className="crew-credit">
-          <span>{w.title} <small>· {w.contentType === 'series' || w.type === 'series' ? 'Series' : w.contentType === 'movie' ? 'Film' : w.contentType === 'podcast' ? 'Podcast' : 'Short'}{w.createdAt ? ` · ${new Date(w.createdAt).getFullYear()}` : ''}</small></span>
+          <span>{w.title} <small>· {w.contentType === 'series' || w.type === 'series' ? 'Series' : w.contentType === 'movie' ? 'Film' : w.contentType === 'podcast' ? 'Podcast' : 'Short'}{w.role ? ` · ${w.role}` : ''}{w.createdAt ? ` · ${new Date(w.createdAt).getFullYear()}` : ''}</small></span>
           <span className="crew-chip ok">✓ on Studio Tapa</span>
         </Link>
       ))}

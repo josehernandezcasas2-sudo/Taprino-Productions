@@ -3,32 +3,42 @@ import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
 import { listCalls, listPendingOutcomes, updateCall, setOutcome } from '../../../lib/crewCalls';
 import { getSupabase } from '../../../lib/supabase';
+import { listReportedProductions, updateProduction } from '../../../lib/productions';
 
 // Admin: the Crew Call board (/admin/crew).
 //   GET  → { pending (booked jobs past their last day with no outcome),
-//            reported (open calls with open reports), open (every open call) }
+//            reported (open calls with open reports), open (every open call),
+//            productions (productions with open reports, migration 104) }
 //   POST { op: 'outcome', callId, responseId, outcome }   settle a job for a quiet poster
 //        { op: 'remove', callId }                         pull a call off the board
+//        { op: 'remove_production', productionId }        take a production down
 export default async function handler(req, res) {
   const account = await getRoleContext(req);
   if (!(account.isAdmin || hasCapability(account, 'handle_flags'))) return res.status(403).json({ error: 'Admin access required.' });
   try {
     if (req.method === 'GET') {
-      const [pending, open, reports] = await Promise.all([
+      const [pending, open, reports, productions] = await Promise.all([
         listPendingOutcomes(),
         listCalls({ includeClosed: false }, { viewerId: account.userId, includeHeld: true }),
-        getSupabase().from('content_reports').select('target_id, reason').eq('target_type', 'call').eq('status', 'open')
+        getSupabase().from('content_reports').select('target_id, reason').eq('target_type', 'call').eq('status', 'open'),
+        listReportedProductions().catch(() => [])
       ]);
       const counts = {};
       for (const r of reports.data || []) counts[r.target_id] = (counts[r.target_id] || 0) + 1;
       return res.status(200).json({
         pending,
         open: open.calls,
-        reported: open.calls.filter((c) => counts[c.id]).map((c) => ({ ...c, reports: counts[c.id] }))
+        reported: open.calls.filter((c) => counts[c.id]).map((c) => ({ ...c, reports: counts[c.id] })),
+        productions
       });
     }
     if (req.method === 'POST') {
-      const { op, callId, responseId, outcome } = req.body || {};
+      const { op, callId, responseId, outcome, productionId } = req.body || {};
+      if (op === 'remove_production') {
+        const result = await updateProduction(account.userId, String(productionId || ''), { status: 'removed' }, { isAdmin: true });
+        await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'production_removed', targetType: 'production', targetId: productionId, details: result.production.title });
+        return res.status(200).json({ ok: true });
+      }
       if (op === 'outcome') {
         const result = await setOutcome(account.userId, callId, responseId, outcome, { isAdmin: true });
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'crew_call_outcome', targetType: 'crew_response', targetId: responseId, details: outcome });

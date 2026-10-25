@@ -67,6 +67,22 @@ export default function CrewAdmin({ account, mainGenres }) {
           </section>
 
           <section>
+            <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-faint)', margin: '0 0 0.5rem' }}>Reported productions · {(data.productions || []).length}</h3>
+            {(data.productions || []).length === 0 && <div className="crew-panel crew-empty">No open reports on productions.</div>}
+            <div className="crew-results">
+              {(data.productions || []).map((p) => (
+                <div key={p.id} className="crew-panel crew-rhead">
+                  <span><Link href={`/productions/${p.id}`}>{p.title}</Link> <span className="crew-mono">· {p.kindLabel} · {p.statusLabel} · by <Link href={p.owner.profilePath}>{p.owner.displayName}</Link> · {p.reports} {p.reports === 1 ? 'report' : 'reports'}</span></span>
+                  <span className="crew-actions">
+                    <Link href={`/productions/${p.id}`} className="crew-btn sm">Open</Link>
+                    <button type="button" className="crew-btn sm" disabled={busy === p.id} onClick={() => { if (window.confirm('Take this production down?')) act(p.id, { op: 'remove_production', productionId: p.id }); }}>Take it down</button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          <section>
             <h3 style={{ fontFamily: 'var(--font-mono)', fontSize: '0.62rem', textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--ink-faint)', margin: '0 0 0.5rem' }}>Open calls · {data.open.length}</h3>
             {data.open.length === 0 && <div className="crew-panel crew-empty">Nothing on the board right now.</div>}
             <div className="crew-results">

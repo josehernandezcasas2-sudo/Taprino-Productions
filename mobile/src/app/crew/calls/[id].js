@@ -85,7 +85,7 @@ export default function CallScreen() {
         {state.error ? <Text style={crew.error}>{state.error}</Text> : null}
         {call ? (
           <>
-            <Text style={[crew.eyebrow, { marginTop: 10 }]}>{call.status === 'open' ? 'Open call' : 'Closed'}{call.projectTitle ? ` · ${call.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${call.projectTitle}` : ''}</Text>
+            <Text style={[crew.eyebrow, { marginTop: 10 }]}>{call.status === 'open' ? 'Open call' : 'Closed'}{call.projectTitle ? ` · ${call.projectType === 'pitch' ? 'Pitch Room' : 'Series'} · ${call.projectTitle}` : ''}{call.productionTitle ? ` · for ${call.productionTitle}` : ''}</Text>
             <Text style={crew.h1}>{call.title}</Text>
             <View style={crew.panel}>
               <KV k="Role" v={`${call.role}${call.spots > 1 ? ` · ${call.spots} spots` : ''}${isPoster ? ` · ${data.booked} booked` : ''}`} />

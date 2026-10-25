@@ -10,6 +10,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getListing } from '../../lib/locations';
 import { getOwnCard } from '../../lib/crewCards';
 import { getSupabase } from '../../lib/supabase';
+import { ownerProductions } from '../../lib/productions';
 import { FEATURES, CANCELLATION, PERMIT_HELP, quoteFor, splitBooking, dollars, dayCount, hoursBetween, MIN_BOOKING_CENTS, MAX_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
 
 // One place (mockups/locations-v1.html §2): gallery, the facts a scout
@@ -42,6 +43,7 @@ export async function getServerSideProps({ req, res, params }) {
     else throw err;
   }
   let projects = [];
+  let productions = [];
   if (account.isSignedIn && listing && !listing.mine) {
     const supabase = getSupabase();
     const [pitches, series] = await Promise.all([
@@ -52,8 +54,9 @@ export async function getServerSideProps({ req, res, params }) {
       ...(pitches.data || []).map((p) => ({ value: `pitch:${p.id}`, label: `Pitch Room · ${p.title}` })),
       ...(series.data || []).map((s) => ({ value: `series:${s.id}`, label: `Series · ${s.name}` }))
     ];
+    productions = await ownerProductions(account.userId).catch(() => []);
   }
-  return { props: { ...base, listing, notFound, setupError, projects } };
+  return { props: { ...base, listing, notFound, setupError, projects, productions } };
 }
 
 const TABS = ['The space', 'Light, power, sound', 'Logistics', 'Rules', 'Permits & insurance', 'Shot here'];
@@ -61,7 +64,7 @@ const has = (l, k) => l.features.includes(k);
 const yesNo = (l, k, yes, no) => (has(l, k) ? yes : no);
 
 export default function ListingPage(props) {
-  const { listing: l, notFound, setupError, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, projects } = props;
+  const { listing: l, notFound, setupError, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, projects, productions = [] } = props;
   const shell = { mainGenres, isSignedIn, email, isAdmin, isCreator, isSubscriber };
   const [photo, setPhoto] = useState(0);
   const [tab, setTab] = useState(0);
@@ -173,7 +176,7 @@ export default function ListingPage(props) {
           </div>
 
           {!l.mine && (isSignedIn
-            ? <RequestPanel listing={l} projects={projects} dates={dates} setDates={setDates} />
+            ? <RequestPanel listing={l} projects={projects} productions={productions} dates={dates} setDates={setDates} />
             : (
               <div className="crew-panel loc-req">
                 <span className="crew-eyebrow">Request to book</span>
@@ -212,9 +215,9 @@ export default function ListingPage(props) {
 
 /* ---------------- the request panel ---------------- */
 
-function RequestPanel({ listing: l, projects, dates, setDates }) {
+function RequestPanel({ listing: l, projects, productions = [], dates, setDates }) {
   const router = useRouter();
-  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
+  const [form, setForm] = useState({ hoursFrom: '08:00', hoursTo: '18:00', crewSize: '', vehicles: '', project: '', production: '', shooting: '', message: '', pricing: l.hourlyCents || l.dayCents ? 'posted' : 'offer', offer: '' });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
   const [done, setDone] = useState(null);
@@ -248,7 +251,7 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
       const res = await fetch(`/api/locations/${l.id}/requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id } : null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer })
+        body: JSON.stringify({ startsOn: dates.from, endsOn, hoursFrom: form.hoursFrom, hoursTo: form.hoursTo, crewSize: form.crewSize, vehicles: form.vehicles, project: type ? { type, id } : null, production: form.production || null, shooting: form.shooting, message: form.message, pricing: form.pricing, offer: form.offer })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not send that.');
@@ -294,6 +297,15 @@ function RequestPanel({ listing: l, projects, dates, setDates }) {
           {projects.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
         </select>
       </label>
+      {productions.length > 0 && (
+        <label className="crew-field"><span>Production (optional)</span>
+          <select className="crew-select" value={form.production} onChange={(e) => set({ production: e.target.value })}>
+            <option value="">None</option>
+            {productions.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+          <span className="crew-mono" style={{ textTransform: 'none', letterSpacing: 0 }}>Once paid, the dates land on the production’s call sheet with this place attached.</span>
+        </label>
+      )}
       <label className="crew-field"><span>What you’re shooting</span><input type="text" className="crew-input" value={form.shooting} onChange={(e) => set({ shooting: e.target.value })} placeholder="Narrative short, dialogue in the living room + yard, one night exterior" maxLength={200} required /></label>
       <div className="crew-field"><span>Pay</span>
         <div className="crew-toggle" role="group" aria-label="Pay">

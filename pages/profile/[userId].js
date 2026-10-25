@@ -593,7 +593,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                     <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
                       <div className="profile-work-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined} />
                       <div className="profile-work-title">{item.title}</div>
-                      <div className="profile-work-type">{workTypeLabel(item)}</div>
+                      <div className="profile-work-type">{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</div>
                     </Link>
                   ))}
                 </div>
