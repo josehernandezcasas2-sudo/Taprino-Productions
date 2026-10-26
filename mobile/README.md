@@ -25,12 +25,15 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
     SDK that matters is the one Expo Go on the phone reports under
     **Settings → App Info → Supported SDK**, not npm's newest `expo` release:
     SDK 58 was on npm from 2026-09-29, but Expo Go on the iOS App Store was
-    still 57.0.9 on 2026-10-18, so the app is on **SDK 57** until Expo Go
-    moves. When Expo Go updates and the project won't open ("incompatible with
-    this version of Expo Go"), move the app to the SDK it now reports:
-    `npx expo install expo@<version> --fix` from `mobile/` (the exact SDK, not
-    `expo@latest`), `npm install`, and `npx expo export --platform ios` to
-    prove it still bundles before testing on the phone.
+    still 57.0.9 until late October. Jose's Expo Go updated to 58 on
+    2026-10-26, so the app is on **SDK 58** (expo 58.0.19, React Native 0.88,
+    React 19.3) until Expo Go moves again. When Expo Go updates and the
+    project won't open ("incompatible with this version of Expo Go"), move the
+    app to the SDK it now reports: `npx expo install expo@<version> --fix`
+    from `mobile/` (the exact SDK, not `expo@latest`), `npm install`, and
+    `npx expo export --platform ios` to prove it still bundles before testing
+    on the phone. Bump `version` in `app.json` with every SDK move (see
+    `PLAY_STORE.md`).
   - **Same Expo account on both ends.** `npx expo whoami` on the PC and the
     account signed into Expo Go must match (studiotapa237). If not:
     `npx expo logout`, `npx expo login`, and sign Expo Go in again.
@@ -38,9 +41,9 @@ That opens Expo's dev tools in your terminal with a QR code. From there:
     Stale `node_modules` on the PC (2026-10-22: left over from a bump to SDK
     58 that was undone) made Expo Go draw every screen over a red
     "Unimplemented component: <RNSScreenStack>" box. `npm install` then
-    `npx expo start -c` fixed it; nothing in the repo was wrong. The SDK stays
-    on 57 until the phone's Expo Go reports a newer Supported SDK — not when
-    npm or Expo's changelog says 58 exists.
+    `npx expo start -c` fixed it; nothing in the repo was wrong. The SDK moves
+    only when the phone's Expo Go reports a newer Supported SDK — not when
+    npm or Expo's changelog says one exists.
 
   Other quick fixes when the QR won't connect: `npx expo start -c` (clears
   Metro's cache), and `npx expo start --tunnel` when the phone and PC can't

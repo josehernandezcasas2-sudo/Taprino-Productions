@@ -49,7 +49,9 @@ before the first upload; after that it's fixed for the life of the app.
 - Each native build is tied to the `version` in `app.json` (runtime
   version policy `appVersion`): bump it when you ship a new build, and
   publish updates to `production` only from code that matches that
-  build's native modules.
+  build's native modules. The move to Expo SDK 58 (2026-10-26) took it
+  to `1.1.0`, so an SDK 58 update is never offered to a build made on
+  SDK 57; every later SDK move bumps it again.
 
 ## Store listing
 
