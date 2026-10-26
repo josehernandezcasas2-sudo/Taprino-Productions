@@ -156,7 +156,7 @@ export function PerformerEditor({ form, set, onError }) {
 // A self-tape: paste a link, or upload a file straight to Cloudflare
 // Stream (TUS, resumable). `value` is { url, uid }; `onChange` gets the
 // same shape.
-export function SelfTapeField({ value, onChange, due }) {
+export function SelfTapeField({ value, onChange, due, callId }) {
   const [stage, setStage] = useState('idle'); // idle | uploading | transcoding | ready | error
   const [pct, setPct] = useState(0);
   const [msg, setMsg] = useState(null);
@@ -187,7 +187,7 @@ export function SelfTapeField({ value, onChange, due }) {
     setMsg(file.name);
     try {
       const tus = await import('tus-js-client');
-      const urlRes = await fetch('/api/crew/self-tape-upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileSize: file.size, fileName: file.name }) });
+      const urlRes = await fetch('/api/crew/self-tape-upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fileSize: file.size, fileName: file.name, callId }) });
       const urlData = await urlRes.json();
       if (!urlRes.ok) throw new Error(urlData.error || 'Could not start the upload.');
       await new Promise((resolve, reject) => {

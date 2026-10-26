@@ -1,4 +1,4 @@
-import { signedSrcForStoredUrl } from '../../lib/videoSigning';
+import { signedSrcForStoredUrl, unsignedFallback } from '../../lib/videoSigning';
 import { playbackGate } from '../../lib/playbackGate';
 import { getAccountContext } from '../../lib/accountContext';
 import { limitPublicRead } from '../../lib/rateLimit';
@@ -60,8 +60,12 @@ export default async function handler(req, res) {
   const signed = await signedSrcForStoredUrl(episode.src);
   if (!signed) {
     // Not a Cloudflare Stream URL (a self-hosted mp4, say), or Cloudflare
-    // isn't configured in this environment. The stored URL is the answer.
-    return res.status(200).json({ src: episode.src, signed: false });
+    // isn't configured in this environment: the stored URL is the answer.
+    // A Cloudflare video whose signing failed gets a 503, never its
+    // permanent address (lib/videoSigning.js unsignedFallback).
+    const fallback = unsignedFallback(episode.src);
+    if (!fallback) return res.status(503).json({ error: 'Playback is having a moment — try again shortly.' });
+    return res.status(200).json({ src: fallback, signed: false });
   }
 
   return res.status(200).json({ src: signed.src, expiresAt: signed.expiresAt, signed: true, owned });

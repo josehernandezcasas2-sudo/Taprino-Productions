@@ -3,6 +3,7 @@ import { createCloudflareTusUploadUrl } from '../../../lib/cloudflareUpload';
 import { checkVideoOwnership } from '../../../lib/videoOwnership';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { selfTapeUploadGate } from '../../../lib/crewCalls';
 
 // Self-tapes for casting calls (migration 106), uploaded straight from the
 // browser to Cloudflare Stream like episodes are.
@@ -36,8 +37,15 @@ export default async function handler(req, res) {
   // Each link can hold a 2 GB file in paid storage, so the limit follows
   // the account as well as the address (security round, 2026-10-26).
   if (!(await checkRateLimit(rateLimitKeyForRequest(req, 'self-tape-upload'), 10, 3600)) || !(await checkRateLimit(`self-tape-upload:u:${userId}`, 8, 86400))) return res.status(429).json({ error: 'That’s a lot of uploads — give it a bit.' });
-  const { fileSize, fileName } = req.body || {};
+  const { fileSize, fileName, callId } = req.body || {};
   if (!fileSize || typeof fileSize !== 'number' || fileSize <= 0) return res.status(400).json({ error: 'fileSize (in bytes) is required.' });
+  // A tape belongs to a casting call (safety batch, 2026-10-26): the call
+  // must exist, be a casting call, and be open to this person (not their
+  // own; open, or one they already answered and are replacing a tape on),
+  // so an upload link isn't free storage for anything at all.
+  const gate = await selfTapeUploadGate(String(callId || ''), userId);
+  if (gate) return res.status(gate.status).json({ error: gate.error });
+  if (!(await checkRateLimit(`self-tape-upload:${userId}:${callId}`, 3, 86400))) return res.status(429).json({ error: 'That’s three tapes for this call today — send the one you have.' });
   if (fileSize > MAX_BYTES) return res.status(400).json({ error: 'A self-tape should be under 2GB — trim it down.' });
   try {
     // Signed playback from the start: a tape (sometimes a minor's) only

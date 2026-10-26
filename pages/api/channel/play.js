@@ -5,7 +5,7 @@ import { getAccountContext } from '../../../lib/accountContext';
 import { getOwnProfile } from '../../../lib/userProfiles';
 import { meetsAgeRequirement } from '../../../lib/ageGate';
 import { getRatings } from '../../../lib/ratings';
-import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
+import { signedSrcForStoredUrl, unsignedFallback } from '../../../lib/videoSigning';
 import { airToEpisode } from '../../../lib/adPlanRules';
 import { applyCors } from '../../../lib/cors';
 import { limitPublicRead } from '../../../lib/rateLimit';
@@ -78,11 +78,15 @@ export default async function handler(req, res) {
   // mid-break right now (the player runs the rest of it, then resumes).
   const plan = program.kind === 'episode' && program.adPlan && program.adPlan.breaks && program.adPlan.breaks.length ? program.adPlan : null;
   const pos = plan ? airToEpisode(program.offsetSeconds, plan.breaks) : { episodeSeconds: program.offsetSeconds, inBreak: null };
+  const src = signed ? signed.src : unsignedFallback(storedSrc);
+  // The player retries a 503 on its own; a Cloudflare video's permanent
+  // address is never the stand-in (lib/videoSigning.js).
+  if (!src) return res.status(503).json({ error: 'Playback is having a moment — try again shortly.' });
   return res.status(200).json({
     kind: program.kind,
     key: program.key,
     episodeId: program.episodeId || null,
-    src: signed ? signed.src : storedSrc,
+    src,
     offsetSeconds: program.offsetSeconds,
     episodeOffsetSeconds: pos.episodeSeconds,
     inBreak: pos.inBreak,

@@ -10354,3 +10354,17 @@ a.prod-day:hover { background: var(--surface-3); }
   .aip-grid { grid-template-columns: 1fr; }
   .aip-hero .ai-seal-stamp { width: 88px; height: 88px; }
 }
+
+/* Two-step reminder for team accounts (safety batch, 2026-10-26). */
+.adm-twostep,
+.account-twostep {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border: 1px solid rgba(var(--olive-rgb), 0.45);
+  background: rgba(var(--olive-rgb), 0.08);
+  border-radius: 4px;
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.adm-twostep a { color: var(--olive); }

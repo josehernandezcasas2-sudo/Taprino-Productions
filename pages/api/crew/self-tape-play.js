@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, signedSrcForStoredUrl } from '../../../lib/cloudflareUpload';
 import { applyCors } from '../../../lib/cors';
 import { checkVideoOwnership } from '../../../lib/videoOwnership';
+import { unsignedFallback } from '../../../lib/videoSigning';
 
 // A signed playback URL for an uploaded self-tape (migration 106). Only
 // the call's poster, the performer who sent it, or an admin can open it.
@@ -31,7 +32,7 @@ export default async function handler(req, res) {
   const owned = await checkVideoOwnership(r.self_tape_uid, { userId: r.user_id, allowUntagged: false });
   if (!owned.ok) return res.status(404).json({ error: 'No uploaded tape on that response.' });
   const signed = await signedSrcForStoredUrl(cloudflarePlaybackUrl(r.self_tape_uid), { expiresInSeconds: 2 * 3600 });
-  const url = signed ? signed.src : cloudflarePlaybackUrl(r.self_tape_uid);
+  const url = signed ? signed.src : unsignedFallback(cloudflarePlaybackUrl(r.self_tape_uid));
   if (!url) return res.status(503).json({ error: 'Video playback isn’t configured.' });
   return res.status(200).json({ url, expiresAt: signed ? signed.expiresAt : null });
 }

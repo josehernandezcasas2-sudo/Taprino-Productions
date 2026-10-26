@@ -10,7 +10,7 @@ import BackButton from '../../components/BackButton';
 import { MIN_AGE_BY_RATING } from '../../lib/ageGate';
 import { episodeHref } from '../../lib/episodeLinks';
 import { getEpisodePageData } from '../../lib/episodePage';
-import { signedSrcForStoredUrl } from '../../lib/videoSigning';
+import { signedSrcForStoredUrl, unsignedFallback } from '../../lib/videoSigning';
 import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadata';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
@@ -78,8 +78,10 @@ export async function getServerSideProps({ req, params, query, res }) {
   // rather than its permanent one, free titles included (Jose,
   // 2026-10-25; lib/streamProtection.js): the page a visitor can share
   // is this one, never the file behind it.
-  let playbackSrc = entitled ? episode.src : null;
-  let describedSrc = entitled ? episode.audioDescriptionSrc : null;
+  // Without a signed link a Cloudflare video gets no src at all (the
+  // player says playback is unavailable) rather than its permanent one.
+  let playbackSrc = entitled ? unsignedFallback(episode.src) : null;
+  let describedSrc = entitled ? unsignedFallback(episode.audioDescriptionSrc) : null;
   let signedPlayback = false;
   if (entitled && episode.src) {
     const signed = await signedSrcForStoredUrl(episode.src);

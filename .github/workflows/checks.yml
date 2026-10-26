@@ -1,0 +1,49 @@
+# The checks a commit should pass before Vercel ships it (safety batch,
+# 2026-10-26): the missing-import scan, every pure rules test, and a scan
+# of the web app's production dependencies for critical advisories.
+# Runs on every push and pull request; the Vercel deploy doesn't wait for
+# it, so a red run here is the signal to look before the next push.
+# (High advisories inside Next's own build-time postcss are known and
+# accepted until Next 16, so the audit fails only on critical ones.)
+name: Checks
+
+on:
+  push:
+    branches: ['**']
+    paths-ignore:
+      - 'mobile/**'
+      - '**/*.md'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    name: refs, rules tests, audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Missing imports and undefined JSX
+        run: node scripts/check-refs.mjs
+      - name: Rules tests
+        run: |
+          set -e
+          for f in scripts/test-*.mjs; do
+            echo "::group::$f"
+            node "$f"
+            echo "::endgroup::"
+          done
+      - name: Dependency audit (production, critical)
+        run: npm audit --omit=dev --audit-level=critical

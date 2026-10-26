@@ -11,6 +11,55 @@ function supabaseHost() {
 }
 const SITE_ORIGIN = 'https://www.studiotapatv.site';
 
+// Clerk's frontend host is inside the publishable key (pk_live_ + base64
+// of "clerk.example.com$"), so the content policy below names the real
+// one without another setting.
+function clerkHost() {
+  try {
+    const key = process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || '';
+    const encoded = key.split('_')[2];
+    const host = encoded ? Buffer.from(encoded, 'base64').toString('utf8').replace(/\$$/, '') : '';
+    return /^[a-z0-9.-]+$/i.test(host) ? host : null;
+  } catch (err) {
+    return null;
+  }
+}
+
+// The full content policy, sent as Report-Only (safety batch,
+// 2026-10-26): browsers report what it would have blocked to
+// /api/csp-report and block nothing, so the list can be corrected from
+// real reports before it's switched to enforcing. Every host here is one
+// the site actually loads from: Clerk (and its bot check), Google Fonts,
+// Cloudflare Stream (playback, thumbnails, uploads), Supabase Storage
+// (art, ad videos, podcast audio, signed uploads, University PDFs in a
+// frame), Google's IMA ad SDK and
+// its ad servers, and YouTube's privacy-mode player for YouTube-backed
+// titles. Inline styles stay allowed (React style props, the theme tag).
+function reportOnlyCsp() {
+  const clerk = clerkHost();
+  const clerkSrc = [clerk ? `https://${clerk}` : null, 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'].filter(Boolean).join(' ');
+  const supabase = supabaseHost() ? `https://${supabaseHost()}` : 'https://*.supabase.co';
+  const stream = 'https://*.cloudflarestream.com https://videodelivery.net https://*.videodelivery.net';
+  const ads = 'https://imasdk.googleapis.com https://*.doubleclick.net https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.gstatic.com';
+  return [
+    "default-src 'self'",
+    `script-src 'self' ${clerkSrc} ${ads}`,
+    `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
+    "font-src 'self' https://fonts.gstatic.com data:",
+    "img-src 'self' data: blob: https:",
+    `media-src 'self' blob: ${stream} ${supabase} ${ads}`,
+    `connect-src 'self' ${clerkSrc} ${stream} ${supabase} ${ads}`,
+    // University readings open in a frame from Storage (a signed PDF link).
+    `frame-src 'self' ${clerkSrc} ${ads} ${supabase} https://www.youtube-nocookie.com`,
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    "frame-ancestors 'self'",
+    'report-uri /api/csp-report'
+  ].join('; ');
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // Don't advertise the framework in every response.
@@ -20,6 +69,11 @@ const nextConfig = {
   // in a cookie so a membership bought later is attributed to them.
   async redirects() {
     return [{ source: '/@:handle', destination: '/profile/:handle?via=:handle', permanent: false }];
+  },
+  // RFC 9116: where to report a security problem (pages/api/security-txt.js
+  // keeps the Expires date moving, which a static file can't).
+  async rewrites() {
+    return [{ source: '/.well-known/security.txt', destination: '/api/security-txt' }];
   },
   // Baseline browser protections the site was serving none of (only
   // Vercel's HSTS): no MIME sniffing, no framing by other sites, referrers
@@ -50,6 +104,13 @@ const nextConfig = {
           // until a full CSP is worked out.
           { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
           { key: 'Content-Security-Policy', value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'" },
+          { key: 'Content-Security-Policy-Report-Only', value: reportOnlyCsp() },
+          // Safety batch (2026-10-26): a page this site opens in a new tab
+          // can't reach back into it (Clerk's and Stripe's popups still
+          // work), and Flash/PDF-plugin cross-domain policy files are
+          // refused outright.
+          { key: 'Cross-Origin-Opener-Policy', value: 'same-origin-allow-popups' },
+          { key: 'X-Permitted-Cross-Domain-Policies', value: 'none' },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
           { key: 'TDM-Reservation', value: '1' },

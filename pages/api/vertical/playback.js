@@ -1,6 +1,6 @@
 import { findPost } from '../../../lib/posts';
 import { getAccountContext } from '../../../lib/accountContext';
-import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
+import { signedSrcForStoredUrl, unsignedFallback } from '../../../lib/videoSigning';
 import { playbackGate } from '../../../lib/playbackGate';
 import { limitPublicRead } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
@@ -11,7 +11,7 @@ import { applyCors } from '../../../lib/cors';
 // the answer only for self-hosted mp4s and local runs without Cloudflare.
 async function playable(storedSrc) {
   const signed = await signedSrcForStoredUrl(storedSrc);
-  return signed ? signed.src : storedSrc;
+  return signed ? signed.src : unsignedFallback(storedSrc);
 }
 
 // Server-only playback source lookup for the vertical discover feed. The

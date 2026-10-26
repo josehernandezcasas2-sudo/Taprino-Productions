@@ -43,6 +43,9 @@ export async function getServerSideProps({ req, res }) {
       subscriptionDetails,
       promoAccessExpiresAt,
       userId: account.userId || null,
+      // Two-step for the team (lib/adminTwoFactor.js): a team account
+      // without it sees why, and what to do, in the Security card.
+      teamTwoStep: (account.isAdmin || account.isSubAdmin || account.adminNeedsTwoFactor) ? { on: Boolean(account.twoFactorEnabled), required: Boolean(account.adminNeedsTwoFactor) } : null,
       // The creator link they followed, if any (middleware.js), to prefill
       // "Did a creator send you?".
       viaHandle: cleanViaSlug(req.cookies && req.cookies.tapa_via) || null
@@ -103,7 +106,7 @@ function formatDate(ms) {
   return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
-export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, viaHandle = null }) {
+export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, viaHandle = null, teamTwoStep = null }) {
   const { signOut, openUserProfile } = useClerk();
   const [newsletter, setNewsletter] = useState(newsletterStatus);
   const [newsletterLoading, setNewsletterLoading] = useState(false);
@@ -887,6 +890,12 @@ export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plan
 
               <div className="account-card">
                 <div className="account-subheading">Security</div>
+                {teamTwoStep && !teamTwoStep.on && (
+                  <div className="account-twostep" role="note">
+                    <b>{teamTwoStep.required ? 'Admin tools are locked until two-step verification is on.' : 'Turn on two-step verification.'}</b>{' '}
+                    Your account can reach people&rsquo;s money and private data. Press Manage, open Security, and add an authenticator app; the admin pages open again as soon as it&rsquo;s set.
+                  </div>
+                )}
                 <div className="account-row">
                   <div>
                     <div className="account-row-label">Email &amp; password</div>

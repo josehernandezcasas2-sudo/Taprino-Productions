@@ -434,7 +434,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
           </label>
           {call.kind === 'cast' && (
             <>
-              {call.selfTapeWanted && <SelfTapeField value={tape} onChange={setTape} due={call.selfTapeDue} />}
+              {call.selfTapeWanted && <SelfTapeField value={tape} onChange={setTape} due={call.selfTapeDue} callId={call.id} />}
               {call.minorsOk && (
                 <div className="cast-minor">
                   <label className="crew-check"><input type="checkbox" checked={minor} onChange={(e) => setMinor(e.target.checked)} /><span>The performer is under 18</span></label>
@@ -473,7 +473,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
           )}
           {call.kind === 'cast' && call.status === 'open' && (
             replacing
-              ? <form className="cc-form" onSubmit={replaceTape}><SelfTapeField value={tape} onChange={setTape} due={call.selfTapeDue} /><div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || (!tape.url && !tape.uid)}>Save tape</button><button type="button" className="crew-btn sm ghost" onClick={() => setReplacing(false)}>Cancel</button></div></form>
+              ? <form className="cc-form" onSubmit={replaceTape}><SelfTapeField value={tape} onChange={setTape} due={call.selfTapeDue} callId={call.id} /><div className="crew-actions"><button type="submit" className="crew-btn sm primary" disabled={busy || (!tape.url && !tape.uid)}>Save tape</button><button type="button" className="crew-btn sm ghost" onClick={() => setReplacing(false)}>Cancel</button></div></form>
               : <div><button type="button" className="crew-btn sm" onClick={() => { setTape({ url: viewerResponse.selfTapeUrl || '', uid: null }); setReplacing(true); }}>{viewerResponse.selfTapeUrl || viewerResponse.selfTapeUid ? 'Replace self-tape' : 'Add a self-tape'}</button></div>
           )}
           <div className="crew-actions">

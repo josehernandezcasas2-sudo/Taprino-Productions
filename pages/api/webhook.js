@@ -12,19 +12,62 @@ import { completeCrewPayFromSession, failCrewPayFromSession, refundCrewPayFromCh
 import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
+import { securityAlert } from '../../lib/securityAlerts';
 
 // Stripe retries any delivery it didn't get a 2xx for, and a creator's
 // payout or a donation must never be applied twice. Each event id is
 // written once (stripe_events, migration 083); a repeat is acknowledged
 // and skipped. Before the migration is run the table is missing and
 // every event is treated as new, which is what happened before anyway.
+//
+// Since migration 112 a finished event also gets processed_at. A row
+// without it that is older than STALE_MS belongs to a delivery that died
+// half-way (a function timeout, not a caught error, which would have
+// removed the row), so the next delivery claims it and does the work
+// again; every step is safe to run twice, ad credits included
+// (apply_ad_credit_purchase). Before 112 the column is missing and a
+// repeat is a duplicate, as it always was.
+const STALE_MS = 2 * 60 * 1000;
+
 async function firstDelivery(event) {
-  const { error } = await getSupabase().from('stripe_events').insert({ id: event.id, type: event.type });
+  const supabase = getSupabase();
+  const { error } = await supabase.from('stripe_events').insert({ id: event.id, type: event.type });
   if (!error) return true;
-  if (error.code === '23505') return false;
   if (error.code === 'PGRST205' || error.code === '42P01') return true;
-  console.error('stripe_events insert failed:', error.message);
-  return true;
+  if (error.code !== '23505') {
+    console.error('stripe_events insert failed:', error.message);
+    return true;
+  }
+  const { data: row, error: readError } = await supabase.from('stripe_events').select('received_at, processed_at').eq('id', event.id).maybeSingle();
+  if (readError || !row || row.processed_at) return false;
+  if (Date.now() - Date.parse(row.received_at) < STALE_MS) return false;
+  // Claim it: only the delivery whose update still finds the old time goes on.
+  const { data: claimed } = await supabase.from('stripe_events').update({ received_at: new Date().toISOString() }).eq('id', event.id).eq('received_at', row.received_at).is('processed_at', null).select('id');
+  return Boolean(claimed && claimed.length);
+}
+
+async function markProcessed(event) {
+  const { error } = await getSupabase().from('stripe_events').update({ processed_at: new Date().toISOString() }).eq('id', event.id);
+  if (error && !/processed_at|schema cache|does not exist/i.test(error.message || '')) console.error('stripe_events processed_at:', error.message);
+}
+
+// Ad credits once per Checkout session: the purchase row and the balance
+// move in one transaction (migration 112). Before 112 the function is
+// missing and the old two-step path runs.
+async function applyAdCredits(session) {
+  const paymentIntent = typeof session.payment_intent === 'string' ? session.payment_intent : (session.payment_intent && session.payment_intent.id) || null;
+  const { data, error } = await getSupabase().rpc('apply_ad_credit_purchase', {
+    p_session: session.id,
+    p_account: session.metadata.adAccountId,
+    p_amount: Math.round(Number(session.amount_total) || 0),
+    p_payment_intent: paymentIntent
+  });
+  if (!error) return { applied: data === true };
+  if (!/could not find the function|does not exist/i.test(error.message || '')) throw new Error(error.message);
+  await addAdCredits({ adAccountId: session.metadata.adAccountId, additionalCents: session.amount_total });
+  // Studio money: a row the reconciliation can match the charge to.
+  await recordAdCreditPurchase(session).catch((err) => console.error('recordAdCreditPurchase from webhook failed:', err.message));
+  return { applied: true, legacy: true };
 }
 
 // Stripe needs the raw request body to verify the webhook signature,
@@ -57,7 +100,14 @@ export default async function handler(req, res) {
     event = verifyStripeEvent(buf, sig);
   } catch (err) {
     console.error('Webhook signature verification failed:', err.message);
-    return res.status(400).send(`Webhook Error: ${err.message}`);
+    // Either a secret is out of step with Stripe's dashboard or someone is
+    // posting forged events: either way a person should look (one email
+    // an hour at most).
+    await securityAlert('Stripe webhook signature check failed', [
+      `Reason: ${String(err.message || '').slice(0, 200)}`,
+      'Check STRIPE_WEBHOOK_SECRET / STRIPE_CONNECT_WEBHOOK_SECRET against the two endpoints in the Stripe dashboard.'
+    ], { throttleKey: 'webhook-signature' });
+    return res.status(400).send('Webhook Error: signature check failed');
   }
 
   // An event from a creator's connected account (event.account set) is
@@ -127,21 +177,15 @@ export default async function handler(req, res) {
       // credit an advertiser's account receives.
       if (session.metadata?.type === 'ad_credits' && session.metadata?.adAccountId) {
         try {
-          await addAdCredits({ adAccountId: session.metadata.adAccountId, additionalCents: session.amount_total });
+          // The purchase row Studio money reconciles against and the
+          // credits themselves, once per session (applyAdCredits).
+          await applyAdCredits(session);
         } catch (err) {
-          console.error('addAdCredits from webhook failed:', err.message);
+          console.error('ad credits from webhook failed:', err.message);
           // Same as the donation branch: let Stripe retry, and let the
           // retry through firstDelivery.
           await getSupabase().from('stripe_events').delete().eq('id', event.id);
           return res.status(500).json({ error: 'credits not applied' });
-        }
-        // Studio money: a row the reconciliation can match the charge to.
-        // Not retried: the credits above are already applied, and a retry
-        // would add them again.
-        try {
-          await recordAdCreditPurchase(session);
-        } catch (err) {
-          console.error('recordAdCreditPurchase from webhook failed:', err.message);
         }
       } else if (session.metadata?.type === 'pitch_donation') {
         // A Pitch Room backing was paid: the pending row becomes the
@@ -196,7 +240,7 @@ export default async function handler(req, res) {
           return res.status(500).json({ error: 'crew pay not recorded' });
         }
       } else {
-        console.log(`New ${SITE.premiumTier} member. Stripe customer:`, session.customer);
+        console.log(`New ${SITE.premiumTier} member (event ${event.id}).`);
         // Creator Share: remember which member this Stripe customer is,
         // so every later invoice.paid finds them without a Stripe call.
         await run('recordCheckoutCustomer', () => recordCheckoutCustomer(session));
@@ -287,12 +331,12 @@ export default async function handler(req, res) {
       break;
     }
     case 'customer.subscription.deleted':
-      console.log(`${SITE.premiumTier} member cancelled. Stripe customer:`, event.data.object.customer);
+      console.log(`${SITE.premiumTier} member cancelled (event ${event.id}).`);
       // The referral attribution ends with the subscription.
       await run('endReferralForSubscription', () => endReferralForSubscription(event.data.object.id));
       break;
     case 'invoice.payment_failed':
-      console.log('Payment failed for customer:', event.data.object.customer);
+      console.log(`Membership payment failed (event ${event.id}).`);
       break;
     case 'transfer.reversed': {
       // A Creator Share payout reversed in the Stripe dashboard: the
@@ -316,5 +360,6 @@ export default async function handler(req, res) {
     await getSupabase().from('stripe_events').delete().eq('id', event.id);
     return res.status(500).json({ error: `not applied: ${failed.join(', ')}` });
   }
+  await markProcessed(event);
   res.json({ received: true });
 }

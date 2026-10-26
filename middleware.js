@@ -3,6 +3,7 @@ import { NextResponse } from 'next/server';
 import { privateBetaOn, isOpenPath, doorPath } from './lib/privateBetaRules';
 import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from './lib/suspensionGate';
 import { robotsTag } from './lib/robotsRules';
+import { crossSiteWriteRefused } from './lib/cors';
 
 // Normally this deliberately does NOT protect any routes — free browsing
 // (homepage, episode pages, genre/series/type pages) stays open to
@@ -41,6 +42,12 @@ import { robotsTag } from './lib/robotsRules';
 //    images, with noindex, nofollow added while the beta door is shut. It
 //    lives here, not in next.config.js, so the two values never fight
 //    over the same header.
+//
+// 5. An API write from another website (Origin not this host or the
+//    lib/cors.js allow-list, or Sec-Fetch-Site: cross-site) is refused
+//    with 403 before any route runs (safety batch, 2026-10-26): Clerk's
+//    SameSite=Lax cookie was the only thing standing between a hostile
+//    page's auto-submitting form and a signed-in member's account.
 const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
@@ -54,6 +61,12 @@ export default clerkMiddleware(async (auth, req) => {
     if (userId === undefined) ({ userId } = await auth());
     return userId;
   };
+
+  if (isApi && crossSiteWriteRefused({ method: req.method, pathname, origin: req.headers.get('origin'), host: req.headers.get('x-forwarded-host') || req.headers.get('host'), secFetchSite: req.headers.get('sec-fetch-site') })) {
+    const refused = NextResponse.json({ error: 'Requests from other websites aren’t accepted.' }, { status: 403 });
+    refused.headers.set('X-Robots-Tag', robotsTag({ privateBeta: beta }));
+    return refused;
+  }
 
   let res = null;
   if (beta && !isOpenPath(pathname)) {
