@@ -8,7 +8,7 @@ export default async function handler(req, res) {
   }
 
   const { email } = req.body || {};
-  if (!email || typeof email !== 'string' || !email.includes('@') || !email.includes('.')) {
+  if (!email || typeof email !== 'string' || !/^[^\s@,;"'<>()=]+@[^\s@,;"'<>()=]+\.[^\s@,;"'<>()=]+$/.test(email.trim())) {
     return res.status(400).json({ error: 'A real email address is required.' });
   }
   if (email.length > 254) {

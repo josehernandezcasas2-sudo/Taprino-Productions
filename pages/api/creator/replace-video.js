@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, cloudflareUidFromUrl } from '../../../lib/cloudflareUpload';
 import { recordOrphan } from '../../../lib/orphanedMedia';
+import { checkVideoOwnership } from '../../../lib/videoOwnership';
 
 // Replacing the video is different from replacing artwork: an admin
 // approved a SPECIFIC video file, not just the metadata around it. If the
@@ -43,6 +44,14 @@ export default async function handler(req, res) {
   }
   if (existing.deletion_requested) {
     return res.status(400).json({ error: 'This episode has a pending deletion request — cancel that first if you want to replace its video.' });
+  }
+
+  // The new file has to be this creator's own upload (lib/videoOwnership.js;
+  // security round, 2026-10-26). Before, any video id in the account could
+  // be attached here, unlike submit-episode.
+  if (!isAdmin) {
+    const owned = await checkVideoOwnership(videoUid, { userId });
+    if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
   }
 
   const newSrc = cloudflarePlaybackUrl(videoUid);

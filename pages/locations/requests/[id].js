@@ -30,7 +30,8 @@ export async function getServerSideProps({ req, res, params }) {
     const request = JSON.parse(JSON.stringify(await getRequest(String(params.id), { viewerId: account.userId, isAdmin: account.isAdmin })));
     return { props: { ...base, request, problem: null } };
   } catch (err) {
-    return { props: { ...base, request: null, problem: err.status === 404 ? 'That request isn’t here.' : err.status === 403 ? 'That request isn’t yours.' : err.message } };
+    if (!err.status) console.error('locations/requests page:', err.message);
+    return { props: { ...base, request: null, problem: err.status === 404 ? 'That request isn’t here.' : err.status === 403 ? 'That request isn’t yours.' : err.status ? err.message : 'Couldn’t load this request right now.' } };
   }
 }
 

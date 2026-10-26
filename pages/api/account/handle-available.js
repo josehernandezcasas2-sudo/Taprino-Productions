@@ -27,6 +27,7 @@ export default async function handler(req, res) {
     const taken = await isHandleTaken(handle, userId);
     return res.status(200).json({ handle, ok: !taken, reason: taken ? `@${handle} is already taken — try another.` : null });
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('handle-available:', err.message);
+    return res.status(500).json({ error: 'Could not check that handle right now.' });
   }
 }

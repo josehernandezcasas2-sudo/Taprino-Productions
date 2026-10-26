@@ -4,7 +4,7 @@ import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { recordWatchedMax } from '../../lib/purchases';
 import { parseWatchProgress } from '../../lib/watchProgress';
 import { recordWatchSeconds } from '../../lib/redis';
-import { firstInWindow } from '../../lib/rateLimit';
+import { firstInWindow, checkRateLimit } from '../../lib/rateLimit';
 import { findEpisode } from '../../lib/episodes';
 import { applyCors } from '../../lib/cors';
 
@@ -48,6 +48,13 @@ export default async function handler(req, res) {
   const customerId = await getStripeCustomerIdFromRequest(req);
   if (!customerId) {
     return res.status(401).json({ error: 'Not signed in.' });
+  }
+  // Progress lives in the Stripe customer's metadata, so every save is two
+  // Stripe calls on the account's shared quota. A player saves every 15
+  // seconds; a ceiling of ten a minute leaves room for a second tab and
+  // stops a script from eating the quota (security round, 2026-10-26).
+  if (!(await checkRateLimit(`watch-progress:${customerId}`, 10, 60))) {
+    return res.status(429).json({ error: 'Saving progress too often.' });
   }
 
   const { episodeId, position, finished } = req.body || {};

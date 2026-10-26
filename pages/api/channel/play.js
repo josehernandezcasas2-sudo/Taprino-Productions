@@ -8,6 +8,7 @@ import { getRatings } from '../../../lib/ratings';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 import { airToEpisode } from '../../../lib/adPlanRules';
 import { applyCors } from '../../../lib/cors';
+import { limitPublicRead } from '../../../lib/rateLimit';
 
 // Hands one viewer a playable URL for whatever is airing on a channel right
 // now — and only that. This is what lets premium titles air on channels
@@ -24,6 +25,9 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  // Every answer can mint a playback token, so a viewer gets a generous
+  // ceiling rather than none (security round, 2026-10-26).
+  if (!(await limitPublicRead(req, res, 'channel-play', { max: 60, windowSeconds: 60 }))) return;
 
   try {
   const channel = await resolvePublicChannel((req.body || {}).channel);

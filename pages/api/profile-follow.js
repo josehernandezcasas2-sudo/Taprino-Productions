@@ -34,6 +34,7 @@ export default async function handler(req, res) {
     const result = await toggleFollow(userId, followedId);
     return res.status(200).json(result);
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error('profile-follow:', err.message);
+    return res.status(500).json({ error: 'Could not update that follow right now.' });
   }
 }

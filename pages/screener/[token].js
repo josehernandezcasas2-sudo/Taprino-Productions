@@ -28,11 +28,11 @@ export default function ScreenerPage({ data, token, problem }) {
   useEffect(() => { const t = setInterval(() => setTick((n) => n + 1), 9000); return () => clearInterval(t); }, []);
   const refreshSrc = useCallback(async () => {
     try {
-      const res = await fetch(`/api/screener/${encodeURIComponent(token)}`, { method: 'POST' });
+      const res = await fetch(`/api/screener/${encodeURIComponent(token)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ viewKey: (data && data.viewKey) || '' }) });
       const d = await res.json();
       return d && d.src ? d.src : null;
     } catch (err) { return null; }
-  }, [token]);
+  }, [token, data]);
 
   if (problem || !data) {
     return (

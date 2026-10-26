@@ -19,7 +19,10 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Sign in to report something.' });
 
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'report-content'), 30, 3600);
+  // Per address and per account: enough reports from one person can pull
+  // a title automatically (lib/moderation.js), so one account can't file
+  // an unlimited number from many addresses (security round, 2026-10-26).
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'report-content'), 30, 3600) && await checkRateLimit(`report-content:u:${userId}`, 30, 86400);
   if (!allowed) return res.status(429).json({ error: 'Too many reports in a short time. Try again later.' });
 
   const { targetType, targetId, reason } = req.body || {};

@@ -25,7 +25,7 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute }) {
       // makes that possible without triggering its own extra render.
       if (!impressionFiredRef.current) {
         impressionFiredRef.current = true;
-        fetch(`/api/house-ads/impression?ad=${ad.id}`).catch(() => {});
+        if (ad.impressionUrl) fetch(ad.impressionUrl).catch(() => {});
       }
     } else {
       v.pause();
@@ -34,7 +34,7 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute }) {
       // a fresh view rather than only ever once per page load.
       impressionFiredRef.current = false;
     }
-  }, [active, ad.id]);
+  }, [active, ad.id, ad.impressionUrl]);
 
   useEffect(() => {
     const v = videoRef.current;

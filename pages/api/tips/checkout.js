@@ -3,6 +3,7 @@ import { getClerkUser } from '../../../lib/clerkUser';
 import { createTipCheckout } from '../../../lib/tips';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { requestOrigin } from '../../../lib/stripe';
 
 // POST { creatorId, amountCents, note, showName, returnTo } → { url }:
 // a Stripe Checkout session for a tip (lib/tips.js). Signed in only;
@@ -28,8 +29,7 @@ export default async function handler(req, res) {
     const primary = user && user.emailAddresses ? user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId) || user.emailAddresses[0] : null;
     // Stripe sends the fan back to the page they tipped from: the site
     // that made the request when the browser says so (the app sends none).
-    const requestOrigin = typeof req.headers.origin === 'string' && /^https?:\/\//.test(req.headers.origin) ? req.headers.origin : null;
-    const origin = requestOrigin || process.env.NEXT_PUBLIC_SITE_URL || `https://${req.headers.host}`;
+    const origin = requestOrigin(req);
     const out = await createTipCheckout({
       tipperId: userId,
       tipperEmail: primary ? primary.emailAddress : null,

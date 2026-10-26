@@ -68,6 +68,20 @@ export default async function handler(req, res) {
       updates[column] = fields[f] || null;
     } else if (f === 'projectUrl') {
       updates[column] = normalizeUrl(fields[f]);
+    } else if (f === 'team') {
+      // Same shape create-pitch accepts (security round, 2026-10-26): up to
+      // 20 members, string fields only, each trimmed.
+      updates[column] = Array.isArray(fields[f])
+        ? fields[f].slice(0, 20).filter((m) => m && typeof m === 'object').map((m) => Object.fromEntries(Object.entries(m).filter(([, v]) => typeof v === 'string').map(([k, v]) => [k.slice(0, 40), v.slice(0, 200)])))
+        : [];
+    } else if (f === 'photos') {
+      // Only https image addresses, at most 12; anything else is dropped
+      // rather than stored and later drawn as an image.
+      updates[column] = Array.isArray(fields[f])
+        ? fields[f].filter((p) => typeof p === 'string' && /^https:\/\/[^\s"'<>()\\;]+$/i.test(p) && p.length <= 500).slice(0, 12)
+        : [];
+    } else if (typeof fields[f] === 'string') {
+      updates[column] = fields[f].slice(0, f === 'description' ? 8000 : 300);
     } else {
       updates[column] = fields[f];
     }
@@ -92,7 +106,7 @@ export default async function handler(req, res) {
   const { error } = await supabase.from('pitches').update(updates).eq('id', pitchId);
   if (error) {
     console.error('edit-pitch error:', error.message);
-    return res.status(500).json({ error: `Could not save changes: ${error.message}` });
+    return res.status(500).json({ error: 'Could not save your changes. Try again in a moment.' });
   }
 
   return res.status(200).json({ ok: true });

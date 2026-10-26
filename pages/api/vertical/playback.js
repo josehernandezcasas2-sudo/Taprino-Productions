@@ -1,8 +1,7 @@
-import { findEpisode } from '../../../lib/episodes';
 import { findPost } from '../../../lib/posts';
 import { getAccountContext } from '../../../lib/accountContext';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
-import { getViewerAgeContext } from '../../../lib/viewerAge';
+import { playbackGate } from '../../../lib/playbackGate';
 import { limitPublicRead } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 
@@ -53,19 +52,17 @@ export default async function handler(req, res) {
     return res.status(200).json({ src: await playable(post.videoSrc) });
   }
 
-  const episode = await findEpisode(episodeId);
-  if (!episode) return res.status(404).json({ error: 'Not found.' });
+  // The same decision as /api/stream-token (lib/playbackGate.js): age and
+  // viewing terms, early screenings, tier and ownership. Until 2026-10-26
+  // this route had its own copy that skipped the early-screening window.
+  const gate = await playbackGate(req, String(episodeId));
+  if (gate.denied) return res.status(gate.denied.status).json(gate.denied.body);
+  const { episode } = gate;
   if (episode.contentType !== 'vertical') {
     // Defense in depth — this endpoint only exists for the vertical feed,
     // it shouldn't become a generic "get me any episode's src" backdoor.
     return res.status(400).json({ error: 'Not a vertical episode.' });
   }
-  // Same age gate as stream-token: the feed filters by rating for the
-  // viewer, but an id can be requested directly.
-  const age = await getViewerAgeContext(account, req);
-  if (!age.allows(episode.rating)) return res.status(403).json({ error: 'This title is age-restricted.', ageRestricted: true });
-  const entitled = episode.tier === 'free' || account.isSubscriber || account.isAdmin;
-  if (!entitled) return res.status(403).json({ error: 'Subscription required.' });
 
   if (!episode.src) return res.status(404).json({ error: 'No video attached.' });
   return res.status(200).json({ src: await playable(episode.src) });

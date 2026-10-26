@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
 import { importAudioFromUrl } from '../../../lib/audioUpload';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 // Takes the episode list the creator already reviewed and checked off in
 // the preview step (see rss-preview.js) — deliberately does NOT re-fetch
@@ -21,6 +22,12 @@ export default async function handler(req, res) {
   const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
+  }
+
+  // One import can pull up to 100 audio files into storage, so imports
+  // are a few an hour per creator (security round, 2026-10-26).
+  if (!(await checkRateLimit(`rss-import:${userId}`, 5, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of imports for one hour — try again later.' });
   }
 
   const { showName, seriesId: existingSeriesId, episodes, defaultTier, defaultMainGenre, defaultGenre, defaultArtist } = req.body || {};

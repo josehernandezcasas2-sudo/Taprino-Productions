@@ -1,6 +1,6 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
-import { ClerkProvider } from '@clerk/nextjs';
+import { ClerkProvider, useAuth } from '@clerk/nextjs';
 import Head from 'next/head';
 import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
 import { PodcastPlayerProvider } from '../contexts/PodcastPlayerContext';
@@ -9,6 +9,28 @@ import PodcastMiniPlayer from '../components/PodcastMiniPlayer';
 import '../styles/globals.css';
 import '@uppy/core/css/style.css';
 import '@uppy/dashboard/css/style.css';
+
+// On sign-out, empty the offline cache (public/sw.js) so nothing the
+// signed-in person saw is left for the next one on this browser
+// (security round, 2026-10-26). The worker stores only shareable pages
+// since then; this is the second lock.
+function ClearCacheOnSignOut() {
+  const { isLoaded, isSignedIn } = useAuth();
+  const wasSignedIn = useRef(false);
+  useEffect(() => {
+    if (!isLoaded) return;
+    if (wasSignedIn.current && !isSignedIn && typeof window !== 'undefined') {
+      try {
+        if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'clear-cache' });
+        if (window.caches) window.caches.keys().then((keys) => keys.forEach((k) => window.caches.delete(k))).catch(() => {});
+      } catch (err) {
+        // A browser without these just has nothing to clear.
+      }
+    }
+    wasSignedIn.current = Boolean(isSignedIn);
+  }, [isLoaded, isSignedIn]);
+  return null;
+}
 
 export default function App({ Component, pageProps }) {
   const router = useRouter();
@@ -117,6 +139,7 @@ export default function App({ Component, pageProps }) {
           instead of tabbing through the whole header each time. Visually hidden
           until it receives focus. */}
       <a href="#main-content" className="skip-link">Skip to content</a>
+      <ClearCacheOnSignOut />
       <UploadProvider>
         <PodcastPlayerProvider>
           <Component {...pageProps} />

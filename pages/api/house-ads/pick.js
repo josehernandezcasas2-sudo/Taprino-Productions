@@ -1,4 +1,5 @@
 import { pickActiveHouseAd } from '../../../lib/houseAds';
+import { signedImpressionPath } from '../../../lib/adImpressionSig';
 
 // JSON sibling to vast.js — same underlying pickActiveHouseAd() selection,
 // but returned as plain data for a React component (ReelAdCard) to render
@@ -19,7 +20,10 @@ export default async function handler(req, res) {
         id: ad.id,
         title: ad.title,
         videoUrl: ad.video_url,
-        clickUrl: ad.click_url || null
+        clickUrl: ad.click_url || null,
+        // The pixel the card fires as it plays; signed, so only this
+        // pick counts (lib/adImpressionSig.js).
+        impressionUrl: signedImpressionPath({ ad: ad.id })
       }
     });
   } catch (err) {

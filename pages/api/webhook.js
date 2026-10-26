@@ -60,6 +60,16 @@ export default async function handler(req, res) {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
 
+  // An event from a creator's connected account (event.account set) is
+  // only ever an onboarding update; every money event this handler acts
+  // on happens on the platform's own account. Anything else arriving
+  // from a connected account is acknowledged and ignored, so a payment
+  // made on someone's Express account can never be read as one of ours
+  // (security round, 2026-10-26).
+  if (event.account && event.type !== 'account.updated') {
+    return res.json({ received: true, ignored: 'connected-account event' });
+  }
+
   if (!(await firstDelivery(event))) {
     return res.json({ received: true, duplicate: true });
   }

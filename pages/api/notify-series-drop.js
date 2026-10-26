@@ -1,3 +1,4 @@
+import { timingSafeEqual } from 'node:crypto';
 import Stripe from 'stripe';
 import { findSeries } from '../../lib/series';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
@@ -33,7 +34,7 @@ async function sendDropEmail(email, seriesName, seriesUrl) {
       reply_to: SITE.contactEmail,
       to: email,
       subject: `New episode of ${seriesName} just dropped`,
-      html: `<p>A new episode of <strong>${seriesName}</strong> is up — you saved this series to get notified.</p><p><a href="${seriesUrl}">${seriesUrl}</a></p>`
+      html: `<p>A new episode of <strong>${escapeHtml(seriesName)}</strong> is up — you saved this series to get notified.</p><p><a href="${escapeHtml(seriesUrl)}">${escapeHtml(seriesUrl)}</a></p>`
     })
   });
   if (!res.ok) {
@@ -41,6 +42,11 @@ async function sendDropEmail(email, seriesName, seriesUrl) {
     throw new Error(`Resend API error: ${body}`);
   }
   return { sent: true };
+}
+
+// A series name is creator-typed text going into an email's HTML.
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
 export default async function handler(req, res) {
@@ -59,7 +65,14 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many requests.' });
   }
 
-  if (!process.env.ADMIN_NOTIFY_SECRET || secret !== process.env.ADMIN_NOTIFY_SECRET) {
+  // Constant-time comparison (security round, 2026-10-26): `!==` returns
+  // early at the first differing character, which leaks the secret's
+  // prefix to anyone timing enough requests.
+  const expected = process.env.ADMIN_NOTIFY_SECRET || '';
+  const given = typeof secret === 'string' ? secret : '';
+  const a = Buffer.from(given);
+  const b = Buffer.from(expected);
+  if (!expected || a.length !== b.length || !timingSafeEqual(a, b)) {
     return res.status(401).json({ error: 'Missing or incorrect secret.' });
   }
 
@@ -72,8 +85,9 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Stripe is not configured.' });
   }
 
-  const origin = req.headers.origin || `https://${req.headers.host}`;
-  const seriesUrl = `${origin}/series/${seriesId}`;
+  // The site's own address, never one taken from the request's headers
+  // (security round, 2026-10-26): this link goes out in emails.
+  const seriesUrl = `https://www.studiotapatv.site/series/${encodeURIComponent(seriesId)}`;
 
   let notified = 0;
   let checked = 0;

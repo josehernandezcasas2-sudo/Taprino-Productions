@@ -111,13 +111,58 @@ export default async function handler(req, res) {
     }
   }
 
+  // Snippet videos (posts) and casting self-tapes (security round,
+  // 2026-10-26): both were left out until now. A post with no thumbnail
+  // of its own gets its frame stored, since the page no longer falls
+  // back to Cloudflare's.
+  const extra = { posts: 0, framesStored: 0, tapes: 0, failures: [] };
+  const { data: postRows, error: postError } = await supabase.from('posts').select('id, caption, video_uid, thumbnail_url').eq('kind', 'video').not('video_uid', 'is', null);
+  if (postError && !isMissingTable(postError)) extra.failures.push({ id: 'posts', title: 'posts', error: postError.message });
+  for (const row of postRows || []) {
+    const uid = row.video_uid;
+    if (!seen.has(uid)) {
+      seen.add(uid);
+      try {
+        await enableSignedUrlsForVideo(uid);
+        extra.posts += 1;
+      } catch (err) {
+        extra.failures.push({ id: row.id, title: row.caption || row.id, error: err.message });
+        continue;
+      }
+    }
+    if (!row.thumbnail_url || CLOUDFLARE_FRAME.test(row.thumbnail_url)) {
+      try {
+        const frame = await fetchCloudflareThumbnail(uid);
+        if (!frame) throw new Error('no frame available yet');
+        const stored = await uploadArtworkImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', pathPrefix: `post-frame-${row.id}` });
+        const { error: updateError } = await supabase.from('posts').update({ thumbnail_url: stored }).eq('id', row.id);
+        if (updateError) throw new Error(updateError.message);
+        extra.framesStored += 1;
+      } catch (err) {
+        extra.failures.push({ id: row.id, title: row.caption || row.id, error: `thumbnail: ${err.message}` });
+      }
+    }
+  }
+  const { data: tapeRows, error: tapeError } = await supabase.from('crew_responses').select('id, self_tape_uid').not('self_tape_uid', 'is', null);
+  if (tapeError && !isMissingTable(tapeError) && !/self_tape_uid/.test(tapeError.message || '')) extra.failures.push({ id: 'crew_responses', title: 'self-tapes', error: tapeError.message });
+  for (const row of tapeRows || []) {
+    if (seen.has(row.self_tape_uid)) continue;
+    seen.add(row.self_tape_uid);
+    try {
+      await enableSignedUrlsForVideo(row.self_tape_uid);
+      extra.tapes += 1;
+    } catch (err) {
+      extra.failures.push({ id: row.id, title: 'self-tape', error: err.message });
+    }
+  }
+
   await recordAudit({
     adminId: userId,
     adminEmail: email,
     action: 'sync_stream_protection',
     targetType: 'episode',
     targetId: 'all',
-    details: `Protected ${protectedIds.length} episodes (${seen.size} videos incl. ${university.videos} University), ${skipped.length} without Cloudflare video, ${failures.length + university.failures.length} failed, ${cloudflarePosters.length} with a Cloudflare frame as poster, ${university.framesReplaced} University frames stored.`
+    details: `Protected ${protectedIds.length} episodes (${seen.size} videos incl. ${university.videos} University, ${extra.posts} snippets, ${extra.tapes} self-tapes), ${skipped.length} without Cloudflare video, ${failures.length + university.failures.length + extra.failures.length} failed, ${cloudflarePosters.length} with a Cloudflare frame as poster, ${university.framesReplaced + extra.framesStored} frames stored.`
   });
 
   return res.status(200).json({
@@ -126,6 +171,7 @@ export default async function handler(req, res) {
     skipped: skipped.length,
     failures,
     cloudflarePosters,
-    university
+    university,
+    extra
   });
 }

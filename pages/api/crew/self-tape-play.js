@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, signedSrcForStoredUrl } from '../../../lib/cloudflareUpload';
 import { applyCors } from '../../../lib/cors';
+import { checkVideoOwnership } from '../../../lib/videoOwnership';
 
 // A signed playback URL for an uploaded self-tape (migration 106). Only
 // the call's poster, the performer who sent it, or an admin can open it.
@@ -24,6 +25,11 @@ export default async function handler(req, res) {
   const { data: r } = await getSupabase().from('crew_responses').select('id, user_id, self_tape_uid, crew_calls!inner(poster_id)').eq('id', responseId).eq('call_id', callId).maybeSingle();
   if (!r || !r.self_tape_uid) return res.status(404).json({ error: 'No uploaded tape on that response.' });
   if (!account.isAdmin && account.userId !== r.user_id && account.userId !== r.crew_calls.poster_id) return res.status(403).json({ error: 'The tape is for the poster.' });
+  // Belt and braces (security round, 2026-10-26): sign only a video the
+  // performer uploaded themselves. lib/crewCalls.js refuses anything else
+  // on the way in; this keeps a row written before that check harmless.
+  const owned = await checkVideoOwnership(r.self_tape_uid, { userId: r.user_id, allowUntagged: false });
+  if (!owned.ok) return res.status(404).json({ error: 'No uploaded tape on that response.' });
   const signed = await signedSrcForStoredUrl(cloudflarePlaybackUrl(r.self_tape_uid), { expiresInSeconds: 2 * 3600 });
   const url = signed ? signed.src : cloudflarePlaybackUrl(r.self_tape_uid);
   if (!url) return res.status(503).json({ error: 'Video playback isn’t configured.' });

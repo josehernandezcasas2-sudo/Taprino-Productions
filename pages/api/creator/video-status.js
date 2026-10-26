@@ -1,21 +1,21 @@
 import { getRoleContext } from '../../../lib/roles';
-import { getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
+import { checkVideoOwnership, publicVideoStatus } from '../../../lib/videoOwnership';
 
 // Polled every few seconds by the creator's browser while a link import (or
 // a regular upload) is being fetched/transcoded on Cloudflare's side.
 //
-// No ownership check against a specific creator's episodes — there's
-// nothing to check yet. This runs BEFORE an episode row exists (the row is
-// only created once the video is ready and the form is submitted), the same
-// as the existing get-upload-url endpoint. Gated to signed-in creators only,
-// which matches that precedent.
+// It runs before an episode row exists, so the only thing to check is the
+// video itself: it has to be this creator's own upload (tagged by
+// get-upload-url / import-video-url), or an untagged older video nobody
+// else uses. Until 2026-10-26 it answered for any uid in the account,
+// uploader id included, which made other people's videos easy to probe.
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -25,10 +25,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'uid is required.' });
   }
 
-  const status = await getCloudflareVideoStatus(uid);
-  if (!status) {
-    return res.status(404).json({ error: 'No video found with that ID.' });
+  const owned = await checkVideoOwnership(uid, { userId, isAdmin });
+  if (!owned.ok) {
+    // Same answer for "not yours" and "doesn't exist".
+    return res.status(owned.status === 400 ? 400 : 404).json({ error: owned.status === 400 ? owned.error : 'No video found with that ID.' });
   }
 
-  return res.status(200).json(status);
+  return res.status(200).json(isAdmin ? owned.video : publicVideoStatus(owned.video));
 }

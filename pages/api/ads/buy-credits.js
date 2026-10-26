@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount } from '../../../lib/adAccounts';
+import { requestOrigin } from '../../../lib/stripe';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -32,8 +34,17 @@ export default async function handler(req, res) {
   if (!Number.isFinite(amountCents) || amountCents < 500) {
     return res.status(400).json({ error: 'Enter at least $5.00 to buy credits.' });
   }
+  // A ceiling per purchase and a few checkouts an hour (security round,
+  // 2026-10-26): each call opens a Stripe session, and a typo'd amount
+  // shouldn't become a five-figure charge.
+  if (amountCents > 1000000) {
+    return res.status(400).json({ error: 'Credits are bought up to $10,000 at a time — contact us for more.' });
+  }
+  if (!(await checkRateLimit(`ad-credits-checkout:${account.id}`, 10, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of checkouts — try again in a little while.' });
+  }
 
-  const origin = req.headers.origin || `https://${req.headers.host}`;
+  const origin = requestOrigin(req);
 
   try {
     const session = await stripe.checkout.sessions.create({
@@ -62,6 +73,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: session.url });
   } catch (err) {
     console.error('buy-credits error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Could not open checkout. Try again in a moment.' });
   }
 }

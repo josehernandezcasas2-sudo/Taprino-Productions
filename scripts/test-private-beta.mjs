@@ -30,6 +30,9 @@ t('the door keeps the page wanted, never an outside one', () => {
   assert.equal(safeNext('/profile/mara?via=mara'), '/profile/mara?via=mara');
   assert.equal(safeNext('//evil.example'), '/');
   assert.equal(safeNext('https://evil.example'), '/');
+  assert.equal(safeNext('/\\evil.example'), '/');
+  assert.equal(safeNext('/\t/evil.example'), '/');
+  assert.equal(safeNext('/%5Cevil.example'), '/%5Cevil.example', 'an encoded backslash stays a path on this site');
   assert.equal(safeNext('/welcome?next=%2Fstream'), '/');
   assert.equal(safeNext(undefined), '/');
   assert.equal(safeNext(['/a']), '/');

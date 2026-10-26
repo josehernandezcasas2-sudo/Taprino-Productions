@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount, submitAdvertiserAd, getAdsForAccount } from '../../../lib/adAccounts';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 // Video is capped at 8MB by lib/houseAdUpload.js (see that file for why
 // this system skips Cloudflare Stream). Base64 encoding adds roughly a
@@ -32,6 +33,16 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { title, videoBase64, videoFileName, durationSeconds, clickUrl, budgetTotalCents, targeting, placements } = req.body || {};
+    // Each ad uploads a video to public storage and waits on a person to
+    // review it: a few a day per account, and no more than five waiting
+    // at once (security round, 2026-10-26).
+    const waiting = (await getAdsForAccount(account.id)).filter((a) => a.reviewStatus === 'pending').length;
+    if (waiting >= 5) {
+      return res.status(429).json({ error: 'You already have five ads waiting for review. Once they’re looked at you can send more.' });
+    }
+    if (!(await checkRateLimit(`ad-submit:${account.id}`, 5, 86400))) {
+      return res.status(429).json({ error: 'That’s five new ads today — send more tomorrow.' });
+    }
     try {
       const ad = await submitAdvertiserAd({
         adAccountId: account.id,

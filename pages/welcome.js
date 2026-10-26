@@ -128,7 +128,7 @@ function RequestForm({ preview }) {
       const res = await fetch('/api/beta/request', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, kind }) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Something went wrong.');
-      setDone(data.repeat ? 'You’re already on the list. We’ll write when a spot opens.' : 'Got it. We’ll write when a spot opens.');
+      setDone('Got it. We’ll write when a spot opens.');
     } catch (err) {
       setError(err.message);
     } finally {

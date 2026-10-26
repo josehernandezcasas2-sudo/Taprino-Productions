@@ -1,7 +1,8 @@
 import { getRoleContext } from '../../../lib/roles';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
-import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
+import { cloudflarePlaybackUrl, getCloudflareVideoStatus, enableSignedUrlsForVideo, fetchCloudflareThumbnail } from '../../../lib/cloudflareUpload';
+import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { createPost } from '../../../lib/posts';
 
 // Small photo, same as episode poster/thumbnail uploads — this rides in
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
   }
 
   // kind === 'video'
-  if (!body.videoUid) {
+  if (!body.videoUid || !VIDEO_UID_PATTERN.test(String(body.videoUid))) {
     return res.status(400).json({ error: 'No video was uploaded.' });
   }
   const src = cloudflarePlaybackUrl(body.videoUid);
@@ -89,6 +90,20 @@ export default async function handler(req, res) {
   }
   if (durationSeconds && durationSeconds > MAX_VIDEO_SECONDS) {
     return res.status(400).json({ error: 'Videos are limited to 5 minutes.' });
+  }
+
+  // Signed playback only, like every other video on the site, and a
+  // stored frame when no thumbnail was uploaded: Cloudflare's own frame
+  // URL stops loading once the video is protected (security round,
+  // 2026-10-26). Best effort; "Protect every video" catches up later.
+  try {
+    await enableSignedUrlsForVideo(body.videoUid);
+  } catch (err) {
+    console.error('posts/create protect:', err.message);
+  }
+  if (!thumbnailUrl) {
+    const frame = await fetchCloudflareThumbnail(body.videoUid).catch(() => null);
+    if (frame) thumbnailUrl = await uploadArtworkImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', pathPrefix: `post-frame-${userId}-${Date.now().toString(36)}` }).catch(() => null);
   }
 
   const id = await createPost({

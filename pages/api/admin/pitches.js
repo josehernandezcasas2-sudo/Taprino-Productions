@@ -186,6 +186,18 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     const { pitchId } = req.body || {};
     if (!pitchId) return res.status(400).json({ error: 'pitchId is required.' });
+    // Deleting a pitch deletes its backing rows with it (on delete
+    // cascade), and those are real-money records refunds, disputes and
+    // Studio money still need. A pitch anyone actually paid toward is
+    // rejected, not deleted (security round, 2026-10-26).
+    const { data: paid, error: paidError } = await supabase.from('pitch_donations').select('id').eq('pitch_id', pitchId).neq('status', 'failed').limit(1);
+    if (paidError && !/does not exist|schema cache/i.test(paidError.message || '')) {
+      console.error('pitches delete check:', paidError.message);
+      return res.status(500).json({ error: 'Could not check this pitch’s backings.' });
+    }
+    if (paid && paid.length) {
+      return res.status(409).json({ error: 'People have backed this pitch, so its records have to stay. Reject it instead to take it down.' });
+    }
     const { error } = await supabase.from('pitches').delete().eq('id', pitchId);
     if (error) {
       console.error('pitches delete error:', error.message);

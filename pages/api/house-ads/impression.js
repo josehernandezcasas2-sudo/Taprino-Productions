@@ -3,8 +3,21 @@ import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 import { recordDailyAdImpression } from '../../../lib/redis';
 import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { normalizeSurface } from '../../../lib/adShareRules';
+import { verifyImpression } from '../../../lib/adImpressionSig';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// An ad only spends credit (and earns ad share) while it may actually
+// serve: approved, switched on, and for an advertiser's ad, an account in
+// good standing with credit left. The SQL functions don't check this, so
+// a pixel for a paused or out-of-credit ad would otherwise still charge.
+async function adMayCount(supabase, adId) {
+  const { data: ad, error } = await supabase.from('house_ads').select('id, active, review_status, ad_account_id').eq('id', adId).maybeSingle();
+  if (error || !ad || !ad.active || ad.review_status !== 'approved') return false;
+  if (!ad.ad_account_id) return true;
+  const { data: account } = await supabase.from('ad_accounts').select('status, credit_balance_cents').eq('id', ad.ad_account_id).maybeSingle();
+  return Boolean(account && account.status === 'active' && Number(account.credit_balance_cents) > 0);
+}
 
 // Fired by the IMA SDK as a plain GET the moment a house ad actually starts
 // playing — this is the <Impression> URL embedded in the VAST response
@@ -35,12 +48,16 @@ export default async function handler(req, res) {
   if (ad && typeof ad === 'string' && UUID_RE.test(ad)) {
     try {
       // This pixel spends the advertiser's paid credit, and ad ids are
-      // public, so a replay has to be worthless: one impression per
-      // viewer per ad per 10 minutes, and a ceiling per viewer overall.
+      // public, so only a URL the server signed counts, each one once
+      // (lib/adImpressionSig.js), and a replay has to be worthless
+      // anyway: one impression per viewer per ad per 10 minutes, and a
+      // ceiling per viewer overall.
+      const signed = verifyImpression(req.query);
       const viewer = rateLimitKeyForRequest(req, 'ad-impression');
-      const fresh = await firstInWindow(`${viewer}:${ad}`, 600);
-      if (fresh && await checkRateLimit(viewer, 30, 600)) {
-        const supabase = getSupabase();
+      const unused = signed.ok && (!signed.nonce || await firstInWindow(`ad-impression-nonce:${signed.nonce}`, signed.ttl));
+      const fresh = unused && await firstInWindow(`${viewer}:${ad}`, 600);
+      const supabase = fresh ? getSupabase() : null;
+      if (fresh && await checkRateLimit(viewer, 30, 600) && await adMayCount(supabase, ad)) {
         await supabase.rpc('increment_house_ad_impression', { target_id: ad });
         await recordDailyAdImpression(ad);
         // Ad share (migration 103): which title the ad played inside,

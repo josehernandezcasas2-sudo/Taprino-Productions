@@ -612,7 +612,9 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-section-label">Photos</div>
             <div className="pitch-photo-row">
               {pitch.photos.map((url, i) => (
-                <div key={i} className="pitch-photo-item" style={{ backgroundImage: `url(${url})` }} />
+                // Quoted, with anything that could close the url() or the
+                // declaration taken out (security round, 2026-10-26).
+                <div key={i} className="pitch-photo-item" style={{ backgroundImage: `url("${String(url).replace(/["\\()\n\r;]/g, '')}")` }} />
               ))}
             </div>
           </>

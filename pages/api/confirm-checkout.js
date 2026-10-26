@@ -1,7 +1,3 @@
-import Stripe from 'stripe';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
-
 // Under the old magic-link system, this endpoint's job was "sign the visitor
 // in by setting a cookie now that they've paid" — checkout could happen
 // anonymously, so this was the first moment identity was established.
@@ -12,22 +8,19 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 // Stripe customer. There's nothing left to set — just send them back with
 // a flag so the UI can show a welcome state. Their new subscription status
 // gets picked up automatically on the next page load, same as every other
-// account change in this app.
+// account change in this app (the webhook is what records the payment).
+//
+// It used to look the session up in Stripe "as a sanity check" and throw
+// the answer away: an unauthenticated, unlimited Stripe API call for anyone
+// who hit the URL in a loop (security round, 2026-10-26). Nothing read the
+// result, so the call is gone.
 export default async function handler(req, res) {
-  const { session_id } = req.query;
-  if (!session_id) return res.redirect('/');
-
-  try {
-    // Just a sanity check that this really was a completed session, not
-    // strictly required for anything downstream anymore.
-    await stripe.checkout.sessions.retrieve(session_id);
-  } catch (err) {
-    console.error('confirm-checkout error:', err.message);
-  }
+  const { session_id: sessionId } = req.query;
+  if (!sessionId) return res.redirect('/');
 
   // Joined from the account page: land back there (the only other
   // destination is the home page, so nothing else can be asked for here).
   const to = req.query.to === 'account' ? '/account' : '/';
   res.writeHead(302, { Location: `${to}?welcome=1` });
-  res.end();
+  return res.end();
 }

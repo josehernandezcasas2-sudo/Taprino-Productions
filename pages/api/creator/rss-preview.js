@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
-import { safeFetch } from '../../../lib/safeFetch';
+import { safeFetch, readTextCapped } from '../../../lib/safeFetch';
 import { parsePodcastFeed } from '../../../lib/rssImport';
 
 const MAX_FEED_BYTES = 10 * 1024 * 1024; // 10MB — generous for even a very long-running show's feed XML
@@ -38,20 +38,27 @@ export default async function handler(req, res) {
     clearTimeout(timeout);
     return res.status(502).json({ error: err.name === 'AbortError' ? 'That feed took too long to respond.' : `Could not reach that feed: ${err.message}` });
   }
-  clearTimeout(timeout);
 
   if (!response.ok) {
+    clearTimeout(timeout);
     return res.status(502).json({ error: `That feed returned an error (${response.status}).` });
   }
 
   const declaredLength = Number(response.headers.get('content-length') || 0);
   if (declaredLength > MAX_FEED_BYTES) {
+    clearTimeout(timeout);
     return res.status(400).json({ error: 'That feed file is unusually large — this only supports standard podcast RSS feeds.' });
   }
 
-  const text = await response.text();
-  if (Buffer.byteLength(text, 'utf8') > MAX_FEED_BYTES) {
-    return res.status(400).json({ error: 'That feed file is unusually large — this only supports standard podcast RSS feeds.' });
+  // Read with a byte cap and the timer still running, so neither a huge
+  // nor a trickling answer can hold the function (security round, 2026-10-26).
+  let text;
+  try {
+    text = await readTextCapped(response, MAX_FEED_BYTES);
+  } catch (err) {
+    return res.status(err.tooLarge ? 400 : 502).json({ error: err.tooLarge ? 'That feed file is unusually large — this only supports standard podcast RSS feeds.' : 'That feed took too long to respond.' });
+  } finally {
+    clearTimeout(timeout);
   }
 
   try {

@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { checkVideoOwnership } from '../../../lib/videoOwnership';
 
 // Owner (series.creator_id) or admin only. It used to be any creator —
 // fine for a small trusted roster, not once /apply hands the creator role
@@ -61,6 +62,12 @@ export default async function handler(req, res) {
 
   let trailerSrc;
   if (trailerUid) {
+    // The trailer has to be this creator's own upload (lib/videoOwnership.js;
+    // security round, 2026-10-26): trailers play unsigned to everyone.
+    if (!isAdmin) {
+      const owned = await checkVideoOwnership(trailerUid, { userId });
+      if (!owned.ok) return res.status(owned.status).json({ error: `Trailer: ${owned.error}` });
+    }
     trailerSrc = cloudflarePlaybackUrl(trailerUid);
     if (!trailerSrc) {
       return res.status(500).json({ error: 'Could not resolve the uploaded trailer — is Cloudflare Stream fully configured?' });

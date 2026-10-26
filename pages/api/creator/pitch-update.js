@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { postPitchUpdate } from '../../../lib/pitches';
 import { applyCors } from '../../../lib/cors';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 export default async function handler(req, res) {
   // The app's Your pitches screen posts here too (its web preview sends a
@@ -21,8 +22,11 @@ export default async function handler(req, res) {
   }
 
   const { pitchId, title, body } = req.body || {};
-  if (!pitchId || !title || !body) {
+  if (!pitchId || typeof title !== 'string' || typeof body !== 'string' || !title.trim() || !body.trim()) {
     return res.status(400).json({ error: 'pitchId, title, and body are required.' });
+  }
+  if (title.length > 140 || body.length > 5000) {
+    return res.status(400).json({ error: 'Keep the title under 140 characters and the update under 5,000.' });
   }
 
   const supabase = getSupabase();
@@ -37,9 +41,15 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Only approved, live pitches can post updates.' });
   }
 
-  const result = await postPitchUpdate(pitchId, title, body);
+  // Every update notifies everyone who saved the pitch: three a day
+  // (security round, 2026-10-26).
+  if (!(await checkRateLimit(`pitch-update:${pitchId}`, 3, 86400))) {
+    return res.status(429).json({ error: 'That’s three updates today — post the next one tomorrow.' });
+  }
+
+  const result = await postPitchUpdate(pitchId, title.trim(), body.trim());
   if (!result.ok) {
-    return res.status(500).json({ error: `Could not post update: ${result.error}` });
+    return res.status(500).json({ error: 'Could not post the update. Try again in a moment.' });
   }
   return res.status(200).json({ ok: true });
 }

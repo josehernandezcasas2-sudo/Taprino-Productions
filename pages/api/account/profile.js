@@ -4,6 +4,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeImagePosition, normalizeZoom } from '../../../lib/profileBanner';
 import { applyCors } from '../../../lib/cors';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 const MAX_SOCIAL_LINKS = 6;
@@ -61,6 +62,15 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { displayName, handle: rawHandle, gender, age, bio, socialLinks, avatarBase64, avatarFileName, removeAvatar, avatarPosition, avatarZoom, bannerBase64, bannerFileName, removeBanner, bannerColor, bannerPosition, bannerZoom, stayInStream, fiscalSponsorName, fiscalSponsorUrl, aiSeal } = req.body || {};
+    // Every photo lands in public storage, so new avatars and banners are
+    // capped per account (security round, 2026-10-26); the app's
+    // switches save on every tap, so plain saves get a roomier ceiling.
+    if (!(await checkRateLimit(`profile-save:${userId}`, 120, 3600))) {
+      return res.status(429).json({ error: 'That’s a lot of saves — try again in a little while.' });
+    }
+    if ((avatarBase64 || bannerBase64) && !(await checkRateLimit(`profile-photo:${userId}`, 20, 3600))) {
+      return res.status(429).json({ error: 'That’s a lot of new photos for one hour — try again later.' });
+    }
     // Tips: a fiscal sponsor is a link (http(s)) with an optional name;
     // a name on its own means nothing, so it needs the link.
     if (fiscalSponsorUrl !== undefined && fiscalSponsorUrl !== null && String(fiscalSponsorUrl).trim() && !/^https?:\/\//i.test(String(fiscalSponsorUrl).trim())) {
@@ -124,8 +134,9 @@ export default async function handler(req, res) {
       }
     }
 
+    let avatarUrl;
+    let bannerUrl;
     try {
-      let avatarUrl;
       if (removeAvatar) {
         avatarUrl = null;
       } else if (avatarBase64) {
@@ -135,12 +146,16 @@ export default async function handler(req, res) {
       // the photo (the color, if any, shows instead). Sending a color
       // alongside a photo is fine — the photo wins on the page, and the
       // color is what shows if the photo is removed later.
-      let bannerUrl;
       if (removeBanner) {
         bannerUrl = null;
       } else if (bannerBase64) {
         bannerUrl = await uploadArtworkImage({ base64: bannerBase64, fileName: bannerFileName, pathPrefix: `banner-${userId}` });
       }
+    } catch (err) {
+      // The image checks' own words ("that isn't an image", too big).
+      return res.status(400).json({ error: err.message });
+    }
+    try {
       const cleanedLinks = socialLinks !== undefined
         ? socialLinks.map((l) => ({ platform: (l.platform || '').trim().slice(0, 30), url: l.url.trim() }))
         : undefined;
@@ -167,7 +182,11 @@ export default async function handler(req, res) {
         ...(bannerZoom !== undefined || removeBanner ? { bannerZoom: removeBanner ? null : normalizeZoom(bannerZoom) } : {})
       });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      if (err.status) return res.status(err.status).json({ error: err.message });
+      // A database message names tables and columns; the person gets a
+      // plain one and the log keeps the real one.
+      console.error('account/profile save:', err.message);
+      return res.status(500).json({ error: 'Could not save your profile. Try again in a moment.' });
     }
   }
 

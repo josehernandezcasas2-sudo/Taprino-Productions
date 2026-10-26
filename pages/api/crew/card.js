@@ -42,6 +42,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status === 400) return res.status(400).json({ error: err.message });
     console.error('crew/card:', err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Could not save your card right now. Try again in a moment.' });
   }
 }

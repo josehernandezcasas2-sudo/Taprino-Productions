@@ -1,4 +1,5 @@
-import { getRoleContext } from '../../../lib/roles';
+import { requireCapability } from '../../../lib/adminAuth';
+import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 
 // The actual "did this file come through okay" check, for a video that
@@ -14,14 +15,15 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isAdmin } = await getRoleContext(req);
-  if (!isAdmin) {
-    return res.status(403).json({ error: 'Admin access required.' });
-  }
+  // The episode forms that call this are open to sub-admins with
+  // manage_episodes, so this is too (until 2026-10-26 it was full admins
+  // only and those forms failed for them).
+  const roleContext = await requireCapability(req, res, 'manage_episodes');
+  if (!roleContext) return;
 
   const { uid } = req.query || {};
-  if (!uid) {
-    return res.status(400).json({ error: 'uid is required.' });
+  if (!uid || !VIDEO_UID_PATTERN.test(String(uid))) {
+    return res.status(400).json({ error: 'A Cloudflare video id is required.' });
   }
 
   const status = await getCloudflareVideoStatus(uid);

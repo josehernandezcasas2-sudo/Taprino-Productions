@@ -5,6 +5,7 @@ import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cl
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
+import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 
 // Every one of these has to be present and non-empty — this is the actual
 // enforcement of "creators must submit complete metadata," not just a UI
@@ -76,6 +77,11 @@ export default async function handler(req, res) {
 
   let src = null;
   if (body.videoUid) {
+    // The id goes into Cloudflare API paths below, so its shape is checked
+    // before anything else is done with it (security round, 2026-10-26).
+    if (!VIDEO_UID_PATTERN.test(String(body.videoUid))) {
+      return res.status(400).json({ error: 'That doesn’t look like a video id from this site.' });
+    }
     src = cloudflarePlaybackUrl(body.videoUid);
     if (!src) {
       return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
@@ -98,26 +104,25 @@ export default async function handler(req, res) {
     // (get-upload-url / import-video-url). An older, untagged video is
     // accepted only if no other creator's episode already uses it, so
     // nobody can attach someone else's film by its id.
+    // lib/videoOwnership.js has the rule (it was written out here first).
     if (!isAdmin) {
-      if (!/^[a-zA-Z0-9]{16,64}$/.test(String(body.videoUid))) {
-        return res.status(400).json({ error: 'That doesn’t look like a video id from this site.' });
-      }
-      const owner = await getCloudflareVideoStatus(body.videoUid);
-      if (owner && owner.creator && owner.creator !== userId) {
-        return res.status(403).json({ error: 'That video was uploaded by someone else.' });
-      }
-      if (!owner || !owner.creator) {
-        const { data: inUse } = await getSupabase().from('episodes').select('id').ilike('src', `%${body.videoUid}%`).neq('submitted_by', userId).limit(1);
-        if (inUse && inUse.length) return res.status(403).json({ error: 'That video is already used by another creator’s episode.' });
-      }
+      const owned = await checkVideoOwnership(body.videoUid, { userId });
+      if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
     }
   }
 
   // trailerUid is optional — a creator may not have a separate trailer cut
   // ready yet. If they uploaded one, it went through the exact same TUS
   // flow as the main video (see get-upload-url.js), just a second time.
+  // Same ownership rule as the video (security round, 2026-10-26):
+  // trailers play unsigned to every visitor, so a trailer pointing at
+  // someone else's premium film would publish that film once approved.
   let trailerSrc = null;
   if (body.trailerUid) {
+    if (!isAdmin) {
+      const ownedTrailer = await checkVideoOwnership(body.trailerUid, { userId });
+      if (!ownedTrailer.ok) return res.status(ownedTrailer.status).json({ error: `Trailer: ${ownedTrailer.error}` });
+    }
     trailerSrc = cloudflarePlaybackUrl(body.trailerUid);
     if (!trailerSrc) {
       return res.status(500).json({ error: 'Could not resolve the uploaded trailer — is Cloudflare Stream fully configured?' });

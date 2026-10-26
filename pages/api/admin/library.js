@@ -10,7 +10,9 @@ export default async function handler(req, res) {
 
   // Full admins pass; a sub-admin needs the capability the page that
   // calls this route is gated on (lib/adminAuth.js).
-  const roleContext = await requireCapability(req, res, 'manage_episodes');
+  // Same capabilities as the /admin/library page itself, so a sub-admin
+  // the page lets in isn't met by an empty, locked list.
+  const roleContext = await requireCapability(req, res, ['manage_episodes', 'manage_artwork', 'manage_deletions']);
   if (!roleContext) return;
   const { isAdmin } = roleContext;
 
@@ -29,7 +31,7 @@ export default async function handler(req, res) {
   if (q && String(q).trim() !== '') {
     // The term goes into a PostgREST filter string: commas and parens would
     // rewrite it, and LIKE wildcards would match everything.
-    const term = String(q).trim().slice(0, 80).replace(/[,()]/g, ' ').replace(/[\\%_]/g, (c) => `\\${c}`);
+    const term = String(q).trim().slice(0, 80).replace(/[,()"]/g, ' ').replace(/[\\%_]/g, (c) => `\\${c}`);
     query = query.or(`title.ilike.%${term}%,artist.ilike.%${term}%`);
   }
 

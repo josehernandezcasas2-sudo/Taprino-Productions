@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { deleteCloudflareVideo } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { videoInUse } from '../../../lib/videoOwnership';
 
 // This is the actual cleanup action, not just marking something reviewed —
 // it calls Cloudflare's or Supabase's real delete API. Permanent, no undo.
@@ -26,6 +27,13 @@ export default async function handler(req, res) {
   const { data: orphan, error: fetchError } = await supabase.from('orphaned_media').select('*').eq('id', orphanId).maybeSingle();
   if (fetchError || !orphan) {
     return res.status(404).json({ error: 'Not found — it may have already been cleaned up.' });
+  }
+
+  // A video listed as orphaned can have been attached again since (a
+  // creator re-pointing an episode, a trailer swap), so look once more
+  // right before deleting it for good (security round, 2026-10-26).
+  if (orphan.kind === 'cloudflare_video' && await videoInUse(orphan.reference)) {
+    return res.status(409).json({ error: 'Something on the site still uses this video, so it wasn’t deleted. Dismiss it from the list instead.' });
   }
 
   try {

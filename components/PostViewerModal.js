@@ -31,6 +31,20 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
   const [reportState, setReportState] = useState('closed');
   const touchStartX = useRef(null);
   const post = posts[index];
+  // A video post's playable src is a signed one asked for as it opens
+  // (the profile never carries the stored manifest; lib/posts.js).
+  const [srcById, setSrcById] = useState({});
+  const postId = post ? post.id : null;
+  const isVideo = Boolean(post && post.kind === 'video');
+  useEffect(() => {
+    if (!isVideo || !postId || srcById[postId] !== undefined) return undefined;
+    let cancelled = false;
+    fetch(`/api/vertical/playback?episodeId=${encodeURIComponent(`post:${postId}`)}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (!cancelled) setSrcById((m) => ({ ...m, [postId]: data && data.src ? data.src : null })); })
+      .catch(() => { if (!cancelled) setSrcById((m) => ({ ...m, [postId]: null })); });
+    return () => { cancelled = true; };
+  }, [isVideo, postId, srcById]);
 
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -138,7 +152,7 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
           {post.kind === 'video' ? (
             <ReelPlayer
               key={post.id}
-              src={post.videoSrc}
+              src={srcById[post.id] || null}
               active
               muted={muted}
               onToggleMute={() => setMuted((m) => !m)}

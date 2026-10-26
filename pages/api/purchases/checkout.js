@@ -1,6 +1,7 @@
 import { getAccountContext } from '../../../lib/accountContext';
 import { createPurchaseCheckout } from '../../../lib/purchases';
 import { applyCors } from '../../../lib/cors';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 // POST { type: 'episode' | 'series', id, returnTo? } → { url }: a Stripe
 // Checkout page for buying the title outright. The app opens the url in
@@ -17,6 +18,9 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');
   const account = await getAccountContext(req);
   if (!account.isSignedIn) return res.status(401).json({ error: 'Sign in to buy.' });
+  // Each call opens a Stripe Checkout session and a pending row
+  // (security round, 2026-10-26).
+  if (!(await checkRateLimit(`purchase-checkout:${account.userId}`, 20, 3600))) return res.status(429).json({ error: 'That’s a lot of checkouts — try again in a little while.' });
   const { type, id, returnTo } = req.body || {};
   const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
   try {
@@ -25,6 +29,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('purchases/checkout error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: 'Could not open checkout. Try again in a moment.' });
   }
 }

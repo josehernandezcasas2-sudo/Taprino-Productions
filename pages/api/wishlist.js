@@ -1,6 +1,7 @@
 import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
+import { checkRateLimit } from '../../lib/rateLimit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -19,6 +20,11 @@ export default async function handler(req, res) {
   const customerId = await getStripeCustomerIdFromRequest(req);
   if (!customerId) {
     return res.status(401).json({ error: 'Not signed in.' });
+  }
+  // My List lives in Stripe customer metadata: two Stripe calls a tap on
+  // the account's shared quota (security round, 2026-10-26).
+  if (!(await checkRateLimit(`wishlist:${customerId}`, 30, 60))) {
+    return res.status(429).json({ error: 'Slow down a little.' });
   }
 
   const { episodeId, action } = req.body || {};

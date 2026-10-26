@@ -54,6 +54,25 @@ export default async function handler(req, res) {
         return res.status(200).json({ ok: true });
       }
       if (op === 'outcome') {
+        // Settling "worked it" / "no-show" on a secured-pay call releases
+        // or refunds real money (lib/crewPay.js), and the admin path skips
+        // the after-the-last-day gate, so on those calls it's a full
+        // admin's call (security round, 2026-10-26). A sub-admin never
+        // settles a job they posted or worked themselves.
+        if (!account.isAdmin) {
+          const supabase = getSupabase();
+          let call = null;
+          const withPay = await supabase.from('crew_calls').select('id, poster_id, pay_secured').eq('id', String(callId || '')).maybeSingle();
+          if (withPay.error && /pay_secured/.test(withPay.error.message || '')) {
+            call = (await supabase.from('crew_calls').select('id, poster_id').eq('id', String(callId || '')).maybeSingle()).data;
+          } else {
+            call = withPay.data;
+          }
+          const { data: response } = await supabase.from('crew_responses').select('id, user_id').eq('id', String(responseId || '')).eq('call_id', String(callId || '')).maybeSingle();
+          if (!call || !response) return res.status(404).json({ error: 'Not found.' });
+          if (call.pay_secured) return res.status(403).json({ error: 'This job has secured pay, so only a full admin can settle it.' });
+          if (call.poster_id === account.userId || response.user_id === account.userId) return res.status(403).json({ error: 'You can’t settle a job you’re part of.' });
+        }
         const result = await setOutcome(account.userId, callId, responseId, outcome, { isAdmin: true });
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'crew_call_outcome', targetType: 'crew_response', targetId: responseId, details: outcome });
         return res.status(200).json(result);

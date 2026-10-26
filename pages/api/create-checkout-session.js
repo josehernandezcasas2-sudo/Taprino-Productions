@@ -1,5 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
-import { getStripe, isStripeConfigured } from '../../lib/stripe';
+import { getStripe, isStripeConfigured, requestOrigin } from '../../lib/stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
 import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
@@ -29,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Stripe is not configured yet. Add STRIPE_SECRET_KEY to the environment.' });
   }
 
-  const origin = req.headers.origin || `https://${req.headers.host}`;
+  const origin = requestOrigin(req);
   const body = req.body || {};
 
   // Checkout requires being signed in first: someone who paid without an

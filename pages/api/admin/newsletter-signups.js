@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { csvCell } from '../../../lib/creatorMoneyRules';
 
 export default async function handler(req, res) {
   const { isAdmin } = await getRoleContext(req);
@@ -17,12 +18,15 @@ export default async function handler(req, res) {
     .select('email, source, synced_to_esp, created_at')
     .order('created_at', { ascending: false });
   if (error) {
-    return res.status(500).json({ error: error.message });
+    console.error('admin/newsletter-signups:', error.message);
+    return res.status(500).json({ error: 'Could not load the signups.' });
   }
 
   if (req.query.format === 'csv') {
     const header = 'email,source,synced_to_esp,created_at';
-    const rows = data.map((r) => [r.email, r.source || '', r.synced_to_esp, r.created_at].join(','));
+    // Anyone can type into the signup box, so every cell is quoted where
+    // needed and a would-be formula is neutralised (security round, 2026-10-26).
+    const rows = data.map((r) => [r.email, r.source || '', r.synced_to_esp, r.created_at].map((v) => csvCell(v)).join(','));
     const csv = [header, ...rows].join('\n');
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="newsletter-signups.csv"');

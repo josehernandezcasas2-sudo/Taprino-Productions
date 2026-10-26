@@ -48,7 +48,10 @@ export default async function handler(req, res) {
     return res.status(200).json({ ageRestricted: true, termsRequired: Boolean(data.termsRequired), requiredRating: data.requiredRating, requiredAge: data.requiredAge ?? null, isSignedIn: data.isSignedIn });
   }
 
-  const entitled = data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin || Boolean(data.purchase && data.purchase.owned);
+  // An early screening still locked for this viewer keeps its captions
+  // and transcript too, as the web page does (security round, 2026-10-26).
+  const earlyLocked = Boolean(data.earlyAccess && data.earlyAccess.locked);
+  const entitled = !earlyLocked && (data.episode.tier === 'free' || data.account.isSubscriber || data.account.isAdmin || Boolean(data.purchase && data.purchase.owned));
   return res.status(200).json({
     episode: stripForViewer(data.episode, entitled),
     isSignedIn: data.account.isSignedIn,

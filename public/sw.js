@@ -4,7 +4,28 @@
 // deliberately skips every /api/ route, so a precached copy would sit in
 // this cache and never once actually get served from it — worth
 // precaching only if that bypass rule changes.
-const CACHE_NAME = 'taprino-shell-v3';
+// v4 (security round, 2026-10-26): earlier versions stored every page
+// they fetched, private ones included (an account page, a conversation, a
+// screener), and could hand them to the next person on the same browser
+// when offline. Bumping the name deletes those caches on activation.
+const CACHE_NAME = 'taprino-shell-v4';
+
+// Only a response meant to be shared may be kept: a successful one whose
+// Cache-Control doesn't say private or no-store. Next marks every
+// server-rendered page that way by default, so in practice only static
+// pages and assets are stored.
+function shareable(response) {
+  if (!response || !response.ok || response.type !== 'basic') return false;
+  const cc = (response.headers.get('Cache-Control') || '').toLowerCase();
+  return !/(^|,|\s)(private|no-store)(,|\s|$)/.test(cc);
+}
+
+// The page asks for this on sign-out (pages/_app.js).
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'clear-cache') {
+    event.waitUntil(caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))));
+  }
+});
 const SHELL_ASSETS = ['/icon.svg'];
 
 self.addEventListener('install', (event) => {
@@ -48,8 +69,8 @@ self.addEventListener('fetch', (event) => {
   // /_next/data/<old-build-id>/... which 404s once that build is gone.
   // Cache is still written here, so it remains available as an offline
   // fallback; it's just no longer preferred over a working network.
-  const isPageOrData =
-    event.request.mode === 'navigate' || url.pathname.startsWith('/_next/data/');
+  const isData = url.pathname.startsWith('/_next/data/');
+  const isPageOrData = event.request.mode === 'navigate' || isData;
 
   // The Cache API only ever supports http/https requests. Browser
   // extensions (password managers, wallets, and similar) commonly inject
@@ -68,7 +89,9 @@ self.addEventListener('fetch', (event) => {
         .then((networkResponse) => {
           // Clone BEFORE handing the response back — see the note in the
           // cache-first branch below for why the ordering matters.
-          if (isCacheable) {
+          // A page's data file carries that viewer's props, so it is
+          // never stored; a page only when it is meant to be shared.
+          if (isCacheable && !isData && shareable(networkResponse)) {
             const copy = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           }
@@ -109,7 +132,7 @@ self.addEventListener('fetch', (event) => {
         // response had often already been consumed by the browser, throwing
         // "Failed to execute 'clone' on 'Response': Response body is already
         // used" on essentially every request.
-        if (isCacheable) {
+        if (isCacheable && shareable(networkResponse)) {
           const copy = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
         }

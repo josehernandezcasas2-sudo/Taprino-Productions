@@ -15,6 +15,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET');
     return res.status(405).json({ error: 'Method not allowed' });
   }
+  // One person's bell: never stored by a shared cache.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
   const { userId } = await getRoleContext(req);
   if (!userId) {

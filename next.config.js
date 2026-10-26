@@ -25,9 +25,10 @@ const nextConfig = {
   // Vercel's HSTS): no MIME sniffing, no framing by other sites, referrers
   // trimmed on cross-origin requests, and the powerful device APIs this
   // site doesn't use switched off — geolocation stays on for the working
-  // card's "use my location" (components/crew/PlaceSearch.js). No CSP yet:
-  // the inline theme <style>, Clerk, Stripe, Cloudflare and the ad SDK
-  // would each need allow-listing, and a wrong CSP breaks playback.
+  // card's "use my location" (components/crew/PlaceSearch.js). No full CSP
+  // yet (only the safe parts below): the inline theme <style>, Clerk,
+  // Stripe, Cloudflare and the ad SDK would each need allow-listing for
+  // scripts and styles, and a wrong CSP breaks playback.
   //
   // The TDM-Reservation / TDM-Policy / Content-Usage trio (lib/robotsRules.js)
   // is the machine-readable "not for text-and-data mining or AI training"
@@ -41,6 +42,14 @@ const nextConfig = {
         headers: [
           { key: 'X-Content-Type-Options', value: 'nosniff' },
           { key: 'X-Frame-Options', value: 'SAMEORIGIN' },
+          // Security round (2026-10-26): HTTPS remembered for two years
+          // (Vercel sends this too; stating it keeps it if the host
+          // changes), and the parts of a CSP that can't break playback,
+          // Clerk, Stripe or the ad SDK: no plugins, no <base> hijack, no
+          // framing by other sites. Script and style sources stay open
+          // until a full CSP is worked out.
+          { key: 'Strict-Transport-Security', value: 'max-age=63072000' },
+          { key: 'Content-Security-Policy', value: "object-src 'none'; base-uri 'self'; frame-ancestors 'self'" },
           { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
           { key: 'Permissions-Policy', value: 'camera=(), microphone=(), geolocation=(self)' },
           { key: 'TDM-Reservation', value: '1' },

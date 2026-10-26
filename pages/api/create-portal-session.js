@@ -1,6 +1,8 @@
 import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
+import { requestOrigin } from '../../lib/stripe';
+import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
@@ -16,6 +18,11 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
+  // Each call is a couple of Stripe requests on the account's shared
+  // quota (security round, 2026-10-26).
+  if (!(await checkRateLimit(rateLimitKeyForRequest(req, 'portal-session'), 20, 3600))) {
+    return res.status(429).json({ error: 'Try again in a little while.' });
+  }
   const customerId = await getStripeCustomerIdFromRequest(req);
   if (!customerId) {
     return res.status(401).json({ error: 'Not signed in.' });
@@ -25,7 +32,7 @@ export default async function handler(req, res) {
   // domain, not anything the mobile client can usefully return to — the
   // portal's "return" link just opens the website in a browser, which is
   // a reasonable fallback rather than something that needs its own path.
-  const origin = req.headers.origin || `https://${req.headers.host}`;
+  const origin = requestOrigin(req);
 
   try {
     const session = await stripe.billingPortal.sessions.create({
@@ -38,6 +45,7 @@ export default async function handler(req, res) {
     // configured yet for this account. Fix at
     // https://dashboard.stripe.com/test/settings/billing/portal — save once
     // with defaults, then this works.
-    res.status(500).json({ error: err.message });
+    console.error('create-portal-session:', err.message);
+    res.status(500).json({ error: 'Could not open the billing page. Try again in a moment.' });
   }
 }
