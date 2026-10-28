@@ -87,3 +87,114 @@ export function ShieldIcon({ size = 20, color = '#fbe8d3' }) {
     </Svg>
   );
 }
+
+// The account dropdown's row icons (TopNav's account panel), the same
+// paths as PlayerIcons.js on the website.
+export function SettingsIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="3" />
+      <Path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    </Svg>
+  );
+}
+
+export function LockIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="4" y="11" width="16" height="10" rx="2" />
+      <Path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </Svg>
+  );
+}
+
+// The filled heart (the website's HeartIcon with active).
+export function HeartIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M12 21s-6.7-4.35-9.33-8.2C.86 10.1 1.3 6.6 4.1 4.9a5.4 5.4 0 0 1 7.1 1.2 5.4 5.4 0 0 1 7.1-1.2c2.8 1.7 3.24 5.2 1.43 7.9C18.7 16.65 12 21 12 21z" />
+    </Svg>
+  );
+}
+
+export function ChatIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M4 5.5h16v11H9l-4 3.5v-3.5H4z" />
+    </Svg>
+  );
+}
+
+export function SparkleIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
+      <Path d="M12 2l1.8 5.7L19.5 9.5 13.8 11.3 12 17l-1.8-5.7L4.5 9.5l5.7-1.8z" />
+    </Svg>
+  );
+}
+
+export function TargetIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="8.5" />
+      <Circle cx="12" cy="12" r="4.5" />
+      <Circle cx="12" cy="12" r="0.7" fill={color} />
+    </Svg>
+  );
+}
+
+export function CardIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="2.5" y="5.5" width="19" height="13" rx="2" />
+      <Path d="M2.5 10h19" />
+    </Svg>
+  );
+}
+
+export function BarChartIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M5 20V10" />
+      <Path d="M12 20V4" />
+      <Path d="M19 20v-7" />
+    </Svg>
+  );
+}
+
+export function ClapperboardIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M3 8.5l1.4-3.1a1.5 1.5 0 0 1 2-.7l13 5.9a1.5 1.5 0 0 1 .7 2l-.6 1.4H3z" />
+      <Rect x="3" y="10.5" width="18" height="9" rx="1.5" />
+      <Path d="M8 8l2-4.4M13 9.5l2-4.4" />
+    </Svg>
+  );
+}
+
+export function FolderIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5h4.7l2 2.2H19.5A1.5 1.5 0 0 1 21 8.7v9.3a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18V6.5z" />
+    </Svg>
+  );
+}
+
+export function LogoutIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M15 4H6.5A1.5 1.5 0 0 0 5 5.5v13A1.5 1.5 0 0 0 6.5 20H15" />
+      <Path d="M10 12h11" />
+      <Path d="M17 8l4 4-4 4" />
+    </Svg>
+  );
+}
+
+export function ArrowRightIcon({ size = 15, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M4 12h16" />
+      <Path d="M13 5l7 7-7 7" />
+    </Svg>
+  );
+}

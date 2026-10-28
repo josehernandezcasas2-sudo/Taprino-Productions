@@ -2,13 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
-import { apiGet } from '../lib/api';
+import { apiGet, absoluteUrl, freshToken } from '../lib/api';
 import { colors, fonts, inkTint, oliveTint, absoluteFill } from '../lib/theme';
-import { SearchIcon, AccountIcon, BellIcon, MenuIcon } from './TabBarIcons';
+import {
+  SearchIcon, AccountIcon, BellIcon, MenuIcon, SettingsIcon, LockIcon, HeartIcon, ChatIcon, SparkleIcon, TargetIcon,
+  CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon
+} from './TabBarIcons';
 import PositionedImage from './PositionedImage';
 import { rememberStayInStream } from '../lib/stayInStream';
 import { useNotifications } from '../lib/useUnread';
+import { useAdminRole, clearAdminRoleCache } from '../lib/adminRole';
 import { hrefToRoute } from './PushListener';
+
+// lib/siteConfig.js SITE.premiumTier on the website.
+const PREMIUM_TIER = 'Tapa +';
 
 // The mobile routes that count as the Stream half of the site — the same
 // pages lib/streamSection.js's isStreamPath() marks on the website, mapped
@@ -90,6 +97,19 @@ function loadGenres() {
   return genresPromise;
 }
 
+// The plan line in the account panel ("Tapa + member" / "Free account"):
+// /api/account/dashboard-info, at most once a minute, asked when the
+// panel opens so a membership bought a moment ago shows.
+let membershipCache = { at: 0, isSubscriber: false, tier: null };
+async function loadMembership(getToken) {
+  if (Date.now() - membershipCache.at < 60000) return membershipCache;
+  const token = await freshToken(getToken);
+  if (!token) return membershipCache;
+  const info = await apiGet('/api/account/dashboard-info', token).catch(() => null);
+  if (info) membershipCache = { at: Date.now(), isSubscriber: Boolean(info.isSubscriber), tier: info.tier || null };
+  return membershipCache;
+}
+
 // The branded header on every screen that's a direct bottom-nav
 // destination (detail screens keep Expo Router's back-button header).
 // It is the website's phone header (components/HeaderNav.js at ≤1180px,
@@ -101,23 +121,28 @@ function loadGenres() {
 // button, the bell with its unread count that opens the notifications
 // panel (the site's .notification-dropdown, mark read / mark all read,
 // a tap opens what the notification points at), and the account photo.
-// Both panels live in one transparent Modal placed just under the bar,
-// so they sit above every screen and BottomNav the way the website's
-// dropdowns do. The brand tap goes home, or straight to Stream for an
-// account with "Here only for the stream?" turned on.
+// The photo opens the site's account dropdown (`.account-dropdown`: who
+// you are and your plan, then every account, creator and admin row the
+// website lists, and Sign Out; signed out, Log in / My Wishlist / Become
+// a creator). All three panels live in one transparent Modal placed just
+// under the bar, so they sit above every screen and BottomNav the way
+// the website's dropdowns do. The brand tap goes home, or straight to
+// Stream for an account with "Here only for the stream?" turned on.
 export default function TopNav() {
   const router = useRouter();
   const pathname = usePathname();
   const { isSignedIn, user } = useUser();
-  const { getToken } = useAuth();
-  const { width: windowWidth } = useWindowDimensions();
+  const { getToken, signOut } = useAuth();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const [settings, setSettings] = useState(settingsCache);
   const [ownProfile, setOwnProfile] = useState(ownProfileCache);
   const [genres, setGenres] = useState(genresCache || []);
-  const [panel, setPanel] = useState(null); // 'menu' | 'bell' | null
+  const [membership, setMembership] = useState(null);
+  const [panel, setPanel] = useState(null); // 'menu' | 'bell' | 'account' | null
   const [anchorTop, setAnchorTop] = useState(0);
   const barRef = useRef(null);
   const { notifications, unreadCount, messagesUnread, markRead, markAllRead } = useNotifications();
+  const role = useAdminRole();
 
   useEffect(() => {
     let cancelled = false;
@@ -131,7 +156,7 @@ export default function TopNav() {
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn) { ownProfileCache = null; setOwnProfile(null); return undefined; }
+    if (!isSignedIn) { ownProfileCache = null; setOwnProfile(null); membershipCache = { at: 0, isSubscriber: false, tier: null }; setMembership(null); return undefined; }
     if (ownProfileCache) { setOwnProfile(ownProfileCache); return undefined; }
     let cancelled = false;
     (async () => {
@@ -163,9 +188,18 @@ export default function TopNav() {
     return () => { cancelled = true; };
   }, [panel, stream]);
 
-  const avatarLetter = isSignedIn && user && user.primaryEmailAddress
-    ? user.primaryEmailAddress.emailAddress[0].toUpperCase()
-    : null;
+  // The plan line, asked for when the account panel opens.
+  useEffect(() => {
+    if (panel !== 'account' || !isSignedIn) return undefined;
+    let cancelled = false;
+    loadMembership(getToken).then((m) => { if (!cancelled) setMembership(m); });
+    return () => { cancelled = true; };
+  }, [panel, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const email = isSignedIn && user && user.primaryEmailAddress ? user.primaryEmailAddress.emailAddress : null;
+  const avatarLetter = email ? email[0].toUpperCase() : null;
+  const profileHref = isSignedIn ? ownProfileHref(ownProfile) : null;
+  const isSubscriber = Boolean(membership && membership.isSubscriber);
 
   function openPanel(which) {
     if (panel === which) { setPanel(null); return; }
@@ -183,6 +217,11 @@ export default function TopNav() {
   function go(href) {
     setPanel(null);
     router.push(href);
+  }
+
+  function doSignOut() {
+    setPanel(null);
+    signOut().then(() => clearAdminRoleCache()).catch(() => {});
   }
 
   function openNotification(n) {
@@ -233,6 +272,8 @@ export default function TopNav() {
 
   const menuWidth = Math.min(Math.round(windowWidth * 0.86), 340);
   const bellWidth = Math.min(300, windowWidth - 32);
+  // A panel never runs off the bottom of the screen: it scrolls instead.
+  const panelMaxHeight = Math.max(240, windowHeight - anchorTop - 24);
 
   return (
     <>
@@ -262,7 +303,7 @@ export default function TopNav() {
               ) : null}
             </CircleButton>
           ) : null}
-          <Pressable style={styles.avatarBtn} onPress={() => router.push('/account')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account">
+          <Pressable style={styles.avatarBtn} onPress={() => openPanel('account')} hitSlop={8} accessibilityRole="button" accessibilityLabel="Account menu" accessibilityState={{ expanded: panel === 'account' }}>
             {isSignedIn && ownProfile && ownProfile.avatarUrl ? (
               <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
             ) : avatarLetter ? (
@@ -277,9 +318,9 @@ export default function TopNav() {
         </View>
       </View>
 
-      <HeaderPanel visible={panel !== null} onClose={() => setPanel(null)} top={anchorTop} side={panel === 'bell' ? 'right' : 'left'} width={panel === 'bell' ? bellWidth : menuWidth}>
+      <HeaderPanel visible={panel !== null} onClose={() => setPanel(null)} top={anchorTop} side={panel === 'menu' ? 'left' : 'right'} width={panel === 'menu' ? menuWidth : bellWidth}>
         {panel === 'menu' ? (
-          <ScrollView style={styles.panelScroll} contentContainerStyle={styles.panelInner} keyboardShouldPersistTaps="handled">
+          <ScrollView style={{ maxHeight: panelMaxHeight }} contentContainerStyle={styles.panelInner} keyboardShouldPersistTaps="handled">
             <Text style={styles.panelLabel}>Browse by type</Text>
             {typeLinks.map((l) => <MenuRow key={l.href} label={l.label} badge={l.badge} active={l.match} onPress={() => go(l.href)} />)}
             {extraLinks.map((l) => <MenuRow key={l.href} label={l.label} active={l.match} onPress={() => go(l.href)} />)}
@@ -300,7 +341,7 @@ export default function TopNav() {
                 <Pressable onPress={markAllRead} hitSlop={8} accessibilityRole="button"><Text style={styles.markAll}>Mark all read</Text></Pressable>
               ) : null}
             </View>
-            <ScrollView style={styles.bellScroll} keyboardShouldPersistTaps="handled">
+            <ScrollView style={{ maxHeight: Math.min(360, panelMaxHeight - 40) }} keyboardShouldPersistTaps="handled">
               {notifications.length === 0 ? (
                 <Text style={styles.bellEmpty}>Nothing yet.</Text>
               ) : notifications.map((n, i) => (
@@ -316,6 +357,77 @@ export default function TopNav() {
               ))}
             </ScrollView>
           </View>
+        ) : panel === 'account' ? (
+          <ScrollView style={{ maxHeight: panelMaxHeight }} contentContainerStyle={styles.panelInner} keyboardShouldPersistTaps="handled">
+            {isSignedIn ? (
+              <>
+                <Pressable
+                  style={({ pressed }) => [styles.accountHead, profileHref && pressed && styles.rowPressed]}
+                  onPress={profileHref ? () => go(profileHref) : undefined}
+                  disabled={!profileHref}
+                  accessibilityRole="button"
+                  accessibilityLabel={profileHref ? 'View public profile' : undefined}
+                >
+                  <View style={styles.accountAvatar}>
+                    {ownProfile && ownProfile.avatarUrl ? (
+                      <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
+                    ) : avatarLetter ? (
+                      <Text style={styles.accountAvatarText}>{avatarLetter}</Text>
+                    ) : (
+                      <AccountIcon size={20} color={colors.inkDim} />
+                    )}
+                  </View>
+                  <View style={styles.accountWho}>
+                    <Text style={styles.accountEmail}>{email || 'Your account'}</Text>
+                    {membership ? <Text style={styles.accountTier}>{isSubscriber ? `${PREMIUM_TIER} member` : 'Free account'}</Text> : null}
+                  </View>
+                </Pressable>
+                <View style={styles.panelDivider} />
+                <MenuRow Icon={SettingsIcon} label="Account Settings" onPress={() => go('/account')} />
+                {profileHref ? <MenuRow Icon={AccountIcon} label="View public profile" onPress={() => go(profileHref)} /> : null}
+                {role.canAccessAdmin ? <MenuRow Icon={LockIcon} label="Admin Portal" onPress={() => go('/admin')} /> : null}
+                <MenuRow Icon={HeartIcon} label="My Wishlist" onPress={() => go('/account/wishlist')} />
+                <MenuRow Icon={AccountIcon} label="My working card" onPress={() => go('/crew/card')} />
+                <MenuRow Icon={AccountIcon} label="My locations" onPress={() => go('/locations/mine')} />
+                <MenuRow Icon={AccountIcon} label="Location requests" onPress={() => go('/locations/requests')} />
+                <MenuRow Icon={AccountIcon} label="My productions" onPress={() => go('/productions')} />
+                <MenuRow Icon={ChatIcon} label="Messages" badge={messagesUnread} onPress={() => go('/messages')} />
+                <MenuRow Icon={SparkleIcon} label="My Recs" onPress={() => go('/recs')} />
+                {settings && settings.elevatorPitchEnabled ? <MenuRow Icon={TargetIcon} label="Pitch Room" onPress={() => go('/pitches')} /> : null}
+                {/* The Account screen's Membership card does the right thing
+                    for everyone: plan picker, Manage subscription for a
+                    paying member, the free-access note for the team. */}
+                <MenuRow Icon={isSubscriber ? CardIcon : SparkleIcon} label={isSubscriber ? 'Membership' : `Join ${PREMIUM_TIER}`} onPress={() => go('/account?section=membership')} />
+                {role.isCreator ? <View style={styles.panelDivider} /> : null}
+                {role.isCreator ? <MenuRow Icon={BarChartIcon} label="Your numbers" onPress={() => go('/creator/numbers')} /> : null}
+                {role.isCreator || role.isAdmin ? (
+                  <>
+                    <MenuRow Icon={CardIcon} label="Money" onPress={() => go('/creator/money')} />
+                    <View style={styles.panelDivider} />
+                    {/* Episode uploads are the website's (a browser TUS
+                        upload), so this one opens the site. */}
+                    <MenuRow Icon={ClapperboardIcon} label="Submit your work" onPress={() => { setPanel(null); Linking.openURL(absoluteUrl('/creator')).catch(() => {}); }} />
+                    <MenuRow Icon={FolderIcon} label="Your work" onPress={() => go('/account/my-work')} />
+                  </>
+                ) : (
+                  <>
+                    <View style={styles.panelDivider} />
+                    <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />
+                  </>
+                )}
+                <View style={styles.panelDivider} />
+                <MenuRow Icon={LogoutIcon} label="Sign Out" onPress={doSignOut} />
+              </>
+            ) : (
+              <>
+                <Text style={styles.panelLabel}>Account</Text>
+                <MenuRow Icon={ArrowRightIcon} label="Log in / Create account" onPress={() => go('/account')} />
+                <MenuRow Icon={HeartIcon} label="My Wishlist" onPress={() => go('/account/wishlist')} />
+                <View style={styles.panelDivider} />
+                <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />
+              </>
+            )}
+          </ScrollView>
         ) : null}
       </HeaderPanel>
     </>
@@ -339,9 +451,12 @@ function CircleButton({ label, active, onPress, children }) {
   );
 }
 
-function MenuRow({ label, badge, active, onPress }) {
+// .dropdown-item: an optional 15px icon (the account panel's rows), the
+// label, gold when it is the screen we are on, the Messages count.
+function MenuRow({ Icon, label, badge, active, onPress }) {
   return (
     <Pressable style={({ pressed }) => [styles.menuRow, pressed && styles.rowPressed]} onPress={onPress} accessibilityRole="button">
+      {Icon ? <Icon size={15} color={active ? colors.olive : colors.ink} /> : null}
       <Text style={[styles.menuRowText, active && styles.menuRowActive]}>
         {label}{badge > 0 ? <Text style={styles.menuRowBadge}>{`  ${badge > 9 ? '9+' : badge}`}</Text> : null}
       </Text>
@@ -418,21 +533,26 @@ const styles = StyleSheet.create({
     shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 34, shadowOffset: { width: 0, height: 16 }, elevation: 16,
     overflow: 'hidden'
   },
-  panelScroll: { maxHeight: 420 },
   panelInner: { padding: 8 },
   // .dropdown-label
   panelLabel: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint, paddingHorizontal: 10, paddingTop: 6, paddingBottom: 5 },
   panelDivider: { height: 1, backgroundColor: inkTint(0.1), marginVertical: 6, marginHorizontal: 3 },
   // .dropdown-item, .dropdown-item.active-cat
-  menuRow: { paddingVertical: 9, paddingHorizontal: 10, borderRadius: 5 },
+  menuRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 9, paddingHorizontal: 10, borderRadius: 5 },
   rowPressed: { backgroundColor: inkTint(0.06) },
-  menuRowText: { fontFamily: fonts.body, fontSize: 13.6, color: colors.ink },
+  menuRowText: { flexShrink: 1, fontFamily: fonts.body, fontSize: 13.6, color: colors.ink },
   menuRowActive: { color: colors.olive },
   menuRowBadge: { fontFamily: fonts.mono, fontSize: 11, color: colors.brass },
+  // .account-dropdown-header / -avatar (38px, void fill) / -email / -tier
+  accountHead: { flexDirection: 'row', alignItems: 'center', gap: 11, paddingVertical: 8, paddingHorizontal: 6, borderRadius: 6 },
+  accountAvatar: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.surface0, borderWidth: 1, borderColor: inkTint(0.16), alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  accountAvatarText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.inkDim },
+  accountWho: { flex: 1, minWidth: 0 },
+  accountEmail: { fontFamily: fonts.body, fontSize: 13.6, lineHeight: 18, color: colors.ink },
+  accountTier: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.5, color: colors.olive, marginTop: 2 },
   // .notification-dropdown (300px, scrolls at 360px), .notification-item
   bellHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 8, paddingTop: 8, paddingRight: 14 },
   markAll: { fontFamily: fonts.mono, fontSize: 10.9, color: colors.olive },
-  bellScroll: { maxHeight: 360 },
   bellEmpty: { fontFamily: fonts.body, fontSize: 13.6, color: colors.ink, paddingHorizontal: 18, paddingVertical: 12 },
   noteRow: { paddingVertical: 10, paddingHorizontal: 14 },
   noteRowBorder: { borderTopWidth: 1, borderTopColor: inkTint(0.08) },
