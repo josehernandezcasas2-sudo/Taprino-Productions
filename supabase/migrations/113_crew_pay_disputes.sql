@@ -4,7 +4,8 @@
 -- destination), so a dispute from the poster's bank pulls the money from
 -- the studio. lib/paymentDisputes.js now knows the table:
 --   held      → 'disputed' while the bank decides (nothing can be released);
---               won → back to 'held'; lost → 'refunded' with the bank's reason.
+--               won → back to 'held'; lost → stays 'disputed', marked lost
+--               (the bank's debit is what Studio money counts, never a refund).
 --   released  → the worker was already paid: the dispute is recorded and
 --               the admin emailed; nothing is taken back automatically.
 -- Same columns as the other disputed tables (migration 096).
