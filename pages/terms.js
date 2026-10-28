@@ -5,6 +5,7 @@ import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
 import { getShareSettings } from '../lib/artistSupport';
 import { dollars } from '../lib/artistSupportRules';
 import { getTipSettings } from '../lib/tips';
+import { getSiteSettings } from '../lib/siteSettings';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -34,12 +35,14 @@ export async function getServerSideProps({ req, res }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const [account, episodes, share, tipSettings] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null), getTipSettings().catch(() => null)]);
+  const [account, episodes, share, tipSettings, siteSettings] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null), getTipSettings().catch(() => null), getSiteSettings().catch(() => null)]);
   return {
     props: {
       // Section 16 (Tips) reads the studio's cut and its cap live from Settings.
       tipCutPercent: tipSettings ? tipSettings.cutPercent : 5,
       tipCutMaxCents: tipSettings ? tipSettings.cutMaxCents : 10000,
+      // Section 14's Secured pay paragraph reads the crew pay fee the same way.
+      crewPayCutPercent: siteSettings && Number.isFinite(Number(siteSettings.crewPayCutPercent)) ? Number(siteSettings.crewPayCutPercent) : 8,
       // The Creator Share numbers in sections 4 and 5 are whatever
       // /admin/creator-money has in force, plus any change it scheduled.
       share: share ? {
@@ -65,13 +68,13 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-10-25';
+const TEXT_UPDATED = '2026-10-28';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
 const bonusSpan = (m) => (Number(m) > 0 ? `during its first ${m} months` : 'for as long as that membership lasts');
 
-export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCents = 10000 }) {
+export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCents = 10000, crewPayCutPercent = 8 }) {
   const n = share || FALLBACK_SHARE;
   const next = share && share.scheduled ? share.scheduled.numbers : null;
   const updated = [TEXT_UPDATED, share && share.changedAt, share && share.scheduled && share.scheduled.setAt].filter(Boolean).sort().pop();
@@ -374,6 +377,21 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         act on it. You can mute or block anyone. Harassment, spam, scams, and soliciting anything illegal get
         the account removed. Only your city or neighborhood is shown on your card and calls; your exact
         location is used for distance and never shown.
+      </p>
+      <p id="secured-pay">
+        <strong>Secured pay.</strong> A poster can choose to secure a call&rsquo;s pay through {SITE.name}. The
+        poster then pays the posted rate for each person they book, plus our {crewPayCutPercent}% service fee
+        and the card processing fee on top, so the crew member receives exactly the posted rate. We hold the
+        money until the poster confirms the person worked the job, then send the rate to that person&rsquo;s
+        payout account; if the poster says the person didn&rsquo;t show, the poster gets everything back, and
+        if the booking is cancelled the poster gets everything back except the card fee. Once anyone on a call
+        is funded, the rate and fee are fixed for that call. A poster who disputes a secured payment with
+        their bank puts the pay on hold until the bank rules; money already sent to a crew member after the
+        poster confirmed the work is not taken back by us. Securing pay doesn&rsquo;t make us a party to the
+        job: who is hired, how the work goes and whether it was done are between the poster and the crew
+        member, and a disagreement about the work is settled between them, with us only holding or releasing
+        the money as described here. The fee is set on our Settings page and shown before the poster pays;
+        a change applies to calls funded after it.
       </p>
 
       <h2 id="buying">15. Buying a title</h2>
