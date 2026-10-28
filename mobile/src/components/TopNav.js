@@ -4,7 +4,7 @@ import { usePathname, useRouter } from 'expo-router';
 import { useAuth, useUser } from '@clerk/expo';
 import { apiGet } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
-import { SearchIcon } from './TabBarIcons';
+import { SearchIcon, AccountIcon } from './TabBarIcons';
 import PositionedImage from './PositionedImage';
 import { rememberStayInStream } from '../lib/stayInStream';
 
@@ -145,8 +145,13 @@ export default function TopNav() {
         <Pressable style={styles.avatarBtn} onPress={() => router.push('/account')} hitSlop={8}>
           {isSignedIn && ownProfile && ownProfile.avatarUrl ? (
             <PositionedImage uri={ownProfile.avatarUrl} position={ownProfile.avatarPosition} zoom={ownProfile.avatarZoom || 1} style={styles.avatarImg} />
+          ) : avatarLetter ? (
+            <Text style={styles.avatarText}>{avatarLetter}</Text>
           ) : (
-            <Text style={styles.avatarText}>{avatarLetter || '☺'}</Text>
+            // Signed out (or Clerk still loading): the same person glyph the
+            // tab bar's Account tab uses — a "☺" here came out as an emoji
+            // on iOS (Jose, 2026-10-28).
+            <AccountIcon size={17} color={colors.onBrass} />
           )}
         </Pressable>
       </View>
