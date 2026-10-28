@@ -338,8 +338,8 @@ button { font-family: inherit; cursor: pointer; }
    by genre/series/wishlist/type, which are pure card-grid browsing pages
    with no long-form text to protect, unlike .stage which legal pages also
    share. */
-.library-stage { max-width: none; margin: 0; padding: 1.6rem 2.4rem 5rem; }
-@media (max-width: 640px) { .library-stage { padding-left: 1.2rem; padding-right: 1.2rem; } }
+.library-stage { max-width: none; margin: 0; padding: 1.6rem 2.4rem 5rem; --stage-gutter: 2.4rem; }
+@media (max-width: 640px) { .library-stage { padding-left: 1.2rem; padding-right: 1.2rem; --stage-gutter: 1.2rem; } }
 .library-back {
   display: inline-block;
   background: transparent;
@@ -569,6 +569,9 @@ button { font-family: inherit; cursor: pointer; }
   max-width: 1180px;
   margin: 0 auto;
   padding: 2.4rem 1.5rem 3rem;
+  /* The side gutter, for children that bleed into it (.cat-row-track):
+     kept in step with padding-left/right here and in .stage-wide. */
+  --stage-gutter: 1.5rem;
   display: grid;
   grid-template-columns: 1fr 320px;
   gap: 2.4rem;
@@ -590,8 +593,8 @@ button { font-family: inherit; cursor: pointer; }
    page (via LegalLayout) and several admin tool pages, where a very wide
    column would hurt paragraph readability and stretch forms/tables
    uncomfortably rather than help anything. */
-.stage-wide { max-width: none; padding-left: 2.4rem; padding-right: 2.4rem; }
-@media (max-width: 640px) { .stage-wide { padding-left: 1.2rem; padding-right: 1.2rem; } }
+.stage-wide { max-width: none; padding-left: 2.4rem; padding-right: 2.4rem; --stage-gutter: 2.4rem; }
+@media (max-width: 640px) { .stage-wide { padding-left: 1.2rem; padding-right: 1.2rem; --stage-gutter: 1.2rem; } }
 
 .stage-single {
   grid-template-columns: 1fr;
@@ -1152,15 +1155,22 @@ button { font-family: inherit; cursor: pointer; }
      30px covers both scale(1.07)'s own growth (~6-7px at this card
      width) and the "0 14px 30px" hover shadow's blur radius, so neither
      gets clipped even at full opacity. */
-  padding-left: calc(0.3rem + 30px);
-  margin-left: -30px;
+  /* …but never more than the page's own gutter (--stage-gutter on .stage):
+     on a phone the gutter is 1.2rem, and a fixed 30px pushed the track
+     11px past the screen edge, so every Stream page scrolled sideways
+     (found by the 2026-10-28 phone sweep). The bleed still reaches the
+     screen edge exactly; the hover room only matters where there is a
+     pointer anyway. */
+  --row-bleed: min(30px, var(--stage-gutter, 30px));
+  padding-left: calc(0.3rem + var(--row-bleed));
+  margin-left: calc(var(--row-bleed) * -1);
   /* Mirrors padding-left/margin-left exactly, for the same two reasons:
      room for the last card's hover-grow, and — combined with
      scroll-padding-right below — somewhere for a card to bleed into as
      it scrolls past the right edge instead of being hard-sliced by
      overflow-x the instant it crosses the gutter. */
-  padding-right: calc(0.3rem + 30px);
-  margin-right: -30px;
+  padding-right: calc(0.3rem + var(--row-bleed));
+  margin-right: calc(var(--row-bleed) * -1);
   /* Without this, mandatory scroll-snap below (touch devices) silently
      cancels the gutter above: a snap-align:start card is defined as
      "snapped" once its own edge reaches the scrollport's edge, which
@@ -1171,8 +1181,8 @@ button { font-family: inherit; cursor: pointer; }
      scroller's edge actually is for alignment purposes, matching this
      rule's own padding-left/-right exactly so both resting positions are
      themselves valid, respected snap positions. */
-  scroll-padding-left: calc(0.3rem + 30px);
-  scroll-padding-right: calc(0.3rem + 30px);
+  scroll-padding-left: calc(0.3rem + var(--row-bleed));
+  scroll-padding-right: calc(0.3rem + var(--row-bleed));
   scroll-behavior: smooth;
   /* overflow-x:auto shows a persistent native scrollbar under the row on
      any mouse-driven browser (desktop Chrome/Edge/Firefox don't
@@ -6782,7 +6792,10 @@ body:has(.mini-player) { padding-bottom: 72px; }
   font-weight: 700;
   margin: 0 auto 1rem;
 }
-.profile-name-row { display: flex; align-items: center; justify-content: center; gap: 0.6rem; }
+/* Wraps: the name, the member badge and the "Not for AI training" chip
+   don't fit one line on a phone, and the chip was running 97px past the
+   screen edge (found by the 2026-10-28 phone sweep). */
+.profile-name-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 0.4rem 0.6rem; min-width: 0; }
 .profile-name { font-family: var(--font-display); font-size: 1.4rem; margin: 0 0 0.3rem; }
 .profile-name-row .profile-name { margin-bottom: 0; }
 .profile-joined { font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); margin: 0.4rem 0 0.8rem; }
@@ -9534,6 +9547,9 @@ a.crew-credit:hover { background: var(--surface-3); }
 @media (max-width: 900px) {
   .dm-inbox { grid-template-columns: 1fr; min-height: 0; }
   .dm-inbox.has-convo .dm-threads { display: none; }
+  /* And the other way round: with no conversation open a phone showed
+     the empty "Pick a conversation" panel under the list (2026-10-28). */
+  .dm-pick { display: none; }
   .dm-back { display: inline-flex; }
   .dm-convo { min-height: 60vh; }
   .dm-msgs { max-height: none; }
