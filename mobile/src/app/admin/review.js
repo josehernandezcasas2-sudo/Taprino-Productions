@@ -7,6 +7,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
+import { useCaptureBlock } from '../../lib/captureBlock';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
@@ -152,6 +153,9 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
   }, [item.id]);
 
   const player = useVideoPlayer(previewSrc || null, (p) => { p.loop = false; });
+  // Unreleased work plays here: no screenshots or recordings, like every
+  // other player in the app (2026-10-28).
+  useCaptureBlock(Boolean(previewSrc));
 
   // Swipe left = skip. Kept simple: translate while dragging, snap back
   // or fly off.

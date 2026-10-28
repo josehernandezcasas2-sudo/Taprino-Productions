@@ -108,6 +108,24 @@ export async function disablePush(getToken) {
   return { ok: true };
 }
 
+// On sign-out (lib/signOut.js): the token stops belonging to this account
+// — the server row goes while the session still exists — and the
+// preference returns to "never asked", so the next person on this phone
+// gets the card rather than the last account's choice. Until 2026-10-28
+// nothing did this, and a signed-out phone kept receiving the old
+// account's pushes.
+export async function forgetPushOnSignOut(getToken) {
+  const token = await read(TOKEN_KEY);
+  if (token) {
+    try {
+      const session = await freshToken(getToken);
+      if (session) await apiPost('/api/push/unregister', { token }, session);
+    } catch { /* the server disables dead tokens on its own */ }
+  }
+  await write(TOKEN_KEY, '');
+  await write(PREF_KEY, '');
+}
+
 // On a signed-in start: keep the token fresh (tokens rotate; the row's
 // last_seen_at moves). Quiet: nothing is asked.
 export async function refreshPushRegistration(getToken) {

@@ -11,7 +11,8 @@ import {
 import PositionedImage from './PositionedImage';
 import { rememberStayInStream } from '../lib/stayInStream';
 import { useNotifications } from '../lib/useUnread';
-import { useAdminRole, clearAdminRoleCache } from '../lib/adminRole';
+import { useAdminRole } from '../lib/adminRole';
+import { signOutEverywhere } from '../lib/signOut';
 import { hrefToRoute } from './PushListener';
 
 // lib/siteConfig.js SITE.premiumTier on the website.
@@ -221,7 +222,7 @@ export default function TopNav() {
 
   function doSignOut() {
     setPanel(null);
-    signOut().then(() => clearAdminRoleCache()).catch(() => {});
+    signOutEverywhere(signOut, getToken).catch(() => {});
   }
 
   function openNotification(n) {

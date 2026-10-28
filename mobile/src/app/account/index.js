@@ -13,6 +13,7 @@ import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { hostedAuthParams } from '../../lib/hostedAuth';
+import { signOutEverywhere } from '../../lib/signOut';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
@@ -479,7 +480,7 @@ export default function Account() {
           <Pressable style={styles.primaryBtn} onPress={() => { setDashboard(null); loadAll(); }}>
             <Text style={styles.primaryBtnText}>Retry</Text>
           </Pressable>
-          <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => signOut()}>
+          <Pressable style={[styles.secondaryBtn, { marginTop: 10 }]} onPress={() => signOutEverywhere(signOut, getToken).catch(() => {})}>
             <Text style={styles.secondaryBtnText}>Log out</Text>
           </Pressable>
         </View>
@@ -916,7 +917,7 @@ export default function Account() {
         <View style={[styles.card, styles.cardDanger]}>
           <Text style={[styles.subheading, { color: colors.danger }]}>Danger zone</Text>
           <Row label="Log out" detail="Sign out of Studio Tapa TV on this device.">
-            <Pressable style={styles.btnSmall} onPress={() => signOut()}>
+            <Pressable style={styles.btnSmall} onPress={() => signOutEverywhere(signOut, getToken).catch(() => {})}>
               <Text style={styles.btnSmallText}>Log out</Text>
             </Pressable>
           </Row>

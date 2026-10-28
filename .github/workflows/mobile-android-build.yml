@@ -10,6 +10,11 @@
 # key, pasted whole). Steps and store listing: mobile/PLAY_STORE.md.
 name: Mobile · Android build
 
+# The job needs nothing from GitHub beyond the checkout; EAS and Play are
+# reached with their own secrets. Never the default write token.
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
     inputs:
@@ -46,7 +51,8 @@ jobs:
       - name: EAS CLI
         uses: expo/expo-github-action@v8
         with:
-          eas-version: latest
+          # Pinned (2026-10-28), same reason as mobile-update.yml.
+          eas-version: 27.1.0
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Install

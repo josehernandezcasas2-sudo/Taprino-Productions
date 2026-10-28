@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../lib/api';
 import { useSuspension, checkSuspension } from '../lib/suspension';
 import { untilLabel, gateShows, CONTACT_EMAIL } from '../lib/suspensionRules';
-import { clearSuspension } from '../lib/suspensionStore';
+import { signOutEverywhere } from '../lib/signOut';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 
 // The app's half of the bounced card (pages/suspended.js on the web;
@@ -50,7 +50,7 @@ export default function SuspendedGate() {
         <Pressable style={({ pressed }) => [styles.btn, pressed && { opacity: 0.85 }]} onPress={() => Linking.openURL(mailto)} accessibilityRole="button">
           <Text style={styles.btnText}>Email us</Text>
         </Pressable>
-        <Pressable style={({ pressed }) => [styles.btnGhost, pressed && { opacity: 0.85 }]} onPress={() => signOut().then(() => clearSuspension()).catch(() => {})} accessibilityRole="button">
+        <Pressable style={({ pressed }) => [styles.btnGhost, pressed && { opacity: 0.85 }]} onPress={() => signOutEverywhere(signOut, getToken).catch(() => {})} accessibilityRole="button">
           <Text style={styles.btnGhostText}>Sign out</Text>
         </Pressable>
       </ScrollView>

@@ -11,7 +11,14 @@
 // who you were).
 import { reportSuspension } from './suspensionStore';
 
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://www.studiotapatv.site';
+const PRODUCTION_API_URL = 'https://www.studiotapatv.site';
+const configuredApiUrl = (process.env.EXPO_PUBLIC_API_URL || '').replace(/\/$/, '');
+// A development bundle may point at a LAN address over http; a published
+// bundle (an EAS Update, a store build) never does — an override left in
+// .env.local when `eas update` runs would otherwise send every install's
+// session token to that address in cleartext (2026-10-28).
+const isDev = typeof __DEV__ !== 'undefined' && __DEV__;
+export const API_BASE_URL = configuredApiUrl && (isDev || /^https:\/\//i.test(configuredApiUrl)) ? configuredApiUrl : PRODUCTION_API_URL;
 
 // A site-relative path (a Film University file's `/api/university/file?…`
 // link, say) as something the in-app browser can open. Absolute URLs pass

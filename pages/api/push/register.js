@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { registerPushToken } from '../../../lib/push';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { token, platform, deviceName, appVersion } → { ok }: the app
 // registers (or refreshes) its Expo push token (lib/push.js, migration
@@ -22,7 +23,8 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await registerPushToken({ userId, token, platform, deviceName, appVersion }));
   } catch (err) {
-    console.error('push/register error:', err.message);
-    return res.status(400).json({ error: err.message });
+    // A bad token keeps its line (status 400 from lib/push.js); database
+    // text never reaches the app's push card.
+    return sendError(res, err, 'push/register', 'Could not register this device.');
   }
 }
