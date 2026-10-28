@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Text as SvgText } from 'react-native-svg';
 import { loadSettings } from './TopNav';
 import { API_BASE_URL } from '../lib/api';
+import { hostedAuthParams } from '../lib/hostedAuth';
 import { colors, fonts, absoluteFill, oliveTint } from '../lib/theme';
 
 // The app's half of the private beta door (pages/welcome.js on the web;
@@ -38,7 +39,7 @@ export default function PrivateBetaGate() {
     setBusy(true);
     setError(null);
     try {
-      await startHostedAuth({ mode: 'sign-in' });
+      await startHostedAuth(hostedAuthParams('sign-in'));
     } catch (err) {
       setError(err.message || 'Sign-in failed.');
     } finally {

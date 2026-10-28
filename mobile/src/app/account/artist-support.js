@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
+import { hostedAuthParams } from '../../lib/hostedAuth';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -94,7 +95,7 @@ export default function ArtistSupport() {
   async function handleStartAuth(mode) {
     setBusyAuth(true);
     try {
-      await startHostedAuth({ mode });
+      await startHostedAuth(hostedAuthParams(mode));
       load();
     } catch (err) {
       // Stay on the sign-in prompt, but say why (a cancel isn't an error:

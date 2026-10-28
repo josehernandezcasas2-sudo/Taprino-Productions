@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
+import { hostedAuthParams } from '../../lib/hostedAuth';
 import { apiGet, apiPost, apiDelete } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -55,7 +56,7 @@ export default function Wishlist() {
   async function handleStartAuth(mode) {
     setBusyMode(mode);
     try {
-      await startHostedAuth({ mode });
+      await startHostedAuth(hostedAuthParams(mode));
       load();
     } catch (err) {
       // The screen stays on the sign-in prompt; say why.

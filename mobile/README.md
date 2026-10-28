@@ -90,6 +90,23 @@ npx eas-cli@latest update --branch preview --message "first"
 (No `--environment` flag: with it, EAS CLI ignores `.env` and the bundle ships
 without the Clerk key. The workflow sources `mobile/.env` for the same reason.)
 
+**Signing in from an update.** Clerk only sends the phone back to a redirect
+address that is on the instance's allowlist. The SDK's default in Expo Go is
+the address the bundle was loaded from — the PC's LAN address on the dev
+server, the update's own address from EAS Update, a new one every publish —
+which is why sign-in from the first cloud version failed with "redirect url …
+does not match an authorized redirect URI". So in Expo Go on iOS the app pins
+one fixed address, `exp://u.expo.dev/<projectId>/--/hosted-auth-callback`
+(`mobile/src/lib/hostedAuth.js`; iOS hands the callback back by scheme, so it
+never has to be a real link). Add it **once** in the Clerk Dashboard →
+Configure → **Native applications** → the allowlist for mobile redirects; the
+old LAN entry can go. Real builds use Clerk's own defaults
+(`site.studiotapatv.app://callback` on iOS, `clerk://site.studiotapatv.app.hosted-callback`
+on Android), which Clerk registers when the app is added on that page with its
+bundle id / package name. Android Expo Go keeps the SDK's default (the OS
+really routes the link there), so it only signs in from the dev server with
+that LAN address allowlisted.
+
 Expo Go has to be on the same SDK as the app (see above); updates are plain
 JavaScript, so anything needing a native module outside Expo Go still needs a
 development build later.

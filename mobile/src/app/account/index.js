@@ -12,6 +12,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { useAuth } from '@clerk/expo';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
+import { hostedAuthParams } from '../../lib/hostedAuth';
 import { apiGet, apiPost, API_BASE_URL } from '../../lib/api';
 import { colors, fonts, absoluteFill, bannerColors, bannerGradient } from '../../lib/theme';
 import TopNav, { updateOwnProfileCache } from '../../components/TopNav';
@@ -218,7 +219,7 @@ export default function Account() {
   async function handleStartAuth(mode) {
     setBusyMode(mode);
     try {
-      await startHostedAuth({ mode });
+      await startHostedAuth(hostedAuthParams(mode));
     } catch (err) {
       Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {
