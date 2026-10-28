@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { endSale, getPricesForCreator, getPurchaseSettings, requestPrice, setSale, startSelling, stopSelling } from '../../../lib/purchases';
 import { recordAudit } from '../../../lib/auditLog';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // The creator's half of Buy to own (My Work's "Sell this title" card and
 // the app's equivalent). GET: every price of theirs plus the rules.
@@ -41,6 +42,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('creator/pricing error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'creator/pricing');
   }
 }

@@ -1,6 +1,7 @@
 import { requireAdminArea } from '../../../lib/adminAuth';
 import { recordAudit } from '../../../lib/auditLog';
 import { listPartnersForAdmin, savePartner, deletePartner } from '../../../lib/partners';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin: partners & resources (/admin/partners, migration 108). Full admins.
 //   GET    → { partners (with codes, contacts, redemption counts), setup }
@@ -32,6 +33,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('admin/partners:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/partners');
   }
 }

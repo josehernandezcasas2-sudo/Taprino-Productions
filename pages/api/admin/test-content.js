@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
 import { findTestContent, searchContent, deleteTestContent } from '../../../lib/testContent';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin → Content → Test content (lib/testContent.js). Full admins only:
 // deleting for good isn't a sub-admin capability.
@@ -37,6 +38,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
     console.error('admin test-content error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/test-content');
   }
 }

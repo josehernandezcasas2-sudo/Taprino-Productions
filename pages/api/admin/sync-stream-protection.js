@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { cloudflareUidFromUrl, enableSignedUrlsForVideo, fetchCloudflareThumbnail } from '../../../lib/cloudflareUpload';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // Turns requireSignedURLs on for every Cloudflare Stream video attached
 // to an episode, whatever its tier (lib/streamProtection.js has the
@@ -44,7 +45,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const { data: episodes, error } = await supabase.from('episodes').select('id, title, tier, src, audio_description_src, poster, thumbnail');
   if (error) {
-    return res.status(500).json({ error: error.message });
+    return sendError(res, error, 'admin/sync-stream-protection');
   }
 
   const protectedIds = [];

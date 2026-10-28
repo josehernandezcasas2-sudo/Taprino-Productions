@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { listRecentPurchases, refundAllForTitle, refundPurchase } from '../../../lib/purchases';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // /admin/purchases: recent sales and refunds. Full admins only — refunds
 // move real money. POST { action: 'refund', purchaseId, reason } or
@@ -31,6 +32,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('admin/purchases error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/purchases');
   }
 }

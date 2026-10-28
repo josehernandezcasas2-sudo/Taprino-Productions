@@ -5,6 +5,7 @@ import { resolveProfileUserId } from '../../../lib/userProfiles';
 import { cancelScheduledNumbers, saveShareNumbers } from '../../../lib/creatorShareSettings';
 import { recordAudit } from '../../../lib/auditLog';
 import { dollars } from '../../../lib/artistSupportRules';
+import { sendError } from '../../../lib/apiErrors';
 
 // /admin/creator-money: Creator Share's ledger summary, the next payout
 // batch's plan and the button that runs it. Full admins only — this moves
@@ -78,6 +79,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('admin/creator-money error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/creator-money');
   }
 }

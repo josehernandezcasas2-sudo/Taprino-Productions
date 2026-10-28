@@ -4,6 +4,7 @@ import { uploadHouseAdVideo } from '../../../lib/houseAdUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { getCloudflareVideoStatus, ensureCloudflareDownloadUrl } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '11mb' } } // 8MB direct-upload video cap, plus base64/JSON overhead
@@ -20,7 +21,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('house_ads').select('*').order('created_at', { ascending: false });
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/house-ads');
     return res.status(200).json({ ads: data || [] });
   }
 
@@ -93,7 +94,7 @@ export default async function handler(req, res) {
       .select()
       .single();
 
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/house-ads');
 
     await recordAudit({
       adminId: userId,

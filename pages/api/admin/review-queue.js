@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { listReviewQueue, decideReviewItem } from '../../../lib/reviewQueue';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // GET  → { items, counts }           the merged review queue
 // POST → { kind, id, decision, reason?, tierOverride? }
@@ -27,6 +28,6 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message });
+    return sendError(res, err, 'admin/review-queue');
   }
 }

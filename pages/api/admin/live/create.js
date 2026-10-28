@@ -2,6 +2,7 @@ import { requireCapability } from '../../../../lib/adminAuth';
 import { getSupabase } from '../../../../lib/supabase';
 import { createLiveInput } from '../../../../lib/cloudflareLive';
 import { recordAudit } from '../../../../lib/auditLog';
+import { sendError } from '../../../../lib/apiErrors';
 
 // Creates the Cloudflare live input and the corresponding live_streams row
 // in status 'idle'. Nothing is visible to viewers yet — that only happens
@@ -54,7 +55,7 @@ export default async function handler(req, res) {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return sendError(res, error, 'admin/live/create');
 
   await recordAudit({
     adminId: userId,

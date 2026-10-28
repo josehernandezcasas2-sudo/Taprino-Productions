@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
 // 33% larger than the original file) plus the rest of the JSON payload
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('genre_icons').select('genre, image_url, updated_at');
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/genre-icons');
     return res.status(200).json({ icons: data || [] });
   }
 
@@ -48,7 +49,7 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('genre_icons')
       .upsert({ genre, image_url: imageUrl, updated_at: new Date().toISOString() });
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/genre-icons');
 
     await recordAudit({
       adminId: userId,
@@ -67,7 +68,7 @@ export default async function handler(req, res) {
     if (!genre) return res.status(400).json({ error: 'genre is required.' });
 
     const { error } = await supabase.from('genre_icons').delete().eq('genre', genre);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/genre-icons');
 
     await recordAudit({
       adminId: userId,

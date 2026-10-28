@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 const TARGETS = {
   favicon: 'favicon_url',
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
       .from('site_settings')
       .update({ [column]: imageUrl })
       .eq('id', 1);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/site-icons');
 
     await recordAudit({
       adminId: userId,
@@ -76,7 +77,7 @@ export default async function handler(req, res) {
       .from('site_settings')
       .update({ [column]: null })
       .eq('id', 1);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/site-icons');
 
     await recordAudit({
       adminId: userId,

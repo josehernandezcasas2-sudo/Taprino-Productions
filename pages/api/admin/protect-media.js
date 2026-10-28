@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
 import { moveCaptionsToPrivate, lockUniversityBucket } from '../../../lib/protectMedia';
+import { sendError } from '../../../lib/apiErrors';
 
 // The Protection card's other two buttons (components/admin/SiteSettingsPanel.js):
 // `what: 'captions'` moves every caption track still at a public URL into
@@ -44,6 +45,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'what must be captions or university.' });
   } catch (err) {
     console.error('protect-media error:', err.message);
-    return res.status(500).json({ error: err.message || 'Could not finish.' });
+    return sendError(res, err, 'admin/protect-media', 'Could not finish.');
   }
 }

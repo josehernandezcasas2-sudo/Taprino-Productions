@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
 import { PLAYER_ICON_KEYS } from '../../../lib/playerIcons';
+import { sendError } from '../../../lib/apiErrors';
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
 // 33% larger than the original file) plus the rest of the JSON payload
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data, error } = await supabase.from('player_icons').select('icon_key, image_url, updated_at');
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/player-icons');
     return res.status(200).json({ icons: data || [] });
   }
 
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('player_icons')
       .upsert({ icon_key: iconKey, image_url: imageUrl, updated_at: new Date().toISOString() });
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/player-icons');
 
     await recordAudit({
       adminId: userId,
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
     if (!iconKey) return res.status(400).json({ error: 'iconKey is required.' });
 
     const { error } = await supabase.from('player_icons').delete().eq('icon_key', iconKey);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/player-icons');
 
     await recordAudit({
       adminId: userId,

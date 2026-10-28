@@ -1,6 +1,7 @@
 import { requireCapability } from '../../../../lib/adminAuth';
 import { getSupabase } from '../../../../lib/supabase';
 import { recordAudit } from '../../../../lib/auditLog';
+import { sendError } from '../../../../lib/apiErrors';
 
 // The actual switch. Whatever Cloudflare's connection status hint says,
 // this is the only thing that makes a stream appear on /live — an
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return sendError(res, error, 'admin/live/go-live');
 
   await recordAudit({
     adminId: userId,

@@ -1,6 +1,7 @@
 import { requireCapability } from '../../../../lib/adminAuth';
 import { getSupabase } from '../../../../lib/supabase';
 import { recordAudit } from '../../../../lib/auditLog';
+import { sendError } from '../../../../lib/apiErrors';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -25,7 +26,7 @@ export default async function handler(req, res) {
     .select()
     .single();
 
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return sendError(res, error, 'admin/live/end');
 
   await recordAudit({
     adminId: userId,

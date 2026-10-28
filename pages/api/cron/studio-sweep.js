@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { runSweepDay } from '../../../lib/studioMoney';
+import { sendError } from '../../../lib/apiErrors';
 
 // Studio money's sweep day. Runs daily at 10:00 UTC (vercel.json) and
 // does nothing unless today is the sweep day: then, in auto mode, it
@@ -34,6 +35,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, ...result });
   } catch (err) {
     console.error('cron/studio-sweep error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'cron/studio-sweep');
   }
 }

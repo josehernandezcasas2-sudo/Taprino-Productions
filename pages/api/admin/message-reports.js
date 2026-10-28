@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
 import { listMessageReports, resolveMessageReport } from '../../../lib/messages';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin: reported conversations (/admin/messages). Each report carries
 // the snapshot of the last messages taken when it was filed — the only
@@ -28,6 +29,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('admin/message-reports:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/message-reports');
   }
 }

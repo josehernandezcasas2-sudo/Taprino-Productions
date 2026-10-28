@@ -3,6 +3,7 @@ import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
 import { listAllContent } from '../../../lib/contentAdmin';
 import { getModerationState, flagContent, decide, setReporterStatus } from '../../../lib/moderation';
+import { sendError } from '../../../lib/apiErrors';
 
 // GET  everything + reports/flags/reporters   (view_all_content or handle_flags)
 // POST { op: 'flag', targetType, targetId, reason, note, emailOwner }
@@ -47,6 +48,6 @@ export default async function handler(req, res) {
     });
     return res.status(200).json({ ok: true });
   } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message });
+    return sendError(res, err, 'admin/content');
   }
 }

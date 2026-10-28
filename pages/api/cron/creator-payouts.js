@@ -3,6 +3,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { runPayoutBatch } from '../../../lib/creatorShareBatch';
 import { recordAudit } from '../../../lib/auditLog';
 import { dollars } from '../../../lib/artistSupportRules';
+import { sendError } from '../../../lib/apiErrors';
 
 // Creator Share's monthly payout batch, on the 1st (vercel.json cron,
 // authenticated the same way as expire-content: Vercel sends
@@ -46,6 +47,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, period: result.period, paid: result.paid.length, paidCents: result.paidCents, failed: result.failed.length, skippedForBalance: result.skippedForBalance.length, held: result.held.length, adShare: result.adShare || null });
   } catch (err) {
     console.error('cron/creator-payouts error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'cron/creator-payouts');
   }
 }

@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
 import { getRatings, saveRating, deleteRating } from '../../../lib/ratings';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin: the content ratings list (/admin/ratings).
 //   GET                                       every rating, fresh
@@ -35,6 +36,6 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message || 'Something went wrong.' });
+    return sendError(res, err, 'admin/ratings', 'Something went wrong.');
   }
 }

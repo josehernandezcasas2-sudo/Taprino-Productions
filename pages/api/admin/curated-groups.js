@@ -10,6 +10,7 @@ import {
   reorderGroups
 } from '../../../lib/curatedGroups';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 export default async function handler(req, res) {
   const { userId, email, isAdmin } = await getRoleContext(req);
@@ -88,6 +89,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `Unknown action: ${action}` });
   } catch (err) {
     console.error('curated-groups action error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/curated-groups');
   }
 }

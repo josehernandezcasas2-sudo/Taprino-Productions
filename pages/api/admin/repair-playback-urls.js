@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflareUidFromUrl, cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // Repairs playback URLs that were written to the database while
 // CLOUDFLARE_STREAM_CUSTOMER_CODE held the wrong value (the full subdomain
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
   const { data: episodes, error } = await supabase
     .from('episodes')
     .select('id, title, src, audio_description_src, trailer_src');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return sendError(res, error, 'admin/repair-playback-urls');
 
   const repaired = [];
   const skipped = [];

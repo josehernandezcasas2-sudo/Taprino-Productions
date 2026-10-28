@@ -4,6 +4,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { sendEmail } from '../../../lib/notify';
 import { applicationEmails, rightsVerdict } from '../../../lib/creatorApplications';
+import { sendError } from '../../../lib/apiErrors';
 
 const STATUSES = ['new', 'reviewing', 'accepted', 'declined'];
 
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
       .select('*')
       .order('created_at', { ascending: false })
       .limit(200);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/applications');
     // The reviewer sees the paperwork list the applicant was shown.
     const applications = (data || []).map((a) => ({ ...a, rights_holds: rightsVerdict(a.rights_answers).holds }));
     return res.status(200).json({ applications });
@@ -79,7 +80,7 @@ export default async function handler(req, res) {
       .eq('id', id)
       .select()
       .single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/applications');
 
     await recordAudit({
       adminId: userId,

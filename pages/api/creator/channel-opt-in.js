@@ -1,5 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { type: 'episode' | 'series', id, optIn: true | false }
 // A creator decides whether channels may air their work. Turning it off
@@ -23,7 +24,7 @@ export default async function handler(req, res) {
   const table = type === 'episode' ? 'episodes' : 'series';
   const ownerField = type === 'episode' ? 'submitted_by' : 'creator_id';
   const { data: row, error } = await supabase.from(table).select(`id, ${ownerField}`).eq('id', id).maybeSingle();
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) return sendError(res, error, 'creator/channel-opt-in');
   if (!row) return res.status(404).json({ error: 'Not found.' });
   if (!isAdmin && row[ownerField] !== userId) {
     return res.status(403).json({ error: type === 'series' ? "Only the show's creator can change this." : 'You can only change your own titles.' });

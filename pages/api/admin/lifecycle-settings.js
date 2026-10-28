@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { getLifecycleSettings, updateLifecycleSettings, isLeavingSoon, isExpired } from '../../../lib/contentLifecycle';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 export default async function handler(req, res) {
   // Full admins pass; a sub-admin needs the same capability the page that
@@ -47,7 +48,7 @@ export default async function handler(req, res) {
     try {
       await updateLifecycleSettings({ newReleaseDays, leavingSoonDays });
     } catch (err) {
-      return res.status(500).json({ error: err.message });
+      return sendError(res, err, 'admin/lifecycle-settings');
     }
     await recordAudit({
       adminId: userId,

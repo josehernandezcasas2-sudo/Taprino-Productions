@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { submitReport } from '../../lib/moderation';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { sendError } from '../../lib/apiErrors';
 
 // POST { targetType: 'episode' | 'series' | 'channel_media', targetId, reason }
 // Signed-in viewers only, one report per account per title. Reports add up
@@ -31,6 +32,6 @@ export default async function handler(req, res) {
     await submitReport({ reporterId: userId, targetType, targetId: String(targetId), reason });
     return res.status(200).json({ ok: true });
   } catch (err) {
-    return res.status(err.status || 500).json({ error: err.message });
+    return sendError(res, err, 'report-content');
   }
 }

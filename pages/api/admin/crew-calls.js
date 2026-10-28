@@ -5,6 +5,7 @@ import { listCalls, listPendingOutcomes, updateCall, setOutcome } from '../../..
 import { getSupabase } from '../../../lib/supabase';
 import { listReportedProductions, updateProduction } from '../../../lib/productions';
 import { listCrewPaymentsForAdmin, adminRefundCrewPay, adminReleaseCrewPay } from '../../../lib/crewPay';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin: the Crew Call board (/admin/crew).
 //   GET  → { pending (booked jobs past their last day with no outcome),
@@ -89,6 +90,6 @@ export default async function handler(req, res) {
   } catch (err) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('admin/crew-calls:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/crew-calls');
   }
 }

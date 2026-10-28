@@ -6,6 +6,7 @@ import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
 import { resolveReferrer } from '../../lib/creatorShare';
 import { firstInWindow } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { sendError } from '../../lib/apiErrors';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
 //   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
@@ -114,6 +115,6 @@ export default async function handler(req, res) {
     });
     res.status(200).json({ url: session.url });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    sendError(res, err, 'create-checkout-session');
   }
 }

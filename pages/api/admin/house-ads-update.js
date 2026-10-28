@@ -1,6 +1,7 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // Action-based single endpoint for updates, matching the pattern already
 // used by manage-creators.js elsewhere in this app rather than introducing
@@ -53,7 +54,7 @@ export default async function handler(req, res) {
       .eq('id', id)
       .select()
       .single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) return sendError(res, error, 'admin/house-ads-update');
 
     await recordAudit({
       adminId: userId,

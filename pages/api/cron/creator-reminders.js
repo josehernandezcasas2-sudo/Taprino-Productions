@@ -1,6 +1,7 @@
 import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { sendCollectReminders } from '../../../lib/creatorShareBatch';
+import { sendError } from '../../../lib/apiErrors';
 
 // Daily: "time to collect" reminders for creators who left (Terms section
 // 5) — lib/creatorShareBatch.js sendCollectReminders. Vercel's cron sends
@@ -29,6 +30,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length });
   } catch (err) {
     console.error('cron/creator-reminders error:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'cron/creator-reminders');
   }
 }

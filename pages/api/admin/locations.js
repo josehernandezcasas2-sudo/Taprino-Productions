@@ -6,6 +6,7 @@ import { searchListings, setListingStatus, listPendingListings, isMissingLocatio
 import { LOCATION_TYPES } from '../../../lib/locationRules';
 import { listRequestsForAdmin, refundBooking, setOutcome, cancelRequest } from '../../../lib/locationRequests';
 import { listBookingDisputes, decideBookingDispute } from '../../../lib/paymentDisputes';
+import { sendError } from '../../../lib/apiErrors';
 
 // Admin: Locations (/admin/locations).
 //   GET  → { pendingCount, issues, settle, bookings, listings, totals }
@@ -99,6 +100,6 @@ export async function handleLocationsAdmin(req, res, account) {
     if (err.status) return res.status(err.status).json({ error: err.message });
     if (isMissingLocationsTable(err)) return res.status(503).json({ error: 'Locations aren’t set up yet — run migration 086.' });
     console.error('admin/locations:', err.message);
-    return res.status(500).json({ error: err.message });
+    return sendError(res, err, 'admin/locations');
   }
 }
