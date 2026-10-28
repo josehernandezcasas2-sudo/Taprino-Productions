@@ -43,6 +43,29 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
   const [isScheduler, setIsScheduler] = useState(false);
   const [isSubAdmin, setIsSubAdmin] = useState(false);
   const rootRef = useRef(null);
+
+  // The primary links scroll inside their own box once they outgrow the
+  // bar (.nav-links in globals.css): mark the overflow so the right edge
+  // fades, and keep the active link in view when the page changes.
+  const navRef = useRef(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof ResizeObserver === 'undefined') return undefined;
+    const update = () => {
+      if (nav.scrollWidth > nav.clientWidth + 1) nav.setAttribute('data-overflow', '1');
+      else nav.removeAttribute('data-overflow');
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(nav);
+    return () => observer.disconnect();
+  }, [router.asPath, isSignedIn, siteSettings]);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav ? nav.querySelector('.nav-link.active') : null;
+    if (!active || nav.scrollWidth <= nav.clientWidth + 1) return;
+    try { active.scrollIntoView({ block: 'nearest', inline: 'nearest' }); } catch (err) { /* older browsers */ }
+  }, [router.asPath]);
   const searchInputRef = useRef(null);
 
   // Self-fetched rather than passed as a prop — HeaderNav renders on every
@@ -224,7 +247,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
           </span>
         </Link>
 
-        <nav className="nav-links" aria-label="Primary">
+        <nav className="nav-links" aria-label="Primary" ref={navRef}>
           {typeLinks.map((l) => (
             <Link key={l.href} href={l.href} className={`nav-link ${l.match ? 'active' : ''}`}>
               {l.label}{l.badge > 0 && <span className="nav-badge">{l.badge > 9 ? '9+' : l.badge}</span>}

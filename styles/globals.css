@@ -4803,7 +4803,20 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 .brand-kicker-stream { color: var(--signal-amber); }
 
-.nav-links { display: flex; align-items: center; gap: 1.4rem; }
+/* The Connect side has 13 links signed in, which outgrows a laptop
+   between 1180px (where the list hides behind the hamburger) and about
+   1400px, and used to run straight into the search button. The list now
+   scrolls inside its own box (scrollbar hidden, like the zine rows) and
+   fades at the right edge while anything is out of view —
+   components/HeaderNav.js sets data-overflow from a ResizeObserver and
+   scrolls the active link into view. */
+.nav-links { display: flex; align-items: center; gap: 1.4rem; min-width: 0; flex: 1 1 auto; overflow-x: auto; overflow-y: hidden; padding: 0.3rem 0; scrollbar-width: none; -ms-overflow-style: none; }
+.nav-links::-webkit-scrollbar { display: none; }
+.nav-links[data-overflow="1"] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 2.8rem), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 2.8rem), transparent);
+  padding-right: 2.8rem;
+}
 .nav-link {
   font-size: 0.9rem;
   color: var(--ink-dim);
