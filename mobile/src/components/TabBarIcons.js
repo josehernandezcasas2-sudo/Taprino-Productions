@@ -56,6 +56,28 @@ export function CaretUpIcon({ size = 8, color = '#fbe8d3' }) {
   );
 }
 
+// The header's bell (PlayerIcons.js BellIcon) — TopNav, signed in.
+export function BellIcon({ size = 18, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+      <Path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </Svg>
+  );
+}
+
+// The header's hamburger (PlayerIcons.js HamburgerMenuIcon) — TopNav's
+// browse menu, the website's .nav-hamburger.
+export function MenuIcon({ size = 18, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M4 7h16" />
+      <Path d="M4 12h16" />
+      <Path d="M4 17h16" />
+    </Svg>
+  );
+}
+
 // Admin tab (shield) — only shown to admins/sub-admins, see BottomNav.
 export function ShieldIcon({ size = 20, color = '#fbe8d3' }) {
   return (

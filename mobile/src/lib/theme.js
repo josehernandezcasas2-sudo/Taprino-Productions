@@ -62,6 +62,9 @@ export const colors = {
 export const brassTint = (a) => `rgba(255,140,66,${a})`;
 export const oliveTint = (a) => `rgba(242,193,78,${a})`;
 export const dangerTint = (a) => `rgba(239,91,91,${a})`;
+// The website's rgba(251, 232, 211, a): hairlines, pressed fills, the
+// header's circle buttons.
+export const inkTint = (a) => `rgba(251,232,211,${a})`;
 
 // Use this instead of StyleSheet.absoluteFillObject — React Native 0.86
 // removed that export (only StyleSheet.absoluteFill remains), so on a real
