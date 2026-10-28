@@ -1,5 +1,6 @@
 import { getAuth, clerkClient } from '@clerk/nextjs/server';
 import { getOwnAdAccount, createAdAccount } from '../../../lib/adAccounts';
+import { sendError } from '../../../lib/apiErrors';
 
 export default async function handler(req, res) {
   const { userId } = getAuth(req);
@@ -42,7 +43,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ account });
     } catch (err) {
       console.error('create-account error:', err.message);
-      return res.status(400).json({ error: err.message });
+      return sendError(res, err, 'ads/create-account', 'Could not create the advertiser account.', { plainStatus: 400 });
     }
   }
 

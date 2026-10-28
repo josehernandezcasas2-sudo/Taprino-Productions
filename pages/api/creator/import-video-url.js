@@ -25,7 +25,8 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-import-url'), 10, 3600);
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-import-url'), 10, 3600)
+    && await checkRateLimit(`creator-import-url:${userId}`, 10, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many link imports — please wait a bit and try again.' });
   }

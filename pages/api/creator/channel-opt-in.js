@@ -31,6 +31,6 @@ export default async function handler(req, res) {
   }
 
   const { error: upErr } = await supabase.from(table).update({ channel_opt_in: optIn }).eq('id', id);
-  if (upErr) return res.status(500).json({ error: upErr.message });
+  if (upErr) return sendError(res, upErr, 'creator/channel-opt-in');
   return res.status(200).json({ ok: true, optIn });
 }

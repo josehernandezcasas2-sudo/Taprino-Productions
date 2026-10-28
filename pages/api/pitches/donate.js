@@ -3,6 +3,7 @@ import { createDonationCheckout, MIN_DONATION_CENTS, MAX_DONATION_CENTS } from '
 import { requestOrigin } from '../../../lib/stripe';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // Back a Pitch Room project: POST { pitchId, amountDollars } → { url }
 // — a Stripe Checkout page to send the person to. The donation is
@@ -50,6 +51,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ url, split });
   } catch (err) {
     console.error('pitch donate error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'pitches/donate', 'Could not start the backing. Try again in a moment.', { plainStatus: 400 });
   }
 }

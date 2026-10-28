@@ -30,8 +30,9 @@ yarn-error.*
 .DS_Store
 *.pem
 
-# local env files
+# local env files (.env itself is tracked: only the Clerk publishable key)
 .env*.local
+.env.*
 
 # typescript
 *.tsbuildinfo

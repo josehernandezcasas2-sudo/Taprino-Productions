@@ -143,10 +143,13 @@ const nextConfig = {
       // Cloudflare Stream's own auto-grabbed frame (lib/cloudflareUpload.js's
       // cloudflareThumbnailUrl) whenever no custom thumbnail was uploaded —
       // that URL lives on this host, not Supabase Storage, and next/image
-      // throws on any src outside the allowlist above without this.
+      // throws on any src outside the allowlist above without this. The
+      // host is this account's own (CLOUDFLARE_STREAM_CUSTOMER_CODE), not
+      // every Stream customer's (security round 2, 2026-10-28); the
+      // wildcard only remains for a build with no code set.
       {
         protocol: 'https',
-        hostname: 'customer-*.cloudflarestream.com',
+        hostname: process.env.CLOUDFLARE_STREAM_CUSTOMER_CODE ? `customer-${process.env.CLOUDFLARE_STREAM_CUSTOMER_CODE}.cloudflarestream.com` : 'customer-*.cloudflarestream.com',
         pathname: '/**'
       }
     ]

@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { setTipNoteHidden } from '../../../lib/tips';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { tipId, hidden } — the creator hides (or shows again) a note on a
 // tip they received, from their Money page. CORS-open for the app.
@@ -20,6 +21,6 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await setTipNoteHidden({ creatorId: userId, tipId: String(tipId), hidden: Boolean(hidden) }));
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'tips/note', 'Could not change the note.', { plainStatus: 400 });
   }
 }

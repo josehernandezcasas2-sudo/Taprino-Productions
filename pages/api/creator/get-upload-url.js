@@ -21,9 +21,12 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  // Rate limited per creator, not just per IP — a compromised or careless
-  // creator account shouldn't be able to spam upload-URL requests either.
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-upload-url'), 20, 3600);
+  // Rate limited per creator AND per IP — a compromised or careless
+  // creator account shouldn't be able to spam upload-URL requests either
+  // (each link reserves a Cloudflare upload; the per-account key was
+  // missing until 2026-10-28, the comment said otherwise).
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-upload-url'), 20, 3600)
+    && await checkRateLimit(`creator-upload-url:${userId}`, 20, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many upload requests — please wait a bit and try again.' });
   }

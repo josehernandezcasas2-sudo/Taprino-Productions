@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount, submitAdvertiserAd, getAdsForAccount } from '../../../lib/adAccounts';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // Video is capped at 8MB by lib/houseAdUpload.js (see that file for why
 // this system skips Cloudflare Stream). Base64 encoding adds roughly a
@@ -58,7 +59,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ad });
     } catch (err) {
       console.error('submit-ad error:', err.message);
-      return res.status(400).json({ error: err.message });
+      return sendError(res, err, 'ads/submit-ad', 'Could not submit the ad.', { plainStatus: 400 });
     }
   }
 

@@ -20,7 +20,8 @@ export default async function handler(req, res) {
       return res.status(200).json({ media });
     }
     if (req.method === 'POST') {
-      const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'channel-media'), 30, 3600);
+      const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'channel-media'), 30, 3600)
+        && await checkRateLimit(`channel-media:${roleContext.userId}`, 30, 3600);
       if (!allowed) return res.status(429).json({ error: 'Too many uploads. Wait a bit and try again.' });
       const id = await createChannelMedia({ ownerId: roleContext.userId, title: body.title, kind: body.kind, videoUid: body.videoUid, isAdmin: roleContext.isAdmin });
       return res.status(200).json({ ok: true, id, status: 'pending' });

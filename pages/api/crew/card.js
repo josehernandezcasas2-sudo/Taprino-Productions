@@ -4,6 +4,7 @@ import { crewOptions } from '../../../lib/crewOptions';
 import { getCreditedWork } from '../../../lib/userProfiles';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // The signed-in person's own Crew Call working card.
 //   GET    → { card | null, creditedWork, options }
@@ -40,7 +41,7 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST, DELETE');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status === 400) return res.status(400).json({ error: err.message });
+    if (err.status === 400) return sendError(res, err, 'crew/card', 'Could not save your card.', { plainStatus: 400 });
     console.error('crew/card:', err.message);
     return res.status(500).json({ error: 'Could not save your card right now. Try again in a moment.' });
   }

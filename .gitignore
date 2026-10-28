@@ -1,7 +1,12 @@
 # Secrets — never commit real keys. .env.local.example is the template;
 # .env.local (and any .env.*.local variant) is where your real values go,
-# and this line is what keeps them out of git.
+# and these lines are what keep them out of git. A root .env or
+# .env.production that a tool writes is ignored too (2026-10-28);
+# mobile/.env is tracked on purpose (it holds only the publishable key).
 .env*.local
+/.env
+/.env.*
+!/.env.local.example
 
 # Next.js build output
 .next/

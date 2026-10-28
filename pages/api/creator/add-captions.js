@@ -4,6 +4,8 @@ import { uploadCaptionFile } from '../../../lib/captionUpload';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { isPrivateRef, removePrivate } from '../../../lib/privateStorage';
 import { captionsHref } from '../../../lib/episodes';
+import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } }
@@ -40,6 +42,10 @@ export default async function handler(req, res) {
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
+  // A track in private storage per call (security round 2).
+  if (!(await checkRateLimit(`add-captions:${userId}`, 20, 3600))) {
+    return res.status(429).json({ error: 'Too many caption changes in a row — give it a little while.' });
+  }
 
   const { episodeId, captionsBase64, captionsFileName, language, label, remove } = req.body || {};
   if (!episodeId) {
@@ -69,7 +75,7 @@ export default async function handler(req, res) {
       .update({ captions_url: null })
       .eq('id', episodeId);
     if (updateError) {
-      return res.status(500).json({ error: updateError.message });
+      return sendError(res, updateError, 'creator/add-captions', 'Could not remove the captions.');
     }
     return res.status(200).json({ ok: true, removed: true });
   }
@@ -88,7 +94,7 @@ export default async function handler(req, res) {
   } catch (err) {
     // These messages are written to be read by a creator, not an engineer —
     // pass them straight through rather than flattening to "upload failed".
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/add-captions', 'Could not save the captions.', { plainStatus: 400 });
   }
 
   await discardOldTrack(existing, `Replaced caption track for "${existing.title}"`);
@@ -103,7 +109,7 @@ export default async function handler(req, res) {
     .eq('id', episodeId);
 
   if (updateError) {
-    return res.status(500).json({ error: updateError.message });
+    return sendError(res, updateError, 'creator/add-captions', 'Could not save the captions.');
   }
 
   return res.status(200).json({

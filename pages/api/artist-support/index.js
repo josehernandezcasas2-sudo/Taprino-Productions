@@ -2,6 +2,7 @@ import { getAccountContext } from '../../../lib/accountContext';
 import { ArtistSupportError, getArtistSupportPayload, saveLineup } from '../../../lib/artistSupport';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { sendError, internalError } from '../../../lib/apiErrors';
 
 // Membership Artist Support — the member's lineup. GET answers with
 // everything the card draws (tier, share, picks, split); POST replaces the
@@ -32,8 +33,8 @@ export default async function handler(req, res) {
     const payload = await getArtistSupportPayload(account.userId, account.tier);
     return res.status(200).json(payload);
   } catch (err) {
-    const status = err instanceof ArtistSupportError ? err.status : 500;
-    if (status === 500) console.error('artist-support error:', err.message);
-    return res.status(status).json({ error: err.message });
+    // ArtistSupportError carries its status and line; anything else is
+    // logged and answered plainly (security round 2, 2026-10-28).
+    return sendError(res, err instanceof ArtistSupportError ? err : internalError(err), 'artist-support', 'Could not load Artist Support right now.');
   }
 }

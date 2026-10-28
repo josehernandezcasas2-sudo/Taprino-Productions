@@ -48,6 +48,15 @@ import { crossSiteWriteRefused } from './lib/cors';
 //    with 403 before any route runs (safety batch, 2026-10-26): Clerk's
 //    SameSite=Lax cookie was the only thing standing between a hostile
 //    page's auto-submitting form and a signed-in member's account.
+//
+// A page's props fetched for a client-side navigation
+// (/_next/data/<build>/<page>.json) reach this middleware as the page
+// they stand for: Next normalises the data path to the page path before
+// matching, and turns a redirect into an x-nextjs-redirect header the
+// router follows. So the door and the suspension bounce cover those
+// requests as they are (checked against the dev server, 2026-10-28:
+// a signed-out /_next/data/…/stream.json gets the door, a suspended
+// person's gets /suspended).
 const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

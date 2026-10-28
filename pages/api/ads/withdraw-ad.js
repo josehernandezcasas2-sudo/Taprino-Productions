@@ -1,5 +1,6 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount, withdrawPendingAd } from '../../../lib/adAccounts';
+import { sendError } from '../../../lib/apiErrors';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -23,6 +24,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('withdraw-ad error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'ads/withdraw-ad', 'Could not withdraw the ad.', { plainStatus: 400 });
   }
 }

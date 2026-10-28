@@ -3,6 +3,8 @@ import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl } from '../../../lib/cloudflareUpload';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { checkVideoOwnership } from '../../../lib/videoOwnership';
+import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // Owner (series.creator_id) or admin only. It used to be any creator —
 // fine for a small trusted roster, not once /apply hands the creator role
@@ -20,6 +22,10 @@ export default async function handler(req, res) {
   const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator) {
     return res.status(403).json({ error: 'Creator access required.' });
+  }
+  // Up to four images land in public storage per call (security round 2).
+  if (!(await checkRateLimit(`series-media:${userId}`, 30, 3600))) {
+    return res.status(429).json({ error: 'Too many changes in a row — give it a little while.' });
   }
 
   const { seriesId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, heroImageBase64, heroImageFileName, titleImageBase64, titleImageFileName, removeTitleImage, trailerUid } = req.body || {};
@@ -57,7 +63,7 @@ export default async function handler(req, res) {
     ]);
   } catch (err) {
     console.error('series-media upload error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/series-media', 'Could not save the series media.', { plainStatus: 400 });
   }
 
   let trailerSrc;

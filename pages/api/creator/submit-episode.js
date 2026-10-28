@@ -6,6 +6,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
+import { sendError } from '../../../lib/apiErrors';
 
 // Every one of these has to be present and non-empty — this is the actual
 // enforcement of "creators must submit complete metadata," not just a UI
@@ -36,7 +37,8 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-submit'), 20, 3600);
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-submit'), 20, 3600)
+    && await checkRateLimit(`creator-submit:${userId}`, 20, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many submissions — please wait a bit and try again.' });
   }
@@ -155,7 +157,7 @@ export default async function handler(req, res) {
     ]);
   } catch (err) {
     console.error('submit-episode artwork error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/submit-episode', 'Could not submit the title.', { plainStatus: 400 });
   }
 
   // "__new__" means the creator picked "a new series not listed here" in

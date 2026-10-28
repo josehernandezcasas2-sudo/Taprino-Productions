@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
 import { safeFetch, readTextCapped } from '../../../lib/safeFetch';
 import { parsePodcastFeed } from '../../../lib/rssImport';
+import { sendError } from '../../../lib/apiErrors';
 
 const MAX_FEED_BYTES = 10 * 1024 * 1024; // 10MB — generous for even a very long-running show's feed XML
 const FETCH_TIMEOUT_MS = 20000;
@@ -65,6 +66,6 @@ export default async function handler(req, res) {
     const parsed = parsePodcastFeed(text);
     return res.status(200).json(parsed);
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/rss-preview', 'Could not read that feed.', { plainStatus: 400 });
   }
 }

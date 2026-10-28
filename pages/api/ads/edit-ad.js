@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount, editPendingAd } from '../../../lib/adAccounts';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // Same body size reasoning as submit-ad.js — replacing the video here
 // needs the same headroom.
@@ -47,6 +48,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ad });
   } catch (err) {
     console.error('edit-ad error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'ads/edit-ad', 'Could not save the ad.', { plainStatus: 400 });
   }
 }

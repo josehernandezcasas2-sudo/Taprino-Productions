@@ -5,6 +5,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeImagePosition, normalizeZoom } from '../../../lib/profileBanner';
 import { applyCors } from '../../../lib/cors';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 const VALID_GENDERS = ['female', 'male', 'nonbinary', 'prefer_not_to_say'];
 const MAX_SOCIAL_LINKS = 6;
@@ -153,7 +154,7 @@ export default async function handler(req, res) {
       }
     } catch (err) {
       // The image checks' own words ("that isn't an image", too big).
-      return res.status(400).json({ error: err.message });
+      return sendError(res, err, 'account/profile', 'Could not save your profile.', { plainStatus: 400 });
     }
     try {
       const cleanedLinks = socialLinks !== undefined

@@ -21,6 +21,13 @@ t('open pages and API routes', () => {
   for (const p of ['/api/home-feed', '/api/stream-token', '/api/admin/invites', '/api/webhooks', '/api/cron', '/api/applyx', '/api/beta/other']) assert.equal(isOpenPath(p), false, p);
 });
 
+t('screeners stay open while the door is shut (the link is the key)', () => {
+  assert.equal(isOpenPath('/screener/abc123'), true);
+  assert.equal(isOpenPath('/api/screener/abc123'), true);
+  assert.equal(isOpenPath('/screener'), false, 'no bare index');
+  assert.equal(isOpenPath('/screeners'), false);
+});
+
 t('the door keeps the page wanted, never an outside one', () => {
   assert.equal(doorPath('/', ''), '/welcome');
   assert.equal(doorPath('/welcome', '?x=1'), '/welcome');

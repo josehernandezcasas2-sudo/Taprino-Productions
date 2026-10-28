@@ -1,12 +1,13 @@
 import { Html, Head, Main, NextScript } from 'next/document';
 import { getSiteSettings } from '../lib/siteSettings';
 import { buildThemeStyleTag } from '../lib/themeColors';
+import { adsenseAllowedOn } from '../lib/adsenseRules';
 
 // Exists primarily for lang="en" on <html>. Without it, screen readers fall
 // back to the user's system language and will happily read English content in
 // a Spanish voice — it's a WCAG 2.1 Level A failure (3.1.1 Language of Page)
 // and one of the cheapest to fix.
-export default function Document({ themeStyleTag, faviconUrl }) {
+export default function Document({ themeStyleTag, faviconUrl, showAdsense }) {
   return (
     <Html lang="en">
       <Head>
@@ -24,12 +25,16 @@ export default function Document({ themeStyleTag, faviconUrl }) {
 
             Note this is the DISPLAY ads script, separate from the IMA SDK
             in _app.js that handles in-player video ads. The two don't
-            interact. */}
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1412100592036798"
-          crossOrigin="anonymous"
-        />
+            interact. Public pages only (lib/adsenseRules.js): never the
+            admin area, the account and Money pages, Messages or a
+            screener. */}
+        {showAdsense && (
+          <script
+            async
+            src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-1412100592036798"
+            crossOrigin="anonymous"
+          />
+        )}
         {/* Theme color overrides — set from /admin/theme. Injected here
             (server-rendered, before any content paints) rather than via a
             client-side effect, specifically so there's no flash of the
@@ -51,5 +56,5 @@ Document.getInitialProps = async (ctx) => {
     ctx.defaultGetInitialProps(ctx),
     getSiteSettings()
   ]);
-  return { ...initialProps, themeStyleTag: buildThemeStyleTag(siteSettings.themeOverrides), faviconUrl: siteSettings.faviconUrl };
+  return { ...initialProps, themeStyleTag: buildThemeStyleTag(siteSettings.themeOverrides), faviconUrl: siteSettings.faviconUrl, showAdsense: adsenseAllowedOn(ctx.pathname) };
 };

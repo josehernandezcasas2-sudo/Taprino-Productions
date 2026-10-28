@@ -4,6 +4,7 @@ import { createTipCheckout } from '../../../lib/tips';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 import { requestOrigin } from '../../../lib/stripe';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { creatorId, amountCents, note, showName, returnTo } → { url }:
 // a Stripe Checkout session for a tip (lib/tips.js). Signed in only;
@@ -43,6 +44,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ url: out.url, tipId: out.tipId, quote: out.quote });
   } catch (err) {
     console.error('tips/checkout error:', err.message);
-    return res.status(400).json({ error: err.message || 'Could not start the tip.' });
+    return sendError(res, err, 'tips/checkout', 'Could not start the tip.', { plainStatus: 400 });
   }
 }

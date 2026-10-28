@@ -1,6 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { unregisterPushToken } from '../../../lib/push';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { token } → { ok }: the app switched push off (lib/push.js). A
 // suspended person may still call this (lib/suspensionGate.js open
@@ -20,6 +21,6 @@ export default async function handler(req, res) {
     return res.status(200).json(await unregisterPushToken({ userId, token: String((req.body || {}).token || '') }));
   } catch (err) {
     console.error('push/unregister error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'push/unregister', 'Could not update this device.', { plainStatus: 400 });
   }
 }

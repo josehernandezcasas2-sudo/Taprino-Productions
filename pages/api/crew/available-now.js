@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { setAvailableNow } from '../../../lib/crewCards';
 import { AVAILABLE_NOW_CHOICES } from '../../../lib/crewCallRules';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // "I'm free right now" (migration 105): flag the signed-in person's card
 // for a few hours so urgent calls nearby reach them first and the
@@ -24,7 +25,7 @@ export default async function handler(req, res) {
   try {
     return res.status(200).json(await setAvailableNow(userId, hours));
   } catch (err) {
-    if (err.status === 400) return res.status(400).json({ error: err.message });
+    if (err.status === 400) return sendError(res, err, 'crew/available-now', 'Could not update your card.', { plainStatus: 400 });
     console.error('crew/available-now:', err.message);
     return res.status(500).json({ error: 'Could not update that right now.' });
   }

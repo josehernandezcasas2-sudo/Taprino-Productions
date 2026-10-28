@@ -4,6 +4,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus, enableSignedUrlsForVideo, fetchCloudflareThumbnail } from '../../../lib/cloudflareUpload';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { createPost } from '../../../lib/posts';
+import { sendError } from '../../../lib/apiErrors';
 
 // Small photo, same as episode poster/thumbnail uploads — this rides in
 // the JSON body as a base64 data URL rather than a real multipart upload.
@@ -27,7 +28,8 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Admin access required.' });
   }
 
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'create-post'), 30, 3600);
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'create-post'), 30, 3600)
+    && await checkRateLimit(`create-post:${userId}`, 30, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many posts — please wait a bit and try again.' });
   }
@@ -48,7 +50,7 @@ export default async function handler(req, res) {
         pathPrefix: `post-${userId}-${Date.now().toString(36)}`
       });
     } catch (err) {
-      return res.status(400).json({ error: err.message });
+      return sendError(res, err, 'posts/create', 'Could not create the post.', { plainStatus: 400 });
     }
     const id = await createPost({ userId, kind: 'post', caption, imageUrl });
     return res.status(200).json({ ok: true, id, kind: 'post' });
@@ -75,7 +77,7 @@ export default async function handler(req, res) {
         pathPrefix: `post-thumb-${userId}-${Date.now().toString(36)}`
       });
     } catch (err) {
-      return res.status(400).json({ error: err.message });
+      return sendError(res, err, 'posts/create', 'Could not create the post.', { plainStatus: 400 });
     }
   }
 

@@ -60,7 +60,8 @@ export default async function handler(req, res) {
     seriesId = `${String(showName).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
     const { error: seriesError } = await supabase.from('series').insert({ id: seriesId, name: String(showName).slice(0, 200), creator_id: userId, submitted_by: email || null, status: 'pending' });
     if (seriesError) {
-      return res.status(500).json({ error: `Could not create the show: ${seriesError.message}` });
+      console.error('creator/rss-import series:', seriesError.message);
+      return res.status(500).json({ error: 'Could not create the show. Try again in a moment.' });
     }
   }
 
@@ -98,7 +99,8 @@ export default async function handler(req, res) {
         submitted_by: userId
       });
       if (insertError) {
-        results.failed.push({ title: ep.title, error: insertError.message });
+        console.error('creator/rss-import episode:', insertError.message);
+        results.failed.push({ title: ep.title, error: 'Could not save this episode.' });
         continue;
       }
       results.imported += 1;

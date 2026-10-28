@@ -2,6 +2,8 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
+import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // Only stages for approval when the episode is already APPROVED (live) —
 // changing what the public sees without review is the actual risk. A
@@ -21,6 +23,10 @@ export default async function handler(req, res) {
   const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
+  }
+  // Two images land in public storage per call (security round 2).
+  if (!(await checkRateLimit(`add-artwork:${userId}`, 20, 3600))) {
+    return res.status(429).json({ error: 'Too many artwork changes in a row — give it a little while.' });
   }
 
   const { episodeId, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName } = req.body || {};
@@ -55,7 +61,7 @@ export default async function handler(req, res) {
     ]);
   } catch (err) {
     console.error('add-artwork upload error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/add-artwork', 'Could not save the artwork.', { plainStatus: 400 });
   }
 
   const dbUpdates = {};

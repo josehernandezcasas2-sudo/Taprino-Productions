@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { uploadListingImage } from '../../../lib/locations';
 import { applyCors } from '../../../lib/cors';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // One image at a time (the form uploads each photo as it's picked, so no
 // request carries the whole gallery): a listing photo, or the proof an
@@ -29,7 +30,6 @@ export default async function handler(req, res) {
     const { base64, fileName, purpose } = req.body || {};
     return res.status(200).json(await uploadListingImage(userId, { base64, fileName, purpose }));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'locations/upload', 'Could not upload the photo.', { plainStatus: 400 });
   }
 }

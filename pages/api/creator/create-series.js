@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { checkRateLimit } from '../../../lib/rateLimit';
 
 // Default Next.js API body limit is 1MB — poster/thumbnail arrive as
 // base64 data URLs, which need real headroom. Same fix applied to every
@@ -26,6 +27,10 @@ export default async function handler(req, res) {
   const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
+  }
+  // A series row and two images per call (security round 2).
+  if (!(await checkRateLimit(`create-series:${userId}`, 10, 3600))) {
+    return res.status(429).json({ error: 'That’s a lot of new series in a row — give it a little while.' });
   }
 
   const { name, description, posterBase64, posterFileName, thumbnailBase64, thumbnailFileName, releaseYear, channelOptIn } = req.body || {};

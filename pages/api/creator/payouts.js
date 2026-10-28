@@ -5,6 +5,8 @@ import { getOwnListings } from '../../../lib/locations';
 import { getOwnCard } from '../../../lib/crewCards';
 import { hasCrewPayInterest } from '../../../lib/crewPay';
 import { applyCors } from '../../../lib/cors';
+import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // The creator's Payouts card (components/creator/PayoutsCard.js, on
 // /account and /creator/pitch/dashboard; the app's
@@ -50,6 +52,8 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       if (!isStripeConfigured()) return res.status(503).json({ error: 'Payments aren’t switched on for this site yet.' });
+      // Each action asks Stripe for a fresh link (security round 2).
+      if (!(await checkRateLimit(`payout-links:${userId}`, 10, 3600))) return res.status(429).json({ error: 'Too many tries in a row — give it a little while.' });
       const { action, returnTo } = req.body || {};
       if (action === 'onboard') {
         const url = await createOnboardingLink({ userId, email, origin: requestOrigin(req), returnTo });
@@ -64,7 +68,6 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    console.error('creator payouts error:', err.message);
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/payouts', 'Could not reach Stripe. Try again in a moment.', { plainStatus: 400 });
   }
 }

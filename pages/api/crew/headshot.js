@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { uploadHeadshot } from '../../../lib/crewCards';
 import { applyCors } from '../../../lib/cors';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // One headshot for a performer card (migration 106): POST { base64,
 // fileName } → { url }. The card save then references the URL. The
@@ -26,7 +27,6 @@ export default async function handler(req, res) {
     const { base64, fileName } = req.body || {};
     return res.status(200).json(await uploadHeadshot(userId, { base64, fileName }));
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'crew/headshot', 'Could not upload the headshot.', { plainStatus: 400 });
   }
 }

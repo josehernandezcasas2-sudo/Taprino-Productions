@@ -3,6 +3,8 @@ import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
+import { checkRateLimit } from '../../../lib/rateLimit';
+import { sendError } from '../../../lib/apiErrors';
 
 // funding_raised isn't here: with real backing it's counted from paid
 // donations, never typed in.
@@ -27,6 +29,10 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) {
     return res.status(401).json({ error: 'Not signed in.' });
+  }
+  // Up to three photos land in public storage per call (security round 2).
+  if (!(await checkRateLimit(`edit-pitch:${userId}`, 30, 3600))) {
+    return res.status(429).json({ error: 'Too many edits in a row — give it a little while.' });
   }
 
   const { pitchId, ...fields } = req.body || {};
@@ -100,7 +106,7 @@ export default async function handler(req, res) {
       updates.photos = [...((current && current.photos) || []), newUrl];
     }
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/edit-pitch', 'Could not save the pitch.', { plainStatus: 400 });
   }
 
   const { error } = await supabase.from('pitches').update(updates).eq('id', pitchId);

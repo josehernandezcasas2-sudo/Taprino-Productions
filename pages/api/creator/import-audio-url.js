@@ -9,7 +9,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -17,8 +17,9 @@ export default async function handler(req, res) {
   // Tighter than video's import rate limit (10/hour) — THIS server does
   // the fetching for audio (see lib/audioUpload.js), so each call
   // consumes our own compute/bandwidth directly, unlike video where
-  // Cloudflare's infrastructure absorbs the fetch.
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-import-audio'), 6, 3600);
+  // Cloudflare's infrastructure absorbs the fetch. Per IP and per account.
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-import-audio'), 6, 3600)
+    && await checkRateLimit(`creator-import-audio:${userId}`, 6, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many audio imports — please wait a bit and try again.' });
   }
