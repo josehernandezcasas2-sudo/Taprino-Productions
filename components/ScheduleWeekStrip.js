@@ -103,7 +103,6 @@ export default function ScheduleWeekStrip({ days, draft, ghostsFor, selectedDay,
               <small>{total ? dur(Math.round(total / 60) * 60) : 'open'}</small>
             </button>
             {/* The lane is a click target for the row; the bars inside stop that click. */}
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
             <div className="sch-ws-lane" onClick={() => onPickDay(d.key)}>
               {ghosts.map((g) => (
                 <span key={`g-${g.id}`} className={`sch-ws-bar ghost k-${g.kind}`} style={{ left: pct(g.start), width: pct(g.durationSeconds) }} title={`${g.title} · ${clock(g.start)}–${clock(g.start + g.durationSeconds)} · default schedule`} />

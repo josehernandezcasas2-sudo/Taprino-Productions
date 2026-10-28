@@ -49,7 +49,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, listings: initial, requests: initialRequests, loadError }) {
+export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, listings: initial, requests: initialRequests, pendingCredits = [], loadError }) {
   const router = useRouter();
   const [listings, setListings] = useState(initial);
   const [requests, setRequests] = useState(initialRequests || []);

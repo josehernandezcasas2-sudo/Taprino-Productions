@@ -8,7 +8,8 @@
     "start": "next start",
     "migrate": "node scripts/migrate-to-supabase.js",
     "bootstrap-admin": "node scripts/bootstrap-admin.js",
-    "check:refs": "node scripts/check-refs.mjs"
+    "check:refs": "node scripts/check-refs.mjs",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@clerk/nextjs": "6.39.6",
@@ -26,6 +27,10 @@
   },
   "devDependencies": {
     "@clerk/backend": "3.11.7",
-    "dotenv": "^16.4.5"
+    "@next/eslint-plugin-next": "^15.5.28",
+    "dotenv": "^16.4.5",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.13.0"
   }
 }

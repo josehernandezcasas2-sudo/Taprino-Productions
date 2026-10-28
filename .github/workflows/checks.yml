@@ -37,6 +37,8 @@ jobs:
       - run: npm ci
       - name: Missing imports and undefined JSX
         run: node scripts/check-refs.mjs
+      - name: Undefined identifiers and hook misuse (ESLint, correctness rules only)
+        run: npm run lint
       - name: Rules tests
         run: |
           set -e

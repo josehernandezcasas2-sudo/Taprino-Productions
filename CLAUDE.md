@@ -52,6 +52,7 @@ Clerk (auth; **live/production keys**, same account works across web and mobile 
 npm run dev              # web on :3000
 npm run build            # web production build
 npm run check:refs       # before every commit: missing imports, undefined JSX tags/hooks (web + app)
+npm run lint             # before every commit too (2026-10-28): ESLint with correctness rules only — no-undef (a prop passed from getServerSideProps but never destructured 500'd /locations/mine for every host), rules-of-hooks, const reassignment, duplicate keys; eslint.config.mjs; CI runs both
 cd mobile && npx expo start
 cd mobile && npx expo install <pkg>   # never plain npm add in mobile
 ```
