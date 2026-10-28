@@ -230,6 +230,28 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             separate "ST" badge — and it resizes as one unit down to
             mobile instead of the kicker surviving alone once the
             wordmark used to just disappear. */}
+        {/* Mobile fallback + genre browsing on any screen size — the five
+            fixed content-type links don't leave room for a variable list
+            of genres, so genres always live behind this menu. It sits
+            before the wordmark and is drawn without the circle the other
+            icon buttons have (.nav-hamburger; Jose, 2026-10-28, the app's
+            TopNav matches). */}
+        <button
+          className={`icon-btn nav-hamburger ${openMenu === 'ham' ? 'active' : ''}`}
+          aria-label="Browse by type and genre"
+          aria-expanded={openMenu === 'ham'}
+          onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
+        >
+          {/* Was a plain "☰" character — .icon-btn's font-family stack is
+              literally aimed at emoji fonts (Apple Color Emoji etc.),
+              which don't all draw a glyph centered in its own em-box, so
+              flexbox centering the button itself wasn't enough to center
+              what actually got painted inside it. Same fix as Search and
+              Notifications, which already use a drawn SVG instead of a
+              character for exactly this reason. */}
+          <HamburgerMenuIcon src={iconOverrides.hamburger} size={20} />
+        </button>
+
         <Link href={ownProfile && ownProfile.stayInStream ? '/stream' : '/'} className="brand-mark">
           {siteSettings && siteSettings.logoUrl && (
             <Image
@@ -269,25 +291,6 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             <a href={siteSettings.shopUrl} target="_blank" rel="noopener noreferrer" className="nav-link">Shop</a>
           )}
         </nav>
-
-        {/* Mobile fallback + genre browsing on any screen size — the five
-            fixed content-type links above don't leave room for a variable
-            list of genres, so genres always live behind this menu. */}
-        <button
-          className={`icon-btn nav-hamburger ${openMenu === 'ham' ? 'active' : ''}`}
-          aria-label="Browse by type and genre"
-          aria-expanded={openMenu === 'ham'}
-          onClick={(e) => { e.stopPropagation(); setOpenMenu((m) => (m === 'ham' ? null : 'ham')); }}
-        >
-          {/* Was a plain "☰" character — .icon-btn's font-family stack is
-              literally aimed at emoji fonts (Apple Color Emoji etc.),
-              which don't all draw a glyph centered in its own em-box, so
-              flexbox centering the button itself wasn't enough to center
-              what actually got painted inside it. Same fix as Search and
-              Notifications right below, which already use a drawn SVG
-              instead of a character for exactly this reason. */}
-          <HamburgerMenuIcon src={iconOverrides.hamburger} />
-        </button>
 
         {openMenu === 'ham' && (
           <div className="dropdown dropdown-left open hamburger-dropdown">

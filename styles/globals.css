@@ -4838,7 +4838,9 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .nav-link:hover { color: var(--ink); }
 .nav-link.active { color: var(--brass); border-bottom-color: var(--brass); }
 
-.nav-hamburger { display: none; }
+/* Before the wordmark and without the circle (Jose, 2026-10-28): the
+   lines alone, same hit area as the other icon buttons. */
+.nav-hamburger { display: none; border: none; background: transparent; }
 
 .tapa-plus-pill {
   background: var(--brass);

@@ -278,6 +278,18 @@ export default function TopNav() {
   return (
     <>
       <View style={styles.bar} ref={barRef} collapsable={false}>
+        {/* The hamburger first, drawn without the circle the other
+            buttons have (the website's .nav-hamburger; Jose, 2026-10-28). */}
+        <Pressable
+          style={({ pressed }) => [styles.menuBtn, pressed && styles.iconBtnPressed]}
+          onPress={() => openPanel('menu')}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="Browse by type and genre"
+          accessibilityState={{ expanded: panel === 'menu' }}
+        >
+          <MenuIcon size={20} color={panel === 'menu' ? colors.olive : colors.inkDim} />
+        </Pressable>
         <Pressable style={styles.brandMark} onPress={() => router.push(ownProfile && ownProfile.stayInStream ? '/stream' : '/')} hitSlop={6}>
           {settings && settings.logoUrl ? (
             <Image source={{ uri: settings.logoUrl }} style={styles.logoImage} resizeMode="contain" />
@@ -287,9 +299,6 @@ export default function TopNav() {
             <Text style={[styles.kicker, { color: stream ? colors.olive : colors.ok }]} numberOfLines={1}>{kicker}</Text>
           </View>
         </Pressable>
-        <CircleButton label="Browse by type and genre" active={panel === 'menu'} onPress={() => openPanel('menu')}>
-          <MenuIcon size={17} color={panel === 'menu' ? colors.olive : colors.inkDim} />
-        </CircleButton>
         <View style={styles.spacer} />
         <View style={styles.actions}>
           <CircleButton label="Search" onPress={() => router.push('/search')}>
@@ -517,6 +526,8 @@ const styles = StyleSheet.create({
   iconBtn: { width: 32, height: 32, borderRadius: 16, borderWidth: 1, borderColor: inkTint(0.18), alignItems: 'center', justifyContent: 'center' },
   iconBtnActive: { borderColor: colors.olive },
   iconBtnPressed: { backgroundColor: inkTint(0.06) },
+  // .nav-hamburger: the same 32px hit area, no border.
+  menuBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginLeft: -4 },
   // .notification-badge
   badge: { position: 'absolute', top: -4, right: -4, minWidth: 14, paddingHorizontal: 4, paddingVertical: 2, borderRadius: 999, backgroundColor: colors.danger, alignItems: 'center' },
   badgeText: { fontFamily: fonts.mono, fontSize: 9.6, lineHeight: 10, color: colors.ink },
