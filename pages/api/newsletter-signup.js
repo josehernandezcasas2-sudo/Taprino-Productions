@@ -21,8 +21,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await saveNewsletterSignup(email, 'footer');
-    return res.status(200).json(result);
+    // The answer is the same whether the address was already on the list
+    // or not (security round 2, 2026-10-28): a signed-out caller could
+    // otherwise test addresses against the subscriber list.
+    await saveNewsletterSignup(email, 'footer');
+    return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('newsletter-signup error:', err.message);
     return res.status(500).json({ error: 'Could not save your signup right now — please try again in a moment.' });

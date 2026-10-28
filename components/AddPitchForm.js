@@ -17,7 +17,9 @@ function readAsDataUrl(file) {
 // episode nor a series, it's a Pitch Room listing with its own funding
 // fields and its own endpoint (api/creator/create-pitch.js).
 export default function AddPitchForm({ onSubmitted }) {
-  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingRaised: '', fundingDeadline: '' });
+  // "Raised so far" left the form on 2026-10-28: backing through the site
+  // is counted from paid rows, and a typed figure drew a progress bar.
+  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingDeadline: '' });
   const [team, setTeam] = useState([{ name: '', role: '' }]);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [heroFile, setHeroFile] = useState(null);
@@ -119,14 +121,10 @@ export default function AddPitchForm({ onSubmitted }) {
       <label>Where should &ldquo;Fund this project&rdquo; send people? <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — you can add this later</span></label>
       <input type="url" value={form.projectUrl} onChange={(e) => update('projectUrl', e.target.value)} placeholder="https://kickstarter.com/..." />
 
-      <div className="admin-field-row cols-3">
+      <div className="admin-field-row cols-2">
         <div className="admin-field">
           <label>Funding goal <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional, self-reported</span></label>
           <input type="number" min="0" value={form.fundingGoal} onChange={(e) => update('fundingGoal', e.target.value)} />
-        </div>
-        <div className="admin-field">
-          <label>Raised so far <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
-          <input type="number" min="0" value={form.fundingRaised} onChange={(e) => update('fundingRaised', e.target.value)} />
         </div>
         <div className="admin-field">
           <label>Funding deadline <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>

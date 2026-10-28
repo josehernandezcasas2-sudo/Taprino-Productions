@@ -2,6 +2,8 @@ import { getAccountContext } from '../../../lib/accountContext';
 import { createPurchaseCheckout } from '../../../lib/purchases';
 import { applyCors } from '../../../lib/cors';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { requestOrigin } from '../../../lib/stripe';
+import { sendError } from '../../../lib/apiErrors';
 
 // POST { type: 'episode' | 'series', id, returnTo? } → { url }: a Stripe
 // Checkout page for buying the title outright. The app opens the url in
@@ -22,13 +24,14 @@ export default async function handler(req, res) {
   // (security round, 2026-10-26).
   if (!(await checkRateLimit(`purchase-checkout:${account.userId}`, 20, 3600))) return res.status(429).json({ error: 'That’s a lot of checkouts — try again in a little while.' });
   const { type, id, returnTo } = req.body || {};
-  const origin = process.env.NEXT_PUBLIC_SITE_URL || `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers.host}`;
+  // One of the site's own addresses, never the request's Host header
+  // (the security round's rule for every Stripe return path; this route
+  // was the one still reading the header, 2026-10-28).
+  const origin = requestOrigin(req);
   try {
     const out = await createPurchaseCheckout({ type, id, buyerId: account.userId, buyerEmail: account.email, isMember: account.isSubscriber, origin, returnTo });
     return res.status(200).json(out);
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('purchases/checkout error:', err.message);
-    return res.status(500).json({ error: 'Could not open checkout. Try again in a moment.' });
+    return sendError(res, err, 'purchases/checkout', 'Could not open checkout. Try again in a moment.');
   }
 }

@@ -1,5 +1,6 @@
 import { findUserByEmail } from '../../../lib/roles';
 import { requireCapability } from '../../../lib/adminAuth';
+import { hasCapability } from '../../../lib/capabilities';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { bunnyPlaybackUrl, isValidBunnyHost, muxPlaybackUrl, isValidMuxPlaybackId } from '../../../lib/videoProviders';
@@ -76,6 +77,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });
   }
   const status = body.status && VALID_STATUSES.includes(body.status) ? body.status : 'pending';
+  // A title created already approved skips review: only someone who may
+  // review can do that (security round 2, 2026-10-28).
+  if (status !== 'pending' && !hasCapability(roleContext, 'review_submissions')) {
+    return res.status(403).json({ error: 'Creating a title that isn’t pending review needs the review capability.' });
+  }
   if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || body.seriesId === '__new__') && !body.newSeriesName) {
     return res.status(400).json({ error: `Choose a ${body.contentType === 'podcast' ? 'show' : 'series'}, or provide newSeriesName to create one.` });
   }

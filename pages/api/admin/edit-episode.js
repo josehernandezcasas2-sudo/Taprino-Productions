@@ -1,4 +1,5 @@
 import { requireCapability } from '../../../lib/adminAuth';
+import { hasCapability } from '../../../lib/capabilities';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
@@ -52,6 +53,12 @@ export default async function handler(req, res) {
   }
   if (fields.status && !VALID_STATUSES.includes(fields.status)) {
     return res.status(400).json({ error: `status must be one of: ${VALID_STATUSES.join(', ')}` });
+  }
+  // Publishing or unpublishing is the review capability's call, not
+  // metadata's (security round 2, 2026-10-28): a sub-admin with
+  // manage_episodes alone could set status: approved here.
+  if (fields.status && fields.status !== existing.status && !hasCapability(roleContext, 'review_submissions')) {
+    return res.status(403).json({ error: 'Changing a title’s status needs the review capability.' });
   }
   if (fields.contentType && !VALID_CONTENT_TYPES.includes(fields.contentType)) {
     return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });

@@ -31,7 +31,8 @@ export default function NewPitch() {
   const router = useRouter();
   const { getToken } = useAuth();
   const scrollRef = useRef(null);
-  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingRaised: '', fundingDeadline: '' });
+  // "Raised so far" left the form on 2026-10-28 (the website's too).
+  const [form, setForm] = useState({ title: '', logline: '', description: '', projectUrl: '', tag: '', fundingGoal: '', fundingDeadline: '' });
   const [team, setTeam] = useState([{ name: '', role: '' }]);
   const [thumb, setThumb] = useState(null);
   const [hero, setHero] = useState(null);
@@ -111,16 +112,8 @@ export default function NewPitch() {
         <Text style={styles.label}>Where should “Fund this project” send people? <Text style={styles.hint}>optional — leave blank to take backing here once payouts are set up</Text></Text>
         <TextInput style={styles.input} value={form.projectUrl} onChangeText={(v) => update('projectUrl', v)} placeholder="https://kickstarter.com/..." placeholderTextColor={colors.inkFaint} autoCapitalize="none" keyboardType="url" />
 
-        <View style={styles.row}>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Funding goal <Text style={styles.hint}>optional</Text></Text>
-            <TextInput style={styles.input} value={form.fundingGoal} onChangeText={(v) => update('fundingGoal', v)} keyboardType="number-pad" placeholder="2000" placeholderTextColor={colors.inkFaint} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.label}>Raised so far <Text style={styles.hint}>optional</Text></Text>
-            <TextInput style={styles.input} value={form.fundingRaised} onChangeText={(v) => update('fundingRaised', v)} keyboardType="number-pad" placeholder="0" placeholderTextColor={colors.inkFaint} />
-          </View>
-        </View>
+        <Text style={styles.label}>Funding goal <Text style={styles.hint}>optional</Text></Text>
+        <TextInput style={styles.input} value={form.fundingGoal} onChangeText={(v) => update('fundingGoal', v)} keyboardType="number-pad" placeholder="2000" placeholderTextColor={colors.inkFaint} />
         <Text style={styles.label}>Funding deadline <Text style={styles.hint}>optional, YYYY-MM-DD</Text></Text>
         <TextInput style={styles.input} value={form.fundingDeadline} onChangeText={(v) => update('fundingDeadline', v)} placeholder="2026-12-31" placeholderTextColor={colors.inkFaint} autoCapitalize="none" />
 

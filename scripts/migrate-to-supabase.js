@@ -41,6 +41,14 @@ async function main() {
     console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env.local — nothing to do.');
     process.exit(1);
   }
+  // These rows are upserted as approved titles with fixed ids. Against
+  // anything but a local database that needs saying out loud (security
+  // round 2, 2026-10-28): `--live` on the command line.
+  const local = /^https?:\/\/(127\.0\.0\.1|localhost)(:|\/|$)/.test(process.env.SUPABASE_URL);
+  if (!local && !process.argv.includes('--live')) {
+    console.error(`SUPABASE_URL points at ${process.env.SUPABASE_URL}, not a local database. Re-run with --live to seed the test content there anyway.`);
+    process.exit(1);
+  }
 
   const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
 

@@ -37,12 +37,14 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Account deletion requests aren’t available right now — please contact support directly.' });
   }
 
+  // Escaped like every other mail builder (an address is user-typed text).
+  const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   await sendEmail({
     to: adminEmail,
     subject: `Account deletion request — ${account.email || userId}`,
     html: `<p>A user has requested their account be deleted.</p>
-      <p><strong>Email:</strong> ${account.email || 'unknown'}<br>
-      <strong>User ID:</strong> ${userId}<br>
+      <p><strong>Email:</strong> ${esc(account.email || 'unknown')}<br>
+      <strong>User ID:</strong> ${esc(userId)}<br>
       <strong>Requested at:</strong> ${new Date().toISOString()}</p>`
   });
 

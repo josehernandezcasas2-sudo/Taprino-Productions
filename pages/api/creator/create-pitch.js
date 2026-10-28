@@ -5,6 +5,7 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { PITCH_TAGS } from '../../../lib/pitches';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
 // 33% larger than the original file) plus the rest of the JSON payload
@@ -60,7 +61,7 @@ export default async function handler(req, res) {
       heroImage = await uploadArtworkImage({ base64: body.heroImageBase64, fileName: body.heroImageFileName, pathPrefix: 'pitch-hero' });
     }
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'creator/create-pitch', 'Could not upload the images.', { plainStatus: 400 });
   }
 
   const supabase = getSupabase();
@@ -78,7 +79,12 @@ export default async function handler(req, res) {
       thumbnail,
       hero_image: heroImage,
       funding_goal: num(body.fundingGoal),
-      funding_raised: num(body.fundingRaised),
+      // "Raised so far" is not the creator's to type (security round 2,
+      // 2026-10-28): the Notice Board and My List drew it as the progress
+      // bar, so a made-up figure was social proof no payment backed.
+      // Backing through the site is counted from paid rows; an admin can
+      // still record an outside campaign's figure on /admin/pitch-room.
+      funding_raised: null,
       funding_deadline: /^\d{4}-\d{2}-\d{2}$/.test(String(body.fundingDeadline || '')) ? body.fundingDeadline : null,
       // Team members are plain objects of short strings (name, role…).
       team: Array.isArray(body.team)
