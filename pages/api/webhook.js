@@ -3,12 +3,12 @@ import { addAdCredits } from '../../lib/adAccounts';
 import { syncAccountFromStripe } from '../../lib/creatorPayouts';
 import { completeDonationFromSession, failDonationFromSession, refundDonationFromCharge } from '../../lib/pitchDonations';
 import { completeBookingFromSession, refundBookingFromCharge } from '../../lib/locationRequests';
-import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge } from '../../lib/creatorShare';
-import { recordAdCreditPurchase, reverseAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
+import { endReferralForSubscription, recordCheckoutCustomer, recordMembershipInvoice, reverseMembershipCharge, restoreMembershipCharge } from '../../lib/creatorShare';
+import { recordAdCreditPurchase, reverseAdCreditPurchase, restoreAdCreditPurchase, syncSweepFromPayout } from '../../lib/studioMoney';
 import { syncPayoutReversal } from '../../lib/creatorShareBatch';
 import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFromCharge } from '../../lib/purchases';
 import { completeTipFromSession, failTipFromSession, refundTipFromCharge } from '../../lib/tips';
-import { completeCrewPayFromSession, failCrewPayFromSession, refundCrewPayFromCharge, releasePendingCrewPay } from '../../lib/crewPay';
+import { completeCrewPayFromSession, failCrewPayFromSession, refundCrewPayFromCharge, releasePendingCrewPay, syncCrewPayReversal } from '../../lib/crewPay';
 import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
@@ -278,8 +278,16 @@ export default async function handler(req, res) {
     }
     case 'charge.dispute.closed': {
       // The bank ruled. Won: a backing counts again and anything taken back
-      // from a creator or host is paid back. Lost: it stays as it is.
-      await run('closeDispute', () => closeDispute(event.data.object));
+      // from a creator or host is paid back; a membership payment's
+      // reversed credits and an advertiser's removed credit come back too
+      // (security round 2, 2026-10-28). Lost: it stays as it is.
+      const closed = event.data.object;
+      await run('closeDispute', () => closeDispute(closed));
+      if (closed.status === 'won' || closed.status === 'warning_closed') {
+        const wonPi = typeof closed.payment_intent === 'string' ? closed.payment_intent : closed.payment_intent && closed.payment_intent.id;
+        await run('restoreMembershipCharge', () => restoreMembershipCharge({ id: closed.charge, payment_intent: wonPi }));
+        await run('restoreAdCreditPurchase', () => restoreAdCreditPurchase({ paymentIntentId: wonPi }));
+      }
       break;
     }
     case 'checkout.session.expired': {
@@ -340,8 +348,10 @@ export default async function handler(req, res) {
       break;
     case 'transfer.reversed': {
       // A Creator Share payout reversed in the Stripe dashboard: the
-      // credits are owed to the creator again.
+      // credits are owed to the creator again. A crew-pay release reversed
+      // there (migration 114) is recorded on its row.
       await run('syncPayoutReversal', () => syncPayoutReversal(event.data.object));
+      await run('syncCrewPayReversal', () => syncCrewPayReversal(event.data.object));
       break;
     }
     case 'payout.paid':

@@ -349,7 +349,7 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
                   {myPay.map((p) => (
                     <div key={p.id} className="crew-rhead">
                       <span><b>{payDollars(p.amountCents)}</b> · {p.call.role} on <Link href={`/crew/calls/${p.call.id}`}>{p.call.title}</Link></span>
-                      <span className={`crew-chip ${p.status === 'released' ? 'ok' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
+                      <span className={`crew-chip ${p.status === 'released' ? 'ok' : 'olive'}`}>{p.status === 'released' ? `💸 sent ${new Date(p.releasedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : p.holdLabel ? `🔒 yours — ${p.holdLabel}` : p.releaseRequestedAt ? '🔒 yours — waiting on your payout account' : '🔒 held until the job is confirmed'}</span>
                     </div>
                   ))}
                 </div>

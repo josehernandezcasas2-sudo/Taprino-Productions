@@ -42,7 +42,7 @@ export default async function handler(req, res) {
       action: 'creator_payouts_run',
       targetType: 'creator_share',
       targetId: result.period,
-      details: `${isCronRequest ? 'cron' : 'manual'} · ${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held${result.adShare ? ` · ad share ${result.adShare.error ? `failed: ${result.adShare.error}` : `${dollars(result.adShare.totalCents)} to ${result.adShare.creators || 0} creators for ${result.adShare.period}`}` : ''}`
+      details: `${isCronRequest ? 'cron' : 'manual'} · ${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held${result.adShare ? ` · ad share ${result.adShare.error ? `failed: ${result.adShare.error}` : result.adShare.skipped ? `skipped (${result.adShare.skipped}, ${result.adShare.period})` : `${dollars(result.adShare.totalCents)} to ${result.adShare.creators || 0} creators for ${result.adShare.period}`}` : ''}`
     }).catch(() => {});
     return res.status(200).json({ ok: true, period: result.period, paid: result.paid.length, paidCents: result.paidCents, failed: result.failed.length, skippedForBalance: result.skippedForBalance.length, held: result.held.length, adShare: result.adShare || null });
   } catch (err) {

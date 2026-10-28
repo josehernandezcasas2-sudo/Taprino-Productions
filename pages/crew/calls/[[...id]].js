@@ -463,7 +463,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
             {viewerResponse.callbackAt && <span className="crew-chip olive">Callback {new Date(viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span>}
             {(viewerResponse.selfTapeUrl || viewerResponse.selfTapeUid) && <span className="crew-chip ok">✓ Self-tape attached</span>}
             {viewerResponse.outcome === 'worked' && <span className="crew-chip ok">✓ Confirmed job — on your track record</span>}
-            {viewerResponse.pay && viewerResponse.pay.status === 'held' && <span className="crew-chip olive">🔒 {payDollars(viewerResponse.pay.amountCents)} secured for you{viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms you worked'}</span>}
+            {viewerResponse.pay && viewerResponse.pay.status === 'held' && <span className="crew-chip olive">🔒 {payDollars(viewerResponse.pay.amountCents)} secured for you{viewerResponse.pay.holdLabel ? ` — ${viewerResponse.pay.holdLabel}` : viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms you worked'}</span>}
             {viewerResponse.pay && viewerResponse.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(viewerResponse.pay.amountCents)} sent to your payout account</span>}
             {viewerResponse.pay && viewerResponse.pay.status === 'refunded' && <span className="crew-chip mute">The secured pay went back to the poster</span>}
             {call.paySecured && viewerResponse.status === 'booked' && !viewerResponse.pay && <span className="crew-chip mute">🔒 {payDollars(call.payRateCents)} secured pay — not funded yet</span>}
@@ -534,7 +534,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
                   {r.outcome === 'worked' && <span className="crew-chip ok">✓ Worked it</span>}
                   {r.outcome === 'no_show' && <span className="crew-chip warn">Didn't happen</span>}
                   {r.outcome === 'cancelled' && <span className="crew-chip mute">Cancelled</span>}
-                  {r.pay && r.pay.status === 'held' && <span className="crew-chip olive" title={`You paid ${payDollars(r.pay.totalCents)} (${payDollars(r.pay.cutCents)} ${SITE.name} fee + ${payDollars(r.pay.feeCents)} card processing)`}>🔒 {payDollars(r.pay.amountCents)} held{r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}</span>}
+                  {r.pay && r.pay.status === 'held' && <span className="crew-chip olive" title={`You paid ${payDollars(r.pay.totalCents)} (${payDollars(r.pay.cutCents)} ${SITE.name} fee + ${payDollars(r.pay.feeCents)} card processing)`}>🔒 {payDollars(r.pay.amountCents)} held{r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}</span>}
                   {r.pay && r.pay.status === 'released' && <span className="crew-chip ok">💸 {payDollars(r.pay.amountCents)} paid out</span>}
                   {r.pay && r.pay.status === 'refunded' && <span className="crew-chip mute">↩ {payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you</span>}
                   {r.pay && r.pay.status === 'pending_payment' && <span className="crew-chip warn">Payment not finished</span>}

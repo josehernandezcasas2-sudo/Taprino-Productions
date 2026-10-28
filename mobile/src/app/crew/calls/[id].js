@@ -189,7 +189,7 @@ export default function CallScreen() {
                   {data.viewerResponse.callbackAt ? <Chip label={`Callback ${new Date(data.viewerResponse.callbackAt).toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}`} tone="gear" /> : null}
                   {data.viewerResponse.selfTapeUrl || data.viewerResponse.selfTapeUid ? <Chip label="✓ Self-tape attached" tone="ok" /> : null}
                   {data.viewerResponse.outcome === 'worked' ? <Chip label="✓ Confirmed job — on your track record" tone="ok" /> : null}
-                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(data.viewerResponse.pay.amountCents)} secured for you${data.viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms'}`} tone="gear" /> : null}
+                  {data.viewerResponse.pay && data.viewerResponse.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(data.viewerResponse.pay.amountCents)} secured for you${data.viewerResponse.pay.holdLabel ? ` — ${data.viewerResponse.pay.holdLabel}` : data.viewerResponse.pay.releaseRequestedAt ? ' — waiting on your payout account' : ' — released when the poster confirms'}`} tone="gear" /> : null}
                   {data.viewerResponse.pay && data.viewerResponse.pay.status === 'released' ? <Chip label={`💸 ${payDollars(data.viewerResponse.pay.amountCents)} sent to your payout account`} tone="ok" /> : null}
                   {data.viewerResponse.pay && data.viewerResponse.pay.status === 'refunded' ? <Chip label="The secured pay went back to the poster" tone="mute" /> : null}
                   {call.paySecured && data.viewerResponse.status === 'booked' && !data.viewerResponse.pay ? <Chip label={`🔒 ${payDollars(call.payRateCents)} secured pay — not funded yet`} tone="mute" /> : null}
@@ -263,7 +263,7 @@ export default function CallScreen() {
                       {r.status === 'declined' ? <Chip label="Declined" tone="mute" /> : null}
                       {r.outcome === 'worked' ? <Chip label="✓ Worked it" tone="ok" /> : null}
                       {r.outcome === 'no_show' ? <Chip label="Didn't happen" tone="mute" /> : null}
-                      {r.pay && r.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
+                      {r.pay && r.pay.status === 'held' ? <Chip label={`🔒 ${payDollars(r.pay.amountCents)} held${r.pay.holdLabel ? ` · ${r.pay.holdLabel}` : r.pay.releaseRequestedAt ? ' · waiting on their payout account' : ' · released when you confirm'}`} tone="gear" /> : null}
                       {r.pay && r.pay.status === 'released' ? <Chip label={`💸 ${payDollars(r.pay.amountCents)} paid out`} tone="ok" /> : null}
                       {r.pay && r.pay.status === 'refunded' ? <Chip label={`↩ ${payDollars(r.pay.refundedCents == null ? r.pay.totalCents : r.pay.refundedCents)} refunded to you`} tone="mute" /> : null}
                       {r.pay && r.pay.status === 'pending_payment' ? <Chip label="Payment not finished" tone="mute" /> : null}

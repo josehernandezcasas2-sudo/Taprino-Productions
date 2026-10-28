@@ -1,3 +1,4 @@
+import { getAuth } from '@clerk/nextjs/server';
 import { getSupabase } from '../../../lib/supabase';
 import { TRANSPARENT_PIXEL } from '../../../lib/houseAds';
 import { recordDailyAdImpression } from '../../../lib/redis';
@@ -17,6 +18,21 @@ async function adMayCount(supabase, adId) {
   if (!ad.ad_account_id) return true;
   const { data: account } = await supabase.from('ad_accounts').select('status, credit_balance_cents').eq('id', ad.ad_account_id).maybeSingle();
   return Boolean(account && account.status === 'active' && Number(account.credit_balance_cents) > 0);
+}
+
+// A creator watching their own title with ads earns no ad share from it
+// (security round 2, 2026-10-28): the advertiser's impression still
+// counts (the ad played), the title's row does not. The pixel is fired
+// from the viewer's own browser, so their session cookie says who they are.
+async function isOwnTitle(supabase, req, episodeId) {
+  try {
+    const { userId } = getAuth(req);
+    if (!userId) return false;
+    const { data } = await supabase.from('episodes').select('submitted_by').eq('id', episodeId).maybeSingle();
+    return Boolean(data && data.submitted_by && data.submitted_by === userId);
+  } catch (err) {
+    return false;
+  }
 }
 
 // Fired by the IMA SDK as a plain GET the moment a house ad actually starts
@@ -64,7 +80,7 @@ export default async function handler(req, res) {
         // and where (the pre-roll, an on-demand break, a live break), so
         // the month's credit can be shared with that title's creator.
         // Reels and a live loop send no episode and earn nothing.
-        if (typeof episode === 'string' && UUID_RE.test(episode)) {
+        if (typeof episode === 'string' && UUID_RE.test(episode) && !(await isOwnTitle(supabase, req, episode))) {
           const { error } = await supabase.rpc('record_ad_impression', { p_ad: ad, p_episode: episode, p_surface: normalizeSurface(typeof surface === 'string' ? surface : '') });
           if (error && !/could not find the function|does not exist/i.test(error.message || '')) console.error('record_ad_impression:', error.message);
         }

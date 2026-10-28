@@ -383,7 +383,10 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         poster then pays the posted rate for each person they book, plus our {crewPayCutPercent}% service fee
         and the card processing fee on top, so the crew member receives exactly the posted rate. We hold the
         money until the poster confirms the person worked the job, then send the rate to that person&rsquo;s
-        payout account; if the poster says the person didn&rsquo;t show, the poster gets everything back, and
+        payout account. Between accounts new to {SITE.name}, or for a person&rsquo;s first payout through
+        it, the rate is sent seven days after the confirmation rather than at once, the same for everyone;
+        the poster&rsquo;s bank may ask them to confirm the payment when they fund it. If the poster says the
+        person didn&rsquo;t show, the poster gets everything back, and
         if the booking is cancelled the poster gets everything back except the card fee. Once anyone on a call
         is funded, the rate and fee are fixed for that call. A poster who disputes a secured payment with
         their bank puts the pay on hold until the bank rules; money already sent to a crew member after the
