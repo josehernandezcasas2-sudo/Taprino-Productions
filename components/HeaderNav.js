@@ -431,8 +431,13 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         >
           {ownAvatarUrl ? (
             <Image src={ownAvatarUrl} alt="" fill sizes="34px" className="avatar-img" style={ownAvatarStyle} />
+          ) : isSignedIn && avatarLetter ? (
+            avatarLetter
           ) : (
-            isSignedIn ? avatarLetter : '☺'
+            // Signed out: the person glyph, never a "☺" — iOS draws that
+            // character as a colour emoji (Jose, 2026-10-28; the app's
+            // TopNav had the same).
+            <AccountIcon size={18} />
           )}
         </button>
 
@@ -446,7 +451,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                       {ownAvatarUrl ? (
                         <Image src={ownAvatarUrl} alt="" fill sizes="38px" className="avatar-img" style={ownAvatarStyle} />
                       ) : (
-                        avatarLetter || '☺'
+                        avatarLetter || <AccountIcon size={20} />
                       )}
                     </div>
                     <div>
@@ -456,7 +461,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                   </Link>
                 ) : (
                   <div className="account-dropdown-header">
-                    <div className="account-dropdown-avatar">{avatarLetter || '☺'}</div>
+                    <div className="account-dropdown-avatar">{avatarLetter || <AccountIcon size={20} />}</div>
                     <div>
                       <div className="account-dropdown-email">{email || 'Your account'}</div>
                       <div className="account-dropdown-tier">{isSubscriber ? `${SITE.premiumTier} member` : 'Free account'}</div>
