@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { apiGet, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
@@ -31,7 +31,10 @@ export default function CrewCall() {
   const [near, setNear] = useState(null);
   const [within, setWithin] = useState(DEFAULT_WITHIN);
   const [openOnly, setOpenOnly] = useState(false);
-  const [freeNow, setFreeNow] = useState(false);
+  // `?free=1` (the home screen's "Everyone free now" link, like the
+  // website's /crew?free=1) opens the directory on the free-right-now filter.
+  const params = useLocalSearchParams();
+  const [freeNow, setFreeNow] = useState(params.free === '1');
   const [verifiedOnly, setVerifiedOnly] = useState(false);
   const [people, setPeople] = useState(null);
   const [gear, setGear] = useState(null);

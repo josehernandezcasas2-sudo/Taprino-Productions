@@ -4,12 +4,11 @@ import { getOwnCard } from '../../lib/crewCards';
 import { limitPublicRead } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
 
-// Public, read-only feed for external clients (the mobile app) — the same
-// content the website's homepage shows an anonymous visitor, minus any
-// per-viewer personalization (subscriber status, etc.), which stays
-// server-rendered only on the website. The one exception is the Crew
-// Call rows: with a Bearer token, "Open to work near you" and the calls
-// are measured from the viewer's own card, and that answer isn't cached.
+// The Notice Board feed for the mobile app (lib/homeFeed.js, the same
+// data pages/index.js renders): the board for everyone, and with a Bearer
+// token the viewer's desk (working card, what needs them) plus the board
+// measured from their own card — that answer isn't cached. Subscriber
+// status stays on /api/account/dashboard-info, the role on /api/my-role.
 export default async function handler(req, res) {
   if (req.method === 'OPTIONS') {
     applyCors(req, res);
