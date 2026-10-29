@@ -69,6 +69,10 @@ export default function RootLayout() {
           {/* The series hub renders TopNav + the Back pill itself
               (2026-10-29: the native header looked like another app). */}
           <Stack.Screen name="series/[id]" options={{ headerShown: false }} />
+          {/* The episode screen too (2026-10-29, the "After Play" canvas):
+              TopNav, a 16:9 player with the site's own controls, the
+              Back pill. */}
+          <Stack.Screen name="episode/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="live/index" options={{ headerShown: false }} />
           <Stack.Screen name="live/[slug]" options={{ headerShown: false }} />
           <Stack.Screen name="about" options={{ headerShown: false }} />

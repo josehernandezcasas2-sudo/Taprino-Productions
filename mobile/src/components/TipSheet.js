@@ -158,14 +158,21 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
 // (the profile's action pill, the episode's credit chip); the coin sits
 // before the label in `iconColor`. Renders nothing when the creator
 // can't be tipped.
-export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, iconColor = colors.olive, iconSize = 13, children, presetCents = 500, onDone }) {
+// `renderInner` draws the button's content instead of the glyph + label
+// row (the episode screen's round action: a ring with the coin, the
+// label under it).
+export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, iconColor = colors.olive, iconSize = 13, children, presetCents = 500, onDone, renderInner = null }) {
   const [open, setOpen] = useState(false);
   if (!tipping || !tipping.enabled) return null;
   return (
     <>
-      <Pressable style={[style, { flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
-        <TipGlyph size={iconSize} color={iconColor} />
-        <Text style={textStyle}>{children || `Tip ${short(tipping.creatorName)}`}</Text>
+      <Pressable style={renderInner ? style : [style, { flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
+        {renderInner ? renderInner() : (
+          <>
+            <TipGlyph size={iconSize} color={iconColor} />
+            <Text style={textStyle}>{children || `Tip ${short(tipping.creatorName)}`}</Text>
+          </>
+        )}
       </Pressable>
       <TipSheet tipping={tipping} visible={open} initialAmountCents={presetCents} onClose={() => setOpen(false)} getToken={getToken} returnTo={returnTo} onDone={onDone} />
     </>

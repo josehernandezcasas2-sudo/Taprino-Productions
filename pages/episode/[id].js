@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
-import { PlayIcon, HeartIcon, TipIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, DiamondIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { episodeCode } from '../../lib/seriesResume';
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
@@ -31,6 +32,69 @@ import { AiSealChip } from '../../components/AiSeal';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
+
+// "22 min" from a "22:00" runtime — the strip's meta line (the Continue
+// Watching card's "12 min left" spells minutes the same way).
+function minutesLabel(runtime) {
+  const s = parseRuntimeToSeconds(runtime);
+  return s ? `${Math.max(1, Math.round(s / 60))} min` : (runtime || '');
+}
+
+function CheckGlyph() {
+  return (
+    <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 12l5 5L20 6" />
+    </svg>
+  );
+}
+
+// The season as landscape cards (the "After Play" canvas, 2026-10-29,
+// https://claude.ai/artifact/UJZJriGJqXaDXeJgSzcKsf): a Watched tick, the
+// one playing now outlined with a "Now playing" pill, a progress bar on
+// anything partway through. Two across + a peek on a phone, a vertical
+// list beside the player on a laptop (.ep-strip). Also the standalone
+// title's "Watch next" picks, without the codes.
+function EpisodeStrip({ heading, items, seeAllHref, seeAllLabel = 'See all', iconOverrides, showCode = true }) {
+  return (
+    <section className="ep-episodes" aria-label={heading}>
+      <div className="ep-strip-head">
+        <h2>{heading}</h2>
+        {seeAllHref && <Link href={seeAllHref} className="ep-strip-seeall">{seeAllLabel}</Link>}
+      </div>
+      <div className="ep-strip">
+        {items.map((it) => {
+          const total = parseRuntimeToSeconds(it.runtime);
+          const pct = it.resumeSeconds && total ? Math.min(100, Math.round((it.resumeSeconds / total) * 100)) : 0;
+          const code = showCode ? episodeCode(it) : null;
+          return (
+            <Link
+              key={it.id}
+              href={it.href}
+              className={`ep-strip-card ${it.current ? 'is-current' : ''} ${it.watched && !it.current ? 'is-watched' : ''}`}
+              aria-current={it.current ? 'true' : undefined}
+            >
+              <span className="ep-strip-thumb" style={it.thumbnail ? { backgroundImage: `url(${it.thumbnail})` } : undefined}>
+                {it.current ? (
+                  <span className="ep-strip-pill now">Now playing</span>
+                ) : it.watched ? (
+                  <span className="ep-strip-pill watched"><CheckGlyph /> Watched</span>
+                ) : (
+                  <span className="ep-strip-play"><PlayIcon size={20} src={iconOverrides.play} /></span>
+                )}
+                {pct > 0 && <span className="ep-strip-progress" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>}
+              </span>
+              <span className="ep-strip-info">
+                <span className="ep-strip-title">{it.title}</span>
+                <span className="ep-strip-meta">{[code, minutesLabel(it.runtime)].filter(Boolean).join(' · ')}</span>
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 export async function getServerSideProps({ req, params, query, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   // View count, age gate, next/previous, Watch next and bonus content all
@@ -131,6 +195,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       nextEpisode: data.nextEpisode,
       previousEpisode: data.previousEpisode,
       previousEpisodeWatched: data.previousEpisodeWatched,
+      seasonEpisodes: data.seasonEpisodes || [],
       watchNext: data.watchNext,
       startOnTrailer: query.trailer === '1',
       startPlaying: query.autoplay === '1',
@@ -151,7 +216,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -184,6 +249,20 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
   // Tips: the end-of-episode card, once per title (components/TipSheet.js).
   const [tipEndCard, setTipEndCard] = useState(false);
+  // "Resumed from 5:00" over the player for a few seconds, once per title
+  // (the "After Play" canvas, 2026-10-29; it used to be a card under it).
+  const [resumeToast, setResumeToast] = useState(0);
+  const resumeToastFor = useRef(null);
+  const lockedNow = (episode.tier === 'premium' && !isSubscriber && !owned) || Boolean(earlyAccess && earlyAccess.locked);
+  useEffect(() => {
+    if (!showPlayer || showingTrailer || lockedNow || !episode.id || resumeToastFor.current === episode.id) return undefined;
+    const pos = getPosition(episode.id);
+    if (!(pos > 0)) return undefined;
+    resumeToastFor.current = episode.id;
+    setResumeToast(pos);
+    const t = setTimeout(() => setResumeToast(0), 4500);
+    return () => clearTimeout(t);
+  }, [showPlayer, showingTrailer, lockedNow, episode.id, getPosition]);
 
   // Safe here — every hook the component uses has already run above,
   // unconditionally, on every render. Nothing below this point is a hook,
@@ -293,6 +372,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     ? { ...episode, src: episode.audioDescriptionSrc }
     : episode;
 
+  // The title block under the player (the "After Play" canvas).
+  const isSeries = episode.contentType === 'series' && Boolean(episode.seriesId);
+  const seriesKicker = isSeries
+    ? [parentSeriesName, episodeCode(episode)].filter(Boolean).join(' · ')
+    : contentTypeTag(episode.contentType).label;
+  const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
+  const tier = tierBadge(episode.tier, episode.adsEnabled);
+  const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
+  const upNext = isSeries && !showingTrailer ? nextEpisode : null;
 
   function goToType(t) {
     router.push(t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`);
@@ -522,7 +610,22 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 signedPlayback={!showingTrailer && signedPlayback}
                 initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
                 onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+                // Full screen: the site's own chrome (the "After Play" canvas).
+                heading={{ kicker: showingTrailer ? 'Trailer' : seriesKicker, title: episode.title }}
+                rating={episode.rating || null}
+                onNext={upNext ? goToNextEpisode : null}
+                nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
+                topRight={!showingTrailer ? (
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} className="tp-fs-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
+                    <TipIcon size={13} src={iconOverrides.tip} /> Tip {tipFirstName}
+                  </TipButton>
+                ) : null}
               />
+              {resumeToast > 0 && (
+                <div className="ep-resume-toast" role="status">
+                  <RestoreIcon size={12} /> Resumed from {Math.floor(resumeToast / 60)}:{String(Math.floor(resumeToast % 60)).padStart(2, '0')}
+                </div>
+              )}
               {tipEndCard && (
                 <TipEndCard
                   tipping={tipping}
@@ -537,111 +640,91 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
         </div>
       )}
 
-      <main id="main-content" className="stage stage-single">
-        <div>
-          <BackButton
-            fallbackHref={
-              episode.contentType === 'series' && episode.seriesId
-                ? `/series/${episode.seriesId}`
-                : episode.contentType === 'podcast'
-                ? '/podcasts'
-                : '/'
-            }
-          />
+      <main id="main-content" className="stage stage-single ep-after">
+        <BackButton
+          fallbackHref={isSeries ? `/series/${episode.seriesId}` : episode.contentType === 'podcast' ? '/podcasts' : '/stream'}
+        />
 
-          <BoughtBanner bought={bought} title={episode.title} email={email} />
-          <TippedBanner email={email} />
+        <BoughtBanner bought={bought} title={episode.title} email={email} />
+        <TippedBanner email={email} />
+        {buyError && <p className="own-error">{buyError}</p>}
 
-          <div className="player-info-row">
-          <div className="player-card">
-            <div className="now-heading">
-              <div className="eyebrow" style={owned ? { display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' } : undefined}>
-                {showingTrailer
-                  ? 'Trailer'
-                  : owned
-                  ? 'Now screening'
-                  : episode.tier === 'premium'
-                  ? `Now screening — ${SITE.premiumTier} exclusive`
-                  : 'Now screening — free signal'}
-                {owned && !showingTrailer && <OwnedChip />}
-              </div>
-              <h1>{episode.title}</h1>
-              <p>{episode.desc}</p>
-              <div className="credit-line">
-                {episode.artist && <span>Made by {episode.artist}</span>}
-                {shotAt.length > 0 && <span className="credit-crew">Shot at {shotAt.map((s, i) => <span key={s.locationId}>{i > 0 ? ', ' : ''}<Link href={s.href}>{s.title}</Link>{s.city ? <small> ({s.city})</small> : null}</span>)}</span>}
-                {crew.length > 0 && <span className="credit-crew">With {crew.slice(0, 6).map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small>({c.role})</small></span>)}{crew.length > 6 ? ` and ${crew.length - 6} more` : ''}</span>}
-                <span>{formatRuntimeLong(episode.runtime) || episode.runtime}</span>
-                {episode.genre && <span>{episode.genre}</span>}
-                {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
-                {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
-                {episode.contentType === 'series' ? (
-                  <Link href={`/series/${episode.seriesId}`} className="content-type-tag series">
-                    ▤ Part of {parentSeriesName || 'a series'}
-                    {episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}
-                  </Link>
-                ) : (
-                  <span className={`content-type-tag ${contentTypeTag(episode.contentType).key}`}>
-                    {contentTypeTag(episode.contentType).label}
-                  </span>
-                )}
-                {/* Tier/ads and audio-described used to live in a completely
-                    separate .player-meta row below this one, which also
-                    repeated the runtime a second time — everything about
-                    this episode's status now lives in this one row. */}
-                <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>
-                  {owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : `${SITE.premiumTier} · members`}
+        {/* The page after Play (the "After Play" canvas, 2026-10-29,
+            https://claude.ai/artifact/UJZJriGJqXaDXeJgSzcKsf): one title
+            block with four round actions, the Up next card, the
+            description and credits, then the season as a strip. On a
+            laptop the Up next card and the strip sit beside the title
+            block (.ep-layout's grid areas). */}
+        <div className={`ep-layout ${upNext ? '' : 'no-upnext'}`}>
+          <section className="ep-head" aria-label="Now screening">
+            <div className="ep-kicker">
+              {isSeries ? (
+                <Link href={`/series/${episode.seriesId}`} className="ep-kicker-link">
+                  {parentSeriesName || 'Series'}
+                  {episode.seriesOrder ? ` · Season ${episode.season || 1} · Episode ${episode.seriesOrder}` : ''}
+                  <ArrowRightIcon size={11} src={iconOverrides.arrow_right} />
+                </Link>
+              ) : (
+                <span className={`ep-kicker-type ${contentTypeTag(episode.contentType).key}`}>
+                  {contentTypeTag(episode.contentType).label}{episode.mainGenre ? ` · ${episode.mainGenre}` : ''}
                 </span>
-                {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
-                {aiSeal && <AiSealChip />}
-                {owned && purchase.boughtAt && (
-                  <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
-                )}
-                {describedActive && (
-                  <span className="trailer-link" style={{ borderColor: 'rgba(251,232,211,0.18)' }}>🔊 Audio described</span>
-                )}
-                <button
-                  className="trailer-link"
-                  onClick={() => toggleWishlist(episode.id)}
-                  style={{ borderColor: 'rgba(179,73,47,0.4)', color: isWishlisted(episode.id) ? 'var(--danger)' : 'var(--ink-dim)' }}
-                >
-                  <HeartIcon size={14} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved to wishlist' : 'Add to wishlist'}
-                </button>
-                {!showingTrailer && episode.trailerSrc && (
-                  <button className="trailer-link" onClick={() => setShowingTrailer(true)}><PlayIcon size={13} src={iconOverrides.play} /> Watch trailer</button>
-                )}
-                {/* Tips: only once the maker's Stripe account can take charges. */}
-                <TipButton tipping={tipping} isSignedIn={isSignedIn} className="trailer-link tip-link" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
-                  <TipIcon size={14} src={iconOverrides.tip} /> Tip the maker
-                </TipButton>
-                <ReportButton targetType="episode" targetId={episode.id} title={episode.title} />
-              </div>
-              {!showingTrailer && getPosition(episode.id) > 0 && (() => {
-                const totalSeconds = parseRuntimeToSeconds(episode.runtime);
-                const posSeconds = getPosition(episode.id);
-                const pct = totalSeconds ? Math.min(100, Math.round((posSeconds / totalSeconds) * 100)) : null;
-                return (
-                  <div className="resume-note">
-                    <span>↺ Resuming from {Math.floor(posSeconds / 60)}:{String(Math.floor(posSeconds % 60)).padStart(2, '0')}</span>
-                    {pct !== null && (
-                      <div className="resume-note-track" aria-hidden="true">
-                        <div className="resume-note-fill" style={{ width: `${pct}%` }} />
-                      </div>
-                    )}
-                  </div>
-                );
-              })()}
-              {showingTrailer && (
-                <button className="trailer-link" onClick={() => setShowingTrailer(false)}>
-                  <PlayIcon size={13} src={iconOverrides.play} /> Back to full episode
-                </button>
               )}
-              {withdrawn && (
-                <p className="own-withdrawn">No longer on {SITE.name} · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you here and in the app.</p>
-              )}
+              {showingTrailer && <span className="ep-kicker-note">Trailer</span>}
+              {owned && <OwnedChip />}
             </div>
-
-            {!showingTrailer && (
+            <div className="ep-head-row">
+              <div className="ep-titlebox">
+                <h1 className="ep-title">{episode.title}</h1>
+                <div className="ep-meta">
+                  {metaLine && <span>{metaLine}</span>}
+                  {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
+                  <span className={`ep-tier-pill ${tier.key}`}>{owned ? 'Yours · ad-free' : tier.label}</span>
+                  {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
+                  {describedActive && <span className="ep-meta-note">Audio described</span>}
+                </div>
+              </div>
+              <div className="ep-actions">
+                <button
+                  type="button"
+                  className={`ep-action ${isWishlisted(episode.id) ? 'is-on' : ''}`}
+                  onClick={() => toggleWishlist(episode.id)}
+                  aria-pressed={isWishlisted(episode.id)}
+                >
+                  <span className="ep-action-ring"><HeartIcon size={18} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /></span>
+                  <span className="ep-action-label">{isWishlisted(episode.id) ? 'Saved' : 'Save'}</span>
+                </button>
+                {/* Tips: only once the maker's Stripe account can take charges. */}
+                <TipButton tipping={tipping} isSignedIn={isSignedIn} className="ep-action ep-action-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
+                  <span className="ep-action-ring"><TipIcon size={18} src={iconOverrides.tip} /></span>
+                  <span className="ep-action-label">Tip {tipFirstName}</span>
+                </TipButton>
+                {/* Buy to own: compact while playing; the full card sits on the landing view. */}
+                {showPlayer && !showingTrailer && purchase && purchase.forSale && !owned && (
+                  <button type="button" className="ep-action" onClick={() => buyTitle('episode', episode.id)} disabled={buyBusy}>
+                    <span className="ep-action-ring"><TicketIcon size={18} src={iconOverrides.ticket} /></span>
+                    <span className="ep-action-label">{buyBusy ? 'Opening…' : `Own · ${dollars(purchase.payCents)}`}</span>
+                  </button>
+                )}
+                {episode.trailerSrc && (showingTrailer ? (
+                  <button type="button" className="ep-action" onClick={() => setShowingTrailer(false)}>
+                    <span className="ep-action-ring"><PlayIcon size={16} src={iconOverrides.play} /></span>
+                    <span className="ep-action-label">Full episode</span>
+                  </button>
+                ) : (
+                  <button type="button" className="ep-action" onClick={() => { setShowingTrailer(true); setShowPlayer(true); }}>
+                    <span className="ep-action-ring"><PlayIcon size={16} src={iconOverrides.play} /></span>
+                    <span className="ep-action-label">Trailer</span>
+                  </button>
+                ))}
+                {episode.fundingUrl && (
+                  <a className="ep-action" href={episode.fundingUrl} target="_blank" rel="noopener noreferrer">
+                    <span className="ep-action-ring"><DiamondIcon size={16} src={iconOverrides.diamond} /></span>
+                    <span className="ep-action-label">Back it</span>
+                  </a>
+                )}
+              </div>
+            </div>
+            {!showPlayer && (
               <OwnTitleCard
                 offer={purchase}
                 bundle={bundle}
@@ -654,7 +737,47 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 onSeePlans={startCheckout}
               />
             )}
+          </section>
 
+          {upNext && (
+            <Link
+              href={`/episode/${upNext.id}?autoplay=1`}
+              className="ep-upnext"
+              aria-label={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}
+            >
+              <span className="ep-upnext-thumb" style={upNext.thumbnail ? { backgroundImage: `url(${upNext.thumbnail})` } : undefined}>
+                <PlayIcon size={22} src={iconOverrides.play} />
+                {upNext.runtime && <span className="ep-upnext-dur">{minutesLabel(upNext.runtime)}</span>}
+              </span>
+              <span className="ep-upnext-text">
+                <span className="ep-upnext-kicker">Up next · plays when this ends</span>
+                <span className="ep-upnext-title">{episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}{upNext.title}</span>
+                <span className="ep-upnext-sub">{tierBadge(upNext.tier, upNext.adsEnabled).label}</span>
+              </span>
+            </Link>
+          )}
+
+          <section className="ep-body">
+            {episode.desc && <p className="ep-desc">{episode.desc}</p>}
+            {withdrawn && (
+              <p className="own-withdrawn">No longer on {SITE.name} · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you here and in the app.</p>
+            )}
+            <div className="ep-credits">
+              {episode.artist && (
+                <span className="ep-maker">
+                  <span className="ep-maker-avatar" aria-hidden="true">{episode.artist.trim().charAt(0).toUpperCase()}</span>
+                  Made by {episode.artist}
+                </span>
+              )}
+              {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
+              {aiSeal && <AiSealChip />}
+              {crew.length > 0 && <span className="ep-credit-line">With {crew.slice(0, 6).map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small>({c.role})</small></span>)}{crew.length > 6 ? ` and ${crew.length - 6} more` : ''}</span>}
+              {shotAt.length > 0 && <span className="ep-credit-line">Shot at {shotAt.map((s, i) => <span key={s.locationId}>{i > 0 ? ', ' : ''}<Link href={s.href}>{s.title}</Link>{s.city ? <small> ({s.city})</small> : null}</span>)}</span>}
+              {owned && purchase.boughtAt && (
+                <span className="ep-credit-line">Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
+              )}
+              <ReportButton targetType="episode" targetId={episode.id} title={episode.title} className="ep-report" />
+            </div>
             {!locked && (
               <AccessibilityPanel
                 episode={episode}
@@ -662,91 +785,36 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 onPlayDescribed={() => setDescribedActive((d) => !d)}
               />
             )}
-          </div>
+          </section>
 
-          {episode.contentType === 'series' && !nextEpisode && !previousEpisode && (
-            <div className="episode-nav-sidebar">
-              <div className="side-heading">Episodes</div>
-              <p style={{ color: 'var(--ink-dim)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                This is the only episode in this show so far.
-              </p>
-              <Link href={`/series/${episode.seriesId}`} className="see-all-episodes-btn">
-                ▤ See show page
-              </Link>
-            </div>
+          {isSeries && seasonEpisodes.length > 1 && (
+            <EpisodeStrip
+              heading={`Episodes · Season ${episode.season || 1}`}
+              items={seasonEpisodes.map((e) => ({ ...e, href: `/episode/${e.id}?autoplay=1` }))}
+              seeAllHref={`/series/${episode.seriesId}`}
+              iconOverrides={iconOverrides}
+            />
           )}
-
-          {episode.contentType === 'series' && (nextEpisode || previousEpisode) && (
-            <div className="episode-nav-sidebar">
-              {nextEpisode && (
-                <>
-                  <div className="side-heading">Next episode</div>
-                  <Link href={`/episode/${nextEpisode.id}?autoplay=1`} className="side-ep-card">
-                    <div className="side-ep-thumb" style={nextEpisode.thumbnail ? { backgroundImage: `url(${nextEpisode.thumbnail})` } : {}}>
-                      <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
-                      {nextEpisode.runtime && <span className="dur-badge">{formatRuntimeLong(nextEpisode.runtime) || nextEpisode.runtime}</span>}
-                    </div>
-                    <div className="side-ep-info">
-                      <h5>{nextEpisode.seriesOrder ? `S${nextEpisode.season || 1}E${nextEpisode.seriesOrder} — ` : ''}{nextEpisode.title}</h5>
-                      <span className={`side-tier-label ${tierBadge(nextEpisode.tier, nextEpisode.adsEnabled).key}`}>{tierBadge(nextEpisode.tier, nextEpisode.adsEnabled).label}</span>
-                    </div>
-                  </Link>
-                </>
-              )}
-
-              {previousEpisode && (
-                <>
-                  <div className="side-heading">Previous episode</div>
-                  <Link href={`/episode/${previousEpisode.id}?autoplay=1`} className="side-ep-card">
-                    <div className="side-ep-thumb" style={previousEpisode.thumbnail ? { backgroundImage: `url(${previousEpisode.thumbnail})` } : {}}>
-                      {previousEpisodeWatched ? (
-                        <span className="watched-badge">↺ Watched</span>
-                      ) : (
-                        <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
-                      )}
-                      {previousEpisode.runtime && <span className="dur-badge">{formatRuntimeLong(previousEpisode.runtime) || previousEpisode.runtime}</span>}
-                    </div>
-                    <div className="side-ep-info">
-                      <h5>{previousEpisode.seriesOrder ? `S${previousEpisode.season || 1}E${previousEpisode.seriesOrder} — ` : ''}{previousEpisode.title}</h5>
-                      <span>{previousEpisodeWatched ? 'Watched' : (formatRuntimeLong(previousEpisode.runtime) || previousEpisode.runtime)}</span>
-                    </div>
-                  </Link>
-                </>
-              )}
-
-              <Link href={`/series/${episode.seriesId}`} className="see-all-episodes-btn">
-                ▤ See all episodes
-              </Link>
-            </div>
+          {isSeries && seasonEpisodes.length <= 1 && (
+            <section className="ep-episodes" aria-label="Episodes">
+              <div className="ep-strip-head"><h2>Episodes</h2></div>
+              <p className="ep-strip-note">This is the only episode in this show so far. <Link href={`/series/${episode.seriesId}`}>See the show page</Link>.</p>
+            </section>
           )}
-
-          {episode.contentType !== 'series' && !isSignedIn && (
-            <div className="episode-nav-sidebar">
-              <div className="side-heading">Watch next</div>
-              <p style={{ color: 'var(--ink-dim)', fontSize: '0.82rem', lineHeight: 1.5 }}>
-                Sign in to get picks based on your wishlist and what you've watched.
-              </p>
-            </div>
+          {!isSeries && isSignedIn && watchNext.length > 0 && (
+            <EpisodeStrip
+              heading="Watch next"
+              items={watchNext.map((item) => ({ ...item, href: item.contentType === 'podcast' ? episodeHref(item) : `/episode/${item.id}?autoplay=1` }))}
+              iconOverrides={iconOverrides}
+              showCode={false}
+            />
           )}
-
-          {episode.contentType !== 'series' && isSignedIn && watchNext.length > 0 && (
-            <div className="episode-nav-sidebar">
-              <div className="side-heading">Watch next</div>
-              {watchNext.map((item) => (
-                <Link key={item.id} href={item.contentType === 'podcast' ? episodeHref(item) : `/episode/${item.id}?autoplay=1`} className="side-ep-card">
-                  <div className="side-ep-thumb" style={item.thumbnail ? { backgroundImage: `url(${item.thumbnail})` } : {}}>
-                    <span className="play-overlay"><PlayIcon size={22} src={iconOverrides.play} /></span>
-                    {item.runtime && <span className="dur-badge">{formatRuntimeLong(item.runtime) || item.runtime}</span>}
-                  </div>
-                  <div className="side-ep-info">
-                    <h5>{item.title}</h5>
-                    <span className={`side-tier-label ${tierBadge(item.tier, item.adsEnabled).key}`}>{tierBadge(item.tier, item.adsEnabled).label}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
+          {!isSeries && !isSignedIn && (
+            <section className="ep-episodes" aria-label="Watch next">
+              <div className="ep-strip-head"><h2>Watch next</h2></div>
+              <p className="ep-strip-note">Sign in to get picks based on your wishlist and what you&rsquo;ve watched.</p>
+            </section>
           )}
-          </div>
         </div>
 
         {bonusContent.length > 0 && (

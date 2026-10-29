@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import { useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
@@ -11,15 +11,18 @@ import { readViewingTerms, saveViewingTerms, withTerms, TERMS_URL } from '../../
 import { advisoryFor, useContentRatings } from '../../lib/contentAdvisory';
 import ContentAdvisory from '../../components/ContentAdvisory';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
-import { formatRuntimeLong, parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
+import { parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useCaptureBlock } from '../../lib/captureBlock';
+import { episodeCode } from '../../lib/seriesResume';
+import TopNav from '../../components/TopNav';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
-import { CardRow } from '../../components/LibraryRows';
+import EpisodePlayer from '../../components/EpisodePlayer';
+import { CardRow, EpisodeStrip } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
 import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
-import { TipButton, TipEndCard, tipChipStyles, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
+import { TipButton, TipEndCard, TipGlyph, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
 import { AiSealChip } from '../../components/AiSeal';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
@@ -31,6 +34,19 @@ const MIN_AGE_BY_RATING = { G: 0, 'TV-Y': 0, 'TV-G': 0, PG: 0, 'TV-PG': 0, 'TV-Y
 
 function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+}
+
+// "22 min" from a "22:00" runtime (the website's minutesLabel).
+function minutesLabel(runtime) {
+  const s = runtimeSeconds(runtime);
+  return s ? `${Math.max(1, Math.round(s / 60))} min` : (runtime || '');
+}
+
+// components/GenreRow.js tierBadge: free-ads = olive-deep, free-noads = green, premium = brass.
+function tierBadge(tier, adsEnabled) {
+  if (tier === 'premium') return { label: 'Tapa +', bg: colors.brass, fg: '#241a05' };
+  if (adsEnabled === false) return { label: 'Free', bg: 'rgba(132,205,152,0.2)', fg: colors.ink };
+  return { label: 'Free with ads', bg: 'rgba(242,193,78,0.2)', fg: colors.ink };
 }
 
 function HeartIcon({ active, size = 14, color }) {
@@ -48,11 +64,28 @@ function BackArrowIcon({ size = 16, color = colors.olive }) {
     </Svg>
   );
 }
-
-function sideTier(tier, adsEnabled) {
-  if (tier === 'premium') return { label: 'Tapa +', color: colors.danger };
-  if (adsEnabled === false) return { label: 'Free', color: colors.ok };
-  return { label: 'Free with ads', color: colors.brass };
+function ChevronIcon({ size = 10, color = colors.brass }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M9 6l6 6-6 6" />
+    </Svg>
+  );
+}
+// components/PlayerIcons.js TicketIcon / DiamondIcon.
+function TicketIcon({ size = 18, color = colors.ink }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.7 1.7 0 0 0 0 3.2v1.6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.6a1.7 1.7 0 0 0 0-3.2z" />
+      <Path d="M15 6.5v11" strokeDasharray="1.6 1.6" />
+    </Svg>
+  );
+}
+function DiamondIcon({ size = 16, color = colors.ink }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round">
+      <Path d="M12 3l9 9-9 9-9-9z" />
+    </Svg>
+  );
 }
 
 // Mirrors pages/episode/[id].js, fed by GET /api/episode-page (the same
@@ -60,12 +93,17 @@ function sideTier(tier, adsEnabled) {
 // the view and applies the age gate exactly like the site) plus
 // POST /api/stream-token for the actual playable URL.
 //
-// Standalone titles open on the landing view (trailer or artwork, title,
-// meta, Play / Save / Back this project) unless reached with ?autoplay=1
+// The page after Play (Jose, 2026-10-29, the "After Play" canvas,
+// https://claude.ai/artifact/UJZJriGJqXaDXeJgSzcKsf): the site header,
+// a 16:9 player with the site's own controls (components/EpisodePlayer.js,
+// full screen sideways), then one title block — the show kicker, the
+// title, the meta line, four round actions (Save, Tip, Own, Trailer) —
+// the Up next card, the description and credits, the season as a strip
+// of landscape cards, and Bonus content. Standalone titles open on the
+// landing view (trailer or artwork, title, Play / Save / Back this
+// project, the full Own-this-title card) unless reached with ?autoplay=1
 // (a Play button) or ?trailer=1; series episodes start playing straight
-// away, as on the site. Then: the "Now screening" card with its credit
-// chips, Next/Previous episode (series) or Watch next (standalone), and
-// Bonus Content. Finishing a series episode moves on to the next one.
+// away, as on the site. Finishing a series episode moves on to the next.
 //
 // Signed-in viewers resume where they left off and their progress is
 // saved (lib/useWatchProgress.js), like the website. Not on mobile yet:
@@ -192,21 +230,21 @@ export default function Episode() {
     if (router.canGoBack()) { router.back(); return; }
     if (episode && episode.contentType === 'series' && episode.seriesId) router.replace(`/series/${episode.seriesId}`);
     else if (episode && episode.contentType === 'podcast') router.replace('/watch/podcasts');
-    else router.replace('/');
+    else router.replace('/stream');
   }
 
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ title: '' }} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
         <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
   if (state.error) {
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'Episode' }} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
         <View style={styles.center}><Text style={styles.errorText}>{state.error}</Text></View>
       </SafeAreaView>
     );
@@ -217,8 +255,8 @@ export default function Episode() {
   if (page.ageRestricted && page.termsRequired) {
     const requiredAge = page.requiredAge ?? 13;
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'A quick confirmation' }} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
         <ScrollView contentContainerStyle={styles.restrictedWrap}>
           <View style={styles.accountCard}>
             <Text style={styles.accountEyebrow}>Rated {page.requiredRating}</Text>
@@ -245,8 +283,8 @@ export default function Episode() {
   if (page.ageRestricted) {
     const requiredAge = page.requiredAge ?? MIN_AGE_BY_RATING[page.requiredRating] ?? 17;
     return (
-      <SafeAreaView style={styles.screen} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'Content restricted' }} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <TopNav />
         <ScrollView contentContainerStyle={styles.restrictedWrap}>
           <View style={styles.accountCard}>
             <Text style={styles.accountEyebrow}>Age-restricted content</Text>
@@ -276,14 +314,21 @@ export default function Episode() {
   }
 
   const saved = isWishlisted(episode.id);
-  const runtime = formatRuntimeLong(episode.runtime) || episode.runtime;
-  const tierChip = owned ? 'Ad-free · yours' : episode.tier === 'free' ? 'Free tier · ad-supported' : 'Tapa + · members';
-  const eyebrow = showingTrailer ? 'Trailer' : owned ? 'Now screening' : episode.tier === 'premium' ? 'Now screening — Tapa + exclusive' : 'Now screening — free signal';
-  const { nextEpisode, previousEpisode, previousEpisodeWatched, watchNext, bonusContent, parentSeriesName, isSignedIn } = page;
+  const { nextEpisode, watchNext = [], bonusContent = [], parentSeriesName, isSignedIn, seasonEpisodes = [] } = page;
+  const isSeries = episode.contentType === 'series' && Boolean(episode.seriesId);
+  const typeLabel = CONTENT_TYPE_LABEL[episode.contentType] || 'Short';
+  const code = episodeCode(episode);
+  const seriesKicker = isSeries ? [parentSeriesName, code].filter(Boolean).join(' · ') : typeLabel;
+  const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
+  const tier = tierBadge(episode.tier, episode.adsEnabled);
+  const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
+  const upNext = isSeries && !showingTrailer ? nextEpisode : null;
+  const returnTo = `/episode/${episode.id}`;
+  const tokenFn = () => withTimeout(getToken().catch(() => null), 4000);
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <Stack.Screen options={{ title: episode.title }} />
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <TopNav />
       <ScrollView contentContainerStyle={styles.scroll}>
 
         {!showPlayer ? (
@@ -304,7 +349,8 @@ export default function Episode() {
                 </Pressable>
                 {episode.fundingUrl ? (
                   <Pressable style={heroButtonStyles.infoBtn} onPress={() => Linking.openURL(episode.fundingUrl)}>
-                    <Text style={heroButtonStyles.infoText}>{'◆'} Back this project</Text>
+                    <DiamondIcon size={14} />
+                    <Text style={heroButtonStyles.infoText}>Back this project</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -323,7 +369,7 @@ export default function Episode() {
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
                     {purchase && purchase.forSale ? (
-                      <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, `/episode/${episode.id}`)}>
+                      <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)}>
                         <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
                       </Pressable>
                     ) : null}
@@ -343,7 +389,7 @@ export default function Episode() {
                   <Text style={styles.lockTitle}>Two ways to watch</Text>
                   <Text style={styles.lockBody}>Join Tapa + for everything on the site, or buy this one title and keep it.</Text>
                   <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap', justifyContent: 'center' }}>
-                    <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, `/episode/${episode.id}`)}>
+                    <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)}>
                       <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
                     </Pressable>
                     <Pressable style={[styles.unlockBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass }]} onPress={() => router.push('/account')}>
@@ -362,22 +408,35 @@ export default function Episode() {
                 </View>
               )
             ) : activeSrc ? (
-              <View style={styles.player}>
-                <VideoView key={activeSrc} player={player} style={absoluteFill} contentFit="contain" nativeControls allowsFullscreen />
+              <EpisodePlayer
+                key={activeSrc}
+                player={player}
+                playing={isPlaying}
+                heading={{ kicker: showingTrailer ? 'Trailer' : seriesKicker, title: episode.title }}
+                rating={episode.rating || null}
+                onNext={upNext ? () => router.replace(`/episode/${upNext.id}?autoplay=1`) : null}
+                nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
+                resumeSeconds={showingTrailer ? 0 : resumeSeconds}
+                topRight={!showingTrailer ? (
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={styles.fsTip} textStyle={styles.fsTipText} iconSize={12}>
+                    Tip {tipFirstName}
+                  </TipButton>
+                ) : null}
+              >
                 <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
                 {tipEndCard && !showingTrailer ? (
                   <TipEndCard
                     tipping={tipping}
                     title={episode.title}
-                    isSignedIn={Boolean(state.page.isSignedIn)}
+                    isSignedIn={Boolean(isSignedIn)}
                     router={router}
-                    getToken={() => withTimeout(getToken().catch(() => null), 4000)}
-                    returnTo={`/episode/${episode.id}`}
-                    onNext={episode.contentType === 'series' && state.page.nextEpisode ? () => router.replace(`/episode/${state.page.nextEpisode.id}?autoplay=1`) : null}
+                    getToken={tokenFn}
+                    returnTo={returnTo}
+                    onNext={upNext ? () => router.replace(`/episode/${upNext.id}?autoplay=1`) : null}
                     onClose={() => setTipEndCard(false)}
                   />
                 ) : null}
-              </View>
+              </EpisodePlayer>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>
             ) : (
@@ -391,168 +450,163 @@ export default function Episode() {
             <BackArrowIcon /><Text style={styles.backText}>Back</Text>
           </Pressable>
 
-          <View style={styles.playerCard}>
-            <View style={styles.nowHeading}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                <Text style={styles.nowEyebrow}>{eyebrow}</Text>
-                {owned && !showingTrailer ? <View style={{ marginBottom: 8 }}><OwnedChip /></View> : null}
-              </View>
-              <Text style={styles.nowTitle}>{episode.title}</Text>
-              {episode.desc ? <Text style={styles.nowDesc}>{episode.desc}</Text> : null}
-              <View style={styles.creditLine}>
-                {episode.artist ? <Text style={styles.creditText}>Made by {episode.artist}</Text> : null}
-                {runtime ? <Text style={styles.creditText}>{runtime}</Text> : null}
-                {episode.genre ? <Text style={styles.creditText}>{episode.genre}</Text> : null}
-                {episode.rating ? <View style={styles.ratingTag}><Text style={styles.creditText}>{episode.rating}</Text></View> : null}
-                {episode.isOriginal ? <View style={styles.originalTag}><Text style={styles.originalText}>Tapa Original</Text></View> : null}
-                {episode.contentType === 'series' ? (
-                  <Pressable style={[styles.typeTag, { borderColor: colors.brass }]} onPress={() => router.push(`/series/${episode.seriesId}`)}>
-                    <Text style={[styles.typeTagText, { color: colors.brass }]}>{'▤'} Part of {parentSeriesName || 'a series'}{episode.seriesOrder ? ` · Ep. ${episode.seriesOrder}` : ''}</Text>
-                  </Pressable>
-                ) : (
-                  <View style={[styles.typeTag, { borderColor: TYPE_COLOR[episode.contentType] || colors.inkDim }]}>
-                    <Text style={[styles.typeTagText, { color: TYPE_COLOR[episode.contentType] || colors.inkDim }]}>{CONTENT_TYPE_LABEL[episode.contentType] || 'Short'}</Text>
-                  </View>
-                )}
-                <View style={[styles.chip, { borderColor: 'rgba(251,232,211,0.18)' }]}><Text style={styles.chipText}>{tierChip}</Text></View>
-                {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
-                {state.page && state.page.aiSeal !== false ? <AiSealChip /> : null}
-                <Pressable style={[styles.chip, styles.chipRow, { borderColor: 'rgba(179,73,47,0.4)' }]} onPress={() => toggleWishlist(episode.id)}>
-                  <HeartIcon active={saved} color={saved ? colors.danger : colors.inkDim} />
-                  <Text style={[styles.chipText, { color: saved ? colors.danger : colors.inkDim }]}>{saved ? 'Saved to wishlist' : 'Add to wishlist'}</Text>
-                </Pressable>
-                {!showingTrailer && episode.trailerSrc ? (
-                  <Pressable style={styles.chip} onPress={() => { setShowPlayer(true); setShowingTrailer(true); }}>
-                    <Text style={styles.chipText}>{'🎬'} Watch trailer</Text>
-                  </Pressable>
-                ) : null}
-                {/* Tips: only once the maker's Stripe account can take charges. */}
-                <TipButton
-                  tipping={tipping}
-                  isSignedIn={isSignedIn}
-                  router={router}
-                  getToken={() => withTimeout(getToken().catch(() => null), 4000)}
-                  returnTo={`/episode/${episode.id}`}
-                  style={tipChipStyles.chip}
-                  textStyle={tipChipStyles.chipText}
-                  iconSize={12}
-                >
-                  Tip the maker
-                </TipButton>
-              </View>
-              {!showingTrailer && resumeSeconds > 0 ? (
-                <View style={styles.resumeNote}>
-                  <Text style={styles.resumeText}>{'↺'} Resuming from {Math.floor(resumeSeconds / 60)}:{String(Math.floor(resumeSeconds % 60)).padStart(2, '0')}</Text>
-                  {runtimeSeconds(episode.runtime) ? (
-                    <View style={styles.resumeTrack}><View style={[styles.resumeFill, { width: `${Math.min(100, Math.round((resumeSeconds / runtimeSeconds(episode.runtime)) * 100))}%` }]} /></View>
-                  ) : null}
-                </View>
-              ) : null}
-              {showingTrailer ? (
-                <Pressable style={[styles.chip, { alignSelf: 'flex-start', marginBottom: 14 }]} onPress={() => setShowingTrailer(false)}>
-                  <Text style={styles.chipText}>{'▶'} Back to full episode</Text>
-                </Pressable>
-              ) : null}
-              {page.withdrawn ? (
-                <View style={styles.withdrawn}><Text style={styles.withdrawnText}>No longer on Studio Tapa TV · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you.</Text></View>
-              ) : null}
-              {!showingTrailer ? (
-                <View style={{ marginBottom: 16 }}>
-                  <OwnTitleCard
-                    offer={purchase}
-                    bundle={page.bundle}
-                    episode={episode}
-                    creatorName={episode.artist}
-                    isSubscriber={page.isSubscriber}
-                    busy={buyBusy}
-                    onBuy={() => buy('episode', episode.id, `/episode/${episode.id}`)}
-                    onSeePlans={() => router.push('/account')}
-                    onSeries={() => router.push(`/series/${episode.seriesId}`)}
-                  />
-                </View>
-              ) : null}
+          {/* The title block (pages/episode/[id].js .ep-head). */}
+          <View style={styles.kickerRow}>
+            {isSeries ? (
+              <Pressable style={styles.kickerLink} onPress={() => router.push(`/series/${episode.seriesId}`)} hitSlop={6}>
+                <Text style={styles.kickerLinkText} numberOfLines={1}>
+                  {(parentSeriesName || 'Series').toUpperCase()}{episode.seriesOrder ? ` · SEASON ${episode.season || 1} · EPISODE ${episode.seriesOrder}` : ''}
+                </Text>
+                <ChevronIcon />
+              </Pressable>
+            ) : (
+              <Text style={[styles.kickerType, { color: TYPE_COLOR[episode.contentType] || colors.inkDim }]}>
+                {typeLabel.toUpperCase()}{episode.mainGenre ? ` · ${episode.mainGenre.toUpperCase()}` : ''}
+              </Text>
+            )}
+            {showingTrailer ? <Text style={styles.kickerNote}>TRAILER</Text> : null}
+            {owned ? <OwnedChip small /> : null}
+          </View>
+          <Text style={styles.title}>{episode.title}</Text>
+          <View style={styles.metaRow}>
+            {metaLine ? <Text style={styles.metaText}>{metaLine}</Text> : null}
+            {episode.rating ? <View style={styles.ratingTag}><Text style={styles.ratingText}>{episode.rating}</Text></View> : null}
+            <View style={[styles.tierPill, { backgroundColor: owned ? 'rgba(242,193,78,0.2)' : tier.bg }]}>
+              <Text style={[styles.tierPillText, { color: owned ? colors.ink : tier.fg }]}>{owned ? 'Yours · ad-free' : tier.label}</Text>
             </View>
+            {episode.isOriginal ? <View style={styles.originalTag}><Text style={styles.originalText}>Tapa Original</Text></View> : null}
           </View>
 
-          {episode.contentType === 'series' && !nextEpisode && !previousEpisode ? (
-            <View style={styles.sidebar}>
-              <Text style={styles.sideHeading}>Episodes</Text>
-              <Text style={styles.sideNote}>This is the only episode in this show so far.</Text>
-              <Pressable style={styles.seeAllEpisodes} onPress={() => router.push(`/series/${episode.seriesId}`)}>
-                <Text style={styles.seeAllEpisodesText}>{'▤'} See show page</Text>
+          {/* Four round actions: Save, Tip, Own, Trailer (Back it when the title has a funding link). */}
+          <View style={styles.actions}>
+            <Pressable style={styles.action} onPress={() => toggleWishlist(episode.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}>
+              <View style={[styles.ring, saved && styles.ringOn]}><HeartIcon active={saved} size={18} color={saved ? colors.danger : colors.ink} /></View>
+              <Text style={styles.actionLabel}>{saved ? 'SAVED' : 'SAVE'}</Text>
+            </Pressable>
+            {/* Tips: only once the maker's Stripe account can take charges. */}
+            <TipButton
+              tipping={tipping}
+              isSignedIn={isSignedIn}
+              router={router}
+              getToken={tokenFn}
+              returnTo={returnTo}
+              style={styles.action}
+              renderInner={() => (
+                <>
+                  <View style={[styles.ring, styles.ringTip]}><TipGlyph size={18} color={colors.olive} /></View>
+                  <Text style={[styles.actionLabel, { color: colors.olive }]}>TIP {tipFirstName.toUpperCase()}</Text>
+                </>
+              )}
+            />
+            {/* Buy to own: compact while playing; the full card sits on the landing view. */}
+            {showPlayer && !showingTrailer && purchase && purchase.forSale && !owned ? (
+              <Pressable style={[styles.action, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)} accessibilityRole="button">
+                <View style={styles.ring}><TicketIcon /></View>
+                <Text style={styles.actionLabel}>{buyBusy ? 'OPENING…' : `OWN · ${dollars(purchase.payCents)}`}</Text>
+              </Pressable>
+            ) : null}
+            {episode.trailerSrc ? (showingTrailer ? (
+              <Pressable style={styles.action} onPress={() => setShowingTrailer(false)} accessibilityRole="button">
+                <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
+                <Text style={styles.actionLabel}>FULL EPISODE</Text>
+              </Pressable>
+            ) : (
+              <Pressable style={styles.action} onPress={() => { setShowingTrailer(true); setShowPlayer(true); }} accessibilityRole="button">
+                <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
+                <Text style={styles.actionLabel}>TRAILER</Text>
+              </Pressable>
+            )) : null}
+            {episode.fundingUrl ? (
+              <Pressable style={styles.action} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
+                <View style={styles.ring}><DiamondIcon /></View>
+                <Text style={styles.actionLabel}>BACK IT</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {!showPlayer ? (
+            <OwnTitleCard
+              offer={purchase}
+              bundle={page.bundle}
+              episode={episode}
+              creatorName={episode.artist}
+              isSubscriber={page.isSubscriber}
+              busy={buyBusy}
+              onBuy={() => buy('episode', episode.id, returnTo)}
+              onSeePlans={() => router.push('/account')}
+              onSeries={() => router.push(`/series/${episode.seriesId}`)}
+            />
+          ) : null}
+
+          {upNext ? (
+            <Pressable style={styles.upNext} onPress={() => router.replace(`/episode/${upNext.id}?autoplay=1`)} accessibilityRole="button" accessibilityLabel={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}>
+              <View style={styles.upNextThumb}>
+                {upNext.thumbnail ? <SmartImage uri={upNext.thumbnail} style={absoluteFill} /> : null}
+                <PlayIcon size={22} color="rgba(251,232,211,0.85)" />
+                {upNext.runtime ? <View style={styles.upNextDur}><Text style={styles.upNextDurText}>{minutesLabel(upNext.runtime)}</Text></View> : null}
+              </View>
+              <View style={styles.upNextText}>
+                <Text style={styles.upNextKicker}>UP NEXT · PLAYS WHEN THIS ENDS</Text>
+                <Text style={styles.upNextTitle} numberOfLines={2}>{episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}{upNext.title}</Text>
+                <Text style={styles.upNextSub}>{tierBadge(upNext.tier, upNext.adsEnabled).label.toUpperCase()}</Text>
+              </View>
+            </Pressable>
+          ) : null}
+
+          {episode.desc ? <Text style={styles.desc}>{episode.desc}</Text> : null}
+          {page.withdrawn ? (
+            <View style={styles.withdrawn}><Text style={styles.withdrawnText}>No longer on Studio Tapa TV · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you.</Text></View>
+          ) : null}
+
+          <View style={styles.credits}>
+            {episode.artist ? (
+              <View style={styles.maker}>
+                <View style={styles.makerAvatar}><Text style={styles.makerInitial}>{episode.artist.trim().charAt(0).toUpperCase()}</Text></View>
+                <Text style={styles.makerText}>Made by {episode.artist}</Text>
+              </View>
+            ) : null}
+            {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
+            {page.aiSeal !== false ? <AiSealChip /> : null}
+          </View>
+
+          {isSeries && seasonEpisodes.length > 1 ? (
+            <EpisodeStrip
+              title={`Episodes · Season ${episode.season || 1}`}
+              items={seasonEpisodes}
+              onPressItem={(e) => { if (e.id !== episode.id) router.replace(`/episode/${e.id}?autoplay=1`); }}
+              onSeeAll={() => router.push(`/series/${episode.seriesId}`)}
+            />
+          ) : null}
+          {isSeries && seasonEpisodes.length <= 1 ? (
+            <View style={styles.note}>
+              <Text style={styles.noteHeading}>Episodes</Text>
+              <Text style={styles.noteText}>This is the only episode in this show so far.</Text>
+              <Pressable style={styles.noteBtn} onPress={() => router.push(`/series/${episode.seriesId}`)}>
+                <Text style={styles.noteBtnText}>See show page</Text>
               </Pressable>
             </View>
           ) : null}
-
-          {episode.contentType === 'series' && (nextEpisode || previousEpisode) ? (
-            <View style={styles.sidebar}>
-              {nextEpisode ? (
-                <>
-                  <Text style={styles.sideHeading}>Next episode</Text>
-                  <SideCard item={nextEpisode} showCode onPress={() => router.replace(`/episode/${nextEpisode.id}?autoplay=1`)} />
-                </>
-              ) : null}
-              {previousEpisode ? (
-                <>
-                  <Text style={styles.sideHeading}>Previous episode</Text>
-                  <SideCard item={previousEpisode} showCode watched={previousEpisodeWatched} onPress={() => router.replace(`/episode/${previousEpisode.id}?autoplay=1`)} />
-                </>
-              ) : null}
-              <Pressable style={styles.seeAllEpisodes} onPress={() => router.push(`/series/${episode.seriesId}`)}>
-                <Text style={styles.seeAllEpisodesText}>{'▤'} See all episodes</Text>
-              </Pressable>
-            </View>
+          {!isSeries && isSignedIn && watchNext.length > 0 ? (
+            <EpisodeStrip
+              title="Watch next"
+              items={watchNext}
+              showCode={false}
+              onPressItem={(item) => router.push(item.contentType === 'podcast' && item.seriesId ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`)}
+            />
           ) : null}
-
-          {episode.contentType !== 'series' && !isSignedIn ? (
-            <View style={styles.sidebar}>
-              <Text style={styles.sideHeading}>Watch next</Text>
-              <Text style={styles.sideNote}>Sign in to get picks based on your wishlist and what you've watched.</Text>
-            </View>
-          ) : null}
-
-          {episode.contentType !== 'series' && isSignedIn && watchNext.length > 0 ? (
-            <View style={styles.sidebar}>
-              <Text style={styles.sideHeading}>Watch next</Text>
-              {watchNext.map((item) => (
-                <SideCard key={item.id} item={item} onPress={() => router.push(item.contentType === 'podcast' && item.seriesId ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`)} />
-              ))}
+          {!isSeries && !isSignedIn ? (
+            <View style={styles.note}>
+              <Text style={styles.noteHeading}>Watch next</Text>
+              <Text style={styles.noteText}>Sign in to get picks based on your wishlist and what you've watched.</Text>
             </View>
           ) : null}
 
           {bonusContent.length > 0 ? (
-            <View style={{ marginTop: 38 }}>
-              <CardRow title="Bonus Content" cards={bonusContent} onPressCard={(b) => router.push(`/episode/${b.id}`)} />
-            </View>
+            <CardRow title="Bonus Content" cards={bonusContent} onPressCard={(b) => router.push(`/episode/${b.id}`)} />
           ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-// .side-ep-card
-function SideCard({ item, showCode, watched, onPress }) {
-  const tier = sideTier(item.tier, item.adsEnabled);
-  const runtime = formatRuntimeLong(item.runtime) || item.runtime;
-  return (
-    <Pressable style={styles.sideCard} onPress={onPress}>
-      <View style={styles.sideThumb}>
-        {item.thumbnail ? <SmartImage uri={item.thumbnail} style={absoluteFill} /> : null}
-        {watched ? (
-          <View style={styles.watchedBadge}><Text style={styles.watchedText}>{'↺'} Watched</Text></View>
-        ) : (
-          <PlayIcon size={22} color={colors.ink} />
-        )}
-        {runtime ? <View style={styles.durBadge}><Text style={styles.durText}>{runtime}</Text></View> : null}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.sideTitle}>
-          {showCode && item.seriesOrder ? `S${item.season || 1}E${item.seriesOrder} — ` : ''}{item.title}
-        </Text>
-        {watched ? <Text style={styles.sideSub}>Watched</Text> : <Text style={[styles.sideSub, { color: tier.color }]}>{tier.label}</Text>}
-      </View>
-    </Pressable>
   );
 }
 
@@ -573,51 +627,68 @@ const styles = StyleSheet.create({
   unlockBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 10, paddingHorizontal: 22 },
   unlockText: { fontFamily: fonts.displaySemi, fontSize: 13.6, color: '#08201e' },
 
-  // .stage.stage-single
-  stage: { paddingTop: 38, paddingHorizontal: 19 },
-  backBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.4, borderColor: colors.olive, marginBottom: 19 },
+  // .stage.ep-after
+  stage: { paddingTop: 14, paddingHorizontal: 19 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.4, borderColor: colors.olive, marginBottom: 16 },
   backText: { color: colors.olive, fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.4, textTransform: 'uppercase' },
 
-  // .player-card / .now-heading / .credit-line
-  playerCard: { borderRadius: 4, overflow: 'hidden', backgroundColor: '#171923', borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)' },
-  nowHeading: { paddingTop: 17.6, paddingHorizontal: 17.6 },
-  nowEyebrow: { fontFamily: fonts.mono, fontSize: 10.9, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.brass, marginBottom: 8 },
-  nowTitle: { fontFamily: fonts.displayBold, fontSize: 20.8, color: colors.ink, marginBottom: 6 },
-  nowDesc: { fontFamily: fonts.body, fontSize: 14.4, lineHeight: 21, color: colors.inkDim, marginBottom: 16 },
-  creditLine: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 14, rowGap: 9, marginTop: 6, marginBottom: 16 },
-  creditText: { fontFamily: fonts.mono, fontSize: 11.2, color: colors.inkDim },
-  ratingTag: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.35)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1 },
+  // .ep-kicker / .ep-title / .ep-meta
+  kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 },
+  kickerLink: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
+  kickerLinkText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.brass, flexShrink: 1 },
+  kickerType: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6 },
+  kickerNote: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.inkDim },
+  title: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 29, letterSpacing: -0.3, color: colors.ink, marginBottom: 6 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  metaText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, color: colors.inkDim },
+  ratingTag: { borderWidth: 1, borderColor: 'rgba(202,181,158,0.7)', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 },
+  ratingText: { fontFamily: fonts.mono, fontSize: 9.5, color: colors.inkDim },
+  tierPill: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  tierPillText: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase' },
   originalTag: { backgroundColor: colors.oliveBright, borderRadius: 4, paddingHorizontal: 8, paddingVertical: 2 },
-  originalText: { fontFamily: fonts.monoBold, fontSize: 11.5, color: '#1a1408' },
-  typeTag: { borderWidth: 1, borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
-  typeTagText: { fontFamily: fonts.mono, fontSize: 9.9, letterSpacing: 0.2 },
-  chip: { borderWidth: 1, borderColor: 'rgba(74,168,162,0.4)', borderRadius: 999, paddingHorizontal: 11, paddingVertical: 4 },
-  chipRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  chipText: { fontFamily: fonts.mono, fontSize: 10.9, color: colors.brass },
-  resumeNote: { flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 14 },
-  resumeText: { fontFamily: fonts.mono, fontSize: 11, color: colors.brass },
-  resumeTrack: { width: 100, height: 4, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.15)', overflow: 'hidden' },
-  resumeFill: { height: '100%', backgroundColor: colors.brass },
-  withdrawn: { padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.4)', marginBottom: 14 },
+  originalText: { fontFamily: fonts.monoBold, fontSize: 10, color: '#1a1408' },
+
+  // .ep-actions / .ep-action
+  actions: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 14 },
+  action: { width: 78, alignItems: 'center', gap: 6 },
+  ring: { width: 44, height: 44, borderRadius: 22, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', alignItems: 'center', justifyContent: 'center' },
+  ringOn: { borderColor: 'rgba(239,91,91,0.6)' },
+  ringTip: { borderColor: 'rgba(242,193,78,0.6)' },
+  actionLabel: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1, color: colors.inkDim, textAlign: 'center' },
+
+  // .ep-upnext
+  upNext: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, backgroundColor: colors.surface2, marginTop: 16 },
+  upNextThumb: { width: 136, height: 76, borderRadius: 7, overflow: 'hidden', backgroundColor: colors.surface3, alignItems: 'center', justifyContent: 'center' },
+  upNextDur: { position: 'absolute', right: 5, bottom: 5, paddingHorizontal: 5, paddingVertical: 2, borderRadius: 3, backgroundColor: 'rgba(12,19,31,0.78)' },
+  upNextDurText: { fontFamily: fonts.mono, fontSize: 8.5, color: colors.ink },
+  upNextText: { flex: 1, minWidth: 0, gap: 4 },
+  upNextKicker: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.4, color: colors.brass },
+  upNextTitle: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
+  upNextSub: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.6, color: colors.inkDim },
+
+  // .ep-desc / .ep-credits
+  desc: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22.5, color: colors.ink, marginTop: 14 },
+  credits: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginTop: 12, marginBottom: 22 },
+  maker: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  makerAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.olive, alignItems: 'center', justifyContent: 'center' },
+  makerInitial: { fontFamily: fonts.displayBold, fontSize: 12, color: '#241a05' },
+  makerText: { fontFamily: fonts.body, fontSize: 14, color: colors.ink },
+  withdrawn: { padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.4)', marginTop: 12 },
   withdrawnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.inkDim },
 
-  // .episode-nav-sidebar (stacked below the card on phones)
-  sidebar: { marginTop: 24 },
-  sideHeading: { fontFamily: fonts.mono, fontSize: 10.9, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.inkDim, marginBottom: 11 },
-  sideNote: { fontFamily: fonts.body, fontSize: 13, lineHeight: 20, color: colors.inkDim },
-  sideCard: { flexDirection: 'row', gap: 13, marginBottom: 19 },
-  sideThumb: { width: 128, height: 72, borderRadius: 6, backgroundColor: colors.surface2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  durBadge: { position: 'absolute', bottom: 5, right: 5, backgroundColor: 'rgba(0,0,0,0.75)', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 },
-  durText: { color: colors.ink, fontSize: 10.4, fontFamily: fonts.mono },
-  watchedBadge: { backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 3, paddingHorizontal: 6, paddingVertical: 2 },
-  watchedText: { color: colors.ink, fontSize: 11, fontFamily: fonts.mono },
-  sideTitle: { fontFamily: fonts.bodyBold, fontSize: 13.6, color: colors.ink, marginBottom: 3 },
-  sideSub: { fontFamily: fonts.body, fontSize: 12, color: colors.inkDim },
-  seeAllEpisodes: { alignItems: 'center', paddingVertical: 10, borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 6, marginTop: 6 },
-  seeAllEpisodesText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
+  // The single-episode / signed-out notes under the strip's heading style.
+  note: { marginBottom: 26 },
+  noteHeading: { fontFamily: fonts.mono, fontSize: 15, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim, marginBottom: 8 },
+  noteText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 20, color: colors.inkDim },
+  noteBtn: { alignSelf: 'flex-start', marginTop: 8, paddingVertical: 8, paddingHorizontal: 14, borderWidth: 1, borderColor: 'rgba(251,232,211,0.2)', borderRadius: 999 },
+  noteBtnText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
+
+  // The full-screen Tip pill (components/EpisodePlayer.js topRight).
+  fsTip: { height: 30, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(242,193,78,0.7)', backgroundColor: 'rgba(12,19,31,0.55)' },
+  fsTipText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: colors.olive },
 
   // age-restricted (.account-card)
-  restrictedWrap: { padding: 19, paddingTop: 64 },
+  restrictedWrap: { padding: 19, paddingTop: 40 },
   accountCard: { backgroundColor: colors.surface2, borderRadius: 14, borderWidth: 1, borderColor: colors.oceanInk, padding: 22, alignItems: 'center' },
   accountEyebrow: { fontFamily: fonts.mono, fontSize: 10.9, letterSpacing: 1.1, textTransform: 'uppercase', color: colors.brass, marginBottom: 8 },
   restrictedTitle: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.ink, textAlign: 'center', marginBottom: 10 },

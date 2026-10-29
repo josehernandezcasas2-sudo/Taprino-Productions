@@ -165,6 +165,62 @@ export function ContinueWatchingRow({ items, onPressItem }) {
   );
 }
 
+function CheckGlyph({ size = 9 }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.ok} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M4 12l5 5L20 6" />
+    </Svg>
+  );
+}
+
+// The episode page's season strip (the "After Play" canvas, 2026-10-29;
+// the website's EpisodeStrip in pages/episode/[id].js): landscape cards
+// at the Continue Watching size, a Watched tick on finished ones, the
+// one playing now outlined with a "Now playing" pill, a progress bar on
+// anything partway through. `items` are /api/episode-page's
+// seasonEpisodes ({ id, title, season, seriesOrder, runtime, thumbnail,
+// watched, resumeSeconds, current }); the standalone title's "Watch next"
+// picks use it too, without the codes.
+export function EpisodeStrip({ title, items, onPressItem, onSeeAll, showCode = true }) {
+  const { width } = useWindowDimensions();
+  if (!items || items.length === 0) return null;
+  const m = rowMetrics(width);
+  return (
+    <View style={styles.catRow}>
+      <RowHeading title={title} onSeeAll={onSeeAll} />
+      <Track gap={m.gap}>
+        {items.map((ep) => {
+          const total = parseRuntimeToSeconds(ep.runtime);
+          const pct = ep.resumeSeconds && total ? Math.min(100, Math.round((ep.resumeSeconds / total) * 100)) : 0;
+          const code = showCode && ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : null;
+          const mins = total ? `${Math.max(1, Math.round(total / 60))} min` : (ep.runtime || '');
+          return (
+            <Pressable key={ep.id} style={{ width: m.landscapeW }} onPress={() => onPressItem(ep)} accessibilityState={{ selected: Boolean(ep.current) }}>
+              <View style={[styles.thumb, { width: m.landscapeW, height: m.landscapeH }, ep.current && styles.thumbCurrent, ep.watched && !ep.current && { opacity: 0.75 }]}>
+                {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={absoluteFill} /> : null}
+                {ep.current ? (
+                  <View style={[styles.stripPill, styles.stripPillNow]}><Text style={styles.stripPillNowText}>Now playing</Text></View>
+                ) : ep.watched ? (
+                  <View style={styles.stripPill}><CheckGlyph /><Text style={styles.stripPillText}>Watched</Text></View>
+                ) : (
+                  <PlayGlyph size={20} />
+                )}
+                {pct > 0 ? (
+                  <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${pct}%` }]} /></View>
+                ) : null}
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{ep.title}</Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>{[code, mins].filter(Boolean).join(' · ')}</Text>
+              </View>
+            </Pressable>
+          );
+        })}
+      </Track>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   // .cat-row / .cat-row-heading / .cat-row-track
   catRow: { marginBottom: 26 },
@@ -190,5 +246,12 @@ const styles = StyleSheet.create({
 
   // .cw-progress-track / .cw-progress-fill
   progressTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.5)' },
-  progressFill: { height: '100%', backgroundColor: colors.olive }
+  progressFill: { height: '100%', backgroundColor: colors.olive },
+
+  // .ep-strip-card.is-current / .ep-strip-pill
+  thumbCurrent: { borderWidth: 2, borderColor: colors.brass },
+  stripPill: { position: 'absolute', left: 7, top: 7, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999, backgroundColor: 'rgba(12,19,31,0.78)' },
+  stripPillText: { fontFamily: fonts.mono, fontSize: 8, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.ink },
+  stripPillNow: { backgroundColor: colors.brass },
+  stripPillNowText: { fontFamily: fonts.monoBold, fontSize: 8, letterSpacing: 0.8, textTransform: 'uppercase', color: '#241a05' }
 });

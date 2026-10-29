@@ -77,6 +77,9 @@ export default async function handler(req, res) {
     nextEpisode: stripPlayable(data.nextEpisode),
     previousEpisode: stripPlayable(data.previousEpisode),
     previousEpisodeWatched: data.previousEpisodeWatched,
+    // The season strip (the "After Play" page, 2026-10-29): every episode
+    // of this season with watched / resumeSeconds / current for the viewer.
+    seasonEpisodes: data.seasonEpisodes || [],
     watchNext: data.watchNext.map(stripPlayable),
     bonusContent: data.bonusContent.map(stripPlayable)
   });

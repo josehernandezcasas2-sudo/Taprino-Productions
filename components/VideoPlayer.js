@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
 import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
@@ -56,7 +56,17 @@ export default function VideoPlayer({
   refreshSrc = null,
   // The content advisory card over the first seconds of playback
   // (lib/contentAdvisory.js); the page turns it off for trailers.
-  advisory = true
+  advisory = true,
+  // Full screen gets the site's own chrome (Jose, 2026-10-29, the "After
+  // Play" canvas): `heading` ({ kicker, title }) and `rating` top-left and
+  // -right with the close button, `topRight` (the page's Tip button)
+  // beside the rating, −10 / play / +10 in the middle, and a "Next
+  // episode" pill in the bar when `onNext` is given.
+  heading = null,
+  rating = null,
+  onNext = null,
+  nextLabel = 'Next episode',
+  topRight = null
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -998,7 +1008,7 @@ export default function VideoPlayer({
   return (
     <div
       ref={shellRef}
-      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''}`}
+      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''} ${advisoryState === 'on' ? 'advisory-on' : ''}`}
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
       onKeyDown={onKeyDown}
@@ -1106,6 +1116,31 @@ export default function VideoPlayer({
 
       <ContentAdvisory info={advisoryInfo} state={advisoryState} onDismiss={dismissAdvisory} />
 
+      {started && !adState && fullscreen && (
+        <div className="tp-fs-top" onMouseEnter={handleControlsMouseEnter} onMouseLeave={handleControlsMouseLeave}>
+          <button className="tp-fs-exit" onClick={toggleFullscreen} aria-label="Leave full screen">
+            <CloseIcon size={16} src={iconOverrides.close} />
+          </button>
+          <div className="tp-fs-heading">
+            {heading && heading.kicker && <span className="tp-fs-kicker">{heading.kicker}</span>}
+            <span className="tp-fs-title">{(heading && heading.title) || episode.title}</span>
+          </div>
+          <div className="tp-fs-right">
+            {rating && <span className="tp-fs-rating">{rating}</span>}
+            {topRight}
+          </div>
+        </div>
+      )}
+      {started && !adState && fullscreen && (
+        <div className="tp-fs-center">
+          <button className="tp-fs-skip" onClick={() => skip(-SKIP_SECONDS)} aria-label="Back 10 seconds">−10</button>
+          <button className="tp-fs-play" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
+            {playing ? <PauseIcon size={28} src={iconOverrides.pause} /> : <PlayIcon size={28} src={iconOverrides.play} />}
+          </button>
+          <button className="tp-fs-skip" onClick={() => skip(SKIP_SECONDS)} aria-label="Forward 10 seconds">+10</button>
+        </div>
+      )}
+
       {started && !adState && (
         <div className="tp-controls" onMouseEnter={handleControlsMouseEnter} onMouseLeave={handleControlsMouseLeave}>
           <div className="tp-scrub">
@@ -1135,11 +1170,11 @@ export default function VideoPlayer({
             <button className="tp-btn" onClick={togglePlay} aria-label={playing ? 'Pause' : 'Play'}>
               {playing ? <PauseIcon src={iconOverrides.pause} /> : <PlayIcon src={iconOverrides.play} />}
             </button>
-            <button className="tp-btn" onClick={() => skip(-SKIP_SECONDS)} aria-label="Back 10 seconds">
-              ↺
+            <button className="tp-btn tp-skip" onClick={() => skip(-SKIP_SECONDS)} aria-label="Back 10 seconds">
+              <SkipBackIcon size={15} src={iconOverrides.skip_back} /><span className="tp-skip-label">10</span>
             </button>
-            <button className="tp-btn" onClick={() => skip(SKIP_SECONDS)} aria-label="Forward 10 seconds">
-              ↻
+            <button className="tp-btn tp-skip" onClick={() => skip(SKIP_SECONDS)} aria-label="Forward 10 seconds">
+              <span className="tp-skip-label">10</span><SkipForwardIcon size={15} src={iconOverrides.skip_forward} />
             </button>
 
             <div className="tp-time">
@@ -1147,6 +1182,12 @@ export default function VideoPlayer({
               <span className="tp-time-sep">/</span>
               <span className="tp-time-total">{formatTime(duration)}</span>
             </div>
+
+            {onNext && fullscreen && (
+              <button className="tp-btn tp-next" onClick={onNext}>
+                {nextLabel} <SkipForwardIcon size={13} src={iconOverrides.skip_forward} />
+              </button>
+            )}
 
             <div className="tp-volume-wrap">
               <button
