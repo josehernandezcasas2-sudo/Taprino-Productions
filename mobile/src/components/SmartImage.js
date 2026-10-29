@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Image, View } from 'react-native';
 import { SvgUri } from 'react-native-svg';
+import { absoluteUrl } from '../lib/api';
 
 // A drop-in replacement for <Image source={{ uri }}> wherever `uri` might
 // be CMS/placeholder artwork (thumbnail/poster/heroImage/titleImageUrl) —
@@ -34,8 +35,11 @@ function SvgArt({ uri, style }) {
   );
 }
 
+// A site-relative path (a Snippet's photo or cover comes as
+// /api/posts/<id>/media since 2026-10-29) is resolved against the API
+// base, the way the app opens every other route of the website's.
 export default function SmartImage({ uri, style, ...rest }) {
   if (!uri) return null;
   if (uri.startsWith('data:image/svg+xml')) return <SvgArt uri={uri} style={style} />;
-  return <Image source={{ uri }} style={style} {...rest} />;
+  return <Image source={{ uri: uri.startsWith('/') ? absoluteUrl(uri) : uri }} style={style} {...rest} />;
 }

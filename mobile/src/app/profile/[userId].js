@@ -15,6 +15,7 @@ import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { PerformerFacts } from '../../components/CastingBits';
 import { TipButton } from '../../components/TipSheet';
 import { rememberVia } from '../../lib/referral';
+import { useCaptureBlock } from '../../lib/captureBlock';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -506,9 +507,13 @@ export default function PublicProfile() {
 }
 
 // Full-screen look at one photo post: the image shown whole (never
-// cropped), caption underneath, tap anywhere or the × to close.
+// cropped), caption underneath, the author's "Not for AI training" seal
+// (their own switch) under that, tap anywhere or the × to close. No
+// screenshots or recording while it is open (mobile/src/lib/captureBlock.js,
+// 2026-10-29), the same as a playing reel.
 function PhotoPostViewer({ post, onClose }) {
   const { width } = useWindowDimensions();
+  useCaptureBlock(Boolean(post));
   if (!post) return null;
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
@@ -518,6 +523,7 @@ function PhotoPostViewer({ post, onClose }) {
         </Pressable>
         <SmartImage uri={post.imageUrl} style={{ width: width - 32, height: (width - 32) * 1.25, borderRadius: 10 }} resizeMode="contain" />
         {post.caption ? <Text style={styles.viewerCaption}>{post.caption}</Text> : null}
+        {post.aiSeal === true ? <AiSealChip style={{ marginTop: 12 }} /> : null}
       </Pressable>
     </Modal>
   );

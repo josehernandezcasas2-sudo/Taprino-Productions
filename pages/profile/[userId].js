@@ -258,11 +258,12 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
     return (
       <div
         key={post.id}
-        className="profile-post-tile"
+        className="profile-post-tile no-save"
         role="link"
         tabIndex={0}
         onClick={openTile}
         onKeyDown={(e) => { if (e.key === 'Enter') openTile(); }}
+        onContextMenu={(e) => e.preventDefault()}
       >
         {imageSrc ? (
           <>

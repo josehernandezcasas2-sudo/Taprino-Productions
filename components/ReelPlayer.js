@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import { PlayIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 // Deliberately not VideoPlayer.js — that component carries ads, captions,
@@ -8,6 +7,16 @@ import { PlayIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 // minimal player: attach HLS, play when active, pause and detach when
 // not, done.
 //
+// The poster is a plain <img>, not next/image (2026-10-29): a post's
+// cover comes from /api/posts/<id>/media, a route of ours that the
+// optimizer would call without the visitor's address (its internal fetch
+// carries no headers), which would pool every visitor into one
+// rate-limit bucket. The route already serves a copy capped to 1600px.
+// No context menu, no drag, no long-press sheet and no download button
+// on the video: the one-tap saves are off. A screenshot, the browser's
+// developer tools or a recording of the screen are not stoppable on the
+// web, and the policy page says so.
+//
 // showControls is off by default — the swipe feeds (pages/vertical/
 // discover.js, pages/snippets/discover.js) are deliberately chrome-free,
 // tap-to-mute-and-move-on, matching Reels/TikTok. PostViewerModal turns
@@ -15,6 +24,10 @@ import { PlayIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 // recover from a blocked autoplay the way the feeds do (see the `active`
 // effect below), so it needs its own explicit play/pause, and a static
 // post benefits from being scrubbable the way a feed clip doesn't.
+export function preventMenu(e) {
+  e.preventDefault();
+}
+
 export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, thumbnail, showControls = false }) {
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
@@ -107,13 +120,16 @@ export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, 
   }
 
   return (
-    <div className="reel-video-wrap" onClick={showControls ? togglePlayPause : onToggleMute}>
-      {loading && thumbnail && <Image src={thumbnail} alt="" fill sizes="480px" className="reel-video-poster" />}
+    <div className="reel-video-wrap no-save" onClick={showControls ? togglePlayPause : onToggleMute} onContextMenu={preventMenu}>
+      {loading && thumbnail && <img src={thumbnail} alt="" className="reel-video-poster" draggable={false} loading="lazy" decoding="async" />}
       <video
         ref={videoRef}
         className="reel-video"
         playsInline
         muted={muted}
+        controlsList="nodownload noremoteplayback"
+        disablePictureInPicture
+        disableRemotePlayback
         onEnded={onEnded}
         onWaiting={() => setLoading(true)}
         onPlaying={() => setLoading(false)}

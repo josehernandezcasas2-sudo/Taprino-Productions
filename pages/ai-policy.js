@@ -94,7 +94,7 @@ export default function AiPolicy({ account = {} }) {
             <div className="aip-card">
               <div className="aip-kicker">02 · Video</div>
               <h3>No permanent address.</h3>
-              <p>Every title plays through a short-lived signed link, free titles included. A copied link stops working within hours.</p>
+              <p>Every title plays through a short-lived signed link, free titles included. A copied link stops working within hours. A Snippet&rsquo;s photo and cover are served by us from private storage, capped in size with the camera data stripped, never from a public address.</p>
             </div>
             <div className="aip-card">
               <div className="aip-kicker">03 · The words</div>

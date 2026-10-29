@@ -10,6 +10,7 @@ import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api'
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
+import { AiSealChip } from '../../components/AiSeal';
 import { buildVerticalUnits, expandUnitToSlides, pickNextUnit, unitKey } from '../../lib/verticalFeed';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
@@ -345,14 +346,19 @@ function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onSha
       {/* box-none: taps fall through to the video except on the author row,
           which opens their profile (components/ReelAuthor.js on the site). */}
       <View style={[styles.caption, { paddingBottom: insets.bottom + 30 }]} pointerEvents="box-none">
-        <Pressable style={styles.authorRow} onPress={onOpenAuthor} disabled={!onOpenAuthor} hitSlop={6}>
-          <View style={styles.authorAvatar}>
-            {slide.episode.authorAvatarUrl
-              ? <PositionedImage uri={slide.episode.authorAvatarUrl} position={slide.episode.authorAvatarPosition} zoom={slide.episode.authorAvatarZoom || 1} style={absoluteFill} />
-              : <Text style={styles.authorAvatarLetter}>{authorName[0].toUpperCase()}</Text>}
-          </View>
-          <Text style={styles.captionAuthor}>{authorName}</Text>
-        </Pressable>
+        {/* The author and, beside them, their "Not for AI training" seal
+            (the website's components/ReelAuthor.js, 2026-10-29). */}
+        <View style={styles.authorLine} pointerEvents="box-none">
+          <Pressable style={styles.authorRow} onPress={onOpenAuthor} disabled={!onOpenAuthor} hitSlop={6}>
+            <View style={styles.authorAvatar}>
+              {slide.episode.authorAvatarUrl
+                ? <PositionedImage uri={slide.episode.authorAvatarUrl} position={slide.episode.authorAvatarPosition} zoom={slide.episode.authorAvatarZoom || 1} style={absoluteFill} />
+                : <Text style={styles.authorAvatarLetter}>{authorName[0].toUpperCase()}</Text>}
+            </View>
+            <Text style={styles.captionAuthor}>{authorName}</Text>
+          </Pressable>
+          {slide.episode.aiSeal === true ? <AiSealChip style={styles.authorSeal} /> : null}
+        </View>
         {slide.episode.title ? <Text style={styles.captionTitle}>{slide.episode.title}</Text> : null}
       </View>
     </View>
@@ -436,7 +442,9 @@ const styles = StyleSheet.create({
   actionRail: { position: 'absolute', right: 12, zIndex: 4, gap: 18, alignItems: 'center' },
   actionBtn: { width: 42, height: 42, borderRadius: 21, backgroundColor: 'rgba(0,0,0,0.35)', alignItems: 'center', justifyContent: 'center' },
   caption: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, paddingHorizontal: 18, paddingTop: 60 },
-  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start', marginBottom: 6 },
+  authorLine: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 10, marginBottom: 6 },
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: 8, alignSelf: 'flex-start' },
+  authorSeal: { backgroundColor: 'rgba(10,10,14,0.45)' },
   authorAvatar: { width: 28, height: 28, borderRadius: 14, overflow: 'hidden', backgroundColor: colors.brass, borderWidth: 1.5, borderColor: 'rgba(251,232,211,0.7)', alignItems: 'center', justifyContent: 'center' },
   authorAvatarLetter: { color: colors.onBrass, fontSize: 11, fontWeight: '700' },
   captionAuthor: { color: colors.brass, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase' },

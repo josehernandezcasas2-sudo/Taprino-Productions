@@ -351,16 +351,18 @@ export default function SiteSettingsPanel() {
 // uploads do by themselves, applied once to what was uploaded before:
 // every Cloudflare Stream video demands a signed URL whatever its tier
 // (lib/streamProtection.js), caption tracks live in the private bucket
-// and play through /api/captions/<id> (lib/captionUpload.js), and Film
+// and play through /api/captions/<id> (lib/captionUpload.js), Film
 // University files open through one-hour signed links from a private
-// bucket (lib/universityDocs.js). Each button is safe to press again.
+// bucket (lib/universityDocs.js), and a Snippet's photo and cover are a
+// capped copy in the private bucket served by /api/posts/<id>/media
+// (lib/posts.js, 2026-10-29). Each button is safe to press again.
 function ProtectionCard() {
   const dim = { fontSize: '0.8rem', color: 'var(--ink-dim)' };
   return (
     <div className="account-card" data-testid="protection-card">
       <div className="account-eyebrow">Protection</div>
       <p style={{ ...dim, marginBottom: '0.75rem' }}>
-        Creators&rsquo; work stays off permanent public URLs: videos play through short-lived signed links, captions through a gated route, course files through one-hour links. New uploads are handled as they land; these buttons bring what was uploaded before in line, and can be pressed again any time.
+        Creators&rsquo; work stays off permanent public URLs: videos play through short-lived signed links, captions and Snippet photos through gated routes, course files through one-hour links. New uploads are handled as they land; these buttons bring what was uploaded before in line, and can be pressed again any time.
       </p>
       <ProtectionAction
         label="Protect every video"
@@ -404,6 +406,19 @@ function ProtectionCard() {
         blurb="Makes the Film University bucket private. Readings and course files keep working: pages open them through one-hour signed links."
         render={(result) => (
           <p style={{ margin: 0 }}>{result.wasPublic ? 'The bucket was public and is now private.' : result.existed ? 'The bucket was already private.' : 'Created the bucket private.'}</p>
+        )}
+      />
+      <ProtectionAction
+        label="Move Snippet photos and covers to private storage"
+        busyLabel="Moving…"
+        url="/api/admin/protect-media"
+        body={{ what: 'posts' }}
+        blurb="A Snippet's photo and a video post's cover. New ones go straight to the private bucket as a copy no wider than 1600px with the camera data stripped; this moves the ones uploaded before the same way and removes their public copies. Pages and the app load them through a gated route from then on."
+        render={(result) => (
+          <>
+            <p style={{ margin: 0 }}>Moved {result.moved} image{result.moved === 1 ? '' : 's'} ({result.resized} brought down to 1600px); {result.alreadyPrivate} already private; {result.skipped.length} hosted elsewhere; {result.failures.length} failed.</p>
+            {result.failures.length > 0 && <ul style={{ margin: '0.4rem 0 0', paddingLeft: '1.1rem' }}>{result.failures.map((f, i) => <li key={`${f.id}-${i}`}>{f.title}: {f.error}</li>)}</ul>}
+          </>
         )}
       />
     </div>

@@ -54,8 +54,11 @@ export async function getServerSideProps({ req, res }) {
     tier: 'free',
     seriesId: null,
     isUserPost: true,
+    aiSeal: p.aiSeal !== false,
     authorName: authors[p.userId].displayName,
-    authorAvatarUrl: authors[p.userId].avatarUrl
+    authorAvatarUrl: authors[p.userId].avatarUrl,
+    authorAvatarPosition: authors[p.userId].avatarPosition || null,
+    authorAvatarZoom: authors[p.userId].avatarZoom || null
   }));
   const verticalEpisodes = [...catalogVertical, ...postUnits];
 

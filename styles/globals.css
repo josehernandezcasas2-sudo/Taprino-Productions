@@ -2745,13 +2745,26 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--void-1);
 }
 .post-viewer-media-backdrop {
-  /* next/image's `fill` sets position/inset/width/height itself; this
-     just needs the crop-to-fill behavior a plain <img> doesn't get for
-     free the way a CSS background-image used to. */
+  /* A plain <img> since 2026-10-29 (it was next/image's `fill`, which set
+     the box itself): the crop-to-fill a CSS background-image used to give. */
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
   object-fit: cover;
   object-position: center;
   filter: blur(18px) brightness(0.5);
   transform: scale(1.15);
+}
+/* The seal under the viewer's caption (components/PostViewerModal.js). */
+.post-viewer-seal { display: flex; justify-content: center; margin-top: 0.6rem; }
+
+/* The one-tap saves are off on a post's photo, cover and video (Jose,
+   2026-10-29): no drag-out, no text selection, no iOS long-press "Save
+   Image" sheet; the context menu is refused in the component. A
+   screenshot or the developer tools are not stoppable in a browser. */
+.no-save, .no-save img, .no-save video {
+  -webkit-user-select: none; user-select: none;
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
 }
 .post-viewer-media-img {
   position: absolute; inset: 0;
@@ -2817,6 +2830,11 @@ button { font-family: inherit; cursor: pointer; }
    title (see .reel-caption-series in pages/vertical/discover.js). */
 .reel-caption-post-author { text-transform: uppercase; }
 /* components/ReelAuthor.js — poster's photo + name, links to their profile */
+/* The author link and, beside it, the "Not for AI training" chip
+   (components/ReelAuthor.js, 2026-10-29): two links side by side. */
+.reel-caption-author-row { display: flex; align-items: center; flex-wrap: wrap; gap: 0.5rem 0.7rem; margin-bottom: 0.35rem; }
+.reel-caption-author-row .reel-caption-author { margin-bottom: 0; }
+.reel-caption-seal { background: rgba(10, 10, 14, 0.45); }
 .reel-caption-author { display: inline-flex; align-items: center; gap: 0.5rem; margin-bottom: 0.35rem; text-decoration: none; }
 .reel-caption-author .reel-caption-series { margin-bottom: 0; }
 .reel-caption-author:hover .reel-caption-series { text-decoration: underline; }

@@ -91,6 +91,14 @@ const nextConfig = {
   // beta door's noindex and the noai directive never overwrite each other.
   async headers() {
     return [
+      // The image optimizer's derivatives (every poster, avatar and still
+      // a page draws through next/image) never pass through middleware.js,
+      // so they carry the no-AI request from here (2026-10-29; the pages
+      // themselves get it from the middleware, beta noindex included).
+      {
+        source: '/_next/image',
+        headers: [{ key: 'X-Robots-Tag', value: 'noai, noimageai' }]
+      },
       {
         source: '/(.*)',
         headers: [

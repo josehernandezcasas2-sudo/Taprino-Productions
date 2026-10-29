@@ -1,12 +1,14 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
-import { moveCaptionsToPrivate, lockUniversityBucket } from '../../../lib/protectMedia';
+import { moveCaptionsToPrivate, lockUniversityBucket, movePostMediaToPrivate } from '../../../lib/protectMedia';
 import { sendError } from '../../../lib/apiErrors';
 
-// The Protection card's other two buttons (components/admin/SiteSettingsPanel.js):
+// The Protection card's other buttons (components/admin/SiteSettingsPanel.js):
 // `what: 'captions'` moves every caption track still at a public URL into
 // the private bucket; `what: 'university'` makes the Film University
-// bucket private. Both are safe to press again (lib/protectMedia.js).
+// bucket private; `what: 'posts'` moves every Snippet photo and cover
+// into the private bucket as a capped copy (2026-10-29). All are safe to
+// press again (lib/protectMedia.js).
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -42,7 +44,19 @@ export default async function handler(req, res) {
       });
       return res.status(200).json({ what, ...result });
     }
-    return res.status(400).json({ error: 'what must be captions or university.' });
+    if (what === 'posts') {
+      const result = await movePostMediaToPrivate();
+      await recordAudit({
+        adminId: userId,
+        adminEmail: email,
+        action: 'protect_post_media',
+        targetType: 'post',
+        targetId: 'all',
+        details: `Moved ${result.moved} Snippet photos and covers to private storage (${result.resized} brought down to 1600px); ${result.alreadyPrivate} already private, ${result.skipped.length} not in our storage, ${result.failures.length} failed.`
+      });
+      return res.status(200).json({ what, ...result });
+    }
+    return res.status(400).json({ error: 'what must be captions, university or posts.' });
   } catch (err) {
     console.error('protect-media error:', err.message);
     return sendError(res, err, 'admin/protect-media', 'Could not finish.');

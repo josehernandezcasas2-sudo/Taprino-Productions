@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
-import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { uploadPrivateImage } from '../../../lib/artworkUpload';
 import { cloudflarePlaybackUrl, getCloudflareVideoStatus, enableSignedUrlsForVideo, fetchCloudflareThumbnail } from '../../../lib/cloudflareUpload';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { createPost } from '../../../lib/posts';
@@ -14,6 +14,14 @@ export const config = {
 
 const MAX_VIDEO_SECONDS = 5 * 60;
 const MAX_CAPTION_LENGTH = 2200;
+
+// A post's photo, cover or stored frame goes to the private bucket as a
+// capped copy (1600px, no EXIF; lib/imageCap.js) and is served by
+// /api/posts/<id>/media (2026-10-29: the safety features on posts). The
+// composer already shrinks in the browser; this is the guarantee.
+function storePostImage({ base64, fileName, tag, userId }) {
+  return uploadPrivateImage({ base64, fileName, pathPrefix: `posts/${userId}-${Date.now().toString(36)}-${tag}`, cap: true });
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -44,11 +52,7 @@ export default async function handler(req, res) {
     }
     let imageUrl = null;
     try {
-      imageUrl = await uploadArtworkImage({
-        base64: body.imageBase64,
-        fileName: body.imageFileName,
-        pathPrefix: `post-${userId}-${Date.now().toString(36)}`
-      });
+      imageUrl = await storePostImage({ base64: body.imageBase64, fileName: body.imageFileName, tag: 'photo', userId });
     } catch (err) {
       return sendError(res, err, 'posts/create', 'Could not create the post.', { plainStatus: 400 });
     }
@@ -71,11 +75,7 @@ export default async function handler(req, res) {
   let thumbnailUrl = null;
   if (body.thumbnailBase64) {
     try {
-      thumbnailUrl = await uploadArtworkImage({
-        base64: body.thumbnailBase64,
-        fileName: body.thumbnailFileName,
-        pathPrefix: `post-thumb-${userId}-${Date.now().toString(36)}`
-      });
+      thumbnailUrl = await storePostImage({ base64: body.thumbnailBase64, fileName: body.thumbnailFileName, tag: 'cover', userId });
     } catch (err) {
       return sendError(res, err, 'posts/create', 'Could not create the post.', { plainStatus: 400 });
     }
@@ -105,7 +105,7 @@ export default async function handler(req, res) {
   }
   if (!thumbnailUrl) {
     const frame = await fetchCloudflareThumbnail(body.videoUid).catch(() => null);
-    if (frame) thumbnailUrl = await uploadArtworkImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', pathPrefix: `post-frame-${userId}-${Date.now().toString(36)}` }).catch(() => null);
+    if (frame) thumbnailUrl = await storePostImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', tag: 'frame', userId }).catch(() => null);
   }
 
   const id = await createPost({

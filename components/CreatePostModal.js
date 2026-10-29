@@ -2,10 +2,17 @@ import { useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
+import { shrinkImage } from './locations/LocationBits';
 import { PlusIcon, VideoCameraIcon, ImageIcon, CloseIcon } from './PlayerIcons';
 
 const MAX_VIDEO_SECONDS = 5 * 60;
 const MAX_CAPTION_LENGTH = 2200;
+// A photo is sent no wider than a page draws it, a 9:16 cover smaller
+// still (2026-10-29): the server caps again and keeps the copy, never
+// the original (lib/imageCap.js). A GIF goes as it is, since redrawing
+// it would flatten the animation.
+const PHOTO_MAX_PX = 1600;
+const COVER_MAX_PX = 1080;
 
 function readAsDataUrl(f) {
   if (!f) return Promise.resolve(null);
@@ -15,6 +22,16 @@ function readAsDataUrl(f) {
     reader.onerror = () => reject(new Error(`Could not read ${f.name}.`));
     reader.readAsDataURL(f);
   });
+}
+
+async function readForUpload(f, maxPx) {
+  if (!f) return null;
+  if (f.type === 'image/gif') return readAsDataUrl(f);
+  try {
+    return await shrinkImage(f, maxPx);
+  } catch {
+    return readAsDataUrl(f);
+  }
 }
 
 // Admin-only test composer (see MobileTabBar's own admin gate on the "+"
@@ -79,7 +96,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
     setSaving(true);
     setError(null);
     try {
-      const imageBase64 = await readAsDataUrl(imageFile);
+      const imageBase64 = await readForUpload(imageFile, PHOTO_MAX_PX);
       const res = await fetch('/api/posts/create', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -164,7 +181,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
     // modal closes as soon as startUpload kicks off, handing off to the
     // global upload widget, so the thumbnail needs to already be part of
     // the payload startUpload carries rather than something added later.
-    const thumbnailBase64 = await readAsDataUrl(thumbnailFile);
+    const thumbnailBase64 = await readForUpload(thumbnailFile, COVER_MAX_PX);
     startUpload(
       videoFile,
       {

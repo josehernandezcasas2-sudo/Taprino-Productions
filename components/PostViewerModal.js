@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import Image from 'next/image';
 import PostMenu from './PostMenu';
-import ReelPlayer from './ReelPlayer';
+import ReelPlayer, { preventMenu } from './ReelPlayer';
+import { AiSealChip } from './AiSeal';
 import { HeartIcon, ShareIcon, CheckIcon, WarningIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const SWIPE_THRESHOLD = 50;
@@ -129,7 +129,7 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <div className="post-viewer-media">
+        <div className="post-viewer-media no-save" onContextMenu={preventMenu}>
           <button className="post-viewer-close" onClick={onClose} aria-label="Close">&times;</button>
           <div className="post-viewer-menu">
             <PostMenu
@@ -161,13 +161,15 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
             />
           ) : post.imageUrl ? (
             <>
-              {/* Two renders of the same photo, but both now go through
-                  next/image's optimizer (resized + WebP/AVIF) instead of
-                  each fetching the full original — this used to be a
-                  CSS background-image plus a separate plain <img>,
-                  downloading the same file twice at full resolution. */}
-              <Image src={post.imageUrl} alt="" fill sizes="420px" className="post-viewer-media-backdrop" quality={20} />
-              <Image src={post.imageUrl} alt="" fill sizes="420px" className="post-viewer-media-img" />
+              {/* Two renders of the same photo (the blurred fill behind,
+                  the whole picture on top), one fetch: the browser loads
+                  the URL once. Plain <img>, not next/image, since
+                  2026-10-29: the photo comes from /api/posts/<id>/media,
+                  already capped to 1600px, and the optimizer's internal
+                  fetch would reach that route without the visitor's
+                  address (see components/ReelPlayer.js). */}
+              <img src={post.imageUrl} alt="" className="post-viewer-media-backdrop" draggable={false} decoding="async" aria-hidden="true" />
+              <img src={post.imageUrl} alt="" className="post-viewer-media-img" draggable={false} decoding="async" />
             </>
           ) : (
             <div className="post-viewer-caption-only">&ldquo;{post.caption}&rdquo;</div>
@@ -226,6 +228,11 @@ export default function PostViewerModal({ posts, startIndex, onClose, viewerId, 
 
         {hasMedia && post.caption && (
           <div className="post-viewer-caption">&ldquo;{post.caption}&rdquo;</div>
+        )}
+        {/* The author's "Not for AI training" seal (their own switch;
+            lib/posts.js, 2026-10-29), under the caption. */}
+        {post.aiSeal === true && (
+          <div className="post-viewer-seal"><AiSealChip /></div>
         )}
       </div>
     </div>

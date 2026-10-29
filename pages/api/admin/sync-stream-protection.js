@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflareUidFromUrl, enableSignedUrlsForVideo, fetchCloudflareThumbnail } from '../../../lib/cloudflareUpload';
-import { uploadArtworkImage } from '../../../lib/artworkUpload';
+import { uploadArtworkImage, uploadPrivateImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
 import { sendError } from '../../../lib/apiErrors';
 
@@ -135,7 +135,9 @@ export default async function handler(req, res) {
       try {
         const frame = await fetchCloudflareThumbnail(uid);
         if (!frame) throw new Error('no frame available yet');
-        const stored = await uploadArtworkImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', pathPrefix: `post-frame-${row.id}` });
+        // A post's cover lives in the private bucket, capped, and is
+        // served by /api/posts/<id>/media (2026-10-29).
+        const stored = await uploadPrivateImage({ base64: frame.toString('base64'), fileName: 'frame.jpg', pathPrefix: `posts/frame-${row.id}`, cap: true });
         const { error: updateError } = await supabase.from('posts').update({ thumbnail_url: stored }).eq('id', row.id);
         if (updateError) throw new Error(updateError.message);
         extra.framesStored += 1;
