@@ -5,7 +5,6 @@ import { getAccountContext } from '../lib/accountContext';
 import { getOwnAdAccount } from '../lib/adAccounts';
 import { getSiteSettings } from '../lib/siteSettings';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 
@@ -71,7 +70,6 @@ export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, is
         <title>Advertise — {SITE.name}</title>
       </Head>
       <HeaderNav mainGenres={[]} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-      <div className="install-row"><InstallButton /></div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Advertise on {SITE.name}</div>

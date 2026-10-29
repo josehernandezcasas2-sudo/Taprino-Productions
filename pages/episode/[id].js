@@ -16,7 +16,6 @@ import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
@@ -371,7 +370,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       {!showPlayer ? (
         <div className="hero-carousel full-bleed">
@@ -610,7 +608,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                   <HeartIcon size={14} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved to wishlist' : 'Add to wishlist'}
                 </button>
                 {!showingTrailer && episode.trailerSrc && (
-                  <button className="trailer-link" onClick={() => setShowingTrailer(true)}>🎬 Watch trailer</button>
+                  <button className="trailer-link" onClick={() => setShowingTrailer(true)}><PlayIcon size={13} src={iconOverrides.play} /> Watch trailer</button>
                 )}
                 {/* Tips: only once the maker's Stripe account can take charges. */}
                 <TipButton tipping={tipping} isSignedIn={isSignedIn} className="trailer-link tip-link" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
@@ -635,7 +633,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               })()}
               {showingTrailer && (
                 <button className="trailer-link" onClick={() => setShowingTrailer(false)}>
-                  ▶ Back to full episode
+                  <PlayIcon size={13} src={iconOverrides.play} /> Back to full episode
                 </button>
               )}
               {withdrawn && (

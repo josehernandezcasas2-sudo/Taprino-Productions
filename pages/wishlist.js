@@ -12,7 +12,6 @@ import { getWatchHistory } from '../lib/watchHistory';
 import { getSavedPitches } from '../lib/pitches';
 import { useWishlist } from '../lib/useWishlist';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import { SITE } from '../lib/siteConfig';
@@ -139,7 +138,6 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
         <BackButton fallbackHref="/stream" />

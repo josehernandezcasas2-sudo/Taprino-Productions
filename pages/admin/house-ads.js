@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import InstallButton from '../../components/InstallButton';
 import HouseAdForm from '../../components/HouseAdForm';
 
 export async function getServerSideProps(ctx) {

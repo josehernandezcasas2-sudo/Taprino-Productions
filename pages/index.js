@@ -6,7 +6,6 @@ import { getAccountContext } from '../lib/accountContext';
 import { getHomeFeedData } from '../lib/homeFeed';
 import { countUnread } from '../lib/messages';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import HomeOnNow from '../components/HomeOnNow';
@@ -114,7 +113,6 @@ export default function Home({
       <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
       <main id="main-content" className="hb-page">
-        <div className="install-row" style={{ padding: '0 1.6rem' }}><InstallButton /></div>
 
         <div className="hb-masthead">
           <div>

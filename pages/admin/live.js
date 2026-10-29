@@ -3,7 +3,6 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import { listChannels } from '../../lib/channelEngine';
-import InstallButton from '../../components/InstallButton';
 import { SITE } from '../../lib/siteConfig';
 
 export async function getServerSideProps(ctx) {

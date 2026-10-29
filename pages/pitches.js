@@ -8,7 +8,6 @@ import { PITCH_TAGS } from '../lib/pitches';
 import { getPitchRoomData } from '../lib/pitchRoom';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
@@ -132,7 +131,6 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
       {bypassingDisabled && (
         <div className="admin-preview-banner">
           ⚠ Pitch Room is turned off for the public right now — you're seeing this because you're an admin.

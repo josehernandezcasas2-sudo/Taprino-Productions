@@ -1,3 +1,8 @@
+// Not rendered anywhere since 2026-10-29 (Jose: "take out that install
+// button across the entire site since it will be useless. We might add that
+// later"). Kept for that later: drop `<div className="install-row"><InstallButton /></div>`
+// back under a page's HeaderNav (the .install-row styles are still in
+// globals.css) and it works as before.
 import { useEffect, useState } from 'react';
 
 export default function InstallButton() {

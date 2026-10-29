@@ -3,7 +3,6 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import HeaderNav from './HeaderNav';
-import InstallButton from './InstallButton';
 import MobileTabBar from './MobileTabBar';
 import Footer from './Footer';
 import ChannelPlayer from './ChannelPlayer';
@@ -187,7 +186,6 @@ export default function LiveChannelsPage(props) {
     <>
       {head}
       {nav}
-      <div className="install-row"><InstallButton /></div>
 
       <main className="stage stage-single stage-wide">
         <div className="tv-layout">

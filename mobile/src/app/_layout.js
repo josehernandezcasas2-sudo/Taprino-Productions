@@ -66,6 +66,9 @@ export default function RootLayout() {
               turned off here rather than just re-titled. */}
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="stream" options={{ headerShown: false }} />
+          {/* The series hub renders TopNav + the Back pill itself
+              (2026-10-29: the native header looked like another app). */}
+          <Stack.Screen name="series/[id]" options={{ headerShown: false }} />
           <Stack.Screen name="live/index" options={{ headerShown: false }} />
           <Stack.Screen name="live/[slug]" options={{ headerShown: false }} />
           <Stack.Screen name="about" options={{ headerShown: false }} />

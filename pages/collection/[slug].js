@@ -5,7 +5,6 @@ import BackButton from '../../components/BackButton';
 import { episodeHref } from '../../lib/episodeLinks';
 import { getCollectionFeedData } from '../../lib/collectionFeed';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import WishlistButton from '../../components/WishlistButton';
 import Footer from '../../components/Footer';
 import { useWishlist } from '../../lib/useWishlist';
@@ -57,7 +56,6 @@ export default function Collection({ slug, label, isSubscriber, isSignedIn, wish
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
         <BackButton fallbackHref="/stream" />

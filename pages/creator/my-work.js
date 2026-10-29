@@ -5,7 +5,6 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getAllSeries } from '../../lib/series';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
 import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
 import CreatorSubmissionForm from '../../components/CreatorSubmissionForm';
@@ -462,7 +461,6 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main id="main-content" className="stage stage-single">
         <div className="ca-head">

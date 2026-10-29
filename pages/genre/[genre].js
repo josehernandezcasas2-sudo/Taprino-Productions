@@ -11,7 +11,6 @@ import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/con
 import HeroSpotlight from '../../components/HeroSpotlight';
 import GenreRow from '../../components/GenreRow';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
@@ -156,7 +155,6 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
 

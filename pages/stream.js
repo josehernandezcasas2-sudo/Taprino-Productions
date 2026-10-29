@@ -14,7 +14,6 @@ import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../lib/conten
 import { getContinueWatching } from '../lib/continueWatching';
 import HeroSpotlight from '../components/HeroSpotlight';
 import SignalPanel from '../components/SignalPanel';
-import InstallButton from '../components/InstallButton';
 import Link from 'next/link';
 import HeaderNav from '../components/HeaderNav';
 import { getCurrentLiveStream } from '../lib/liveStreams';
@@ -275,7 +274,6 @@ export default function Home({ liveStream, isSubscriber, isSignedIn, showNewslet
         isSubscriber={isSubscriber}
         liveStream={liveStream}
       />
-      <div className="install-row"><InstallButton /></div>
 
       {liveStream && (
         <Link href="/live" className="live-now-banner">

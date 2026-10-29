@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
-import InstallButton from '../../components/InstallButton';
 import { SITE } from '../../lib/siteConfig';
 import { ADMIN_CAPABILITIES } from '../../lib/capabilities';
 
@@ -396,7 +395,6 @@ export default function AdminTeam({ account, mainGenres }) {
         </section>
       </AdminShell>
 
-      <InstallButton />
     </div>
   );
 }

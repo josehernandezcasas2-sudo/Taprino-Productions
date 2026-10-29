@@ -13,7 +13,6 @@ import { getSiteSettings } from '../lib/siteSettings';
 import { getRecommendations } from '../lib/recommendations';
 import { useWishlist } from '../lib/useWishlist';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import WishlistButton from '../components/WishlistButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
@@ -108,7 +107,6 @@ export default function MyRecs({ isSignedIn, isSubscriber, wishlist, mainGenres,
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
         <BackButton fallbackHref="/stream" />

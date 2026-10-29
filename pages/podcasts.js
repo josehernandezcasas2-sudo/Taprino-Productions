@@ -5,7 +5,6 @@ import { getAccountContext } from '../lib/accountContext';
 import { getPodcastShows } from '../lib/podcastShow';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';
-import InstallButton from '../components/InstallButton';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
@@ -56,7 +55,6 @@ export default function Podcasts({ isSignedIn, isSubscriber, email, isAdmin, isC
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
         <BackButton fallbackHref="/stream" />

@@ -1,6 +1,5 @@
 import Head from 'next/head';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import MoneyPage from '../../components/creator/MoneyPage';
@@ -46,7 +45,6 @@ export default function CreatorMoney({ mainGenres = [], isSignedIn, isSubscriber
         <meta name="robots" content="noindex" />
       </Head>
       <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-      <div className="install-row"><InstallButton /></div>
       <MoneyPage />
       <Footer />
       <MobileTabBar />

@@ -6,7 +6,6 @@ import BackButton from '../../components/BackButton';
 import { getSeriesHubData } from '../../lib/seriesHub';
 import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
@@ -100,7 +99,6 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <SeriesHero
         title={seriesInfo.name}

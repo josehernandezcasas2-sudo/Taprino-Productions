@@ -1,19 +1,24 @@
 import { useAuth } from '@clerk/expo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Svg, { Path } from 'react-native-svg';
+import { LinearGradient } from 'expo-linear-gradient';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet, apiPost } from '../../lib/api';
-import { colors, absoluteFill } from '../../lib/theme';
+import { colors, fonts, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import TopNav from '../../components/TopNav';
+import { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import { BundleCard, BuyChip, useBuy } from '../../components/BuyBits';
 import { AiSealChip } from '../../components/AiSeal';
 
+// Mirrors components/GenreRow.js's tierBadge classes (the same pills as
+// LibraryRows.js): free-ads = olive-deep, free-noads = green, premium = brass.
 function tierBadge(tier, adsEnabled) {
-  if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: colors.onBrass };
-  if (adsEnabled === false) return { label: 'Free', color: colors.mint, text: colors.onBrass };
-  return { label: 'Free with ads', color: colors.surface3, text: colors.ink };
+  if (tier === 'premium') return { label: 'Tapa +', color: colors.brass, text: '#241a05' };
+  if (adsEnabled === false) return { label: 'Free', color: colors.ok, text: '#14261a' };
+  return { label: 'Free with ads', color: colors.oliveDeep, text: colors.ink };
 }
 
 // Ported from lib/videoMetadata.js's formatRuntimeLong/parseRuntimeToSeconds
@@ -66,10 +71,19 @@ function LockIcon({ size = 13, color = colors.inkDim }) {
     </Svg>
   );
 }
-function PlayIcon({ size = 13, color = colors.inkDim }) {
+function ThumbPlayIcon({ size = 13, color = colors.inkDim }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill={color}>
       <Path d="M7 4l14 8-14 8z" />
+    </Svg>
+  );
+}
+// The website's BackButton pill (TypeBrowseScreen.js carries the same one).
+function BackArrowIcon({ size = 16, color = colors.olive }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Circle cx="12" cy="12" r="9.5" />
+      <Path d="M13.5 8.5L10 12l3.5 3.5" />
     </Svg>
   );
 }
@@ -78,18 +92,21 @@ function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
 }
 
-// Mirrors pages/series/[id].js — same tabs (Episodes/Bonus Content/About),
-// same season grouping, same hero. Image-only hero (no autoplaying
-// trailer), same simplification as Stream/Home/Watch everywhere else on
-// mobile. Fed by the new GET /api/series-hub?id=, built on the same
-// lib/seriesHub.js the website page itself now also calls — this is what
-// every series card across the app (Stream, Watch Series/Movies, Home,
-// Wishlist) now links to, instead of the no-op placeholder those screens
-// shipped with.
+// Mirrors pages/series/[id].js — the site header (TopNav, 2026-10-29: the
+// screen used to show the native stack header, which looked like another
+// app), the same hero as the website's SeriesHero (image or a flat stand-in,
+// kicker, Fraunces title, description, tier pill, episode count, "Made by",
+// the AI seal, First episode / Save this series), the Back pill under it,
+// then the same tabs (Episodes / Bonus Content / About) and season
+// grouping. Image-only hero (no autoplaying trailer), same simplification
+// as Stream/Home/Watch everywhere else on mobile. Fed by GET
+// /api/series-hub?id=, built on the same lib/seriesHub.js the website page
+// calls — every series card across the app links here.
 export default function SeriesHub() {
   const { id } = useLocalSearchParams();
   const router = useRouter();
   const { getToken } = useAuth();
+  const { height: windowHeight } = useWindowDimensions();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [activeTab, setActiveTab] = useState('episodes');
   const [activeSeason, setActiveSeason] = useState(null);
@@ -137,18 +154,35 @@ export default function SeriesHub() {
     }
   }
 
+  function goBack() {
+    if (router.canGoBack()) router.back(); else router.replace('/stream');
+  }
+
+  // The same 56% hero as the Stream screen's HeroSpotlight.
+  const heroHeight = Math.min(600, Math.max(300, Math.round(windowHeight * 0.56)));
+
   if (state.loading) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <ActivityIndicator color={colors.brass} />
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TopNav />
+        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
       </SafeAreaView>
     );
   }
 
   if (state.error || !state.data) {
     return (
-      <SafeAreaView style={styles.center} edges={['bottom']}>
-        <Text style={styles.errorText}>Couldn't load this series: {state.error || 'not found'}</Text>
+      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+        <Stack.Screen options={{ headerShown: false }} />
+        <TopNav />
+        <View style={styles.center}>
+          <Text style={styles.errorText}>Couldn't load this series: {state.error || 'not found'}</Text>
+          <Pressable style={styles.backBtn} onPress={goBack}>
+            <BackArrowIcon />
+            <Text style={styles.backText}>Back</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -165,220 +199,234 @@ export default function SeriesHub() {
   const representativeRating = seriesEpisodes.find((e) => e.rating)?.rating;
   const seriesArtist = seriesInfo.artist || heroEpisode?.artist;
   const badge = heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled) : null;
+  const playLabel = heroEpisode && heroEpisode.seriesOrder ? `Play S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : 'Play first episode';
 
   return (
-    <SafeAreaView style={styles.screen} edges={['bottom']}>
-      <Stack.Screen options={{ title: seriesInfo.name }} />
+    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
+      <Stack.Screen options={{ headerShown: false }} />
+      <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
-        <View style={styles.hero}>
-          {heroImage ? <SmartImage uri={heroImage} style={styles.heroImage} /> : <View style={styles.heroImage} />}
-          <View style={styles.heroOverlay}>
-            <Text style={styles.heroEyebrow}>Series{seriesInfo.isOriginal ? ' · Tapa Original' : ''}</Text>
-            <Text style={styles.heroTitle}>{seriesInfo.name}</Text>
-            {seriesInfo.desc ? <Text style={styles.heroDesc} numberOfLines={3}>{seriesInfo.desc}</Text> : null}
-            <View style={styles.heroMetaRow}>
+        <View style={[styles.hero, { height: heroHeight }]}>
+          {heroImage ? <SmartImage uri={heroImage} style={absoluteFill} /> : <View style={[absoluteFill, styles.heroFallback]} />}
+          <LinearGradient colors={['rgba(12,19,31,0)', 'rgba(12,19,31,0.88)', colors.surface0]} locations={[0.2, 0.72, 1]} style={absoluteFill} pointerEvents="none" />
+          <View style={styles.heroContent}>
+            <Text style={styles.eyebrow}>Series{seriesInfo.isOriginal ? ' · Tapa Original' : ''}</Text>
+            <Text style={styles.title}>{seriesInfo.name}</Text>
+            {seriesInfo.desc ? <Text style={styles.desc} numberOfLines={3}>{seriesInfo.desc}</Text> : null}
+            <View style={styles.meta}>
               {badge ? (
-                <View style={[styles.badge, { backgroundColor: badge.color }]}>
-                  <Text style={[styles.badgeText, { color: badge.text }]}>{badge.label}</Text>
+                <View style={[styles.tierBadge, { backgroundColor: badge.color }]}>
+                  <Text style={[styles.tierBadgeText, { color: badge.text }]}>{badge.label}</Text>
                 </View>
               ) : null}
-              <Text style={styles.heroMetaText}>
+              <Text style={styles.metaText}>
                 {seasonNumbers.length > 1 ? `${seasonNumbers.length} seasons · ` : ''}{seriesEpisodes.length} episode{seriesEpisodes.length === 1 ? '' : 's'}
               </Text>
+              {seriesArtist ? <Text style={styles.metaText}>Made by {seriesArtist}</Text> : null}
+              {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
+              {state.data.aiSeal !== false ? <AiSealChip /> : null}
             </View>
-            {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
-            {state.data.aiSeal !== false ? <AiSealChip style={{ alignSelf: 'flex-start', marginBottom: 10 }} /> : null}
-            <View style={styles.heroActions}>
+            <View style={heroButtonStyles.actions}>
               {heroEpisode ? (
-                <Pressable style={styles.playBtn} onPress={() => router.push(`/episode/${heroEpisode.id}`)}>
-                  <Text style={styles.playBtnText}>▶ Play {heroEpisode.seriesOrder ? `S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : heroEpisode.title}</Text>
+                <Pressable style={heroButtonStyles.playBtn} onPress={() => router.push(`/episode/${heroEpisode.id}?autoplay=1`)}>
+                  <PlayIcon size={14} />
+                  <Text style={heroButtonStyles.playText}>{playLabel}</Text>
                 </Pressable>
               ) : null}
-              <Pressable style={styles.saveBtn} onPress={toggleWishlist}>
+              <Pressable style={heroButtonStyles.infoBtn} onPress={toggleWishlist}>
                 <HeartIcon active={wishlisted} size={15} />
-                <Text style={styles.saveBtnText}> {wishlisted ? 'Saved' : 'Save'}</Text>
+                <Text style={heroButtonStyles.infoText}>{wishlisted ? 'Saved' : 'Save this series'}</Text>
               </Pressable>
             </View>
           </View>
         </View>
 
-        {bundle && bundle.owned ? (
-          <Text style={styles.ownedSeries}>You own this series: every episode plays ad-free, including ones added later.</Text>
-        ) : null}
-        <BundleCard
-          bundle={bundle}
-          creatorName={seriesArtist}
-          isSubscriber={state.data.isSubscriber}
-          busy={buyBusy}
-          onBuy={() => buy('series', seriesInfo.id, `/series/${seriesInfo.id}`)}
-          ownedNames={(bundle && bundle.ownedEpisodeIds ? bundle.ownedEpisodeIds : []).map((eid) => { const e = seriesEpisodes.find((x) => x.id === eid); return e ? (e.seriesOrder ? `Episode ${e.seriesOrder}` : e.title) : null; }).filter(Boolean)}
-        />
-
-        <View style={styles.tabs}>
-          <Pressable style={[styles.tab, activeTab === 'episodes' && styles.tabOn]} onPress={() => setActiveTab('episodes')}>
-            <Text style={[styles.tabText, activeTab === 'episodes' && styles.tabTextOn]}>Episodes</Text>
+        <View style={styles.stage}>
+          <Pressable style={styles.backBtn} onPress={goBack}>
+            <BackArrowIcon />
+            <Text style={styles.backText}>Back</Text>
           </Pressable>
-          {bonusContent.length > 0 ? (
-            <Pressable style={[styles.tab, activeTab === 'bonus' && styles.tabOn]} onPress={() => setActiveTab('bonus')}>
-              <Text style={[styles.tabText, activeTab === 'bonus' && styles.tabTextOn]}>Bonus Content</Text>
-            </Pressable>
+
+          {bundle && bundle.owned ? (
+            <Text style={styles.ownedSeries}>You own this series: every episode plays ad-free, including ones added later.</Text>
           ) : null}
-          <Pressable style={[styles.tab, activeTab === 'about' && styles.tabOn]} onPress={() => setActiveTab('about')}>
-            <Text style={[styles.tabText, activeTab === 'about' && styles.tabTextOn]}>About</Text>
-          </Pressable>
-        </View>
+          <BundleCard
+            bundle={bundle}
+            creatorName={seriesArtist}
+            isSubscriber={state.data.isSubscriber}
+            busy={buyBusy}
+            onBuy={() => buy('series', seriesInfo.id, `/series/${seriesInfo.id}`)}
+            ownedNames={(bundle && bundle.ownedEpisodeIds ? bundle.ownedEpisodeIds : []).map((eid) => { const e = seriesEpisodes.find((x) => x.id === eid); return e ? (e.seriesOrder ? `Episode ${e.seriesOrder}` : e.title) : null; }).filter(Boolean)}
+          />
 
-        {activeTab === 'episodes' ? (
-          seriesEpisodes.length === 0 ? (
-            <Text style={styles.emptyText}>Nothing published in this series yet — check back soon.</Text>
-          ) : (
-            <>
-              {seasonNumbers.length > 1 ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.seasonTabs} contentContainerStyle={styles.seasonTabsContent}>
-                  {seasonNumbers.map((num) => (
-                    <Pressable key={num} style={[styles.seasonTab, num === activeSeason && styles.seasonTabOn]} onPress={() => setActiveSeason(num)}>
-                      <Text style={[styles.seasonTabText, num === activeSeason && styles.seasonTabTextOn]}>Season {num}</Text>
-                    </Pressable>
-                  ))}
-                </ScrollView>
-              ) : (
-                <Text style={styles.seasonHeading}>Season {activeSeason}</Text>
-              )}
-
-              {activeSeasonEpisodes.map((ep) => {
-                const epBadge = tierBadge(ep.tier, ep.adsEnabled);
-                return (
-                  <Pressable key={ep.id} style={styles.episodeRow} onPress={() => router.push(`/episode/${ep.id}`)}>
-                    <View style={styles.episodeThumb}>
-                      {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={styles.episodeThumbImg} /> : null}
-                      <View style={[styles.episodeBadge, { backgroundColor: epBadge.color }]}>
-                        <Text style={[styles.episodeBadgeText, { color: epBadge.text }]}>{epBadge.label}</Text>
-                      </View>
-                      {!ep.thumbnail ? (
-                        <View style={styles.episodeThumbIconRow}>
-                          {ep.tier === 'premium' && !ownsEp(ep) ? <LockIcon size={13} /> : <PlayIcon size={13} />}
-                        </View>
-                      ) : null}
-                    </View>
-                    <View style={styles.episodeInfo}>
-                      <Text style={styles.episodeTitle} numberOfLines={1}>{ep.title}</Text>
-                      <View style={styles.episodeMetaRow}>
-                        <Text style={styles.episodeMeta}>{ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : `Season ${ep.season || 1}`}</Text>
-                        {ep.runtime ? <Text style={styles.episodeMeta}>{formatRuntimeLong(ep.runtime) || ep.runtime}</Text> : null}
-                        {ep.rating ? <Text style={styles.metaPill}>{ep.rating}</Text> : null}
-                      </View>
-                      {ep.desc ? <Text style={styles.episodeDesc} numberOfLines={2}>{ep.desc}</Text> : null}
-                      {/* Buy to own: the episode's own price, or Owned. */}
-                      {episodeOffers[ep.id] ? (
-                        <View style={{ marginTop: 6 }}>
-                          <BuyChip offer={episodeOffers[ep.id]} busy={buyBusy} onBuy={() => buy('episode', ep.id, `/series/${seriesInfo.id}`)} />
-                        </View>
-                      ) : null}
-                    </View>
-                  </Pressable>
-                );
-              })}
-            </>
-          )
-        ) : null}
-
-        {activeTab === 'bonus' ? (
-          <View style={styles.bonusGrid}>
-            {bonusContent.map((b) => (
-              <Pressable key={b.id} style={styles.bonusCard} onPress={() => router.push(`/episode/${b.id}`)}>
-                {b.thumbnail ? <SmartImage uri={b.thumbnail} style={styles.bonusThumb} /> : <View style={styles.bonusThumb} />}
-                <Text style={styles.bonusTitle} numberOfLines={1}>{b.title}</Text>
-                <Text style={styles.bonusRuntime}>{formatRuntimeLong(b.runtime) || b.runtime}</Text>
+          <View style={styles.tabs}>
+            <Pressable style={[styles.tab, activeTab === 'episodes' && styles.tabOn]} onPress={() => setActiveTab('episodes')}>
+              <Text style={[styles.tabText, activeTab === 'episodes' && styles.tabTextOn]}>Episodes</Text>
+            </Pressable>
+            {bonusContent.length > 0 ? (
+              <Pressable style={[styles.tab, activeTab === 'bonus' && styles.tabOn]} onPress={() => setActiveTab('bonus')}>
+                <Text style={[styles.tabText, activeTab === 'bonus' && styles.tabTextOn]}>Bonus Content</Text>
               </Pressable>
-            ))}
+            ) : null}
+            <Pressable style={[styles.tab, activeTab === 'about' && styles.tabOn]} onPress={() => setActiveTab('about')}>
+              <Text style={[styles.tabText, activeTab === 'about' && styles.tabTextOn]}>About</Text>
+            </Pressable>
           </View>
-        ) : null}
 
-        {activeTab === 'about' ? (
-          <View style={styles.aboutGrid}>
-            <View style={styles.aboutBox}>
-              <Text style={styles.aboutLabel}>Genre</Text>
-              <Text style={styles.aboutValue}>{seriesGenres.length > 0 ? seriesGenres.join(', ') : '—'}</Text>
+          {activeTab === 'episodes' ? (
+            seriesEpisodes.length === 0 ? (
+              <Text style={styles.emptyText}>Nothing published in this series yet — check back soon.</Text>
+            ) : (
+              <>
+                {seasonNumbers.length > 1 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.seasonTabs} contentContainerStyle={styles.seasonTabsContent}>
+                    {seasonNumbers.map((num) => (
+                      <Pressable key={num} style={[styles.seasonTab, num === activeSeason && styles.seasonTabOn]} onPress={() => setActiveSeason(num)}>
+                        <Text style={[styles.seasonTabText, num === activeSeason && styles.seasonTabTextOn]}>Season {num}</Text>
+                      </Pressable>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={styles.seasonHeading}>Season {activeSeason}</Text>
+                )}
+
+                {activeSeasonEpisodes.map((ep) => {
+                  const epBadge = tierBadge(ep.tier, ep.adsEnabled);
+                  return (
+                    <Pressable key={ep.id} style={styles.episodeRow} onPress={() => router.push(`/episode/${ep.id}`)}>
+                      <View style={styles.episodeThumb}>
+                        {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={absoluteFill} /> : null}
+                        <View style={[styles.episodeBadge, { backgroundColor: epBadge.color }]}>
+                          <Text style={[styles.episodeBadgeText, { color: epBadge.text }]}>{epBadge.label}</Text>
+                        </View>
+                        {!ep.thumbnail ? (
+                          <View style={styles.episodeThumbIconRow}>
+                            {ep.tier === 'premium' && !ownsEp(ep) ? <LockIcon size={13} /> : <ThumbPlayIcon size={13} />}
+                          </View>
+                        ) : null}
+                      </View>
+                      <View style={styles.episodeInfo}>
+                        <Text style={styles.episodeTitle} numberOfLines={2}>{ep.title}</Text>
+                        <View style={styles.episodeMetaRow}>
+                          <Text style={styles.episodeMeta}>{ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : `Season ${ep.season || 1}`}</Text>
+                          {ep.runtime ? <Text style={styles.episodeMeta}>{formatRuntimeLong(ep.runtime) || ep.runtime}</Text> : null}
+                          {ep.rating ? <Text style={styles.metaPill}>{ep.rating}</Text> : null}
+                        </View>
+                        {ep.desc ? <Text style={styles.episodeDesc} numberOfLines={2}>{ep.desc}</Text> : null}
+                        {/* Buy to own: the episode's own price, or Owned. */}
+                        {episodeOffers[ep.id] ? (
+                          <View style={{ marginTop: 6 }}>
+                            <BuyChip offer={episodeOffers[ep.id]} busy={buyBusy} onBuy={() => buy('episode', ep.id, `/series/${seriesInfo.id}`)} />
+                          </View>
+                        ) : null}
+                      </View>
+                    </Pressable>
+                  );
+                })}
+              </>
+            )
+          ) : null}
+
+          {activeTab === 'bonus' ? (
+            <View style={styles.bonusGrid}>
+              {bonusContent.map((b) => (
+                <Pressable key={b.id} style={styles.bonusCard} onPress={() => router.push(`/episode/${b.id}`)}>
+                  {b.thumbnail ? <SmartImage uri={b.thumbnail} style={styles.bonusThumb} /> : <View style={styles.bonusThumb} />}
+                  <Text style={styles.bonusTitle} numberOfLines={2}>{b.title}</Text>
+                  <Text style={styles.bonusRuntime}>{formatRuntimeLong(b.runtime) || b.runtime}</Text>
+                </Pressable>
+              ))}
             </View>
-            <View style={styles.aboutBox}>
-              <Text style={styles.aboutLabel}>Creator</Text>
-              <Text style={styles.aboutValue}>{seriesArtist || '—'}</Text>
+          ) : null}
+
+          {activeTab === 'about' ? (
+            <View style={styles.aboutGrid}>
+              <View style={styles.aboutBox}>
+                <Text style={styles.aboutLabel}>Genre</Text>
+                <Text style={styles.aboutValue}>{seriesGenres.length > 0 ? seriesGenres.join(', ') : '—'}</Text>
+              </View>
+              <View style={styles.aboutBox}>
+                <Text style={styles.aboutLabel}>Creator</Text>
+                <Text style={styles.aboutValue}>{seriesArtist || '—'}</Text>
+              </View>
+              <View style={styles.aboutBox}>
+                <Text style={styles.aboutLabel}>Rating</Text>
+                <Text style={styles.aboutValue}>{representativeRating || 'Not rated'}</Text>
+              </View>
+              <View style={styles.aboutBox}>
+                <Text style={styles.aboutLabel}>Episodes</Text>
+                <Text style={styles.aboutValue}>{seriesEpisodes.length} across {seasonNumbers.length} season{seasonNumbers.length === 1 ? '' : 's'}</Text>
+              </View>
             </View>
-            <View style={styles.aboutBox}>
-              <Text style={styles.aboutLabel}>Rating</Text>
-              <Text style={styles.aboutValue}>{representativeRating || 'Not rated'}</Text>
-            </View>
-            <View style={styles.aboutBox}>
-              <Text style={styles.aboutLabel}>Episodes</Text>
-              <Text style={styles.aboutValue}>{seriesEpisodes.length} across {seasonNumbers.length} season{seasonNumbers.length === 1 ? '' : 's'}</Text>
-            </View>
-          </View>
-        ) : null}
+          ) : null}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+const shadow = { textShadowColor: 'rgba(0,0,0,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 };
+
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
   scroll: { paddingBottom: 120 },
-  center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: colors.danger, fontSize: 15, textAlign: 'center' },
-  emptyText: { color: colors.inkDim, fontSize: 14, paddingHorizontal: 16 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 18 },
+  errorText: { color: colors.danger, fontSize: 15, textAlign: 'center', fontFamily: fonts.display },
+  emptyText: { color: colors.inkDim, fontSize: 14, fontFamily: fonts.body },
 
-  hero: { width: '100%', aspectRatio: 3 / 4, position: 'relative', backgroundColor: colors.surface2 },
-  heroImage: { ...absoluteFill, resizeMode: 'cover' },
-  heroOverlay: { position: 'absolute', left: 0, right: 0, bottom: 0, padding: 18, paddingTop: 60, backgroundColor: 'rgba(12,19,31,0.55)' },
-  heroEyebrow: { color: colors.olive, fontSize: 11, fontWeight: '700', letterSpacing: 1, marginBottom: 4, textTransform: 'uppercase' },
-  heroTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', marginBottom: 6 },
-  heroDesc: { color: colors.ink, fontSize: 13, opacity: 0.9, lineHeight: 18, marginBottom: 10 },
-  heroMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  heroMetaText: { color: colors.inkDim, fontSize: 11 },
-  badge: { borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
-  badgeText: { fontSize: 10, fontWeight: '700' },
-  heroActions: { flexDirection: 'row', gap: 10, flexWrap: 'wrap' },
-  playBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18 },
-  playBtnText: { color: colors.onBrass, fontSize: 13, fontWeight: '700' },
-  saveBtn: { flexDirection: 'row', alignItems: 'center', borderRadius: 999, borderWidth: 1, borderColor: colors.hairline, paddingVertical: 11, paddingHorizontal: 16, backgroundColor: 'rgba(0,0,0,0.3)' },
-  saveBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },
+  // components/SeriesHero.js (.hero-carousel.full-bleed + .hero-content)
+  hero: { width: '100%', position: 'relative', backgroundColor: colors.surface2, overflow: 'hidden' },
+  heroFallback: { backgroundColor: colors.surface2 },
+  heroContent: { position: 'absolute', left: 19, right: 19, bottom: 0, paddingBottom: 24 },
+  eyebrow: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 2.2, textTransform: 'uppercase', color: colors.olive, marginBottom: 8, ...shadow },
+  title: { fontFamily: fonts.bodyBold, fontSize: 32, lineHeight: 34, color: colors.ink, marginBottom: 8, ...shadow },
+  desc: { fontFamily: fonts.body, fontSize: 14.4, lineHeight: 21, color: colors.ink, opacity: 0.9, marginBottom: 11, ...shadow, textShadowRadius: 6 },
+  meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 8, marginBottom: 16 },
+  tierBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 999 },
+  tierBadgeText: { fontFamily: fonts.monoBold, fontSize: 11, letterSpacing: 0.2 },
+  metaText: { color: colors.inkDim, fontFamily: fonts.mono, fontSize: 12.5, ...shadow, textShadowRadius: 6 },
 
-  tabs: { flexDirection: 'row', gap: 8, paddingHorizontal: 16, paddingTop: 16, paddingBottom: 10 },
-  ownedSeries: { color: colors.inkFaint, fontSize: 12.5, lineHeight: 18, paddingHorizontal: 16, paddingTop: 14 },
-  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.surface2 },
-  tabOn: { backgroundColor: colors.surface3 },
-  tabText: { color: colors.inkDim, fontSize: 13, fontWeight: '600' },
+  // .stage.stage-single (≤640px) with the website's BackButton pill
+  stage: { paddingTop: 22, paddingHorizontal: 19 },
+  backBtn: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 7, paddingVertical: 9, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1.4, borderColor: colors.olive, marginBottom: 19 },
+  backText: { color: colors.olive, fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.4, textTransform: 'uppercase' },
+  ownedSeries: { color: colors.inkFaint, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 18, paddingBottom: 14 },
+
+  tabs: { flexDirection: 'row', gap: 8, paddingTop: 4, paddingBottom: 14 },
+  tab: { paddingVertical: 8, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.14)', backgroundColor: 'transparent' },
+  tabOn: { backgroundColor: colors.surface2, borderColor: colors.olive },
+  tabText: { color: colors.inkDim, fontFamily: fonts.displaySemi, fontSize: 13 },
   tabTextOn: { color: colors.ink },
 
-  seasonTabs: { paddingLeft: 16, marginBottom: 10 },
-  seasonTabsContent: { gap: 8, paddingRight: 16 },
-  seasonTab: { paddingVertical: 7, paddingHorizontal: 13, borderRadius: 999, borderWidth: 1, borderColor: colors.hairline },
+  seasonTabs: { marginBottom: 10 },
+  seasonTabsContent: { gap: 8 },
+  seasonTab: { paddingVertical: 7, paddingHorizontal: 13, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.14)' },
   seasonTabOn: { backgroundColor: colors.brass, borderColor: colors.brass },
-  seasonTabText: { color: colors.inkDim, fontSize: 12, fontWeight: '600' },
-  seasonTabTextOn: { color: colors.onBrass },
-  seasonHeading: { color: colors.ink, fontSize: 15, fontWeight: '700', paddingHorizontal: 16, marginBottom: 10 },
+  seasonTabText: { color: colors.inkDim, fontFamily: fonts.mono, fontSize: 11, letterSpacing: 0.6, textTransform: 'uppercase' },
+  seasonTabTextOn: { color: '#241a05' },
+  seasonHeading: { color: colors.inkDim, fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase', marginBottom: 10 },
 
-  episodeRow: { flexDirection: 'row', gap: 12, paddingHorizontal: 16, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  episodeThumb: { width: 110, height: 66, borderRadius: 8, backgroundColor: colors.surface2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  episodeThumbImg: { ...absoluteFill, resizeMode: 'cover' },
+  episodeRow: { flexDirection: 'row', gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: 'rgba(251,232,211,0.08)' },
+  episodeThumb: { width: 120, height: 68, borderRadius: 8, backgroundColor: colors.surface2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
   episodeThumbIconRow: { alignItems: 'center', justifyContent: 'center' },
-  episodeBadge: { position: 'absolute', top: 5, left: 5, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 6 },
-  episodeBadgeText: { fontSize: 8, fontWeight: '700' },
+  episodeBadge: { position: 'absolute', bottom: 5, left: 5, borderRadius: 999, paddingVertical: 2, paddingHorizontal: 6 },
+  episodeBadgeText: { fontFamily: fonts.mono, fontSize: 7.5, letterSpacing: 0.5, textTransform: 'uppercase' },
   episodeInfo: { flex: 1, minWidth: 0 },
-  episodeTitle: { color: colors.ink, fontSize: 14, fontWeight: '700', marginBottom: 4 },
+  episodeTitle: { color: colors.ink, fontFamily: fonts.displaySemi, fontSize: 14, lineHeight: 18, marginBottom: 4 },
   episodeMetaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' },
-  episodeMeta: { color: colors.inkFaint, fontSize: 10.5 },
-  metaPill: { color: colors.inkDim, fontSize: 9, fontWeight: '700', borderWidth: 1, borderColor: colors.hairline, borderRadius: 4, paddingVertical: 1, paddingHorizontal: 4 },
-  episodeDesc: { color: colors.inkDim, fontSize: 11.5, lineHeight: 15 },
+  episodeMeta: { color: colors.inkFaint, fontFamily: fonts.mono, fontSize: 10, letterSpacing: 0.5, textTransform: 'uppercase' },
+  metaPill: { color: colors.inkDim, fontFamily: fonts.mono, fontSize: 9, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 4, paddingVertical: 1, paddingHorizontal: 4 },
+  episodeDesc: { color: colors.inkDim, fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17 },
 
-  bonusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12, paddingHorizontal: 16 },
+  bonusGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   bonusCard: { width: '47%' },
-  bonusThumb: { width: '100%', aspectRatio: 16 / 9, borderRadius: 8, backgroundColor: colors.surface2, marginBottom: 6 },
-  bonusTitle: { color: colors.ink, fontSize: 12.5, fontWeight: '700' },
-  bonusRuntime: { color: colors.inkFaint, fontSize: 10.5, marginTop: 1 },
+  bonusThumb: { width: '100%', aspectRatio: 16 / 9, borderRadius: 8, backgroundColor: colors.surface2, marginBottom: 7 },
+  bonusTitle: { color: colors.ink, fontFamily: fonts.displaySemi, fontSize: 12.8, lineHeight: 16 },
+  bonusRuntime: { color: colors.inkFaint, fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.5, textTransform: 'uppercase', marginTop: 2 },
 
-  aboutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, paddingHorizontal: 16 },
+  aboutGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   aboutBox: { width: '47%', backgroundColor: colors.surface2, borderRadius: 10, padding: 14 },
-  aboutLabel: { color: colors.inkFaint, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 4 },
-  aboutValue: { color: colors.ink, fontSize: 13 }
+  aboutLabel: { color: colors.inkFaint, fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 1, textTransform: 'uppercase', marginBottom: 5 },
+  aboutValue: { color: colors.ink, fontFamily: fonts.display, fontSize: 13.5, lineHeight: 18 }
 });

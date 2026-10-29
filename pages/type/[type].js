@@ -14,7 +14,6 @@ import HeaderNav from '../../components/HeaderNav';
 import HeroSpotlight from '../../components/HeroSpotlight';
 import GenreRow from '../../components/GenreRow';
 import GenreBrowseRow from '../../components/GenreBrowseRow';
-import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 
@@ -128,7 +127,6 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       {heroPool.length > 0 && (
         <HeroSpotlight

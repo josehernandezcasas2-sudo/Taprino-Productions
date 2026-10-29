@@ -6,7 +6,6 @@ import VideoPlayer from '../../components/VideoPlayer';
 import { getPodcastShowHubData } from '../../lib/podcastShowHub';
 import { usePodcastPlayer } from '../../contexts/PodcastPlayerContext';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { PlayIcon, PauseIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
@@ -92,7 +91,6 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main className="library-stage">
         <BackButton fallbackHref="/podcasts" />

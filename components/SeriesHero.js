@@ -126,7 +126,7 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, image
             {aiSeal && <AiSealChip />}
           </div>
           <div className="hero-actions">
-            <button className="hero-play" onClick={onPlay}>▶ {playLabel || 'Play first episode'}</button>
+            <button className="hero-play" onClick={onPlay}><PlayIcon size={14} src={iconOverrides.play} /> {playLabel || 'Play first episode'}</button>
             {onToggleSave && (
               <button className="hero-trailer" onClick={onToggleSave}>
                 <HeartIcon size={16} active={isSaved} src={isSaved ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isSaved ? 'Saved' : 'Save this series'}

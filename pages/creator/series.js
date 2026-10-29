@@ -6,7 +6,6 @@ import { getAllSeriesForCreator } from '../../lib/series';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getSupabase } from '../../lib/supabase';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import SeriesMediaForm from '../../components/SeriesMediaForm';
 import CreatorSubmissionForm from '../../components/CreatorSubmissionForm';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
@@ -183,7 +182,6 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
         <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Series management</div>

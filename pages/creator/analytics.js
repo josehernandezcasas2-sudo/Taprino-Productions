@@ -6,7 +6,6 @@ import BackButton from '../../components/BackButton';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
-import InstallButton from '../../components/InstallButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
@@ -236,7 +235,6 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
-      <div className="install-row"><InstallButton /></div>
 
       <main id="main-content" className="stage stage-single">
         <div className="ca-head">
