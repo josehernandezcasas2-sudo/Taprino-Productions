@@ -1134,9 +1134,14 @@ button { font-family: inherit; cursor: pointer; }
      and runs to the screen edge, and a card is as wide as it has to be
      for --cards-across of them to fit with one --row-gap each plus a
      --row-peek of the next card, so a row always shows a sliver of what
-     scrolls in. The phone/tablet overrides sit after this rule; the
-     Continue Watching row sets its own --cards-across for its 16:9
-     cards. The app's LibraryRows.js carries the same numbers. */
+     scrolls in. The column count steps with the window, the way HBO Max
+     and Prime Video add columns instead of growing the poster (Jose,
+     2026-10-29, after a 1920 screenshot with 280px posters): 3 on a phone,
+     4 to 900, 5 to 1200, 6 to 1536, 7 to 1800, 8 to 2100, 9 to 2400, 10
+     beyond, which keeps a poster between about 165 and 240px everywhere;
+     the Continue Watching row's 16:9 cards are two columns fewer (one on
+     a phone or small tablet). The overrides sit after this rule; the
+     app's LibraryRows.js carries the same table. */
   --cards-across: 6;
   --row-gap: 16px;
   --row-peek: 20px;
@@ -1245,8 +1250,28 @@ button { font-family: inherit; cursor: pointer; }
   flex: 0 0 auto;
 }
 .continue-watching-row .cat-row-track { --cards-across: 4; }
-@media (max-width: 1024px) {
-  .cat-row-track { --cards-across: 4; --row-gap: 14px; --row-peek: 16px; }
+@media (min-width: 1536px) {
+  .cat-row-track { --cards-across: 7; }
+  .continue-watching-row .cat-row-track { --cards-across: 5; }
+}
+@media (min-width: 1800px) {
+  .cat-row-track { --cards-across: 8; }
+  .continue-watching-row .cat-row-track { --cards-across: 6; }
+}
+@media (min-width: 2100px) {
+  .cat-row-track { --cards-across: 9; }
+  .continue-watching-row .cat-row-track { --cards-across: 7; }
+}
+@media (min-width: 2400px) {
+  .cat-row-track { --cards-across: 10; }
+  .continue-watching-row .cat-row-track { --cards-across: 8; }
+}
+@media (max-width: 1199px) {
+  .cat-row-track { --cards-across: 5; --row-gap: 14px; --row-peek: 16px; }
+  .continue-watching-row .cat-row-track { --cards-across: 4; }
+}
+@media (max-width: 899px) {
+  .cat-row-track { --cards-across: 4; }
   .continue-watching-row .cat-row-track { --cards-across: 3; }
 }
 @media (max-width: 640px) {
@@ -4985,13 +5010,26 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   .brand-kicker { font-size: 0.54rem; }
 }
 @media (max-width: 480px) {
-  .tapa-plus-pill { padding: 0.45rem 0.85rem; font-size: 0.74rem; }
+  /* With a broadcast on, the right cluster (LIVE, search, bell, Tapa +,
+     avatar) ran 50px into the wordmark on a 390 phone (found 2026-10-29
+     in the width sweep): the LIVE badge keeps its red dot and drops the
+     word (its own rule, below the badge's), and the cluster packs a
+     little tighter, which leaves room down to a 360 screen. */
+  .tapa-plus-pill { padding: 0.45rem 0.6rem; font-size: 0.72rem; }
+  .nav-right { gap: 0.4rem; }
+  .nav-right .icon-btn, .nav-right .avatar-btn { width: 30px; height: 30px; min-width: 30px; }
   /* The wordmark+kicker lockup is the whole logo now (no separate "ST"
      badge) — it shrinks further here instead of the wordmark
      disappearing, so the logo itself stays visible and readable at any
      width rather than collapsing to just the kicker alone. */
   .brand-word { font-size: 0.8rem; }
   .brand-kicker { font-size: 0.48rem; letter-spacing: 0.13em; }
+}
+@media (max-width: 380px) {
+  /* A 360 screen with a broadcast on: the wordmark gives up a few pixels
+     so the right cluster never touches it (2026-10-29). After the ≤480
+     rule so it wins the cascade. */
+  .brand-word { font-size: 0.72rem; }
 }
 
 /* Live badge in the header nav (components/HeaderNav.js). Only rendered
@@ -5015,6 +5053,11 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 }
 .header-live-badge:hover { background: var(--danger); }
 .header-live-badge .live-dot { width: 7px; height: 7px; }
+/* Dot only on a phone (the aria-label keeps the words): see the ≤480 header
+   block above for why. */
+@media (max-width: 480px) {
+  .header-live-badge { font-size: 0; gap: 0; padding: 0.55rem; }
+}
 
 /* Live TV nav link's glowing dot indicator (components/HeaderNav.js) */
 .nav-link-live {

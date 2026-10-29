@@ -20,13 +20,26 @@ export const ROW_GUTTER = 19;
 // gutter to the screen edge, and a card is as wide as it has to be for
 // `across` of them to fit with one gap each plus a peek of the next.
 // Posters are 2:3, Continue Watching is 16:9.
+// The column count steps with the screen the way HBO Max and Prime Video
+// add columns instead of growing the poster (the website's .cat-row-track
+// carries the same table, 2026-10-29): a phone 3, an iPad portrait 4,
+// a 10.9" iPad landscape or a 12.9" portrait 5, a 12.9" landscape 6, and
+// the wider steps only ever apply to a desktop window. A poster stays
+// between about 165 and 240pt everywhere.
+const ROW_TIERS = [
+  { min: 2400, across: 10, landscape: 8, gap: 16, peek: 20 },
+  { min: 2100, across: 9, landscape: 7, gap: 16, peek: 20 },
+  { min: 1800, across: 8, landscape: 6, gap: 16, peek: 20 },
+  { min: 1536, across: 7, landscape: 5, gap: 16, peek: 20 },
+  { min: 1200, across: 6, landscape: 4, gap: 16, peek: 20 },
+  { min: 900, across: 5, landscape: 4, gap: 14, peek: 16 },
+  { min: 641, across: 4, landscape: 3, gap: 14, peek: 16 },
+  { min: 0, across: 3, landscape: 2, gap: 10, peek: 10 }
+];
+
 export function rowMetrics(width) {
-  const phone = width < 640;
-  const tablet = !phone && width < 1024;
-  const across = phone ? 3 : tablet ? 4 : 6;
-  const landscapeAcross = phone ? 2 : tablet ? 3 : 4;
-  const gap = phone ? 10 : tablet ? 14 : 16;
-  const peek = phone ? 10 : tablet ? 16 : 20;
+  const tier = ROW_TIERS.find((t) => width >= t.min) || ROW_TIERS[ROW_TIERS.length - 1];
+  const { across, landscape: landscapeAcross, gap, peek } = tier;
   const row = width - ROW_GUTTER;
   const posterW = Math.floor((row - across * gap - peek) / across);
   const landscapeW = Math.floor((row - landscapeAcross * gap - peek) / landscapeAcross);
