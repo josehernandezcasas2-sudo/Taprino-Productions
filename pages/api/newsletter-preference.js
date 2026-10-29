@@ -1,8 +1,7 @@
-import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
+import { getStripe } from '../../lib/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -27,7 +26,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    await stripe.customers.update(customerId, {
+    await getStripe().customers.update(customerId, {
       metadata: { newsletter: action === 'optOut' ? 'opted_out' : 'subscribed' }
     });
     return res.status(200).json({ ok: true, newsletter: action === 'optOut' ? 'opted_out' : 'subscribed' });

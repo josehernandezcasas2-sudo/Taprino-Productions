@@ -9,6 +9,11 @@ import { formatRuntimeLong } from '../lib/videoMetadata';
 
 const MAX_CARDS = 15;
 
+// A row card is about 30% of a phone's width (3 across + a peek), a
+// quarter of a tablet's and a sixth of a laptop's — see .cat-row-track's
+// --cards-across in globals.css.
+export const ROW_CARD_SIZES = '(max-width: 640px) 32vw, (max-width: 1024px) 24vw, 220px';
+
 export default function CategoryRow({ title, episodes, allSeries, currentId, onSelect, isWishlisted, onToggleWishlist, seeAllHref, viewCounts }) {
   const iconOverrides = usePlayerIconOverrides();
   if (episodes.length === 0) return null;
@@ -65,6 +70,11 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
     .sort((a, b) => b.rank - a.rank)
     .slice(0, MAX_CARDS);
 
+  // The card (2026-10-29, option A of the Stream cards canvas): the art is
+  // the card, with the tier pill and the heart on it, and the title + meta
+  // sit under it (.row-card .ep-info in globals.css) — not over the art
+  // on a scrim, so a frame-grab thumbnail still names the title and the
+  // smaller card keeps its whole picture.
   return (
     <div className="cat-row">
       <div className="cat-row-heading">
@@ -84,13 +94,13 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             >
               <div className="ep-thumb">
                 {card.hasNew && <span className="new-episode-banner">New episode</span>}
-                {card.ep.thumbnail && <Image src={card.ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
+                {card.ep.thumbnail && <Image src={card.ep.thumbnail} alt="" fill sizes={ROW_CARD_SIZES} className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.ep.tier, card.ep.adsEnabled).label}</span>
                 {!card.ep.thumbnail && (card.ep.tier === 'premium' ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> preview</>)}
-                <div className="ep-info">
-                  <h4>{card.ep.title}</h4>
-                  <span>{formatRuntimeLong(card.ep.runtime) || card.ep.runtime}</span> · <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
-                </div>
+              </div>
+              <div className="ep-info">
+                <h4>{card.ep.title}</h4>
+                <span>{formatRuntimeLong(card.ep.runtime) || card.ep.runtime}</span> · <span className={`type-line ${contentTypeTag(card.ep.contentType).key}`}>{contentTypeTag(card.ep.contentType).label}</span>
               </div>
             </button>
           </div>
@@ -102,13 +112,13 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
             <Link href={`/series/${card.info.id}`} className={`ep-card ${tierBadge(card.tier, card.adsEnabled).key}`}>
               <div className="ep-thumb">
                 {card.hasNew && <span className="new-episode-banner">New episode</span>}
-                {card.info.thumbnail && <Image src={card.info.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
+                {card.info.thumbnail && <Image src={card.info.thumbnail} alt="" fill sizes={ROW_CARD_SIZES} className="ep-thumb-img" />}
                 <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
                 {!card.info.thumbnail && '▤ series'}
-                <div className="ep-info">
-                  <h4>{card.info.name}</h4>
-                  <span>{card.count} episode{card.count === 1 ? '' : 's'}</span> · <span className="type-line series">▤ Series</span>
-                </div>
+              </div>
+              <div className="ep-info">
+                <h4>{card.info.name}</h4>
+                <span>{card.count} episode{card.count === 1 ? '' : 's'}</span> · <span className="type-line series">▤ Series</span>
               </div>
             </Link>
           </div>

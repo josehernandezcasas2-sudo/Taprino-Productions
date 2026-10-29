@@ -1,10 +1,8 @@
-import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
-import { requestOrigin } from '../../lib/stripe';
+import { requestOrigin, getStripe } from '../../lib/stripe';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -35,7 +33,7 @@ export default async function handler(req, res) {
   const origin = requestOrigin(req);
 
   try {
-    const session = await stripe.billingPortal.sessions.create({
+    const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
       return_url: `${origin}/account`
     });
@@ -43,7 +41,7 @@ export default async function handler(req, res) {
   } catch (err) {
     // The most common cause here: the Stripe Customer Portal hasn't been
     // configured yet for this account. Fix at
-    // https://dashboard.stripe.com/test/settings/billing/portal — save once
+    // https://dashboard.getStripe().com/test/settings/billing/portal — save once
     // with defaults, then this works.
     console.error('create-portal-session:', err.message);
     res.status(500).json({ error: 'Could not open the billing page. Try again in a moment.' });

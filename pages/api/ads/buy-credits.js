@@ -1,10 +1,8 @@
-import Stripe from 'stripe';
 import { getAuth } from '@clerk/nextjs/server';
 import { getOwnAdAccount } from '../../../lib/adAccounts';
-import { requestOrigin } from '../../../lib/stripe';
+import { requestOrigin, getStripe } from '../../../lib/stripe';
 import { checkRateLimit } from '../../../lib/rateLimit';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -47,7 +45,7 @@ export default async function handler(req, res) {
   const origin = requestOrigin(req);
 
   try {
-    const session = await stripe.checkout.sessions.create({
+    const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
       // Dynamic price_data rather than a fixed STRIPE_PRICE_ID — unlike

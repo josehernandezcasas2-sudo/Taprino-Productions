@@ -759,11 +759,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 <div key={b.id} className="card-wrap row-card">
                   <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
                     <div className="ep-thumb">
-                      {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
-                      <div className="ep-info">
-                        <h4>{b.title}</h4>
-                        <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
-                      </div>
+                      {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="(max-width: 640px) 32vw, (max-width: 1024px) 24vw, 220px" className="ep-thumb-img" />}
+                    </div>
+                    <div className="ep-info">
+                      <h4>{b.title}</h4>
+                      <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
                     </div>
                   </Link>
                 </div>

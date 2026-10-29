@@ -1,4 +1,3 @@
-import Stripe from 'stripe';
 import { getAuth } from '@clerk/nextjs/server';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { recordWatchedMax } from '../../lib/purchases';
@@ -7,8 +6,8 @@ import { recordWatchSeconds } from '../../lib/redis';
 import { firstInWindow, checkRateLimit } from '../../lib/rateLimit';
 import { findEpisode } from '../../lib/episodes';
 import { applyCors } from '../../lib/cors';
+import { getStripe } from '../../lib/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 // Stripe metadata values cap at 500 characters, so this can't just grow
 // forever — keep only the most recently updated N episodes. 12 is a
@@ -29,10 +28,10 @@ export default async function handler(req, res) {
     const { episodeId } = req.body || {};
     if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
     try {
-      const customer = await stripe.customers.retrieve(customerId);
+      const customer = await getStripe().customers.retrieve(customerId);
       const current = parseWatchProgress(customer);
       delete current[episodeId];
-      await stripe.customers.update(customerId, { metadata: { watchProgress: JSON.stringify(current) } });
+      await getStripe().customers.update(customerId, { metadata: { watchProgress: JSON.stringify(current) } });
       return res.status(200).json({ ok: true });
     } catch (err) {
       console.error('watch-progress delete error:', err.message);
@@ -63,7 +62,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const customer = await stripe.customers.retrieve(customerId);
+    const customer = await getStripe().customers.retrieve(customerId);
     const current = parseWatchProgress(customer);
 
     // Analytics: how much was actually watched since the last save, not
@@ -117,7 +116,7 @@ export default async function handler(req, res) {
       serialized = JSON.stringify(Object.fromEntries(entries));
     }
 
-    await stripe.customers.update(customerId, { metadata: { watchProgress: serialized } });
+    await getStripe().customers.update(customerId, { metadata: { watchProgress: serialized } });
     return res.status(200).json({ ok: true });
   } catch (err) {
     console.error('watch-progress error:', err.message);

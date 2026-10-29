@@ -88,7 +88,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
   const [muted, setMuted] = useState(true);
   const timerRef = useRef(null);
 
-  const heroHeight = Math.min(900, Math.max(300, Math.round(windowHeight * 0.75)));
+  // 56% of the screen since 2026-10-29 (option A of the Stream cards canvas;
+  // the website's .hero-carousel clamp is the same), so the first row of
+  // cards shows on the first screen. It was 75%.
+  const heroHeight = Math.min(600, Math.max(300, Math.round(windowHeight * 0.56)));
 
   useEffect(() => {
     if (paused || pool.length <= 1) return undefined;

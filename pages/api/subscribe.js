@@ -1,11 +1,10 @@
 import { SITE } from '../../lib/siteConfig';
 import fs from 'fs';
 import path from 'path';
-import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
+import { getStripe } from '../../lib/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 // Where fan signups go. If NOTION_TOKEN + NOTION_DATABASE_ID are set, they're
 // written straight into a Notion database (a natural fit if you're already
@@ -87,7 +86,7 @@ export default async function handler(req, res) {
     const customerId = await getStripeCustomerIdFromRequest(req);
     if (customerId && process.env.STRIPE_SECRET_KEY) {
       try {
-        await stripe.customers.update(customerId, { metadata: { newsletter: 'subscribed' } });
+        await getStripe().customers.update(customerId, { metadata: { newsletter: 'subscribed' } });
       } catch (e) {
         // Non-fatal — the signup itself still succeeded even if this fails.
       }

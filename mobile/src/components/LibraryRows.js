@@ -1,5 +1,4 @@
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import { Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds } from '../lib/runtime';
@@ -8,6 +7,31 @@ import WishlistHeart from './WishlistHeart';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_LINE_COLOR = { series: colors.brass, movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
+
+// The stage's horizontal padding on every screen that renders a row
+// (stream, the type browser, the episode screen: paddingHorizontal 19).
+// A row bleeds out of it to the screen edge, as on the website, so the
+// next card peeks in at the edge instead of being cut at the padding.
+export const ROW_GUTTER = 19;
+
+// How many cards fit (Jose, 2026-10-29, option A of the "Stream cards
+// sizing" canvas — HBO Max / Prime Video proportions; the website's
+// .cat-row-track variables carry the same numbers): a row runs from the
+// gutter to the screen edge, and a card is as wide as it has to be for
+// `across` of them to fit with one gap each plus a peek of the next.
+// Posters are 2:3, Continue Watching is 16:9.
+export function rowMetrics(width) {
+  const phone = width < 640;
+  const tablet = !phone && width < 1024;
+  const across = phone ? 3 : tablet ? 4 : 6;
+  const landscapeAcross = phone ? 2 : tablet ? 3 : 4;
+  const gap = phone ? 10 : tablet ? 14 : 16;
+  const peek = phone ? 10 : tablet ? 16 : 20;
+  const row = width - ROW_GUTTER;
+  const posterW = Math.floor((row - across * gap - peek) / across);
+  const landscapeW = Math.floor((row - landscapeAcross * gap - peek) / landscapeAcross);
+  return { gap, posterW, posterH: Math.round(posterW * 1.5), landscapeW, landscapeH: Math.round(landscapeW * 9 / 16) };
+}
 
 // Mirrors components/GenreRow.js's tierBadge classes: free-ads = olive-deep
 // pill, free-noads = green, premium = brass.
@@ -34,16 +58,31 @@ function RowHeading({ title, onSeeAll }) {
   );
 }
 
-// components/GenreRow.js: a 190px-wide 2:3 poster card with the tier badge
-// top-left, a bottom scrim, and the title + "runtime · type" laid over the
-// artwork itself. `cards` are the consolidated cards from
-// lib/libraryCards.js (one per series, one per standalone title).
+// The horizontal track: bleeds out of the stage's padding so the cards run
+// to the screen edge, with the gutter restored inside as the first card's
+// left edge.
+function Track({ gap, children }) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.track} contentContainerStyle={[styles.trackContent, { gap }]}>
+      {children}
+    </ScrollView>
+  );
+}
+
+// components/GenreRow.js: the art is the card (2:3, radius 8, no box), the
+// tier badge and the heart sit on it, and the title + "runtime · type"
+// line sit under it — not over the art on a scrim, so a frame-grab
+// thumbnail still names the title and the smaller card keeps its whole
+// picture. `cards` are the consolidated cards from lib/libraryCards.js
+// (one per series, one per standalone title).
 export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onToggleWishlist }) {
+  const { width } = useWindowDimensions();
   if (!cards || cards.length === 0) return null;
+  const m = rowMetrics(width);
   return (
     <View style={styles.catRow}>
       <RowHeading title={title} onSeeAll={onSeeAll} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trackContent}>
+      <Track gap={m.gap}>
         {cards.map((card) => {
           const badge = cardBadge(card.tier, card.adsEnabled);
           const isSeries = card.type === 'series';
@@ -51,90 +90,103 @@ export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onT
           const typeLabel = isSeries ? '▤ Series' : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
           const first = isSeries ? `${card.episodeCount} episode${card.episodeCount === 1 ? '' : 's'}` : (formatRuntimeLong(card.runtime) || card.runtime || '');
           return (
-            <Pressable key={card.id} style={styles.card} onPress={() => onPressCard(card)}>
-              <View style={styles.thumb}>
+            <Pressable key={card.id} style={{ width: m.posterW }} onPress={() => onPressCard(card)}>
+              <View style={[styles.thumb, { width: m.posterW, height: m.posterH }]}>
                 {card.thumbnail ? <SmartImage uri={card.thumbnail} style={absoluteFill} /> : (
                   <Text style={styles.thumbFallback}>{card.tier === 'premium' ? 'locked' : isSeries ? '▤ series' : '▶ preview'}</Text>
                 )}
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
-                {onToggleWishlist ? <WishlistHeart active={isWishlisted(card.id)} onToggle={() => onToggleWishlist(card.id)} top={card.hasNew ? 27 : 8} /> : null}
-                <View style={[styles.badge, { backgroundColor: badge.bg, top: card.hasNew ? 27 : 8 }]}>
+                {onToggleWishlist ? <WishlistHeart active={isWishlisted(card.id)} onToggle={() => onToggleWishlist(card.id)} top={card.hasNew ? 27 : 7} /> : null}
+                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
                   <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
                 </View>
-                <View style={styles.info}>
-                  <Text style={styles.cardTitle}>{card.title}</Text>
-                  <Text style={styles.cardMeta}>
-                    {first}{first ? ' · ' : ''}<Text style={{ color: TYPE_LINE_COLOR[typeKey] || colors.inkDim }}>{typeLabel}</Text>
-                  </Text>
-                </View>
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{card.title}</Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>
+                  {first}{first ? ' · ' : ''}<Text style={{ color: TYPE_LINE_COLOR[typeKey] || colors.inkDim }}>{typeLabel}</Text>
+                </Text>
               </View>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </Track>
     </View>
   );
 }
 
-// components/ContinueWatchingRow.js — same card shell, but one card per
-// in-progress episode (never consolidated into a series card), with the
-// artist line and a 4px resume-progress bar along the bottom edge.
+// "S1 E4 · 12 min left" for an episode of a show, "12 min left" for a film
+// or short, the maker's name when the runtime isn't known (the website's
+// components/ContinueWatchingRow.js resumeMeta).
+function resumeMeta(ep, totalSeconds) {
+  const parts = [];
+  if (ep.contentType === 'series' && ep.seriesOrder) parts.push(`S${ep.season || 1} E${ep.seriesOrder}`);
+  if (totalSeconds && ep.resumeSeconds != null) {
+    const left = Math.max(1, Math.round((totalSeconds - ep.resumeSeconds) / 60));
+    parts.push(`${left} min left`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : (ep.artist || '');
+}
+
+// components/ContinueWatchingRow.js — one card per in-progress episode
+// (never consolidated into a series card), landscape 16:9 as on HBO Max
+// and Prime Video, with the 4px resume-progress bar along the bottom of
+// the art and the episode + time-left line under it.
 export function ContinueWatchingRow({ items, onPressItem }) {
+  const { width } = useWindowDimensions();
   if (!items || items.length === 0) return null;
+  const m = rowMetrics(width);
   return (
     <View style={styles.catRow}>
       <RowHeading title="Continue Watching" />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.trackContent}>
+      <Track gap={m.gap}>
         {items.slice(0, 15).map((ep) => {
           const total = parseRuntimeToSeconds(ep.runtime);
           const pct = total ? Math.min(100, Math.round((ep.resumeSeconds / total) * 100)) : null;
           return (
-            <Pressable key={ep.id} style={styles.card} onPress={() => onPressItem(ep)}>
-              <View style={styles.thumb}>
+            <Pressable key={ep.id} style={{ width: m.landscapeW }} onPress={() => onPressItem(ep)}>
+              <View style={[styles.thumb, { width: m.landscapeW, height: m.landscapeH }]}>
                 {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={absoluteFill} /> : (
                   <View style={styles.resumeFallback}><PlayGlyph /><Text style={styles.thumbFallback}> Resume</Text></View>
                 )}
-                <LinearGradient colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']} style={styles.scrim} pointerEvents="none" />
-                <View style={styles.info}>
-                  <Text style={styles.cardTitle}>{ep.title}</Text>
-                  {ep.artist ? <Text style={styles.cardMeta}>{ep.artist}</Text> : null}
-                </View>
                 {pct !== null ? (
                   <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${pct}%` }]} /></View>
                 ) : null}
               </View>
+              <View style={styles.info}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{ep.title}</Text>
+                <Text style={styles.cardMeta} numberOfLines={1}>{resumeMeta(ep, total)}</Text>
+              </View>
             </Pressable>
           );
         })}
-      </ScrollView>
+      </Track>
     </View>
   );
 }
 
-const CARD_W = 190;
-
 const styles = StyleSheet.create({
   // .cat-row / .cat-row-heading / .cat-row-track
-  catRow: { marginBottom: 29 },
+  catRow: { marginBottom: 26 },
   rowHeadingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 11 },
   rowHeading: { fontFamily: fonts.mono, fontSize: 20, letterSpacing: 2, textTransform: 'uppercase', color: colors.inkDim },
   seeAll: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.7, textTransform: 'uppercase', color: colors.brass },
-  trackContent: { flexDirection: 'row', gap: 22, paddingTop: 32, paddingBottom: 58, paddingHorizontal: 5 },
+  track: { marginHorizontal: -ROW_GUTTER },
+  trackContent: { flexDirection: 'row', paddingLeft: ROW_GUTTER, paddingRight: ROW_GUTTER, paddingTop: 2, paddingBottom: 6 },
 
-  // .ep-card / .ep-thumb / .ep-info
-  card: { width: CARD_W, borderRadius: 16, borderWidth: 1, borderColor: 'rgba(251,232,211,0.08)', backgroundColor: colors.surface1, overflow: 'hidden' },
-  thumb: { width: '100%', aspectRatio: 2 / 3, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface1 },
+  // .row-card .ep-thumb / .ep-info
+  thumb: { borderRadius: 8, overflow: 'hidden', backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' },
   thumbFallback: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(251,232,211,0.5)' },
   resumeFallback: { flexDirection: 'row', alignItems: 'center' },
-  scrim: { position: 'absolute', left: 0, right: 0, bottom: 0, height: '55%' },
-  badge: { position: 'absolute', left: 8, paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999 },
-  badgeText: { fontFamily: fonts.mono, fontSize: 8.8, letterSpacing: 0.7, textTransform: 'uppercase' },
+  // Bottom-left of the art: on a 110pt card it can't share the top edge
+  // with the heart (the website's .row-card .ep-thumb .ep-badge).
+  badge: { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
+  badgeText: { fontFamily: fonts.mono, fontSize: 8, letterSpacing: 0.6, textTransform: 'uppercase' },
   newBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.sky, paddingVertical: 5 },
   newBannerText: { color: colors.surface0, fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', textAlign: 'center' },
-  info: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 10, paddingHorizontal: 11, paddingBottom: 11 },
-  cardTitle: { fontFamily: fonts.displaySemi, fontSize: 13.6, lineHeight: 17, color: colors.ink, textTransform: 'uppercase', marginBottom: 3 },
-  cardMeta: { fontFamily: fonts.mono, fontSize: 9.6, letterSpacing: 1, textTransform: 'uppercase', color: colors.inkDim },
+  info: { paddingTop: 7, gap: 2 },
+  cardTitle: { fontFamily: fonts.displaySemi, fontSize: 12.8, lineHeight: 16, color: colors.ink },
+  cardMeta: { fontFamily: fonts.mono, fontSize: 9.3, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.inkDim },
 
   // .cw-progress-track / .cw-progress-fill
   progressTrack: { position: 'absolute', left: 0, right: 0, bottom: 0, height: 4, backgroundColor: 'rgba(0,0,0,0.5)' },

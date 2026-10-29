@@ -1,11 +1,10 @@
 import { timingSafeEqual } from 'node:crypto';
-import Stripe from 'stripe';
 import { findSeries } from '../../lib/series';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
 import { mailFrom } from '../../lib/notify';
 import { SITE } from '../../lib/siteConfig';
+import { getStripe } from '../../lib/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 // This is a manually-triggered tool, not an automated pipeline — there's no
 // database watching for "a new episode was added," so you call this
@@ -97,7 +96,7 @@ export default async function handler(req, res) {
     // Paginate through every customer, 100 at a time, checking metadata.
     // eslint-disable-next-line no-constant-condition
     while (true) {
-      const page = await stripe.customers.list({ limit: 100, starting_after: startingAfter });
+      const page = await getStripe().customers.list({ limit: 100, starting_after: startingAfter });
       for (const customer of page.data) {
         checked += 1;
         const wishlist = (customer.metadata && customer.metadata.wishlist) || '';

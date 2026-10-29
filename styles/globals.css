@@ -826,7 +826,10 @@ button { font-family: inherit; cursor: pointer; }
   /* Fallback for browsers that don't understand svh — if the next
      declaration below is understood, it wins; if not, this is what
      actually applies. */
-  height: clamp(300px, 75vh, 900px);
+  /* 56% since 2026-10-29 (option A of the Stream cards canvas): the first
+     row of cards shows on the first screen. It was 75%, which on a phone
+     put the first card a screen and a half down. */
+  height: clamp(300px, 56vh, 600px);
   /* svh (small viewport height), not plain vh: on mobile, plain vh
      locks to the LARGEST possible viewport height (address bar
      collapsed) rather than tracking what's actually visible. On first
@@ -839,7 +842,7 @@ button { font-family: inherit; cursor: pointer; }
      live as the address bar animates, but that has documented visual
      jank issues in Safari, which svh's fixed-to-smallest approach
      avoids entirely.) */
-  height: clamp(300px, 75svh, 900px);
+  height: clamp(300px, 56svh, 600px);
   background: linear-gradient(160deg, var(--surface-2), var(--ocean-ink) 55%, #000); /* a hero with no trailer or artwork shows this, not a black box */
   border: 1px solid rgba(251, 232, 211, 0.08);
 }
@@ -1125,8 +1128,20 @@ button { font-family: inherit; cursor: pointer; }
 }
 .cat-row-heading .see-all:hover { color: var(--olive-bright); }
 .cat-row-track {
+  /* How many cards fit (Jose, 2026-10-29, option A of the "Stream cards
+     sizing" canvas, https://claude.ai/artifact/72THHDALDS2jY5ZmmFiKKc —
+     HBO Max / Prime Video proportions): a row starts at the left gutter
+     and runs to the screen edge, and a card is as wide as it has to be
+     for --cards-across of them to fit with one --row-gap each plus a
+     --row-peek of the next card, so a row always shows a sliver of what
+     scrolls in. The phone/tablet overrides sit after this rule; the
+     Continue Watching row sets its own --cards-across for its 16:9
+     cards. The app's LibraryRows.js carries the same numbers. */
+  --cards-across: 6;
+  --row-gap: 16px;
+  --row-peek: 20px;
   display: flex;
-  gap: 1.4rem;
+  gap: var(--row-gap);
   overflow-x: auto;
   /* Setting overflow-x to anything but visible implicitly makes
      overflow-y non-visible too (a CSS quirk, not a choice) — there's no
@@ -1222,7 +1237,28 @@ button { font-family: inherit; cursor: pointer; }
     scroll-snap-align: start;
   }
 }
-.row-card { width: 190px; min-width: 190px; max-width: 190px; flex: 0 0 auto; }
+/* The visible row is this track's content box plus its right padding
+   (0.3rem of hover room + the gutter bleed), which is where the peek
+   lives — see .cat-row-track. */
+.row-card {
+  width: calc((100% + 0.3rem + var(--row-bleed, 0px) - var(--cards-across) * var(--row-gap) - var(--row-peek)) / var(--cards-across));
+  flex: 0 0 auto;
+}
+.continue-watching-row .cat-row-track { --cards-across: 4; }
+@media (max-width: 1024px) {
+  .cat-row-track { --cards-across: 4; --row-gap: 14px; --row-peek: 16px; }
+  .continue-watching-row .cat-row-track { --cards-across: 3; }
+}
+@media (max-width: 640px) {
+  .cat-row-track { --cards-across: 3; --row-gap: 10px; --row-peek: 10px; }
+  .continue-watching-row .cat-row-track { --cards-across: 2; }
+}
+/* The track's tall vertical padding only exists so a hovered card can grow
+   and cast its shadow without being clipped; a touch screen never hovers,
+   so there it would just be empty space between rows. */
+@media (hover: none) {
+  .cat-row-track { padding-top: 0.4rem; padding-bottom: 0.9rem; }
+}
 /* Small top padding added for the same reason .cat-row-track has
    vertical padding: overflow-x:auto implicitly makes overflow-y
    non-visible too, and .genre-browse-item:hover's translateY(-2px) had
@@ -1466,6 +1502,30 @@ button { font-family: inherit; cursor: pointer; }
 .type-line.vertical { color: var(--rust) !important; }
 .type-line.podcast { color: var(--olive) !important; }
 .type-line.bonus { color: var(--ink-faint) !important; }
+
+/* Row cards (2026-10-29, option A of the Stream cards canvas): the art is
+   the card — radius 8, no box, no border — and the title and meta sit
+   under it, two lines at most, so a frame-grab thumbnail with no text on
+   it still names the title. Grids (.shelf, .poster-grid, the search
+   results) keep the overlaid card for now. */
+.row-card .ep-card { background: transparent; border: 0; border-radius: 0; overflow: visible; }
+.row-card .ep-thumb { border-radius: 8px; overflow: hidden; }
+.row-card .ep-thumb::before { display: none; }
+.row-card .ep-info { position: static; padding: 0.5rem 0 0; }
+.row-card .ep-info h4 { font-size: 0.8rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.row-card .ep-info span { font-size: 0.58rem; letter-spacing: 0.04em; }
+.card-wrap.row-card:hover .ep-card { border-color: transparent; box-shadow: none; }
+.card-wrap.row-card:hover .ep-thumb { box-shadow: 0 14px 30px rgba(0,0,0,0.5); outline: 1px solid rgba(232, 163, 61, 0.55); }
+.row-card .ep-card.active { border-color: transparent; }
+.row-card .ep-card.active .ep-thumb { outline: 2px solid var(--signal-amber); }
+/* On a 110px card the "Free with ads" pill and the heart can't share the
+   top edge (they overlapped), so the pill sits at the bottom-left of the
+   art and the heart keeps the top-right; the "New episode" banner keeps
+   the top edge. Later than the :has() rules above, which it overrides. */
+.row-card .ep-thumb .ep-badge { top: auto; bottom: 0.4rem; left: 0.4rem; font-size: 0.5rem; padding: 0.18rem 0.4rem; }
+/* Continue Watching is a landscape 16:9 card, as on HBO Max and Prime
+   Video; every other row stays 2:3. */
+.continue-watching-row .row-card .ep-thumb { aspect-ratio: 16 / 9; }
 
 .account-card {
   background: var(--void-2);

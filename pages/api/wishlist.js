@@ -1,9 +1,8 @@
-import Stripe from 'stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
 import { checkRateLimit } from '../../lib/rateLimit';
+import { getStripe } from '../../lib/stripe';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -33,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const customer = await stripe.customers.retrieve(customerId);
+    const customer = await getStripe().customers.retrieve(customerId);
     const current = (customer.metadata && customer.metadata.wishlist)
       ? customer.metadata.wishlist.split(',').filter(Boolean)
       : [];
@@ -51,7 +50,7 @@ export default async function handler(req, res) {
     if (action === 'add' && serialized.length > 490) {
       return res.status(400).json({ error: `Your list is full (${current.length} titles) — remove one to add another.`, wishlist: current, full: true });
     }
-    await stripe.customers.update(customerId, { metadata: { wishlist: serialized } });
+    await getStripe().customers.update(customerId, { metadata: { wishlist: serialized } });
     return res.status(200).json({ ok: true, wishlist: next });
   } catch (err) {
     console.error('wishlist error:', err.message);

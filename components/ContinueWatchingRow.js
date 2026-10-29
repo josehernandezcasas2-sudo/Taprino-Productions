@@ -3,6 +3,7 @@ import { parseRuntimeToSeconds } from '../lib/videoMetadata';
 import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
 import { PlayIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { ROW_CARD_SIZES } from './GenreRow';
 
 const MAX_CARDS = 15;
 
@@ -17,6 +18,10 @@ const MAX_CARDS = 15;
 // on top (arrows, wheel-to-horizontal conversion, loop-around) that
 // wasn't working reliably, so it's been removed; touch, trackpad, and a
 // normal scrollbar all already work here without it.
+//
+// The card is landscape 16:9 since 2026-10-29 (option A of the Stream
+// cards canvas, as on HBO Max and Prime Video) — .continue-watching-row in
+// globals.css — with the title and "S1 E4 · 12 min left" under the art.
 export default function ContinueWatchingRow({ items, onSelect }) {
   const iconOverrides = usePlayerIconOverrides();
   if (!items || items.length === 0) return null;
@@ -38,6 +43,7 @@ export default function ContinueWatchingRow({ items, onSelect }) {
               key={ep.id}
               ep={ep}
               pct={pct}
+              meta={resumeMeta(ep, totalSeconds)}
               onSelect={onSelect}
               iconOverrides={iconOverrides}
             />
@@ -48,6 +54,18 @@ export default function ContinueWatchingRow({ items, onSelect }) {
   );
 }
 
+// "S1 E4 · 12 min left" for an episode of a show, "12 min left" for a
+// film or short, the maker's name when the runtime isn't known.
+export function resumeMeta(ep, totalSeconds) {
+  const parts = [];
+  if (ep.contentType === 'series' && ep.seriesOrder) parts.push(`S${ep.season || 1} E${ep.seriesOrder}`);
+  if (totalSeconds && ep.resumeSeconds != null) {
+    const left = Math.max(1, Math.round((totalSeconds - ep.resumeSeconds) / 60));
+    parts.push(`${left} min left`);
+  }
+  return parts.length > 0 ? parts.join(' · ') : (ep.artist || '');
+}
+
 // A title already in progress is already unlocked for this viewer, so the
 // no-thumbnail/broken-thumbnail fallback here is always a plain "Resume"
 // treatment — unlike GenreRow's browsing cards, there's no tier/lock
@@ -55,7 +73,7 @@ export default function ContinueWatchingRow({ items, onSelect }) {
 // present but broken (a corrupted or partially-uploaded file rendering as
 // garbled blocks of color) and swaps to the same clean fallback rather
 // than letting the browser show whatever it managed to decode.
-function ContinueWatchingCard({ ep, pct, onSelect, iconOverrides }) {
+function ContinueWatchingCard({ ep, pct, meta, onSelect, iconOverrides }) {
   const [imgError, setImgError] = useState(false);
   const showThumb = ep.thumbnail && !imgError;
   return (
@@ -73,7 +91,7 @@ function ContinueWatchingCard({ ep, pct, onSelect, iconOverrides }) {
               src={ep.thumbnail}
               alt=""
               fill
-              sizes="(max-width: 640px) 40vw, 200px"
+              sizes={ROW_CARD_SIZES}
               className="ep-thumb-img"
               onError={() => setImgError(true)}
             />
@@ -81,15 +99,15 @@ function ContinueWatchingCard({ ep, pct, onSelect, iconOverrides }) {
           {!showThumb && (
             <span className="ep-thumb-fallback"><PlayIcon size={13} src={iconOverrides.play} /> Resume</span>
           )}
-          <div className="ep-info">
-            <h4>{ep.title}</h4>
-            <span>{ep.artist}</span>
-          </div>
           {pct !== null && (
             <div className="cw-progress-track" aria-hidden="true">
               <div className="cw-progress-fill" style={{ width: `${pct}%` }} />
             </div>
           )}
+        </div>
+        <div className="ep-info">
+          <h4>{ep.title}</h4>
+          <span>{meta}</span>
         </div>
       </div>
     </div>
