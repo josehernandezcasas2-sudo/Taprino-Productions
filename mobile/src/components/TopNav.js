@@ -21,9 +21,10 @@ const PREMIUM_TIER = 'Tapa +';
 // The mobile routes that count as the Stream half of the site — the same
 // pages lib/streamSection.js's isStreamPath() marks on the website, mapped
 // to their app routes (/type/series|movie → /watch/series|movies,
-// /podcasts → /watch/podcasts, /vertical/browse → /watch/vertical). Search
-// counts too: on the website a search runs inside /stream. Everything else
-// (home, pitches, about, account, profiles, genre, collections…) is Connect.
+// /podcasts → /watch/podcasts, /vertical/browse → /watch/vertical,
+// /wishlist → /account/wishlist). Search counts too: on the website a
+// search runs inside /stream. Everything else (home, pitches, about,
+// account, profiles, University…) is Connect.
 export function isStreamRoute(pathname) {
   return (
     pathname === '/stream' ||
@@ -36,7 +37,13 @@ export function isStreamRoute(pathname) {
     pathname === '/watch/vertical' ||
     pathname.startsWith('/podcasts/') ||
     pathname.startsWith('/episode/') ||
-    pathname.startsWith('/series/')
+    pathname.startsWith('/series/') ||
+    pathname.startsWith('/genre/') ||
+    pathname.startsWith('/collection/') ||
+    // Lists of titles (the website's /wishlist and /recs, Stream since
+    // 2026-10-28).
+    pathname === '/account/wishlist' ||
+    pathname === '/recs'
   );
 }
 

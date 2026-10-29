@@ -210,6 +210,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     return (
       <>
         <Head><title>A quick confirmation — {SITE.name}</title></Head>
+        <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
         <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
           <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
             <div className="account-eyebrow">Rated {requiredRating}</div>
@@ -226,6 +227,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             </div>
           </div>
         </main>
+        <MobileTabBar />
       </>
     );
   }
@@ -236,6 +238,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     return (
       <>
         <Head><title>Content restricted — {SITE.name}</title></Head>
+        <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
         <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
           <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
             <div className="account-eyebrow">Age-restricted content</div>
@@ -274,6 +277,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             </div>
           </div>
         </main>
+        <MobileTabBar />
       </>
     );
   }

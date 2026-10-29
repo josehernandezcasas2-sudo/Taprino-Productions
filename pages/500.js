@@ -1,10 +1,13 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import ErrorPageNav from '../components/ErrorPageNav';
 import { SITE } from '../lib/siteConfig';
 
 // Shown when something genuinely broke server-side. Kept as simple as the
 // 404 — if the app is already failing, this page must not depend on
-// anything that could fail alongside it.
+// anything that could fail alongside it: it is static, and the header's
+// one browser-side fetch (ErrorPageNav) falls back to the signed-out
+// header when it can't be answered.
 export default function ServerError() {
   return (
     <>
@@ -12,6 +15,7 @@ export default function ServerError() {
         <title>Something went wrong — {SITE.name}</title>
         <meta name="robots" content="noindex" />
       </Head>
+      <ErrorPageNav />
       <main className="error-page">
         <div className="error-code">500</div>
         <h1>Something broke on our end</h1>

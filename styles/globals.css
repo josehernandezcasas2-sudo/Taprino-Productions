@@ -4433,7 +4433,9 @@ img.house-ad-preview { object-fit: cover; background: #000; }
    header itself is what failed, so they share no components with the app.
    --------------------------------------------------------------------- */
 .error-page {
-  min-height: 100vh;
+  /* Centred under the header (ErrorPageNav, 2026-10-28), so not the
+     whole viewport any more — that left a header's worth of scroll. */
+  min-height: 72vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -6729,7 +6731,7 @@ body:has(.mini-player) { padding-bottom: 72px; }
 /* ============================================================
    Browse other vertical series (pages/vertical/browse.js)
    ============================================================ */
-.reel-browse { min-height: 100vh; min-height: 100svh; padding: 1.2rem 1.2rem 3rem; background: var(--void); }
+.reel-browse { min-height: 60vh; min-height: 60svh; padding: 1.2rem 1.2rem 3rem; background: var(--void); } /* under the header since 2026-10-28 */
 .reel-browse-header { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.2rem; }
 .reel-browse-back { color: var(--ink); font-size: 1.2rem; text-decoration: none; }
 .reel-browse-title { font-family: var(--font-mono); font-size: 0.85rem; letter-spacing: 0.04em; text-transform: uppercase; color: var(--ink-dim); }
@@ -7789,8 +7791,9 @@ body:has(.mini-player) { padding-bottom: 72px; }
    chromeless (no HeaderNav/Footer at all), so this genuinely feels like
    a separate front door rather than a page embedded in the regular site. */
 .ad-manager-login-page {
-  min-height: 100vh;
-  min-height: 100svh;
+  /* Under the site header since 2026-10-28, so not the whole viewport. */
+  min-height: 72vh;
+  min-height: 72svh;
   display: flex;
   align-items: center;
   justify-content: center;
