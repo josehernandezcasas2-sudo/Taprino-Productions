@@ -12,6 +12,7 @@ import TopNav from '../../components/TopNav';
 import { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import { BundleCard, BuyChip, useBuy } from '../../components/BuyBits';
 import { AiSealChip } from '../../components/AiSeal';
+import { seriesPlayLabel, episodeCode } from '../../lib/seriesResume';
 
 // Mirrors components/GenreRow.js's tierBadge classes (the same pills as
 // LibraryRows.js): free-ads = olive-deep, free-noads = green, premium = brass.
@@ -199,7 +200,12 @@ export default function SeriesHub() {
   const representativeRating = seriesEpisodes.find((e) => e.rating)?.rating;
   const seriesArtist = seriesInfo.artist || heroEpisode?.artist;
   const badge = heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled) : null;
-  const playLabel = heroEpisode && heroEpisode.seriesOrder ? `Play S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : 'Play first episode';
+  // Play: the first episode before the viewer has started the show, the
+  // episode they're on once they have (`resume` on /api/series-hub; the
+  // episode screen resumes at the saved position by itself).
+  const resume = state.data.resume || null;
+  const playEpisodeId = (resume && resume.episodeId) || (heroEpisode && heroEpisode.id) || null;
+  const playLabel = seriesPlayLabel(resume, heroEpisode && episodeCode(heroEpisode) ? `Play ${episodeCode(heroEpisode)}` : 'Play first episode');
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -227,8 +233,8 @@ export default function SeriesHub() {
               {state.data.aiSeal !== false ? <AiSealChip /> : null}
             </View>
             <View style={heroButtonStyles.actions}>
-              {heroEpisode ? (
-                <Pressable style={heroButtonStyles.playBtn} onPress={() => router.push(`/episode/${heroEpisode.id}?autoplay=1`)}>
+              {playEpisodeId ? (
+                <Pressable style={heroButtonStyles.playBtn} onPress={() => router.push(`/episode/${playEpisodeId}?autoplay=1`)}>
                   <PlayIcon size={14} />
                   <Text style={heroButtonStyles.playText}>{playLabel}</Text>
                 </Pressable>

@@ -10,6 +10,7 @@ import TopNav from '../components/TopNav';
 import HeroSpotlight from '../components/HeroSpotlight';
 import { CardRow, ContinueWatchingRow } from '../components/LibraryRows';
 import { useWishlist } from '../lib/useWishlist';
+import { seriesPlayEpisodeId } from '../lib/seriesResume';
 
 // Mirrors pages/stream.js: live banner, full-bleed HeroSpotlight, Continue
 // Watching, New Releases, Leaving Soon, the Tapa + promo, then one row per
@@ -43,10 +44,12 @@ export default function Stream() {
     return () => { cancelled = true; };
   }, []);
 
-  // pages/stream.js goToEpisode — Play means "start watching now".
+  // pages/stream.js goToEpisode — Play means "start watching now": a series
+  // opens the episode this viewer is on (episode 1 before they start).
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
+      const target = seriesPlayEpisodeId(item);
+      router.push(target ? `/episode/${target}?autoplay=1` : `/series/${item.id}`);
       return;
     }
     if (item.contentType === 'podcast' && item.seriesId) {

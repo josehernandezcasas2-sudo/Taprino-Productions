@@ -8,6 +8,8 @@ import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import { buildHeroCandidates } from '../../lib/heroCandidates';
 import { useWishlist } from '../../lib/useWishlist';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
+import { getViewerProgress } from '../../lib/continueWatching';
+import { withSeriesResume, seriesPlayEpisodeId } from '../../lib/seriesResume';
 import HeroSpotlight from '../../components/HeroSpotlight';
 import GenreRow from '../../components/GenreRow';
 import HeaderNav from '../../components/HeaderNav';
@@ -75,6 +77,8 @@ export async function getServerSideProps({ req, params, res }) {
     heroPool = buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
   }
   if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
+  // A series hero's Play continues where this viewer is (lib/seriesResume.js).
+  heroPool = withSeriesResume(heroPool, episodes, hasSession ? await getViewerProgress(req, episodes) : null);
 
   const newReleases = episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays));
   const leavingSoon = episodes.filter((e) => isLeavingSoon(e.availableUntil, lifecycleSettings.leavingSoonDays));
@@ -110,8 +114,9 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
   // land on its show page instead, same fix as the homepage.
   function goToEpisode(ep) {
     if (ep.isSeries) {
-      if (ep.firstEpisodeId) {
-        router.push(`/episode/${ep.firstEpisodeId}?autoplay=1`);
+      const target = seriesPlayEpisodeId(ep);
+      if (target) {
+        router.push(`/episode/${target}?autoplay=1`);
       } else {
         router.push(`/series/${ep.id}`);
       }

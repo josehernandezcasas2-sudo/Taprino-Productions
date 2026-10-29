@@ -19,9 +19,12 @@ export default async function handler(req, res) {
 
   applyCors(req, res);
   if (!(await limitPublicRead(req, res, 'type-feed'))) return undefined;
-  res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
+  // Signed in (the app sends its token), the series hero carries where
+  // this viewer picks the show up, so the answer is theirs alone.
+  const hasSession = Boolean(req.headers.authorization) || Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  res.setHeader('Cache-Control', hasSession ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=60, stale-while-revalidate=300');
 
-  const feed = await getTypeFeedData(type);
+  const feed = await getTypeFeedData(type, hasSession ? req : null);
   if (!feed) {
     return res.status(404).json({ error: 'Unknown type.' });
   }

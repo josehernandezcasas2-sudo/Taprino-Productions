@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import { useAuth } from '@clerk/expo';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiGet } from '../lib/api';
+import { seriesPlayEpisodeId } from '../lib/seriesResume';
 import { colors, fonts } from '../lib/theme';
 import TopNav from './TopNav';
 import SmartImage from './SmartImage';
@@ -39,12 +41,21 @@ export default function TypeBrowseScreen({ type }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
 
+  // Signed in, the request carries the token so a series hero's Play can
+  // continue where this viewer is (the route then answers privately).
+  const { getToken } = useAuth();
   useEffect(() => {
     let cancelled = false;
     setState({ loading: true, error: null, feed: null });
-    apiGet(`/api/type-feed?type=${encodeURIComponent(type)}`)
-      .then((feed) => { if (!cancelled) setState({ loading: false, error: null, feed }); })
-      .catch((err) => { if (!cancelled) setState({ loading: false, error: err.message, feed: null }); });
+    (async () => {
+      try {
+        const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+        const feed = await apiGet(`/api/type-feed?type=${encodeURIComponent(type)}`, token);
+        if (!cancelled) setState({ loading: false, error: null, feed });
+      } catch (err) {
+        if (!cancelled) setState({ loading: false, error: err.message, feed: null });
+      }
+    })();
     return () => { cancelled = true; };
   }, [type]);
 
@@ -61,10 +72,12 @@ export default function TypeBrowseScreen({ type }) {
     router.push(`/episode/${item.id}`);
   }
 
-  // The hero's Play button — a series hero jumps straight to episode 1.
+  // The hero's Play button — a series hero jumps straight to the episode
+  // this viewer is on (episode 1 before they start).
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
+      const target = seriesPlayEpisodeId(item);
+      router.push(target ? `/episode/${target}?autoplay=1` : `/series/${item.id}`);
       return;
     }
     if (item.contentType === 'podcast' && item.seriesId) { router.push(`/podcasts/${item.seriesId}`); return; }

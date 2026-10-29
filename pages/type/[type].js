@@ -10,6 +10,8 @@ import { getGenreIcons } from '../../lib/genreIcons';
 import { buildHeroCandidates } from '../../lib/heroCandidates';
 import { getCuratedRowsForPage } from '../../lib/curatedGroups';
 import { getSiteSettings } from '../../lib/siteSettings';
+import { getViewerProgress } from '../../lib/continueWatching';
+import { withSeriesResume, seriesPlayEpisodeId } from '../../lib/seriesResume';
 import HeaderNav from '../../components/HeaderNav';
 import HeroSpotlight from '../../components/HeroSpotlight';
 import GenreRow from '../../components/GenreRow';
@@ -71,8 +73,10 @@ export async function getServerSideProps({ req, params, res }) {
     heroPool = buildHeroCandidates(typeEpisodes, allSeries).filter((c) => c.featured);
   }
   if (heroPool.length === 0) heroPool = buildHeroCandidates(typeEpisodes, allSeries).slice(0, 3);
+  // A series hero's Play continues where this viewer is (lib/seriesResume.js).
+  heroPool = withSeriesResume(heroPool, typeEpisodes, hasSession ? await getViewerProgress(req, typeEpisodes) : null);
 
-  const seriesUsed = new Set([...typeEpisodes, ...curatedRows.flatMap((r) => r.episodes || [])].map((e) => e.seriesId).filter(Boolean));
+  const seriesUsed =new Set([...typeEpisodes, ...curatedRows.flatMap((r) => r.episodes || [])].map((e) => e.seriesId).filter(Boolean));
 
   return {
     props: {
@@ -131,7 +135,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
       {heroPool.length > 0 && (
         <HeroSpotlight
           pool={heroPool}
-          onPlay={(item) => { window.location.href = item.isSeries ? (item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`) : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`; }}
+          onPlay={(item) => { window.location.href = item.isSeries ? (seriesPlayEpisodeId(item) ? `/episode/${seriesPlayEpisodeId(item)}?autoplay=1` : `/series/${item.id}`) : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`; }}
           onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}`; }}
           fullBleed
         />

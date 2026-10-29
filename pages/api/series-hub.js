@@ -43,6 +43,8 @@ export default async function handler(req, res) {
     bundle: data.bundle,
     episodeOffers: data.episodeOffers,
     // The maker's "Not for AI training" seal (lib/aiPolicyRules.js).
-    aiSeal: data.aiSeal !== false
+    aiSeal: data.aiSeal !== false,
+    // Where the Play button picks the show up for this viewer (lib/seriesResume.js).
+    resume: data.resume || null
   });
 }

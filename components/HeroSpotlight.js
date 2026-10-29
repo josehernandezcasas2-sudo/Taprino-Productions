@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
 import { formatRuntimeLong } from '../lib/videoMetadata';
+import { seriesPlayLabel } from '../lib/seriesResume';
 import { PlayIcon, PauseIcon, VolumeIcon, InfoIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
@@ -10,7 +11,9 @@ const ROTATE_MS = 9000;
 // a mix of standalone movies/shorts and whole series (aggregated by total
 // views across their episodes). This component doesn't know or care which is
 // which beyond the `isSeries` flag, used to label it and route Play/Trailer
-// correctly (a series' "Play" goes to its hub, not straight into a video).
+// correctly. A series' Play plays the first episode before the viewer has
+// started the show and continues where they are once they have (`resume`
+// from lib/seriesResume.js, stamped on the candidate by the page).
 //
 // Each candidate can use EITHER a video background (trailerSrc/src) OR a
 // static image (heroImage) — set `heroImage` on an episode/series to use a
@@ -188,7 +191,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <p>{ep.desc}</p>
           <div className="hero-actions">
             <button className="hero-play" onClick={() => onPlay(ep)}>
-              <PlayIcon size={16} src={iconOverrides.play} /> {ep.isSeries ? 'Play first episode' : 'Play'}
+              <PlayIcon size={16} src={iconOverrides.play} /> {ep.isSeries ? seriesPlayLabel(ep.resume) : 'Play'}
             </button>
             <button className="hero-trailer" onClick={() => onTrailer(ep)}>
               <InfoIcon size={16} src={iconOverrides.info} /> More info

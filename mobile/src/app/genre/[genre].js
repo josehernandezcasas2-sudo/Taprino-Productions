@@ -2,9 +2,12 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
+import { seriesPlayLabel, seriesPlayEpisodeId } from '../../lib/seriesResume';
 import SmartImage from '../../components/SmartImage';
+import { PlayIcon } from '../../components/HeroSpotlight';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -25,12 +28,21 @@ export default function GenreLibrary() {
   const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
 
+  // Signed in, the request carries the token so a series hero's Play can
+  // continue where this viewer is (the route then answers privately).
+  const { getToken } = useAuth();
   useEffect(() => {
     if (!genre) return undefined;
     let cancelled = false;
-    apiGet(`/api/genre-feed?genre=${encodeURIComponent(genre)}`)
-      .then((feed) => { if (!cancelled) setState({ loading: false, error: null, feed }); })
-      .catch((err) => { if (!cancelled) setState({ loading: false, error: err.message, feed: null }); });
+    (async () => {
+      try {
+        const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+        const feed = await apiGet(`/api/genre-feed?genre=${encodeURIComponent(genre)}`, token);
+        if (!cancelled) setState({ loading: false, error: null, feed });
+      } catch (err) {
+        if (!cancelled) setState({ loading: false, error: err.message, feed: null });
+      }
+    })();
     return () => { cancelled = true; };
   }, [genre]);
 
@@ -45,9 +57,12 @@ export default function GenreLibrary() {
     }
     router.push(`/episode/${item.id}`);
   }
+  // A series hero's Play opens the episode this viewer is on (episode 1
+  // before they start).
   function playHero(item) {
     if (item.isSeries) {
-      router.push(item.firstEpisodeId ? `/episode/${item.firstEpisodeId}?autoplay=1` : `/series/${item.id}`);
+      const target = seriesPlayEpisodeId(item);
+      router.push(target ? `/episode/${target}?autoplay=1` : `/series/${item.id}`);
       return;
     }
     if (item.contentType === 'podcast' && item.seriesId) { router.push(`/podcasts/${item.seriesId}`); return; }
@@ -91,7 +106,8 @@ export default function GenreLibrary() {
               {hero.desc ? <Text style={styles.heroDesc} numberOfLines={2}>{hero.desc}</Text> : null}
               <View style={styles.heroActions}>
                 <Pressable style={styles.playBtn} onPress={() => playHero(hero)}>
-                  <Text style={styles.playBtnText}>▶ {hero.isSeries ? 'Play first episode' : 'Play'}</Text>
+                  <PlayIcon size={13} />
+                  <Text style={styles.playBtnText}>{hero.isSeries ? seriesPlayLabel(hero.resume) : 'Play'}</Text>
                 </Pressable>
                 <Pressable style={styles.infoBtn} onPress={() => goToCard(hero)}><Text style={styles.infoBtnText}>ⓘ More info</Text></Pressable>
               </View>
@@ -157,7 +173,7 @@ const styles = StyleSheet.create({
   badgeText: { fontSize: 10, fontWeight: '700' },
   heroDesc: { color: colors.ink, fontSize: 13, opacity: 0.9, lineHeight: 18, marginBottom: 12 },
   heroActions: { flexDirection: 'row', gap: 10 },
-  playBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18 },
+  playBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18 },
   playBtnText: { color: colors.onBrass, fontSize: 13, fontWeight: '700' },
   infoBtn: { borderRadius: 999, paddingVertical: 11, paddingHorizontal: 16, borderWidth: 1, borderColor: colors.hairline, backgroundColor: 'rgba(0,0,0,0.3)' },
   infoBtnText: { color: colors.ink, fontSize: 13, fontWeight: '600' },

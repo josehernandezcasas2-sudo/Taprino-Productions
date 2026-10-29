@@ -25,11 +25,14 @@ export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   if (!(await limitPublicRead(req, res, 'genre-feed'))) return undefined;
-  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+  // Signed in (the app sends its token), the series hero carries where
+  // this viewer picks the show up, so the answer is theirs alone.
+  const hasSession = Boolean(req.headers.authorization) || Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  res.setHeader('Cache-Control', hasSession ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=300, stale-while-revalidate=600');
 
   const { genre } = req.query;
   if (!genre) return res.status(400).json({ error: 'genre is required.' });
 
-  const data = await getGenreFeedData(genre);
+  const data = await getGenreFeedData(genre, hasSession ? req : null);
   return res.status(200).json(data);
 }

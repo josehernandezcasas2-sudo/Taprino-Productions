@@ -6,6 +6,7 @@ import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import SmartImage from './SmartImage';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatRuntimeLong } from '../lib/runtime';
+import { seriesPlayLabel } from '../lib/seriesResume';
 
 const ROTATE_MS = 9000;
 
@@ -167,7 +168,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
         <View style={styles.actions}>
           <Pressable style={styles.playBtn} onPress={() => onPlay(ep)}>
             <PlayIcon />
-            <Text style={styles.playText}>{ep.isSeries ? 'Play first episode' : 'Play'}</Text>
+            <Text style={styles.playText}>{ep.isSeries ? seriesPlayLabel(ep.resume) : 'Play'}</Text>
           </Pressable>
           <Pressable style={styles.infoBtn} onPress={() => onTrailer(ep)}>
             <InfoIcon />

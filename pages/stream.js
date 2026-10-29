@@ -11,7 +11,8 @@ import GenreRow from '../components/GenreRow';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import ContinueWatchingRow from '../components/ContinueWatchingRow';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../lib/contentLifecycle';
-import { getContinueWatching } from '../lib/continueWatching';
+import { getContinueWatching, getViewerProgress } from '../lib/continueWatching';
+import { withSeriesResume, seriesPlayEpisodeId } from '../lib/seriesResume';
 import HeroSpotlight from '../components/HeroSpotlight';
 import SignalPanel from '../components/SignalPanel';
 import Link from 'next/link';
@@ -121,6 +122,8 @@ export async function getServerSideProps({ req, res }) {
     heroPool = buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
   }
   if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
+  // A series hero's Play continues where this viewer is (lib/seriesResume.js).
+  heroPool = withSeriesResume(heroPool, episodes, hasSession ? await getViewerProgress(req, episodes) : null);
 
   return {
     props: {
@@ -194,11 +197,13 @@ export default function Home({ liveStream, isSubscriber, isSignedIn, showNewslet
   function goToEpisode(ep) {
     if (ep.isSeries) {
       // Play should mean "start watching," same as it does for standalone
-      // content — jump straight to episode 1 rather than the series'
+      // content — jump straight to the episode this viewer is on (episode
+      // 1 before they start, lib/seriesResume.js) rather than the series'
       // overview page. Falls back to the overview only if a series
       // somehow has no episodes at all (shouldn't happen in practice).
-      if (ep.firstEpisodeId) {
-        router.push(`/episode/${ep.firstEpisodeId}?autoplay=1`);
+      const target = seriesPlayEpisodeId(ep);
+      if (target) {
+        router.push(`/episode/${target}?autoplay=1`);
       } else {
         router.push(`/series/${ep.id}`);
       }

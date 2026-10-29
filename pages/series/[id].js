@@ -12,6 +12,7 @@ import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/Pla
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
 import { formatRuntimeLong } from '../../lib/videoMetadata';
+import { seriesPlayLabel, episodeCode } from '../../lib/seriesResume';
 import { BundleCard, BuyChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
 
 import Footer from '../../components/Footer';
@@ -46,7 +47,7 @@ export async function getServerSideProps({ req, params, res, query }) {
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true, resume = null }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
@@ -81,6 +82,11 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   const representativeRating = seriesEpisodes.find((e) => e.rating)?.rating;
   const seriesArtist = seriesInfo.artist || heroEpisode?.artist;
   const isOriginal = seriesInfo.isOriginal || seriesEpisodes.some((e) => e.isOriginal);
+  // Play: the first episode before the viewer has started the show, the
+  // episode they're on once they have (lib/seriesResume.js; the episode
+  // page resumes at the saved position by itself).
+  const playEpisodeId = (resume && resume.episodeId) || (heroEpisode && heroEpisode.id) || null;
+  const playLabel = seriesPlayLabel(resume, heroEpisode && episodeCode(heroEpisode) ? `Play ${episodeCode(heroEpisode)}` : 'Play first episode');
 
   return (
     <>
@@ -106,8 +112,8 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         desc={seriesInfo.desc}
         videoSrc={heroSrc}
         imageSrc={heroImage}
-        playLabel={heroEpisode ? `${heroEpisode.seriesOrder ? `S${heroEpisode.season || 1}E${heroEpisode.seriesOrder}` : heroEpisode.title}` : 'Play'}
-        onPlay={() => { if (heroEpisode) window.location.href = `/episode/${heroEpisode.id}?autoplay=1`; }}
+        playLabel={playLabel}
+        onPlay={() => { if (playEpisodeId) window.location.href = `/episode/${playEpisodeId}?autoplay=1`; }}
         tierLabel={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).label : null}
         tierKey={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).key : null}
         episodeCount={seriesEpisodes.length}
