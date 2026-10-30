@@ -7,9 +7,11 @@ import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, fonts, absoluteFill } from '../lib/theme';
+import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
+const DOUBLE_TAP_MS = 300;
 const { OrientationLock, Orientation } = ScreenOrientation;
 const lock = (o) => ScreenOrientation.lockAsync(o).catch(() => {});
 const isLandscape = (o) => o === Orientation.LANDSCAPE_LEFT || o === Orientation.LANDSCAPE_RIGHT;
@@ -59,7 +61,11 @@ function RestoreGlyph({ size = 11 }) {
 // full screen; turning it back comes out — the same rules as
 // ChannelPlayer.js. `children` draw over the video in both views (the
 // content advisory, the end-of-episode card). A "Resumed from 5:00" toast
-// shows for a few seconds when `resumeSeconds` is set.
+// shows for a few seconds when `resumeSeconds` is set. In full screen the
+// picture fills the phone's screen when that crops only a little of it
+// (mobile/src/lib/screenFill.js; Jose, 2026-10-30: the black band each
+// side of a 16:9 picture) and a double tap switches between filling the
+// screen and the whole picture.
 export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
@@ -67,6 +73,11 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const [duration, setDuration] = useState(0);
   const [scrubbing, setScrubbing] = useState(null); // seconds while the thumb is held
   const [toast, setToast] = useState(0);
+  // Filling the screen: the rule from the video's size, or the viewer's
+  // double tap; a short toast names the state after each switch.
+  const { fill, toggle: toggleFill } = useScreenFill(player);
+  const [fillToast, setFillToast] = useState(null);
+  const lastTap = useRef(0);
   const hideTimer = useRef(null);
   const fullscreenRef = useRef(false);
   const autoRotate = useRef(true);
@@ -96,6 +107,11 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     const t = setTimeout(() => setToast(0), 4500);
     return () => clearTimeout(t);
   }, [resumeSeconds]);
+  useEffect(() => {
+    if (!fillToast) return undefined;
+    const t = setTimeout(() => setFillToast(null), 1600);
+    return () => clearTimeout(t);
+  }, [fillToast]);
 
   const showControls = useCallback(() => setControlsShown(true), []);
   useEffect(() => {
@@ -110,6 +126,21 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     showControls();
     if (!player) return;
     if (player.playing) player.pause(); else player.play();
+  }
+  // A tap shows or hides the controls; a second tap within a third of a
+  // second in full screen switches between filling the screen and the
+  // whole picture instead, and leaves the controls showing.
+  function onTap(full) {
+    const now = Date.now();
+    if (full && now - lastTap.current < DOUBLE_TAP_MS) {
+      lastTap.current = 0;
+      setFillToast(fill ? FIT_LABEL : FILL_LABEL);
+      toggleFill();
+      setControlsShown(true);
+      return;
+    }
+    lastTap.current = now;
+    setControlsShown((v) => !v);
   }
   function skip(delta) {
     showControls();
@@ -202,10 +233,15 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     return (
       <>
         {/* A tap anywhere brings the controls back (or hides them). */}
-        <Pressable style={absoluteFill} onPress={() => setControlsShown((v) => !v)} accessibilityRole="button" accessibilityLabel={controlsShown ? 'Hide controls' : 'Show controls'} />
+        <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityRole="button" accessibilityLabel={controlsShown ? 'Hide controls' : 'Show controls'} />
         {toast > 0 && !full ? (
           <View style={styles.toast} pointerEvents="none">
             <RestoreGlyph /><Text style={styles.toastText}>Resumed from {clock(toast)}</Text>
+          </View>
+        ) : null}
+        {full && fillToast ? (
+          <View style={styles.fillToastWrap} pointerEvents="none">
+            <View style={styles.fillToast}><Text style={styles.fillToastText}>{fillToast}</Text></View>
           </View>
         ) : null}
         {controlsShown ? (
@@ -293,7 +329,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
       >
         <StatusBar hidden />
         <View style={styles.fullRoot}>
-          {fullscreen && <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />}
+          {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
           <SafeAreaView style={absoluteFill} edges={['left', 'right', 'top', 'bottom']} pointerEvents="box-none">
             <View style={{ flex: 1 }} pointerEvents="box-none">
               {renderOverlay(true)}
@@ -314,6 +350,10 @@ const styles = StyleSheet.create({
 
   toast: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(12,19,31,0.8)', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 9 },
   toastText: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.6, color: colors.ink },
+  // "Filling the screen" / "Whole picture" after a double tap, under the top row.
+  fillToastWrap: { position: 'absolute', left: 0, right: 0, top: 78, alignItems: 'center' },
+  fillToast: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(12,19,31,0.8)' },
+  fillToastText: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.9, textTransform: 'uppercase', color: colors.ink },
 
   // Full screen only (the phone turned sideways): sized up on 2026-10-30
   // (Jose, the Theatre board: "it could be bigger on mobile") — the

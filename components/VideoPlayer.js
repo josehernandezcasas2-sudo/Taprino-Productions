@@ -5,6 +5,7 @@ import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
 import { advisoryFor, ADVISORY_MS } from '../lib/contentAdvisory';
 import { isHttpUrl } from '../lib/safeUrl';
+import { screenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 
 // Resolved lazily, inside startAds() below, rather than at module scope —
 // the fallback needs `window.location.origin`, which doesn't exist during
@@ -111,6 +112,15 @@ export default function VideoPlayer({
   const [volume, setVolume] = useState(1);
   const [muted, setMuted] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  // Filling the screen in full screen on a touch screen (lib/screenFill.js;
+  // Jose, 2026-10-30: the black band each side of a 16:9 picture on a
+  // phone). The video's own size against the window decides; a double tap
+  // on the video switches for this playback and a toast names the state.
+  const [videoSize, setVideoSize] = useState(null);
+  const [viewport, setViewport] = useState(null);
+  const [coarse, setCoarse] = useState(false);
+  const [fillChoice, setFillChoice] = useState(null);
+  const [fillToast, setFillToast] = useState(null);
   const [controlsVisible, setControlsVisible] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [volumePopupOpen, setVolumePopupOpen] = useState(false);
@@ -928,6 +938,43 @@ export default function VideoPlayer({
     return () => document.removeEventListener('fullscreenchange', onFsChange);
   }, []);
 
+  // The picture's size and the window's, for the fill rule; both are read
+  // again when the title changes, and the viewer's choice is forgotten.
+  useEffect(() => {
+    setFillChoice(null);
+    setVideoSize(null);
+    setCoarse(Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches));
+    const v = videoRef.current;
+    const read = () => { if (v && v.videoWidth > 0 && v.videoHeight > 0) setVideoSize({ w: v.videoWidth, h: v.videoHeight }); };
+    const measure = () => setViewport({ w: window.innerWidth, h: window.innerHeight });
+    read();
+    measure();
+    if (v) {
+      v.addEventListener('loadedmetadata', read);
+      v.addEventListener('resize', read);
+    }
+    window.addEventListener('resize', measure);
+    return () => {
+      if (v) {
+        v.removeEventListener('loadedmetadata', read);
+        v.removeEventListener('resize', read);
+      }
+      window.removeEventListener('resize', measure);
+    };
+  }, [episode.id]);
+  useEffect(() => {
+    if (!fillToast) return undefined;
+    const t = setTimeout(() => setFillToast(null), 1600);
+    return () => clearTimeout(t);
+  }, [fillToast]);
+  const fillScreen = Boolean(fullscreen && coarse && videoSize && viewport && screenFill({ videoW: videoSize.w, videoH: videoSize.h, screenW: viewport.w, screenH: viewport.h, choice: fillChoice }));
+  const toggleFill = useCallback(() => {
+    if (!fullscreen || !coarse) return;
+    const next = !fillScreen;
+    setFillChoice(next);
+    setFillToast(next ? FILL_LABEL : FIT_LABEL);
+  }, [fullscreen, coarse, fillScreen]);
+
   const onKeyDown = useCallback(
     (e) => {
       if (adState) return; // controls are locked out during an ad
@@ -1008,7 +1055,7 @@ export default function VideoPlayer({
   return (
     <div
       ref={shellRef}
-      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''} ${advisoryState === 'on' ? 'advisory-on' : ''}`}
+      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''} ${fillScreen ? 'fill-screen' : ''} ${advisoryState === 'on' ? 'advisory-on' : ''}`}
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
       onKeyDown={onKeyDown}
@@ -1038,6 +1085,7 @@ export default function VideoPlayer({
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
         onClick={() => !adState && togglePlay()}
+        onDoubleClick={toggleFill}
         onEnded={(e) => {
           setPlaying(false);
           if (onProgress) onProgress(e.target.duration, e.target.duration);
@@ -1055,6 +1103,7 @@ export default function VideoPlayer({
         )}
       </video>
 
+      {fillToast && <div className="tp-fill-toast" role="status">{fillToast}</div>}
       {/* IMA renders its creative into this layer. */}
       <div ref={adContainerRef} className="tp-ad-layer" style={{ pointerEvents: adState && !adState.pod ? 'auto' : 'none' }} />
       {/* An ad plan's break plays here (lib/adPlanRules.js), the episode paused beneath. */}

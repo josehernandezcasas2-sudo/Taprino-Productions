@@ -3002,6 +3002,28 @@ button { font-family: inherit; cursor: pointer; }
 }
 .tp-ad-layer { position: absolute; inset: 0; }
 .tp-player.is-fullscreen { aspect-ratio: auto; width: 100%; height: 100%; }
+/* Filling the screen in full screen on a touch screen (lib/screenFill.js;
+   Jose, 2026-10-30: the black band each side of a 16:9 picture on a
+   phone): the picture covers the screen when that crops only a little of
+   it, a double tap switches to the whole picture and back. */
+.tp-player.is-fullscreen.fill-screen .tp-video { object-fit: cover; }
+.tp-fill-toast {
+  position: absolute;
+  left: 50%;
+  top: 5.2rem;
+  transform: translateX(-50%);
+  z-index: 7;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: rgba(12, 19, 31, 0.8);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  pointer-events: none;
+}
 
 /* Trial: 75% of viewport height instead of the shared 16:9 aspect-ratio,
    scoped to only the channel player for now — if this looks good, the

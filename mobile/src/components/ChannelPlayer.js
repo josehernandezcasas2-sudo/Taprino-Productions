@@ -14,6 +14,7 @@ import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 import { useCaptureBlock } from '../lib/captureBlock';
+import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 
 const SAFETY_POLL_MS = 45000;
 // Viewers without an age on file take the viewing terms once; the device
@@ -94,6 +95,32 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const player = useVideoPlayer(null, (p) => {
     p.timeUpdateEventInterval = 1;
   });
+
+  // Filling the screen in full screen (mobile/src/lib/screenFill.js, the
+  // same rule as EpisodePlayer): the picture's size decides, a second tap
+  // within a third of a second switches between filling the screen and the
+  // whole picture, and a short toast names the state.
+  const { fill, toggle: toggleFill } = useScreenFill(player);
+  const [fillToast, setFillToast] = useState(null);
+  const lastTap = useRef(0);
+  useEffect(() => {
+    if (!fillToast) return undefined;
+    const t = setTimeout(() => setFillToast(null), 1600);
+    return () => clearTimeout(t);
+  }, [fillToast]);
+  function onTap(full) {
+    if (menuOpen) { setMenuOpen(false); return; }
+    const now = Date.now();
+    if (full && now - lastTap.current < 300) {
+      lastTap.current = 0;
+      setFillToast(fill ? FIT_LABEL : FILL_LABEL);
+      toggleFill();
+      setControlsShown(true);
+      return;
+    }
+    lastTap.current = now;
+    setControlsShown((v) => !v);
+  }
 
   const updateNow = useCallback((fresh) => {
     nowRef.current = fresh;
@@ -432,7 +459,12 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   function renderOverlay(full) {
     return (
       <>
-        <Pressable style={absoluteFill} onPress={() => (menuOpen ? setMenuOpen(false) : setControlsShown((v) => !v))} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
+        <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
+        {full && fillToast ? (
+          <View style={styles.fillToastWrap} pointerEvents="none">
+            <View style={styles.fillToast}><Text style={styles.fillToastText}>{fillToast}</Text></View>
+          </View>
+        ) : null}
         {screen === null && userPaused && !playing && (
           <View style={styles.pausedNote} pointerEvents="none">
             <Text style={styles.pausedTitle}>Paused</Text>
@@ -569,7 +601,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       >
         <StatusBar hidden />
         <View style={styles.fullRoot}>
-          {fullscreen && <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />}
+          {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
           <SafeAreaView style={absoluteFill} edges={['left', 'right', 'top', 'bottom']} pointerEvents="box-none">
             <View style={styles.fullInner} pointerEvents="box-none">
               {renderOverlay(true)}
@@ -588,6 +620,10 @@ const styles = StyleSheet.create({
   fullInner: { flex: 1 },
   badge: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,11,15,0.7)', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999 },
   badgeFull: { top: 14, left: 64 },
+  // "Filling the screen" / "Whole picture" after a double tap (EpisodePlayer's twin).
+  fillToastWrap: { position: 'absolute', left: 0, right: 0, top: 78, alignItems: 'center' },
+  fillToast: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(12,19,31,0.8)' },
+  fillToastText: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.9, textTransform: 'uppercase', color: colors.ink },
   dot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.olive },
   dotLive: { backgroundColor: colors.brass },
   badgeText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, textTransform: 'uppercase', color: colors.ink },
