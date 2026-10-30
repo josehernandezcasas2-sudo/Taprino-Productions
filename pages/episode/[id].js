@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, DiamondIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { episodeCode } from '../../lib/seriesResume';
+import { endCardFor } from '../../lib/endCardRules';
 import Head from 'next/head';
 import Link from 'next/link';
 import BackButton from '../../components/BackButton';
@@ -197,6 +198,8 @@ export async function getServerSideProps({ req, params, query, res }) {
       previousEpisodeWatched: data.previousEpisodeWatched,
       seasonEpisodes: data.seasonEpisodes || [],
       watchNext: data.watchNext,
+      // The end card's pick once the show is over or a film ends (lib/endCardRules.js).
+      afterShow: data.afterShow || null,
       startOnTrailer: query.trailer === '1',
       startPlaying: query.autoplay === '1',
       signedPlayback,
@@ -216,7 +219,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, afterShow = null, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -252,6 +255,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // (the "After Play" canvas, 2026-10-29; it used to be a card under it).
   const [resumeToast, setResumeToast] = useState(0);
   const resumeToastFor = useRef(null);
+  // The end card once the title plays out (lib/endCardRules.js, drawn by
+  // components/EndCard.js inside the player; Jose, 2026-10-30): the next
+  // episode with a ten-second timer, or the pick once the show is over.
+  // Memoised so a re-render never restarts its timer.
+  const endCard = useMemo(
+    () => endCardFor({ episode, nextEpisode, pick: afterShow, seriesName: parentSeriesName, trailer: showingTrailer }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [episode.id, nextEpisode && nextEpisode.id, afterShow && afterShow.id, parentSeriesName, showingTrailer]
+  );
   const lockedNow = (episode.tier === 'premium' && !isSubscriber && !owned) || Boolean(earlyAccess && earlyAccess.locked);
   useEffect(() => {
     if (!showPlayer || showingTrailer || lockedNow || !episode.id || resumeToastFor.current === episode.id) return undefined;
@@ -394,24 +406,13 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       setShowingTrailer(false);
       return;
     }
-    // (The "Liked it? Tip …" card that came up here from 2026-10-24 is
-    // gone since 2026-10-30 — Jose: the Tip belongs in the player's own
-    // chrome only — so a series goes straight on to the next episode.)
-    // Autoplay now only ever continues within the SAME series — it used
-    // to pick (currentIndex + 1) % allEpisodes.length across the entire
-    // public catalog, which meant finishing any video could autoplay into
-    // something completely unrelated (wrong genre, wrong creator, even a
-    // different content type). If this isn't a series episode, or it's
-    // the last episode in its series, playback just stops — no next
-    // video, no wraparound back to episode one.
-    if (episode.contentType !== 'series' || !episode.seriesId) {
-      return;
-    }
-    // The server already worked out the next episode in this series.
-    if (nextEpisode) {
-      router.push(`/episode/${nextEpisode.id}`);
-    }
-    // No next episode in this series — just stop. Nothing to autoplay into.
+    // The end card takes it from here (components/EndCard.js in the
+    // player; Jose, 2026-10-30): a series episode offers the next one
+    // with a ten-second timer — only ever within the SAME series, never
+    // across the catalogue — and the last episode of a show, or a film,
+    // offers one pick. A podcast gets no card and simply stops. (The
+    // "Liked it? Tip …" card of 2026-10-24 is gone — the Tip belongs in
+    // the player's chrome only.)
   }
 
   async function startCheckout() {
@@ -608,6 +609,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 rating={episode.rating || null}
                 onNext={upNext ? goToNextEpisode : null}
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
+                // The end card once the title plays out (lib/endCardRules.js).
+                endCard={endCard}
+                onEndCardGo={(href) => router.push(href)}
                 topRight={!showingTrailer ? (
                   <TipButton tipping={tipping} isSignedIn={isSignedIn} className="tp-fs-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
                     <TipIcon size={13} src={iconOverrides.tip} /> Tip {tipFirstName}

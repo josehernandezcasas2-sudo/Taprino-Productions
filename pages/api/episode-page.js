@@ -81,6 +81,9 @@ export default async function handler(req, res) {
     // of this season with watched / resumeSeconds / current for the viewer.
     seasonEpisodes: data.seasonEpisodes || [],
     watchNext: data.watchNext.map(stripPlayable),
+    // The end card's pick once the show is over or a film ends
+    // (lib/endCardRules.js): one title, already trimmed to card fields.
+    afterShow: data.afterShow || null,
     bonusContent: data.bonusContent.map(stripPlayable)
   });
 }

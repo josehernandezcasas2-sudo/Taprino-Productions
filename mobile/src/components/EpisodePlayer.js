@@ -8,6 +8,7 @@ import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 import { FullscreenChrome } from '../lib/fullscreenChrome';
+import EndCard from './EndCard';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -99,13 +100,15 @@ function RestoreGlyph({ size = 11 }) {
 // episode" pill when `onNext` is given. Turning the phone sideways goes
 // full screen; turning it back comes out — the same rules as
 // ChannelPlayer.js. `children` draw over the video in both views (the
-// content advisory, the end-of-episode card). A "Resumed from 5:00" toast
-// shows for a few seconds when `resumeSeconds` is set. In full screen the
-// picture fills the phone's screen when that crops only a little of it
+// content advisory). A "Resumed from 5:00" toast shows for a few seconds
+// when `resumeSeconds` is set. In full screen the picture fills the
+// phone's screen when that crops only a little of it
 // (mobile/src/lib/screenFill.js; Jose, 2026-10-30: the black band each
 // side of a 16:9 picture) and a double tap switches between filling the
-// screen and the whole picture.
-export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, children }) {
+// screen and the whole picture. `endCard` = { card, onGo, onBack, onStay }
+// draws the end card (components/EndCard.js) over the last frame in
+// place of the controls once the title plays out; null for none.
+export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -271,11 +274,12 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   // `F` is the full-screen chrome from fullChrome() (null inline), handed
   // in by the full-screen frame so its insets are the Modal's own.
   function renderOverlay(full, F) {
+    const showEnd = Boolean(endCard && endCard.card);
     return (
       <>
         {/* A tap anywhere brings the controls back (or hides them). */}
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityRole="button" accessibilityLabel={controlsShown ? 'Hide controls' : 'Show controls'} />
-        {toast > 0 && !full ? (
+        {toast > 0 && !full && !showEnd ? (
           <View style={styles.toast} pointerEvents="none">
             <RestoreGlyph /><Text style={styles.toastText}>Resumed from {clock(toast)}</Text>
           </View>
@@ -285,7 +289,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
             <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
           </View>
         ) : null}
-        {controlsShown ? (
+        {controlsShown && !showEnd ? (
           <>
             {full ? (
               <View style={[styles.top, F.top]} pointerEvents="box-none">
@@ -343,6 +347,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
           </>
         ) : null}
         {children}
+        {showEnd ? <EndCard card={endCard.card} onGo={endCard.onGo} onBack={endCard.onBack} onStay={endCard.onStay} full={full} chrome={F} /> : null}
       </>
     );
   }

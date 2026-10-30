@@ -3,6 +3,7 @@ import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SkipBack
 import { useImaSdk } from '../lib/imaSdk';
 import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
+import EndCard from './EndCard';
 import { advisoryFor, ADVISORY_MS } from '../lib/contentAdvisory';
 import { isHttpUrl } from '../lib/safeUrl';
 import { screenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
@@ -30,6 +31,18 @@ function getAdTagUrl(placement, episodeId = null) {
 }
 
 const SKIP_SECONDS = 10;
+
+// play() returns a promise that rejects when something interrupts it — a
+// src swap on the move to the next episode, an autoplay the browser
+// refused — and an unhandled rejection surfaced as "The play() request
+// was interrupted by a new load request" on every episode-to-episode
+// move. The event handlers below already carry the real state.
+function safePlay(v) {
+  try {
+    const p = v.play();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (err) { /* nothing to do: the pause/play events carry the state */ }
+}
 
 function formatTime(seconds) {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
@@ -67,7 +80,12 @@ export default function VideoPlayer({
   rating = null,
   onNext = null,
   nextLabel = 'Next episode',
-  topRight = null
+  topRight = null,
+  // The end card once the title plays out (components/EndCard.js; the
+  // card from lib/endCardRules.js, null for no card) and where its
+  // timer / PLAY NOW / Back link go: `onEndCardGo(href, target)`.
+  endCard = null,
+  onEndCardGo = null
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
@@ -131,6 +149,13 @@ export default function VideoPlayer({
   const [adState, setAdState] = useState(null);
   const [cuePoints, setCuePoints] = useState([]);
   const [srcError, setSrcError] = useState(false);
+  // The src that played out, for the end card: a trailer's end never
+  // raises the card over the full episode that follows it (the src moves
+  // on, this stays the trailer's), and play / a new title clears it.
+  const [endedSrc, setEndedSrc] = useState(null);
+  // The card's layout follows the player's width (compact on a phone's
+  // inline strip, wide from 640px, xl on a laptop's inline player).
+  const [shellWidth, setShellWidth] = useState(0);
   // Episode Ad Curator pods: a ready plan's break plays in this second
   // <video> (ads are MP4s, bumpers signed HLS) while the episode waits;
   // cards and the hold card are drawn over it.
@@ -237,7 +262,7 @@ export default function VideoPlayer({
     const v = videoRef.current;
     if (!v) return;
 
-    const onPlay = () => setPlaying(true);
+    const onPlay = () => { setPlaying(true); setEndedSrc(null); };
     const onPause = () => setPlaying(false);
     const onWaiting = () => setBuffering(true);
     const onPlayingEvt = () => setBuffering(false);
@@ -424,6 +449,7 @@ export default function VideoPlayer({
   useEffect(() => {
     setStarted(false);
     setPlaying(false);
+    setEndedSrc(null);
     setCurrentTime(0);
     setAdState(null);
     setCuePoints([]);
@@ -489,7 +515,7 @@ export default function VideoPlayer({
           });
           adsManager.addEventListener(AdEvent.CONTENT_RESUME_REQUESTED, () => {
             setAdState(null);
-            v.play();
+            safePlay(v);
           });
           adsManager.addEventListener(AdEvent.STARTED, (e) => {
             const ad = e.getAd ? e.getAd() : null;
@@ -509,12 +535,12 @@ export default function VideoPlayer({
           adsManager.addEventListener(AdEvent.COMPLETE, () => setAdState(null));
           adsManager.addEventListener(AdEvent.ALL_ADS_COMPLETED, () => {
             setAdState(null);
-            v.play();
+            safePlay(v);
           });
           adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => {
             setAdState(null);
             adsManager.destroy();
-            v.play();
+            safePlay(v);
           });
 
           try {
@@ -522,7 +548,7 @@ export default function VideoPlayer({
             adsManager.start();
           } catch (adError) {
             setAdState(null);
-            v.play();
+            safePlay(v);
           }
         },
         false
@@ -533,7 +559,7 @@ export default function VideoPlayer({
         () => {
           // Fail open — an ad problem must never stop someone watching.
           setAdState(null);
-          v.play();
+          safePlay(v);
         },
         false
       );
@@ -826,7 +852,7 @@ export default function VideoPlayer({
           consumedBreaksRef.current.add(0);
           if (runPod(pre.index)) return;
         }
-        v.play();
+        safePlay(v);
         return;
       }
       const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
@@ -835,10 +861,10 @@ export default function VideoPlayer({
         const requested = startAds();
         if (requested) return;
       }
-      v.play();
+      safePlay(v);
       return;
     }
-    if (v.paused) v.play();
+    if (v.paused) safePlay(v);
     else v.pause();
     showControlsTemporarily();
   }, [adsEnabled, started, startAds, showControlsTemporarily, episode.adBreakSeconds, plan, runPod]);
@@ -975,9 +1001,27 @@ export default function VideoPlayer({
     setFillToast(next ? FILL_LABEL : FIT_LABEL);
   }, [fullscreen, coarse, fillScreen]);
 
+  // The player's width, for the end card's layout.
+  useEffect(() => {
+    const el = shellRef.current;
+    if (!el) return undefined;
+    const read = () => setShellWidth(el.getBoundingClientRect().width || 0);
+    read();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', read);
+      return () => window.removeEventListener('resize', read);
+    }
+    const ro = new ResizeObserver(read);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [isYouTube]);
+  const showEndCard = Boolean(endCard && endedSrc && endedSrc === episode.src && !adState);
+  const endCardLayout = shellWidth >= 1000 ? 'xl' : shellWidth >= 640 ? 'wide' : 'compact';
+
   const onKeyDown = useCallback(
     (e) => {
       if (adState) return; // controls are locked out during an ad
+      if (showEndCard) return; // the end card has the keys (components/EndCard.js)
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       switch (e.key) {
@@ -1018,7 +1062,7 @@ export default function VideoPlayer({
       }
       showControlsTemporarily();
     },
-    [adState, togglePlay, skip, changeVolume, volume, toggleMute, toggleFullscreen, showControlsTemporarily, textTracks, activeTrack, selectTextTrack]
+    [adState, showEndCard, togglePlay, skip, changeVolume, volume, toggleMute, toggleFullscreen, showControlsTemporarily, textTracks, activeTrack, selectTextTrack]
   );
 
   function setQuality(levelIndex) {
@@ -1055,7 +1099,7 @@ export default function VideoPlayer({
   return (
     <div
       ref={shellRef}
-      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''} ${fillScreen ? 'fill-screen' : ''} ${advisoryState === 'on' ? 'advisory-on' : ''}`}
+      className={`tp-player episode-player ${episode.contentType === 'vertical' ? 'is-vertical' : ''} ${controlsVisible || !playing ? 'controls-on' : ''} ${fullscreen ? 'is-fullscreen' : ''} ${fillScreen ? 'fill-screen' : ''} ${advisoryState === 'on' ? 'advisory-on' : ''} ${showEndCard ? 'endcard-on' : ''}`}
       onMouseMove={showControlsTemporarily}
       onTouchStart={showControlsTemporarily}
       onKeyDown={onKeyDown}
@@ -1088,6 +1132,7 @@ export default function VideoPlayer({
         onDoubleClick={toggleFill}
         onEnded={(e) => {
           setPlaying(false);
+          setEndedSrc(episode.src || null);
           if (onProgress) onProgress(e.target.duration, e.target.duration);
           if (onEnded) onEnded(e);
         }}
@@ -1164,6 +1209,17 @@ export default function VideoPlayer({
       )}
 
       <ContentAdvisory info={advisoryInfo} state={advisoryState} onDismiss={dismissAdvisory} />
+
+      {/* The end card (components/EndCard.js) over the last frame; the
+          chrome below is hidden under it (.endcard-on). */}
+      {showEndCard && (
+        <EndCard
+          card={endCard}
+          layout={endCardLayout}
+          onGo={(href, target) => { if (onEndCardGo) onEndCardGo(href, target); }}
+          onStay={() => { setEndedSrc(null); showControlsTemporarily(); }}
+        />
+      )}
 
       {started && !adState && fullscreen && (
         <div className="tp-fs-top" onMouseEnter={handleControlsMouseEnter} onMouseLeave={handleControlsMouseLeave}>

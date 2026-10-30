@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -17,6 +17,7 @@ import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { episodeCode } from '../../lib/seriesResume';
+import { endCardFor } from '../../lib/endCardRules';
 import TopNav from '../../components/TopNav';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
 import EpisodePlayer from '../../components/EpisodePlayer';
@@ -104,7 +105,9 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // landing view (trailer or artwork, title, Play / Save / Back this
 // project, the full Own-this-title card) unless reached with ?autoplay=1
 // (a Play button) or ?trailer=1; series episodes start playing straight
-// away, as on the site. Finishing a series episode moves on to the next.
+// away, as on the site. When a title plays out the end card comes up over
+// the last frame (components/EndCard.js): the next episode with a
+// ten-second timer, or one pick once the show is over.
 //
 // Signed-in viewers resume where they left off and their progress is
 // saved (lib/useWatchProgress.js), like the website. Not on mobile yet:
@@ -211,18 +214,32 @@ export default function Episode() {
     return () => sub.remove();
   }, [player]);
 
+  // The end card once the title plays out (mobile/src/lib/endCardRules.js,
+  // drawn by components/EndCard.js inside the player; Jose, 2026-10-30):
+  // the next episode with a ten-second timer, or the pick once the show
+  // is over. `endedSrc` is the src that played out — a trailer's end never
+  // raises the card over the episode that follows it, and play clears it.
+  const [endedSrc, setEndedSrc] = useState(null);
+  const endCard = useMemo(() => {
+    const p = state.page;
+    if (!p || !p.episode) return null;
+    return endCardFor({ episode: p.episode, nextEpisode: p.nextEpisode, pick: p.afterShow, seriesName: p.parentSeriesName, trailer: showingTrailer });
+  }, [state.page, showingTrailer]);
   useEffect(() => {
     if (!player) return undefined;
-    const sub = player.addListener('playToEnd', async () => {
+    const sub = player.addListener('playToEnd', () => {
       if (showingTrailer) { setShowingTrailer(false); return; }
-      // (The "Liked it? Tip …" end card is gone since 2026-10-30 — the
-      // Tip lives in the player's chrome only — so a series goes straight
-      // on to the next episode.)
-      const next = state.page && state.page.nextEpisode;
-      if (episode && episode.contentType === 'series' && next) router.replace(`/episode/${next.id}?autoplay=1`);
+      setEndedSrc(activeSrc || null);
     });
     return () => sub.remove();
-  }, [player, showingTrailer, state.page]);
+  }, [player, showingTrailer, activeSrc]);
+  useEffect(() => { if (isPlaying) setEndedSrc(null); }, [isPlaying]);
+  const endCardProps = endCard && endedSrc && endedSrc === activeSrc ? {
+    card: endCard,
+    onGo: (target) => { if (target) router.replace(`/episode/${target.id}?autoplay=1`); },
+    onBack: () => router.replace(endCard.back && endCard.back.seriesId ? `/series/${endCard.back.seriesId}` : '/stream'),
+    onStay: () => setEndedSrc(null)
+  } : null;
 
   function goBack() {
     if (router.canGoBack()) { router.back(); return; }
@@ -415,6 +432,7 @@ export default function Episode() {
                 onNext={upNext ? () => router.replace(`/episode/${upNext.id}?autoplay=1`) : null}
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
                 resumeSeconds={showingTrailer ? 0 : resumeSeconds}
+                endCard={endCardProps}
                 topRight={!showingTrailer ? (
                   <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
                     Tip {tipFirstName}

@@ -11465,3 +11465,104 @@ a.prod-day:hover { background: var(--surface-3); }
   .tp-player.is-fullscreen .tp-fs-play { width: clamp(82px, 21vmin, 122px); height: clamp(82px, 21vmin, 122px); }
   .tp-player.is-fullscreen .tp-fs-play svg { width: clamp(36px, 9.2vmin, 54px); height: clamp(36px, 9.2vmin, 54px); }
 }
+
+/* ---- The end card (components/EndCard.js; Jose, 2026-10-30, the end-card
+   boards on the After Play canvas): over the last frame once a title
+   plays out — what just ended top-left, × top-right (stay), the next
+   episode or the pick in the middle with the countdown ring on its art,
+   PLAY NOW bottom-left, a quiet Back link bottom-right. Three layouts by
+   the player's width (VideoPlayer measures it): compact under 640px (a
+   phone's inline strip), wide from 640px (full screen sideways, a
+   tablet), xl from 1000px (a laptop's inline player). Every size is a
+   custom property so full screen on a touch screen can grow them with
+   the rest of the chrome (the pointer: coarse block below). ---- */
+.tp-endcard {
+  --ec-gutter: 14px; --ec-stay: 32px; --ec-stay-top: 10px; --ec-art-w: 150px; --ec-ring: 44px; --ec-ring-stroke: 3; --ec-gap: 14px;
+  --ec-kicker: 9.5px; --ec-title: 17px; --ec-meta: 10px; --ec-in: 10.5px; --ec-btn: 36px; --ec-btn-text: 11px; --ec-back: 32px; --ec-back-text: 10px;
+  --ec-hk: 11px; --ec-ht: 16px;
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  background: rgba(5, 8, 14, 0.66);
+  color: var(--ink);
+  font-family: var(--font-display);
+}
+.tp-endcard.wide { --ec-gutter: 22px; --ec-stay: 44px; --ec-stay-top: 18px; --ec-art-w: 280px; --ec-ring: 72px; --ec-ring-stroke: 4; --ec-gap: 28px; --ec-kicker: 11.5px; --ec-title: 28px; --ec-meta: 12px; --ec-in: 13px; --ec-btn: 46px; --ec-btn-text: 12.5px; --ec-back: 44px; --ec-back-text: 12px; }
+.tp-endcard.xl { --ec-gutter: 28px; --ec-stay: 48px; --ec-stay-top: 22px; --ec-art-w: 360px; --ec-ring: 84px; --ec-ring-stroke: 4; --ec-gap: 34px; --ec-kicker: 12.5px; --ec-title: 32px; --ec-meta: 13px; --ec-in: 14px; --ec-btn: 50px; --ec-btn-text: 13px; --ec-back: 46px; --ec-back-text: 12.5px; --ec-hk: 12px; --ec-ht: 18px; }
+.tp-endcard-headline { display: none; position: absolute; left: var(--ec-gutter); top: calc(var(--ec-stay-top) + 2px); max-width: calc(100% - var(--ec-gutter) * 2 - var(--ec-stay) - 12px); flex-direction: column; gap: 4px; }
+.tp-endcard.wide .tp-endcard-headline, .tp-endcard.xl .tp-endcard-headline { display: flex; }
+.tp-endcard-hk { font-family: var(--font-mono); font-size: var(--ec-hk); letter-spacing: 0.14em; text-transform: uppercase; color: var(--ink-dim); }
+.tp-endcard.kind-show .tp-endcard-hk, .tp-endcard.kind-season .tp-endcard-hk { color: var(--olive); }
+.tp-endcard-ht { font-size: var(--ec-ht); font-weight: 500; color: var(--ink-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tp-endcard-stay {
+  position: absolute; right: var(--ec-gutter); top: var(--ec-stay-top);
+  width: var(--ec-stay); height: var(--ec-stay); padding: 0;
+  border-radius: 999px; border: 1px solid rgba(251, 232, 211, 0.45); background: rgba(12, 19, 31, 0.45); color: var(--ink);
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.tp-endcard-stay svg { width: calc(var(--ec-stay) * 0.42); height: calc(var(--ec-stay) * 0.42); }
+.tp-endcard-main {
+  position: absolute; left: var(--ec-gutter); right: calc(var(--ec-gutter) + var(--ec-stay) + 8px); top: 48%; transform: translateY(-50%);
+  display: flex; align-items: center; gap: var(--ec-gap); color: var(--ink); text-decoration: none;
+}
+.tp-endcard-main:hover { color: var(--ink); }
+.tp-endcard-art {
+  position: relative; width: var(--ec-art-w); max-width: 48%; aspect-ratio: 16 / 9; flex: 0 0 auto;
+  border-radius: 8px; overflow: hidden;
+  background: linear-gradient(160deg, #3a2f55 0%, #1c2a44 60%, #0d1422 100%) center / cover no-repeat;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+}
+.tp-endcard-ring {
+  position: absolute; left: 50%; top: 50%; width: var(--ec-ring); height: var(--ec-ring); transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-size: calc(var(--ec-ring) / 3); font-weight: 600; color: var(--ink);
+}
+.tp-endcard-ring svg { position: absolute; inset: 0; width: 100%; height: 100%; transform: rotate(-90deg); }
+.tp-endcard-ring-track { fill: rgba(12, 19, 31, 0.6); stroke: rgba(251, 232, 211, 0.28); stroke-width: var(--ec-ring-stroke); }
+.tp-endcard-ring-fill { fill: none; stroke: var(--brass); stroke-width: var(--ec-ring-stroke); stroke-linecap: round; transition: stroke-dashoffset 1s linear; }
+.tp-endcard-count { position: relative; }
+.tp-endcard-tier { display: none; position: absolute; left: 10px; bottom: 10px; padding: 4px 9px; border-radius: 999px; background: rgba(var(--olive-rgb), 0.22); color: var(--ink); font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+.tp-endcard-tier.premium { background: rgba(var(--brass-rgb), 0.25); }
+.tp-endcard.wide .tp-endcard-tier, .tp-endcard.xl .tp-endcard-tier { display: inline-block; }
+.tp-endcard-text { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.tp-endcard.wide .tp-endcard-text, .tp-endcard.xl .tp-endcard-text { gap: 6px; }
+.tp-endcard-kicker { font-family: var(--font-mono); font-size: var(--ec-kicker); letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+.tp-endcard-title { font-size: var(--ec-title); font-weight: 600; line-height: 1.12; letter-spacing: -0.01em; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tp-endcard-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; font-family: var(--font-mono); font-size: var(--ec-meta); letter-spacing: 0.05em; color: var(--ink-dim); }
+.tp-endcard-rating { padding: 2px 6px; border: 1px solid rgba(202, 181, 158, 0.7); border-radius: 3px; font-size: 0.9em; }
+.tp-endcard-in { margin-top: 4px; font-family: var(--font-mono); font-size: var(--ec-in); letter-spacing: 0.05em; color: var(--ink); }
+.tp-endcard-play {
+  position: absolute; left: var(--ec-gutter); bottom: var(--ec-gutter);
+  height: var(--ec-btn); padding: 0 calc(var(--ec-btn) * 0.42) 0 calc(var(--ec-btn) * 0.38);
+  border-radius: 999px; background: var(--brass); color: #241a05;
+  font-family: var(--font-mono); font-size: var(--ec-btn-text); font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 8px; text-decoration: none; white-space: nowrap;
+}
+.tp-endcard-play:hover { color: #241a05; filter: brightness(1.06); }
+.tp-endcard-play svg { width: calc(var(--ec-btn) * 0.36); height: calc(var(--ec-btn) * 0.36); }
+.tp-endcard-back {
+  position: absolute; right: var(--ec-gutter); bottom: var(--ec-gutter);
+  height: var(--ec-back); padding: 0 calc(var(--ec-back) * 0.36); max-width: 46%; box-sizing: border-box;
+  border: 1px solid rgba(251, 232, 211, 0.4); border-radius: 999px; background: rgba(12, 19, 31, 0.55); color: var(--ink);
+  font-family: var(--font-mono); font-size: var(--ec-back-text); letter-spacing: 0.08em; text-transform: uppercase;
+  display: inline-flex; align-items: center; gap: 6px; text-decoration: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.tp-endcard-back:hover { color: var(--ink); border-color: rgba(251, 232, 211, 0.7); }
+.tp-endcard-back svg { flex: 0 0 auto; }
+/* The player's chrome stays hidden under the card, and so does the content
+   advisory (a very short title can end while it is still up; it showed
+   through the card's translucent backdrop). */
+.tp-player.endcard-on .tp-controls, .tp-player.endcard-on:focus-within .tp-controls,
+.tp-player.endcard-on .tp-fs-top, .tp-player.endcard-on:focus-within .tp-fs-top,
+.tp-player.endcard-on .tp-fs-center, .tp-player.endcard-on:focus-within .tp-fs-center,
+.tp-player.endcard-on .tp-advisory, .tp-player.endcard-on .tp-bigplay { opacity: 0; pointer-events: none; }
+@media (prefers-reduced-motion: reduce) { .tp-endcard-ring-fill { transition: none; } }
+@media (pointer: coarse) {
+  .tp-player.is-fullscreen .tp-endcard.wide, .tp-player.is-fullscreen .tp-endcard.xl {
+    --ec-gutter: clamp(22px, 5.7vmin, 34px); --ec-stay: clamp(44px, 11.3vmin, 66px); --ec-stay-top: clamp(18px, 4.6vmin, 28px);
+    --ec-art-w: clamp(280px, 72vmin, 420px); --ec-ring: clamp(72px, 18.5vmin, 108px); --ec-gap: clamp(28px, 7.2vmin, 42px);
+    --ec-kicker: clamp(11.5px, 2.95vmin, 17px); --ec-title: clamp(28px, 7.2vmin, 42px); --ec-meta: clamp(12px, 3.1vmin, 18px); --ec-in: clamp(13px, 3.3vmin, 19px);
+    --ec-btn: clamp(46px, 11.8vmin, 68px); --ec-btn-text: clamp(12.5px, 3.2vmin, 18px); --ec-back: clamp(44px, 11.3vmin, 66px); --ec-back-text: clamp(12px, 3.1vmin, 17px);
+    --ec-hk: clamp(11px, 2.8vmin, 16px); --ec-ht: clamp(16px, 4.1vmin, 24px);
+  }
+}
