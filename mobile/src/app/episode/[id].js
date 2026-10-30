@@ -412,7 +412,7 @@ export default function Episode() {
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
                 resumeSeconds={showingTrailer ? 0 : resumeSeconds}
                 topRight={!showingTrailer ? (
-                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={styles.fsTip} textStyle={styles.fsTipText} iconSize={12}>
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={styles.fsTip} textStyle={styles.fsTipText} iconSize={14}>
                     Tip {tipFirstName}
                   </TipButton>
                 ) : null}
@@ -666,8 +666,8 @@ const styles = StyleSheet.create({
   noteBtnText: { fontFamily: fonts.body, fontSize: 13, color: colors.ink },
 
   // The full-screen Tip pill (components/EpisodePlayer.js topRight).
-  fsTip: { height: 30, paddingHorizontal: 11, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(242,193,78,0.7)', backgroundColor: 'rgba(12,19,31,0.55)' },
-  fsTipText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: colors.olive },
+  fsTip: { height: 36, paddingHorizontal: 14, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(242,193,78,0.7)', backgroundColor: 'rgba(12,19,31,0.55)' },
+  fsTipText: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1, textTransform: 'uppercase', color: colors.olive },
 
   // age-restricted (.account-card)
   restrictedWrap: { padding: 19, paddingTop: 40 },

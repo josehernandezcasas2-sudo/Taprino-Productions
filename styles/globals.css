@@ -11408,3 +11408,34 @@ a.prod-day:hover { background: var(--surface-3); }
 /* The episode player's wrapper: the "Resumed from" toast is positioned
    against it (it was .tip-end-wrap until the end card went, 2026-10-30). */
 .ep-player-wrap { position: relative; }
+
+/* Full screen on a touch screen (Jose, 2026-10-30, on the after-Play
+   canvas's Theatre board: "check mobile for how big this is, it looks
+   like it could be bigger"): the chrome grows by about a third — the
+   bar's text and pills, the scrubber and its thumb, the round buttons —
+   so a phone turned sideways reads like the board, not like a laptop's
+   bar shrunk. A laptop (a fine pointer) keeps the sizes above. */
+@media (pointer: coarse) {
+  .tp-player.is-fullscreen .tp-controls { padding: 2.6rem 1.1rem 1rem; }
+  .tp-player.is-fullscreen .tp-scrub { height: 32px; }
+  .tp-player.is-fullscreen .tp-track { height: 5px; border-radius: 3px; }
+  .tp-player.is-fullscreen .tp-range { height: 32px; }
+  .tp-player.is-fullscreen .tp-range::-webkit-slider-thumb { width: 18px; height: 18px; }
+  .tp-player.is-fullscreen .tp-range::-moz-range-thumb { width: 18px; height: 18px; }
+  .tp-player.is-fullscreen .tp-range::-webkit-slider-runnable-track { height: 18px; }
+  .tp-player.is-fullscreen .tp-time { font-size: 1rem; margin-left: 0.6rem; }
+  .tp-player.is-fullscreen .tp-btn { min-width: 46px; height: 46px; }
+  .tp-player.is-fullscreen .tp-btn svg { width: 20px; height: 20px; }
+  .tp-player.is-fullscreen .tp-skip-label { font-size: 0.74rem; }
+  .tp-player.is-fullscreen .tp-next { height: 44px; padding: 0 1rem; font-size: 0.76rem; margin-left: 0.9rem; }
+  .tp-player.is-fullscreen .tp-fs-top { padding: 1.1rem 1.4rem 2.6rem; gap: 1rem; }
+  .tp-player.is-fullscreen .tp-fs-exit { width: 44px; height: 44px; }
+  .tp-player.is-fullscreen .tp-fs-exit svg { width: 20px; height: 20px; }
+  .tp-player.is-fullscreen .tp-fs-kicker { font-size: 0.72rem; }
+  .tp-player.is-fullscreen .tp-fs-title { font-size: 1.25rem; }
+  .tp-player.is-fullscreen .tp-fs-rating { font-size: 0.78rem; padding: 0.2rem 0.55rem; }
+  .tp-player.is-fullscreen .tp-fs-tip { height: 36px; padding: 0 0.9rem; font-size: 0.74rem; }
+  .tp-player.is-fullscreen .tp-fs-skip { width: 56px; height: 56px; font-size: 0.86rem; }
+  .tp-player.is-fullscreen .tp-fs-play { width: 82px; height: 82px; }
+  .tp-player.is-fullscreen .tp-fs-play svg { width: 36px; height: 36px; }
+}

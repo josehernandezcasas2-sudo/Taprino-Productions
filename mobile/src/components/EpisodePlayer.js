@@ -212,7 +212,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
           <>
             {full ? (
               <View style={styles.top} pointerEvents="box-none">
-                <Pressable style={styles.round} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
+                <Pressable style={[styles.round, styles.roundFull]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
                   <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
                 </Pressable>
                 <View style={{ flex: 1, minWidth: 0 }}>
@@ -225,38 +225,38 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
             ) : null}
             <View style={styles.center} pointerEvents="box-none">
               <Pressable style={[styles.skip, full && styles.skipFull]} onPress={() => skip(-SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Back 10 seconds" hitSlop={8}>
-                <Text style={styles.skipText}>−10</Text>
+                <Text style={[styles.skipText, full && styles.skipTextFull]}>−10</Text>
               </Pressable>
               <Pressable style={[styles.play, full && styles.playFull]} onPress={togglePlay} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={8}>
-                <PlayGlyph playing={playing} size={full ? 30 : 22} />
+                <PlayGlyph playing={playing} size={full ? 34 : 22} />
               </Pressable>
               <Pressable style={[styles.skip, full && styles.skipFull]} onPress={() => skip(SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Forward 10 seconds" hitSlop={8}>
-                <Text style={styles.skipText}>+10</Text>
+                <Text style={[styles.skipText, full && styles.skipTextFull]}>+10</Text>
               </Pressable>
             </View>
             <View style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
               <View
-                style={styles.trackHit}
+                style={[styles.trackHit, full && styles.trackHitFull]}
                 onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
                 {...pan.panHandlers}
                 accessibilityRole="adjustable"
                 accessibilityLabel="Seek"
                 accessibilityValue={{ text: `${clock(shownTime)} of ${clock(duration)}` }}
               >
-                <View style={styles.track} pointerEvents="none">
-                  <View style={[styles.trackFill, { width: `${progress * 100}%` }]} />
-                  <View style={[styles.thumb, { left: `${progress * 100}%` }]} />
+                <View style={[styles.track, full && styles.trackFull]} pointerEvents="none">
+                  <View style={[styles.trackFill, full && styles.trackFillFull, { width: `${progress * 100}%` }]} />
+                  <View style={[styles.thumb, full && styles.thumbFull, { left: `${progress * 100}%` }]} />
                 </View>
               </View>
               <View style={styles.row}>
-                <Text style={styles.time}>{clock(shownTime)} <Text style={styles.timeDim}>/ {clock(duration)}</Text></Text>
+                <Text style={[styles.time, full && styles.timeFull]}>{clock(shownTime)} <Text style={styles.timeDim}>/ {clock(duration)}</Text></Text>
                 {full && onNext ? (
                   <Pressable style={styles.next} onPress={onNext} accessibilityRole="button">
                     <Text style={styles.nextText} numberOfLines={1}>{nextLabel}</Text><NextGlyph />
                   </Pressable>
                 ) : null}
                 <View style={{ flex: 1 }} />
-                <Pressable style={styles.round} onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} accessibilityRole="button" accessibilityLabel={full ? 'Leave full screen' : 'Full screen'} hitSlop={8}>
+                <Pressable style={[styles.round, full && styles.roundFull]} onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} accessibilityRole="button" accessibilityLabel={full ? 'Leave full screen' : 'Full screen'} hitSlop={8}>
                   <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
                   </Svg>
@@ -315,22 +315,33 @@ const styles = StyleSheet.create({
   toast: { position: 'absolute', top: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: 'rgba(12,19,31,0.8)', borderRadius: 999, paddingVertical: 5, paddingHorizontal: 9 },
   toastText: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.6, color: colors.ink },
 
-  top: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 18, paddingTop: 14 },
+  // Full screen only (the phone turned sideways): sized up on 2026-10-30
+  // (Jose, the Theatre board: "it could be bigger on mobile") — the
+  // kicker, title, rating, the Next pill, the round buttons, the
+  // scrubber and the time all grow by about a third.
+  top: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingTop: 16 },
+  roundFull: { width: 44, height: 44, borderRadius: 22 },
   round: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: 'rgba(251,232,211,0.45)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
-  kicker: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.brass },
-  title: { fontFamily: fonts.displaySemi, fontSize: 18, color: colors.ink },
-  ratingBox: { paddingVertical: 2, paddingHorizontal: 6, borderWidth: 1, borderColor: 'rgba(251,232,211,0.75)', borderRadius: 3 },
-  ratingText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, color: colors.ink },
+  kicker: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.brass },
+  title: { fontFamily: fonts.displaySemi, fontSize: 20, color: colors.ink },
+  ratingBox: { paddingVertical: 3, paddingHorizontal: 7, borderWidth: 1, borderColor: 'rgba(251,232,211,0.75)', borderRadius: 3 },
+  ratingText: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1, color: colors.ink },
 
   center: { position: 'absolute', left: 0, right: 0, top: '50%', marginTop: -27, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30 },
   skip: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: 'rgba(251,232,211,0.45)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
-  skipFull: { width: 48, height: 48, borderRadius: 24 },
+  skipFull: { width: 54, height: 54, borderRadius: 27 },
+  skipTextFull: { fontSize: 12 },
   skipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.ink },
   play: { width: 54, height: 54, borderRadius: 27, borderWidth: 1.5, borderColor: 'rgba(251,232,211,0.75)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
-  playFull: { width: 72, height: 72, borderRadius: 36 },
+  playFull: { width: 80, height: 80, borderRadius: 40 },
 
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingBottom: 6 },
-  barFull: { paddingHorizontal: 22, paddingBottom: 12 },
+  barFull: { paddingHorizontal: 22, paddingBottom: 16 },
+  trackHitFull: { paddingVertical: 12 },
+  trackFull: { height: 5, borderRadius: 3 },
+  trackFillFull: { height: 5, borderRadius: 3 },
+  thumbFull: { top: -5, marginLeft: -8, width: 16, height: 16, borderRadius: 8 },
+  timeFull: { fontSize: 15.5 },
   trackHit: { paddingVertical: 10, justifyContent: 'center' },
   track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.28)' },
   trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },
@@ -338,6 +349,6 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   time: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.ink },
   timeDim: { color: colors.inkDim },
-  next: { height: 32, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.4)', backgroundColor: bubble, flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
-  nextText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1, textTransform: 'uppercase', color: colors.ink }
+  next: { height: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.4)', backgroundColor: bubble, flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
+  nextText: { fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.ink }
 });
