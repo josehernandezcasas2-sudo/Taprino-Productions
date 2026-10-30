@@ -1,6 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
 import { VideoView } from 'expo-video';
 import { StatusBar } from 'expo-status-bar';
@@ -8,7 +7,7 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
-import { useFullscreenChrome, FULLSCREEN_EDGES } from '../lib/fullscreenChrome';
+import { FullscreenChrome } from '../lib/fullscreenChrome';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -17,13 +16,16 @@ const DOUBLE_TAP_MS = 300;
 // The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
 // Jose, 2026-10-30: the controls run to the screen's edges and grow with
 // the device). Every number is the phone's, drawn for a 390pt short side
-// and scaled by `s`; `gutter` is the distance from the screen's edge.
+// and scaled by `s`. The overlay itself covers the whole screen; the top
+// row and the bar add the screen's own insets (the notch upright, the
+// home indicator at the bottom) and the side gutter to their padding.
 // Sized up on 2026-10-30 (Jose, the Theatre board: "it could be bigger
 // on mobile") — the kicker, title, rating, the Next pill, the round
 // buttons, the scrubber and the time all grew by about a third.
-function fullChrome(s, gutter) {
+function fullChrome(c) {
+  const { s } = c;
   return {
-    top: { gap: s(14), paddingHorizontal: gutter, paddingTop: s(16) },
+    top: { gap: s(14), paddingLeft: c.padLeft, paddingRight: c.padRight, paddingTop: s(16) + c.padTop },
     round: { width: s(44), height: s(44), borderRadius: s(22) },
     closeIcon: s(18),
     kicker: { fontSize: s(11.5), letterSpacing: s(1.6) },
@@ -35,7 +37,7 @@ function fullChrome(s, gutter) {
     skipText: { fontSize: s(12) },
     play: { width: s(80), height: s(80), borderRadius: s(40) },
     playGlyph: s(34),
-    bar: { paddingHorizontal: gutter, paddingBottom: s(16) },
+    bar: { paddingLeft: c.padLeft, paddingRight: c.padRight, paddingBottom: s(8) + c.padBottom },
     trackHit: { paddingVertical: s(12) },
     track: { height: s(5), borderRadius: 3 },
     thumb: { top: -s(5), marginLeft: -s(8), width: s(16), height: s(16), borderRadius: s(8) },
@@ -44,7 +46,7 @@ function fullChrome(s, gutter) {
     nextText: { fontSize: s(12) },
     nextGlyph: s(13),
     fsIcon: s(20),
-    fillToastWrap: { top: s(78) },
+    fillToastWrap: { top: s(78) + c.padTop },
     fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
     fillToastText: { fontSize: s(11.5) }
   };
@@ -115,8 +117,6 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const { fill, toggle: toggleFill } = useScreenFill(player);
   const [fillToast, setFillToast] = useState(null);
   const lastTap = useRef(0);
-  const chrome = useFullscreenChrome();
-  const F = useMemo(() => fullChrome(chrome.s, chrome.gutter), [chrome]);
   const hideTimer = useRef(null);
   const fullscreenRef = useRef(false);
   const autoRotate = useRef(true);
@@ -268,7 +268,9 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const shownTime = scrubbing != null ? scrubbing : currentTime;
   const progress = duration ? Math.min(1, shownTime / duration) : 0;
 
-  function renderOverlay(full) {
+  // `F` is the full-screen chrome from fullChrome() (null inline), handed
+  // in by the full-screen frame so its insets are the Modal's own.
+  function renderOverlay(full, F) {
     return (
       <>
         {/* A tap anywhere brings the controls back (or hides them). */}
@@ -353,7 +355,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
         ) : (
           <>
             <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />
-            {renderOverlay(false)}
+            {renderOverlay(false, null)}
           </>
         )}
       </View>
@@ -369,11 +371,10 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
         <StatusBar hidden />
         <View style={styles.fullRoot}>
           {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
-          <SafeAreaView style={absoluteFill} edges={FULLSCREEN_EDGES} pointerEvents="box-none">
-            <View style={{ flex: 1 }} pointerEvents="box-none">
-              {renderOverlay(true)}
-            </View>
-          </SafeAreaView>
+          {/* The whole screen, never a SafeAreaView: the advisory and the
+              toasts cover the picture edge to edge; the rows add the
+              Modal's own insets to their padding (fullChrome above). */}
+          <FullscreenChrome>{(c) => renderOverlay(true, fullChrome(c))}</FullscreenChrome>
         </View>
       </Modal>
     </View>

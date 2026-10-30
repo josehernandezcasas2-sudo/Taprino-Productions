@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -15,26 +14,29 @@ import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 import { useCaptureBlock } from '../lib/captureBlock';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
-import { useFullscreenChrome, FULLSCREEN_EDGES } from '../lib/fullscreenChrome';
+import { FullscreenChrome } from '../lib/fullscreenChrome';
 
 // The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
 // Jose, 2026-10-30: the controls run to the screen's edges and grow with
-// the device): the phone's numbers scaled by `s`, `gutter` from the edge.
-function fullChrome(s, gutter) {
+// the device): the phone's numbers scaled by `s`. The overlay covers the
+// whole screen; the rows add the screen's insets (the notch upright, the
+// home indicator at the bottom) and the side gutter to their own padding.
+function fullChrome(c) {
+  const { s } = c;
   return {
-    exit: { top: s(10), left: gutter, width: s(44), height: s(44), borderRadius: s(22) },
+    exit: { top: s(10) + c.padTop, left: c.padLeft, width: s(44), height: s(44), borderRadius: s(22) },
     exitIcon: s(22),
-    badge: { top: s(16), left: gutter + s(44) + s(10), paddingVertical: s(5), paddingHorizontal: s(10) },
+    badge: { top: s(16) + c.padTop, left: c.padLeft + s(44) + s(10), paddingVertical: s(5), paddingHorizontal: s(10) },
     badgeText: { fontSize: s(10.5) },
-    bar: { paddingHorizontal: gutter, paddingBottom: s(14) },
+    bar: { paddingLeft: c.padLeft, paddingRight: c.padRight, paddingBottom: s(8) + c.padBottom },
     track: { height: s(4), borderRadius: 2 },
     btn: { width: s(44), height: s(44), borderRadius: s(22) },
     icon: s(22),
     playIcon: s(28),
     pill: { paddingVertical: s(9), paddingHorizontal: s(14) },
     timeLeft: { fontSize: s(12.5) },
-    menu: { right: gutter, bottom: s(70) },
-    fillToastWrap: { top: s(78) },
+    menu: { right: c.padRight, bottom: s(72) + c.padBottom },
+    fillToastWrap: { top: s(78) + c.padTop },
     fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
     fillToastText: { fontSize: s(11.5) }
   };
@@ -127,8 +129,6 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const { fill, toggle: toggleFill } = useScreenFill(player);
   const [fillToast, setFillToast] = useState(null);
   const lastTap = useRef(0);
-  const chrome = useFullscreenChrome();
-  const F = useMemo(() => fullChrome(chrome.s, chrome.gutter), [chrome]);
   useEffect(() => {
     if (!fillToast) return undefined;
     const t = setTimeout(() => setFillToast(null), 1600);
@@ -482,7 +482,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
 
   // One overlay for both the inline player and fullscreen (a render
   // function, not a component, so it isn't remounted on every render).
-  function renderOverlay(full) {
+  // `F` is the full-screen chrome from fullChrome() (null inline), handed
+  // in by the full-screen frame so its insets are the Modal's own.
+  function renderOverlay(full, F) {
     return (
       <>
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
@@ -612,7 +614,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         ) : (
           <>
             <VideoView player={player} style={absoluteFill} contentFit="contain" nativeControls={false} />
-            {renderOverlay(false)}
+            {renderOverlay(false, null)}
           </>
         )}
       </View>
@@ -628,11 +630,10 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         <StatusBar hidden />
         <View style={styles.fullRoot}>
           {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
-          <SafeAreaView style={absoluteFill} edges={FULLSCREEN_EDGES} pointerEvents="box-none">
-            <View style={styles.fullInner} pointerEvents="box-none">
-              {renderOverlay(true)}
-            </View>
-          </SafeAreaView>
+          {/* The whole screen, never a SafeAreaView: the cards and the
+              toast cover the picture edge to edge; the rows add the
+              Modal's own insets to their padding (fullChrome above). */}
+          <FullscreenChrome>{(c) => renderOverlay(true, fullChrome(c))}</FullscreenChrome>
         </View>
       </Modal>
     </View>
@@ -643,7 +644,6 @@ const styles = StyleSheet.create({
   frame: { aspectRatio: 16 / 9, width: '100%', backgroundColor: '#000', borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: colors.oceanInk },
   elsewhere: { ...absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface0 },
   fullRoot: { flex: 1, backgroundColor: '#000' },
-  fullInner: { flex: 1 },
   badge: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,11,15,0.7)', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999 },
   // Full screen sizes come from fullChrome() above, scaled to the device.
   // "Filling the screen" / "Whole picture" after a double tap (EpisodePlayer's twin).
