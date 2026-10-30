@@ -83,6 +83,19 @@ export default function SiteSettingsPanel() {
     }
   }
 
+  // One or two fields on their own (the API only touches what it receives),
+  // for the switches that save the moment they change.
+  async function saveFields(body) {
+    const res = await fetch('/api/admin/site-settings', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Could not save.');
+    await loadSiteSettings();
+  }
+
   function readAsDataUrl(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -319,7 +332,7 @@ export default function SiteSettingsPanel() {
         </a>
       </div>
 
-      <ProtectionCard />
+      <ProtectionCard settings={siteSettings} onSaveFields={saveFields} />
 
       <div className="account-card">
         <div className="account-eyebrow">Quick links</div>
@@ -356,7 +369,7 @@ export default function SiteSettingsPanel() {
 // bucket (lib/universityDocs.js), and a Snippet's photo and cover are a
 // capped copy in the private bucket served by /api/posts/<id>/media
 // (lib/posts.js, 2026-10-29). Each button is safe to press again.
-function ProtectionCard() {
+function ProtectionCard({ settings, onSaveFields }) {
   const dim = { fontSize: '0.8rem', color: 'var(--ink-dim)' };
   return (
     <div className="account-card" data-testid="protection-card">
@@ -364,6 +377,7 @@ function ProtectionCard() {
       <p style={{ ...dim, marginBottom: '0.75rem' }}>
         Creators&rsquo; work stays off permanent public URLs: videos play through short-lived signed links, captions and Snippet photos through gated routes, course files through one-hour links. New uploads are handled as they land; these buttons bring what was uploaded before in line, and can be pressed again any time.
       </p>
+      <CaptureSwitch settings={settings} onSaveFields={onSaveFields} />
       <ProtectionAction
         label="Protect every video"
         busyLabel="Protecting…"
@@ -421,6 +435,52 @@ function ProtectionCard() {
           </>
         )}
       />
+    </div>
+  );
+}
+
+// The app's screenshot block (mobile/src/lib/captureBlock.js; migration
+// 115, site_settings.screen_capture_block). Saves the moment it changes,
+// on its own, so a database without the column fails only this save.
+// Jose, 2026-10-30: off while he grabs screenshots of the app for a
+// design round, back on after. SCREEN_CAPTURE_BLOCK=off in Vercel keeps
+// the block off whatever this says; the row says so when it is set.
+function CaptureSwitch({ settings, onSaveFields }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const on = settings ? settings.screenCaptureBlock !== false : true;
+  const envOff = Boolean(settings && settings.screenCaptureEnvOff);
+
+  async function flip(next) {
+    setBusy(true);
+    setError(null);
+    try {
+      await onSaveFields({ screenCaptureBlock: next });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div style={{ borderTop: '1px solid var(--line)', paddingTop: '0.75rem', marginTop: '0.75rem' }} data-testid="capture-switch">
+      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="checkbox" checked={on} disabled={busy} onChange={(e) => flip(e.target.checked)} />
+        Block screenshots and screen recording in the app
+        <span style={{ fontSize: '0.74rem', fontWeight: 700, color: envOff || !on ? 'var(--warn)' : 'var(--brass)' }}>
+          {busy ? 'Saving…' : envOff ? 'Off (Vercel)' : on ? 'On' : 'Off for everyone'}
+        </span>
+      </label>
+      <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', margin: '0.5rem 0 0' }}>
+        On, a screenshot or recording of a playing title, Snippet, lesson video or self-tape comes out black in the app (Android also hides the app in the recents screen). Off, screenshots work everywhere, for everyone, until you turn it back on. An open app picks the change up within about a minute. Turn it off to grab screenshots for a design round, and back on after.
+      </p>
+      {envOff && (
+        <p style={{ fontSize: '0.8rem', color: 'var(--warn)', margin: '0.5rem 0 0' }}>
+          SCREEN_CAPTURE_BLOCK=off is set in Vercel, which keeps the block off whatever this switch says. Remove the variable there to hand control back to the switch.
+        </p>
+      )}
+      {error && <p style={{ color: 'var(--danger)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{error}</p>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 import * as ScreenCapture from 'expo-screen-capture';
-import { loadSettings } from '../components/TopNav';
+import { apiGet } from './api';
 
 // Screenshots and screen recording are off while a creator's work is
 // playing (Jose, 2026-10-25: a home whose work is not harvested). Android
@@ -13,14 +13,21 @@ import { loadSettings } from '../components/TopNav';
 // flag does not reach.
 //
 // One flag for the whole app: every playing screen holds a reference,
-// the block is on while any screen in focus holds one. The server can
-// switch it off for everyone (`captureBlock: false` from
-// /api/site-settings, SCREEN_CAPTURE_BLOCK=off in Vercel) in case the
-// block misbehaves on some phone.
+// the block is on while any screen in focus holds one. The server decides
+// whether it applies at all: `captureBlock` from /api/site-settings is the
+// switch on Admin → Settings → Protection (site_settings.screen_capture_block,
+// migration 115; Jose, 2026-10-30, so he can screenshot the app for a
+// design round) and the SCREEN_CAPTURE_BLOCK=off kill switch in Vercel.
+// The app asks again every half minute while something plays, with a
+// query string that steps round the route's CDN cache, so a flip in admin
+// reaches an open app within about a minute. Until the first answer the
+// block is on.
 const KEY = 'playback';
+const ASK_EVERY_MS = 30 * 1000;
 let holders = 0;
 let serverAllows = true;
-let settingsAsked = false;
+let lastAsked = 0;
+let asking = null;
 let applied = false;
 
 function apply() {
@@ -32,16 +39,17 @@ function apply() {
 }
 
 function askServer() {
-  if (settingsAsked) return;
-  settingsAsked = true;
-  loadSettings()
+  const now = Date.now();
+  if (asking || now - lastAsked < ASK_EVERY_MS) return;
+  lastAsked = now;
+  asking = apiGet(`/api/site-settings?t=${Math.floor(now / ASK_EVERY_MS)}`)
     .then((settings) => {
-      if (settings && settings.captureBlock === false) {
-        serverAllows = false;
-        apply();
-      }
+      if (!settings) return;
+      serverAllows = settings.captureBlock !== false;
+      apply();
     })
-    .catch(() => {});
+    .catch(() => {})
+    .finally(() => { asking = null; });
 }
 
 // `active`: true while this screen is actually playing something worth
@@ -58,7 +66,9 @@ export function useCaptureBlock(active) {
     holders += 1;
     askServer();
     apply();
+    const timer = setInterval(askServer, ASK_EVERY_MS);
     return () => {
+      clearInterval(timer);
       holders = Math.max(0, holders - 1);
       apply();
     };

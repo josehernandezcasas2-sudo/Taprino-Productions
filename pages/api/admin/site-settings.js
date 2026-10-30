@@ -30,7 +30,9 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
     const settings = await getSiteSettings();
-    return res.status(200).json(settings);
+    // The Protection card says so when the Vercel kill switch is holding
+    // the app's screenshot block off whatever the switch below says.
+    return res.status(200).json({ ...settings, screenCaptureEnvOff: process.env.SCREEN_CAPTURE_BLOCK === 'off' });
   }
 
   if (req.method !== 'POST') {
@@ -165,6 +167,11 @@ export default async function handler(req, res) {
     if (!Number.isFinite(pct) || pct < 0 || pct > 30) return res.status(400).json({ error: 'The crew pay fee has to be between 0% and 30%.' });
     updates.crew_pay_cut_percent = pct;
   }
+  // The app's screenshot block (migration 115): the Protection card's
+  // switch sends this field on its own, so a database without the column
+  // only ever fails that one save, with the column named.
+  const { screenCaptureBlock } = req.body || {};
+  if (screenCaptureBlock !== undefined) updates.screen_capture_block = !!screenCaptureBlock;
   if (connectLabel !== undefined) updates.connect_label = connectLabel && connectLabel.trim() ? connectLabel.trim() : 'Connect';
   if (streamLabel !== undefined) updates.stream_label = streamLabel && streamLabel.trim() ? streamLabel.trim() : 'Stream';
 
