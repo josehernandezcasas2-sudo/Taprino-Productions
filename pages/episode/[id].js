@@ -27,7 +27,7 @@ import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../compon
 import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
-import { TipButton, TipEndCard, TippedBanner, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
+import { TipButton, TippedBanner } from '../../components/TipSheet';
 import { AiSealChip } from '../../components/AiSeal';
 
 import Footer from '../../components/Footer';
@@ -248,7 +248,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const owned = Boolean(purchase && purchase.owned);
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
   // Tips: the end-of-episode card, once per title (components/TipSheet.js).
-  const [tipEndCard, setTipEndCard] = useState(false);
   // "Resumed from 5:00" over the player for a few seconds, once per title
   // (the "After Play" canvas, 2026-10-29; it used to be a card under it).
   const [resumeToast, setResumeToast] = useState(0);
@@ -395,15 +394,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       setShowingTrailer(false);
       return;
     }
-    // Tips: the first time a title plays out, the "Liked it? Tip …" card
-    // comes up over the player (never on trailers). In a series it counts
-    // down to the next episode, so autoplay still happens, ten seconds
-    // later; a title with no next episode just stops with the card up.
-    if (tipping && tipping.enabled && !tipEndCardSeen(episode.id)) {
-      markTipEndCardSeen(episode.id);
-      setTipEndCard(true);
-      return;
-    }
+    // (The "Liked it? Tip …" card that came up here from 2026-10-24 is
+    // gone since 2026-10-30 — Jose: the Tip belongs in the player's own
+    // chrome only — so a series goes straight on to the next episode.)
     // Autoplay now only ever continues within the SAME series — it used
     // to pick (currentIndex + 1) % allEpisodes.length across the entire
     // public catalog, which meant finishing any video could autoplay into
@@ -597,7 +590,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               </div>
             )
           ) : (
-            <div className="tip-end-wrap">
+            <div className="ep-player-wrap">
               <VideoPlayer
                 episode={playingEpisode}
                 // Ads follow the membership tier, not the title: Standard members
@@ -625,15 +618,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 <div className="ep-resume-toast" role="status">
                   <RestoreIcon size={12} /> Resumed from {Math.floor(resumeToast / 60)}:{String(Math.floor(resumeToast % 60)).padStart(2, '0')}
                 </div>
-              )}
-              {tipEndCard && (
-                <TipEndCard
-                  tipping={tipping}
-                  title={episode.title}
-                  isSignedIn={isSignedIn}
-                  onNext={episode.contentType === 'series' && nextEpisode ? goToNextEpisode : null}
-                  onClose={() => setTipEndCard(false)}
-                />
               )}
             </div>
           )}

@@ -22,7 +22,7 @@ import EpisodePlayer from '../../components/EpisodePlayer';
 import { CardRow, EpisodeStrip } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
 import { OwnTitleCard, OwnedChip, useBuy } from '../../components/BuyBits';
-import { TipButton, TipEndCard, TipGlyph, tipEndCardSeen, markTipEndCardSeen } from '../../components/TipSheet';
+import { TipButton, TipGlyph } from '../../components/TipSheet';
 import { AiSealChip } from '../../components/AiSeal';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
@@ -149,7 +149,6 @@ export default function Episode() {
   const owned = Boolean(purchase && purchase.owned);
   // Tips: the end-of-episode card, once per title (components/TipSheet.js).
   const tipping = state.page && state.page.tipping;
-  const [tipEndCard, setTipEndCard] = useState(false);
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => null), 4000),
     router,
@@ -212,14 +211,9 @@ export default function Episode() {
     if (!player) return undefined;
     const sub = player.addListener('playToEnd', async () => {
       if (showingTrailer) { setShowingTrailer(false); return; }
-      // Tips: the first time a title plays out, "Liked it? Tip …" comes up
-      // over the player; in a series it counts down to the next episode.
-      const t = state.page && state.page.tipping;
-      if (t && t.enabled && episode && !(await tipEndCardSeen(episode.id))) {
-        markTipEndCardSeen(episode.id);
-        setTipEndCard(true);
-        return;
-      }
+      // (The "Liked it? Tip …" end card is gone since 2026-10-30 — the
+      // Tip lives in the player's chrome only — so a series goes straight
+      // on to the next episode.)
       const next = state.page && state.page.nextEpisode;
       if (episode && episode.contentType === 'series' && next) router.replace(`/episode/${next.id}?autoplay=1`);
     });
@@ -424,18 +418,6 @@ export default function Episode() {
                 ) : null}
               >
                 <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
-                {tipEndCard && !showingTrailer ? (
-                  <TipEndCard
-                    tipping={tipping}
-                    title={episode.title}
-                    isSignedIn={Boolean(isSignedIn)}
-                    router={router}
-                    getToken={tokenFn}
-                    returnTo={returnTo}
-                    onNext={upNext ? () => router.replace(`/episode/${upNext.id}?autoplay=1`) : null}
-                    onClose={() => setTipEndCard(false)}
-                  />
-                ) : null}
               </EpisodePlayer>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>

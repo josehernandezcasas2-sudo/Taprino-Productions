@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
 import { colors, fonts, oliveTint, brassTint, absoluteFill } from '../lib/theme';
@@ -179,64 +178,6 @@ export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, sty
   );
 }
 
-// Once per title: remembered in SecureStore (the website uses localStorage).
-const SEEN_KEY = 'tip_end_seen';
-let seenCache = null;
-async function loadSeen() {
-  if (seenCache) return seenCache;
-  try {
-    seenCache = new Set(JSON.parse((await SecureStore.getItemAsync(SEEN_KEY)) || '[]'));
-  } catch {
-    seenCache = new Set();
-  }
-  return seenCache;
-}
-export async function tipEndCardSeen(episodeId) {
-  return (await loadSeen()).has(episodeId);
-}
-export async function markTipEndCardSeen(episodeId) {
-  const seen = await loadSeen();
-  seen.add(episodeId);
-  try {
-    // SecureStore values are small: keep the last 40 titles.
-    await SecureStore.setItemAsync(SEEN_KEY, JSON.stringify([...seen].slice(-40)));
-  } catch { /* keep the in-memory copy */ }
-}
-
-// Over the player after the credits start. In a series, counts down to the
-// next episode so autoplay still happens.
-export function TipEndCard({ tipping, title, isSignedIn, router, getToken, returnTo, onNext, nextSeconds = 10, onClose }) {
-  const [sheet, setSheet] = useState(null);
-  const [left, setLeft] = useState(onNext ? nextSeconds : null);
-  useEffect(() => {
-    if (!onNext || sheet) return undefined;
-    if (left <= 0) { onNext(); return undefined; }
-    const t = setTimeout(() => setLeft((n) => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [left, onNext, sheet]);
-  if (!tipping || !tipping.enabled) return null;
-  const name = short(tipping.creatorName);
-  const tip = (cents) => (isSignedIn ? setSheet(cents) : promptTipSignIn(router));
-  return (
-    <View style={[absoluteFill, styles.endWrap]}>
-      <View style={styles.endCard}>
-        <Pressable onPress={onClose} accessibilityLabel="Close" hitSlop={10} style={[styles.close, { position: 'absolute', top: 8, right: 8 }]}><Text style={styles.closeText}>×</Text></Pressable>
-        <Text style={[styles.kicker, { color: colors.inkDim }]} numberOfLines={1}>That was {title}</Text>
-        <Text style={styles.endTitle}>Liked it? Tip {name}.</Text>
-        <Text style={styles.endBody}>Tips go straight to {name}’s Stripe account. $3 covers a coffee; $10 covers a hard drive’s worth of footage.</Text>
-        <View style={styles.endActions}>
-          <Pressable style={styles.endBtn} onPress={() => tip(300)}><TipGlyph size={14} color={colors.onBrass} /><Text style={styles.endBtnText}>Tip $3</Text></Pressable>
-          <Pressable style={styles.endBtn} onPress={() => tip(500)}><TipGlyph size={14} color={colors.onBrass} /><Text style={styles.endBtnText}>Tip $5</Text></Pressable>
-          {onNext ? (
-            <Pressable style={[styles.endBtn, styles.endBtnGhost]} onPress={onNext}><Text style={[styles.endBtnText, { color: colors.ink }]}>Next episode{left != null && !sheet ? ` in ${left}s` : ''} →</Text></Pressable>
-          ) : null}
-        </View>
-      </View>
-      <TipSheet tipping={tipping} visible={sheet != null} initialAmountCents={sheet || 500} onClose={() => { setSheet(null); setLeft(null); }} getToken={getToken} returnTo={returnTo} />
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(12,19,31,0.6)' },
   sheetWrap: { flex: 1, justifyContent: 'flex-end' },
@@ -266,14 +207,6 @@ const styles = StyleSheet.create({
   fine: { fontFamily: fonts.body, fontSize: 12, lineHeight: 17, color: colors.inkFaint },
   link: { color: colors.olive, textDecorationLine: 'underline' },
   error: { fontFamily: fonts.body, fontSize: 13, color: colors.danger },
-  endWrap: { backgroundColor: 'rgba(12,19,31,0.86)', alignItems: 'center', justifyContent: 'center', padding: 12 },
-  endCard: { width: '100%', maxWidth: 440, backgroundColor: colors.surface3, borderRadius: 16, padding: 16, paddingTop: 18, gap: 8 },
-  endTitle: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink, paddingRight: 36 },
-  endBody: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.inkDim },
-  endActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 4 },
-  endBtn: { minHeight: 40, paddingHorizontal: 14, borderRadius: 999, backgroundColor: colors.olive, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  endBtnGhost: { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.ink },
-  endBtnText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.onBrass }
 });
 
 export const tipChipStyles = StyleSheet.create({

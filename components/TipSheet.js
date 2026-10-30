@@ -157,64 +157,6 @@ export function TipButton({ tipping, isSignedIn, className = '', presetCents = 5
   );
 }
 
-// Once per title (localStorage), over the player after the credits
-// start. `onNext` + `nextTitle`: a series' next episode, which also
-// counts down (the autoplay the page did before this card existed).
-const SEEN_KEY = 'tip_end_seen';
-export function tipEndCardSeen(episodeId) {
-  try {
-    const seen = JSON.parse(window.localStorage.getItem(SEEN_KEY) || '[]');
-    return seen.includes(episodeId);
-  } catch { return false; }
-}
-export function markTipEndCardSeen(episodeId) {
-  try {
-    const seen = JSON.parse(window.localStorage.getItem(SEEN_KEY) || '[]');
-    if (!seen.includes(episodeId)) window.localStorage.setItem(SEEN_KEY, JSON.stringify([...seen, episodeId].slice(-200)));
-  } catch { /* private mode */ }
-}
-
-export function TipEndCard({ tipping, title, isSignedIn, onNext, nextSeconds = 10, onClose }) {
-  const router = useRouter();
-  const { openSignIn } = useClerk();
-  const iconOverrides = usePlayerIconOverrides();
-  const [sheet, setSheet] = useState(null);
-  const [left, setLeft] = useState(onNext ? nextSeconds : null);
-  useEffect(() => {
-    if (!onNext || sheet) return undefined;
-    if (left <= 0) { onNext(); return undefined; }
-    const t = setTimeout(() => setLeft((n) => n - 1), 1000);
-    return () => clearTimeout(t);
-  }, [left, onNext, sheet]);
-  if (!tipping || !tipping.enabled) return null;
-  const name = short(tipping.creatorName);
-  function tip(cents) {
-    if (!isSignedIn) {
-      openSignIn({ redirectUrl: router.asPath });
-      return;
-    }
-    setSheet(cents);
-  }
-  return (
-    <div className="tip-end-card" role="dialog" aria-label={`Tip ${name}`}>
-      <div className="tip-end-inner">
-        <button type="button" className="modal-close tip-end-close" onClick={onClose} aria-label="Close"><CloseIcon size={16} src={iconOverrides.close} /></button>
-        <span className="tip-kicker">That was {title}</span>
-        <h3>Liked it? Tip {name}.</h3>
-        <p>Tips go straight to {name}&rsquo;s Stripe account. $3 covers a coffee; $10 covers a hard drive&rsquo;s worth of footage.</p>
-        <div className="tip-end-actions">
-          <button type="button" className="tip-end-btn" onClick={() => tip(300)}><TipIcon size={14} src={iconOverrides.tip} /> Tip $3</button>
-          <button type="button" className="tip-end-btn" onClick={() => tip(500)}><TipIcon size={14} src={iconOverrides.tip} /> Tip $5</button>
-          {onNext && (
-            <button type="button" className="tip-end-btn ghost" onClick={onNext}>Next episode{left != null && !sheet ? ` in ${left}s` : ''} →</button>
-          )}
-        </div>
-      </div>
-      {sheet && <TipSheet tipping={tipping} initialAmountCents={sheet} onClose={() => { setSheet(null); setLeft(null); }} />}
-    </div>
-  );
-}
-
 // Back from Checkout with ?tipped=<id> (or =cancelled) on the page the fan
 // tipped from. Reads the tip so the thank-you names the real amount; the
 // query is stripped so a reload doesn't repeat it.
