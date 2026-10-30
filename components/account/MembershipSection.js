@@ -99,7 +99,11 @@ export default function MembershipSection({ plans = [], tier = 'basic', subscrip
   }
 
   return (
-    <>
+    // On a laptop the plan card takes the left column and the two short
+    // cards sit beside it (.side); a non-member's four-plan picker needs
+    // the whole width, so the short cards go under it in two columns
+    // (.picker). styles/globals.css, the account hub block.
+    <div className={`acct-membership ${paid || freeAccessNote ? 'side' : 'picker'}`}>
       <div className="account-card" id="membership">
         <div className="account-subheading">Your plan</div>
         {paid ? (
@@ -192,7 +196,7 @@ export default function MembershipSection({ plans = [], tier = 'basic', subscrip
         )}
         <p className="account-fineprint" style={{ marginTop: '0.6rem' }}>A promo or gift code from the studio. A creator&rsquo;s handle goes in the field above the plans before you join.</p>
       </div>
-    </>
+    </div>
   );
 }
 

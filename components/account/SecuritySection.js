@@ -36,7 +36,10 @@ export default function SecuritySection({ email, teamTwoStep = null, twoFactorEn
   const twoStepOn = teamTwoStep ? teamTwoStep.on : twoFactorEnabled;
 
   return (
-    <>
+    // On a laptop the Sign-in card takes the left column, This device and
+    // Delete account stack on the right (styles/globals.css, the account
+    // hub block).
+    <div className="acct-security">
       <div className="account-card">
         <div className="account-subheading">Sign-in</div>
         {teamTwoStep && !teamTwoStep.on && (
@@ -130,6 +133,6 @@ export default function SecuritySection({ email, teamTwoStep = null, twoFactorEn
           </p>
         )}
       </div>
-    </>
+    </div>
   );
 }

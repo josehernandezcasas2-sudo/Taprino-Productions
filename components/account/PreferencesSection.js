@@ -55,7 +55,9 @@ export default function PreferencesSection({ newsletterStatus = 'undecided', pro
   }
 
   return (
-    <>
+    // Three short cards: a row of three on a laptop (styles/globals.css,
+    // the account hub block), stacked on a phone.
+    <div className="acct-preferences">
       <div className="account-card">
         <div className="account-subheading">Email</div>
         <div className="account-row">
@@ -95,6 +97,6 @@ export default function PreferencesSection({ newsletterStatus = 'undecided', pro
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }

@@ -11381,3 +11381,38 @@ a.prod-day:hover { background: var(--surface-3); }
 /* The Payouts card under the Money page's head (pages/creator/money.js). */
 .money-top { margin-bottom: 1.4rem; scroll-margin-top: 92px; }
 .money-top .account-card { margin: 0; }
+
+/* Laptop layouts for the hub's pages (Jose, 2026-10-30: "fix the website
+   version of them too" — the phone order was fine, but on a laptop every
+   card stretched across the stage, the very thing the redesign set out
+   to end). The phone order stays; from 1024px the long card takes the
+   left column and the short ones sit beside it. */
+.acct-membership, .acct-security, .acct-preferences { display: grid; gap: 1.2rem; }
+.acct-membership > .account-card, .acct-security > .account-card, .acct-preferences > .account-card { margin: 0; min-width: 0; }
+@media (min-width: 900px) and (max-width: 1023px) {
+  .acct-preferences { grid-template-columns: 1fr 1fr; align-items: start; }
+  .acct-preferences > :last-child { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  .acct-stage { max-width: 1080px; }
+  /* Membership (a member or the team) and Security: the tall card left,
+     the two short cards stacked on the right. */
+  .acct-membership.side, .acct-security { grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto auto 1fr; align-items: start; }
+  .acct-membership.side > :first-child, .acct-security > :first-child { grid-row: 1 / span 3; grid-column: 1; }
+  /* Membership for a non-member: the picker across the top, the two
+     short cards side by side under it. */
+  .acct-membership.picker { grid-template-columns: 1fr 1fr; align-items: start; }
+  .acct-membership.picker > :first-child { grid-column: 1 / -1; }
+  /* Preferences: three short cards in a row. */
+  .acct-preferences { grid-template-columns: repeat(3, minmax(0, 1fr)); align-items: start; }
+  /* Profile: the public form left, Private details and the Save row in a
+     360px column that follows the scroll. */
+  .acct-profile-form { display: grid; grid-template-columns: minmax(0, 1fr) 360px; grid-template-rows: auto 1fr; grid-template-areas: "public private" "public save"; align-items: start; gap: 1.2rem; }
+  .acct-profile-form > .account-card:nth-child(1) { grid-area: public; }
+  .acct-profile-form > .account-card:nth-child(2) { grid-area: private; }
+  .acct-profile-form > .acct-save-row { grid-area: save; align-self: start; position: sticky; top: 92px; bottom: auto; padding: 0; background: none; }
+  /* The 360px column is too narrow for two fields abreast ("Prefer not
+     to answer" was clipped), so gender/age and the sponsor pair stack. */
+  .acct-profile-form > .account-card:nth-child(2) .admin-field-row { grid-template-columns: 1fr; }
+  .acct-photos-row { grid-template-columns: 130px minmax(0, 1fr); }
+}

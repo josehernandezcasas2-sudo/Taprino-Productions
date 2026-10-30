@@ -447,7 +447,7 @@ export default function ProfileSection({ profile, setProfile, originalAge, setOr
         {(isCreator || isAdmin) && (
           <>
             <label style={{ marginTop: '0.6rem' }}>Fiscal sponsor <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
-            <div className="admin-field-row" style={{ marginBottom: '0.4rem' }}>
+            <div className="admin-field-row acct-sponsor-row" style={{ marginBottom: '0.4rem' }}>
               <input
                 type="text"
                 value={profile.fiscalSponsorName || ''}
