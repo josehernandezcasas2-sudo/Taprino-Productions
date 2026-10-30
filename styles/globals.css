@@ -11436,28 +11436,32 @@ a.prod-day:hover { background: var(--surface-3); }
    like it could be bigger"): the chrome grows by about a third — the
    bar's text and pills, the scrubber and its thumb, the round buttons —
    so a phone turned sideways reads like the board, not like a laptop's
-   bar shrunk. A laptop (a fine pointer) keeps the sizes above. */
+   bar shrunk. A laptop (a fine pointer) keeps the sizes above.
+   The sizes grow with the device (Jose, 2026-10-30: "make sure it
+   adjusts to the device type and size"): each is the phone's number at
+   a 390px short side, scaled by vmin up to about one and a half times on
+   a tablet — the same rule as the app's mobile/src/lib/fullscreenChrome.js. */
 @media (pointer: coarse) {
-  .tp-player.is-fullscreen .tp-controls { padding: 2.6rem 1.1rem 1rem; }
-  .tp-player.is-fullscreen .tp-scrub { height: 32px; }
-  .tp-player.is-fullscreen .tp-track { height: 5px; border-radius: 3px; }
-  .tp-player.is-fullscreen .tp-range { height: 32px; }
-  .tp-player.is-fullscreen .tp-range::-webkit-slider-thumb { width: 18px; height: 18px; }
-  .tp-player.is-fullscreen .tp-range::-moz-range-thumb { width: 18px; height: 18px; }
-  .tp-player.is-fullscreen .tp-range::-webkit-slider-runnable-track { height: 18px; }
-  .tp-player.is-fullscreen .tp-time { font-size: 1rem; margin-left: 0.6rem; }
-  .tp-player.is-fullscreen .tp-btn { min-width: 46px; height: 46px; }
-  .tp-player.is-fullscreen .tp-btn svg { width: 20px; height: 20px; }
-  .tp-player.is-fullscreen .tp-skip-label { font-size: 0.74rem; }
-  .tp-player.is-fullscreen .tp-next { height: 44px; padding: 0 1rem; font-size: 0.76rem; margin-left: 0.9rem; }
-  .tp-player.is-fullscreen .tp-fs-top { padding: 1.1rem 1.4rem 2.6rem; gap: 1rem; }
-  .tp-player.is-fullscreen .tp-fs-exit { width: 44px; height: 44px; }
-  .tp-player.is-fullscreen .tp-fs-exit svg { width: 20px; height: 20px; }
-  .tp-player.is-fullscreen .tp-fs-kicker { font-size: 0.72rem; }
-  .tp-player.is-fullscreen .tp-fs-title { font-size: 1.25rem; }
-  .tp-player.is-fullscreen .tp-fs-rating { font-size: 0.78rem; padding: 0.2rem 0.55rem; }
-  .tp-player.is-fullscreen .tp-fs-tip { height: 36px; padding: 0 0.9rem; font-size: 0.74rem; }
-  .tp-player.is-fullscreen .tp-fs-skip { width: 56px; height: 56px; font-size: 0.86rem; }
-  .tp-player.is-fullscreen .tp-fs-play { width: 82px; height: 82px; }
-  .tp-player.is-fullscreen .tp-fs-play svg { width: 36px; height: 36px; }
+  .tp-player.is-fullscreen .tp-controls { padding: 2.6rem clamp(1rem, 4.1vmin, 1.5rem) clamp(1rem, 4.1vmin, 1.5rem); }
+  .tp-player.is-fullscreen .tp-scrub { height: clamp(32px, 8.2vmin, 48px); }
+  .tp-player.is-fullscreen .tp-track { height: clamp(5px, 1.3vmin, 7px); border-radius: 3px; }
+  .tp-player.is-fullscreen .tp-range { height: clamp(32px, 8.2vmin, 48px); }
+  .tp-player.is-fullscreen .tp-range::-webkit-slider-thumb { width: clamp(18px, 4.6vmin, 26px); height: clamp(18px, 4.6vmin, 26px); }
+  .tp-player.is-fullscreen .tp-range::-moz-range-thumb { width: clamp(18px, 4.6vmin, 26px); height: clamp(18px, 4.6vmin, 26px); }
+  .tp-player.is-fullscreen .tp-range::-webkit-slider-runnable-track { height: clamp(18px, 4.6vmin, 26px); }
+  .tp-player.is-fullscreen .tp-time { font-size: clamp(1rem, 4.1vmin, 1.5rem); margin-left: 0.6rem; }
+  .tp-player.is-fullscreen .tp-btn { min-width: clamp(46px, 11.8vmin, 68px); height: clamp(46px, 11.8vmin, 68px); }
+  .tp-player.is-fullscreen .tp-btn svg { width: clamp(20px, 5.1vmin, 30px); height: clamp(20px, 5.1vmin, 30px); }
+  .tp-player.is-fullscreen .tp-skip-label { font-size: clamp(0.74rem, 3vmin, 1.1rem); }
+  .tp-player.is-fullscreen .tp-next { height: clamp(44px, 11.3vmin, 66px); padding: 0 clamp(1rem, 4.1vmin, 1.5rem); font-size: clamp(0.76rem, 3.1vmin, 1.1rem); margin-left: 0.9rem; }
+  .tp-player.is-fullscreen .tp-fs-top { padding: clamp(1.1rem, 4.5vmin, 1.6rem) clamp(1.4rem, 5.7vmin, 2.1rem) 2.6rem; gap: clamp(1rem, 4.1vmin, 1.5rem); }
+  .tp-player.is-fullscreen .tp-fs-exit { width: clamp(44px, 11.3vmin, 66px); height: clamp(44px, 11.3vmin, 66px); }
+  .tp-player.is-fullscreen .tp-fs-exit svg { width: clamp(20px, 5.1vmin, 30px); height: clamp(20px, 5.1vmin, 30px); }
+  .tp-player.is-fullscreen .tp-fs-kicker { font-size: clamp(0.72rem, 2.95vmin, 1.05rem); }
+  .tp-player.is-fullscreen .tp-fs-title { font-size: clamp(1.25rem, 5.1vmin, 1.85rem); }
+  .tp-player.is-fullscreen .tp-fs-rating { font-size: clamp(0.78rem, 3.2vmin, 1.15rem); padding: 0.2rem 0.55rem; }
+  .tp-player.is-fullscreen .tp-fs-tip { height: clamp(36px, 9.2vmin, 54px); padding: 0 clamp(0.9rem, 3.7vmin, 1.35rem); font-size: clamp(0.74rem, 3vmin, 1.1rem); }
+  .tp-player.is-fullscreen .tp-fs-skip { width: clamp(56px, 14.4vmin, 84px); height: clamp(56px, 14.4vmin, 84px); font-size: clamp(0.86rem, 3.5vmin, 1.3rem); }
+  .tp-player.is-fullscreen .tp-fs-play { width: clamp(82px, 21vmin, 122px); height: clamp(82px, 21vmin, 122px); }
+  .tp-player.is-fullscreen .tp-fs-play svg { width: clamp(36px, 9.2vmin, 54px); height: clamp(36px, 9.2vmin, 54px); }
 }

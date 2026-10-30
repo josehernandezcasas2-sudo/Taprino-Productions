@@ -15,6 +15,7 @@ import { parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useCaptureBlock } from '../../lib/captureBlock';
+import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { episodeCode } from '../../lib/seriesResume';
 import TopNav from '../../components/TopNav';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
@@ -196,6 +197,9 @@ export default function Episode() {
   // No screenshots or recording while the title itself plays; trailers
   // are promotional and stay capturable (mobile/src/lib/captureBlock.js).
   useCaptureBlock(Boolean(showPlayer && !showingTrailer && playback.src));
+  // The full-screen Tip pill grows with the device like the player's own
+  // chrome (mobile/src/lib/fullscreenChrome.js).
+  const chrome = useFullscreenChrome();
 
   // Same reason as HeroSpotlight's trailer: a play() issued before the
   // stream has loaded can be dropped, so start again once it's ready.
@@ -412,7 +416,7 @@ export default function Episode() {
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
                 resumeSeconds={showingTrailer ? 0 : resumeSeconds}
                 topRight={!showingTrailer ? (
-                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={styles.fsTip} textStyle={styles.fsTipText} iconSize={14}>
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
                     Tip {tipFirstName}
                   </TipButton>
                 ) : null}

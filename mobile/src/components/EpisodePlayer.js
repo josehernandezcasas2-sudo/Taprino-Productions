@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from 'expo-router';
@@ -8,10 +8,47 @@ import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { colors, fonts, absoluteFill } from '../lib/theme';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
+import { useFullscreenChrome, FULLSCREEN_EDGES } from '../lib/fullscreenChrome';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
 const DOUBLE_TAP_MS = 300;
+
+// The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
+// Jose, 2026-10-30: the controls run to the screen's edges and grow with
+// the device). Every number is the phone's, drawn for a 390pt short side
+// and scaled by `s`; `gutter` is the distance from the screen's edge.
+// Sized up on 2026-10-30 (Jose, the Theatre board: "it could be bigger
+// on mobile") — the kicker, title, rating, the Next pill, the round
+// buttons, the scrubber and the time all grew by about a third.
+function fullChrome(s, gutter) {
+  return {
+    top: { gap: s(14), paddingHorizontal: gutter, paddingTop: s(16) },
+    round: { width: s(44), height: s(44), borderRadius: s(22) },
+    closeIcon: s(18),
+    kicker: { fontSize: s(11.5), letterSpacing: s(1.6) },
+    title: { fontSize: s(20) },
+    ratingBox: { paddingVertical: s(3), paddingHorizontal: s(7) },
+    ratingText: { fontSize: s(11.5) },
+    center: { gap: s(30), marginTop: -s(40) },
+    skip: { width: s(54), height: s(54), borderRadius: s(27) },
+    skipText: { fontSize: s(12) },
+    play: { width: s(80), height: s(80), borderRadius: s(40) },
+    playGlyph: s(34),
+    bar: { paddingHorizontal: gutter, paddingBottom: s(16) },
+    trackHit: { paddingVertical: s(12) },
+    track: { height: s(5), borderRadius: 3 },
+    thumb: { top: -s(5), marginLeft: -s(8), width: s(16), height: s(16), borderRadius: s(8) },
+    time: { fontSize: s(15.5) },
+    next: { height: s(44), paddingHorizontal: s(16), gap: s(8), maxWidth: s(220) },
+    nextText: { fontSize: s(12) },
+    nextGlyph: s(13),
+    fsIcon: s(20),
+    fillToastWrap: { top: s(78) },
+    fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
+    fillToastText: { fontSize: s(11.5) }
+  };
+}
 const { OrientationLock, Orientation } = ScreenOrientation;
 const lock = (o) => ScreenOrientation.lockAsync(o).catch(() => {});
 const isLandscape = (o) => o === Orientation.LANDSCAPE_LEFT || o === Orientation.LANDSCAPE_RIGHT;
@@ -78,6 +115,8 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const { fill, toggle: toggleFill } = useScreenFill(player);
   const [fillToast, setFillToast] = useState(null);
   const lastTap = useRef(0);
+  const chrome = useFullscreenChrome();
+  const F = useMemo(() => fullChrome(chrome.s, chrome.gutter), [chrome]);
   const hideTimer = useRef(null);
   const fullscreenRef = useRef(false);
   const autoRotate = useRef(true);
@@ -240,60 +279,60 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
           </View>
         ) : null}
         {full && fillToast ? (
-          <View style={styles.fillToastWrap} pointerEvents="none">
-            <View style={styles.fillToast}><Text style={styles.fillToastText}>{fillToast}</Text></View>
+          <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
+            <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
           </View>
         ) : null}
         {controlsShown ? (
           <>
             {full ? (
-              <View style={styles.top} pointerEvents="box-none">
-                <Pressable style={[styles.round, styles.roundFull]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
-                  <Svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
+              <View style={[styles.top, F.top]} pointerEvents="box-none">
+                <Pressable style={[styles.round, F.round]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
+                  <Svg width={F.closeIcon} height={F.closeIcon} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
                 </Pressable>
                 <View style={{ flex: 1, minWidth: 0 }}>
-                  {heading && heading.kicker ? <Text style={styles.kicker} numberOfLines={1}>{heading.kicker}</Text> : null}
-                  {heading && heading.title ? <Text style={styles.title} numberOfLines={1}>{heading.title}</Text> : null}
+                  {heading && heading.kicker ? <Text style={[styles.kicker, F.kicker]} numberOfLines={1}>{heading.kicker}</Text> : null}
+                  {heading && heading.title ? <Text style={[styles.title, F.title]} numberOfLines={1}>{heading.title}</Text> : null}
                 </View>
-                {rating ? <View style={styles.ratingBox}><Text style={styles.ratingText}>{rating}</Text></View> : null}
+                {rating ? <View style={[styles.ratingBox, F.ratingBox]}><Text style={[styles.ratingText, F.ratingText]}>{rating}</Text></View> : null}
                 {topRight}
               </View>
             ) : null}
-            <View style={styles.center} pointerEvents="box-none">
-              <Pressable style={[styles.skip, full && styles.skipFull]} onPress={() => skip(-SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Back 10 seconds" hitSlop={8}>
-                <Text style={[styles.skipText, full && styles.skipTextFull]}>−10</Text>
+            <View style={[styles.center, full && F.center]} pointerEvents="box-none">
+              <Pressable style={[styles.skip, full && F.skip]} onPress={() => skip(-SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Back 10 seconds" hitSlop={8}>
+                <Text style={[styles.skipText, full && F.skipText]}>−10</Text>
               </Pressable>
-              <Pressable style={[styles.play, full && styles.playFull]} onPress={togglePlay} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={8}>
-                <PlayGlyph playing={playing} size={full ? 34 : 22} />
+              <Pressable style={[styles.play, full && F.play]} onPress={togglePlay} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={8}>
+                <PlayGlyph playing={playing} size={full ? F.playGlyph : 22} />
               </Pressable>
-              <Pressable style={[styles.skip, full && styles.skipFull]} onPress={() => skip(SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Forward 10 seconds" hitSlop={8}>
-                <Text style={[styles.skipText, full && styles.skipTextFull]}>+10</Text>
+              <Pressable style={[styles.skip, full && F.skip]} onPress={() => skip(SKIP_SECONDS)} accessibilityRole="button" accessibilityLabel="Forward 10 seconds" hitSlop={8}>
+                <Text style={[styles.skipText, full && F.skipText]}>+10</Text>
               </Pressable>
             </View>
-            <View style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
+            <View style={[styles.bar, full && F.bar]} pointerEvents="box-none">
               <View
-                style={[styles.trackHit, full && styles.trackHitFull]}
+                style={[styles.trackHit, full && F.trackHit]}
                 onLayout={(e) => { trackWidth.current = e.nativeEvent.layout.width; }}
                 {...pan.panHandlers}
                 accessibilityRole="adjustable"
                 accessibilityLabel="Seek"
                 accessibilityValue={{ text: `${clock(shownTime)} of ${clock(duration)}` }}
               >
-                <View style={[styles.track, full && styles.trackFull]} pointerEvents="none">
-                  <View style={[styles.trackFill, full && styles.trackFillFull, { width: `${progress * 100}%` }]} />
-                  <View style={[styles.thumb, full && styles.thumbFull, { left: `${progress * 100}%` }]} />
+                <View style={[styles.track, full && F.track]} pointerEvents="none">
+                  <View style={[styles.trackFill, full && F.track, { width: `${progress * 100}%` }]} />
+                  <View style={[styles.thumb, full && F.thumb, { left: `${progress * 100}%` }]} />
                 </View>
               </View>
               <View style={styles.row}>
-                <Text style={[styles.time, full && styles.timeFull]}>{clock(shownTime)} <Text style={styles.timeDim}>/ {clock(duration)}</Text></Text>
+                <Text style={[styles.time, full && F.time]}>{clock(shownTime)} <Text style={styles.timeDim}>/ {clock(duration)}</Text></Text>
                 {full && onNext ? (
-                  <Pressable style={styles.next} onPress={onNext} accessibilityRole="button">
-                    <Text style={styles.nextText} numberOfLines={1}>{nextLabel}</Text><NextGlyph />
+                  <Pressable style={[styles.next, F.next]} onPress={onNext} accessibilityRole="button">
+                    <Text style={[styles.nextText, F.nextText]} numberOfLines={1}>{nextLabel}</Text><NextGlyph size={F.nextGlyph} />
                   </Pressable>
                 ) : null}
                 <View style={{ flex: 1 }} />
-                <Pressable style={[styles.round, full && styles.roundFull]} onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} accessibilityRole="button" accessibilityLabel={full ? 'Leave full screen' : 'Full screen'} hitSlop={8}>
-                  <Svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <Pressable style={[styles.round, full && F.round]} onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} accessibilityRole="button" accessibilityLabel={full ? 'Leave full screen' : 'Full screen'} hitSlop={8}>
+                  <Svg width={full ? F.fsIcon : 20} height={full ? F.fsIcon : 20} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
                   </Svg>
                 </Pressable>
@@ -330,7 +369,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
         <StatusBar hidden />
         <View style={styles.fullRoot}>
           {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
-          <SafeAreaView style={absoluteFill} edges={['left', 'right', 'top', 'bottom']} pointerEvents="box-none">
+          <SafeAreaView style={absoluteFill} edges={FULLSCREEN_EDGES} pointerEvents="box-none">
             <View style={{ flex: 1 }} pointerEvents="box-none">
               {renderOverlay(true)}
             </View>
@@ -355,12 +394,9 @@ const styles = StyleSheet.create({
   fillToast: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(12,19,31,0.8)' },
   fillToastText: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 0.9, textTransform: 'uppercase', color: colors.ink },
 
-  // Full screen only (the phone turned sideways): sized up on 2026-10-30
-  // (Jose, the Theatre board: "it could be bigger on mobile") — the
-  // kicker, title, rating, the Next pill, the round buttons, the
-  // scrubber and the time all grow by about a third.
-  top: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 20, paddingTop: 16 },
-  roundFull: { width: 44, height: 44, borderRadius: 22 },
+  // Full screen only (the phone turned sideways): the sizes come from
+  // fullChrome() above, scaled to the device; these are the phone's base.
+  top: { position: 'absolute', left: 0, right: 0, top: 0, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 16, paddingTop: 16 },
   round: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: 'rgba(251,232,211,0.45)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
   kicker: { fontFamily: fonts.mono, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.brass },
   title: { fontFamily: fonts.displaySemi, fontSize: 20, color: colors.ink },
@@ -369,19 +405,10 @@ const styles = StyleSheet.create({
 
   center: { position: 'absolute', left: 0, right: 0, top: '50%', marginTop: -27, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 30 },
   skip: { width: 38, height: 38, borderRadius: 19, borderWidth: 1, borderColor: 'rgba(251,232,211,0.45)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
-  skipFull: { width: 54, height: 54, borderRadius: 27 },
-  skipTextFull: { fontSize: 12 },
   skipText: { fontFamily: fonts.monoBold, fontSize: 10, color: colors.ink },
   play: { width: 54, height: 54, borderRadius: 27, borderWidth: 1.5, borderColor: 'rgba(251,232,211,0.75)', backgroundColor: bubble, alignItems: 'center', justifyContent: 'center' },
-  playFull: { width: 80, height: 80, borderRadius: 40 },
 
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingHorizontal: 12, paddingBottom: 6 },
-  barFull: { paddingHorizontal: 22, paddingBottom: 16 },
-  trackHitFull: { paddingVertical: 12 },
-  trackFull: { height: 5, borderRadius: 3 },
-  trackFillFull: { height: 5, borderRadius: 3 },
-  thumbFull: { top: -5, marginLeft: -8, width: 16, height: 16, borderRadius: 8 },
-  timeFull: { fontSize: 15.5 },
   trackHit: { paddingVertical: 10, justifyContent: 'center' },
   track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.28)' },
   trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,30 @@ import { formatClock, pacificLabel, pacificOffset } from '../lib/channelTime';
 import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 import { useCaptureBlock } from '../lib/captureBlock';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
+import { useFullscreenChrome, FULLSCREEN_EDGES } from '../lib/fullscreenChrome';
+
+// The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
+// Jose, 2026-10-30: the controls run to the screen's edges and grow with
+// the device): the phone's numbers scaled by `s`, `gutter` from the edge.
+function fullChrome(s, gutter) {
+  return {
+    exit: { top: s(10), left: gutter, width: s(44), height: s(44), borderRadius: s(22) },
+    exitIcon: s(22),
+    badge: { top: s(16), left: gutter + s(44) + s(10), paddingVertical: s(5), paddingHorizontal: s(10) },
+    badgeText: { fontSize: s(10.5) },
+    bar: { paddingHorizontal: gutter, paddingBottom: s(14) },
+    track: { height: s(4), borderRadius: 2 },
+    btn: { width: s(44), height: s(44), borderRadius: s(22) },
+    icon: s(22),
+    playIcon: s(28),
+    pill: { paddingVertical: s(9), paddingHorizontal: s(14) },
+    timeLeft: { fontSize: s(12.5) },
+    menu: { right: gutter, bottom: s(70) },
+    fillToastWrap: { top: s(78) },
+    fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
+    fillToastText: { fontSize: s(11.5) }
+  };
+}
 
 const SAFETY_POLL_MS = 45000;
 // Viewers without an age on file take the viewing terms once; the device
@@ -103,6 +127,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const { fill, toggle: toggleFill } = useScreenFill(player);
   const [fillToast, setFillToast] = useState(null);
   const lastTap = useRef(0);
+  const chrome = useFullscreenChrome();
+  const F = useMemo(() => fullChrome(chrome.s, chrome.gutter), [chrome]);
   useEffect(() => {
     if (!fillToast) return undefined;
     const t = setTimeout(() => setFillToast(null), 1600);
@@ -461,8 +487,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       <>
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
         {full && fillToast ? (
-          <View style={styles.fillToastWrap} pointerEvents="none">
-            <View style={styles.fillToast}><Text style={styles.fillToastText}>{fillToast}</Text></View>
+          <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
+            <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
           </View>
         ) : null}
         {screen === null && userPaused && !playing && (
@@ -472,14 +498,14 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
           </View>
         )}
         {(controlsShown || screen !== null) && (
-          <View style={[styles.badge, full && styles.badgeFull]} pointerEvents="none">
+          <View style={[styles.badge, full && F.badge]} pointerEvents="none">
             <View style={[styles.dot, isLive && styles.dotLive]} />
-            <Text style={styles.badgeText}>{screen === 'ad' ? 'Ad break' : isLive ? `Live · ${channelName}` : `On air · ${channelName}`}</Text>
+            <Text style={[styles.badgeText, full && F.badgeText]}>{screen === 'ad' ? 'Ad break' : isLive ? `Live · ${channelName}` : `On air · ${channelName}`}</Text>
           </View>
         )}
         {full && (controlsShown || screen !== null) && (
-          <Pressable style={styles.exit} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Exit fullscreen" hitSlop={12}>
-            <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
+          <Pressable style={[styles.exit, F.exit]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Exit fullscreen" hitSlop={12}>
+            <Svg width={F.exitIcon} height={F.exitIcon} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
           </Pressable>
         )}
 
@@ -518,34 +544,34 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         )}
 
         {screen === null && controlsShown && (
-          <View style={[styles.bar, full && styles.barFull]} pointerEvents="box-none">
-            {!isLive && <View style={styles.track}><View style={[styles.trackFill, { width: `${progress * 100}%` }]} /></View>}
+          <View style={[styles.bar, full && F.bar]} pointerEvents="box-none">
+            {!isLive && <View style={[styles.track, full && F.track]}><View style={[styles.trackFill, full && F.track, { width: `${progress * 100}%` }]} /></View>}
             <View style={styles.buttons}>
-              <Pressable onPress={togglePlay} style={styles.btn} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={10}>
-                <Svg width={full ? 28 : 24} height={full ? 28 : 24} viewBox="0 0 24 24">
+              <Pressable onPress={togglePlay} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={playing ? 'Pause' : 'Play'} hitSlop={10}>
+                <Svg width={full ? F.playIcon : 24} height={full ? F.playIcon : 24} viewBox="0 0 24 24">
                   {playing
                     ? <><Rect x="6" y="5" width="4" height="14" rx="1" fill={colors.ink} /><Rect x="14" y="5" width="4" height="14" rx="1" fill={colors.ink} /></>
                     : <Path d="M8 5v14l11-7z" fill={colors.ink} />}
                 </Svg>
               </Pressable>
-              <Pressable onPress={toggleMute} style={styles.btn} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute' : 'Mute'} hitSlop={10}>
-                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <Pressable onPress={toggleMute} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute' : 'Mute'} hitSlop={10}>
+                <Svg width={full ? F.icon : 22} height={full ? F.icon : 22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   <Path d="M11 5L6 9H3v6h3l5 4z" />
                   {muted ? <Path d="M22 9l-6 6M16 9l6 6" /> : <Path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
                 </Svg>
               </Pressable>
               <View style={styles.pillWrap}>
-                <View style={styles.pill}>
-                  <Text style={styles.timeLeft} numberOfLines={1}>
+                <View style={[styles.pill, full && F.pill]}>
+                  <Text style={[styles.timeLeft, full && F.timeLeft]} numberOfLines={1}>
                     {full && program ? `${program.seriesName || program.title}  ·  ` : ''}{!isLive && remaining != null ? `${formatClock(remaining)} left` : isLive ? 'Live' : ''}
                   </Text>
                 </View>
               </View>
-              <Pressable onPress={() => { showControls(); setMenuOpen((v) => !v); }} style={styles.btn} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Close menu' : 'Menu'} hitSlop={10}>
-                <Svg width={22} height={22} viewBox="0 0 24 24" fill={colors.ink}><Path d="M5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" /></Svg>
+              <Pressable onPress={() => { showControls(); setMenuOpen((v) => !v); }} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={menuOpen ? 'Close menu' : 'Menu'} hitSlop={10}>
+                <Svg width={full ? F.icon : 22} height={full ? F.icon : 22} viewBox="0 0 24 24" fill={colors.ink}><Path d="M5 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zm7 0a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3z" /></Svg>
               </Pressable>
-              <Pressable onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} style={styles.btn} accessibilityRole="button" accessibilityLabel={full ? 'Exit fullscreen' : 'Fullscreen'} hitSlop={10}>
-                <Svg width={22} height={22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+              <Pressable onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={full ? 'Exit fullscreen' : 'Fullscreen'} hitSlop={10}>
+                <Svg width={full ? F.icon : 22} height={full ? F.icon : 22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                   {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
                 </Svg>
               </Pressable>
@@ -554,7 +580,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         )}
 
         {screen === null && menuOpen && (
-          <View style={[styles.menu, full && styles.menuFull]}>
+          <View style={[styles.menu, full && F.menu]}>
             <Pressable style={styles.menuRow} onPress={() => { setMenuOpen(false); togglePlay(); }} accessibilityRole="button">
               <Text style={styles.menuText}>{playing ? 'Pause' : 'Play'}</Text>
             </Pressable>
@@ -602,7 +628,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         <StatusBar hidden />
         <View style={styles.fullRoot}>
           {fullscreen && <VideoView player={player} style={absoluteFill} contentFit={fill ? 'cover' : 'contain'} nativeControls={false} />}
-          <SafeAreaView style={absoluteFill} edges={['left', 'right', 'top', 'bottom']} pointerEvents="box-none">
+          <SafeAreaView style={absoluteFill} edges={FULLSCREEN_EDGES} pointerEvents="box-none">
             <View style={styles.fullInner} pointerEvents="box-none">
               {renderOverlay(true)}
             </View>
@@ -619,7 +645,7 @@ const styles = StyleSheet.create({
   fullRoot: { flex: 1, backgroundColor: '#000' },
   fullInner: { flex: 1 },
   badge: { position: 'absolute', top: 10, left: 10, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(10,11,15,0.7)', paddingVertical: 4, paddingHorizontal: 9, borderRadius: 999 },
-  badgeFull: { top: 14, left: 64 },
+  // Full screen sizes come from fullChrome() above, scaled to the device.
   // "Filling the screen" / "Whole picture" after a double tap (EpisodePlayer's twin).
   fillToastWrap: { position: 'absolute', left: 0, right: 0, top: 78, alignItems: 'center' },
   fillToast: { paddingVertical: 7, paddingHorizontal: 12, borderRadius: 999, backgroundColor: 'rgba(12,19,31,0.8)' },
@@ -638,7 +664,6 @@ const styles = StyleSheet.create({
   cardExit: { marginTop: 10, borderWidth: 1, borderColor: 'rgba(251,232,211,0.25)', borderRadius: 999, paddingVertical: 7, paddingHorizontal: 16 },
   cardExitText: { fontFamily: fonts.display, fontSize: 13, color: colors.ink },
   bar: { position: 'absolute', left: 0, right: 0, bottom: 0, paddingTop: 6, paddingHorizontal: 10, paddingBottom: 8 },
-  barFull: { paddingHorizontal: 18, paddingBottom: 14 },
   track: { height: 3, borderRadius: 2, backgroundColor: 'rgba(251,232,211,0.28)', marginBottom: 8, marginHorizontal: 4 },
   trackFill: { height: 3, borderRadius: 2, backgroundColor: colors.brass },
   buttons: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -652,7 +677,6 @@ const styles = StyleSheet.create({
   pausedTitle: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
   pausedSub: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkDim, textAlign: 'center' },
   menu: { position: 'absolute', right: 10, bottom: 54, minWidth: 190, backgroundColor: 'rgba(10,11,15,0.94)', borderWidth: 1, borderColor: colors.oceanInk, borderRadius: 10, paddingVertical: 4 },
-  menuFull: { right: 18, bottom: 64 },
   menuRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, paddingVertical: 9, paddingHorizontal: 12 },
   menuText: { fontFamily: fonts.display, fontSize: 13.5, color: colors.ink },
   volCtl: { flexDirection: 'row', alignItems: 'center', gap: 8 },
