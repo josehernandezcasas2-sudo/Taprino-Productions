@@ -1,995 +1,226 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import BackButton from '../components/BackButton';
+import { useRouter } from 'next/router';
 import { useClerk, SignInButton, SignUpButton } from '@clerk/nextjs';
-import { getAccountDashboardData } from '../lib/accountDashboard';
-import { getPublicEpisodes } from '../lib/publicEpisodes';
-import HeaderNav from '../components/HeaderNav';
-import MobileTabBar from '../components/MobileTabBar';
-import { SITE } from '../lib/siteConfig';
-import { BANNER_COLORS } from '../lib/profileBanner';
-import Footer from '../components/Footer';
-import PayoutsCard from '../components/creator/PayoutsCard';
-import MoneySummaryCard from '../components/creator/MoneySummaryCard';
-import MembershipPlans from '../components/MembershipPlans';
-import ReferredByField from '../components/ReferredByField';
-import PurchasesCard from '../components/PurchasesCard';
-import { cleanViaSlug } from '../lib/creatorShareRules';
-import { memberBadge } from '../lib/membershipTiers';
-import RepositionFrame, { CropWindow } from '../components/RepositionFrame';
+import BackButton from '../components/BackButton';
+import AccountShell from '../components/account/AccountShell';
+import { useOwnProfile } from '../components/account/useOwnProfile';
+import { membershipTileLines } from '../components/account/MembershipSection';
 import PositionedPhoto from '../components/PositionedPhoto';
-import { AiSealGlyph } from '../components/AiSeal';
+import { accountPageProps } from '../lib/accountPage';
+import { freeAccessNoteFor, roleBadgeFor } from '../lib/accountRules';
+import { memberBadge } from '../lib/membershipTiers';
+import { dollars } from '../lib/creatorMoneyRules';
+import { SITE } from '../lib/siteConfig';
 
+// The account hub (Jose, 2026-10-29, option B of the "Account page"
+// canvas https://claude.ai/artifact/CKYB1K51ueg8ESLQCbNqQa): the identity
+// card, six tiles that carry their own state and open their own page
+// under /account/… (Money is the existing /creator/money with Payouts on
+// top), Log out, and a quiet line to the delete request on the Security
+// page. Until 2026-10-29 this was one 6,000px column of nine cards; those
+// cards live on in components/account/*.js, one per page.
 export async function getServerSideProps({ req, res }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const { account, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, plans } = await getAccountDashboardData(req);
-
-  const episodes = await getPublicEpisodes();
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
-
-  return {
-    props: {
-      isSignedIn: account.isSignedIn,
-      isSubscriber: account.isSubscriber,
-      tier: account.tier,
-      plans,
-      email: account.email,
-      isAdmin: account.isAdmin,
-      isSubAdmin: account.isSubAdmin,
-      isCreator: account.isCreator,
-      isComped: account.isComped,
-      mainGenres,
-      newsletterStatus,
-      subscriptionDetails,
-      promoAccessExpiresAt,
-      userId: account.userId || null,
-      // Two-step for the team (lib/adminTwoFactor.js): a team account
-      // without it sees why, and what to do, in the Security card.
-      teamTwoStep: (account.isAdmin || account.isSubAdmin || account.adminNeedsTwoFactor) ? { on: Boolean(account.twoFactorEnabled), required: Boolean(account.adminNeedsTwoFactor) } : null,
-      // The creator link they followed, if any (middleware.js), to prefill
-      // "Did a creator send you?".
-      viaHandle: cleanViaSlug(req.cookies && req.cookies.tapa_via) || null
-    }
-  };
+  return accountPageProps(req, res);
 }
 
-// Avatars are only ever shown at 22–96px, so there's no reason to upload a
-// multi-MB original — that's how existing ones ended up 2–3MB each (heavy
-// in every comment list), and anything over ~3.3MB hit Vercel's 4.5MB
-// request cap as base64. Center-crops to a square and shrinks to a 512px
-// JPEG (~50–100KB), same as the app does with expo-image-manipulator.
-// Banner: wide, not square. Scaled to at most 1600px across, JPEG, so a
-// phone photo lands well under the API's size limit.
-function shrinkBanner(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-    img.onload = () => {
-      const scale = Math.min(1, 1600 / img.naturalWidth);
-      const canvas = document.createElement('canvas');
-      canvas.width = Math.round(img.naturalWidth * scale);
-      canvas.height = Math.round(img.naturalHeight * scale);
-      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
-    img.src = url;
-  });
+const LEGACY_HASHES = { '#membership': '/account/membership', '#purchases': '/account/purchases', '#money': '/creator/money', '#delete': '/account/security#delete' };
+
+function TileIcon({ kind }) {
+  const common = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round', 'aria-hidden': 'true' };
+  if (kind === 'membership') return <svg {...common} stroke="var(--olive)"><path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.6 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" /></svg>;
+  if (kind === 'profile') return <svg {...common} stroke="var(--brass)"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>;
+  if (kind === 'money') return <svg {...common} stroke="var(--ok)"><circle cx="12" cy="12" r="8" /><path d="M12 8v8M9.5 10.5h3.5a1.5 1.5 0 0 1 0 3h-2a1.5 1.5 0 0 0 0 3H15" /></svg>;
+  if (kind === 'purchases') return <svg {...common} stroke="var(--ink-dim)"><path d="M4 8h16v4a2 2 0 0 0 0 4v4H4v-4a2 2 0 0 0 0-4z" /><path d="M12 8v12" /></svg>;
+  if (kind === 'preferences') return <svg {...common} stroke="var(--ink-dim)"><path d="M4 7h10M18 7h2M4 17h4M12 17h8" /><circle cx="16" cy="7" r="2.5" /><circle cx="10" cy="17" r="2.5" /></svg>;
+  return <svg {...common} stroke="var(--ink-dim)"><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9 12l2 2 4-4" /></svg>;
 }
 
-function shrinkAvatar(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new window.Image();
-    img.onload = () => {
-      const side = Math.min(img.naturalWidth, img.naturalHeight);
-      const out = Math.min(512, side);
-      const canvas = document.createElement('canvas');
-      canvas.width = out;
-      canvas.height = out;
-      canvas.getContext('2d').drawImage(
-        img,
-        (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side,
-        0, 0, out, out
-      );
-      URL.revokeObjectURL(url);
-      resolve(canvas.toDataURL('image/jpeg', 0.85));
-    };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('unreadable image')); };
-    img.src = url;
-  });
-}
-
-function formatDate(ms) {
-  if (!ms) return null;
-  return new Date(ms).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-}
-
-export default function Account({ isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, viaHandle = null, teamTwoStep = null }) {
-  const { signOut, openUserProfile } = useClerk();
-  const [newsletter, setNewsletter] = useState(newsletterStatus);
-  const [newsletterLoading, setNewsletterLoading] = useState(false);
-  const [portalLoading, setPortalLoading] = useState(false);
-  // Which plan's Join button is opening Checkout (null = none).
-  const [joiningTier, setJoiningTier] = useState(null);
-  const [referredBy, setReferredBy] = useState(viaHandle || '');
-  const [redeemInput, setRedeemInput] = useState('');
-  const [redeeming, setRedeeming] = useState(false);
-  const [redeemError, setRedeemError] = useState(null);
-  const [redeemSuccess, setRedeemSuccess] = useState(null);
-  const [profile, setProfile] = useState(null);
-  const [profileSaving, setProfileSaving] = useState(false);
-  // Reposition mode for the banner / avatar photo (components/RepositionFrame.js):
-  // which one is being dragged, and where it was so Cancel can put it back.
-  const [reposition, setReposition] = useState(null);
-  const [positionBackup, setPositionBackup] = useState(null);
-  // The banner preview's width/height, so the crop window shows the right slice.
-  const [bannerAspect, setBannerAspect] = useState(3);
-  function startReposition(which) {
-    setPositionBackup({ banner: profile.bannerPosition || null, avatar: profile.avatarPosition || null, bannerZoom: profile.bannerZoom || null, avatarZoom: profile.avatarZoom || null });
-    setReposition(which);
-  }
-  function cancelReposition() {
-    if (positionBackup) setProfile((p) => ({ ...p, bannerPosition: positionBackup.banner, avatarPosition: positionBackup.avatar, bannerZoom: positionBackup.bannerZoom, avatarZoom: positionBackup.avatarZoom }));
-    setReposition(null);
-  }
-  // Live availability for the handle field: { handle, ok, reason }. ok is
-  // null while nothing has been checked (empty, or unchanged from what's
-  // saved). The save still re-checks; the DB's unique index is final.
-  const [handleCheck, setHandleCheck] = useState({ handle: null, ok: null, reason: null });
-  const savedHandle = profile && profile.savedHandle;
-  const draftHandle = profile ? profile.handle || '' : '';
-  useEffect(() => {
-    if (!draftHandle || draftHandle === savedHandle) { setHandleCheck({ handle: null, ok: null, reason: null }); return undefined; }
-    let cancelled = false;
-    const t = setTimeout(() => {
-      fetch(`/api/account/handle-available?handle=${encodeURIComponent(draftHandle)}`)
-        .then((r) => r.json())
-        .then((d) => { if (!cancelled && !d.error) setHandleCheck(d); })
-        .catch(() => {});
-    }, 350);
-    return () => { cancelled = true; clearTimeout(t); };
-  }, [draftHandle, savedHandle]);
-  const [profileSaved, setProfileSaved] = useState(false);
-  const [profileError, setProfileError] = useState(null);
-  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState('');
-  const [deleteRequesting, setDeleteRequesting] = useState(false);
-  const [deleteRequested, setDeleteRequested] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
-  // Tracks what was actually loaded from the server, separate from the
-  // live form value — this is what lets the warning appear only when the
-  // person has actually changed their age this session, not just because
-  // they have one on file already.
-  const [originalAge, setOriginalAge] = useState(null);
-  const [ageChangeConfirmed, setAgeChangeConfirmed] = useState(false);
-
-  useEffect(() => {
-    fetch('/api/account/profile')
-      .then((r) => r.json())
-      .then((data) => { setProfile({ ...data, savedHandle: data.handle || '' }); setOriginalAge(data.age ?? null); })
-      .catch(() => setProfile({ displayName: '', gender: '', age: '', bio: '', avatarUrl: null, socialLinks: [], stayInStream: false }));
-  }, []);
-
-  const ageWasChanged = originalAge !== null && String(profile.age || '') !== String(originalAge || '') && profile.age !== '';
-
-  async function saveProfile(e) {
-    e.preventDefault();
-    if (ageWasChanged && !ageChangeConfirmed) {
-      setProfileError('Please confirm the age change below before saving.');
-      return;
-    }
-    setProfileSaving(true);
-    setProfileSaved(false);
-    setProfileError(null);
-    try {
-      const res = await fetch('/api/account/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(profile)
-      });
-      let data;
-      try {
-        data = await res.json();
-      } catch {
-        // Infrastructure-level failures (a request that's still too
-        // large even at the raised limit, a gateway timeout, etc.) come
-        // back as plain text or HTML, not JSON — trying to parse that as
-        // JSON is what actually produced the confusing "Unexpected
-        // token" error, masking the real, simpler problem underneath.
-        throw new Error(
-          res.status === 413
-            ? 'That image is too large — please use a smaller file.'
-            : `Something went wrong (server responded with status ${res.status}). Please try again.`
-        );
-      }
-      if (!res.ok) throw new Error(data.error || 'Could not save.');
-      setProfile((p) => ({
-        ...p,
-        savedHandle: p.handle || '',
-        avatarUrl: 'avatarUrl' in data ? data.avatarUrl : p.avatarUrl,
-        avatarBase64: null,
-        avatarFileName: null,
-        removeAvatar: false,
-        bannerUrl: 'bannerUrl' in data && data.bannerUrl !== undefined ? data.bannerUrl : (p.removeBanner ? null : p.bannerUrl),
-        bannerBase64: null,
-        bannerFileName: null,
-        removeBanner: false
-      }));
-      // HeaderNav fetched the old photo once on load — tell it about the
-      // new one so the header avatar changes now, not on the next reload.
-      if ('avatarUrl' in data || 'avatarPosition' in data || 'avatarZoom' in data || 'handle' in data) {
-        const detail = {};
-        if ('avatarUrl' in data) detail.avatarUrl = data.avatarUrl;
-        if ('avatarPosition' in data) detail.avatarPosition = data.avatarPosition;
-        if ('avatarZoom' in data) detail.avatarZoom = data.avatarZoom;
-        if ('handle' in data) detail.handle = data.handle;
-        window.dispatchEvent(new CustomEvent('taprino:own-profile-updated', { detail }));
-      }
-      setProfileSaved(true);
-      setOriginalAge(profile.age ?? null);
-      setAgeChangeConfirmed(false);
-      setTimeout(() => setProfileSaved(false), 2500);
-    } catch (err) {
-      setProfileError(err.message);
-    } finally {
-      setProfileSaving(false);
-    }
-  }
-
-  // Join: straight into Stripe Checkout (this page only renders signed
-  // in, so no sign-in detour like the episode paywall needs).
-  async function startCheckout(planTier) {
-    setJoiningTier(planTier);
-    const via = referredBy.trim();
-    try {
-      const res = await fetch('/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tier: planTier, returnTo: '/account', ...(via ? { via, viaSource: via === viaHandle ? 'link' : 'typed' } : {}) })
-      });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || 'Checkout isn’t available right now.');
-        setJoiningTier(null);
-      }
-    } catch (err) {
-      alert('Could not start checkout.');
-      setJoiningTier(null);
-    }
-  }
-
-  // Team, comped and promo-code accounts have Premium without a
-  // subscription — the picker gives way to a note saying so.
-  const freeAccessNote = isAdmin
-    ? `You have ${SITE.premiumTier} as part of the Studio Tapa team — no payment needed, ever.`
-    : isSubAdmin
-      ? `You have ${SITE.premiumTier} as a sub-admin on the team — no payment needed, ever.`
-      : isComped
-        ? 'Your access was given to you by the team — it’s free, and no payment is needed.'
-        : promoAccessExpiresAt
-          ? `You have ${SITE.premiumTier} from a redeemed code, through ${formatDate(promoAccessExpiresAt)}. Redeeming another code before then adds to this instead of replacing it.`
-          : null;
-
-  async function openPortal() {
-    setPortalLoading(true);
-    try {
-      const res = await fetch('/api/create-portal-session', { method: 'POST' });
-      const data = await res.json();
-      if (data.url) {
-        window.location.href = data.url;
-      } else {
-        alert(data.error || 'Could not open subscription settings.');
-        setPortalLoading(false);
-      }
-    } catch (err) {
-      alert('Could not open subscription settings.');
-      setPortalLoading(false);
-    }
-  }
-
-  async function handleRedeemCode(e) {
-    e.preventDefault();
-    setRedeemError(null);
-    setRedeemSuccess(null);
-    setRedeeming(true);
-    try {
-      const res = await fetch('/api/account/redeem-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: redeemInput.trim() })
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setRedeemError(data.error || 'Could not redeem that code.');
-        setRedeeming(false);
-        return;
-      }
-      setRedeemSuccess(data.expiresAt);
-      setRedeemInput('');
-      // A full reload rather than local state juggling — isSubscriber and
-      // the subscription-details branch above both come from
-      // getServerSideProps, so this is the simplest way to make the rest
-      // of the page (nav pill, membership section) reflect the new access
-      // immediately rather than only updating this one form.
-      setTimeout(() => window.location.reload(), 1200);
-    } catch (err) {
-      setRedeemError('Could not redeem that code — try again.');
-      setRedeeming(false);
-    }
-  }
-
-  async function handleRequestDeletion() {
-    if (deleteConfirmText.trim().toUpperCase() !== 'DELETE') return;
-    setDeleteRequesting(true);
-    setDeleteError(null);
-    try {
-      const res = await fetch('/api/account/request-deletion', { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Could not send that request.');
-      setDeleteRequested(true);
-      setDeleteConfirmOpen(false);
-      setDeleteConfirmText('');
-    } catch (err) {
-      setDeleteError(err.message);
-    } finally {
-      setDeleteRequesting(false);
-    }
-  }
-
-  async function toggleStayInStream() {
-    const next = !(profile && profile.stayInStream);
-    setProfile((p) => ({ ...p, stayInStream: next }));
-    try {
-      const res = await fetch('/api/account/profile', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ stayInStream: next })
-      });
-      if (!res.ok) throw new Error();
-    } catch (err) {
-      // Revert on failure — same best-effort pattern as toggleNewsletter below.
-      setProfile((p) => ({ ...p, stayInStream: !next }));
-    }
-  }
-
-  async function toggleNewsletter(action) {
-    setNewsletterLoading(true);
-    try {
-      const res = await fetch('/api/newsletter-preference', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action })
-      });
-      const data = await res.json();
-      if (res.ok) setNewsletter(data.newsletter);
-    } catch (err) {
-      // Silently ignore — button just stays as-is if this fails.
-    }
-    setNewsletterLoading(false);
-  }
-
-  const avatarLetter = email && email[0] ? email[0].toUpperCase() : '?';
-
-  // Priority order matters here — an account can technically match more
-  // than one (e.g. an admin is also isCreator per lib/roles.js), and we
-  // only ever want to show the single highest-privilege badge, not stack
-  // several that all describe the same person.
-  const roleBadge = isAdmin ? 'Admin' : isSubAdmin ? 'Sub-admin' : isCreator ? 'Creator' : null;
-
-  // Single column since the Membership card joined it (the old 320px
-  // rail is gone), so the standard 1180px stage — full width stretched
-  // every field across a wide monitor.
+function Tile({ href, kind, title, lines, cta }) {
   return (
-    <>
-      <HeaderNav
-        isSignedIn={isSignedIn}
-        isSubscriber={isSubscriber}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        mainGenres={mainGenres}
-      />
+    <Link href={href} className="acct-tile" data-tile={kind}>
+      <TileIcon kind={kind} />
+      <span className="acct-tile-title">{title}</span>
+      <span className="acct-tile-lines">
+        {lines.filter(Boolean).map((l, i) => <span key={i}>{l}</span>)}
+      </span>
+      <span className="acct-tile-cta">{cta} ›</span>
+    </Link>
+  );
+}
 
-      {isSignedIn ? (
-        <main id="main-content" className="stage stage-single">
-          <BackButton fallbackHref="/stream" />
+export default function Account(props) {
+  const { isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, twoFactorEnabled = false, teamTwoStep = null } = props;
+  const router = useRouter();
+  const { signOut } = useClerk();
+  const { profile } = useOwnProfile();
+  const [purchases, setPurchases] = useState(null);
+  const [tipsSent, setTipsSent] = useState(null);
+  const [money, setMoney] = useState(null);
 
-          <div className="account-identity">
-            <div className="account-identity-top">
-              <PositionedPhoto className="account-avatar" url={profile && (profile.avatarBase64 || profile.avatarUrl)} position={profile && profile.avatarPosition} zoom={(profile && profile.avatarZoom) || 1}>
-                {!(profile && (profile.avatarBase64 || profile.avatarUrl)) && avatarLetter}
-              </PositionedPhoto>
-              <div className="account-identity-meta">
-                <div className="account-identity-name-row">
-                  <h3>{profile && profile.displayName ? profile.displayName : (email || 'Your account')}</h3>
-                  {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
-                  {memberBadge(tier, SITE.premiumTier) && <span className="account-tier-badge">{memberBadge(tier, SITE.premiumTier)}</span>}
-                </div>
-                <div className="account-identity-sub">
-                  {profile && profile.handle && <span className="account-identity-handle">@{profile.handle}</span>}
-                  {profile && profile.handle && email && ' · '}
-                  {email ? <>Signed in as {email}</> : 'Signed in'}
-                </div>
-              </div>
-            </div>
-            {userId && (
-              <Link href={`/profile/${(profile && profile.handle) || userId}`} className="account-btn-secondary account-identity-link">
-                View public profile →
-              </Link>
-            )}
+  // The old one-page links still land: /account#membership and
+  // #purchases (the tab bar and a few banners used them), ?twostep=1
+  // from lib/adminPage.js.
+  useEffect(() => {
+    if (!router.isReady || !isSignedIn) return;
+    const hash = typeof window !== 'undefined' ? window.location.hash : '';
+    if (router.query.twostep === '1') { router.replace('/account/security?twostep=1'); return; }
+    if (LEGACY_HASHES[hash]) router.replace(LEGACY_HASHES[hash]);
+  }, [router, isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignedIn) return undefined;
+    let cancelled = false;
+    fetch('/api/purchases').then((r) => r.json()).then((d) => { if (!cancelled) setPurchases(Array.isArray(d.items) ? d.items : []); }).catch(() => { if (!cancelled) setPurchases([]); });
+    fetch('/api/tips?mine=1').then((r) => r.json()).then((d) => { if (!cancelled) setTipsSent(Array.isArray(d.tips) ? d.tips : []); }).catch(() => { if (!cancelled) setTipsSent([]); });
+    if (isCreator || isAdmin) {
+      fetch('/api/creator/money').then((r) => r.json()).then((d) => { if (!cancelled) setMoney(d && !d.error ? d : false); }).catch(() => { if (!cancelled) setMoney(false); });
+    }
+    return () => { cancelled = true; };
+  }, [isSignedIn, isCreator, isAdmin]);
+
+  const shellProps = { mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator };
+
+  if (!isSignedIn) {
+    return (
+      <AccountShell {...shellProps} back={false}>
+        <BackButton fallbackHref="/stream" />
+        <div className="account-card" style={{ maxWidth: 560 }}>
+          <div className="account-eyebrow">Your account</div>
+          <h3>Sign in or create your account</h3>
+          <p>
+            Real email + password now — sign in if you&rsquo;ve been here before, or create a free
+            account if you&rsquo;re new. Either way, you can upgrade to {SITE.premiumTier} any time once
+            signed in.
+          </p>
+          <SignInButton mode="modal" forceRedirectUrl="/account">
+            <button className="account-btn-primary">Sign in</button>
+          </SignInButton>
+          <SignUpButton mode="modal" forceRedirectUrl="/account">
+            <button className="account-btn-secondary">Create a free account</button>
+          </SignUpButton>
+          <div className="account-fineprint">
+            A free account doesn&rsquo;t unlock {SITE.premiumTier} content by itself — you can upgrade any time
+            from the account page once signed in.
           </div>
+        </div>
+      </AccountShell>
+    );
+  }
 
-          <div className="account-shell">
-            {/* MAIN COLUMN — identity-facing settings */}
-            <div className="account-main">
-              {/* Membership: the plan picker (components/MembershipPlans.js);
-                  id = where the tab bar's Membership row lands. */}
-              <div className="account-card" id="membership">
-                <div className="account-subheading">Membership</div>
-                {!freeAccessNote && !['standard', 'premium', 'sponsor'].includes(tier) && (
-                  <ReferredByField value={referredBy} onChange={setReferredBy} fromLink={viaHandle} />
-                )}
-                <MembershipPlans
-                  plans={plans}
-                  tier={tier}
-                  subscriptionDetails={subscriptionDetails}
-                  freeAccessNote={freeAccessNote}
-                  onJoin={startCheckout}
-                  onPortal={openPortal}
-                  joiningTier={joiningTier}
-                  portalLoading={portalLoading}
-                />
-                {/* Quick access to Membership Artist Support — the creators
-                    a member's share goes to (pages/artist-support.js). */}
-                <Link href="/artist-support" className="asup-quick">
-                  <span className="asup-quick-kicker">Membership Artist Support</span>
-                  <span className="asup-quick-text">Choose up to 10 creators your membership supports, and how your share splits between them. →</span>
-                </Link>
-                <div className="account-divider" />
-                <div className="account-subheading" style={{ fontSize: '0.72rem' }}>Have a code?</div>
-                <form onSubmit={handleRedeemCode} style={{ display: 'flex', gap: '0.5rem' }}>
-                  <input
-                    type="text"
-                    value={redeemInput}
-                    onChange={(e) => setRedeemInput(e.target.value)}
-                    placeholder="XXXX-XXXX-XXXX"
-                    style={{ flex: 1 }}
-                    disabled={redeeming}
-                  />
-                  <button className="account-btn-secondary" type="submit" style={{ width: 'auto' }} disabled={redeeming || !redeemInput.trim()}>
-                    {redeeming ? 'Checking…' : 'Redeem'}
-                  </button>
-                </form>
-                {redeemError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem', marginTop: '0.4rem' }}>{redeemError}</p>}
-                {redeemSuccess && (
-                  <p style={{ color: 'var(--ok)', fontSize: '0.85rem', marginTop: '0.4rem' }}>
-                    Code accepted — you now have {SITE.premiumTier} through {formatDate(redeemSuccess)}. Refreshing…
-                  </p>
-                )}
-              </div>
+  const freeAccessNote = freeAccessNoteFor({ isAdmin, isSubAdmin, isComped, promoAccessExpiresAt });
+  const roleBadge = roleBadgeFor({ isAdmin, isSubAdmin, isCreator });
+  const avatarLetter = email && email[0] ? email[0].toUpperCase() : '?';
+  const displayName = profile && profile.displayName ? profile.displayName : (email || 'Your account');
+  const handle = profile && profile.handle ? `@${profile.handle}` : null;
+  const twoStepOn = teamTwoStep ? teamTwoStep.on : twoFactorEnabled;
+  const ownedCount = purchases ? purchases.length : null;
+  const tipCount = tipsSent ? tipsSent.length : null;
+  const nextPayout = money && money.top && money.top.nextPayout;
 
-              {/* Buy to own: titles this account owns (components/PurchasesCard.js);
-                  shows once there's a purchase. id = the tab bar's row. */}
-              {isSignedIn && <PurchasesCard isSubscriber={isSubscriber} />}
+  return (
+    <AccountShell {...shellProps} back={false}>
+      <BackButton fallbackHref="/stream" />
 
-
-              <div className="account-card">
-                <div className="account-card-head">
-                  <h3>Public profile</h3>
-                  <span className="account-visibility public">Visible to anyone on {SITE.name}</span>
-                </div>
-                {!profile ? (
-                  <p>Loading…</p>
-                ) : (
-                  <form onSubmit={saveProfile}>
-                    {profileError && <p style={{ color: 'var(--danger)' }}>{profileError}</p>}
-
-                    <label>Display name</label>
-                    <input
-                      type="text"
-                      value={profile.displayName || ''}
-                      onChange={(e) => setProfile((p) => ({ ...p, displayName: e.target.value }))}
-                      maxLength={60}
-                      placeholder="How you'd like to appear publicly"
-                    />
-
-                    <label style={{ marginTop: '1rem' }}>Handle <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional — makes your profile link /profile/yourname instead of a long id</span></label>
-                    <div className="account-handle-field">
-                      <span className="account-handle-at">@</span>
-                      <input
-                        type="text"
-                        value={profile.handle || ''}
-                        onChange={(e) => setProfile((p) => ({ ...p, handle: e.target.value.replace(/^@+/, '').replace(/[^A-Za-z0-9_]/g, '').slice(0, 30) }))}
-                        maxLength={30}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        spellCheck={false}
-                        placeholder="yourname"
-                      />
-                    </div>
-                    <div className={`account-handle-hint ${handleCheck.ok === true ? 'ok' : handleCheck.ok === false ? 'bad' : ''}`} aria-live="polite">
-                      {handleCheck.reason
-                        || (handleCheck.ok === true && handleCheck.handle ? `@${handleCheck.handle} is available` : '')
-                        || (profile.handle ? '' : 'Handles are unique — one person per name.')}
-                    </div>
-
-                    <label style={{ marginTop: '1rem' }}>Avatar</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.9rem', marginBottom: '0.9rem', flexWrap: 'wrap' }}>
-                      <RepositionFrame
-                        className={`account-avatar ${reposition === 'avatar' ? 'account-avatar-large' : ''}`}
-                        url={profile.avatarBase64 || profile.avatarUrl}
-                        position={profile.avatarPosition}
-                        zoom={profile.avatarZoom || 1}
-                      >
-                        {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
-                      </RepositionFrame>
-                      {reposition === 'avatar' ? (
-                        <div className="account-reposition-panel" style={{ flex: '1 1 320px', margin: 0 }}>
-                          <CropWindow
-                            url={profile.avatarBase64 || profile.avatarUrl}
-                            position={profile.avatarPosition}
-                            zoom={profile.avatarZoom || 1}
-                            frameAspect={1}
-                            round
-                            height={220}
-                            onChange={(pos) => setProfile((p) => ({ ...p, avatarPosition: pos }))}
-                            onZoomChange={(z) => setProfile((p) => ({ ...p, avatarZoom: z }))}
-                          />
-                          <div className="account-reposition-actions">
-                            <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
-                            <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
-                            <span className="account-fineprint">Drag the bright window over the part you want in the circle, then Save profile below.</span>
-                          </div>
-                        </div>
-                      ) : (
-                      <>
-                      <input
-                        type="file"
-                        accept="image/png,image/jpeg,image/webp"
-                        onChange={(e) => {
-                          const file = e.target.files && e.target.files[0];
-                          if (!file) return;
-                          shrinkAvatar(file)
-                            .then((dataUrl) => setProfile((p) => ({ ...p, avatarBase64: dataUrl, avatarFileName: 'avatar.jpg', removeAvatar: false })))
-                            .catch(() => setProfileError('Could not read that image — try a JPG or PNG.'));
-                        }}
-                      />
-                      {(profile.avatarBase64 || profile.avatarUrl) && (
-                        <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => startReposition('avatar')}>
-                          Reposition
-                        </button>
-                      )}
-                      {(profile.avatarBase64 || profile.avatarUrl) && (
-                        <button
-                          type="button"
-                          className="account-btn-secondary"
-                          style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, avatarUrl: null, avatarBase64: null, removeAvatar: true, avatarPosition: null, avatarZoom: null }))}
-                        >
-                          Remove
-                        </button>
-                      )}
-                      </>
-                      )}
-                    </div>
-                    {profile.avatarBase64 && (
-                      <p style={{ marginTop: '-0.4rem', fontSize: '0.8rem', color: 'var(--signal-amber)' }}>
-                        New photo selected — press Save profile below to apply it.
-                      </p>
-                    )}
-
-                    <label>Banner <span style={{ fontWeight: 'normal', opacity: 0.65 }}>the backdrop at the top of your profile — a photo or a solid color</span></label>
-                    <RepositionFrame
-                      className="account-banner-preview"
-                      url={profile.bannerBase64 || profile.bannerUrl}
-                      position={profile.bannerPosition}
-                      zoom={profile.bannerZoom || 1}
-                      onMeasure={setBannerAspect}
-                      style={!(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor ? { background: profile.bannerColor } : undefined}
-                    >
-                      {reposition === 'banner' && <div className="account-banner-guide" aria-hidden="true" />}
-                      <PositionedPhoto className={`account-banner-preview-avatar ${reposition === 'banner' ? 'dim' : ''}`} url={profile.avatarBase64 || profile.avatarUrl} position={profile.avatarPosition} zoom={profile.avatarZoom || 1}>
-                        {!(profile.avatarBase64 || profile.avatarUrl) && avatarLetter}
-                      </PositionedPhoto>
-                    </RepositionFrame>
-                    {reposition === 'banner' ? (
-                      <div className="account-reposition-panel">
-                        <CropWindow
-                          url={profile.bannerBase64 || profile.bannerUrl}
-                          position={profile.bannerPosition}
-                          zoom={profile.bannerZoom || 1}
-                          frameAspect={bannerAspect}
-                          height={260}
-                          onChange={(pos) => setProfile((p) => ({ ...p, bannerPosition: pos }))}
-                          onZoomChange={(z) => setProfile((p) => ({ ...p, bannerZoom: z }))}
-                        />
-                        <div className="account-reposition-actions">
-                          <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => setReposition(null)}>Done</button>
-                          <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={cancelReposition}>Cancel</button>
-                          <span className="account-fineprint">The bright window is what shows on your profile; the dashed line above is where your avatar sits. Save profile below to keep it.</span>
-                        </div>
-                      </div>
-                    ) : (
-                    <div className="account-banner-controls">
-                      <label className="account-btn-secondary account-banner-upload">
-                        {(profile.bannerBase64 || profile.bannerUrl) ? 'Change photo' : 'Upload photo'}
-                        <input
-                          type="file"
-                          accept="image/png,image/jpeg,image/webp"
-                          onChange={(e) => {
-                            const file = e.target.files && e.target.files[0];
-                            if (!file) return;
-                            shrinkBanner(file)
-                              .then((dataUrl) => setProfile((p) => ({ ...p, bannerBase64: dataUrl, bannerFileName: 'banner.jpg', removeBanner: false })))
-                              .catch(() => setProfileError('Could not read that image — try a JPG or PNG.'));
-                          }}
-                        />
-                      </label>
-                      {(profile.bannerBase64 || profile.bannerUrl) && (
-                        <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => startReposition('banner')}>
-                          Reposition
-                        </button>
-                      )}
-                      {(profile.bannerBase64 || profile.bannerUrl) && (
-                        <button
-                          type="button"
-                          className="account-btn-secondary"
-                          style={{ width: 'auto' }}
-                          onClick={() => setProfile((p) => ({ ...p, bannerUrl: null, bannerBase64: null, removeBanner: true, bannerPosition: null, bannerZoom: null }))}
-                        >
-                          Remove photo
-                        </button>
-                      )}
-                    </div>
-                    )}
-                    <div className="account-banner-swatches" role="radiogroup" aria-label="Banner color">
-                      {BANNER_COLORS.map((c) => (
-                        <button
-                          key={c.value}
-                          type="button"
-                          role="radio"
-                          aria-checked={(profile.bannerColor || '').toLowerCase() === c.value}
-                          aria-label={c.label}
-                          title={c.label}
-                          className={`account-banner-swatch ${(profile.bannerColor || '').toLowerCase() === c.value ? 'is-active' : ''}`}
-                          style={{ background: c.value }}
-                          onClick={() => setProfile((p) => ({ ...p, bannerColor: c.value }))}
-                        />
-                      ))}
-                      <label className="account-banner-swatch account-banner-swatch-custom" title="Custom color">
-                        <input
-                          type="color"
-                          value={profile.bannerColor || '#283c63'}
-                          onChange={(e) => setProfile((p) => ({ ...p, bannerColor: e.target.value }))}
-                          aria-label="Custom banner color"
-                        />
-                        <span>+</span>
-                      </label>
-                      {profile.bannerColor && (
-                        <button type="button" className="account-banner-swatch-clear" onClick={() => setProfile((p) => ({ ...p, bannerColor: null }))}>
-                          No color
-                        </button>
-                      )}
-                    </div>
-                    {(profile.bannerBase64 || profile.bannerUrl) && profile.bannerColor && (
-                      <p className="account-banner-note">The photo shows on your profile; the color is what people see if you remove it.</p>
-                    )}
-
-                    <label>Bio <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional, up to 400 characters</span></label>
-                    <textarea
-                      value={profile.bio || ''}
-                      onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))}
-                      maxLength={400}
-                      placeholder="A line or two about what you make"
-                      style={{ minHeight: '4rem' }}
-                    />
-
-                    <label style={{ marginTop: '0.6rem' }}>Links <span style={{ fontWeight: 'normal', opacity: 0.65 }}>up to 6</span></label>
-                    {(profile.socialLinks || []).map((link, i) => (
-                      <div key={i} className="admin-field-row" style={{ marginBottom: '0.5rem' }}>
-                        <input
-                          type="text"
-                          value={link.platform || ''}
-                          placeholder="Instagram"
-                          onChange={(e) => setProfile((p) => {
-                            const next = [...(p.socialLinks || [])];
-                            next[i] = { ...next[i], platform: e.target.value };
-                            return { ...p, socialLinks: next };
-                          })}
-                        />
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                          <input
-                            type="text"
-                            value={link.url || ''}
-                            placeholder="https://instagram.com/you"
-                            style={{ flex: 1 }}
-                            onChange={(e) => setProfile((p) => {
-                              const next = [...(p.socialLinks || [])];
-                              next[i] = { ...next[i], url: e.target.value };
-                              return { ...p, socialLinks: next };
-                            })}
-                          />
-                          <button
-                            type="button"
-                            className="account-btn-secondary"
-                            style={{ width: 'auto' }}
-                            onClick={() => setProfile((p) => ({ ...p, socialLinks: (p.socialLinks || []).filter((_, idx) => idx !== i) }))}
-                          >
-                            &times;
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {(profile.socialLinks || []).length < 6 && (
-                      <button
-                        type="button"
-                        className="account-btn-secondary"
-                        style={{ width: 'auto', marginBottom: '0.6rem' }}
-                        onClick={() => setProfile((p) => ({ ...p, socialLinks: [...(p.socialLinks || []), { platform: '', url: '' }] }))}
-                      >
-                        + Add link
-                      </button>
-                    )}
-
-                    {(isCreator || isAdmin) && (
-                      <>
-                        <label style={{ marginTop: '0.6rem' }}>Fiscal sponsor <span style={{ fontWeight: 'normal', opacity: 0.65 }}>optional</span></label>
-                        <div className="admin-field-row" style={{ marginBottom: '0.4rem' }}>
-                          <input
-                            type="text"
-                            value={profile.fiscalSponsorName || ''}
-                            placeholder="Sponsor’s name"
-                            maxLength={80}
-                            onChange={(e) => setProfile((p) => ({ ...p, fiscalSponsorName: e.target.value }))}
-                          />
-                          <input
-                            type="text"
-                            value={profile.fiscalSponsorUrl || ''}
-                            placeholder="https://…/donate"
-                            onChange={(e) => setProfile((p) => ({ ...p, fiscalSponsorUrl: e.target.value }))}
-                          />
-                        </div>
-                        <p className="account-fineprint" style={{ marginBottom: '0.6rem' }}>
-                          If a nonprofit sponsors your work, add its donation link. Your tip sheet sends fans who want a tax-deductible donation there. Tips themselves are a thank-you, never a donation.
-                        </p>
-
-                        {/* The "Not for AI training" seal (migration 111): whether the
-                            mark shows on this creator's work; the policy applies either way. */}
-                        <div className="seal-switch-row">
-                          <div>
-                            <label htmlFor="ai-seal-switch" style={{ marginTop: 0 }}>Show the &ldquo;Not for AI training&rdquo; seal on my work</label>
-                            <p className="account-fineprint" style={{ marginBottom: '0.5rem' }}>
-                              On your titles, your series and your profile. The <Link href="/ai-policy">policy</Link> covers your work either way; this is only whether the mark shows.
-                            </p>
-                            <span className="ai-seal-chip" aria-hidden="true"><AiSealGlyph /> Not for AI training</span>
-                          </div>
-                          <button
-                            id="ai-seal-switch"
-                            type="button"
-                            role="switch"
-                            aria-checked={profile.aiSeal !== false}
-                            aria-label="Show the seal on my work"
-                            className={`seal-switch ${profile.aiSeal !== false ? 'on' : ''}`}
-                            onClick={() => setProfile((p) => ({ ...p, aiSeal: !(p.aiSeal !== false) }))}
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    <button className="account-btn-primary" type="submit" disabled={profileSaving} style={{ width: 'auto', marginTop: '0.8rem' }}>
-                      {profileSaving ? 'Saving…' : 'Save profile'}
-                    </button>
-                    {profileSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
-                  </form>
-                )}
-              </div>
-
-              {profile && (
-                <div className="account-card">
-                  <div className="account-card-head">
-                    <h3>Privacy</h3>
-                    <span className="account-visibility private">Never shown publicly — for our own understanding of who uses {SITE.name}</span>
-                  </div>
-                  <form onSubmit={saveProfile}>
-                    <div className="admin-field-row">
-                      <div className="admin-field">
-                        <label>Gender</label>
-                        <select value={profile.gender || ''} onChange={(e) => setProfile((p) => ({ ...p, gender: e.target.value }))}>
-                          <option value="">Prefer not to answer</option>
-                          <option value="female">Female</option>
-                          <option value="male">Male</option>
-                          <option value="nonbinary">Non-binary</option>
-                          <option value="prefer_not_to_say">Prefer not to say</option>
-                        </select>
-                      </div>
-                      <div className="admin-field">
-                        <label>Age</label>
-                        <input
-                          type="number"
-                          min="13"
-                          max="120"
-                          value={profile.age || ''}
-                          onChange={(e) => { setProfile((p) => ({ ...p, age: e.target.value })); setAgeChangeConfirmed(false); }}
-                        />
-                      </div>
-                    </div>
-
-                    {ageWasChanged && (
-                      <div style={{ background: 'rgba(var(--brass-rgb),0.1)', border: '1px solid rgba(var(--brass-rgb),0.3)', borderRadius: 8, padding: '0.9rem 1rem', margin: '0.8rem 0' }}>
-                        <p style={{ margin: '0 0 0.6rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
-                          <strong>Before you save this change:</strong> the age you provide here determines
-                          which age-restricted titles are shown to you — content rated for adults won&rsquo;t
-                          appear for an account listed as a minor. By changing your age, you&rsquo;re confirming
-                          the new value is accurate. Providing an inaccurate age to access content that
-                          wouldn&rsquo;t otherwise be shown to you may violate our Terms of Service and
-                          applicable law, and {SITE.name} is not responsible for content viewed as a result
-                          of inaccurate age information you provided.
-                        </p>
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.82rem', fontWeight: 'normal' }}>
-                          <input type="checkbox" checked={ageChangeConfirmed} onChange={(e) => setAgeChangeConfirmed(e.target.checked)} />
-                          I confirm this age is accurate.
-                        </label>
-                      </div>
-                    )}
-
-                    <button className="account-btn-primary" type="submit" disabled={profileSaving} style={{ width: 'auto', marginTop: '0.4rem' }}>
-                      {profileSaving ? 'Saving…' : 'Save'}
-                    </button>
-                    {profileSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
-                  </form>
-                </div>
-              )}
-
-              <div className="account-card">
-                <div className="account-subheading">Preferences</div>
-                <div className="account-row">
-                  <div>
-                    <div className="account-row-label">Newsletter</div>
-                    <div className="account-row-detail">
-                      {newsletter === 'subscribed' && "You're subscribed to new episode and creator-update emails."}
-                      {newsletter === 'opted_out' && "You've opted out — you won't be asked again unless you opt back in."}
-                      {newsletter === 'undecided' && "You haven't chosen yet — the signup panel will keep showing until you do."}
-                    </div>
-                  </div>
-                  {newsletter === 'subscribed' ? (
-                    <button className="account-btn-secondary" onClick={() => toggleNewsletter('optOut')} disabled={newsletterLoading}>
-                      {newsletterLoading ? 'Updating…' : 'Opt out'}
-                    </button>
-                  ) : (
-                    <button className="account-btn-secondary" onClick={() => toggleNewsletter('optIn')} disabled={newsletterLoading}>
-                      {newsletterLoading ? 'Updating…' : 'Opt in'}
-                    </button>
-                  )}
-                </div>
-                {profile && (
-                  <div className="account-row">
-                    <div>
-                      <div className="account-row-label">Here only for the stream?</div>
-                      <div className="account-row-detail">
-                        {profile.stayInStream
-                          ? `On — the logo takes you straight to /stream, skipping the ${SITE.name} homepage.`
-                          : `Off — the logo takes you to the ${SITE.name} homepage by default.`}
-                      </div>
-                    </div>
-                    <button className="account-btn-secondary" onClick={toggleStayInStream}>
-                      {profile.stayInStream ? 'Turn off' : 'Click to stay within the stream platform'}
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              {(isCreator || isAdmin) && <PayoutsCard returnTo="/account" />}
-              {/* Money (2026-10-23): one summary card in place of the Member
-                  support, Sales and Bring your people cards; the detail is
-                  on /creator/money. */}
-              {(isCreator || isAdmin) && <MoneySummaryCard />}
-
-              <div className="account-card">
-                <div className="account-subheading">Security</div>
-                {teamTwoStep && !teamTwoStep.on && (
-                  <div className="account-twostep" role="note">
-                    <b>{teamTwoStep.required ? 'Admin tools are locked until two-step verification is on.' : 'Turn on two-step verification.'}</b>{' '}
-                    Your account can reach people&rsquo;s money and private data. Press Manage, open Security, and add an authenticator app; the admin pages open again as soon as it&rsquo;s set.
-                  </div>
-                )}
-                <div className="account-row">
-                  <div>
-                    <div className="account-row-label">Email &amp; password</div>
-                    <div className="account-row-detail">Change your email, reset your password, or manage active sessions.</div>
-                  </div>
-                  <button className="account-btn-secondary" onClick={() => openUserProfile()}>Manage</button>
-                </div>
-              </div>
-
-              <div className="account-card account-card-danger">
-                <div className="account-subheading">Danger zone</div>
-                <div className="account-row">
-                  <div>
-                    <div className="account-row-label">Log out</div>
-                    <div className="account-row-detail">Sign out of {SITE.name} on this device.</div>
-                  </div>
-                  <button className="account-btn-secondary" onClick={() => signOut({ redirectUrl: '/' })}>Log out</button>
-                </div>
-                <div className="account-row">
-                  <div>
-                    <div className="account-row-label danger">Delete account</div>
-                    <div className="account-row-detail">Permanently removes your profile, wishlist, and viewing history. This can&rsquo;t be undone.</div>
-                  </div>
-                  {!deleteConfirmOpen && !deleteRequested && (
-                    <button className="account-btn-danger" onClick={() => setDeleteConfirmOpen(true)}>Delete account…</button>
-                  )}
-                </div>
-                {deleteConfirmOpen && (
-                  <div style={{ background: 'rgba(var(--danger-rgb),0.08)', border: '1px solid var(--danger-deep)', borderRadius: 6, padding: '0.9rem 1rem', marginTop: '0.4rem' }}>
-                    <p style={{ margin: '0 0 0.7rem', fontSize: '0.82rem', color: 'var(--ink)' }}>
-                      This sends a deletion request to our team, who will action it and confirm by email — it
-                      doesn&rsquo;t delete anything instantly. Type <strong>DELETE</strong> to confirm.
-                    </p>
-                    {deleteError && <p style={{ color: 'var(--danger)', fontSize: '0.82rem', marginBottom: '0.6rem' }}>{deleteError}</p>}
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input
-                        type="text"
-                        value={deleteConfirmText}
-                        onChange={(e) => setDeleteConfirmText(e.target.value)}
-                        placeholder="DELETE"
-                        style={{ flex: 1, marginBottom: 0 }}
-                      />
-                      <button
-                        className="account-btn-danger"
-                        disabled={deleteRequesting || deleteConfirmText.trim().toUpperCase() !== 'DELETE'}
-                        onClick={handleRequestDeletion}
-                      >
-                        {deleteRequesting ? 'Sending…' : 'Confirm request'}
-                      </button>
-                      <button className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => { setDeleteConfirmOpen(false); setDeleteConfirmText(''); setDeleteError(null); }}>
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                )}
-                {deleteRequested && (
-                  <p style={{ color: 'var(--ok)', fontSize: '0.85rem', marginTop: '0.6rem' }}>
-                    Request sent — our team will follow up by email to confirm.
-                  </p>
-                )}
-              </div>
-
+      <div className="account-identity acct-identity">
+        <div className="account-identity-top">
+          <PositionedPhoto className="account-avatar" url={profile && (profile.avatarBase64 || profile.avatarUrl)} position={profile && profile.avatarPosition} zoom={(profile && profile.avatarZoom) || 1}>
+            {!(profile && (profile.avatarBase64 || profile.avatarUrl)) && avatarLetter}
+          </PositionedPhoto>
+          <div className="account-identity-meta">
+            <div className="account-identity-name-row">
+              <h3>{displayName}</h3>
+              {roleBadge && <span className="account-role-badge">{roleBadge}</span>}
+              {memberBadge(tier, SITE.premiumTier) && <span className="account-tier-badge">{memberBadge(tier, SITE.premiumTier)}</span>}
             </div>
-
-          </div>
-        </main>
-      ) : (
-        <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '560px' }}>
-          <BackButton fallbackHref="/stream" />
-          <div className="account-card">
-            <div className="account-eyebrow">Your account</div>
-            <h3>Sign in or create your account</h3>
-            <p>
-              Real email + password now — sign in if you've been here before, or create a free
-              account if you're new. Either way, you can upgrade to {SITE.premiumTier} any time once
-              signed in.
-            </p>
-
-            <SignInButton mode="modal" forceRedirectUrl="/account">
-              <button className="account-btn-primary">Sign in</button>
-            </SignInButton>
-            <SignUpButton mode="modal" forceRedirectUrl="/account">
-              <button className="account-btn-secondary">Create a free account</button>
-            </SignUpButton>
-
-            <div className="account-fineprint">
-              A free account doesn&rsquo;t unlock {SITE.premiumTier} content by itself — you can upgrade any time
-              from the account page once signed in.
+            <div className="account-identity-sub">
+              {handle && <span className="account-identity-handle">{handle}</span>}
+              {handle && email && ' · '}
+              {email || 'Signed in'}
             </div>
           </div>
-        </main>
-      )}
-      <Footer />
-      <MobileTabBar />
-    </>
+        </div>
+        {userId && (
+          <Link href={`/profile/${(profile && profile.handle) || userId}`} className="account-btn-secondary account-identity-link">
+            View public profile →
+          </Link>
+        )}
+      </div>
+
+      <nav className="acct-tiles" aria-label="Account sections">
+        <Tile
+          href="/account/membership"
+          kind="membership"
+          title="Membership"
+          lines={membershipTileLines({ plans, tier, subscriptionDetails, freeAccessNote })}
+          cta="Manage"
+        />
+        <Tile
+          href="/account/profile"
+          kind="profile"
+          title="Profile"
+          lines={[
+            profile ? `${displayName}${handle ? ` · ${handle}` : ''}` : 'Loading…',
+            'Visible to anyone',
+            (isCreator || isAdmin) && profile ? (profile.aiSeal !== false ? 'Not for AI training seal on' : 'Seal off') : null
+          ]}
+          cta="Edit"
+        />
+        {(isCreator || isAdmin) && (
+          <Tile
+            href="/creator/money"
+            kind="money"
+            title="Money"
+            lines={[
+              money === null ? 'Loading…' : money ? `${money.periodLabel || 'This month'} ${dollars(money.top.monthCents)}` : 'Every lane that pays you',
+              money ? (nextPayout && nextPayout.willPay ? `Owed ${dollars(money.top.owedCents)} · pays on the 1st` : `Owed ${dollars(money.top.owedCents)}`) : null,
+              money && money.payouts ? (money.payouts.availableCents == null ? 'Payouts: set up in Stripe' : `${dollars(money.payouts.availableCents)} in your Stripe balance`) : 'Payouts and the full history'
+            ]}
+            cta="Open"
+          />
+        )}
+        <Tile
+          href="/account/purchases"
+          kind="purchases"
+          title="Purchases"
+          lines={[
+            ownedCount === null ? 'Loading…' : ownedCount === 0 ? 'No titles bought yet' : `${ownedCount} title${ownedCount === 1 ? '' : 's'} you own`,
+            tipCount === null ? null : tipCount === 0 ? 'No tips sent' : `${tipCount} tip${tipCount === 1 ? '' : 's'} sent`,
+            'Receipts and refunds'
+          ]}
+          cta="See all"
+        />
+        <Tile
+          href="/account/preferences"
+          kind="preferences"
+          title="Preferences"
+          lines={[
+            `Newsletter ${newsletterStatus === 'subscribed' ? 'on' : newsletterStatus === 'opted_out' ? 'off' : 'not chosen'}`,
+            profile ? `Start in Stream ${profile.stayInStream ? 'on' : 'off'}` : 'Start in Stream',
+            'Push, in the app'
+          ]}
+          cta="Change"
+        />
+        <Tile
+          href="/account/security"
+          kind="security"
+          title="Security"
+          lines={[
+            `Two-step ${twoStepOn ? 'on' : 'off'}`,
+            email || 'Email & password',
+            'Devices, log out, delete'
+          ]}
+          cta="Manage"
+        />
+      </nav>
+
+      <div className="acct-hub-foot">
+        <button type="button" className="account-btn-secondary" style={{ width: 'auto', marginBottom: 0 }} onClick={() => signOut({ redirectUrl: '/' })}>Log out of this device</button>
+        <div className="acct-delete-line">
+          <Link href="/account/security#delete">Delete account…</Link>
+          <span>Removes your profile, wishlist and viewing history for good.</span>
+        </div>
+      </div>
+    </AccountShell>
   );
 }

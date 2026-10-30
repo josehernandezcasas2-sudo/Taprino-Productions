@@ -106,6 +106,12 @@ export default function RootLayout() {
           <Stack.Screen name="watch/podcasts" options={{ headerShown: false }} />
           <Stack.Screen name="watch/vertical" options={{ headerShown: false }} />
           <Stack.Screen name="account/index" options={{ headerShown: false }} />
+          {/* The account hub's screens (option B, 2026-10-29): each
+              draws the site header + its own Back pill. */}
+          <Stack.Screen name="account/membership" options={{ headerShown: false }} />
+          <Stack.Screen name="account/profile" options={{ headerShown: false }} />
+          <Stack.Screen name="account/preferences" options={{ headerShown: false }} />
+          <Stack.Screen name="account/security" options={{ headerShown: false }} />
           <Stack.Screen name="account/wishlist" options={{ headerShown: false }} />
           <Stack.Screen name="account/my-work" options={{ headerShown: false }} />
           <Stack.Screen name="account/artist-support" options={{ headerShown: false }} />

@@ -18,9 +18,10 @@ export default async function handler(req, res) {
   const { session_id: sessionId } = req.query;
   if (!sessionId) return res.redirect('/');
 
-  // Joined from the account page: land back there (the only other
-  // destination is the home page, so nothing else can be asked for here).
-  const to = req.query.to === 'account' ? '/account' : '/';
+  // Joined from the account's Membership page (web, or the app's in-app
+  // browser): land back there (the only other destination is the home
+  // page, so nothing else can be asked for here).
+  const to = req.query.to === 'account' ? '/account/membership' : '/';
   res.writeHead(302, { Location: `${to}?welcome=1` });
   return res.end();
 }

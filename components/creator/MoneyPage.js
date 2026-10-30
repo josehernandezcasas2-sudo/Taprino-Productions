@@ -18,7 +18,7 @@ function Row({ label, value }) {
   return <span className="money-row"><span>{label}</span><b>{value}</b></span>;
 }
 
-export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPath = '/api/creator/payouts' }) {
+export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPath = '/api/creator/payouts', top = null, back = null }) {
   const [period, setPeriod] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -94,7 +94,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
 
   return (
   <main className="library-stage money-stage">
-    <BackButton fallbackHref="/account" />
+    {back || <BackButton fallbackHref="/account" />}
 
     <div className="money-head">
       <div className="money-head-text">
@@ -113,11 +113,16 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
       <div className="money-head-actions">
         {data && (ready
           ? <span className="money-pill ok">Payouts ready{data.payouts.bank ? ` · ${data.payouts.bank.name} ····${data.payouts.bank.last4}` : ''}</span>
-          : <Link href="/account" className="money-pill wait">Set up payouts on your account →</Link>)}
+          : <a href="#payouts" className="money-pill wait">Set up payouts below ↓</a>)}
         {data && <a className="account-btn-secondary money-btn" href={`${apiPath}${apiPath.includes('?') ? '&' : '?'}period=${encodeURIComponent(data.period)}&format=csv`}>Export CSV</a>}
         {ready && <button type="button" className="unlock-btn money-btn" onClick={openStripe} disabled={stripeBusy}>{stripeBusy ? 'Opening…' : 'Open Stripe'}</button>}
       </div>
     </div>
+
+    {/* The Payouts card (Stripe Express: setup, balance, next payout)
+        sits under the head since the account hub of 2026-10-29; the
+        page passes it in so this body stays free of Stripe calls. */}
+    {top && <div id="payouts" className="money-top">{top}</div>}
 
     {error && <p className="asup-note error" role="alert">{error}</p>}
     {loading && !data && <p className="money-loading">Adding it up…</p>}

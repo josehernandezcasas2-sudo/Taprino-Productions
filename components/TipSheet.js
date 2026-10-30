@@ -244,7 +244,7 @@ export function TippedBanner({ email }) {
       <p>
         {settled ? `It’s in ${name}’s Stripe account now.` : `It lands in ${name}’s Stripe account the moment the card clears.`}
         {tip && tip.note ? ` ${name} will see your note${tip.showName ? ' and your name' : ' from “a fan”'}.` : tip ? (tip.showName ? ` ${name} will see your name.` : ` ${name} sees it from “a fan”.`) : ''}
-        {email ? ` Receipt from Stripe to ${email}.` : ' Stripe emailed a receipt.'} Your tips are listed under Account → <Link href="/account#purchases">Your purchases</Link>.
+        {email ? ` Receipt from Stripe to ${email}.` : ' Stripe emailed a receipt.'} Your tips are listed under Account → <Link href="/account/purchases">Your purchases</Link>.
       </p>
     </div>
   );

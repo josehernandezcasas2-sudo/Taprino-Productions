@@ -1,8 +1,11 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import MoneyPage from '../../components/creator/MoneyPage';
+import PayoutsCard from '../../components/creator/PayoutsCard';
+import { BackArrowIcon } from '../../components/PlayerIcons';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnListings } from '../../lib/locations';
@@ -13,8 +16,11 @@ import { SITE } from '../../lib/siteConfig';
 // sales, backing, bookings — with what is owed, what Stripe already
 // holds, a History of every line, and the CSV. The body is
 // components/creator/MoneyPage.js (reads /api/creator/money,
-// lib/creatorMoney.js); nothing here moves money. The app's
-// creator/money screen is the same page stacked.
+// lib/creatorMoney.js); nothing here moves money. Since the account hub
+// (option B, 2026-10-29) this is the hub's Money tile, so the Payouts
+// card (Stripe Express setup, balance, next payout) sits under the head
+// and Stripe's onboarding returns here (lib/creatorPayouts.js
+// RETURN_PATHS). The app's creator/money screen is the same page stacked.
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -45,7 +51,10 @@ export default function CreatorMoney({ mainGenres = [], isSignedIn, isSubscriber
         <meta name="robots" content="noindex" />
       </Head>
       <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
-      <MoneyPage />
+      <MoneyPage
+        back={<Link href="/account" className="acct-back"><BackArrowIcon size={14} /> Account</Link>}
+        top={<PayoutsCard returnTo="/creator/money" />}
+      />
       <Footer />
       <MobileTabBar />
     </>

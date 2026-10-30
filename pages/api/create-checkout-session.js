@@ -73,7 +73,9 @@ export default async function handler(req, res) {
       return res.status(429).json({ error: 'Checkout is already opening — give it a moment.' });
     }
 
-    const back = body.returnTo === '/account' ? '/account' : '/';
+    // The Membership page (web and app) asks to land back on it; the
+    // app still sends the old '/account', which means the same page.
+    const back = body.returnTo === '/account' || body.returnTo === '/account/membership' ? '/account/membership' : '/';
 
     // Creator Share (lib/creatorShare.js): the subscription carries the
     // member's id, so every renewal can be recorded without a lookup, and
@@ -103,7 +105,7 @@ export default async function handler(req, res) {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back === '/account' ? '&to=account' : ''}`,
+      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back !== '/' ? '&to=account' : ''}`,
       // From the account page (web or app) land back on it; the in-app
       // browser then closes and the screen re-reads membership.
       cancel_url: `${origin}${back}?checkout=cancelled`,

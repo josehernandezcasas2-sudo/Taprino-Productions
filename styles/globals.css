@@ -11248,3 +11248,136 @@ a.prod-day:hover { background: var(--surface-3); }
   gap: 0.4rem;
   white-space: nowrap;
 }
+
+/* ---------- The account hub (option B, 2026-10-29) ----------
+   /account is the identity card + six tiles; each tile opens its own
+   page under /account/… (components/account/AccountShell.js draws the
+   frame: a Back pill to the hub, the title, the body). Money is the
+   existing /creator/money with the Payouts card under its head. */
+.acct-stage { max-width: 980px; }
+.acct-back {
+  display: inline-flex;
+  align-self: flex-start;
+  width: max-content;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid rgba(251, 232, 211, 0.18);
+  color: var(--ink-dim);
+  border-radius: 999px;
+  padding: 0.4rem 0.9rem 0.4rem 0.7rem;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  text-decoration: none;
+  margin-bottom: 1.2rem;
+}
+.acct-back:hover { border-color: var(--signal-amber); color: var(--signal-amber); }
+.acct-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-bottom: 1.1rem; }
+.acct-title { font-family: var(--font-display); font-weight: 600; font-size: 1.7rem; line-height: 1.1; margin: 0; color: var(--ink); }
+.acct-title-link { font-family: var(--font-mono); font-size: 0.74rem; color: var(--olive); text-decoration: none; white-space: nowrap; }
+.acct-title-link:hover { color: var(--brass); }
+.acct-lede { margin: -0.4rem 0 1.2rem; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; max-width: 60ch; }
+.acct-body { display: flex; flex-direction: column; gap: 1.2rem; }
+.acct-body > .account-card { margin: 0; }
+
+/* The hub's tiles: two across on a phone, three from 900px. The icon,
+   the name, two or three lines of live state, and the action word. */
+.acct-identity { margin-bottom: 1.2rem; }
+.acct-tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem; margin: 0; padding: 0; }
+.acct-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  min-height: 150px;
+  padding: 1rem 1rem 0.9rem;
+  background: var(--void-2);
+  border: 1px solid rgba(251, 232, 211, 0.1);
+  border-radius: 14px;
+  color: var(--ink);
+  text-decoration: none;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.acct-tile:hover { border-color: rgba(var(--brass-rgb), 0.5); transform: translateY(-1px); color: var(--ink); }
+.acct-tile:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.acct-tile svg { flex: none; }
+.acct-tile-title { font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; line-height: 1.15; }
+.acct-tile-lines { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.8rem; line-height: 1.35; color: var(--ink-dim); flex: 1; min-width: 0; }
+.acct-tile-lines > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acct-tile-lines > span:first-child { color: var(--ink); }
+.acct-tile[data-tile="membership"] .acct-tile-lines > span:first-child { color: var(--olive); }
+.acct-tile[data-tile="money"] .acct-tile-lines > span:first-child { color: var(--ok); font-variant-numeric: tabular-nums; }
+.acct-tile-cta { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--brass); margin-top: auto; }
+.acct-hub-foot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid rgba(251, 232, 211, 0.1); }
+.acct-delete-line { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.78rem; color: var(--ink-faint); }
+.acct-delete-line a { color: var(--ink-dim); font-weight: 600; text-decoration: underline; text-underline-offset: 2px; }
+.acct-delete-line a:hover { color: var(--danger); }
+@media (min-width: 900px) {
+  .acct-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+  .acct-tile { min-height: 170px; padding: 1.15rem 1.15rem 1rem; }
+}
+@media (max-width: 380px) {
+  .acct-tile { min-height: 140px; padding: 0.85rem 0.8rem 0.8rem; }
+  .acct-tile-title { font-size: 0.98rem; }
+}
+
+/* Membership: a paying member sees one row for their plan — name,
+   price, the perks, Renews/Ends, Manage subscription and a Compare
+   plans disclosure that reveals the picker underneath. */
+.acct-plan-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1rem 1.4rem; align-items: start; }
+.acct-plan-name { display: flex; flex-direction: column; gap: 0.2rem; }
+.acct-plan-tier { font-family: var(--font-display); font-weight: 700; font-size: 1.3rem; color: var(--olive); }
+.acct-plan-price { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-dim); }
+.acct-plan-perks { grid-column: 1 / -1; list-style: none; margin: 0; padding: 0; display: grid; gap: 0.35rem; font-size: 0.86rem; line-height: 1.4; color: var(--ink-dim); }
+.acct-plan-perks li { padding-left: 1.3rem; position: relative; }
+.acct-plan-perks li::before { content: "✓"; position: absolute; left: 0; color: var(--ok); font-family: var(--font-mono); }
+.acct-plan-actions { grid-column: 1 / -1; display: flex; align-items: center; gap: 0.6rem 1rem; flex-wrap: wrap; padding-top: 0.6rem; border-top: 1px solid rgba(251, 232, 211, 0.1); }
+.acct-plan-actions .account-btn-primary, .acct-plan-actions .account-btn-secondary { width: auto; margin-bottom: 0; }
+.acct-linkbtn { background: none; border: 0; padding: 0; color: var(--olive); font: inherit; font-size: 0.84rem; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.acct-linkbtn:hover { color: var(--brass); }
+.acct-linkbtn[aria-expanded="true"] { color: var(--ink-dim); }
+
+/* Small state chips (Security's two-step "On"). */
+.acct-chip { display: inline-flex; align-items: center; gap: 0.3rem; font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.05em; text-transform: uppercase; padding: 0.25rem 0.6rem; border-radius: 999px; border: 1px solid rgba(251, 232, 211, 0.2); color: var(--ink-dim); white-space: nowrap; }
+.acct-chip.ok { color: var(--ok); border-color: rgba(132, 205, 152, 0.45); }
+
+/* Preferences: the switches are the seal switch (.seal-switch) in a
+   label/description/switch row. */
+.acct-switch-row { display: flex; justify-content: space-between; align-items: flex-start; gap: 1rem; padding: 0.9rem 0; border-top: 1px solid rgba(251, 232, 211, 0.1); }
+.acct-switch-row:first-of-type { border-top: 0; padding-top: 0; }
+.acct-switch-row > div { min-width: 0; }
+.acct-switch-row b { display: block; font-size: 0.92rem; margin-bottom: 0.15rem; }
+.acct-switch-row p { margin: 0; font-size: 0.8rem; color: var(--ink-dim); line-height: 1.45; }
+.acct-switch[disabled] { opacity: 0.55; cursor: wait; }
+
+/* Profile: the photos preview with one "Edit photos" button, the
+   editor it opens, and the Save row at the end of both cards. */
+.acct-profile-form { display: flex; flex-direction: column; gap: 1.2rem; }
+.acct-photos-preview { position: relative; }
+.acct-photos-edit {
+  position: absolute;
+  right: 0.7rem;
+  bottom: 0.7rem;
+  background: rgba(12, 19, 31, 0.78);
+  border: 1px solid rgba(251, 232, 211, 0.3);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 0.4rem 0.85rem;
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+.acct-photos-edit:hover { border-color: var(--brass); color: var(--brass); }
+.acct-photos-editor { display: flex; flex-direction: column; gap: 0.8rem; margin: -0.4rem 0 1.2rem; padding: 1rem; background: var(--void); border: 1px solid rgba(251, 232, 211, 0.1); border-radius: 10px; }
+.acct-photos-row { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 0.5rem 1rem; align-items: center; }
+.acct-photos-label { font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint); }
+.acct-photos-row .account-banner-controls { margin: 0; }
+.acct-photos-row .account-banner-controls .account-btn-secondary { margin-bottom: 0; }
+@media (max-width: 480px) { .acct-photos-row { grid-template-columns: 1fr; gap: 0.35rem; } }
+.acct-save-row { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; position: sticky; bottom: 0; padding: 0.8rem 0; background: linear-gradient(180deg, rgba(12, 19, 31, 0), var(--void) 40%); z-index: 2; }
+@media (max-width: 900px) { .acct-save-row { bottom: 64px; } }
+/* The Payouts card under the Money page's head (pages/creator/money.js). */
+.money-top { margin-bottom: 1.4rem; scroll-margin-top: 92px; }
+.money-top .account-card { margin: 0; }

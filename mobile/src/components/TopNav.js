@@ -411,10 +411,10 @@ export default function TopNav() {
                 <MenuRow Icon={ChatIcon} label="Messages" badge={messagesUnread} onPress={() => go('/messages')} />
                 <MenuRow Icon={SparkleIcon} label="My Recs" onPress={() => go('/recs')} />
                 {settings && settings.elevatorPitchEnabled ? <MenuRow Icon={TargetIcon} label="Pitch Room" onPress={() => go('/pitches')} /> : null}
-                {/* The Account screen's Membership card does the right thing
-                    for everyone: plan picker, Manage subscription for a
-                    paying member, the free-access note for the team. */}
-                <MenuRow Icon={isSubscriber ? CardIcon : SparkleIcon} label={isSubscriber ? 'Membership' : `Join ${PREMIUM_TIER}`} onPress={() => go('/account?section=membership')} />
+                {/* The Membership screen does the right thing for everyone:
+                    plan picker, Manage subscription for a paying member,
+                    the free-access note for the team. */}
+                <MenuRow Icon={isSubscriber ? CardIcon : SparkleIcon} label={isSubscriber ? 'Membership' : `Join ${PREMIUM_TIER}`} onPress={() => go('/account/membership')} />
                 {role.isCreator ? <View style={styles.panelDivider} /> : null}
                 {role.isCreator ? <MenuRow Icon={BarChartIcon} label="Your numbers" onPress={() => go('/creator/numbers')} /> : null}
                 {role.isCreator || role.isAdmin ? (

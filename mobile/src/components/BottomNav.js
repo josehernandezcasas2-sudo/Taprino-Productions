@@ -58,8 +58,8 @@ const GROUPS = {
     items: ({ profileHref, role }) => [
       { href: '/account', label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
-      // The Account screen scrolls itself to its Membership card.
-      { href: '/account?section=membership', label: 'Membership' },
+      // The account hub's screens (option B, 2026-10-29).
+      { href: '/account/membership', label: 'Membership' },
       { href: '/account/purchases', label: 'Your purchases' },
       // Membership Artist Support: the creators a member's share goes to.
       { href: '/account/artist-support', label: 'Artist Support' },

@@ -430,9 +430,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       return;
     }
     // There's more than one plan now, so the paywall sends them to the
-    // picker on the account page rather than guessing a tier.
+    // picker on the account's Membership page rather than guessing a tier.
     setCheckoutLoading(true);
-    router.push('/account#membership');
+    router.push('/account/membership');
   }
 
   return (

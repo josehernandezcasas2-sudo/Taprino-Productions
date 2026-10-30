@@ -94,7 +94,7 @@ export default function AdminShell({ account, mainGenres, title, crumbs = [], in
           {account.twoFactorEnabled === false && (
             <div className="adm-twostep" role="note">
               <b>Turn on two-step verification.</b> This account can move money and read private data; a password alone is one leak away. Account → Security → Manage → add an authenticator app.{' '}
-              <Link href="/account?twostep=1">Go to Account</Link>
+              <Link href="/account/security?twostep=1">Go to Security</Link>
             </div>
           )}
           {children}

@@ -23,7 +23,9 @@ export default function PositionedPhoto({ url, position, zoom = 1, className = '
 
   useEffect(() => {
     if (!frameRef.current) return undefined;
-    const measure = () => { const r = frameRef.current.getBoundingClientRect(); if (r.width > 0 && r.height > 0) setFrame({ w: r.width, h: r.height }); };
+    // The observer can fire after the frame is gone (a page that
+    // redirects while mounting), so read the ref each time.
+    const measure = () => { const el = frameRef.current; if (!el) return; const r = el.getBoundingClientRect(); if (r.width > 0 && r.height > 0) setFrame({ w: r.width, h: r.height }); };
     measure();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
     if (ro) ro.observe(frameRef.current);

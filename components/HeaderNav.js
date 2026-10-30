@@ -487,12 +487,12 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                 {siteSettings && siteSettings.elevatorPitchEnabled && (
                   <Link href="/pitches" className="dropdown-item"><TargetIcon size={15} src={iconOverrides.target} /> Pitch Room</Link>
                 )}
-                {/* The Membership card on /account does the right thing for
-                    everyone: plan picker, Manage subscription for a paying
-                    member, the free-access note for the team. Opening
-                    Stripe's portal from here showed an empty page to
-                    accounts with no subscription (admins, comped). */}
-                <Link href="/account#membership" className="dropdown-item">
+                {/* /account/membership does the right thing for everyone:
+                    plan picker, Manage subscription for a paying member,
+                    the free-access note for the team. Opening Stripe's
+                    portal from here showed an empty page to accounts with
+                    no subscription (admins, comped). */}
+                <Link href="/account/membership" className="dropdown-item">
                   {isSubscriber ? <CardIcon size={15} src={iconOverrides.card} /> : <SparkleIcon size={15} src={iconOverrides.sparkle} />}
                   {' '}{isSubscriber ? 'Membership' : `Join ${SITE.premiumTier}`}
                 </Link>

@@ -8,6 +8,7 @@ import * as Clipboard from 'expo-clipboard';
 import { apiGet, apiPost, freshToken, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import PayoutsCard from '../../components/PayoutsCard';
 import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creatorMoneyRules';
 
 // The creator's Money page, stacked (mockup signed off 2026-10-23):
@@ -139,13 +140,18 @@ export default function CreatorMoneyScreen() {
         <View style={styles.headActions}>
           {ready
             ? <View style={styles.pillOk}><View style={styles.pillDot} /><Text style={styles.pillOkText}>Payouts ready{data.payouts.bank ? ` · ····${data.payouts.bank.last4}` : ''}</Text></View>
-            : <Pressable style={styles.pillWait} onPress={() => router.push('/account')}><Text style={styles.pillWaitText}>Set up payouts on Account →</Text></Pressable>}
+            : <View style={styles.pillWait}><Text style={styles.pillWaitText}>Set up payouts below ↓</Text></View>}
           {ready ? (
             <Pressable style={[styles.btnPrimary, styles.btnInline, busy && styles.disabled]} disabled={busy} onPress={openStripe}>
               <Text style={styles.btnPrimaryText}>{busy ? 'Opening…' : 'Open Stripe'}</Text>
             </Pressable>
           ) : null}
         </View>
+
+        {/* The Payouts card (Stripe Express: setup, balance, next payout)
+            under the head, since the account hub of 2026-10-29 made this
+            screen the hub's Money tile. */}
+        <PayoutsCard showEarningsLink={false} />
 
         <View style={styles.kpis}>
           <View style={styles.kpi}>

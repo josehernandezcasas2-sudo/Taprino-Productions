@@ -154,7 +154,7 @@ export function BoughtBanner({ bought, title, email }) {
       </span>
       <div>
         <b>It&rsquo;s yours.</b>
-        <p>{title} is in your library for good.{email ? ` Receipt sent to ${email}.` : ''} Find it any time under Account → <Link href="/account#purchases">Your purchases</Link>.</p>
+        <p>{title} is in your library for good.{email ? ` Receipt sent to ${email}.` : ''} Find it any time under Account → <Link href="/account/purchases">Your purchases</Link>.</p>
       </div>
     </div>
   );

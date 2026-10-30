@@ -89,10 +89,11 @@ const GROUPS = {
       // Their public page, as anyone else sees it (/api/my-role sends
       // the @handle URL once signed in).
       ...(roles.profileHref ? [{ href: roles.profileHref, label: 'View profile' }] : []),
-      // The Membership card on /account: status + Manage subscription for
-      // members, the Tapa + benefits + Join for everyone else.
-      { href: '/account#membership', label: 'Membership' },
-      { href: '/account#purchases', label: 'Your purchases' },
+      // The account hub's pages (option B, 2026-10-29): status + Manage
+      // subscription for members, the Tapa + benefits + Join for
+      // everyone else; the titles they own and the tips they sent.
+      { href: '/account/membership', label: 'Membership' },
+      { href: '/account/purchases', label: 'Your purchases' },
       // Membership Artist Support: the creators a member's share goes to.
       { href: '/artist-support', label: 'Artist Support' },
       { href: '/wishlist', label: 'My List' },
