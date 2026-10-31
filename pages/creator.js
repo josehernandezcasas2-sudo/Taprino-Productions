@@ -1,17 +1,22 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { getAccountContext } from '../lib/accountContext';
-import { getAllSeries } from '../lib/series';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
+import { listDrafts } from '../lib/creatorDrafts';
+import { SUBMIT_TYPES } from '../lib/submitRules';
+import { bytesLabel } from '../lib/creatorRights';
 import HeaderNav from '../components/HeaderNav';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
-import CreatorSubmissionForm from '../components/CreatorSubmissionForm';
-import AddSeriesForm from '../components/AddSeriesForm';
-import AddPitchForm from '../components/AddPitchForm';
-import SubmissionModal from '../components/SubmissionModal';
 
+// Creator Studio, the hub (2026-10-31, from the creator-path canvas): one
+// Submit a title button, the types as pills under it, the drafts in
+// flight, and three piles that answer "where are my things" without
+// opening Your work — In review, Needs you, Live. The six-button modal
+// page it replaces is gone; submitting is /creator/submit.
+//
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
 // renders.
@@ -21,12 +26,11 @@ export async function getServerSideProps({ req, res }) {
   if (!account.isCreator && !account.isAdmin) {
     return { redirect: { destination: '/stream', permanent: false } };
   }
-  const [allSeries, episodes] = await Promise.all([getAllSeries(account.userId), getPublicEpisodes()]);
-  const mainGenres = [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))];
+  const [episodes, drafts] = await Promise.all([getPublicEpisodes(), listDrafts(account.userId)]);
   return {
     props: {
-      allSeries,
-      mainGenres,
+      mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
+      drafts,
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
       email: account.email,
@@ -36,155 +40,157 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-// Five type-specific buttons replace the old single generic form with a
-// content-type dropdown buried inside it — each opens a popup built for
-// just that type, so a podcast submission shows the show/season picker
-// and audio import right away, while a film submission never shows
-// series-related fields at all. "Add Series" is genuinely different from
-// the other four: it creates only a series shell (name/description/
-// artwork), no episode, pending admin review — episodes get added to it
-// afterward through the normal flow, whenever the creator's ready,
-// without waiting on that review.
-const TYPE_BUTTONS = [
-  { key: 'movie', icon: '\u{1F3AC}', label: 'Add Film' },
-  { key: 'series', icon: '\u{1F4FA}', label: 'Add Series' },
-  { key: 'podcast', icon: '\u{1F3A7}', label: 'Add Podcast' },
-  { key: 'short', icon: '\u26A1', label: 'Add Short' },
-  { key: 'vertical', icon: '\u{1F4F1}', label: 'Add Vertical' },
-  { key: 'pitch', icon: '\u{1F4E3}', label: 'Add Pitch' }
-];
+const PILE_LIMIT = 4;
 
-const TYPE_TITLES = {
-  movie: 'Add Film',
-  series: 'Add Series',
-  podcast: 'Add Podcast',
-  short: 'Add Short',
-  vertical: 'Add Vertical',
-  pitch: 'Add Pitch'
-};
+function needsYou(s) {
+  if (s.status === 'rejected') return s.rejectionReason ? `Not this time: ${s.rejectionReason}` : 'Not this time';
+  if (s.deletionRequested) return null;
+  if (s.held && s.status === 'approved') return 'Pulled while an admin looks at it';
+  if (s.missingArtwork) return 'Missing a poster or a still';
+  if (s.status === 'approved' && s.contentType !== 'podcast' && !s.captionsUrl) return 'No captions yet';
+  if (s.cloudflareState === 'error') return 'The video failed to process';
+  if (s.cloudflareState === 'pendingupload') return 'The upload never finished';
+  return null;
+}
 
-export default function CreatorSubmit({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
-  const [openModal, setOpenModal] = useState(null);
-  const [seriesCreated, setSeriesCreated] = useState(null);
-  const [pitchSubmitted, setPitchSubmitted] = useState(null);
-  // Distinct from openModal==='series' (which opens the "create a new
-  // series" form) — this instead opens the episode-submission form
-  // pre-targeted at a series that already exists, used by the "Add the
-  // first episode now" handoff right after a new series is created.
-  const [episodeForSeriesId, setEpisodeForSeriesId] = useState(null);
+export default function CreatorStudio({ mainGenres, drafts: initialDrafts, isSignedIn, isSubscriber, email, isAdmin, isCreator }) {
+  const router = useRouter();
+  const [subs, setSubs] = useState(null);
+  const [drafts, setDrafts] = useState(initialDrafts || []);
+  const [error, setError] = useState(null);
+  const submitted = typeof router.query.submitted === 'string' ? router.query.submitted : null;
 
-  function closeModal() {
-    setOpenModal(null);
-    setEpisodeForSeriesId(null);
-    setSeriesCreated(null);
-    setPitchSubmitted(null);
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/creator/my-submissions').then((r) => r.json()).then((d) => {
+      if (!alive) return;
+      if (d && Array.isArray(d.submissions)) setSubs(d.submissions);
+      else setError((d && d.error) || 'Could not load your titles.');
+    }).catch(() => { if (alive) setError('Could not load your titles.'); });
+    return () => { alive = false; };
+  }, []);
+
+  async function discardDraft(id) {
+    if (!window.confirm('Discard this draft? Its uploaded file is deleted too.')) return;
+    try {
+      const res = await fetch('/api/creator/drafts', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) });
+      if (!res.ok) throw new Error((await res.json()).error || 'Could not discard it.');
+      setDrafts((d) => d.filter((x) => x.id !== id));
+    } catch (err) {
+      setError(err.message);
+    }
   }
+
+  const list = subs || [];
+  const inReview = list.filter((s) => s.status === 'pending');
+  const needs = list.map((s) => ({ s, why: needsYou(s) })).filter((x) => x.why);
+  const live = list.filter((s) => s.status === 'approved' && !s.held).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''));
 
   return (
     <>
-      <Head>
-        <title>Submit an episode — {SITE.name}</title>
-      </Head>
+      <Head><title>Creator Studio — {SITE.name}</title></Head>
+      <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
 
-      <HeaderNav
-        activeType="All"
-        mainGenres={mainGenres}
-        isSignedIn={isSignedIn}
-        email={email}
-        isAdmin={isAdmin}
-        isCreator={isCreator}
-        isSubscriber={isSubscriber}
-      />
-
-      <main id="main-content" className="stage" style={{ gridTemplateColumns: '1fr', maxWidth: '720px' }}>
-        <div className="library-heading" style={{ marginBottom: '0.3rem' }}>Creator Studio</div>
-        <p className="library-sub" style={{ marginBottom: '1.2rem' }}>Submit new episodes and track your review status.</p>
-
-        <div className="creator-type-grid">
-          {TYPE_BUTTONS.map((t) => (
-            <button key={t.key} type="button" className="creator-type-btn" onClick={() => setOpenModal(t.key)}>
-              <span className="creator-type-icon">{t.icon}</span>
-              <span>{t.label}</span>
-            </button>
-          ))}
+      <main id="main-content" className="cs">
+        <div className="cs-head">
+          <div className="apl-eyebrow">Creator Studio</div>
+          <h1 className="cs-h1">Your titles, in one place.</h1>
         </div>
-        <p style={{ fontSize: '0.78rem', color: 'var(--ink-dim)', margin: '0.6rem 0 1.4rem' }}>
-          Each opens a form built for that type only — no unrelated fields to skip past.
-        </p>
 
-        <Link href="/creator/series" className="account-btn-secondary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginBottom: '0.7rem' }}>
-          ▤ Series management
-        </Link>
-        <Link href="/creator/my-work" className="account-btn-secondary" style={{ display: 'block', textAlign: 'center', textDecoration: 'none' }}>
-          📁 View your work
-        </Link>
+        {submitted && (
+          <div className="cs-flash" role="status">
+            <strong>“{submitted}” is in.</strong> It sits under In review until we&rsquo;ve watched it; the upload keeps going in the corner if it hasn&rsquo;t finished.
+          </div>
+        )}
+
+        <div className="cs-submit">
+          <Link href="/creator/submit" className="apl-btn cs-submit-btn">Submit a title</Link>
+          <div className="apl-pills cs-types">
+            {SUBMIT_TYPES.map((t) => <Link key={t.value} href={`/creator/submit?type=${t.value}`} className="apl-pill">{t.label}</Link>)}
+            <Link href="/creator/pitch/new" className="apl-pill">Pitch a project</Link>
+          </div>
+          <p className="apl-help">Three steps: the file (it uploads while you type), a few words about it, artwork. Saved as a draft as you go.</p>
+        </div>
+
+        {drafts.length > 0 && (
+          <section className="cs-pile cs-drafts">
+            <div className="cs-pile-head"><span className="apl-card-k">Drafts</span><span className="cs-count">{drafts.length}</span></div>
+            {drafts.map((d) => (
+              <div key={d.id} className="cs-row">
+                <div className="cs-row-main">
+                  <div className="cs-row-title">{(d.form && d.form.title) || (d.video && d.video.name) || 'Untitled draft'}</div>
+                  <div className="cs-row-meta">
+                    {d.video ? `${d.video.state === 'uploading' ? 'the master’s upload stopped' : d.video.state === 'processing' ? 'the master is processing' : d.video.state === 'ready' ? 'the master is in' : 'the master failed to process'}${d.video.bytes ? ` · ${bytesLabel(d.video.bytes)}` : ''}` : 'no file yet'} · step {d.form && d.form.step ? d.form.step : 1} of 3
+                  </div>
+                </div>
+                <div className="cs-row-acts">
+                  <Link href={`/creator/submit?draft=${encodeURIComponent(d.id)}`} className="apl-btn-secondary small">Continue</Link>
+                  <button type="button" className="apl-link" onClick={() => discardDraft(d.id)}>Discard</button>
+                </div>
+              </div>
+            ))}
+          </section>
+        )}
+
+        {error && <p className="admin-error" role="alert">{error}</p>}
+
+        <div className="cs-piles">
+          <Pile k="In review" count={inReview.length} empty={subs ? 'Nothing waiting on us.' : 'Loading…'} href="/creator/my-work?status=pending">
+            {inReview.slice(0, PILE_LIMIT).map((s) => <Row key={s.id} s={s} meta={`${s.seriesName ? `${s.seriesName} · ` : ''}sent ${ago(s.createdAt)}${s.cloudflareState && s.cloudflareState !== 'ready' ? ` · ${cfLabel(s.cloudflareState)}` : ''}`} />)}
+          </Pile>
+          <Pile k="Needs you" count={needs.length} empty={subs ? 'Nothing to fix.' : 'Loading…'} href="/creator/my-work?attention=1" tone="warn">
+            {needs.slice(0, PILE_LIMIT).map(({ s, why }) => <Row key={s.id} s={s} meta={why} href="/creator/my-work" />)}
+          </Pile>
+          <Pile k="Live" count={live.length} empty={subs ? 'Nothing live yet. The first one is the hardest.' : 'Loading…'} href="/creator/my-work?status=approved" tone="ok">
+            {live.slice(0, PILE_LIMIT).map((s) => <Row key={s.id} s={s} meta={`${s.seriesName ? `${s.seriesName} · ` : ''}${s.viewCount} view${s.viewCount === 1 ? '' : 's'}`} href={`/episode/${s.id}`} />)}
+          </Pile>
+        </div>
+
+        <nav className="cs-links" aria-label="Creator Studio">
+          <Link href="/creator/my-work">Your work</Link>
+          <Link href="/creator/series">Series management</Link>
+          <Link href="/creator/analytics">Your numbers</Link>
+          <Link href="/creator/money">Money</Link>
+          <Link href="/creator/pitch/dashboard">Pitch Room</Link>
+        </nav>
       </main>
-
-      {openModal && openModal !== 'series' && openModal !== 'pitch' && (
-        <SubmissionModal title={TYPE_TITLES[openModal]} icon={TYPE_BUTTONS.find((t) => t.key === openModal).icon} onClose={closeModal}>
-          <CreatorSubmissionForm
-            allSeries={allSeries}
-            initialContentType={openModal}
-            lockContentType
-            onSubmitted={closeModal}
-          />
-        </SubmissionModal>
-      )}
-
-      {episodeForSeriesId && (
-        <SubmissionModal title={`Add Episode to ${seriesCreated ? seriesCreated.name : 'Series'}`} icon="📺" onClose={closeModal}>
-          <CreatorSubmissionForm
-            allSeries={allSeries.some((s) => s.id === episodeForSeriesId) ? allSeries : [...allSeries, { id: episodeForSeriesId, name: seriesCreated ? seriesCreated.name : 'Your new series' }]}
-            initialContentType="series"
-            initialSeriesId={episodeForSeriesId}
-            lockContentType
-            onSubmitted={closeModal}
-          />
-        </SubmissionModal>
-      )}
-
-      {openModal === 'series' && (
-        <SubmissionModal title="Add Series" icon="📺" onClose={closeModal}>
-          {seriesCreated ? (
-            <div>
-              <p style={{ color: 'var(--ok)', fontSize: '0.9rem' }}>
-                &ldquo;{seriesCreated.name}&rdquo; was created and is pending review. You can start adding
-                episodes to it right away — no need to wait.
-              </p>
-              <button
-                type="button"
-                className="account-btn-primary"
-                style={{ marginTop: '0.8rem' }}
-                onClick={() => { setOpenModal(null); setEpisodeForSeriesId(seriesCreated.id); }}
-              >
-                Add the first episode now →
-              </button>
-            </div>
-          ) : (
-            <AddSeriesForm onSubmitted={setSeriesCreated} />
-          )}
-        </SubmissionModal>
-      )}
-
-      {openModal === 'pitch' && (
-        <SubmissionModal title="Add Pitch" icon="\u{1F4E3}" onClose={closeModal}>
-          {pitchSubmitted ? (
-            <div>
-              <p style={{ color: 'var(--ok)', fontSize: '0.9rem' }}>
-                &ldquo;{pitchSubmitted.title || 'Your project'}&rdquo; was submitted and is pending review.
-                You&rsquo;ll see its status on your Pitch Room dashboard.
-              </p>
-              <Link href="/creator/pitch/dashboard" className="account-btn-primary" style={{ display: 'inline-block', marginTop: '0.8rem', textDecoration: 'none' }}>
-                Go to your Pitch Room dashboard →
-              </Link>
-            </div>
-          ) : (
-            <AddPitchForm onSubmitted={setPitchSubmitted} />
-          )}
-        </SubmissionModal>
-      )}
-
       <Footer />
     </>
   );
+}
+
+function Pile({ k, count, empty, href, tone = '', children }) {
+  const rows = Array.isArray(children) ? children.filter(Boolean) : children ? [children] : [];
+  return (
+    <section className={`cs-pile ${tone}`}>
+      <div className="cs-pile-head"><span className="apl-card-k">{k}</span><span className="cs-count">{count}</span></div>
+      {rows.length === 0 ? <p className="cs-empty">{empty}</p> : rows}
+      {count > PILE_LIMIT && <Link href={href} className="apl-link">All {count} in Your work</Link>}
+    </section>
+  );
+}
+
+function Row({ s, meta, href = '/creator/my-work' }) {
+  return (
+    <Link href={href} className="cs-row">
+      <span className="cs-thumb" style={s.thumbnail || s.poster ? { backgroundImage: `url(${s.thumbnail || s.poster})` } : undefined} aria-hidden="true" />
+      <span className="cs-row-main">
+        <span className="cs-row-title">{s.title}</span>
+        <span className="cs-row-meta">{meta}</span>
+      </span>
+    </Link>
+  );
+}
+
+function cfLabel(state) {
+  return { pendingupload: 'upload not finished', downloading: 'receiving', queued: 'queued', inprogress: 'processing', error: 'failed to process' }[state] || state;
+}
+
+function ago(iso) {
+  if (!iso) return '';
+  const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
 }

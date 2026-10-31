@@ -421,9 +421,8 @@ export default function TopNav() {
                   <>
                     <MenuRow Icon={CardIcon} label="Money" onPress={() => go('/creator/money')} />
                     <View style={styles.panelDivider} />
-                    {/* Episode uploads are the website's (a browser TUS
-                        upload), so this one opens the site. */}
-                    <MenuRow Icon={ClapperboardIcon} label="Submit your work" onPress={() => { setPanel(null); Linking.openURL(absoluteUrl('/creator')).catch(() => {}); }} />
+                    {/* Creator Studio's hub + the three-step submit (2026-10-31). */}
+                    <MenuRow Icon={ClapperboardIcon} label="Creator Studio" onPress={() => go('/creator')} />
                     <MenuRow Icon={FolderIcon} label="Your work" onPress={() => go('/account/my-work')} />
                   </>
                 ) : (

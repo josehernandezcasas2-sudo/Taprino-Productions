@@ -4,14 +4,17 @@ import { RIGHTS_QUESTIONS, rightsVerdict, rightsVerdictCopy } from '../lib/creat
 // them. The verdict updates as answers change, so the applicant knows
 // before applying whether their film would sit in review, and why.
 // `answers` is { [questionId]: 'yes' | 'no' }; the page owns it.
-export default function RightsCheck({ answers, onAnswer }) {
+// `compact` (the one-page apply form, 2026-10-31): the questions as a
+// tight list and the verdict as a strip under them, inside the page's
+// own card.
+export default function RightsCheck({ answers, onAnswer, compact = false }) {
   const verdict = rightsVerdict(answers);
   const copy = rightsVerdictCopy(verdict);
   const showHolds = verdict.result === 'held' || (verdict.result === 'incomplete' && verdict.holds.length > 0);
 
   return (
-    <div className="rights-check">
-      <div className="account-card rights-list" role="group" aria-label="Rights check">
+    <div className={`rights-check ${compact ? 'compact' : ''}`}>
+      <div className={`${compact ? '' : 'account-card '}rights-list`} role="group" aria-label="Rights check">
         {RIGHTS_QUESTIONS.map((q, i) => (
           <div key={q.id} className="rights-row">
             <div className="rights-row-text">

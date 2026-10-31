@@ -17,10 +17,11 @@ import { dollars } from '../../lib/purchaseRules';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
+// The creator path's words (2026-10-31): In review / Live / Not this time.
 const STATUS_LABEL = {
-  pending: { text: 'Pending review', color: colors.olive },
-  approved: { text: 'Approved — live', color: colors.ok },
-  rejected: { text: 'Rejected', color: colors.danger }
+  pending: { text: 'In review', color: colors.olive },
+  approved: { text: 'Live', color: colors.ok },
+  rejected: { text: 'Not this time', color: colors.danger }
 };
 
 const CF_STATE_LABEL = {
@@ -244,8 +245,8 @@ export default function MyWork() {
           <Text style={styles.eyebrow}>Creator Studio</Text>
           <Text style={styles.title}>Your work</Text>
           <Text style={styles.sub}>Everything you've submitted, pending or already live — edit, add artwork, or manage it here.</Text>
-          <Pressable style={styles.primaryBtn} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator`)}>
-            <Text style={styles.primaryBtnText}>+ Submit new episode</Text>
+          <Pressable style={styles.primaryBtn} onPress={() => router.push('/creator/submit')}>
+            <Text style={styles.primaryBtnText}>+ Submit a title</Text>
           </Pressable>
         </View>
 
@@ -257,7 +258,7 @@ export default function MyWork() {
 
         {submissions.length === 0 ? (
           <Text style={styles.note}>
-            Nothing submitted yet — <Text style={styles.link} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator`)}>submit your first one</Text>.
+            Nothing submitted yet — <Text style={styles.link} onPress={() => router.push('/creator/submit')}>submit your first one</Text>.
           </Text>
         ) : (
           <>
@@ -391,6 +392,7 @@ export default function MyWork() {
               copiedId={copiedId}
               pricing={pricing}
               onSell={(target) => { setActionSheet(null); setSellModal(target); }}
+              onBonus={(seriesId) => { setActionSheet(null); router.push(`/creator/submit?type=bonus&series=${encodeURIComponent(seriesId)}`); }}
             /> : null}
           </Pressable>
         </Pressable>
@@ -464,7 +466,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, copiedId, pricing, onSell }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, copiedId, pricing, onSell, onBonus }) {
   const { type, item } = actionSheet;
   if (type === 'series') {
     return (
@@ -476,8 +478,8 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
         <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'series', id: item.id, title: item.name, sub: 'Whole series' })}>
           <Text style={[styles.sheetRowText, { color: colors.olive, fontWeight: '700' }]}>$</Text><Text style={styles.sheetRowText}>{pricing.prices[`series:${item.id}`] ? 'Series price and sales' : 'Sell the whole series'}</Text>
         </Pressable>
-        <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/my-work`)}>
-          <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Add bonus content (on website)</Text>
+        <Pressable style={styles.sheetRow} onPress={() => onBonus(item.id)}>
+          <ClapperboardIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Add bonus content</Text>
         </Pressable>
         <Pressable style={styles.sheetCancel} onPress={onClose}><Text style={styles.sheetCancelText}>Close</Text></Pressable>
       </>

@@ -7,6 +7,9 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { sendError } from '../../../lib/apiErrors';
+import { uploadCaptionFile } from '../../../lib/captionUpload';
+import { deleteDraft } from '../../../lib/creatorDrafts';
+import { applyCors } from '../../../lib/cors';
 
 // Every one of these has to be present and non-empty — this is the actual
 // enforcement of "creators must submit complete metadata," not just a UI
@@ -27,12 +30,17 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  // The app's submit screen calls this with a Bearer token.
+  applyCors(req, res);
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') {
-    res.setHeader('Allow', 'POST');
+    res.setHeader('Allow', 'POST, OPTIONS');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { userId, isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -44,6 +52,15 @@ export default async function handler(req, res) {
   }
 
   const body = req.body || {};
+  // The three-step submit page (2026-10-31) sends what it read from the
+  // file and the main genre doubles as the specific one when none was typed.
+  if ((!body.runtime || !String(body.runtime).trim()) && Number(body.runtimeSeconds) > 0) {
+    const total = Math.round(Number(body.runtimeSeconds));
+    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
+    body.runtime = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+  }
+  if ((!body.genre || !String(body.genre).trim()) && body.mainGenre) body.genre = body.mainGenre;
+  if (!body.tier) body.tier = 'free';
 
   const missing = REQUIRED_FIELDS.filter((f) => !body[f] || String(body[f]).trim() === '');
   if (missing.length > 0) {
@@ -59,6 +76,31 @@ export default async function handler(req, res) {
   // podcast episode always belongs to a show (even a show with only one
   // episode so far), same reasoning as a series episode always belonging
   // to a series. Standalone movie/short/vertical has no season or order.
+  // "+ New show" inline on the submit page: the show is created here, in
+  // the same breath as its first episode, pending review like one made
+  // through create-series.
+  const newSeriesName = typeof body.newSeriesName === 'string' ? body.newSeriesName.trim().slice(0, 120) : '';
+  if (newSeriesName && (body.contentType === 'series' || body.contentType === 'podcast')) {
+    const seriesId = `${newSeriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'show'}-${Date.now().toString(36)}`;
+    const { error: seriesError } = await getSupabase().from('series').insert({
+      id: seriesId,
+      name: newSeriesName,
+      description: typeof body.newSeriesDescription === 'string' ? body.newSeriesDescription.trim().slice(0, 2000) || null : null,
+      poster: null,
+      thumbnail: null,
+      creator_id: userId,
+      channel_opt_in: body.channelOptIn === true,
+      submitted_by: email || null,
+      status: 'pending'
+    });
+    if (seriesError) {
+      console.error('submit-episode new series:', seriesError.message);
+      return res.status(500).json({ error: 'Could not create the show.' });
+    }
+    body.seriesId = seriesId;
+    if (!body.seriesOrder) body.seriesOrder = 1;
+    if (!body.season) body.season = 1;
+  }
   if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || !body.seriesOrder)) {
     return res.status(400).json({ error: `${body.contentType === 'podcast' ? 'Podcast' : 'Series'} episodes need a show/series and an episode number.` });
   }
@@ -176,6 +218,17 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'You can only add episodes to your own series.' });
   }
 
+  // Captions with the submission (optional; SRT is converted, VTT checked).
+  let captionsUrl = null;
+  if (body.captionsBase64) {
+    try {
+      const track = await uploadCaptionFile({ base64: body.captionsBase64, fileName: body.captionsFileName, pathPrefix: id });
+      captionsUrl = track ? track.url : null;
+    } catch (err) {
+      return res.status(400).json({ error: `Captions: ${err.message}` });
+    }
+  }
+
   const supabase = getSupabase();
   const { error } = await supabase.from('episodes').insert({
     id,
@@ -201,6 +254,7 @@ export default async function handler(req, res) {
     trailer_src: trailerSrc,
     poster,
     thumbnail,
+    ...(captionsUrl ? { captions_url: captionsUrl, captions_language: typeof body.captionsLanguage === 'string' ? body.captionsLanguage.slice(0, 10) || 'en' : 'en', captions_label: typeof body.captionsLabel === 'string' ? body.captionsLabel.slice(0, 40) || 'English' : 'English' } : {}),
     // These three used to be admin-only. Creator submissions still go to
     // 'pending' regardless of what's checked here (see status below), so
     // none of them bypass review — a creator requesting hero rotation or
@@ -223,5 +277,8 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Could not save the submission.' });
   }
 
-  return res.status(200).json({ ok: true, id, status: 'pending' });
+  // The draft this came from is done; its video rides on with the title.
+  if (body.draftId) await deleteDraft(userId, String(body.draftId), { keepMedia: true }).catch(() => {});
+
+  return res.status(200).json({ ok: true, id, status: 'pending', seriesId: body.seriesId && body.seriesId !== '__new__' ? body.seriesId : null });
 }

@@ -12,7 +12,7 @@ import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
 const SITE_ORIGIN = 'https://www.studiotapatv.site';
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place', price: 'Price' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application' };
 const SWIPE_THRESHOLD = 90;
 
 // Review on the go (2026-10-08): one item at a time as a card. The video
@@ -22,7 +22,11 @@ const SWIPE_THRESHOLD = 90;
 // deep-link there instead of approving blind.
 // Places (Locations listings) approve here too; the host's proof opens in
 // the in-app browser when it's a web address.
-// ?kind=submission|channel|ad|series|location narrows the deck.
+// Applications (the creator path, 2026-10-31): a film sent through /apply
+// with its master, which plays here as a signed HLS stream. Accept puts it
+// live (Free, or Tapa + from the chips) and grants Creator Studio; Hold
+// sends one thing to fix; Decline deletes the file.
+// ?kind=submission|channel|ad|series|location|application narrows the deck.
 export default function AdminReview() {
   const router = useRouter();
   const { kind } = useLocalSearchParams();
@@ -31,8 +35,10 @@ export default function AdminReview() {
   const [index, setIndex] = useState(0);
   const [busy, setBusy] = useState(false);
   const [rejecting, setRejecting] = useState(false);
+  const [holding, setHolding] = useState(false);
   const [reason, setReason] = useState('');
   const [done, setDone] = useState(0);
+  const [tiers, setTiers] = useState({});
 
   // A fresh token for every request: one kept from when the queue opened
   // has expired a minute later, and Approve/Reject then failed.
@@ -57,8 +63,13 @@ export default function AdminReview() {
     if (!item || busy) return;
     setBusy(true);
     try {
-      await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' ? reason : undefined, tierOverride: item.kind === 'submission' ? item.meta.tier : undefined }, await freshToken(getToken));
+      const tierOverride = item.kind === 'submission' ? item.meta.tier : item.kind === 'application' ? (tiers[item.id] || 'free') : undefined;
+      const res = await apiPost('/api/admin/review-queue', { kind: item.kind, id: item.id, decision, reason: decision === 'reject' || decision === 'hold' ? reason : undefined, tierOverride }, await freshToken(getToken));
+      if (item.kind === 'application' && decision === 'approve') {
+        Alert.alert(res.mode === 'live' ? 'Live' : 'Accepted', res.mode === 'live' ? `“${item.title}” is live at ${res.episode.href}${res.roleGranted ? ', and Creator Studio is granted' : ''}. They’ve been emailed.` : 'Creator Studio is theirs; they upload the master there. They’ve been emailed.');
+      }
       setRejecting(false);
+      setHolding(false);
       setReason('');
       setDone((d) => d + 1);
       setState((s) => ({ ...s, items: s.items.filter((i) => !(i.kind === item.kind && i.id === item.id)) }));
@@ -102,32 +113,41 @@ export default function AdminReview() {
           busy={busy}
           onApprove={() => decide('approve')}
           onReject={() => setRejecting(true)}
+          onHold={() => setHolding(true)}
+          tier={tiers[item.id] || 'free'}
+          onTier={(t) => setTiers((m) => ({ ...m, [item.id]: t }))}
           onSkip={skip}
           canSkip={items.length > 1}
           dots={items.slice(0, 8).map((_, i) => i === index)}
         />
       )}
 
-      <Modal visible={rejecting} transparent animationType="fade" onRequestClose={() => setRejecting(false)}>
-        <Pressable style={styles.backdrop} onPress={() => setRejecting(false)}>
+      <Modal visible={rejecting || holding} transparent animationType="fade" onRequestClose={() => { setRejecting(false); setHolding(false); }}>
+        <Pressable style={styles.backdrop} onPress={() => { setRejecting(false); setHolding(false); }}>
           <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={styles.eyebrow}>Reject</Text>
+            <Text style={[styles.eyebrow, holding && { color: colors.olive }]}>{holding ? 'Hold' : item && item.kind === 'application' ? 'Decline' : 'Reject'}</Text>
             <Text style={styles.sheetTitle}>{item ? item.title : ''}</Text>
-            <Text style={styles.sheetBody}>The reason is shown to whoever submitted it.</Text>
+            <Text style={styles.sheetBody}>{holding ? 'The one thing to fix. They read it, replace the file, and it comes back here.' : 'The reason is shown to whoever submitted it.'}</Text>
             <TextInput
               style={styles.input}
               value={reason}
               onChangeText={setReason}
-              placeholder="What needs to change?"
+              placeholder={holding ? 'What needs fixing?' : 'What needs to change?'}
               placeholderTextColor={colors.inkFaint}
               multiline
               autoFocus
             />
             <View style={styles.acts}>
-              <Pressable style={styles.btnSecondary} onPress={() => setRejecting(false)}><Text style={styles.btnSecondaryText}>Cancel</Text></Pressable>
-              <Pressable style={[styles.btnDanger, (!reason.trim() || busy) && { opacity: 0.5 }]} disabled={!reason.trim() || busy} onPress={() => decide('reject')}>
-                {busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.btnDangerText}>Reject</Text>}
-              </Pressable>
+              <Pressable style={styles.btnSecondary} onPress={() => { setRejecting(false); setHolding(false); }}><Text style={styles.btnSecondaryText}>Cancel</Text></Pressable>
+              {holding ? (
+                <Pressable style={[styles.btnOk, { flex: 0, paddingHorizontal: 18 }, (!reason.trim() || busy) && { opacity: 0.5 }]} disabled={!reason.trim() || busy} onPress={() => decide('hold')}>
+                  {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.btnOkText}>Send the hold</Text>}
+                </Pressable>
+              ) : (
+                <Pressable style={[styles.btnDanger, (!reason.trim() || busy) && { opacity: 0.5 }]} disabled={!reason.trim() || busy} onPress={() => decide('reject')}>
+                  {busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.btnDangerText}>{item && item.kind === 'application' ? 'Decline' : 'Reject'}</Text>}
+                </Pressable>
+              )}
             </View>
           </Pressable>
         </Pressable>
@@ -136,10 +156,11 @@ export default function AdminReview() {
   );
 }
 
-function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip, dots }) {
+function ReviewCard({ item, getToken, busy, onApprove, onReject, onHold, onSkip, canSkip, dots, tier, onTier }) {
   const { width } = useWindowDimensions();
   const [previewSrc, setPreviewSrc] = useState(item.media.src || null);
   const needsWeb = item.kind === 'ad' || item.kind === 'series';
+  const isApplication = item.kind === 'application';
 
   // Channel uploads need a signed URL from the server.
   useEffect(() => {
@@ -172,7 +193,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
     }
   }), [canSkip, width, onSkip]);
 
-  const meta = Object.entries(item.meta || {}).filter(([, v]) => v !== null && v !== undefined && v !== '' && typeof v !== 'object');
+  const meta = Object.entries(item.meta || {}).filter(([, v]) => v !== null && v !== undefined && v !== '' && typeof v !== 'object' && typeof v !== 'boolean');
 
   return (
     <View style={{ flex: 1 }}>
@@ -184,7 +205,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
             ) : item.media.poster ? (
               <SmartImage uri={item.media.poster} style={styles.video} resizeMode="cover" />
             ) : (
-              <View style={[styles.video, styles.videoEmpty]}><Text style={styles.videoEmptyText}>{item.kind === 'channel' ? 'Loading preview…' : 'No video'}</Text></View>
+              <View style={[styles.video, styles.videoEmpty]}><Text style={styles.videoEmptyText}>{item.kind === 'channel' ? 'Loading preview…' : isApplication ? (item.meta.filesLink ? 'No upload; open their link below' : 'The master is still uploading or processing') : 'No video'}</Text></View>
             )}
             <View style={styles.kindChip}><Text style={styles.kindChipText}>{KIND_LABEL[item.kind]}{item.meta.durationSeconds ? ` · ${fmtDuration(item.meta.durationSeconds)}` : ''}</Text></View>
           </View>
@@ -197,9 +218,9 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
                 {meta.map(([k, v]) => (
                   <View key={k} style={styles.kvRow}>
                     <Text style={styles.kvKey}>{labelFor(k)}</Text>
-                    {k === 'proofUrl' && isWebUrl(v) ? (
+                    {(k === 'proofUrl' || k === 'filesLink') && isWebUrl(v) ? (
                       <Pressable style={{ flex: 1 }} onPress={() => WebBrowser.openBrowserAsync(String(v)).catch(() => {})} accessibilityRole="link">
-                        <Text style={[styles.kvVal, styles.kvLink]}>Open the proof ↗</Text>
+                        <Text style={[styles.kvVal, styles.kvLink]}>{k === 'filesLink' ? 'Open their link ↗' : 'Open the proof ↗'}</Text>
                       </Pressable>
                     ) : (
                       <Text style={styles.kvVal}>{fmtValue(k, v)}</Text>
@@ -213,12 +234,23 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
                 <Text style={styles.btnPrimaryText}>{item.kind === 'ad' ? 'Set the rate on the web ↗' : 'Check artwork on the web ↗'}</Text>
               </Pressable>
             ) : (
-              <View style={styles.decide}>
-                <Pressable style={[styles.btnDanger, busy && { opacity: 0.5 }]} disabled={busy} onPress={onReject}><Text style={styles.btnDangerText}>Reject…</Text></Pressable>
-                <Pressable style={[styles.btnOk, busy && { opacity: 0.5 }]} disabled={busy} onPress={onApprove}>
-                  {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.btnOkText}>Approve</Text>}
-                </Pressable>
-              </View>
+              <>
+                {isApplication ? (
+                  <View style={styles.tierRow}>
+                    <Text style={styles.kvKey}>Who can watch</Text>
+                    {[['free', 'Free with ads'], ['premium', 'Tapa + members']].map(([v, label]) => (
+                      <Pressable key={v} style={[styles.tierChip, tier === v && styles.tierChipOn]} onPress={() => onTier(v)}><Text style={[styles.tierChipText, tier === v && { color: colors.olive }]}>{label}</Text></Pressable>
+                    ))}
+                  </View>
+                ) : null}
+                <View style={styles.decide}>
+                  <Pressable style={[styles.btnDanger, busy && { opacity: 0.5 }]} disabled={busy} onPress={onReject}><Text style={styles.btnDangerText}>{isApplication ? 'Decline…' : 'Reject…'}</Text></Pressable>
+                  {isApplication ? <Pressable style={[styles.btnHold, busy && { opacity: 0.5 }]} disabled={busy} onPress={onHold}><Text style={styles.btnHoldText}>Hold…</Text></Pressable> : null}
+                  <Pressable style={[styles.btnOk, busy && { opacity: 0.5 }]} disabled={busy} onPress={onApprove}>
+                    {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.btnOkText}>{isApplication ? (item.meta.masterReady ? 'Accept · live' : 'Accept') : 'Approve'}</Text>}
+                  </Pressable>
+                </View>
+              </>
             )}
           </View>
         </ScrollView>
@@ -230,7 +262,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onSkip, canSkip
 }
 
 function labelFor(k) {
-  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing' }[k]
+  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means' }[k]
     || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 function fmtValue(k, v) {
@@ -284,6 +316,12 @@ const styles = StyleSheet.create({
   kvVal: { fontFamily: fonts.mono, fontSize: 12, color: colors.ink, flex: 1 },
   kvLink: { color: colors.brass, textDecorationLine: 'underline' },
   decide: { flexDirection: 'row', gap: 8, marginTop: 8 },
+  tierRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 6 },
+  tierChip: { borderRadius: 999, paddingVertical: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: colors.hairline },
+  tierChipOn: { borderColor: colors.olive, backgroundColor: 'rgba(242,193,78,0.16)' },
+  tierChipText: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim },
+  btnHold: { flex: 1, borderWidth: 1, borderColor: colors.olive, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
+  btnHoldText: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.olive },
   btnOk: { flex: 1, backgroundColor: colors.ok, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },
   btnOkText: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.onBrass },
   btnDanger: { flex: 1, borderWidth: 1, borderColor: colors.danger, borderRadius: 999, paddingVertical: 13, alignItems: 'center' },

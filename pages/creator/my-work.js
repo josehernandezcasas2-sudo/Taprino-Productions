@@ -7,7 +7,6 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
 import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
-import CreatorSubmissionForm from '../../components/CreatorSubmissionForm';
 import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
@@ -19,10 +18,11 @@ import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIco
 import { SITE } from '../../lib/siteConfig';
 import { dollars } from '../../lib/purchaseRules';
 
+// The creator path's words (2026-10-31): In review / Live / Not this time.
 const STATUS_LABEL = {
-  pending: { text: 'Pending review', color: 'var(--signal-amber)' },
-  approved: { text: 'Approved — live', color: 'var(--ok)' },
-  rejected: { text: 'Rejected', color: 'var(--danger)' }
+  pending: { text: 'In review', color: 'var(--signal-amber)' },
+  approved: { text: 'Live', color: 'var(--ok)' },
+  rejected: { text: 'Not this time', color: 'var(--danger)' }
 };
 
 const CF_STATE_LABEL = {
@@ -64,12 +64,19 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [channelError, setChannelError] = useState(null);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  // The hub's piles deep-link here: ?status=pending|approved|rejected, ?attention=1.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const q = new URLSearchParams(window.location.search);
+    const st = q.get('status');
+    if (st && ['pending', 'approved', 'rejected'].includes(st)) setStatusFilter(st);
+    if (q.get('attention') === '1') setNeedsAttentionOnly(true);
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [fullEditSubmission, setFullEditSubmission] = useState(null);
-  const [bonusContentSeriesId, setBonusContentSeriesId] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
   const [captionSubmission, setCaptionSubmission] = useState(null);
@@ -594,15 +601,9 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                                   >
                                     <PencilIcon size={12} src={iconOverrides.pencil} /> Edit show details
                                   </button>
-                                  <button
-                                    className="dropdown-item"
-                                    onClick={() => {
-                                      setBonusContentSeriesId(group.key.replace('series:', ''));
-                                      setOpenDropdown(null);
-                                    }}
-                                  >
+                                  <Link href={`/creator/submit?type=bonus&series=${encodeURIComponent(group.key.replace('series:', ''))}`} className="dropdown-item">
                                     ＋ Add bonus content
-                                  </button>
+                                  </Link>
                                   <button
                                     className="dropdown-item"
                                     onClick={() => {
@@ -677,29 +678,6 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           onClose={() => setFullEditSubmission(null)}
           onSaved={() => { setFullEditSubmission(null); loadSubmissions(); }}
         />
-      )}
-
-      {bonusContentSeriesId && (
-        <div className="modal-backdrop" onClick={() => setBonusContentSeriesId(null)}>
-          <div className="modal-card bonus-content-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Add bonus content</h3>
-              <button className="modal-close" onClick={() => setBonusContentSeriesId(null)} aria-label="Close">
-                <CloseIcon size={16} src={iconOverrides.close} />
-              </button>
-            </div>
-            <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
-              Same form as a regular submission, pre-set to bonus content for this show — give it a
-              descriptive title (e.g. &ldquo;Behind the Scenes&rdquo; or &ldquo;Official Trailer&rdquo;) below.
-            </p>
-            <CreatorSubmissionForm
-              allSeries={allSeries}
-              initialContentType="bonus"
-              initialSeriesId={bonusContentSeriesId}
-              onSubmitted={() => { setBonusContentSeriesId(null); loadSubmissions(); }}
-            />
-          </div>
-        </div>
       )}
 
       {artworkSubmission && (

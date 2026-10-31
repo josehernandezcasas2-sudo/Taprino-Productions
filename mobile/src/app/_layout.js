@@ -120,7 +120,10 @@ export default function RootLayout() {
           <Stack.Screen name="creator/numbers" options={{ headerShown: false }} />
           <Stack.Screen name="recs" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
-          <Stack.Screen name="apply" options={{ title: 'Become a creator' }} />
+          {/* The creator path (2026-10-31): apply, the hub and the three-step submit draw the site header. */}
+          <Stack.Screen name="apply" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/index" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/submit" options={{ headerShown: false }} />
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen name="admin/review" options={{ headerShown: false }} />
         </Stack>

@@ -282,9 +282,109 @@ export function UploadProvider({ children }) {
     }
   }
 
+  // The upload alone, nothing saved afterwards: the creator path (2026-10-31).
+  // /apply and /creator/submit start the master the moment it's dropped and
+  // save the form separately (the uid is known from the first second, the
+  // upload rides along in this provider while they type). Resolves as soon
+  // as the upload address exists with { uid, done }: `done` settles when the
+  // last byte is in. `resumeUrl` is tus's own address for an upload that
+  // stopped earlier (the row keeps it); with the same file picked again the
+  // transfer carries on from where it was. `onUrl` reports that address as
+  // soon as it exists, so the caller can keep it.
+  async function startVideoUpload(file, { urlEndpoint = '/api/apply/upload-url', resumeUrl = null, kind = 'main', onUrl = null, authHeaders = null } = {}) {
+    if (activeUpload && activeUpload.status === 'uploading') {
+      throw new Error('An upload is already in progress — wait for it to finish before starting another.');
+    }
+    lastAttemptRef.current = { file, urlEndpoint, resumeUrl, kind, onUrl, authHeaders, isVideoOnly: true };
+
+    setActiveUpload({
+      phase: kind,
+      fileName: file.name,
+      fileSize: file.size,
+      bytesUploaded: 0,
+      startedAt: Date.now(),
+      status: 'requesting-url',
+      uploadMethod: 'tus',
+      videoOnly: true,
+      uid: null,
+      doneMessages: { label: kind === 'trailer' ? 'Trailer uploaded' : 'Upload finished', meta: 'It keeps processing on our side; nothing more to do here.' },
+      errorTitle: null,
+      errorMessage: null,
+      likelyBlocked: false
+    });
+
+    let uploadUrl = resumeUrl;
+    let uid = resumeUrl ? (resumeUrl.match(/\/tus\/([a-zA-Z0-9]+)/) || [])[1] || null : null;
+    try {
+      if (!uploadUrl || !uid) {
+        const urlRes = await fetch(urlEndpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(authHeaders || {}) },
+          body: JSON.stringify({ fileSize: file.size, fileName: file.name })
+        });
+        const urlData = await urlRes.json();
+        if (!urlRes.ok) throw new Error(urlData.error || 'Could not get an upload link.');
+        uploadUrl = urlData.uploadUrl;
+        uid = urlData.uid;
+      }
+    } catch (err) {
+      const described = describeUploadError(err);
+      setActiveUpload((u) => (u ? { ...u, status: 'error', errorTitle: described.title, errorMessage: described.message, errorRaw: described.raw, likelyBlocked: described.likelyBlocked } : u));
+      throw err;
+    }
+
+    setActiveUpload((u) => (u ? { ...u, status: 'uploading', uid } : u));
+
+    const done = new Promise((resolve, reject) => {
+      let reportedUrl = Boolean(resumeUrl);
+      const upload = new tus.Upload(file, {
+        // A fresh address is tus's creation endpoint (the POST answers with
+        // the upload's own address); a kept one is resumed directly.
+        ...(resumeUrl ? { uploadUrl: resumeUrl } : { endpoint: uploadUrl }),
+        retryDelays: [0, 3000, 5000, 10000, 20000],
+        metadata: { filename: file.name, filetype: file.type },
+        chunkSize: 52428800,
+        onError: (error) => reject(error),
+        onProgress: (bytesUploaded, bytesTotal) => {
+          if (!reportedUrl && upload.url) {
+            reportedUrl = true;
+            if (onUrl) onUrl(upload.url);
+          }
+          setActiveUpload((u) => (u ? { ...u, bytesUploaded, fileSize: bytesTotal } : u));
+        },
+        onSuccess: () => {
+          // A small file can finish before a progress event fires.
+          if (!reportedUrl && upload.url) {
+            reportedUrl = true;
+            if (onUrl) onUrl(upload.url);
+          }
+          resolve();
+        }
+      });
+      tusInstanceRef.current = upload;
+      upload.start();
+    }).then(() => {
+      setActiveUpload((u) => (u ? { ...u, status: 'uploaded', bytesUploaded: u.fileSize } : u));
+      lastAttemptRef.current = null;
+      return { uid };
+    }).catch((err) => {
+      const described = describeUploadError(err);
+      setActiveUpload((u) => (u ? { ...u, status: 'error', errorTitle: described.title, errorMessage: described.message, errorRaw: described.raw, likelyBlocked: described.likelyBlocked } : u));
+      throw err;
+    });
+    // Nobody listening is fine: the widget shows the error.
+    done.catch(() => {});
+
+    return { uid, uploadUrl, done };
+  }
+
   function retryUpload(useMethod) {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
+    if (attempt.isVideoOnly) {
+      startVideoUpload(attempt.file, { urlEndpoint: attempt.urlEndpoint, resumeUrl: attempt.resumeUrl, kind: attempt.kind, onUrl: attempt.onUrl, authHeaders: attempt.authHeaders }).catch(() => {});
+      return;
+    }
     if (attempt.isUrlImport) {
       startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData, attempt.submitEndpoint, attempt.doneMessages);
       return;
@@ -299,7 +399,7 @@ export function UploadProvider({ children }) {
   }
 
   return (
-    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, retryUpload, dismissUpload }}>
+    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, startVideoUpload, retryUpload, dismissUpload }}>
       {children}
     </UploadContext.Provider>
   );

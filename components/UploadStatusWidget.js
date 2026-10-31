@@ -44,18 +44,21 @@ export default function UploadStatusWidget() {
     importing: 'Importing from your link…',
     saving: 'Saving submission…',
     done: doneMessages.label || 'Submitted for review',
+    // The upload alone (the creator path): the form is saved by its page.
+    uploaded: doneMessages.label || 'Upload finished',
     error: isUrlImport ? 'Import failed' : 'Upload failed'
   }[activeUpload.status];
+  const finished = activeUpload.status === 'done' || activeUpload.status === 'uploaded';
 
   return (
     <div className="upload-widget">
-      <div className={`upload-widget-header ${activeUpload.status === 'done' ? 'is-done' : ''} ${activeUpload.status === 'error' ? 'is-error' : ''}`}>
+      <div className={`upload-widget-header ${finished ? 'is-done' : ''} ${activeUpload.status === 'error' ? 'is-error' : ''}`}>
         <span>{label}</span>
-        {(activeUpload.status === 'done' || activeUpload.status === 'error') && (
+        {(finished || activeUpload.status === 'error') && (
           <button className="upload-widget-dismiss" onClick={dismissUpload} aria-label="Dismiss">✕</button>
         )}
       </div>
-      {activeUpload.status === 'done' && (
+      {finished && (
         <div className="upload-widget-icon upload-widget-icon-done" aria-hidden="true">✓</div>
       )}
       {activeUpload.status === 'error' && (
@@ -95,7 +98,7 @@ export default function UploadStatusWidget() {
       {activeUpload.status === 'saving' && (
         <div className="upload-widget-meta">Almost done — saving your submission details…</div>
       )}
-      {activeUpload.status === 'done' && (
+      {finished && (
         <div className="upload-widget-meta">{doneMessages.meta || 'It now sits with the admin for review.'}</div>
       )}
       {activeUpload.status === 'error' && (

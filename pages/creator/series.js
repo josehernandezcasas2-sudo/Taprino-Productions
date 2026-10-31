@@ -7,7 +7,6 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getSupabase } from '../../lib/supabase';
 import HeaderNav from '../../components/HeaderNav';
 import SeriesMediaForm from '../../components/SeriesMediaForm';
-import CreatorSubmissionForm from '../../components/CreatorSubmissionForm';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
 import { SITE } from '../../lib/siteConfig';
 import Footer from '../../components/Footer';
@@ -214,7 +213,6 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
           {seriesList.length === 0 && <p style={{ color: 'var(--ink-dim)' }}>No series yet — create one above.</p>}
 
           {seriesList.map((s) => {
-            const addOpen = expanded && expanded.seriesId === s.id && expanded.panel === 'add';
             const editOpen = expanded && expanded.seriesId === s.id && expanded.panel === 'edit';
             const posterUrl = s.poster || s.thumbnail;
             return (
@@ -245,13 +243,13 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
                     )}
 
                     <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      <button
-                        className={addOpen ? 'account-btn-secondary' : 'account-btn-primary'}
-                        style={{ width: 'auto' }}
-                        onClick={() => togglePanel(s.id, 'add')}
+                      <Link
+                        href={`/creator/submit?type=series&series=${encodeURIComponent(s.id)}`}
+                        className="account-btn-primary"
+                        style={{ width: 'auto', textDecoration: 'none' }}
                       >
-                        {addOpen ? '− Close' : '+ Add episode'}
-                      </button>
+                        + Add episode
+                      </Link>
                       <button
                         className="account-btn-secondary"
                         style={{ width: 'auto' }}
@@ -262,20 +260,6 @@ export default function SeriesManagement({ allSeries, mainGenres, isSignedIn, is
                     </div>
                   </div>
                 </div>
-
-                {addOpen && (
-                  <div className="series-mgmt-panel add">
-                    <div className="account-eyebrow" style={{ marginBottom: '0.6rem' }}>
-                      New episode for {s.name}
-                    </div>
-                    <CreatorSubmissionForm
-                      allSeries={seriesList}
-                      initialContentType="series"
-                      initialSeriesId={s.id}
-                      onSubmitted={() => { setExpanded(null); refreshSeriesList(); }}
-                    />
-                  </div>
-                )}
 
                 {editOpen && (
                   <div className="series-mgmt-panel edit">

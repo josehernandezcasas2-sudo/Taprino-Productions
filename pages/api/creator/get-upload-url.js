@@ -54,7 +54,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId });
+    // Signed URLs from the first byte (the anti-harvest rule), and the
+    // address kept alive a day so a draft's stopped upload can resume.
+    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId, requireSignedURLs: true, expiryHours: 24 });
     return res.status(200).json({ uploadUrl, uid, method: 'tus' });
   } catch (err) {
     console.error('get-upload-url error:', err.message);

@@ -4,6 +4,7 @@ import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import { SITE } from '../../lib/siteConfig';
 import { isHttpUrl } from '../../lib/safeUrl';
+import { runtimeClock, bytesLabel } from '../../lib/creatorRights';
 
 // Applicants typed these. Only a web address becomes a link; anything
 // else (a javascript: URL above all) shows as plain text.
@@ -16,12 +17,17 @@ export async function getServerSideProps(ctx) {
   return adminPageProps(ctx, { caps: ['manage_applications'] });
 }
 
-const STATUS_LABEL = { new: 'New', reviewing: 'Reviewing', accepted: 'Accepted', declined: 'Declined' };
+const STATUS_LABEL = { new: 'New', reviewing: 'Reviewing', held: 'Held', accepted: 'Accepted', declined: 'Declined' };
 const RIGHTS_LABEL = { clear: 'Rights clear', held: 'Needs paperwork', blocked: 'Not rights holder' };
 const RIGHTS_CLASS = { clear: 'ok', held: 'warn', blocked: 'bad' };
-const TYPE_LABEL = { short: 'Short', film: 'Film', series: 'Series', podcast: 'Podcast', vertical: 'Vertical', other: 'Other' };
+const TYPE_LABEL = { short: 'Short', film: 'Film', series: 'Series', podcast: 'Podcast', vertical: 'Snippet', other: 'Other' };
 const STAND_LABEL = { finished: 'Finished', festival: 'Festival run ongoing', in_post: 'In post', in_progress: 'In progress', concept: 'Concept' };
+const VIDEO_LABEL = { uploading: 'still uploading from their side', processing: 'Cloudflare is processing it', ready: 'ready to watch', error: 'Cloudflare could not process it', deleted: 'deleted (declined)' };
 
+// The creator path (2026-10-31): an application arrives with its master.
+// Accept puts the title live (free, or Tapa + from the select), grants
+// Creator Studio and emails "it's live"; Hold sends one thing to fix;
+// Decline deletes the file. The master plays here once processed.
 export default function ApplicationsAdmin({ account, mainGenres }) {
   const [apps, setApps] = useState(null);
   const [filter, setFilter] = useState('all');
@@ -29,6 +35,7 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
   const [busyId, setBusyId] = useState(null);
   const [openId, setOpenId] = useState(null);
   const [notes, setNotes] = useState({});
+  const [tiers, setTiers] = useState({});
   const [flash, setFlash] = useState({});
   // "Invite to apply" (top of the page): emails someone the /apply link.
   const [inviteOpen, setInviteOpen] = useState(false);
@@ -84,7 +91,8 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
     try {
       const body = { id: app.id, status };
       // The note goes out with a decision, in the email and on /apply.
-      if (status === 'accepted' || status === 'declined') body.decisionNote = notes[app.id] !== undefined ? notes[app.id] : (app.decision_note || '');
+      if (status === 'accepted' || status === 'declined' || status === 'held') body.decisionNote = notes[app.id] !== undefined ? notes[app.id] : (app.decision_note || '');
+      if (status === 'accepted') body.tier = tiers[app.id] || 'free';
       const res = await fetch('/api/admin/applications', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -92,12 +100,14 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
-      setApps((prev) => prev.map((a) => (a.id === app.id ? data.application : a)));
+      setApps((prev) => prev.map((a) => (a.id === app.id ? { ...a, ...data.application, media: null } : a)));
       let msg = null;
-      if (data.roleGranted) msg = `Creator Studio granted to ${data.application.email}. They've been emailed.`;
+      if (status === 'accepted' && data.mode === 'live') msg = <>Live at <Link href={data.episode.href}>{data.episode.href}</Link>{data.cut ? ' (artwork cut from the film)' : ''}.{data.roleGranted ? ' Creator Studio granted.' : ''} They’ve been emailed.</>;
+      else if (data.roleGranted) msg = `Creator Studio granted to ${data.application.email}. They upload the master there. They've been emailed.`;
       else if (data.needsManualGrant) msg = 'Accepted, but this application has no account linked (it predates sign-in). Grant Creator Studio by email under People.';
       else if (status === 'accepted') msg = 'Accepted. They already had a team role, so nothing to grant. They’ve been emailed.';
-      else if (status === 'declined') msg = 'Declined. They’ve been emailed.';
+      else if (status === 'held') msg = 'Held. They’ve been emailed what to fix; the application comes back to Reviewing when they replace the file.';
+      else if (status === 'declined') msg = `Declined${app.video_uid ? ', the file is deleted' : ''}. They’ve been emailed.`;
       setFlash((f) => ({ ...f, [app.id]: msg }));
     } catch (err) {
       setError(err.message);
@@ -119,9 +129,9 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
             <div className="eyebrow">Admin</div>
             <h1>Applications</h1>
             <p className="ca-sub">
-              Creators applying via <Link href="/apply">/apply</Link>. Each one did the rights check first, so the
-              paperwork it would need is listed here. <strong>Accept</strong> grants Creator Studio to their account
-              and emails them; they upload the master there and it lands in <Link href="/admin/review">Review</Link>.
+              Films sent through <Link href="/apply">/apply</Link>, master included. Each one did the rights check first, so the
+              paperwork it would need is listed here. <strong>Accept</strong> puts the title live, grants Creator Studio and emails them;
+              <strong> Hold</strong> sends one thing to fix; <strong>Decline</strong> deletes the file. They also sit in <Link href="/admin/review">Review</Link>.
             </p>
           </div>
           <div className="ap-invite-actions">
@@ -154,13 +164,14 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
           <div className="ca-stats" style={{ marginTop: '1.2rem' }}>
             <div className="ca-stat"><b>{counts.new || 0}</b><small>New</small></div>
             <div className="ca-stat"><b>{counts.reviewing || 0}</b><small>Reviewing</small></div>
+            <div className="ca-stat"><b>{counts.held || 0}</b><small>Held</small></div>
             <div className="ca-stat"><b>{counts.accepted || 0}</b><small>Accepted</small></div>
             <div className="ca-stat"><b>{apps.length}</b><small>All time</small></div>
           </div>
         )}
 
         <div className="ca-range" style={{ marginTop: '1.2rem' }}>
-          {['all', 'new', 'reviewing', 'accepted', 'declined'].map((f) => (
+          {['all', 'new', 'reviewing', 'held', 'accepted', 'declined'].map((f) => (
             <button key={f} className={`ca-range-btn ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>
               {f === 'all' ? 'All' : STATUS_LABEL[f]}
             </button>
@@ -179,6 +190,10 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
           {shown.map((app) => {
             const rights = app.rights_result || null;
             const holds = app.rights_holds || [];
+            const open = app.status === 'new' || app.status === 'reviewing' || app.status === 'held';
+            const videoLine = app.video_uid || app.video_state === 'deleted'
+              ? `Master: ${VIDEO_LABEL[app.video_state] || app.video_state || 'unknown'}${app.runtime_seconds ? ` · ${runtimeClock(app.runtime_seconds)}` : ''}${app.video_bytes ? ` · ${bytesLabel(app.video_bytes)}` : ''}`
+              : (app.media_link ? 'No upload: linked to their files' : 'No file');
             return (
               <div key={app.id} className="house-ad-card app-card">
                 <div className="house-ad-info">
@@ -188,8 +203,9 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
                     {app.user_id ? '' : ' · no account linked'}
                   </div>
                   <div className="house-ad-meta">
-                    {[TYPE_LABEL[app.content_type] || app.content_type, app.main_genre, app.runtime, app.rating, STAND_LABEL[app.completion_status] || app.completion_status].filter(Boolean).join(' · ')}
+                    {[TYPE_LABEL[app.content_type] || app.content_type, app.main_genre, app.rating, STAND_LABEL[app.completion_status] || app.completion_status].filter(Boolean).join(' · ')}
                   </div>
+                  <div className="house-ad-meta">{videoLine}{app.episode_id ? <> · live as <Link href={`/episode/${app.episode_id}`}>{app.episode_id}</Link></> : null}</div>
                   <p className="app-logline">{app.logline}</p>
 
                   {rights && (
@@ -202,6 +218,12 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
 
                   {openId === app.id && (
                     <div className="app-detail">
+                      {app.media && app.media.iframe && (
+                        <div className="rq-detail" style={{ padding: 0, background: 'none' }}>
+                          <iframe src={app.media.iframe} title={`${app.title} — the master`} allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowFullScreen />
+                        </div>
+                      )}
+                      {open && app.video_uid && !(app.media && app.media.iframe) && <p><em>The master isn&rsquo;t ready to play yet ({VIDEO_LABEL[app.video_state] || app.video_state}). Reload in a few minutes.</em></p>}
                       {app.description && <p>{app.description}</p>}
                       {app.portfolio_url && (
                         <p><strong>Portfolio:</strong> <ApplicantLink url={app.portfolio_url} /></p>
@@ -210,6 +232,7 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
                         <p><strong>Files:</strong> <ApplicantLink url={app.media_link} /></p>
                       )}
                       {app.media_notes && <p><strong>Notes from them:</strong> {app.media_notes}</p>}
+                      {(app.poster || app.thumbnail) && <p><strong>Artwork sent:</strong> {app.poster ? <a href={app.poster} target="_blank" rel="noreferrer">poster</a> : 'no poster'} · {app.thumbnail ? <a href={app.thumbnail} target="_blank" rel="noreferrer">still</a> : 'no still'}</p>}
                       {app.user_id && <p><strong>Account:</strong> <Link href={`/profile/${app.user_id}`}>{app.user_id}</Link>{app.role_granted_at ? ' · Creator Studio granted' : ''}</p>}
                       {app.decision_note && <p><strong>Note sent to them:</strong> {app.decision_note}</p>}
                       <p>
@@ -217,16 +240,27 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
                           Email {app.name} →
                         </a>
                       </p>
-                      {app.status !== 'accepted' && (
-                        <div className="admin-field" style={{ marginTop: '0.6rem' }}>
-                          <label>Note to the applicant <span className="admin-optional">optional, goes in the decision email and on /apply</span></label>
-                          <textarea
-                            rows={2}
-                            value={notes[app.id] !== undefined ? notes[app.id] : (app.decision_note || '')}
-                            onChange={(e) => setNotes((n) => ({ ...n, [app.id]: e.target.value }))}
-                            placeholder="Why, or what would make it a fit next time."
-                          />
-                        </div>
+                      {open && (
+                        <>
+                          {app.video_uid && account.isAdmin && (
+                            <label className="rq-tier">
+                              Who can watch, once live
+                              <select value={tiers[app.id] || 'free'} onChange={(e) => setTiers((t) => ({ ...t, [app.id]: e.target.value }))}>
+                                <option value="free">Free with ads</option>
+                                <option value="premium">Tapa + members</option>
+                              </select>
+                            </label>
+                          )}
+                          <div className="admin-field" style={{ marginTop: '0.6rem' }}>
+                            <label>Note to the applicant <span className="admin-optional">goes in the email and on /apply · required for Hold</span></label>
+                            <textarea
+                              rows={2}
+                              value={notes[app.id] !== undefined ? notes[app.id] : (app.decision_note || '')}
+                              onChange={(e) => setNotes((n) => ({ ...n, [app.id]: e.target.value }))}
+                              placeholder="For a hold: the one thing to fix. For a decline: why, or what would make it a fit next time."
+                            />
+                          </div>
+                        </>
                       )}
                     </div>
                   )}
@@ -240,15 +274,16 @@ export default function ApplicationsAdmin({ account, mainGenres }) {
 
                 <div className="house-ad-actions">
                   <span className={`b ${app.status === 'accepted' ? 'ok' : app.status === 'declined' ? 'bad' : 'warn'}`}>
-                    {STATUS_LABEL[app.status]}
+                    {STATUS_LABEL[app.status] || app.status}
                   </span>
-                  {app.status !== 'reviewing' && app.status !== 'accepted' && <button onClick={() => setStatus(app, 'reviewing')} disabled={busyId === app.id}>Reviewing</button>}
-                  {app.status !== 'accepted' && account.isAdmin && (
-                    <button onClick={() => setStatus(app, 'accepted')} disabled={busyId === app.id} title="Grants Creator Studio to their account and emails them">
-                      Accept · grant Creator Studio
+                  {app.status === 'new' && <button onClick={() => setStatus(app, 'reviewing')} disabled={busyId === app.id}>Reviewing</button>}
+                  {open && account.isAdmin && (
+                    <button onClick={() => setStatus(app, 'accepted')} disabled={busyId === app.id || (app.video_uid && app.video_state !== 'ready')} title={app.video_uid ? (app.video_state === 'ready' ? 'Puts it live now, grants Creator Studio and emails them' : 'The master has to finish processing first') : 'Grants Creator Studio to their account and emails them'}>
+                      {app.video_uid ? 'Accept · put it live' : 'Accept · grant Creator Studio'}
                     </button>
                   )}
-                  {app.status !== 'declined' && app.status !== 'accepted' && <button onClick={() => setStatus(app, 'declined')} disabled={busyId === app.id} className="house-ad-remove">Decline</button>}
+                  {open && app.status !== 'held' && <button onClick={() => { setOpenId(app.id); setStatus(app, 'held'); }} disabled={busyId === app.id || !((notes[app.id] !== undefined ? notes[app.id] : app.decision_note) || '').trim()} title="Needs the note: the one thing to fix">Hold</button>}
+                  {open && <button onClick={() => setStatus(app, 'declined')} disabled={busyId === app.id} className="house-ad-remove">Decline</button>}
                 </div>
               </div>
             );
