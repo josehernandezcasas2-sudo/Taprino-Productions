@@ -21,7 +21,7 @@ async function uploadTrailer(file, onProgress) {
   const urlRes = await fetch('/api/creator/get-upload-url', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ fileSize: file.size, fileName: file.name })
+    body: JSON.stringify({ fileSize: file.size, fileName: file.name, kind: 'trailer' })
   });
   const urlData = await urlRes.json();
   if (!urlRes.ok) throw new Error(urlData.error || 'Could not get an upload link.');

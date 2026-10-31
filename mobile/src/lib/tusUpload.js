@@ -51,7 +51,7 @@ export async function startTusUpload({ asset, urlPath, token, resumeUrl = null, 
   let uid = resumeUrl ? uidFromTusUrl(resumeUrl) : null;
   try {
     if (!uploadUrl || !uid) {
-      const data = await apiPost(urlPath, { fileSize: size, fileName: name }, token);
+      const data = await apiPost(urlPath, { fileSize: size, fileName: name, kind }, token);
       uploadUrl = data.uploadUrl;
       uid = data.uid;
     }

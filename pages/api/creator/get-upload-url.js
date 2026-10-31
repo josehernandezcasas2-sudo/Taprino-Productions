@@ -31,7 +31,7 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many upload requests — please wait a bit and try again.' });
   }
 
-  const { fileSize, fileName, method } = req.body || {};
+  const { fileSize, fileName, method, kind } = req.body || {};
   if (!fileSize || typeof fileSize !== 'number' || fileSize <= 0) {
     return res.status(400).json({ error: 'fileSize (in bytes) is required.' });
   }
@@ -56,7 +56,13 @@ export default async function handler(req, res) {
   try {
     // Signed URLs from the first byte (the anti-harvest rule), and the
     // address kept alive a day so a draft's stopped upload can resume.
-    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId, requireSignedURLs: true, expiryHours: 24 });
+    // Trailers are the exception for now: every page plays a trailer from
+    // its stored address without a token, so a signed-only trailer would
+    // never play (it didn't, from the 2026-10-31 creator-path deploy until
+    // this line). Signing trailers on the way out is part of the series
+    // redesign; until then they upload as they did before.
+    const isTrailer = kind === 'trailer';
+    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId, requireSignedURLs: !isTrailer, expiryHours: 24 });
     return res.status(200).json({ uploadUrl, uid, method: 'tus' });
   } catch (err) {
     console.error('get-upload-url error:', err.message);

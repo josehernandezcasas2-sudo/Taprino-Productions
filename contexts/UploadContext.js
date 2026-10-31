@@ -85,11 +85,11 @@ export function UploadProvider({ children }) {
     // Cloudflare video uid. Shared between the main video and the optional
     // trailer — the only real difference between the two is which `phase`
     // label the widget shows.
-    async function runOneUpload(targetFile, useMethod) {
+    async function runOneUpload(targetFile, useMethod, kind = 'main') {
       const urlRes = await fetch('/api/creator/get-upload-url', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fileSize: targetFile.size, fileName: targetFile.name, method: useMethod })
+        body: JSON.stringify({ fileSize: targetFile.size, fileName: targetFile.name, method: useMethod, kind })
       });
       const urlData = await urlRes.json();
       if (!urlRes.ok) throw new Error(urlData.error || 'Could not get an upload link.');
@@ -150,7 +150,7 @@ export function UploadProvider({ children }) {
           startedAt: Date.now(),
           status: 'uploading'
         } : u));
-        trailerUid = await runOneUpload(trailerFile, uploadMethod);
+        trailerUid = await runOneUpload(trailerFile, uploadMethod, 'trailer');
       }
 
       setActiveUpload((u) => (u ? { ...u, phase: 'saving', status: 'saving' } : u));
@@ -320,7 +320,7 @@ export function UploadProvider({ children }) {
         const urlRes = await fetch(urlEndpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...(authHeaders || {}) },
-          body: JSON.stringify({ fileSize: file.size, fileName: file.name })
+          body: JSON.stringify({ fileSize: file.size, fileName: file.name, kind })
         });
         const urlData = await urlRes.json();
         if (!urlRes.ok) throw new Error(urlData.error || 'Could not get an upload link.');
