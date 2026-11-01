@@ -47,8 +47,9 @@ recommended unless it is listed under "Still open".
     this was fixed on 2026-10-31: trailers are uploaded without the signed-only flag again until they are
     signed on the way out.)
 13. **Earnings go to the title's owner. Decided 2026-10-31.** Details in the amendments.
-14. **Fix the money columns that can't hold a title's id.** *As recommended;* amendment 25 adds ad share's
-    columns and suggests fixing all of them sooner, on their own.
+14. **Fix the money columns that can't hold a title's id.** *Updated 2026-11-01:* worse than it looked (a
+    price can't even be saved today, and ad share has the same mistake, amendment 25), so the fix goes
+    first, on its own, as migration 117; the series migration becomes 118.
 15. **Removing a show takes its episodes and extras in one confirmation**; anything someone bought is
     withdrawn and kept for them. *As recommended.*
 16. **Duplicate episode numbers already in the database are moved out of the way** (1001, 1002…), never
@@ -61,14 +62,64 @@ recommended unless it is listed under "Still open".
 
 ## Still open
 
-Being gathered on 2026-11-01: three reviewers are checking the plan against the code for questions that
-decisions 2 and 13 raised. So far:
+Put to Jose on 2026-11-01, after three reviewers (creators and money, Make it public and the admin's day,
+viewers and data) checked the plan against the code and a fourth merged their 21 candidates. Numbered as on
+the canvas's Decisions board.
 
-1. **When an admin attaches a show to a producer, does the producer take over running it** (order, art,
-   pricing, Make it public, removal), **or only get paid** while the creator who built it keeps running it?
-   The two reviewers who looked recommended opposite answers.
-2. **The title-id fix for Buy to own and ad share** (amendment 25): its own small migration now
-   (recommended, so both work before the live-mode money test), or inside the series migration.
+19. **When an admin attaches a show or a title to a producer, do they take over running it, or only get
+    paid?** As planned, attaching a whole show hands it over (the creator who built it could no longer add
+    episodes, reorder or press Make it public), while attaching one title moves only its money; the series
+    migration has to know which. *Recommended: paid only* — the producer gets the earnings and sets the
+    prices, the creator keeps running the show, both see its numbers; "hand the show over" stays its own
+    button on the same card. It adds one optional "paid to" field on the show, and the rule becomes
+    `payeeOf = episode.owner_id ?? series.paid_to ?? series.creator_id ?? episode.submitted_by`.
+    *Instead:* they take over (the creator keeps the credit and sees it read-only), or as planned.
+20. **When a title is paid to a producer rather than the creator who made it, whose profile shows it?**
+    *Recommended: both* — on the maker's profile and on the producer's as produced, the credit line reads
+    "Made by Mara · Produced by Lux" when they differ, and members can pick either in Artist Support.
+    Whatever the answer, slice 1 counts producers for members' share so theirs isn't given to others.
+    *Instead:* the producer's only, or the maker's only (as today; the producer is paid but invisible).
+21. **If one episode of a show is paid to someone else, who gets a whole-series sale?** *Recommended: the
+    show keeps it*, and attaching the episode says "Whole-series sales of Night Bus still go to Mara".
+    *Instead:* split each series sale by episode count (a new payout path, a table and a Terms line), or no
+    whole-series sale for a show paid to more than one person.
+
+**Going this way unless Jose says otherwise:**
+
+- The title-id fix for Buy to own and ad share (amendment 25) ships now as its own small migration, 117,
+  ahead of the series one (then 118), so both work before the live-mode money test.
+- On the day the series migration runs, only approved shows with an approved episode stay public; every
+  other show becomes private and follows Make it public. Nothing anyone can watch appears or disappears; the
+  SQL Editor lists the shows that become "Ready to go public".
+- Accepting an application for a series still puts the show and S1 E1 live at once (Accept counts as Make it
+  public).
+- Make it public is the release: it restarts the clock on the show's approved episodes, so Premium's 24-hour
+  early screening and the "New episode" banner start then.
+- Make it public is one-way, and its confirm says so; a show comes down only through Remove this show
+  (buyers keep what they bought) or an admin's Hold. (A pause that hides a show from everyone but its buyers
+  is the thing to add if creators ask, e.g. for a festival window; never by setting the status back.)
+- Once a show's first episode is approved, changes to its name, poster, still, hero image, title image and
+  trailer wait for approval as on a live show, and that first review card shows all of them, the trailer
+  included.
+- A live episode can be moved into a show that isn't public yet (to split a season off); the Move sheet says
+  it leaves the site until that show goes public, and its buyers keep playing it (`findEpisodeForOwner` must
+  then tell "not public yet" from the legal switch).
+- Nothing from a show that isn't public appears anywhere else: profiles, the home page's faces, Artist
+  Support, channels and feeds all skip it (today the faces and Artist Support would list its approved
+  episodes).
+- A show going public appears in the admin dashboard's recent activity (the one owner action not filtered
+  out), and /admin/shows gets a "Went public this week" filter. No email.
+- Existing shows take their defaults (Who can watch, rating, genre, Made by) from what most of their
+  episodes have, the latest breaking a tie, not from episode 1, so a show with a free first episode defaults
+  to Tapa +.
+- When a title starts paying someone else, plays before the change pay the old account and plays after it
+  the new one (ad share by the day the ad played, members' share by the day it was watched); the migration
+  keeps a small record of who was paid for each title from when.
+- Attaching a title to someone without the creator role grants it in the same step (one confirm); until
+  their payouts are set up, the title's Own and Tip buttons stay hidden (today Own fails at Checkout after
+  the click) and its earnings wait as owed.
+- Titles paid to the studio (a full admin) earn no members' share and show no Tip button, as title sales and
+  ad share already treat them; that share goes to the other creators the member watched, else the pool.
 
 ## Series spec — amendments after the refuter (2026-10-31)
 
