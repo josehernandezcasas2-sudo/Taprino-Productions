@@ -1,4 +1,5 @@
 import { pickActiveHouseAd, buildHouseAdVast, emptyVast, siteOriginFromRequest } from '../../../lib/houseAds';
+import { isTitleId } from '../../../lib/titleIds';
 
 // This IS the ad tag. It's what NEXT_PUBLIC_AD_TAG_URL points at (or what
 // the player defaults to automatically when that env var is unset — see
@@ -46,8 +47,9 @@ export default async function handler(req, res) {
       return res.status(200).send(emptyVast());
     }
     const origin = siteOriginFromRequest(req);
-    // The player says which title the ad plays before (ad share, 103).
-    const episodeId = typeof episode === 'string' && /^[0-9a-f-]{36}$/i.test(episode) ? episode : null;
+    // The player says which title the ad plays before (ad share, 103). A
+    // title id is a text slug, not a uuid (migration 117).
+    const episodeId = isTitleId(episode) ? episode : null;
     return res.status(200).send(buildHouseAdVast(ad, origin, { episodeId, surface: placement === 'live_tv' ? 'live' : 'preroll' }));
   } catch (err) {
     console.error('house-ads/vast error:', err.message);

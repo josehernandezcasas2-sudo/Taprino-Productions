@@ -1,6 +1,7 @@
 // node scripts/test-ad-share.mjs — ad share (lib/adShareRules.js).
 import assert from 'node:assert/strict';
 import { adShareLines, normalizeAdSharePercent, periodDays, periodLabel, normalizeSurface } from '../lib/adShareRules.js';
+import { isTitleId } from '../lib/titleIds.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
@@ -76,6 +77,17 @@ t('a different percent and an empty month', () => {
   assert.equal(out.lines[0].cents, 180);
   const empty = adShareLines({ rows: [], episodes: EPISODES, percent: 50, period: '2026-09' });
   assert.deepEqual(empty, { lines: [], skipped: [], percent: 50, impressions: 0, creditCents: 0, totalCents: 0 });
+});
+
+t('title ids are text slugs, not uuids (migration 117)', () => {
+  // Every id the site makes: a title slug plus a stamp, a placeholder, an
+  // older catalogue id, and a uuid (which fits too).
+  for (const id of ['night-bus-last-stop-lx3k9a', 'placeholder-movie-lx3k9a', 'cipher-lore', 'show-mh2x1', '0b9f3c2e-5a61-4d0e-9a7b-1c2d3e4f5a6b', 'Legacy_ID_1']) {
+    assert.equal(isTitleId(id), true, id);
+  }
+  for (const id of ['', '-leading-dash', 'has space', 'semi;colon', 'slash/path', '../up', 'x'.repeat(201), null, undefined, 42, ['night-bus']]) {
+    assert.equal(isTitleId(id), false, String(id));
+  }
 });
 
 console.log(`${n} passed`);

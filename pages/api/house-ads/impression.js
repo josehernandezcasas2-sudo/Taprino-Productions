@@ -5,8 +5,19 @@ import { recordDailyAdImpression } from '../../../lib/redis';
 import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { normalizeSurface } from '../../../lib/adShareRules';
 import { verifyImpression } from '../../../lib/adImpressionSig';
+import { isTitleId } from '../../../lib/titleIds';
 
+// Ad ids are uuids; title ids are text slugs (lib/titleIds.js).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Before migration 117 record_ad_impression took the episode as a uuid, so
+// Postgres refuses a real (text) title id with 22P02. That's the migration
+// not being run yet, not a failure worth a log line per ad play: say it
+// once per instance.
+let warnedTitleIdType = false;
+function isTitleIdTypeError(error) {
+  return Boolean(error) && (error.code === '22P02' || /invalid input syntax for type uuid/i.test(error.message || ''));
+}
 
 // An ad only spends credit (and earns ad share) while it may actually
 // serve: approved, switched on, and for an advertiser's ad, an account in
@@ -79,10 +90,19 @@ export default async function handler(req, res) {
         // Ad share (migration 103): which title the ad played inside,
         // and where (the pre-roll, an on-demand break, a live break), so
         // the month's credit can be shared with that title's creator.
-        // Reels and a live loop send no episode and earn nothing.
-        if (typeof episode === 'string' && UUID_RE.test(episode) && !(await isOwnTitle(supabase, req, episode))) {
+        // Reels and a live loop send no episode and earn nothing. The
+        // episode is part of the signature checked above, so it is the
+        // title the server put in the ad tag.
+        if (isTitleId(episode) && !(await isOwnTitle(supabase, req, episode))) {
           const { error } = await supabase.rpc('record_ad_impression', { p_ad: ad, p_episode: episode, p_surface: normalizeSurface(typeof surface === 'string' ? surface : '') });
-          if (error && !/could not find the function|does not exist/i.test(error.message || '')) console.error('record_ad_impression:', error.message);
+          if (error && isTitleIdTypeError(error)) {
+            if (!warnedTitleIdType) {
+              warnedTitleIdType = true;
+              console.warn('record_ad_impression: run migration 117 (title ids are text); ad share records no titles until then');
+            }
+          } else if (error && !/could not find the function|does not exist/i.test(error.message || '')) {
+            console.error('record_ad_impression:', error.message);
+          }
         }
       }
     } catch (err) {
