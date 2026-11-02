@@ -11,8 +11,8 @@ and 2026-11-01. **Nothing here is built yet.**
 
 ## Jose's decisions
 
-The numbers are the canvas's Decisions board. Jose answered 2, 10, 11 and 13; everything else goes as
-recommended unless it is listed under "Still open".
+The numbers are the canvas's Decisions board. Jose answered 2, 10, 11 and 13 (2026-10-31 / 11-01) and 19–21
+(2026-11-02); everything else goes as recommended unless it is listed under "Still open".
 
 1. **No separate show review.** The episode's review card carries the show (poster, owner, description).
    *As changed by 2:* approving an episode no longer makes the show public by itself.
@@ -59,45 +59,52 @@ recommended unless it is listed under "Still open".
 18. **The app gets the creator's screens; the admin Shows pages stay on the laptop.** The app's review deck
     shows a new show's episodes with the show on the card; saver emails go out once a day, plus a "Tell
     savers" button. *As recommended.*
+19. **A producer attached to a show or title: paid only. Decided 2026-11-02.** The owner keeps running the show
+    and chooses who gets the earnings; everyone working on the show sees who runs it and who is paid.
+20. **Credits. Decided 2026-11-02.** "Made by" the original creator, on top; an optional Studio and Producer;
+    the owner may put another line first.
+21. **Whole-series sales go to the show. Decided 2026-11-02:** "The show owner gets the sale. Or the original
+    creator." (Question 24 confirms the case where the owner picked someone else for the show's earnings.)
 
 ## Still open
 
-Put to Jose on 2026-11-01, after three reviewers (creators and money, Make it public and the admin's day,
-viewers and data) checked the plan against the code and a fourth merged their 21 candidates. Numbered as on
-the canvas's Decisions board.
+Answered by Jose on 2026-11-02: 19 (paid only; the owner chooses who gets the earnings; everyone on a show sees
+who runs it and who is paid), 20 (Made by the original creator on top, an optional Studio and Producer, the
+order optional), 21 (a whole-series sale goes to the show's owner, the original creator). Details in the
+amendments. Three questions his answers raise, numbered on from the canvas:
 
-19. **When an admin attaches a show or a title to a producer, do they take over running it, or only get
-    paid?** As planned, attaching a whole show hands it over (the creator who built it could no longer add
-    episodes, reorder or press Make it public), while attaching one title moves only its money; the series
-    migration has to know which. *Recommended: paid only* — the producer gets the earnings and sets the
-    prices, the creator keeps running the show, both see its numbers; "hand the show over" stays its own
-    button on the same card. It adds one optional "paid to" field on the show, and the rule becomes
-    `payeeOf = episode.owner_id ?? series.paid_to ?? series.creator_id ?? episode.submitted_by`.
-    *Instead:* they take over (the creator keeps the credit and sees it read-only), or as planned.
-20. **When a title is paid to a producer rather than the creator who made it, whose profile shows it?**
-    *Recommended: both* — on the maker's profile and on the producer's as produced, the credit line reads
-    "Made by Mara · Produced by Lux" when they differ, and members can pick either in Artist Support.
-    Whatever the answer, slice 1 counts producers for members' share so theirs isn't given to others.
-    *Instead:* the producer's only, or the maker's only (as today; the producer is paid but invisible).
-21. **If one episode of a show is paid to someone else, who gets a whole-series sale?** *Recommended: the
-    show keeps it*, and attaching the episode says "Whole-series sales of Night Bus still go to Mara".
-    *Instead:* split each series sale by episode count (a new payout path, a table and a Terms line), or no
-    whole-series sale for a show paid to more than one person.
+22. **When an owner picks someone else to get the earnings, does that person have to accept first?**
+    *Recommended: yes.* They get an invite (notification, email, a card in Creator Studio); until they accept,
+    the earnings keep going where they went. Without it, anyone could be named on someone else's income — and
+    on their tax forms — without knowing. *Instead:* the switch is immediate and they're only told.
+23. **Who can see who runs a show and who is paid?** *Recommended: everyone working on the show* (its owner, the
+    paid account, anyone with an episode in it) and the team; viewers see only the credits (decision 20), never
+    who is paid. *Instead:* only the owner and the team; or also the public.
+24. **When the owner has someone else get the show's earnings, does a whole-series sale go to that person, or
+    always to the original creator?** *Recommended: to the show's paid account* (the original creator unless
+    the owner picked someone): a series sale is the show's money, and the owner chose where that goes.
+    *Instead:* always the original creator.
 
-**Going this way unless Jose says otherwise:**
+**Going this way unless Jose says otherwise** (from 2026-11-01, plus four from his 2026-11-02 answers):
 
-- The title-id fix for Buy to own and ad share (amendment 25) ships now as its own small migration, 117,
-  ahead of the series one (then 118), so both work before the live-mode money test.
-- On the day the series migration runs, only approved shows with an approved episode stay public; every
-  other show becomes private and follows Make it public. Nothing anyone can watch appears or disappears; the
-  SQL Editor lists the shows that become "Ready to go public".
+- The Studio and Producer credits are a typed name with an optional link to an account on the site; a linked
+  account's profile lists the title, and members can pick a linked producer in Artist Support.
+- Credits and the paid account are set on the show and can be overridden on one title.
+- The owner can change who gets paid at any time (with the acceptance above); money already credited never
+  moves; an admin can set it too, audited, and both sides are told.
+- "Hand the show over" (a new owner runs it) stays an admin action, separate from who gets paid.
+- The title-id fix for Buy to own and ad share shipped on 2026-11-02 as migration 117; the series migration is
+  118.
+- On the day the series migration runs, only approved shows with an approved episode stay public; every other
+  show becomes private and follows Make it public. Nothing anyone can watch appears or disappears; the SQL
+  Editor lists the shows that become "Ready to go public".
 - Accepting an application for a series still puts the show and S1 E1 live at once (Accept counts as Make it
   public).
 - Make it public is the release: it restarts the clock on the show's approved episodes, so Premium's 24-hour
   early screening and the "New episode" banner start then.
-- Make it public is one-way, and its confirm says so; a show comes down only through Remove this show
-  (buyers keep what they bought) or an admin's Hold. (A pause that hides a show from everyone but its buyers
-  is the thing to add if creators ask, e.g. for a festival window; never by setting the status back.)
+- Make it public is one-way, and its confirm says so; a show comes down only through Remove this show (buyers
+  keep what they bought) or an admin's Hold. (A pause that hides a show from everyone but its buyers is the
+  thing to add if creators ask, e.g. for a festival window; never by setting the status back.)
 - Once a show's first episode is approved, changes to its name, poster, still, hero image, title image and
   trailer wait for approval as on a live show, and that first review card shows all of them, the trailer
   included.
@@ -292,6 +299,61 @@ seriesHidden) and accepted. These amendments override the synthesized spec where
 - **Decision 10 — option A.** A "Tapa +" pill plus a separate green chip: "E1 free" / "E1–E3 free" /
   "2 free"; "Free with ads" when everything is free; members see the same chips; a non-member's Play
   reads "Play S1 E1 · free". `showRollup` returns `{ tier: 'premium'|'free'|'mixed', freeLabel }`.
+
+### Jose's answers (2026-11-02) and what they change
+
+Jose: "Let's fix the ad money issue and make sure it works, 19... so yeah, let's have it paid only. However.
+Let the users or owners see who runs everything ie. They also chose who gets the earnings. 20. Have made by
+Mara, the original creator, but also allow a studio and a producers name to be on there, however, optional.
+The creators name stays on top unless otherwise/have it optional too. 21. The show owner gets the sale. Or the
+original creator. Let's start building and let's see what other things you need my decision on."
+
+- **The money fix shipped first** (2026-11-02, commit 47f90f7): migration 117 is the title-id fix (title_prices /
+  purchases / ad_impression_days / creator_ledger ids to text, record_ad_impression on text). So the series
+  migration is **118_shows.sql**: everything this spec says for "117_shows.sql", minus the title_prices /
+  purchases change (done in 117), plus the columns below. Check it on a real Postgres with
+  `scripts/pg-chain.mjs` before handing it over (a `scripts/check-migration-118.mjs` like 117's).
+- **19 — paid only, and the owner chooses who gets the earnings.** A show has a runner, its owner
+  (`series.creator_id`, who builds and arranges it and presses Make it public); a standalone title's runner is
+  its uploader. Separately, a show and each title have a **paid account**, chosen by the runner (an admin can
+  set it too): `series.paid_to` (the show's earnings) and `episodes.paid_to` (one title's, overriding the
+  show's). The one rule, in lib/showRules.js: `payeeOf(episode, series) = episode.paid_to ?? series.paid_to ??
+  series.creator_id ?? episode.submitted_by`. It replaces decision 13's `episodes.owner_id`, which is not added.
+  "Hand the show over" (changing `series.creator_id`) stays its own admin action on the Owner card.
+  **Everyone working on a show sees who runs it and who is paid**: a "Runs it · Paid to" line on the show page
+  and in the episode editor for the runner, the paid account(s), every uploader with an episode in the show,
+  and the team; viewers never see who is paid. *(Question 23 confirms who sees it.)*
+  **The chosen account accepts first** *(question 22; built this way unless Jose says otherwise)*: choosing
+  someone sends them an invite (notification + email, a "Get paid for Night Bus?" card in Creator Studio);
+  until they accept, the earnings keep going where they went; they need a ready payout account to be paid
+  (earnings wait as owed, like any creator's). Money already credited never moves; from the acceptance on,
+  ad share counts by the day the ad played, members' watched share by the day it was watched, sales and tips
+  by the moment of the sale or tip. Every change is kept in `title_payees` (title_type, title_id, payee_id,
+  from_at, to_at, set_by) so a month that spans a change is split. Schema in 118: `series.paid_to text`,
+  `episodes.paid_to text`, `payee_invites` (id uuid, title_type 'series'|'episode', title_id text,
+  invitee_id text, invited_by text, status pending|accepted|declined|cancelled, created_at, decided_at; one
+  pending invite per title by a partial unique index), `title_payees` as above (one open row per title, to_at
+  null). The money lanes (title sales' destination and who may price, ad share, Creator Share's watched basis,
+  the Tip button, Your numbers, the Money page) adopt payeeOf in the slice that lets someone set paid_to;
+  until then paid_to is always null and nothing changes.
+- **20 — credits.** "Made by" names the original creator (the title's artist text, else the show's, else the
+  maker's display name) and stays on top. A show, and a title overriding its show, can add an optional
+  **Studio** and an optional **Producer**: each a name, optionally linked to an account on the site (a linked
+  account's profile lists the title under studio / producer work, and members can pick a linked producer in
+  Artist Support). The runner can put the Studio or Producer line above "Made by". Schema in 118:
+  `series.credits` and `episodes.credits` jsonb not null default '{}' — `{ studio: { name, userId },
+  producer: { name, userId }, order: ['maker','studio','producer'] }`. The editor writes it (slice 2/3), the
+  public pages and the app read it (slice 4/5); `creditLines(episode, series, names)` in lib/showRules.js is
+  the pure rule (order, fallbacks, empty lines dropped).
+- **21 — a whole-series sale goes to the show**: to the show's paid account (`series.paid_to ??
+  series.creator_id`), the original creator unless the runner chose someone else for the show's earnings. An
+  episode paid to someone else takes no share of series sales, and choosing it says so ("Whole-series sales of
+  Night Bus still go to Mara"). *(Question 24 confirms the series sale follows the show's paid account rather
+  than always the original creator.)*
+- **Decision 2 in 118:** `series.public_at timestamptz`. On the day 118 runs: an approved show with at least one
+  approved episode stays public (`public_at` = its earliest episode release); an approved show with no approved
+  episode becomes private (`status = 'pending'`), one notice per show; a pending show with approved episodes
+  stays private and reads "Ready to go public". Nothing anyone can watch appears or disappears.
 
 ## The spec
 
