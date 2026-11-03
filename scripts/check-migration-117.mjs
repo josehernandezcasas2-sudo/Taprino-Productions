@@ -130,4 +130,51 @@ const legacy = (await db.query(`select target_id from title_prices where target_
 assert.equal(legacy, LEGACY);
 ok('a value stored before the change keeps its exact text');
 
+// --- the database of 2026-11-03: everything through 116 but 103 -------------
+// 117 first stopped at "relation ad_impression_days does not exist". Build
+// that database (the chain to 116 with 103 left out), show 117 now names
+// 103 and changes nothing, then run 103 (after 112, as it will be there)
+// and 117, and check ad share works and its table has row level security.
+{
+  const { migrationFiles, runFile, SUPABASE_DIR } = await import('./pg-chain.mjs');
+  const path = await import('node:path');
+  const { PGlite } = await import('@electric-sql/pglite');
+  const gap = new PGlite();
+  await gap.exec('create role anon; create role authenticated; create role service_role;');
+  await runFile(gap, path.join(SUPABASE_DIR, 'schema.sql'));
+  for (const f of migrationFiles()) {
+    const m = Number(f.slice(0, 3));
+    if (m > 116 || m === 103) continue;
+    await runFile(gap, path.join(SUPABASE_DIR, 'migrations', f));
+  }
+  ok('a database with every migration through 116 except 103');
+  try {
+    await runMigration(gap, 117);
+    throw new Error('117 ran without 103');
+  } catch (err) {
+    assert.match(err.message, /117 needs migration 103 \(Ad share\) first/);
+  }
+  const t = await gap.query(`select data_type from information_schema.columns where table_name = 'title_prices' and column_name = 'target_id'`);
+  assert.equal(t.rows[0].data_type, 'uuid');
+  ok('117 without 103 stops with "117 needs migration 103 (Ad share) first" and changes nothing');
+
+  await runMigration(gap, 103);
+  const before = await gap.query(`select relrowsecurity from pg_class where relname = 'ad_impression_days'`);
+  assert.equal(before.rows[0].relrowsecurity, false);
+  ok('103 run after 112 makes ad_impression_days without row level security');
+  await runMigration(gap, 117);
+  const after = await gap.query(`select relrowsecurity from pg_class where relname = 'ad_impression_days'`);
+  assert.equal(after.rows[0].relrowsecurity, true);
+  const cols = await gap.query(`select table_name, data_type from information_schema.columns where (table_name, column_name) in (('title_prices','target_id'),('purchases','target_id'),('ad_impression_days','episode_id'),('creator_ledger','episode_id')) order by 1`);
+  assert.deepEqual(cols.rows.map((r) => r.data_type), ['text', 'text', 'text', 'text']);
+  const ad = (await gap.query(`insert into house_ads (title, video_url, duration_seconds) values ('Studio promo', 'https://example.test/promo.mp4', 15) returning id`)).rows[0].id;
+  await gap.query(`select record_ad_impression($1, $2, 'vod')`, [ad, EP]);
+  const plays = await gap.query(`select impressions from ad_impression_days where episode_id = $1`, [EP]);
+  assert.equal(plays.rows[0].impressions, 1);
+  ok('then 117 runs: the four columns are text, ad plays count against a real title, and the table has row level security');
+  const grants = await gap.query(`select has_table_privilege('anon', 'ad_impression_days', 'select') as anon_reads`);
+  assert.equal(grants.rows[0].anon_reads, false);
+  ok('the anon key cannot read ad_impression_days (112\'s default privileges cover a table made after it)');
+}
+
 console.log(`\n${n} checks passed`);

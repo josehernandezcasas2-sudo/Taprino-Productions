@@ -14,6 +14,24 @@
 --
 -- Re-runnable: altering a text column to text is a no-op, and the
 -- function is dropped and created by its exact signature.
+--
+-- Needs 097 (Buy to own) and 103 (Ad share). On 2026-11-03 the first run
+-- stopped at "relation ad_impression_days does not exist": 103 was not in
+-- the database. Now it says which migration to run first, and changes
+-- nothing (the SQL Editor runs the whole paste as one transaction).
+-- supabase/check_migrations.sql lists every migration a database lacks.
+
+do $$
+begin
+  if to_regclass('public.title_prices') is null or to_regclass('public.purchases') is null then
+    raise exception '117 needs migration 097 (Buy to own) first. Run 097_buy_to_own.sql, then 117 again. Nothing was changed.';
+  end if;
+  if to_regclass('public.ad_impression_days') is null
+     or not exists (select 1 from information_schema.columns
+                     where table_schema = 'public' and table_name = 'creator_ledger' and column_name = 'episode_id') then
+    raise exception '117 needs migration 103 (Ad share) first. Run 103_ad_share.sql, then 117 again. Nothing was changed.';
+  end if;
+end $$;
 
 alter table title_prices alter column target_id type text using target_id::text;
 alter table purchases alter column target_id type text using target_id::text;
@@ -49,6 +67,11 @@ $$;
 -- Only the server (the service-role key) may call it (migration 112's rule).
 revoke execute on function record_ad_impression(uuid, text, text) from public, anon, authenticated;
 grant execute on function record_ad_impression(uuid, text, text) to service_role;
+
+-- 103 made ad_impression_days without row level security (it came before
+-- 112, which turned it on for every table there was). Where 103 was run
+-- after 112, this is the line that closes it; elsewhere it changes nothing.
+alter table ad_impression_days enable row level security;
 
 comment on column title_prices.target_id is 'The episode or series id (text, like every title id on the site; uuid until migration 117).';
 comment on column purchases.target_id is 'The episode or series id (text, like every title id on the site; uuid until migration 117).';
