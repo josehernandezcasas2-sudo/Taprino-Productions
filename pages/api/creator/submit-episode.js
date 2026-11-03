@@ -1,23 +1,15 @@
 import { getRoleContext } from '../../../lib/roles';
-import { getSupabase } from '../../../lib/supabase';
-import { creatorOwnsSeries } from '../../../lib/series';
-import { cloudflarePlaybackUrl, getCloudflareVideoStatus } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
-import { uploadArtworkImage } from '../../../lib/artworkUpload';
-import { normalizeUrl } from '../../../lib/normalizeUrl';
-import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { sendError } from '../../../lib/apiErrors';
-import { uploadCaptionFile } from '../../../lib/captionUpload';
-import { deleteDraft } from '../../../lib/creatorDrafts';
 import { applyCors } from '../../../lib/cors';
+import { submitDraft, ShowError } from '../../../lib/showPage';
 
-// Every one of these has to be present and non-empty — this is the actual
-// enforcement of "creators must submit complete metadata," not just a UI
-// nicety. A form can be bypassed by anyone calling this endpoint directly;
-// this check can't be.
-const REQUIRED_FIELDS = ['title', 'description', 'contentType', 'genre', 'mainGenre', 'runtime', 'artist', 'tier'];
-const VALID_TIERS = ['free', 'premium'];
-const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
+// Sends a title in for review (Creator Studio's three-step submit, the
+// app's submit screen). Everything about the title — the checks, its place
+// in a show, the show's defaults, "+ New show", the write — is
+// submitDraft in lib/showPage.js (the series revamp, 2026-11-02), shared
+// with the show page's "Send N for review"; this route checks who is
+// asking and how often.
 
 // Poster/thumbnail arrive as base64 data URLs in the JSON body (see
 // pages/creator.js) rather than a real multipart upload — simplest thing
@@ -34,6 +26,7 @@ export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Cache-Control', 'private, no-store');
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST, OPTIONS');
@@ -51,234 +44,14 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many submissions — please wait a bit and try again.' });
   }
 
-  const body = req.body || {};
-  // The three-step submit page (2026-10-31) sends what it read from the
-  // file and the main genre doubles as the specific one when none was typed.
-  if ((!body.runtime || !String(body.runtime).trim()) && Number(body.runtimeSeconds) > 0) {
-    const total = Math.round(Number(body.runtimeSeconds));
-    const h = Math.floor(total / 3600), m = Math.floor((total % 3600) / 60), sec = total % 60;
-    body.runtime = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
-  }
-  if ((!body.genre || !String(body.genre).trim()) && body.mainGenre) body.genre = body.mainGenre;
-  if (!body.tier) body.tier = 'free';
-
-  const missing = REQUIRED_FIELDS.filter((f) => !body[f] || String(body[f]).trim() === '');
-  if (missing.length > 0) {
-    return res.status(400).json({ error: `Missing required field${missing.length === 1 ? '' : 's'}: ${missing.join(', ')}` });
-  }
-  if (!VALID_TIERS.includes(body.tier)) {
-    return res.status(400).json({ error: `tier must be one of: ${VALID_TIERS.join(', ')}` });
-  }
-  if (!VALID_CONTENT_TYPES.includes(body.contentType)) {
-    return res.status(400).json({ error: `contentType must be one of: ${VALID_CONTENT_TYPES.join(', ')}` });
-  }
-  // Series-specific fields are required for 'series' AND 'podcast' — a
-  // podcast episode always belongs to a show (even a show with only one
-  // episode so far), same reasoning as a series episode always belonging
-  // to a series. Standalone movie/short/vertical has no season or order.
-  // "+ New show" inline on the submit page: the show is created here, in
-  // the same breath as its first episode, pending review like one made
-  // through create-series.
-  const newSeriesName = typeof body.newSeriesName === 'string' ? body.newSeriesName.trim().slice(0, 120) : '';
-  if (newSeriesName && (body.contentType === 'series' || body.contentType === 'podcast')) {
-    const seriesId = `${newSeriesName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'show'}-${Date.now().toString(36)}`;
-    const { error: seriesError } = await getSupabase().from('series').insert({
-      id: seriesId,
-      name: newSeriesName,
-      description: typeof body.newSeriesDescription === 'string' ? body.newSeriesDescription.trim().slice(0, 2000) || null : null,
-      poster: null,
-      thumbnail: null,
-      creator_id: userId,
-      channel_opt_in: body.channelOptIn === true,
-      submitted_by: email || null,
-      status: 'pending'
-    });
-    if (seriesError) {
-      console.error('submit-episode new series:', seriesError.message);
-      return res.status(500).json({ error: 'Could not create the show.' });
-    }
-    body.seriesId = seriesId;
-    if (!body.seriesOrder) body.seriesOrder = 1;
-    if (!body.season) body.season = 1;
-  }
-  if ((body.contentType === 'series' || body.contentType === 'podcast') && (!body.seriesId || !body.seriesOrder)) {
-    return res.status(400).json({ error: `${body.contentType === 'podcast' ? 'Podcast' : 'Series'} episodes need a show/series and an episode number.` });
-  }
-  // Bonus content attaches to a show but isn't part of its own numbered
-  // episode sequence — no season/order needed, just which show it's for.
-  if (body.contentType === 'bonus' && !body.seriesId) {
-    return res.status(400).json({ error: 'Choose which show this bonus content is for.' });
-  }
-
-  // Every episode needs at least one way to actually play — a video, an
-  // audio file, or both (podcasts specifically can be either/or/both;
-  // every other content type is video-only in practice, but this check
-  // doesn't need to special-case that since a video-only submission
-  // naturally satisfies it).
-  if (!body.videoUid && !body.audioUrl) {
-    return res.status(400).json({ error: 'Add a video, an audio file, or both — there\u2019s nothing to play otherwise.' });
-  }
-
-  let src = null;
-  if (body.videoUid) {
-    // The id goes into Cloudflare API paths below, so its shape is checked
-    // before anything else is done with it (security round, 2026-10-26).
-    if (!VIDEO_UID_PATTERN.test(String(body.videoUid))) {
-      return res.status(400).json({ error: 'That doesn’t look like a video id from this site.' });
-    }
-    src = cloudflarePlaybackUrl(body.videoUid);
-    if (!src) {
-      return res.status(500).json({ error: 'Could not resolve the uploaded video — is Cloudflare Stream fully configured?' });
-    }
-    // SECURITY: a videoUid arriving from this app's own upload flow (TUS or
-    // URL import) is inherently trustworthy — it's the direct result of an
-    // upload that just happened. A hand-typed video ID (the "paste a
-    // Cloudflare video ID" option) is not — there's no proof it's ready,
-    // finished processing, or even belongs to this creator, so it gets
-    // re-verified against Cloudflare directly before being trusted, same
-    // as manual episode entry and house ads already do.
-    if (body.videoIdWasManuallyEntered) {
-      const status = await getCloudflareVideoStatus(body.videoUid);
-      if (!status || !status.readyToStream) {
-        return res.status(400).json({ error: 'That video ID isn\u2019t ready to stream yet in Cloudflare — wait for it to finish processing.' });
-      }
-    }
-    // Whatever the browser says about where the id came from, it has to be
-    // this creator's video: uploads are tagged with the uploader's account
-    // (get-upload-url / import-video-url). An older, untagged video is
-    // accepted only if no other creator's episode already uses it, so
-    // nobody can attach someone else's film by its id.
-    // lib/videoOwnership.js has the rule (it was written out here first).
-    if (!isAdmin) {
-      const owned = await checkVideoOwnership(body.videoUid, { userId });
-      if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
-    }
-  }
-
-  // trailerUid is optional — a creator may not have a separate trailer cut
-  // ready yet. If they uploaded one, it went through the exact same TUS
-  // flow as the main video (see get-upload-url.js), just a second time.
-  // Same ownership rule as the video (security round, 2026-10-26):
-  // trailers play unsigned to every visitor, so a trailer pointing at
-  // someone else's premium film would publish that film once approved.
-  let trailerSrc = null;
-  if (body.trailerUid) {
-    if (!isAdmin) {
-      const ownedTrailer = await checkVideoOwnership(body.trailerUid, { userId });
-      if (!ownedTrailer.ok) return res.status(ownedTrailer.status).json({ error: `Trailer: ${ownedTrailer.error}` });
-    }
-    trailerSrc = cloudflarePlaybackUrl(body.trailerUid);
-    if (!trailerSrc) {
-      return res.status(500).json({ error: 'Could not resolve the uploaded trailer — is Cloudflare Stream fully configured?' });
-    }
-    if (body.trailerIdWasManuallyEntered) {
-      const trailerStatus = await getCloudflareVideoStatus(body.trailerUid);
-      if (!trailerStatus || !trailerStatus.readyToStream) {
-        return res.status(400).json({ error: 'That trailer video ID isn\u2019t ready to stream yet in Cloudflare.' });
-      }
-    }
-  }
-
-  // A stable, URL-safe id derived from the title — good enough for a
-  // creator-facing flow; an admin can rename it during review if a
-  // collision or something unreadable comes through.
-  const id = `${body.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
-
-  // Poster and thumbnail are both optional — a submission is still valid
-  // without them (it just shows the gradient placeholder until an admin
-  // or a follow-up submission adds artwork). Errors here (e.g. a file
-  // that's too large) DO fail the whole submission rather than silently
-  // dropping the image, so a creator finds out immediately rather than
-  // discovering a missing poster days later.
-  let poster = null;
-  let thumbnail = null;
   try {
-    [poster, thumbnail] = await Promise.all([
-      uploadArtworkImage({ base64: body.posterBase64, fileName: body.posterFileName, pathPrefix: `${id}-poster` }),
-      uploadArtworkImage({ base64: body.thumbnailBase64, fileName: body.thumbnailFileName, pathPrefix: `${id}-thumbnail` })
-    ]);
+    const result = await submitDraft(req.body || {}, { userId, email, isAdmin });
+    return res.status(200).json(result);
   } catch (err) {
-    console.error('submit-episode artwork error:', err.message);
+    // A taken episode number answers with its holder and the next free
+    // number, so the page can offer "Use E4 | Swap"; a show that takes
+    // nothing new says so with code 'show-closed'.
+    if (err instanceof ShowError && err.extra) return res.status(err.status).json({ error: err.message, ...err.extra });
     return sendError(res, err, 'creator/submit-episode', 'Could not submit the title.', { plainStatus: 400 });
   }
-
-  // "__new__" means the creator picked "a new series not listed here" in
-  // the dropdown — there's no real series row for it yet, so series_id has
-  // to stay null (the column has a foreign key to series.id) rather than
-  // trying to insert a value that doesn't exist there. The creator was
-  // told in the UI to name the new series in their description instead;
-  // the admin sets up the real series and reassigns this during review.
-  const isNewSeries = body.seriesId === '__new__';
-
-  // An episode or bonus clip goes only into the creator's own series: the
-  // review queue doesn't show which series a submission targets, so this
-  // used to let one creator file episodes into another's show.
-  const targetsSeries = (body.contentType === 'series' || body.contentType === 'podcast' || body.contentType === 'bonus') && body.seriesId && !isNewSeries;
-  if (targetsSeries && !(await creatorOwnsSeries(userId, body.seriesId, { isAdmin }))) {
-    return res.status(403).json({ error: 'You can only add episodes to your own series.' });
-  }
-
-  // Captions with the submission (optional; SRT is converted, VTT checked).
-  let captionsUrl = null;
-  if (body.captionsBase64) {
-    try {
-      const track = await uploadCaptionFile({ base64: body.captionsBase64, fileName: body.captionsFileName, pathPrefix: id });
-      captionsUrl = track ? track.url : null;
-    } catch (err) {
-      return res.status(400).json({ error: `Captions: ${err.message}` });
-    }
-  }
-
-  const supabase = getSupabase();
-  const { error } = await supabase.from('episodes').insert({
-    id,
-    title: body.title,
-    description: body.description,
-    tier: body.tier,
-    genre: body.genre,
-    main_genre: body.mainGenre,
-    content_type: body.contentType,
-    series_id: (body.contentType === 'series' || body.contentType === 'podcast') && !isNewSeries ? body.seriesId : null,
-    season: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.season) || 1 : null,
-    series_order: (body.contentType === 'series' || body.contentType === 'podcast') ? Number(body.seriesOrder) : null,
-    bonus_parent_type: body.contentType === 'bonus' ? 'series' : null,
-    bonus_parent_id: body.contentType === 'bonus' ? body.seriesId : null,
-    artist: body.artist,
-    runtime: body.runtime,
-    rating: body.rating || null,
-    release_year: body.releaseYear && Number.isInteger(Number(body.releaseYear)) ? Number(body.releaseYear) : null,
-    video_type: 'html5',
-    src,
-    audio_url: body.audioUrl || null,
-    audio_bytes: body.audioBytes || null,
-    trailer_src: trailerSrc,
-    poster,
-    thumbnail,
-    ...(captionsUrl ? { captions_url: captionsUrl, captions_language: typeof body.captionsLanguage === 'string' ? body.captionsLanguage.slice(0, 10) || 'en' : 'en', captions_label: typeof body.captionsLabel === 'string' ? body.captionsLabel.slice(0, 40) || 'English' : 'English' } : {}),
-    // These three used to be admin-only. Creator submissions still go to
-    // 'pending' regardless of what's checked here (see status below), so
-    // none of them bypass review — a creator requesting hero rotation or
-    // marking something Tapa Original doesn't make it live or featured by
-    // itself, admin still has to approve the submission either way.
-    featured: !!body.featured,
-    ads_enabled: body.adsEnabled !== false,
-    ad_break_seconds: Array.isArray(body.adBreakSeconds) && body.adBreakSeconds.length > 0 ? body.adBreakSeconds : [0],
-    is_original: !!body.isOriginal,
-    funding_url: body.fundingUrl && body.fundingUrl.trim() ? normalizeUrl(body.fundingUrl) : null,
-    // Off unless the creator ticked "Let channels air this" — see
-    // lib/channelEngine.js for what opting in allows.
-    channel_opt_in: body.channelOptIn === true,
-    status: 'pending',
-    submitted_by: userId
-  });
-
-  if (error) {
-    console.error('submit-episode error:', error.message);
-    return res.status(500).json({ error: 'Could not save the submission.' });
-  }
-
-  // The draft this came from is done; its video rides on with the title.
-  if (body.draftId) await deleteDraft(userId, String(body.draftId), { keepMedia: true }).catch(() => {});
-
-  return res.status(200).json({ ok: true, id, status: 'pending', seriesId: body.seriesId && body.seriesId !== '__new__' ? body.seriesId : null });
 }

@@ -159,13 +159,43 @@ export default async function handler(req, res) {
     }
   }
 
+  // Trailers (decision 12 of the series revamp, 2026-11-02): they play
+  // through signed links like the films, so every episode's and show's
+  // trailer demands one too, and so does what waits for approval — a
+  // show's staged trailer, a live episode's replacement video
+  // (episodes.pending_src, migration 118; read without it before then).
+  // Trailers uploaded between 2026-10-31 and 2026-11-02 went up without
+  // the flag; approving a title protects its trailers from now on.
+  const trailers = { videos: 0, failures: [] };
+  const trailerRefs = [];
+  let { data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src, pending_src').or('trailer_src.not.is.null,pending_src.not.is.null');
+  if (epTrailerError && /pending_src/.test(epTrailerError.message || '')) {
+    ({ data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src').not('trailer_src', 'is', null));
+  }
+  if (epTrailerError) trailers.failures.push({ id: 'episodes', title: 'trailers', error: epTrailerError.message });
+  for (const row of epTrailers || []) for (const src of [row.trailer_src, row.pending_src]) trailerRefs.push({ id: row.id, title: row.title, src });
+  const { data: showTrailers, error: showTrailerError } = await supabase.from('series').select('id, name, trailer_src, pending_trailer_src').or('trailer_src.not.is.null,pending_trailer_src.not.is.null');
+  if (showTrailerError) trailers.failures.push({ id: 'series', title: 'show trailers', error: showTrailerError.message });
+  for (const row of showTrailers || []) for (const src of [row.trailer_src, row.pending_trailer_src]) trailerRefs.push({ id: row.id, title: row.name, src });
+  for (const ref of trailerRefs) {
+    const uid = cloudflareUidFromUrl(ref.src || '');
+    if (!uid || seen.has(uid)) continue;
+    seen.add(uid);
+    try {
+      await enableSignedUrlsForVideo(uid);
+      trailers.videos += 1;
+    } catch (err) {
+      trailers.failures.push({ id: ref.id, title: ref.title, error: err.message });
+    }
+  }
+
   await recordAudit({
     adminId: userId,
     adminEmail: email,
     action: 'sync_stream_protection',
     targetType: 'episode',
     targetId: 'all',
-    details: `Protected ${protectedIds.length} episodes (${seen.size} videos incl. ${university.videos} University, ${extra.posts} snippets, ${extra.tapes} self-tapes), ${skipped.length} without Cloudflare video, ${failures.length + university.failures.length + extra.failures.length} failed, ${cloudflarePosters.length} with a Cloudflare frame as poster, ${university.framesReplaced + extra.framesStored} frames stored.`
+    details: `Protected ${protectedIds.length} episodes (${seen.size} videos incl. ${university.videos} University, ${extra.posts} snippets, ${extra.tapes} self-tapes, ${trailers.videos} trailers and videos waiting for approval), ${skipped.length} without Cloudflare video, ${failures.length + university.failures.length + extra.failures.length + trailers.failures.length} failed, ${cloudflarePosters.length} with a Cloudflare frame as poster, ${university.framesReplaced + extra.framesStored} frames stored.`
   });
 
   return res.status(200).json({
@@ -175,6 +205,7 @@ export default async function handler(req, res) {
     failures,
     cloudflarePosters,
     university,
-    extra
+    extra,
+    trailers
   });
 }

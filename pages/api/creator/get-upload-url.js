@@ -31,7 +31,10 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many upload requests — please wait a bit and try again.' });
   }
 
-  const { fileSize, fileName, method, kind } = req.body || {};
+  // `kind` ('main' | 'trailer') is what the uploaders say they are sending
+  // (UploadContext, SeriesMediaForm, the app's tusUpload). It no longer
+  // changes anything here: masters and trailers alike are signed-only.
+  const { fileSize, fileName, method } = req.body || {};
   if (!fileSize || typeof fileSize !== 'number' || fileSize <= 0) {
     return res.status(400).json({ error: 'fileSize (in bytes) is required.' });
   }
@@ -56,13 +59,13 @@ export default async function handler(req, res) {
   try {
     // Signed URLs from the first byte (the anti-harvest rule), and the
     // address kept alive a day so a draft's stopped upload can resume.
-    // Trailers are the exception for now: every page plays a trailer from
-    // its stored address without a token, so a signed-only trailer would
-    // never play (it didn't, from the 2026-10-31 creator-path deploy until
-    // this line). Signing trailers on the way out is part of the series
-    // redesign; until then they upload as they did before.
-    const isTrailer = kind === 'trailer';
-    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId, requireSignedURLs: !isTrailer, expiryHours: 24 });
+    // Trailers included again (decision 12 of the series revamp,
+    // 2026-11-02): they were the exception from 2026-10-31, while every page
+    // played a trailer from its stored address; now every player gets a
+    // signed link (lib/heroCandidates.js signTrailerSrc: the series and
+    // episode pages and their APIs, the heroes through /api/stream-token's
+    // part 'trailer') and never the stored address.
+    const { uploadUrl, uid } = await createCloudflareTusUploadUrl({ fileSize, fileName, creator: userId, requireSignedURLs: true, expiryHours: 24 });
     return res.status(200).json({ uploadUrl, uid, method: 'tus' });
   } catch (err) {
     console.error('get-upload-url error:', err.message);

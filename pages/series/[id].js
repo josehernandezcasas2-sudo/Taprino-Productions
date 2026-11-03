@@ -12,7 +12,7 @@ import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/Pla
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
 import { formatRuntimeLong } from '../../lib/videoMetadata';
-import { seriesPlayLabel, episodeCode } from '../../lib/seriesResume';
+import { seriesPlayLabel, episodeCode, sortEpisodes } from '../../lib/seriesResume';
 import { BundleCard, BuyChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
 
 import Footer from '../../components/Footer';
@@ -38,41 +38,61 @@ export async function getServerSideProps({ req, params, res, query }) {
     res.setHeader('Vary', 'Cookie');
   }
 
-  const data = await getSeriesHubData(params.id, req);
+  // ?season=2 opens that season's tab (lib/seriesHub.js answers `season`).
+  const data = await getSeriesHubData(params.id, req, { season: typeof query.season === 'string' ? query.season : null });
   if (!data) {
     return { notFound: true };
+  }
+  // A podcast lives at /podcasts/<id> (the series revamp: a show's kind),
+  // with whatever the link carried (?bought=, ...).
+  if (data.redirect) {
+    const rest = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (key === 'id') continue;
+      for (const v of Array.isArray(value) ? value : [value]) if (typeof v === 'string') rest.append(key, v);
+    }
+    const qs = rest.toString();
+    return { redirect: { destination: `${data.redirect}${qs ? `?${qs}` : ''}`, statusCode: 302 } };
   }
 
   // Buy to own: ?bought=<id> is Checkout bringing a buyer back.
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true, resume = null }) {
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true, resume = null, heroTrailer = null, season = null }) {
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
   const ownsEp = (ep) => Boolean(episodeOffers[ep.id] && episodeOffers[ep.id].owned);
 
-  // Group by season — episodes without an explicit season default to 1, so
-  // existing single-season series don't need every episode retagged.
-  const seasonNumbers = [...new Set(seriesEpisodes.map((e) => e.season || 1))].sort((a, b) => a - b);
-  const [activeSeason, setActiveSeason] = useState(seasonNumbers[0] || 1);
+  // Group by season — episodes without an explicit season are in season 1
+  // (the sorter's rule), so existing single-season series don't need
+  // every episode retagged.
+  const seasonOf = (e) => (Number.isInteger(Number(e.season)) && Number(e.season) > 0 ? Number(e.season) : 1);
+  const seasonNumbers = [...new Set(seriesEpisodes.map(seasonOf))].sort((a, b) => a - b);
+  // The season the link asked for (?season=, checked by lib/seriesHub.js).
+  const [activeSeason, setActiveSeason] = useState(seasonNumbers.includes(season) ? season : (seasonNumbers[0] || 1));
   const [activeTab, setActiveTab] = useState('episodes');
 
-  const activeSeasonEpisodes = seriesEpisodes
-    .filter((e) => (e.season || 1) === activeSeason)
-    .sort((a, b) => (a.seriesOrder || 0) - (b.seriesOrder || 0));
+  // Play order, the one sorter (lib/seriesResume.js).
+  const activeSeasonEpisodes = sortEpisodes(seriesEpisodes.filter((e) => seasonOf(e) === activeSeason));
 
-  // Hero trailer: the series' own trailerSrc if set, otherwise fall back to
-  // the first episode's trailer or full video. heroImage (series-level or
-  // from the rep episode) always wins over video when present.
+  // The hero's trailer: the show's own, else its first episode's, signed
+  // by lib/seriesHub.js (heroTrailer = { src, expiresAt, ref }; src null
+  // when it couldn't be signed). With the ref the hero asks
+  // /api/stream-token for a fresh link when its link runs out or fails,
+  // and shows the artwork when there's nothing it can play.
+  // heroImage (series-level or from the rep episode) always wins over
+  // video when present.
   const heroEpisode = seriesEpisodes[0];
-  // SECURITY: trailerSrc only — never fall back to the full episode's real
-  // src here. This hero is visible to everyone browsing the series page,
-  // subscribed or not; entitlement is only checked once someone actually
-  // clicks into an episode page.
-  const heroSrc = seriesInfo.trailerSrc || (heroEpisode && heroEpisode.trailerSrc);
+  // SECURITY: a trailer only, never the full episode's real src — this
+  // hero is visible to everyone browsing the series page, subscribed or
+  // not; entitlement is only checked once someone actually clicks into an
+  // episode page.
   const heroImage = seriesInfo.heroImage || (heroEpisode && heroEpisode.heroImage);
+  // The artwork stands in for a trailer while its link loads or when it
+  // can't play; a show with no trailer keeps the gradient it always had.
+  const heroFallbackImage = heroTrailer ? (seriesInfo.thumbnail || seriesInfo.poster || (heroEpisode && (heroEpisode.thumbnail || heroEpisode.poster)) || null) : null;
 
   // About tab content — genre/rating aren't series-level fields (only
   // episodes carry them), so they're derived from what's actually in this
@@ -110,7 +130,10 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         title={seriesInfo.name}
         titleImageUrl={seriesInfo.titleImageUrl}
         desc={seriesInfo.desc}
-        videoSrc={heroSrc}
+        videoSrc={heroTrailer ? heroTrailer.src : null}
+        trailerRef={heroTrailer ? heroTrailer.ref : null}
+        trailerExpiresAt={heroTrailer ? heroTrailer.expiresAt : null}
+        fallbackImageSrc={heroFallbackImage}
         imageSrc={heroImage}
         playLabel={playLabel}
         onPlay={() => { if (playEpisodeId) window.location.href = `/episode/${playEpisodeId}?autoplay=1`; }}

@@ -17,6 +17,9 @@ function readAsDataUrl(f) {
 // the main day-to-day workflow that needs to survive page navigation.
 // Simpler to keep this self-contained than to generalize the shared
 // context for a case that doesn't need its persistence.
+// The trailer is signed-only from its first byte, like every upload, and
+// the series page plays it through a signed link (decision 12 of the
+// series revamp, 2026-11-02); `kind` just says what it is.
 async function uploadTrailer(file, onProgress) {
   const urlRes = await fetch('/api/creator/get-upload-url', {
     method: 'POST',

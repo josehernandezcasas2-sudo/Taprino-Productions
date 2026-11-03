@@ -4,7 +4,96 @@
 // /api/genre-feed hero candidates and on /api/series-hub:
 //   { episodeId, season, seriesOrder, resumeSeconds, state: 'first' | 'next' | 'resume' }
 // (Jose, 2026-10-29: play the first episode before they start, continue
-// where they are once they have.) Kept in step with the website by hand.
+// where they are once they have.) Kept in step with the website by hand;
+// the play-order block below is the website's text word for word, and
+// scripts/test-series-resume.mjs checks that and runs its cases on both
+// copies. Imports nothing, so the test can load it as it stands.
+
+// --- play order: the one sorter ----------------------------------------------
+// This block, down to "end of play order", is the same text in
+// lib/seriesResume.js and mobile/src/lib/seriesResume.js;
+// scripts/test-series-resume.mjs checks that and runs every case on both.
+//
+// Season first (none, 0, or anything that isn't a whole number above 0 is
+// season 1), then the episode number (none, or 0, goes after the numbered
+// episodes of its season), then the oldest first (no date goes after the
+// dated ones), then the id. The last two settle duplicates — two episodes
+// on the same season and number, which migration 118 moves out of the way
+// — so a show comes out in the same order whatever order its rows arrived
+// in. Reads the rows the pages and APIs hand around (season, seriesOrder,
+// createdAt), the database's own (series_order, created_at) and a draft's
+// (creator_drafts keeps the season and number in its form). The series
+// revamp's rule (mockups/series-revamp-spec.md): every list of a show's
+// episodes sorts with this, so Up next, the end card, the season strip,
+// the series page, the hero, the channel engine and the show page agree.
+// lib/showRules.js compareEpisodes is the same comparison in its own copy
+// (that file imports nothing); the tests hold the two together.
+
+function wholeAboveZero(v) {
+  if (v === undefined || v === null || typeof v === 'boolean') return null;
+  if (typeof v === 'string' && v.trim() === '') return null;
+  const n = Number(v);
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
+
+function field(ep, camel, snake) {
+  if (!ep || typeof ep !== 'object') return undefined;
+  if (ep[camel] !== undefined) return ep[camel];
+  if (snake && ep[snake] !== undefined) return ep[snake];
+  if (ep.form && typeof ep.form === 'object' && ep.form[camel] !== undefined) return ep.form[camel];
+  return undefined;
+}
+
+function playSeason(ep) {
+  return wholeAboveZero(field(ep, 'season')) || 1;
+}
+
+function playNumber(ep) {
+  return wholeAboveZero(field(ep, 'seriesOrder', 'series_order'));
+}
+
+function playTime(ep) {
+  const v = field(ep, 'createdAt', 'created_at');
+  if (v === undefined || v === null || (typeof v === 'string' && v.trim() === '')) return null;
+  if (v instanceof Date) return Number.isFinite(v.getTime()) ? v.getTime() : null;
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  const t = Date.parse(String(v));
+  return Number.isFinite(t) ? t : null;
+}
+
+function playId(ep) {
+  return String(ep && ep.id !== undefined && ep.id !== null ? ep.id : '');
+}
+
+// The comparison, for code that sorts in place (list.sort(compareEpisodes)).
+export function compareEpisodes(a, b) {
+  const season = playSeason(a) - playSeason(b);
+  if (season !== 0) return season;
+  const na = playNumber(a);
+  const nb = playNumber(b);
+  if (na !== nb) {
+    if (na === null) return 1;
+    if (nb === null) return -1;
+    return na - nb;
+  }
+  const ta = playTime(a);
+  const tb = playTime(b);
+  if (ta !== tb) {
+    if (ta === null) return 1;
+    if (tb === null) return -1;
+    return ta - tb;
+  }
+  const ia = playId(a);
+  const ib = playId(b);
+  return ia < ib ? -1 : ia > ib ? 1 : 0;
+}
+
+// A sorted copy in play order; the list it is given is left as it was.
+export function sortEpisodes(episodes) {
+  return [...(episodes || [])].sort(compareEpisodes);
+}
+
+// --- end of play order -------------------------------------------------------
 
 // "S1 E4" (the Continue Watching card's spelling), or null without a number.
 export function episodeCode(ep) {

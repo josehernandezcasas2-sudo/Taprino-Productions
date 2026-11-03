@@ -4,9 +4,12 @@ import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwners
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
+import { isTitleId } from '../../../lib/titleIds';
 
 // Creator Studio's drafts (the three-step submit page, web + app).
 //   GET            → { drafts }         GET ?id= → { draft }
+//                  ?seriesId= keeps one show's drafts; ?limit= (at most
+//                  100, the default) — lib/creatorDrafts.js listDrafts
 //   POST           { id?, form, video?, trailer? } → { draft }   (upsert)
 //   DELETE         { id }               → { ok }  (the media goes too)
 export default async function handler(req, res) {
@@ -27,7 +30,10 @@ export default async function handler(req, res) {
         if (!draft) return res.status(404).json({ error: 'No such draft.' });
         return res.status(200).json({ draft });
       }
-      return res.status(200).json({ drafts: await listDrafts(userId, { refresh: true }) });
+      const seriesId = typeof req.query.seriesId === 'string' && isTitleId(req.query.seriesId) ? req.query.seriesId : null;
+      if (req.query.seriesId !== undefined && !seriesId) return res.status(400).json({ error: 'Which show?' });
+      const limit = typeof req.query.limit === 'string' ? req.query.limit : undefined;
+      return res.status(200).json({ drafts: await listDrafts(userId, { refresh: true, seriesId, limit }) });
     }
 
     if (req.method === 'POST') {
