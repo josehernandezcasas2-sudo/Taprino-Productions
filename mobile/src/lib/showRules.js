@@ -371,6 +371,23 @@ export function slotCheck(rows, { season, number, excludeId } = {}) {
   return { free: false, code: 'taken', season: s, number: n, holder, nextFree: p.nextFree, words: `E${n} in Season ${s} is ${holder.title ? `taken by “${holder.title}”` : 'taken'}` };
 }
 
+// The 409 a number another episode keeps answers with, the same wherever a
+// number is set (submit-episode, the creator's edit, the admin's edit): the
+// holder and the next free number to offer. A number that reads free again
+// by the time it is asked (whoever took it a moment ago is gone) says so
+// plainly instead of "E3 is free".
+export function slotTakenBody(slot) {
+  const s = slot || {};
+  return {
+    error: s.free || !s.words ? 'That number was just taken — reload and pick another.' : `${s.words}. The next free number is E${s.nextFree}.`,
+    code: 'taken',
+    season: s.season ?? null,
+    number: s.number ?? null,
+    holder: s.holder ? { id: s.holder.id, title: s.holder.title || null } : null,
+    nextFree: s.nextFree ?? null
+  };
+}
+
 // The numbering lines for the status card, season by season: two rows on
 // one number, a hole in the run, a parked number, rows with no number.
 export function numberingProblems(rows, opts = {}) {

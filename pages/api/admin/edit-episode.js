@@ -13,7 +13,7 @@ import { internalError, sendError } from '../../../lib/apiErrors';
 import { updateCompat } from '../../../lib/dbCompat';
 import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
-import { MAX_EPISODE_NUMBER, isPublicShow, masterState, slotCheck } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, slotCheck, slotTakenBody } from '../../../lib/showRules';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -36,15 +36,19 @@ import { MAX_EPISODE_NUMBER, isPublicShow, masterState, slotCheck } from '../../
 //     pulled), and its season and number can't be another episode's (409
 //     with the holder and the next free number — a declined or withdrawn
 //     episode holds none, amendment 6);
-//   - only what actually changed is written and audited (the modal sends
-//     every field on every save, so the audit line used to list them all
-//     and reviewed_at moved on every save);
+//   - only what actually changed is written and audited (the modal sent
+//     every field on every save, so the audit line listed them all and
+//     reviewed_at moved on every save; since 2026-11-03 it sends only the
+//     fields the admin changed, and a missing key here means unchanged);
 //   - a status change to approved is an approval (amendment 4, as decision
 //     2 left it): released_at starts now, the video and the trailers
 //     (the episode's and its show's) demand signed links, a Cloudflare
 //     video still uploading, processing or failed is refused (amendment
 //     3), a series or podcast episode needs its number; the show is never
-//     made public by it — its owner or a full admin does that.
+//     made public by it — its owner or a full admin does that;
+//   - a show with no other episode in its running order takes its kind
+//     from the series or podcast episode saved into it (adoptShowKind
+//     below), as manual-episode, submit-episode and rss-import do.
 export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
 };
@@ -145,13 +149,41 @@ function sameValue(column, a, b) {
   return x === y;
 }
 
+// A show with no episode in its running order but this one takes this
+// one's kind, by manual-episode's rule: migration 118's series.kind
+// decides whether /series/<id> sends its viewers on to /podcasts/<id>, and
+// a show made through "Add series" (which sends no kind) reads as a
+// series, so a podcast episode moved into it — or a lone episode retyped
+// inside it — would otherwise keep rendering as a series. The column has
+// to be on the row (118 run); a vertical (Snippet) series, and a show that
+// has other episodes, keep their kind. Best effort, after the episode is
+// saved: a failed read or write is logged, never the admin's problem.
+// → the kind the show now has, or null when it kept its own.
+async function adoptShowKind(supabase, show, episodeId, type) {
+  if (!show || !Object.prototype.hasOwnProperty.call(show, 'kind')) return null;
+  if (!NUMBERED_TYPES.includes(show.kind) || !NUMBERED_TYPES.includes(type) || show.kind === type) return null;
+  const { data: rows, error } = await supabase.from('episodes').select('id, status, content_type, withdrawn_at').eq('series_id', show.id);
+  if (error) {
+    console.error('admin/edit-episode show kind (episodes):', error.message);
+    return null;
+  }
+  if ((rows || []).some((r) => r.id !== episodeId && inRunningOrder(r) && NUMBERED_TYPES.includes(r.content_type))) return null;
+  const { error: kindError } = await supabase.from('series').update({ kind: type }).eq('id', show.id);
+  if (kindError) {
+    console.error('admin/edit-episode show kind:', kindError.message);
+    return null;
+  }
+  return type;
+}
+
 async function slotRefusal(supabase, next, episodeId) {
   const { data: rows, error } = await supabase.from('episodes').select('id, title, season, series_order, status, content_type, withdrawn_at, created_at').eq('series_id', next.series_id);
   if (error) throw internalError(error, 'edit-episode slots');
   const season = next.season || 1;
   const slot = slotCheck(rows || [], { season, number: next.series_order, excludeId: episodeId });
   if (slot.free) return null;
-  return refuse(`${slot.words}. The next free number is E${slot.nextFree}.`, 409, { code: 'taken', season, number: next.series_order, holder: slot.holder ? { id: slot.holder.id, title: slot.holder.title || null } : null, nextFree: slot.nextFree });
+  const { error: message, ...extra } = slotTakenBody(slot);
+  return refuse(message, 409, extra);
 }
 
 export default async function handler(req, res) {
@@ -321,8 +353,13 @@ async function editEpisode(req, res, roleContext) {
   // Its place can't be another episode's (a declined or withdrawn one
   // holds none). Before migration 118's unique index this is the only
   // thing that stops two S1 E3s; after it, the index backs it up.
+  // A season left empty plays as Season 1 (lib/showRules.js seasonOf), so
+  // the 1 written into it above is not a move: a title-only save of such a
+  // row (from before 118 filled the seasons in) isn't refused over a
+  // number it already had.
   const holdsSlot = NUMBERED_TYPES.includes(type) && next.series_id && next.series_order && next.status !== 'rejected' && !next.withdrawn_at;
-  if (holdsSlot && PLACE_COLUMNS.some((c) => c in changed)) {
+  const placeChanged = PLACE_COLUMNS.some((c) => c in changed && !(c === 'season' && (posInt(changed.season) || 1) === (posInt(existing.season) || 1)));
+  if (holdsSlot && placeChanged) {
     const taken = await slotRefusal(supabase, next, existing.id);
     if (taken) throw taken;
   }
@@ -401,35 +438,42 @@ async function editEpisode(req, res, roleContext) {
     }
   }
 
+  // The show it's in, read once for what follows: the trailer an approval
+  // protects, and the kind a series or podcast episode gives a show that
+  // has no other (a moved episode's show was read above).
+  const numbered = NUMBERED_TYPES.includes(type);
+  let showRow = targetShow;
+  if (!showRow && next.series_id && (approving || numbered)) {
+    const { data } = await supabase.from('series').select('*').eq('id', next.series_id).maybeSingle();
+    showRow = data || null;
+  }
+  const kindTaken = numbered ? await adoptShowKind(supabase, showRow, existing.id, type) : null;
+
   // Every Cloudflare video the site plays demands a signed link: a new
   // video, a tier decided, and an approval — which covers the trailers
   // too, the episode's and its show's (decision 12). Best effort.
   const src = newSrc || existing.src;
   const protect = [];
   if (changed.tier !== undefined || newSrc || approving) protect.push(src);
-  let showRow = targetShow;
   if (approving) {
     protect.push(existing.trailer_src);
-    if (next.series_id && !showRow) {
-      const { data } = await supabase.from('series').select('*').eq('id', next.series_id).maybeSingle();
-      showRow = data || null;
-    }
     if (showRow) protect.push(showRow.trailer_src);
   }
   await Promise.all([...new Set(protect.filter(Boolean))].map((s) => syncStreamProtection({ src: s })));
 
   await invalidateCache('public_episodes_v1');
-  if ('series_id' in changed) await invalidateCache('all_series_approved_v1');
+  if ('series_id' in changed || kindTaken) await invalidateCache('all_series_approved_v1');
 
   const columns = Object.keys(dbUpdates).filter((c) => !['reviewed_at', 'reviewed_by', 'released_at'].includes(c));
   const moved = 'series_id' in changed ? ` · moved from ${existing.series_id || 'no show'} to ${changed.series_id || 'no show'}` : '';
+  const retyped = kindTaken ? ` · ${showRow.id} is now a ${kindTaken} show` : '';
   await recordAudit({
     adminId: userId,
     adminEmail: email,
     action: 'edit_episode',
     targetType: 'episode',
     targetId: existing.id,
-    details: `${existing.title} — changed: ${columns.join(', ') || 'nothing'}${moved}`
+    details: `${existing.title} — changed: ${columns.join(', ') || 'nothing'}${moved}${retyped}`
   });
 
   // A status override outside the normal review flow (e.g. un-approving
@@ -453,9 +497,11 @@ async function editEpisode(req, res, roleContext) {
     answer.showOwner = targetShow.creator_id;
   }
   // An approved title in a show that isn't public stays off the site until
-  // the show is made public (decision 2).
-  if (next.status === 'approved' && NUMBERED_TYPES.includes(type) && showRow && !isPublicShow(showRow)) {
+  // the show is made public (decision 2): said when it's approved or moved.
+  if ((approving || targetShow) && next.status === 'approved' && numbered && showRow && !isPublicShow(showRow)) {
     answer.showNote = `${showRow.name || 'The show'} isn’t public yet: this episode shows once its owner or a full admin makes it public.`;
   }
+  // The show took this episode's kind (adoptShowKind).
+  if (kindTaken) answer.showKind = kindTaken;
   return res.status(200).json(answer);
 }

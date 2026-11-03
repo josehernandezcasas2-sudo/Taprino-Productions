@@ -173,6 +173,18 @@ function suite(R, who) {
     assert.equal(R.slotCheck([{ id: 'y', seriesOrder: 1 }], { number: 1 }).words, 'E1 in Season 1 is taken');
   });
 
+  tt('slotTakenBody: the one 409 a taken number answers with, everywhere', () => {
+    const rows = [ep('x', 1), ep('y', 2)];
+    assert.deepEqual(R.slotTakenBody(R.slotCheck(rows, { season: 1, number: 1 })), {
+      error: 'E1 in Season 1 is taken by “T-x”. The next free number is E3.', code: 'taken', season: 1, number: 1, holder: { id: 'x', title: 'T-x' }, nextFree: 3
+    });
+    assert.deepEqual(R.slotTakenBody(R.slotCheck([{ id: 'y', seriesOrder: 1 }], { number: 1 })).holder, { id: 'y', title: null });
+    const raced = R.slotTakenBody(R.slotCheck(rows, { season: 1, number: 5 }));
+    assert.equal(raced.error, 'That number was just taken — reload and pick another.');
+    assert.equal(raced.code, 'taken');
+    assert.deepEqual([R.slotTakenBody(null).code, R.slotTakenBody(null).error], ['taken', 'That number was just taken — reload and pick another.']);
+  });
+
   tt('numberingProblems: the status card\'s words', () => {
     assert.deepEqual(R.numberingProblems(run(4)), []);
     const words = R.numberingProblems([ep('a', 1), ep('b', 3), ep('c', 4, 2), ep('c2', 4, 2), ep('u', null, 2), ep('x', 6), ep('y', 7), ep('z', 8), ep('far', 1009)]).map((p) => [p.code, p.season, p.words]);

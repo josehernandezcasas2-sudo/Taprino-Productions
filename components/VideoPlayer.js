@@ -31,6 +31,8 @@ function getAdTagUrl(placement, episodeId = null) {
 }
 
 const SKIP_SECONDS = 10;
+// One fresh signed link per source per half minute (refreshSignedSrc).
+const REFRESH_GAP_MS = 30 * 1000;
 
 // play() returns a promise that rejects when something interrupts it — a
 // src swap on the move to the next episode, an autoplay the browser
@@ -120,6 +122,8 @@ export default function VideoPlayer({
   // trigger a re-render on its own.
   const hoveringControlsRef = useRef(false);
   const refreshingRef = useRef(false);
+  // When each source last asked for a fresh signed link (refreshSignedSrc).
+  const refreshedAtRef = useRef({});
 
   const [started, setStarted] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -309,9 +313,20 @@ export default function VideoPlayer({
    * episode) can outlive the token the page was rendered with, so rather
    * than surfacing that as a playback failure we mint a new one and
    * resume from the same spot.
+   *
+   * At most one fresh link per source per half minute: a link fetched
+   * moments ago that fails again isn't an expired one (a deleted video, an
+   * outage, a signing key Cloudflare won't accept), and asking again only
+   * spends the viewer's budget at /api/stream-token. A dead film used to
+   * loop through it (about sixty requests in ten seconds, until the route
+   * answered 429), which then refused the viewer's next title for up to an
+   * hour. A refused refresh answers null, as a failed one does.
    * ------------------------------------------------------------------ */
   const refreshSignedSrc = useCallback(async () => {
     if (!signedPlayback || refreshingRef.current) return null;
+    const key = `${episode.id}|${episode.src || ''}`;
+    if (Date.now() - (refreshedAtRef.current[key] || 0) < REFRESH_GAP_MS) return null;
+    refreshedAtRef.current[key] = Date.now();
     refreshingRef.current = true;
     try {
       if (refreshSrc) return await refreshSrc();
@@ -327,7 +342,7 @@ export default function VideoPlayer({
     } finally {
       refreshingRef.current = false;
     }
-  }, [episode.id, signedPlayback, refreshSrc]);
+  }, [episode.id, episode.src, signedPlayback, refreshSrc]);
 
   /* ------------------------------------------------------------------ *
    * Source attachment. Cloudflare Stream serves HLS, which only Safari

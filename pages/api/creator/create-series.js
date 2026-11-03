@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { checkRateLimit } from '../../../lib/rateLimit';
+import { mintTitleId } from '../../../lib/showPage';
 
 // Default Next.js API body limit is 1MB — poster/thumbnail arrive as
 // base64 data URLs, which need real headroom. Same fix applied to every
@@ -41,9 +42,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Series name is limited to 120 characters.' });
   }
 
-  // Same slugging approach as episode ids — a timestamp suffix avoids
-  // needing to handle name collisions as an error case.
-  const id = `${String(name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`;
+  // Same slugging as every title id (lib/showPage.js mintTitleId): a
+  // timestamp suffix avoids name collisions, and a name the slug empties
+  // (another script, emoji) becomes "series-…" instead of an id that
+  // starts with a dash.
+  const id = mintTitleId(name, { fallback: 'series' });
 
   try {
     let poster = null;

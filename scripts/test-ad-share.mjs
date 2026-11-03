@@ -81,11 +81,13 @@ t('a different percent and an empty month', () => {
 
 t('title ids are text slugs, not uuids (migration 117)', () => {
   // Every id the site makes: a title slug plus a stamp, a placeholder, an
-  // older catalogue id, and a uuid (which fits too).
-  for (const id of ['night-bus-last-stop-lx3k9a', 'placeholder-movie-lx3k9a', 'cipher-lore', 'show-mh2x1', '0b9f3c2e-5a61-4d0e-9a7b-1c2d3e4f5a6b', 'Legacy_ID_1']) {
+  // older catalogue id, and a uuid (which fits too) — and the ids minted
+  // before slice 1 for a name the slugger emptied ("-lx3k9a"), which must
+  // keep opening.
+  for (const id of ['night-bus-last-stop-lx3k9a', 'placeholder-movie-lx3k9a', 'cipher-lore', 'show-mh2x1', '0b9f3c2e-5a61-4d0e-9a7b-1c2d3e4f5a6b', 'Legacy_ID_1', '-lx3k9a', '_lx3k9a', 'x'.repeat(200)]) {
     assert.equal(isTitleId(id), true, id);
   }
-  for (const id of ['', '-leading-dash', 'has space', 'semi;colon', 'slash/path', '../up', 'x'.repeat(201), null, undefined, 42, ['night-bus']]) {
+  for (const id of ['', 'has space', 'semi;colon', 'slash/path', 'has/slash', '..', '../up', 'dot.ted', '%2e%2e', "o'brien", 'a"b', 'a,b', 'f(x)', 'café', 'x'.repeat(201), null, undefined, 42, ['night-bus']]) {
     assert.equal(isTitleId(id), false, String(id));
   }
 });

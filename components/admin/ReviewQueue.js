@@ -16,6 +16,10 @@ const KIND_LABEL = { submission: 'Episode', ad: 'Ad', series: 'Series', channel:
 // select in the detail) and grants Creator Studio; Hold sends one thing
 // to fix; Reject declines and deletes the file. The master plays in
 // Cloudflare's player once it has processed.
+//
+// A series item is a private show with an approved episode (decision 2 of
+// the series revamp): its Approve is "Make it public", the release, until
+// the show pages bring that button (lib/reviewQueue.js).
 export default function ReviewQueue({ limit = null, compact = false, defaultCpmCents }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -117,6 +121,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
         const busy = busyId === key;
         const src = item.kind === 'channel' ? previews[item.id] : item.media.src;
         const isApplication = item.kind === 'application';
+        const isReadyShow = item.kind === 'series' && Boolean(item.meta && item.meta.readyToGoPublic);
         const approveExtra = item.kind === 'submission' ? { tierOverride: item.meta.tier } : isApplication ? { tierOverride: tiers[item.id] || 'free' } : {};
         return (
           <div key={key} className="rq-row">
@@ -126,13 +131,14 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
             <div>
               <div className="rq-title"><span className="rq-kind">{KIND_LABEL[item.kind]}</span>{item.title}</div>
               <div className="rq-sub">{item.subtitle}{item.createdAt && ` · ${timeAgo(item.createdAt)}`}</div>
+              {isReadyShow && <div className="rq-sub">Its approved episodes go live now, and Premium’s early screening starts again.</div>}
             </div>
             <div className="rq-acts">
               {item.kind === 'ad' ? (
                 <button type="button" className="rq-btn" onClick={() => setReviewingAd(item)} disabled={busy}>Review…</button>
               ) : (
                 <button type="button" className="rq-btn rq-btn-ok" onClick={() => decide(item, 'approve', approveExtra)} disabled={busy} title={isApplication ? (item.meta.masterReady ? 'Puts it live now and grants Creator Studio' : 'Grants Creator Studio') : undefined}>
-                  {busy ? 'Working…' : isApplication ? (item.meta.masterReady ? 'Accept · live' : 'Accept') : 'Approve'}
+                  {busy ? 'Working…' : isApplication ? (item.meta.masterReady ? 'Accept · live' : 'Accept') : isReadyShow ? 'Make it public' : 'Approve'}
                 </button>
               )}
               <button type="button" className="rq-btn" onClick={() => toggleOpen(item)}>{openId === key ? 'Close' : 'Open'}</button>
@@ -200,7 +206,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
 }
 
 function FragmentRow({ k, v }) {
-  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
   let value = v;
   if (k === 'hasCaptions') value = v ? 'Yes' : 'No';
   if (k === 'durationSeconds') value = `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;

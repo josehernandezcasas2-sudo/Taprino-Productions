@@ -19,7 +19,9 @@ const SWIPE_THRESHOLD = 90;
 // plays inline, the fields that matter are listed, Approve / Reject
 // (with a reason sheet) at the bottom, swipe left to skip to the next.
 // Ads and series need the web (billing rate, artwork), so their cards
-// deep-link there instead of approving blind.
+// deep-link there instead of approving blind. A series card is a private
+// show with an approved episode (the series revamp's decision 2): its
+// button says it's made public on the web, like the website's card.
 // Places (Locations listings) approve here too; the host's proof opens in
 // the in-app browser when it's a web address.
 // Applications (the creator path, 2026-10-31): a film sent through /apply
@@ -231,7 +233,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onHold, onSkip,
             )}
             {needsWeb ? (
               <Pressable style={styles.btnPrimary} onPress={() => Linking.openURL(`${SITE_ORIGIN}/admin/review`)}>
-                <Text style={styles.btnPrimaryText}>{item.kind === 'ad' ? 'Set the rate on the web ↗' : 'Check artwork on the web ↗'}</Text>
+                <Text style={styles.btnPrimaryText}>{item.kind === 'ad' ? 'Set the rate on the web ↗' : item.meta && item.meta.readyToGoPublic ? 'Make it public on the web ↗' : 'Check artwork on the web ↗'}</Text>
               </Pressable>
             ) : (
               <>
@@ -262,7 +264,7 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onHold, onSkip,
 }
 
 function labelFor(k) {
-  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means' }[k]
+  return { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes' }[k]
     || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
 }
 function fmtValue(k, v) {

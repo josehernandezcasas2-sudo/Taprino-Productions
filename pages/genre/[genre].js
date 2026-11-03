@@ -5,7 +5,7 @@ import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
 import { getAccountContext } from '../../lib/accountContext';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
-import { buildHeroCandidates } from '../../lib/heroCandidates';
+import { buildHeroCandidates, signHeroTrailers } from '../../lib/heroCandidates';
 import { useWishlist } from '../../lib/useWishlist';
 import { getLifecycleSettings, isNewRelease, isLeavingSoon } from '../../lib/contentLifecycle';
 import { getViewerProgress } from '../../lib/continueWatching';
@@ -79,6 +79,8 @@ export async function getServerSideProps({ req, params, res }) {
   if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
   // A series hero's Play continues where this viewer is (lib/seriesResume.js).
   heroPool = withSeriesResume(heroPool, episodes, hasSession ? await getViewerProgress(req, episodes) : null);
+  // Trailers go out as signed links, as on /stream (pages/stream.js says why).
+  heroPool = await signHeroTrailers(heroPool);
 
   const newReleases = episodes.filter((e) => isNewRelease(e.availableFrom, lifecycleSettings.newReleaseDays));
   const leavingSoon = episodes.filter((e) => isLeavingSoon(e.availableUntil, lifecycleSettings.leavingSoonDays));

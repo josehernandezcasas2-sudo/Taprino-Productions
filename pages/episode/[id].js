@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
@@ -17,6 +17,7 @@ import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadat
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
+import { attachHeroTrailer, fetchTrailerSrc, trailerKeyOf, useHeroTrailer } from '../../components/HeroSpotlight';
 import HeaderNav from '../../components/HeaderNav';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
@@ -33,6 +34,10 @@ import { AiSealChip } from '../../components/AiSeal';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
+
+// The player's trailer gets at most one fresh link per half minute
+// (refreshTrailerSrc in the page).
+const TRAILER_REFRESH_GAP_MS = 30 * 1000;
 
 // "22 min" from a "22:00" runtime — the strip's meta line (the Continue
 // Watching card's "12 min left" spells minutes the same way).
@@ -275,6 +280,55 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     return () => clearTimeout(t);
   }, [showPlayer, showingTrailer, lockedNow, episode.id, getPosition]);
 
+  // The trailer plays through a signed link like the film (decision 12 of
+  // the series revamp; lib/episodePage.js signs it for 60 minutes), so a
+  // page left open past the hour holds a link that no longer plays.
+  //
+  // The landing view's hero (no ?autoplay) swaps a link that has run out
+  // for a fresh one from /api/stream-token before playing it, asks once
+  // more when the stream fails, and shows the artwork when the trailer
+  // can't play — the rule the browse heroes follow (useHeroTrailer). It
+  // plays through hls.js where the browser can't play HLS from a plain
+  // src (every browser but Safari, so Chrome used to show a black hero).
+  const landingVideoRef = useRef(null);
+  const landingTrailer = useHeroTrailer({
+    trailerKey: trailerKeyOf(episode.trailerRef) || (episode.trailerSrc ? `e:${episode.id}` : null),
+    src: episode.trailerSrc || null,
+    expiresAt: episode.trailerExpiresAt || null,
+    ref: episode.trailerRef || null,
+    active: !showPlayer
+  });
+  const landingTrailerSrc = !showPlayer && landingTrailer.hasTrailer ? landingTrailer.src : null;
+  // episode.id too: the <video> is keyed by it, so moving to another title
+  // whose trailer signs to the same link (two podcast episodes sharing the
+  // show's trailer) is a new element that needs the stream attached again.
+  useEffect(() => {
+    if (!landingTrailerSrc) return undefined; // the player is showing, or a fresh link is on its way
+    const v = landingVideoRef.current;
+    if (!v) return undefined;
+    return attachHeroTrailer(v, landingTrailerSrc, { muted: true, paused: false, onFatal: landingTrailer.onFatal });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [landingTrailerSrc, landingTrailer.gen, episode.id]);
+
+  // In the player ("Watch the trailer", ?trailer=1, the early screening's
+  // trailer) the expired token fails the way the film's does, and the
+  // player asks for a fresh link through refreshSrc. One per half minute:
+  // a link fetched moments ago that fails again isn't an expired one, and
+  // asking again would only spend the visitor's trailer budget at
+  // /api/stream-token, which the browse heroes share. Keyed by the trailer
+  // so a re-render never hands the player a new function (it would
+  // re-attach the stream).
+  const trailerKey = trailerKeyOf(episode.trailerRef);
+  const trailerFetchedAt = useRef({});
+  const refreshTrailerSrc = useCallback(async () => {
+    if (!trailerKey) return null;
+    if (Date.now() - (trailerFetchedAt.current[trailerKey] || 0) < TRAILER_REFRESH_GAP_MS) return null;
+    trailerFetchedAt.current[trailerKey] = Date.now();
+    const fresh = await fetchTrailerSrc(episode.trailerRef);
+    return fresh ? fresh.src : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trailerKey]);
+
   // Safe here — every hook the component uses has already run above,
   // unconditionally, on every render. Nothing below this point is a hook,
   // so branching on ageRestricted from here on doesn't violate the Rules
@@ -455,8 +509,20 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
       {!showPlayer ? (
         <div className="hero-carousel full-bleed">
-          {episode.trailerSrc ? (
-            <video className="hero-video" src={episode.trailerSrc} autoPlay muted loop playsInline onContextMenu={(e) => e.preventDefault()} />
+          {landingTrailer.hasTrailer ? (
+            // The link is attached by the effect above (hls.js where needed);
+            // the artwork shows while it loads.
+            <video
+              key={episode.id}
+              ref={landingVideoRef}
+              className="hero-video"
+              poster={episode.heroImage || episode.poster || episode.thumbnail || undefined}
+              autoPlay
+              muted
+              loop
+              playsInline
+              onContextMenu={(e) => e.preventDefault()}
+            />
           ) : (
             (episode.heroImage || episode.poster || episode.thumbnail) && <Image
               src={episode.heroImage || episode.poster || episode.thumbnail}
@@ -601,7 +667,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
                 onEnded={handleEnded}
                 advisory={!showingTrailer}
-                signedPlayback={!showingTrailer && signedPlayback}
+                // The film refreshes its own token through /api/stream-token;
+                // the trailer's link is signed too, and refreshes through its
+                // own (refreshTrailerSrc above).
+                signedPlayback={showingTrailer ? Boolean(episode.trailerRef) : signedPlayback}
+                refreshSrc={showingTrailer ? refreshTrailerSrc : null}
                 initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
                 onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
                 // Full screen: the site's own chrome (the "After Play" canvas).

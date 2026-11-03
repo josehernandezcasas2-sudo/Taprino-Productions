@@ -7,7 +7,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { useWishlist } from '../../lib/useWishlist';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import { getGenreIcons } from '../../lib/genreIcons';
-import { buildHeroCandidates } from '../../lib/heroCandidates';
+import { buildHeroCandidates, signHeroTrailers } from '../../lib/heroCandidates';
 import { getCuratedRowsForPage } from '../../lib/curatedGroups';
 import { getSiteSettings } from '../../lib/siteSettings';
 import { getViewerProgress } from '../../lib/continueWatching';
@@ -75,6 +75,8 @@ export async function getServerSideProps({ req, params, res }) {
   if (heroPool.length === 0) heroPool = buildHeroCandidates(typeEpisodes, allSeries).slice(0, 3);
   // A series hero's Play continues where this viewer is (lib/seriesResume.js).
   heroPool = withSeriesResume(heroPool, typeEpisodes, hasSession ? await getViewerProgress(req, typeEpisodes) : null);
+  // Trailers go out as signed links, as on /stream (pages/stream.js says why).
+  heroPool = await signHeroTrailers(heroPool);
 
   const seriesUsed =new Set([...typeEpisodes, ...curatedRows.flatMap((r) => r.episodes || [])].map((e) => e.seriesId).filter(Boolean));
 

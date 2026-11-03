@@ -44,8 +44,10 @@ function toDateInputValue(iso) {
   return iso.slice(0, 10);
 }
 
-export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEpisodes, onClose, onSaved }) {
-  const [form, setForm] = useState({
+// The form as the episode stands when the modal opens (the Library's row,
+// /api/admin/library). A save is compared against it.
+function formFromEpisode(episode) {
+  return {
     title: episode.title || '',
     description: episode.description || '',
     contentType: episode.contentType || 'short',
@@ -69,7 +71,60 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
     availableUntil: toDateInputValue(episode.availableUntil),
     adsEnabled: episode.adsEnabled !== false,
     adBreaksText: formatAdBreaksForInput(episode.adBreakSeconds)
-  });
+  };
+}
+
+// Compared as trimmed text: the inputs, the selects, the dates and the
+// numbers as typed (/api/admin/edit-episode reads the numbers).
+const TEXT_FIELDS = ['title', 'description', 'contentType', 'rating', 'artist', 'runtime', 'releaseYear', 'genre', 'mainGenre', 'tier', 'status', 'fundingUrl', 'availableFrom', 'availableUntil'];
+const SWITCH_FIELDS = ['featured', 'discoverCurated', 'isOriginal'];
+const PLACE_FIELDS = ['seriesId', 'season', 'seriesOrder'];
+const NUMBERED_TYPES = ['series', 'podcast'];
+// The inputs marked required: changed to nothing but spaces, they'd save blank.
+const REQUIRED_TEXT = [['title', 'The title'], ['description', 'The description'], ['artist', 'The artist credit'], ['runtime', 'The runtime'], ['genre', 'The specific genre']];
+
+const textOf = (v) => (v === null || v === undefined ? '' : String(v).trim());
+
+// What a save sends besides the episode id and the files: only the fields
+// that differ from the form the modal opened with. The route reads a
+// missing key as "unchanged", so a field nobody touched is never
+// overwritten by whatever the form happened to show (every save used to
+// send the whole form: discoverCurated false for a title whose curated
+// switch isn't on screen, and a blank bonus parent that the route now
+// refuses).
+function changedFields(start, form) {
+  const out = {};
+  for (const f of TEXT_FIELDS) if (textOf(form[f]) !== textOf(start[f])) out[f] = textOf(form[f]);
+  for (const f of SWITCH_FIELDS) if (Boolean(form[f]) !== Boolean(start[f])) out[f] = Boolean(form[f]);
+  // A place in a show means something only to a series or podcast
+  // episode; for anything else the route clears it (or, for a Snippet,
+  // keeps the stored one).
+  if (NUMBERED_TYPES.includes(form.contentType)) {
+    for (const f of PLACE_FIELDS) if (textOf(form[f]) !== textOf(start[f])) out[f] = textOf(form[f]);
+  }
+  // What bonus content belongs under: when it was picked again, or when
+  // the title becomes bonus content (the route checks the parent then).
+  if (form.contentType === 'bonus' && (form.bonusParent !== start.bonusParent || form.contentType !== start.contentType)) {
+    const at = form.bonusParent.indexOf(':');
+    out.bonusParentType = at > 0 ? form.bonusParent.slice(0, at) : null;
+    out.bonusParentId = at > 0 ? form.bonusParent.slice(at + 1) : null;
+  }
+  // The ads switch, and the break times whenever either one moved
+  // (switched off, only the opening break is kept, as the modal always
+  // sent it).
+  const adsChanged = Boolean(form.adsEnabled) !== Boolean(start.adsEnabled);
+  if (adsChanged) out.adsEnabled = Boolean(form.adsEnabled);
+  if (adsChanged || textOf(form.adBreaksText) !== textOf(start.adBreaksText)) {
+    out.adBreakSeconds = form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0];
+  }
+  return out;
+}
+
+export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEpisodes, onClose, onSaved }) {
+  // `start` is the form the modal opened with and never changes; `form` is
+  // what's on screen.
+  const [start] = useState(() => formFromEpisode(episode));
+  const [form, setForm] = useState(start);
   const [posterFile, setPosterFile] = useState(null);
   const [thumbnailFile, setThumbnailFile] = useState(null);
   const [titleImageFile, setTitleImageFile] = useState(null);
@@ -82,6 +137,16 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
   const [revealUid, setRevealUid] = useState(false);
 
   const existingUid = uidFromPlaybackUrl(episode.src);
+
+  // The show and the parent it has now, when the pickers don't list them
+  // (the parent picker lists the shows and this Library page's films and
+  // shorts; an extra hung on a series episode, or on a title the search
+  // left out, isn't there). Without its own option the select would show
+  // the placeholder and its `required` would block every save.
+  const storedShowUnlisted = Boolean(start.seriesId) && !(allSeries || []).some((s) => s.id === start.seriesId);
+  const storedParentUnlisted = Boolean(start.bonusParent)
+    && !(allSeries || []).some((s) => `series:${s.id}` === start.bonusParent)
+    && !(standaloneEpisodes || []).some((e) => `episode:${e.id}` === start.bonusParent);
 
   // Runs the moment the modal opens — this is what makes "is a video
   // actually attached" something you SEE rather than something you have
@@ -141,24 +206,33 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
 
   async function handleSave(e) {
     e.preventDefault();
+    setError(null);
+    const changes = changedFields(start, form);
+    const blank = REQUIRED_TEXT.find(([field]) => changes[field] === '');
+    if (blank) {
+      setError(`${blank[1]} can’t be blank.`);
+      return;
+    }
+    // Nothing changed and nothing attached: close as Cancel would, without
+    // a request.
+    const attaching = Boolean(posterFile || thumbnailFile || titleImageFile || removeTitleImage || videoUid.trim());
+    if (Object.keys(changes).length === 0 && !attaching) {
+      onClose();
+      return;
+    }
     if (dangerous && !confirmNoVideo) {
       setConfirmNoVideo(true);
       return;
     }
     setSaving(true);
-    setError(null);
     try {
       const [posterBase64, thumbnailBase64, titleImageBase64] = await Promise.all([readAsDataUrl(posterFile), readAsDataUrl(thumbnailFile), readAsDataUrl(titleImageFile)]);
-      const [bonusParentType, bonusParentId] = form.bonusParent ? form.bonusParent.split(':') : [null, null];
       const res = await fetch('/api/admin/edit-episode', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           episodeId: episode.id,
-          ...form,
-          adBreakSeconds: form.adsEnabled ? parseAdBreaksInput(form.adBreaksText) : [0],
-          bonusParentType,
-          bonusParentId,
+          ...changes,
           ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
           ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: thumbnailFile.name } : {}),
           ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
@@ -235,6 +309,9 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
               <label>This bonus content belongs under</label>
               <select value={form.bonusParent} onChange={(e) => update('bonusParent', e.target.value)} required>
                 <option value="">Choose a series or movie/short…</option>
+                {storedParentUnlisted && (
+                  <option value={start.bonusParent}>{episode.bonusParentTitle || start.bonusParent.slice(start.bonusParent.indexOf(':') + 1)} · where it is now</option>
+                )}
                 {(allSeries || []).length > 0 && (
                   <optgroup label="Series">
                     {allSeries.map((s) => <option key={`series:${s.id}`} value={`series:${s.id}`}>{s.name}</option>)}
@@ -255,6 +332,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
                 <label>Series</label>
                 <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
                   <option value="">Choose a series…</option>
+                  {storedShowUnlisted && <option value={start.seriesId}>{start.seriesId} · where it is now</option>}
                   {(allSeries || []).map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
                 </select>
               </div>
@@ -298,6 +376,7 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <div className="admin-field">
               <label>Main genre</label>
               <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
+                {!MAIN_GENRES.includes(start.mainGenre) && <option value={start.mainGenre}>{start.mainGenre}</option>}
                 {MAIN_GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>

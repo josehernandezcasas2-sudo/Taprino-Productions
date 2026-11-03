@@ -5,7 +5,7 @@ import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
 import { getAccountContext } from '../lib/accountContext';
 import { getViewCounts, isRedisConfigured } from '../lib/redis';
-import { buildHeroCandidates } from '../lib/heroCandidates';
+import { buildHeroCandidates, signHeroTrailers } from '../lib/heroCandidates';
 import { useWishlist } from '../lib/useWishlist';
 import GenreRow from '../components/GenreRow';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
@@ -124,6 +124,16 @@ export async function getServerSideProps({ req, res }) {
   if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
   // A series hero's Play continues where this viewer is (lib/seriesResume.js).
   heroPool = withSeriesResume(heroPool, episodes, hasSession ? await getViewerProgress(req, episodes) : null);
+  // Each hero's trailer goes out as a signed link (decision 12 of the series
+  // revamp; lib/heroCandidates.js signHeroTrailers, as the app's feeds do),
+  // so the browser no longer asks /api/stream-token for every one — that
+  // route's per-address budget ran out for many visitors behind one address
+  // (an office, a campus), whose heroes then fell back to artwork. A link
+  // lasts an hour, longer than a signed-out copy of this page lives in the
+  // CDN (s-maxage + stale-while-revalidate above); HeroSpotlight still
+  // replaces one that has run out, and asks for one a candidate came
+  // without (a trailer Cloudflare wouldn't sign just now).
+  heroPool = await signHeroTrailers(heroPool);
 
   return {
     props: {

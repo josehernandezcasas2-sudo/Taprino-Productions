@@ -163,7 +163,11 @@ export function UploadProvider({ children }) {
       const submitData = await submitRes.json();
       if (!submitRes.ok) throw new Error(submitData.error || 'Could not save the submission.');
 
-      setActiveUpload((u) => (u ? { ...u, status: 'done' } : u));
+      // A route may say what it did with the save (replace-video gives a
+      // declined episode the next free number when its own was taken
+      // meanwhile): its line replaces the widget's usual second line.
+      const note = typeof submitData.message === 'string' && submitData.message.trim() ? submitData.message.trim() : null;
+      setActiveUpload((u) => (u ? { ...u, status: 'done', ...(note ? { doneMessages: { ...(u.doneMessages || {}), meta: note } } : {}) } : u));
       lastAttemptRef.current = null;
     } catch (err) {
       const described = describeUploadError(err);
