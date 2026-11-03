@@ -1,8 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
-import { getSupabase } from '../../../lib/supabase';
-import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { checkRateLimit } from '../../../lib/rateLimit';
-import { mintTitleId } from '../../../lib/showPage';
+import { sendError } from '../../../lib/apiErrors';
+import { createShowFromForm } from '../../../lib/showPage';
 
 // Default Next.js API body limit is 1MB — poster/thumbnail arrive as
 // base64 data URLs, which need real headroom. Same fix applied to every
@@ -12,13 +11,11 @@ export const config = {
   api: { bodyParser: { sizeLimit: '10mb' } }
 };
 
-// Two entry points share this endpoint: the inline "a new series not
-// listed here" option inside the episode-submission form, and the
-// standalone "Add Series" button on /creator that creates a series with
-// no episode at all. Both produce the same thing — a series row pending
-// admin review, with its own name/description/artwork — closing a real
-// gap where a whole new show used to need an admin to manually create
-// the series row after the fact.
+// "Add series" (Series management's new mode, components/AddSeriesForm.js):
+// a show with no episode yet. Since the series revamp's slice 2 this is a
+// thin alias of New show (POST /api/show, lib/showPage.js
+// createShowFromForm): the same private show with its owner, its artwork
+// and a distinct id ("<name>-<stamp>-show"); the answer keeps its shape.
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -42,44 +39,20 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Series name is limited to 120 characters.' });
   }
 
-  // Same slugging as every title id (lib/showPage.js mintTitleId): a
-  // timestamp suffix avoids name collisions, and a name the slug empties
-  // (another script, emoji) becomes "series-…" instead of an id that
-  // starts with a dash.
-  const id = mintTitleId(name, { fallback: 'series' });
-
   try {
-    let poster = null;
-    let thumbnail = null;
-    if (posterBase64) {
-      poster = await uploadArtworkImage({ base64: posterBase64, fileName: posterFileName, pathPrefix: 'series-poster' });
-    }
-    if (thumbnailBase64) {
-      thumbnail = await uploadArtworkImage({ base64: thumbnailBase64, fileName: thumbnailFileName, pathPrefix: 'series-thumbnail' });
-    }
-
-    const supabase = getSupabase();
-    const { error } = await supabase.from('series').insert({
-      id,
-      name,
-      description: description || null,
-      poster,
-      thumbnail,
-      release_year: releaseYear ? Number(releaseYear) : null,
-      creator_id: userId,
-      channel_opt_in: channelOptIn === true,
-      submitted_by: email,
-      status: 'pending'
-    });
-
-    if (error) {
-      console.error('create-series error:', error.message);
-      return res.status(500).json({ error: 'Could not create the series.' });
-    }
-
-    return res.status(200).json({ ok: true, id, name });
+    const made = await createShowFromForm({
+      name: String(name),
+      kind: 'series',
+      description: typeof description === 'string' ? description : '',
+      posterBase64,
+      posterFileName,
+      thumbnailBase64,
+      thumbnailFileName,
+      releaseYear,
+      channelOptIn: channelOptIn === true
+    }, { userId, email, isAdmin, team: isAdmin });
+    return res.status(200).json({ ok: true, id: made.id, name: made.name });
   } catch (err) {
-    console.error('create-series error:', err.message);
-    return res.status(500).json({ error: 'Could not create the series right now — please try again.' });
+    return sendError(res, err, 'creator/create-series', 'Could not create the series right now — please try again.', { plainStatus: 400 });
   }
 }

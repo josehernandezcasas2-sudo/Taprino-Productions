@@ -67,7 +67,7 @@ function listWords(items) {
 // The creator side of a show (Series management today; the show page
 // once the series revamp's slice 2 ships, which forwards ?series= there).
 function showHref(seriesId) {
-  return `/creator/series?series=${encodeURIComponent(seriesId)}`;
+  return `/creator/show/${encodeURIComponent(seriesId)}`;
 }
 
 async function readShow(supabase, seriesId) {

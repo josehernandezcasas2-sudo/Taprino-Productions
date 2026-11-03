@@ -4,6 +4,7 @@ import { creatorOwnsSeries } from '../../../lib/series';
 import { internalError, sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
 import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody } from '../../../lib/showRules';
+import { syncNumberTitles } from '../../../lib/numberTitles';
 
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
@@ -224,6 +225,9 @@ async function editSubmission(req, res) {
   if (!saved || saved.length === 0) {
     return res.status(400).json({ error: 'Only submissions still pending review can be edited — this one has already been reviewed.' });
   }
+
+  // A title that is only its number follows a new number (lib/numberTitles.js).
+  if ('series_order' in dbUpdates || 'season' in dbUpdates || 'title' in dbUpdates) await syncNumberTitles([existing.id]);
 
   return res.status(200).json({ ok: true, episodeId: existing.id });
 }

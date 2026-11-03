@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { getAccountContext } from '../../lib/accountContext';
 import { getAllSeries } from '../../lib/series';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
+import { needsYou } from '../../lib/showRules';
+import { sortEpisodes, episodeCode } from '../../lib/seriesResume';
+import { parseRuntimeToSeconds } from '../../lib/videoMetadata';
 import HeaderNav from '../../components/HeaderNav';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
 import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
@@ -14,7 +17,7 @@ import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
 import Footer from '../../components/Footer';
-import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, CloseIcon, UndoIcon, TicketIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, UndoIcon, TicketIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { dollars } from '../../lib/purchaseRules';
 
@@ -34,6 +37,19 @@ const CF_STATE_LABEL = {
   error: 'Processing failed'
 };
 
+const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts', bonus: 'Extras' };
+const SHOW_STATE_CLASS = { live: 'live', ready: 'ready', review: 'private', drafts: 'private', empty: 'private', pulled: 'pulled', removal: 'removal', declined: 'declined' };
+
+// Your work, grouped (the series revamp, slice 2; the YourWork board): a
+// show's titles sit under the show — a header that opens its show page
+// (the show's gear menu is gone: the show page edits it, sells it and
+// takes its extras), "Season N" sub-headings when it has more than one,
+// rows in play order with their "S1 E3" code, the changes waiting for
+// approval and why a title was pulled, and a pencil that opens the
+// episode editor (/creator/show/<id>/episode/<episodeId>) instead of the
+// old modals. Its extras follow it. Films, shorts and Snippets keep their
+// rows and their modals until the editor learns them (the next pass).
+// Needs attention is the hub's Needs you (lib/showRules.js needsYou).
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -56,14 +72,77 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
+function showHref(id) {
+  return `/creator/show/${encodeURIComponent(id)}`;
+}
+
+function editorHref(showId, episodeId) {
+  return `/creator/show/${encodeURIComponent(showId)}/episode/${encodeURIComponent(episodeId)}`;
+}
+
+function bg(url) {
+  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+}
+
+function displayTitle(s) {
+  const own = typeof s.title === 'string' ? s.title.trim() : '';
+  if (own) return own;
+  return s.seriesOrder ? `Episode ${s.seriesOrder}` : 'Untitled';
+}
+
+// "24 min" from the stored runtime ("23:40", "1:02:15"); the text as it is
+// when it isn't a clock.
+function minutes(runtime) {
+  const secs = parseRuntimeToSeconds(runtime);
+  if (secs === null) return runtime || null;
+  if (secs < 60) return `${secs} s`;
+  return `${Math.round(secs / 60)} min`;
+}
+
+function ago(iso) {
+  if (!iso) return '';
+  const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
+  if (h < 1) return 'just now';
+  if (h < 24) return `${h} h ago`;
+  const d = Math.floor(h / 24);
+  return d === 1 ? 'yesterday' : `${d} days ago`;
+}
+
+// On the site now: approved, not pulled, not on its way out, and in no
+// show or a public one (decision 2: an approved episode of a private show
+// isn't Live yet). An extra has no show status of its own on the row
+// (my-submissions reads series_id, which an extra doesn't have): `show`,
+// the summary of the show it is attached to, answers for it when known.
+function isLive(s, show) {
+  if (s.status !== 'approved' || s.held || s.deletionRequested) return false;
+  if (s.seriesId) return !s.seriesHeld && (s.seriesStatus === 'approved' || s.seriesStatus == null);
+  return !show || show.isPublic !== false;
+}
+
+// The words on a show row's status pill.
+function showRowStatus(s, live) {
+  if (s.status === 'pending') return { text: 'In review', tone: 'pending' };
+  if (s.status === 'rejected') return { text: 'Not this time', tone: 'rejected' };
+  if (s.held) return { text: 'Pulled', tone: 'rejected' };
+  if (s.deletionRequested) return { text: 'Removal requested', tone: 'muted' };
+  if (s.seriesHeld) return { text: 'Show pulled', tone: 'rejected' };
+  if (!live) return { text: 'Approved · not public yet', tone: 'pending' };
+  return { text: 'Live', tone: 'approved' };
+}
+
 export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, allSeries }) {
   const iconOverrides = usePlayerIconOverrides();
   const [submissions, setSubmissions] = useState(null);
-  const [seriesChannel, setSeriesChannel] = useState({}); // seriesId -> { channelOptIn, canChange }
+  // The viewer's shows (GET /api/show?mine=1) for the group headers: art,
+  // kind, where the show stands, its count line and season names. The
+  // headers fall back to what the rows say when it can't load.
+  const [shows, setShows] = useState([]);
   const [channelBusy, setChannelBusy] = useState(null);
   const [channelError, setChannelError] = useState(null);
   const [loadingSubmissions, setLoadingSubmissions] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   // The hub's piles deep-link here: ?status=pending|approved|rejected, ?attention=1.
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -72,8 +151,6 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     if (st && ['pending', 'approved', 'rejected'].includes(st)) setStatusFilter(st);
     if (q.get('attention') === '1') setNeedsAttentionOnly(true);
   }, []);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(false);
   const [copiedLinkId, setCopiedLinkId] = useState(null);
   const [editingSubmission, setEditingSubmission] = useState(null);
   const [fullEditSubmission, setFullEditSubmission] = useState(null);
@@ -84,7 +161,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [deleteActionError, setDeleteActionError] = useState(null);
   const [extractingId, setExtractingId] = useState(null);
   const [extractProgress, setExtractProgress] = useState(null);
-  const [openDropdown, setOpenDropdown] = useState(null); // 'episode:<id>' | 'series:<id>' | null
+  const [openDropdown, setOpenDropdown] = useState(null); // 'episode:<id>' | null
   const [editRequestTarget, setEditRequestTarget] = useState(null); // { type, currentValues }
   // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>"
   // (/api/creator/pricing) and the title the Sell modal is open for.
@@ -100,6 +177,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     }
   }
   useEffect(() => { loadPricing(); }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetch('/api/show?mine=1')
+      .then((r) => (r.ok ? r.json() : { shows: [] }))
+      .then((d) => { if (alive && d && Array.isArray(d.shows)) setShows(d.shows); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   // A short pill for a row: "On sale · $4.99", "In review", …
   function pricePill(type, id) {
@@ -171,10 +257,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     try {
       const res = await fetch('/api/creator/my-submissions');
       const data = await res.json();
-      if (res.ok) {
-        setSubmissions(data.submissions);
-        setSeriesChannel(data.seriesChannel || {});
-      }
+      if (res.ok) setSubmissions(data.submissions);
     } catch (err) {
       // Leave submissions as whatever it already was — a failed refresh
       // shouldn't wipe out what's already showing.
@@ -184,7 +267,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
 
   useEffect(() => { loadSubmissions(); }, []);
 
-  // "Let channels air this" — per title, or per show (covers every episode).
+  // "Let channels air this" — per standalone title (a show's channels are
+  // set on its show page).
   async function setChannelOptIn(type, id, optIn) {
     setChannelBusy(`${type}:${id}`);
     setChannelError(null);
@@ -196,12 +280,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not change that.');
-      if (type === 'series') {
-        setSeriesChannel((m) => ({ ...m, [id]: { ...(m[id] || {}), channelOptIn: optIn } }));
-        setSubmissions((list) => (list || []).map((x) => (x.seriesId === id ? { ...x, seriesChannelOptIn: optIn } : x)));
-      } else {
-        setSubmissions((list) => (list || []).map((x) => (x.id === id ? { ...x, channelOptIn: optIn } : x)));
-      }
+      setSubmissions((list) => (list || []).map((x) => (x.id === id ? { ...x, channelOptIn: optIn } : x)));
     } catch (err) {
       setChannelError(err.message);
     } finally {
@@ -237,74 +316,273 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     }
   }
 
-  const total = submissions ? submissions.length : 0;
-  const approvedCount = submissions ? submissions.filter((s) => s.status === 'approved').length : 0;
-  const pendingCount = submissions ? submissions.filter((s) => s.status === 'pending').length : 0;
-  const rejectedCount = submissions ? submissions.filter((s) => s.status === 'rejected').length : 0;
+  const all = submissions || [];
+  const byId = new Map(all.map((s) => [s.id, s]));
+  const showById = new Map(shows.map((sh) => [sh.id, sh]));
+  const seriesById = new Map((allSeries || []).map((s) => [s.id, s]));
+
+  // The show a title sits under: its own, or for an extra the show it is
+  // attached to (directly, or through the episode it follows when that
+  // episode is one of these titles).
+  function showIdOf(s) {
+    if (s.seriesId) return s.seriesId;
+    if (s.contentType !== 'bonus') return null;
+    if (s.bonusParentType === 'series' && s.bonusParentId) return s.bonusParentId;
+    if (s.bonusParentType === 'episode' && s.bonusParentId) {
+      const parent = byId.get(s.bonusParentId);
+      return parent && parent.seriesId ? parent.seriesId : null;
+    }
+    return null;
+  }
+  const live = (s) => isLive(s, showIdOf(s) ? showById.get(showIdOf(s)) : null);
+
+  const total = all.length;
+  const liveCount = all.filter(live).length;
+  const pendingCount = all.filter((s) => s.status === 'pending').length;
+  const approvedCount = all.filter((s) => s.status === 'approved').length;
+  const rejectedCount = all.filter((s) => s.status === 'rejected').length;
   const reviewedCount = approvedCount + rejectedCount;
   const approvalRate = reviewedCount > 0 ? Math.round((approvedCount / reviewedCount) * 100) : null;
-  const turnaroundHoursList = submissions
-    ? submissions
-        .filter((s) => s.reviewedAt && s.createdAt)
-        .map((s) => (new Date(s.reviewedAt).getTime() - new Date(s.createdAt).getTime()) / (1000 * 60 * 60))
-    : [];
+  const turnaroundHoursList = all
+    .filter((s) => s.reviewedAt && s.createdAt)
+    .map((s) => (new Date(s.reviewedAt).getTime() - new Date(s.createdAt).getTime()) / (1000 * 60 * 60));
   const avgTurnaroundHours = turnaroundHoursList.length > 0
     ? Math.round(turnaroundHoursList.reduce((a, b) => a + b, 0) / turnaroundHoursList.length)
     : null;
-  const missingArtworkCount = submissions
-    ? submissions.filter((s) => s.status !== 'rejected' && s.missingArtwork).length
-    : 0;
+  const missingArtworkCount = all.filter((s) => s.status !== 'rejected' && s.missingArtwork).length;
 
-  const filteredSubmissions = (submissions || []).filter((s) => {
-    if (statusFilter !== 'all' && s.status !== statusFilter) return false;
-    if (searchQuery.trim() && !s.title.toLowerCase().includes(searchQuery.trim().toLowerCase())) return false;
-    if (needsAttentionOnly) {
-      const needsIt = s.status === 'pending' || (s.missingArtwork && s.status !== 'rejected') || (s.status === 'approved' && s.contentType !== 'podcast' && !s.captionsUrl);
-      if (!needsIt) return false;
+  const query = searchQuery.trim().toLowerCase();
+  const filteredSubmissions = all.filter((s) => {
+    if (statusFilter === 'approved' && !live(s)) return false;
+    if (statusFilter !== 'all' && statusFilter !== 'approved' && s.status !== statusFilter) return false;
+    if (query) {
+      const sid = showIdOf(s);
+      const hay = `${displayTitle(s)} ${s.seriesName || ''} ${(sid && showById.get(sid) && showById.get(sid).name) || ''}`.toLowerCase();
+      if (!hay.includes(query)) return false;
     }
+    if (needsAttentionOnly && !needsYou(s)) return false;
     return true;
   });
 
-  const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts' };
-
-  // Grouped by project always — a show/series/podcast gets its own
-  // section keyed by seriesId (podcast episodes always belong to a show,
-  // same as series episodes), and anything without one (standalone
-  // movies/shorts/vertical) gets grouped by content type instead, so a
-  // creator with several different kinds of standalone work still sees
-  // it organized rather than one undifferentiated pile.
+  // Grouped by project always — a show (series or podcast) gets its own
+  // section with its episodes and its extras, and anything without one
+  // (standalone films, shorts, Snippets) is grouped by content type, so a
+  // creator with several kinds of standalone work still sees it
+  // organized rather than one undifferentiated pile.
   const groupsByKey = {};
   for (const s of filteredSubmissions) {
-    const isGrouped = !!s.seriesId;
-    const key = isGrouped ? `series:${s.seriesId}` : `type:${s.contentType}`;
+    const sid = showIdOf(s);
+    const key = sid ? `series:${sid}` : `type:${s.contentType}`;
     if (!groupsByKey[key]) {
+      const summary = sid ? showById.get(sid) : null;
+      const series = sid ? seriesById.get(sid) : null;
       groupsByKey[key] = {
         key,
-        isGrouped,
-        label: isGrouped ? (s.seriesName || 'Untitled show') : (STANDALONE_TYPE_LABELS[s.contentType] || 'Other'),
-        typeTag: s.contentType === 'podcast' ? 'podcast' : (s.contentType === 'series' ? 'series' : null),
+        isShow: Boolean(sid),
+        showId: sid,
+        summary,
+        label: sid ? ((summary && summary.name) || s.seriesName || (series && series.name) || 'A show') : (STANDALONE_TYPE_LABELS[s.contentType] || 'Other'),
+        kind: sid ? ((summary && summary.kind) || s.seriesKind || (s.contentType === 'podcast' ? 'podcast' : 'series')) : null,
         items: []
       };
     }
     groupsByKey[key].items.push(s);
   }
-  // Shows/series/podcasts first (alphabetical), then standalone-by-type
-  // groups after, in that same fixed Films/Shorts/Vertical/Podcasts order
-  // used everywhere else on the site.
+  // Shows first (alphabetical), then the standalone groups in the fixed
+  // Films / Shorts / Vertical / Podcasts / Extras order used elsewhere.
   const typeOrder = Object.keys(STANDALONE_TYPE_LABELS);
   const projectGroups = Object.values(groupsByKey).sort((a, b) => {
-    if (a.isGrouped !== b.isGrouped) return a.isGrouped ? -1 : 1;
-    if (!a.isGrouped && !b.isGrouped) {
+    if (a.isShow !== b.isShow) return a.isShow ? -1 : 1;
+    if (!a.isShow && !b.isShow) {
       return typeOrder.indexOf(a.items[0].contentType) - typeOrder.indexOf(b.items[0].contentType);
     }
     return a.label.localeCompare(b.label);
   });
+
+  function gearMenu(s, { forShow = false } = {}) {
+    const key = `episode:${s.id}`;
+    const onSite = live(s);
+    const canExtract = s.contentType === 'podcast' && s.hasVideo && !s.hasAudio;
+    if (forShow && !onSite && !canExtract) return <span className="yw-gear-space" aria-hidden="true" />;
+    return (
+      <span className="yw-gear-wrap">
+        <button
+          type="button"
+          className={forShow ? 'yw-gear' : 'yw-gear-inline'}
+          onClick={() => setOpenDropdown(openDropdown === key ? null : key)}
+          aria-label={`Options for ${displayTitle(s)}`}
+          aria-haspopup="menu"
+          aria-expanded={openDropdown === key}
+        >
+          <SettingsIcon size={forShow ? 16 : 14} src={iconOverrides.settings} />
+        </button>
+        {openDropdown === key && (
+          <div className="dropdown dropdown-left open yw-menu" role="menu" aria-label={displayTitle(s)}>
+            {!forShow && (isAdmin ? (
+              <button className="dropdown-item" role="menuitem" onClick={() => { setFullEditSubmission(s); setOpenDropdown(null); }}>
+                <PencilIcon size={12} src={iconOverrides.pencil} /> Edit full details
+              </button>
+            ) : (
+              <button
+                className="dropdown-item"
+                role="menuitem"
+                onClick={() => {
+                  setEditRequestTarget({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '' } });
+                  setOpenDropdown(null);
+                }}
+              >
+                <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
+              </button>
+            ))}
+            {onSite && (
+              <>
+                <a className="dropdown-item" role="menuitem" href={publicUrlFor(s)} target="_blank" rel="noopener noreferrer" onClick={() => setOpenDropdown(null)}>
+                  <ExternalLinkIcon size={12} src={iconOverrides.external_link} /> View page
+                </a>
+                <button className="dropdown-item" role="menuitem" onClick={() => copyPublicLink(s)}>
+                  <LinkIcon size={12} src={iconOverrides.link} /> {copiedLinkId === s.id ? 'Link copied!' : 'Copy link'}
+                </button>
+              </>
+            )}
+            {forShow && onSite && s.contentType !== 'bonus' && (
+              <button
+                className="dropdown-item"
+                role="menuitem"
+                onClick={() => {
+                  setSellTarget({ type: 'episode', id: s.id, title: displayTitle(s), sub: [episodeCode(s), minutes(s.runtime), s.seriesName].filter(Boolean).join(' · ') });
+                  setOpenDropdown(null);
+                }}
+              >
+                <TicketIcon size={12} src={iconOverrides.ticket} /> {pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell'}
+                {pricing.prices[`episode:${s.id}`] && pricing.prices[`episode:${s.id}`].price_cents ? <span className="yw-menu-price">{dollars(pricing.prices[`episode:${s.id}`].price_cents)}</span> : null}
+              </button>
+            )}
+            {forShow && canExtract && (
+              <button className="dropdown-item" role="menuitem" disabled={extractingId === s.id} onClick={() => { setOpenDropdown(null); extractAudio(s.id); }}>
+                <HeadphonesIcon size={12} src={iconOverrides.headphones} /> {extractingId === s.id ? `Extracting the audio…${extractProgress != null ? ` ${Math.round(extractProgress)}%` : ''}` : 'Extract the audio'}
+              </button>
+            )}
+          </div>
+        )}
+      </span>
+    );
+  }
+
+  // The lines under a show row: what waits for approval, why it was
+  // pulled or sent back, what the file is missing.
+  function showRowFlags(s) {
+    const flags = [];
+    if (s.status === 'rejected') flags.push({ key: 'rejected', tone: 'warn', Icon: WarningIcon, icon: 'warning', text: s.rejectionReason ? `Not this time: ${s.rejectionReason}` : 'Not this time' });
+    if (s.held) flags.push({ key: 'held', tone: 'warn', Icon: WarningIcon, icon: 'warning', text: s.holdReason ? `Pulled: ${s.holdReason}` : 'Pulled while an admin looks at it' });
+    if (s.deletionRequested) flags.push({ key: 'removal', tone: 'muted', Icon: TrashIcon, icon: 'trash', text: s.deletionReason ? `Removal requested: ${s.deletionReason}` : 'Removal requested' });
+    if (s.pendingTitle) flags.push({ key: 'title', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Title change waiting' });
+    if (s.pendingDescription) flags.push({ key: 'desc', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Description change waiting' });
+    if (s.pendingSrc) flags.push({ key: 'video', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: s.pendingVideoState && s.pendingVideoState !== 'ready' ? 'New video waiting · still processing' : 'New video waiting' });
+    if (s.artworkPending) flags.push({ key: 'art', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Art waiting for approval' });
+    if (s.cloudflareState === 'error') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, icon: 'warning', text: 'The file failed to process — replace it' });
+    else if (s.cloudflareState === 'pendingupload') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, icon: 'warning', text: 'The upload never finished' });
+    if (s.status === 'approved' && s.contentType !== 'podcast' && s.contentType !== 'bonus' && !s.captionsUrl) flags.push({ key: 'captions', tone: 'warn', Icon: ChatIcon, icon: 'chat', text: 'No captions' });
+    else if (s.captionsStale) flags.push({ key: 'stale', tone: 'warn', Icon: ChatIcon, icon: 'chat', text: 'Captions may be out of sync' });
+    return flags;
+  }
+
+  function showRowMeta(s) {
+    const parts = [];
+    if (s.cloudflareState && !['ready', 'error', 'pendingupload'].includes(s.cloudflareState)) parts.push(CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState);
+    else if (s.runtime) parts.push(minutes(s.runtime));
+    if (s.contentType === 'bonus') {
+      if (s.bonusParentType === 'episode') {
+        const parent = byId.get(s.bonusParentId);
+        parts.push(parent && episodeCode(parent) ? `after ${episodeCode(parent)}` : 'after an episode');
+      } else {
+        parts.push('with the show');
+      }
+    }
+    if (s.status === 'pending') parts.push(`sent ${ago(s.createdAt)}`);
+    if (live(s)) parts.push(`${s.viewCount || 0} view${s.viewCount === 1 ? '' : 's'}`);
+    return parts.filter(Boolean).join(' · ');
+  }
+
+  function renderShowRow(s, group) {
+    const code = s.contentType === 'bonus' ? null : episodeCode(s);
+    const titleId = `yw-t-${s.id}`;
+    const status = showRowStatus(s, live(s));
+    const flags = showRowFlags(s);
+    return (
+      <div key={s.id} className="yw-row" id={`yw-${s.id}`}>
+        <span className="yw-thumb" style={bg(s.thumbnail || s.poster)} aria-hidden="true" />
+        <span className="yw-main">
+          <span className="yw-title" id={titleId}>{code && <span className="yw-code">{code}</span>}<span className="yw-title-text">{displayTitle(s)}</span></span>
+          <span className="yw-meta">
+            <span className={`yw-status ${status.tone}`}>{status.text}</span>
+            <span className="yw-meta-text">{showRowMeta(s)}</span>
+          </span>
+          {flags.map((f) => (
+            <span key={f.key} className={`yw-flag ${f.tone}`}><f.Icon size={12} src={iconOverrides[f.icon]} />{f.text}</span>
+          ))}
+        </span>
+        <Link href={editorHref(group.showId, s.id)} className="yw-edit" aria-label={s.contentType === 'bonus' ? 'Edit extra' : 'Edit episode'} aria-describedby={titleId}>
+          <PencilIcon size={15} src={iconOverrides.pencil} />
+        </Link>
+        {gearMenu(s, { forShow: true })}
+      </div>
+    );
+  }
+
+  function renderShowGroup(group) {
+    const sh = group.summary;
+    const episodes = sortEpisodes(group.items.filter((s) => s.contentType !== 'bonus'));
+    const extras = group.items.filter((s) => s.contentType === 'bonus').sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
+    const seasons = [...new Set(episodes.map((s) => Number(s.season) || 1))];
+    const labelFor = (n) => {
+      const entry = sh && Array.isArray(sh.seasons) ? sh.seasons.find((x) => x.number === n) : null;
+      return (entry && entry.label) || `Season ${n}`;
+    };
+    const fallbackStatus = group.items.find((s) => s.seriesStatus) || null;
+    const state = sh ? sh.state : fallbackStatus && fallbackStatus.seriesHeld ? 'pulled' : fallbackStatus && fallbackStatus.seriesStatus === 'pending' ? 'review' : fallbackStatus && fallbackStatus.seriesStatus === 'rejected' ? 'declined' : 'live';
+    const statusLabel = sh ? sh.statusLabel : { pulled: 'Pulled', review: 'Not public yet', declined: 'Not this time', live: 'Live' }[state];
+    const poster = (sh && (sh.poster || sh.thumbnail)) || (seriesById.get(group.showId) && (seriesById.get(group.showId).poster || seriesById.get(group.showId).thumbnail)) || null;
+    const countLine = sh ? sh.countLine : `${episodes.length} episode${episodes.length === 1 ? '' : 's'}${extras.length ? ` · ${extras.length} extra${extras.length === 1 ? '' : 's'}` : ''}`;
+    const headingId = `yw-g-${group.showId}`;
+    return (
+      <section key={group.key} className="project-group yw-group" aria-labelledby={headingId}>
+        <Link href={showHref(group.showId)} className="yw-head">
+          <span className={`yw-poster${poster ? '' : ' empty'}`} style={bg(poster)} aria-hidden="true">{!poster && <span>{group.label}</span>}</span>
+          <span className="yw-head-main">
+            <span className="yw-head-title">
+              <h2 id={headingId} className="yw-name">{group.label}</h2>
+              <span className={`cs-chip kind-${group.kind === 'podcast' ? 'podcast' : 'series'}`}>{group.kind === 'podcast' ? 'Podcast' : 'Series'}</span>
+              {state !== 'live' && statusLabel && <span className={`cs-chip state-${SHOW_STATE_CLASS[state] || 'private'}`}>{statusLabel}</span>}
+            </span>
+            <span className="yw-count">{countLine}</span>
+            <span className="yw-open">Open show page →</span>
+          </span>
+        </Link>
+        {episodes.length > 0 && seasons.length > 1
+          ? seasons.map((n) => (
+            <div key={n} className="yw-season-block">
+              <div className="yw-season"><h3>{labelFor(n)}</h3></div>
+              {episodes.filter((s) => (Number(s.season) || 1) === n).map((s) => renderShowRow(s, group))}
+            </div>
+          ))
+          : episodes.map((s) => renderShowRow(s, group))}
+        {extras.length > 0 && (
+          <div className="yw-season-block">
+            <div className="yw-season"><h3>Extras</h3></div>
+            {extras.map((s) => renderShowRow(s, group))}
+          </div>
+        )}
+      </section>
+    );
+  }
 
   function renderEpisodeRow(s) {
     const flags = [];
     if (s.missingArtwork && s.status !== 'rejected') flags.push({ type: 'artwork', title: 'Missing artwork', Icon: ImageIcon, iconKey: 'image' });
     if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ type: 'captions', title: 'No captions', Icon: ChatIcon, iconKey: 'chat' });
     if (s.artworkPending) flags.push({ type: 'pending', title: 'Artwork change awaiting approval', Icon: ClockIcon, iconKey: 'clock' });
+    if (s.pendingTitle) flags.push({ type: 'title', title: 'Title change waiting', Icon: ClockIcon, iconKey: 'clock' });
+    if (s.pendingSrc) flags.push({ type: 'video', title: 'New video waiting', Icon: ClockIcon, iconKey: 'clock' });
     if (s.deletionRequested) flags.push({ type: 'deletion', title: 'Pending deletion', Icon: TrashIcon, iconKey: 'trash' });
 
     return (
@@ -321,61 +599,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 offer both, without opening anything. */}
             {s.hasVideo && <span className="episode-media-icon" title="Has video"><ClapperboardIcon size={12} src={iconOverrides.clapperboard} /></span>}
             {s.hasAudio && <span className="episode-media-icon" title="Has audio"><HeadphonesIcon size={12} src={iconOverrides.headphones} /></span>}
-            {!s.deletionRequested && (
-              <span style={{ position: 'relative' }}>
-                <button
-                  onClick={() => setOpenDropdown(openDropdown === `episode:${s.id}` ? null : `episode:${s.id}`)}
-                  style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', padding: 0, display: 'inline-flex' }}
-                  aria-label="Episode settings"
-                >
-                  <SettingsIcon size={14} src={iconOverrides.settings} />
-                </button>
-                {openDropdown === `episode:${s.id}` && (
-                  <div className="dropdown dropdown-left open">
-                    {isAdmin ? (
-                      <button
-                        className="dropdown-item"
-                        onClick={() => {
-                          setFullEditSubmission(s);
-                          setOpenDropdown(null);
-                        }}
-                      >
-                        <PencilIcon size={12} src={iconOverrides.pencil} /> Edit full details
-                      </button>
-                    ) : (
-                      <button
-                        className="dropdown-item"
-                        onClick={() => {
-                          setEditRequestTarget({
-                            type: 'episode',
-                            currentValues: { id: s.id, title: s.title, description: s.description || '' }
-                          });
-                          setOpenDropdown(null);
-                        }}
-                      >
-                        <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
-                      </button>
-                    )}
-                    {s.status === 'approved' && (
-                      <>
-                        <a
-                          className="dropdown-item"
-                          href={publicUrlFor(s)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          onClick={() => setOpenDropdown(null)}
-                        >
-                          <ExternalLinkIcon size={12} src={iconOverrides.external_link} /> View public page
-                        </a>
-                        <button className="dropdown-item" onClick={() => copyPublicLink(s)}>
-                          <LinkIcon size={12} src={iconOverrides.link} /> {copiedLinkId === s.id ? 'Link copied!' : 'Copy public link'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </span>
-            )}
+            {!s.deletionRequested && gearMenu(s)}
           </div>
           <div className="episode-meta">
             {s.cloudflareState && s.cloudflareState !== 'ready'
@@ -383,25 +607,22 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
               : (s.runtime || s.description)}
           </div>
           {s.contentType !== 'bonus' && (
-            s.seriesId && s.seriesChannelOptIn ? (
-              <span className="chan-optin on static" title="Set for the whole show">Channels: on for the whole show</span>
-            ) : (
-              <button
-                type="button"
-                className={`chan-optin ${s.channelOptIn ? 'on' : ''}`}
-                aria-pressed={s.channelOptIn}
-                disabled={channelBusy === `episode:${s.id}`}
-                onClick={() => setChannelOptIn('episode', s.id, !s.channelOptIn)}
-                title={s.channelOptIn ? 'Channels can air this. Click to stop.' : 'Let channels like TapaTV air this'}
-              >
-                <i aria-hidden="true" />Channels: {s.channelOptIn ? 'on' : 'off'}
-              </button>
-            )
+            <button
+              type="button"
+              className={`chan-optin ${s.channelOptIn ? 'on' : ''}`}
+              aria-pressed={s.channelOptIn}
+              disabled={channelBusy === `episode:${s.id}`}
+              onClick={() => setChannelOptIn('episode', s.id, !s.channelOptIn)}
+              title={s.channelOptIn ? 'Channels can air this. Click to stop.' : 'Let channels like TapaTV air this'}
+            >
+              <i aria-hidden="true" />Channels: {s.channelOptIn ? 'on' : 'off'}
+            </button>
           )}
           {s.status === 'approved' && pricePill('episode', s.id)}
           {s.status === 'rejected' && s.rejectionReason && (
             <p className="submission-rejection">Admin's note: {s.rejectionReason}</p>
           )}
+          {s.held && s.holdReason && <p className="submission-rejection">Pulled: {s.holdReason}</p>}
           {s.cloudflareState === 'error' && s.cloudflareError && (
             <p className="submission-rejection">Upload problem: {s.cloudflareError} — this file likely needs to be re-exported and re-submitted.</p>
           )}
@@ -453,6 +674,31 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     );
   }
 
+  function renderStandaloneGroup(group) {
+    const pendingInGroup = group.items.filter((s) => s.status === 'pending').length;
+    const missingArtworkInGroup = group.items.filter((s) => s.missingArtwork && s.status !== 'rejected').length;
+    const groupArt = group.items.find((s) => s.thumbnail || s.poster);
+    return (
+      <div key={group.key} className="project-group">
+        <div className="project-header">
+          <div
+            className="project-art"
+            style={groupArt ? { backgroundImage: `url(${groupArt.thumbnail || groupArt.poster})` } : {}}
+          />
+          <div className="project-title-wrap">
+            <div className="project-title">{group.label}</div>
+            <div className="project-sub">{group.items.length} title{group.items.length === 1 ? '' : 's'}</div>
+          </div>
+          <div className="project-badges">
+            {pendingInGroup > 0 && <span className="project-badge pending">{pendingInGroup} in review</span>}
+            {missingArtworkInGroup > 0 && <span className="project-badge missing">{missingArtworkInGroup} needs artwork</span>}
+          </div>
+        </div>
+        {group.items.map(renderEpisodeRow)}
+      </div>
+    );
+  }
+
   return (
     <>
       <Head>
@@ -474,10 +720,10 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           <div>
             <div className="eyebrow">Creator Studio</div>
             <h1>Your work</h1>
-            <p className="ca-sub">Everything you've submitted, pending or already live — edit, add artwork, or manage it here.</p>
+            <p className="ca-sub">Everything you&rsquo;ve sent us, in review or live. A show&rsquo;s episodes sit under the show.</p>
           </div>
-          <Link href="/creator" className="account-btn-primary" style={{ width: 'auto', textDecoration: 'none' }}>
-            + Submit new episode
+          <Link href="/creator/submit" className="account-btn-primary" style={{ width: 'auto', textDecoration: 'none' }}>
+            + Submit a title
           </Link>
         </div>
 
@@ -492,13 +738,13 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           {deleteActionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{deleteActionError}</p>}
           {channelError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }} role="alert">{channelError}</p>}
 
-          {loadingSubmissions && <p>Loading…</p>}
+          {loadingSubmissions && !submissions && <p>Loading…</p>}
 
-          {!loadingSubmissions && submissions && submissions.length === 0 && (
-            <p>Nothing submitted yet — <Link href="/creator" style={{ color: 'var(--signal-amber)' }}>submit your first one</Link>.</p>
+          {submissions && submissions.length === 0 && (
+            <p>Nothing submitted yet — <Link href="/creator/submit" style={{ color: 'var(--signal-amber)' }}>submit your first one</Link>.</p>
           )}
 
-          {!loadingSubmissions && submissions && submissions.length > 0 && (
+          {submissions && submissions.length > 0 && (
             <>
               <div className="dash-stats">
                 <div className="dash-stat">
@@ -507,11 +753,11 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 </div>
                 <div className="dash-stat">
                   <div className="dash-stat-value">{pendingCount}</div>
-                  <div className="dash-stat-label">Pending</div>
+                  <div className="dash-stat-label">In review</div>
                 </div>
                 <div className="dash-stat">
-                  <div className="dash-stat-value">{approvedCount}</div>
-                  <div className="dash-stat-label">Approved</div>
+                  <div className="dash-stat-value">{liveCount}</div>
+                  <div className="dash-stat-label">Live</div>
                 </div>
                 <div className="dash-stat">
                   <div className="dash-stat-value">{approvalRate === null ? '—' : `${approvalRate}%`}</div>
@@ -525,7 +771,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
 
               {missingArtworkCount > 0 && (
                 <div className="dash-nudge">
-                  <ImageIcon size={13} src={iconOverrides.image} /> {missingArtworkCount} submission{missingArtworkCount === 1 ? '' : 's'} still missing a poster or thumbnail — use &ldquo;Add artwork&rdquo; below on any of them, pending or already live.
+                  <ImageIcon size={13} src={iconOverrides.image} /> {missingArtworkCount} title{missingArtworkCount === 1 ? '' : 's'} still missing a poster or a still — a show&rsquo;s episodes take theirs on its show page, a film&rsquo;s from &ldquo;Add artwork&rdquo; on its row.
                 </div>
               )}
 
@@ -533,6 +779,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 <input
                   type="search"
                   placeholder="Search your titles…"
+                  aria-label="Search your titles"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                 />
@@ -540,6 +787,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                   <button
                     key={f}
                     className={`filter-pill ${statusFilter === f ? 'on' : ''}`}
+                    aria-pressed={statusFilter === f}
                     onClick={() => setStatusFilter(f)}
                   >
                     {f === 'all' ? 'All' : STATUS_LABEL[f].text}
@@ -547,6 +795,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 ))}
                 <button
                   className={`filter-pill ${needsAttentionOnly ? 'on' : ''}`}
+                  aria-pressed={needsAttentionOnly}
                   onClick={() => setNeedsAttentionOnly((v) => !v)}
                 >
                   <WarningIcon size={12} src={iconOverrides.warning} /> Needs attention
@@ -557,100 +806,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 <p>Nothing matches this filter.</p>
               )}
 
-              {projectGroups.map((group) => {
-                const pendingInGroup = group.items.filter((s) => s.status === 'pending').length;
-                const missingArtworkInGroup = group.items.filter((s) => s.missingArtwork && s.status !== 'rejected').length;
-                const groupArt = group.items.find((s) => s.thumbnail || s.poster);
-                return (
-                  <div key={group.key} className="project-group">
-                    <div className="project-header">
-                      <div
-                        className="project-art"
-                        style={groupArt ? { backgroundImage: `url(${groupArt.thumbnail || groupArt.poster})` } : {}}
-                      />
-                      <div className="project-title-wrap">
-                        <div className="project-title">
-                          {group.label}
-                          {group.typeTag && (
-                            <span className="project-type-tag">
-                              {group.typeTag === 'podcast' ? <><HeadphonesIcon size={11} src={iconOverrides.headphones} /> Podcast</> : 'Series'}
-                            </span>
-                          )}
-                          {group.isGrouped && (
-                            <span style={{ position: 'relative' }}>
-                              <button
-                                onClick={() => setOpenDropdown(openDropdown === `series:${group.key}` ? null : `series:${group.key}`)}
-                                style={{ background: 'none', border: 'none', color: 'var(--ink-dim)', cursor: 'pointer', display: 'inline-flex' }}
-                                aria-label="Show settings"
-                              >
-                                <SettingsIcon size={14} src={iconOverrides.settings} />
-                              </button>
-                              {openDropdown === `series:${group.key}` && (
-                                <div className="dropdown dropdown-left open">
-                                  <button
-                                    className="dropdown-item"
-                                    onClick={() => {
-                                      const seriesId = group.key.replace('series:', '');
-                                      const seriesRecord = (allSeries || []).find((s) => s.id === seriesId);
-                                      setEditRequestTarget({
-                                        type: 'series',
-                                        currentValues: { id: seriesId, name: group.label, description: (seriesRecord && seriesRecord.desc) || '' }
-                                      });
-                                      setOpenDropdown(null);
-                                    }}
-                                  >
-                                    <PencilIcon size={12} src={iconOverrides.pencil} /> Edit show details
-                                  </button>
-                                  <Link href={`/creator/submit?type=bonus&series=${encodeURIComponent(group.key.replace('series:', ''))}`} className="dropdown-item">
-                                    ＋ Add bonus content
-                                  </Link>
-                                  <button
-                                    className="dropdown-item"
-                                    onClick={() => {
-                                      setSellTarget({ type: 'series', id: group.key.replace('series:', ''), title: group.label, sub: `Whole series · ${group.items.length} episode${group.items.length === 1 ? '' : 's'}` });
-                                      setOpenDropdown(null);
-                                    }}
-                                  >
-                                    <TicketIcon size={12} src={iconOverrides.ticket} /> {pricing.prices[group.key] ? 'Series price and sales' : 'Sell the whole series'}
-                                  </button>
-                                </div>
-                              )}
-                            </span>
-                          )}
-                        </div>
-                        <div className="project-sub">
-                          {group.items.length} episode{group.items.length === 1 ? '' : 's'}
-                          {group.isGrouped && pricePill('series', group.key.replace('series:', ''))}
-                          {group.isGrouped && (() => {
-                            const sid = group.key.replace('series:', '');
-                            const sc = seriesChannel[sid];
-                            if (!sc) return null;
-                            if (!sc.canChange) return <span className="chan-optin-note"> · Channels: {sc.channelOptIn ? 'on for the whole show' : 'set per episode'}</span>;
-                            return (
-                              <button
-                                type="button"
-                                className={`chan-optin ${sc.channelOptIn ? 'on' : ''}`}
-                                aria-pressed={sc.channelOptIn}
-                                disabled={channelBusy === `series:${sid}`}
-                                onClick={() => setChannelOptIn('series', sid, !sc.channelOptIn)}
-                                title="Covers every episode of this show, now and later"
-                                style={{ marginLeft: '0.6rem' }}
-                              >
-                                <i aria-hidden="true" />Channels: {sc.channelOptIn ? 'on for the whole show' : 'off'}
-                              </button>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                      <div className="project-badges">
-                        {pendingInGroup > 0 && <span className="project-badge pending">{pendingInGroup} pending</span>}
-                        {missingArtworkInGroup > 0 && <span className="project-badge missing">{missingArtworkInGroup} needs artwork</span>}
-                      </div>
-                    </div>
-                    {group.items.map(renderEpisodeRow)}
-                  </div>
-                );
-              })}
+              {projectGroups.map((group) => (group.isShow ? renderShowGroup(group) : renderStandaloneGroup(group)))}
             </>
           )}
         </div>
@@ -660,7 +816,6 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
       {editingSubmission && (
         <EditSubmissionModal
           submission={editingSubmission}
-          allSeries={allSeries}
           onClose={() => setEditingSubmission(null)}
           onSaved={() => { setEditingSubmission(null); loadSubmissions(); }}
         />

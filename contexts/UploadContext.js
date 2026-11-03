@@ -30,15 +30,21 @@ export function UploadProvider({ children }) {
   // form — File objects stay valid in memory for as long as the tab is
   // open, they just can't survive an actual page reload.
   const lastAttemptRef = useRef(null);
+  // Whether a transfer is running right now, kept by hand at every start
+  // and end: the show page's queue (below) starts the next file the moment
+  // the last one is in, before React has re-rendered with the new state, so
+  // "is something uploading?" can't be read from `activeUpload` there.
+  const runningRef = useRef(false);
 
   useEffect(() => {
     uploadStatusRef.current = activeUpload;
   }, [activeUpload]);
 
   async function startUpload(file, formData, trailerFile, uploadMethod = 'tus', submitEndpoint = '/api/creator/submit-episode', doneMessages) {
-    if (activeUpload && activeUpload.status === 'uploading') {
+    if (runningRef.current) {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
+    runningRef.current = true;
 
     lastAttemptRef.current = { file, formData, trailerFile, submitEndpoint, doneMessages };
 
@@ -185,6 +191,8 @@ export function UploadProvider({ children }) {
         errorRaw: described.raw,
         likelyBlocked: described.likelyBlocked
       }));
+    } finally {
+      runningRef.current = false;
     }
   }
 
@@ -201,9 +209,10 @@ export function UploadProvider({ children }) {
   // TUS/basic-upload state machine above, which already has to handle a lot
   // of real-world flakiness on its own.
   async function startUrlImport(videoUrl, fileName, formData, submitEndpoint = '/api/creator/submit-episode', doneMessages) {
-    if (activeUpload && activeUpload.status === 'uploading') {
+    if (runningRef.current) {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
+    runningRef.current = true;
 
     lastAttemptRef.current = { videoUrl, fileName, formData, submitEndpoint, doneMessages, isUrlImport: true };
 
@@ -283,6 +292,8 @@ export function UploadProvider({ children }) {
         errorRaw: described.raw,
         likelyBlocked: false
       } : u));
+    } finally {
+      runningRef.current = false;
     }
   }
 
@@ -295,11 +306,14 @@ export function UploadProvider({ children }) {
   // stopped earlier (the row keeps it); with the same file picked again the
   // transfer carries on from where it was. `onUrl` reports that address as
   // soon as it exists, so the caller can keep it.
-  async function startVideoUpload(file, { urlEndpoint = '/api/apply/upload-url', resumeUrl = null, kind = 'main', onUrl = null, authHeaders = null } = {}) {
-    if (activeUpload && activeUpload.status === 'uploading') {
+  // `queue` (the show page's queue, below) rides on the widget's state: which
+  // show, which file of how many.
+  async function startVideoUpload(file, { urlEndpoint = '/api/apply/upload-url', resumeUrl = null, kind = 'main', onUrl = null, authHeaders = null, queue = null } = {}) {
+    if (runningRef.current) {
       throw new Error('An upload is already in progress — wait for it to finish before starting another.');
     }
-    lastAttemptRef.current = { file, urlEndpoint, resumeUrl, kind, onUrl, authHeaders, isVideoOnly: true };
+    runningRef.current = true;
+    lastAttemptRef.current = { file, urlEndpoint, resumeUrl, kind, onUrl, authHeaders, isVideoOnly: true, queueKey: queue ? queue.key : null };
 
     setActiveUpload({
       phase: kind,
@@ -311,6 +325,7 @@ export function UploadProvider({ children }) {
       uploadMethod: 'tus',
       videoOnly: true,
       uid: null,
+      queue,
       doneMessages: { label: kind === 'trailer' ? 'Trailer uploaded' : 'Upload finished', meta: 'It keeps processing on our side; nothing more to do here.' },
       errorTitle: null,
       errorMessage: null,
@@ -332,6 +347,7 @@ export function UploadProvider({ children }) {
         uid = urlData.uid;
       }
     } catch (err) {
+      runningRef.current = false;
       const described = describeUploadError(err);
       setActiveUpload((u) => (u ? { ...u, status: 'error', errorTitle: described.title, errorMessage: described.message, errorRaw: described.raw, likelyBlocked: described.likelyBlocked } : u));
       throw err;
@@ -368,10 +384,12 @@ export function UploadProvider({ children }) {
       tusInstanceRef.current = upload;
       upload.start();
     }).then(() => {
+      runningRef.current = false;
       setActiveUpload((u) => (u ? { ...u, status: 'uploaded', bytesUploaded: u.fileSize } : u));
       lastAttemptRef.current = null;
       return { uid };
     }).catch((err) => {
+      runningRef.current = false;
       const described = describeUploadError(err);
       setActiveUpload((u) => (u ? { ...u, status: 'error', errorTitle: described.title, errorMessage: described.message, errorRaw: described.raw, likelyBlocked: described.likelyBlocked } : u));
       throw err;
@@ -382,9 +400,223 @@ export function UploadProvider({ children }) {
     return { uid, uploadUrl, done };
   }
 
+  // --- the show page's queue (the series revamp, slice 2) ---------------------
+  // Files dropped on a show (amendment 10, decision 17) become drafts first
+  // (POST /api/show/[id]/episodes, by the page) and then upload here, one
+  // after another through startVideoUpload — still one transfer at a time —
+  // so the queue keeps going while the creator moves around the site (this
+  // provider wraps the whole app). Each upload is saved onto its draft as it
+  // starts (the tus address, so a stopped one resumes) and again when the
+  // last byte is in. A closed tab stops the queue; picking the same file
+  // again resumes it from the draft's saved address.
+  //   item: { key, draftId, showId, showName, label, file, endpoint,
+  //           runtimeSeconds, status: 'queued' | 'starting' | 'uploading' |
+  //           'uploaded' | 'stopped' | 'skipped' | 'cancelled', error, uid }
+  const [queue, setQueue] = useState([]);
+  const queueRef = useRef([]);
+  const pumpingRef = useRef(false);
+  const cancelRef = useRef(new Map()); // key → resolve(): stops waiting on a cancelled upload
+  const [queuePaused, setQueuePaused] = useState(null); // the line why, when an upload link couldn't be had
+  const pausedRef = useRef(null);
+  // The show page that draws the queue itself (the corner widget stays out
+  // of its way there).
+  const [queueHost, setQueueHost] = useState(null);
+
+  function updateQueue(fn) {
+    queueRef.current = fn(queueRef.current);
+    setQueue(queueRef.current);
+  }
+  function patchItem(key, fields) {
+    updateQueue((q) => q.map((it) => (it.key === key ? { ...it, ...fields } : it)));
+  }
+  const LIVE_ITEM = ['queued', 'starting', 'uploading'];
+
+  // The draft as it is now, so a save never puts back an older form or
+  // trailer (the drafts route replaces form, video and trailer together).
+  async function readDraft(draftId) {
+    try {
+      const res = await fetch(`/api/creator/drafts?id=${encodeURIComponent(draftId)}`, { credentials: 'same-origin' });
+      if (res.status === 404) return { gone: true };
+      const data = await res.json().catch(() => ({}));
+      return res.ok && data.draft ? { draft: data.draft } : { failed: true };
+    } catch {
+      return { failed: true };
+    }
+  }
+  async function saveDraftVideo(draftId, video) {
+    const now = await readDraft(draftId);
+    if (!now.draft) return false;
+    try {
+      const res = await fetch('/api/creator/drafts', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: draftId, form: now.draft.form || {}, video, trailer: now.draft.trailer || null })
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function runQueueItem(item) {
+    patchItem(item.key, { status: 'starting', error: null });
+    // A stopped upload of this very file resumes from the draft's address; a
+    // draft that has its file already (or is gone) is skipped.
+    const now = await readDraft(item.draftId);
+    if (now.gone) {
+      patchItem(item.key, { status: 'cancelled', error: 'That draft isn’t there any more.', file: null });
+      return;
+    }
+    const v = now.draft ? now.draft.video : null;
+    let resumeUrl = null;
+    if (v && v.uid) {
+      const same = v.name === item.file.name && Number(v.bytes) === item.file.size;
+      if (v.state === 'uploading' && same && v.uploadUrl && !item.freshStart) resumeUrl = v.uploadUrl;
+      else if (v.state === 'processing' || v.state === 'ready') {
+        patchItem(item.key, { status: 'skipped', error: null, file: null });
+        return;
+      }
+    }
+    const shows = queueRef.current.filter((it) => it.showId === item.showId && it.batch === item.batch);
+    const meta = { key: item.key, showId: item.showId, showName: item.showName || null, draftId: item.draftId, label: item.label || null, index: shows.findIndex((it) => it.key === item.key) + 1, total: shows.length };
+    let current = null;
+    let urlSeen = null;
+    let chain = Promise.resolve();
+    const save = (video) => {
+      chain = chain.then(() => saveDraftVideo(item.draftId, video)).catch(() => false);
+      return chain;
+    };
+    let started;
+    try {
+      started = await startVideoUpload(item.file, {
+        urlEndpoint: item.endpoint,
+        resumeUrl,
+        kind: 'main',
+        queue: meta,
+        onUrl: (url) => {
+          urlSeen = url;
+          if (current) {
+            current = { ...current, uploadUrl: url };
+            save(current);
+          }
+        }
+      });
+    } catch (err) {
+      // No upload link (a limit, the connection): the queue waits for "Try again".
+      const line = (err && err.message) || 'Could not get an upload link.';
+      patchItem(item.key, { status: 'stopped', error: line });
+      pausedRef.current = line;
+      setQueuePaused(line);
+      return;
+    }
+    current = {
+      uid: started.uid,
+      state: 'uploading',
+      name: item.file.name,
+      bytes: item.file.size,
+      uploadUrl: resumeUrl || urlSeen || null,
+      runtimeSeconds: item.runtimeSeconds || (v && v.runtimeSeconds) || null
+    };
+    patchItem(item.key, { status: 'uploading', uid: started.uid, startedAt: Date.now() });
+    save(current);
+    const cancelled = new Promise((resolve) => cancelRef.current.set(item.key, resolve));
+    try {
+      const outcome = await Promise.race([started.done.then(() => 'done'), cancelled.then(() => 'cancelled')]);
+      if (outcome === 'cancelled') return;
+      current = { ...current, state: 'processing' };
+      await save(current);
+      patchItem(item.key, { status: 'uploaded', file: null, error: null });
+    } catch {
+      patchItem(item.key, { status: 'stopped', error: 'The upload stopped — pick the same file to resume.', freshStart: Boolean(resumeUrl) });
+    } finally {
+      cancelRef.current.delete(item.key);
+    }
+  }
+
+  async function pumpQueue() {
+    if (pumpingRef.current) return;
+    pumpingRef.current = true;
+    try {
+      for (;;) {
+        if (pausedRef.current || runningRef.current) break;
+        const next = queueRef.current.find((it) => it.status === 'queued');
+        if (!next) break;
+        await runQueueItem(next);
+      }
+    } finally {
+      pumpingRef.current = false;
+    }
+  }
+
+  // Another caller's upload (the editor's "Replace the file", the submit
+  // page) holds the one transfer: the queue waits and carries on after it.
+  useEffect(() => {
+    if (!runningRef.current && !pausedRef.current && queueRef.current.some((it) => it.status === 'queued')) pumpQueue();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeUpload && activeUpload.status, queue]);
+
+  // items: [{ draftId, file, showId, showName, label, endpoint, runtimeSeconds }]
+  function enqueueUploads(items) {
+    const list = (items || []).filter((x) => x && x.draftId && x.file);
+    if (!list.length) return;
+    const batch = `b${Date.now().toString(36)}`;
+    updateQueue((q) => {
+      const busy = new Set(q.filter((it) => ['starting', 'uploading'].includes(it.status)).map((it) => it.draftId));
+      const fresh = list.filter((x) => !busy.has(x.draftId));
+      const replaced = new Set(fresh.map((x) => x.draftId));
+      const kept = q.filter((it) => !replaced.has(it.draftId));
+      return [...kept, ...fresh.map((x, i) => ({ ...x, key: `${x.draftId}:${batch}:${i}`, batch, status: 'queued', error: null, uid: null, freshStart: Boolean(x.freshStart) }))];
+    });
+    pausedRef.current = null;
+    setQueuePaused(null);
+    setTimeout(pumpQueue, 0);
+  }
+
+  // Takes a draft's file out of the queue: a waiting one goes, the one
+  // uploading is stopped (its tus address stays on the draft).
+  function cancelQueueItem(draftId) {
+    const item = queueRef.current.find((it) => it.draftId === draftId && LIVE_ITEM.includes(it.status));
+    if (!item) return;
+    if (item.status === 'uploading' || item.status === 'starting') {
+      const upload = tusInstanceRef.current;
+      if (upload && typeof upload.abort === 'function') upload.abort().catch(() => {});
+      runningRef.current = false;
+      setActiveUpload(null);
+      lastAttemptRef.current = null;
+      const resolve = cancelRef.current.get(item.key);
+      if (resolve) resolve();
+    }
+    patchItem(item.key, { status: 'cancelled', file: null });
+    setTimeout(pumpQueue, 0);
+  }
+
+  // "Try again": the stopped files of a show (or these drafts) go back in
+  // line; a resume that failed starts the file afresh.
+  function retryQueueItems({ showId = null, draftIds = null } = {}) {
+    const want = (it) => it.status === 'stopped' && it.file && (draftIds ? draftIds.includes(it.draftId) : !showId || it.showId === showId);
+    updateQueue((q) => q.map((it) => (want(it) ? { ...it, status: 'queued', error: null } : it)));
+    pausedRef.current = null;
+    setQueuePaused(null);
+    setTimeout(pumpQueue, 0);
+  }
+
+  // Finished files leave the list after a while (and their File with them).
+  useEffect(() => {
+    const done = queue.filter((it) => ['uploaded', 'skipped', 'cancelled'].includes(it.status));
+    if (!done.length) return undefined;
+    const t = setTimeout(() => updateQueue((q) => q.filter((it) => !done.some((d) => d.key === it.key))), 90 * 1000);
+    return () => clearTimeout(t);
+  }, [queue]);
+
   function retryUpload(useMethod) {
     const attempt = lastAttemptRef.current;
     if (!attempt) return;
+    if (attempt.queueKey) {
+      const item = queueRef.current.find((it) => it.key === attempt.queueKey);
+      if (item) retryQueueItems({ draftIds: [item.draftId] });
+      return;
+    }
     if (attempt.isVideoOnly) {
       startVideoUpload(attempt.file, { urlEndpoint: attempt.urlEndpoint, resumeUrl: attempt.resumeUrl, kind: attempt.kind, onUrl: attempt.onUrl, authHeaders: attempt.authHeaders }).catch(() => {});
       return;
@@ -403,7 +635,7 @@ export function UploadProvider({ children }) {
   }
 
   return (
-    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, startVideoUpload, retryUpload, dismissUpload }}>
+    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, startVideoUpload, retryUpload, dismissUpload, queue, queuePaused, queueHost, setQueueHost, enqueueUploads, cancelQueueItem, retryQueueItems }}>
       {children}
     </UploadContext.Provider>
   );

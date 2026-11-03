@@ -1,5 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
+import { sendError } from '../../../lib/apiErrors';
+import { setShowRemoval } from '../../../lib/showPage';
 
 // Same shape as request-episode-deletion.js. Owner (series.creator_id) or
 // admin only — /apply now grants the creator role to anyone accepted, so
@@ -38,15 +40,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Only the creator of this series can do that.' });
   }
 
-  const dbUpdates = action === 'request'
-    ? { deletion_requested: true, deletion_reason: reason, deletion_requested_at: new Date().toISOString() }
-    : { deletion_requested: false, deletion_reason: null, deletion_requested_at: null };
-
-  const { error } = await supabase.from('series').update(dbUpdates).eq('id', seriesId);
-
-  if (error) {
-    console.error('request-series-deletion error:', error.message);
-    return res.status(500).json({ error: 'Could not save your request.' });
+  // The write, the cache and the audit line are the show page's own
+  // (lib/showPage.js setShowRemoval, POST /api/show/[id]/removal); this
+  // route keeps its checks and its answers for Series management.
+  try {
+    await setShowRemoval(existing.id, { action, reason: String(reason || '') }, { userId, isAdmin }, { strict: false });
+  } catch (err) {
+    return sendError(res, err, 'creator/request-series-deletion', 'Could not save your request.');
   }
 
   return res.status(200).json({ ok: true, seriesId, deletionRequested: action === 'request' });

@@ -634,6 +634,44 @@ function suite(R, who) {
     assert.equal(R.episodeHasPage({}), true);
   });
 
+  tt('the editors: one description as "One line about it" + "About it"', () => {
+    assert.equal(R.ONE_LINE_MAX, 300);
+    assert.deepEqual(R.splitDescription(null), { oneLine: '', about: '' });
+    assert.deepEqual(R.splitDescription('   '), { oneLine: '', about: '' });
+    assert.deepEqual(R.splitDescription('Six nights on the last bus.'), { oneLine: 'Six nights on the last bus.', about: '' });
+    assert.deepEqual(R.splitDescription('The hook.\n\nNight three. The bridge is out.\n\nA second paragraph.'), { oneLine: 'The hook.', about: 'Night three. The bridge is out.\n\nA second paragraph.' });
+    assert.deepEqual(R.splitDescription('The hook.\r\n  \r\nThe rest.'), { oneLine: 'The hook.', about: 'The rest.' });
+    // A first paragraph broken over lines, or longer than one line, is all "About it".
+    assert.deepEqual(R.splitDescription('Line one\nline two\n\nMore.'), { oneLine: '', about: 'Line one\nline two\n\nMore.' });
+    const long = 'x'.repeat(301);
+    assert.deepEqual(R.splitDescription(`${long}\n\nMore.`), { oneLine: '', about: `${long}\n\nMore.` });
+    assert.deepEqual(R.splitDescription(`${'y'.repeat(20)}\n\nMore.`, 10), { oneLine: '', about: `${'y'.repeat(20)}\n\nMore.` });
+    assert.equal(R.joinDescription('The hook.', 'The rest.'), 'The hook.\n\nThe rest.');
+    assert.equal(R.joinDescription('  The hook,\nwrapped. ', ''), 'The hook, wrapped.');
+    assert.equal(R.joinDescription('', '  Only about.  '), 'Only about.');
+    assert.equal(R.joinDescription('', ''), '');
+    assert.equal(R.joinDescription(null, undefined), '');
+    // Split then join gives the same text back, so an untouched one is never rewritten.
+    for (const s of ['Six nights on the last bus.', 'The hook.\n\nThe rest.\n\nMore.', 'Line one\nline two', `${long}\n\nMore.`, 'Only about.']) {
+      const p = R.splitDescription(s);
+      assert.equal(R.joinDescription(p.oneLine, p.about), s, s);
+    }
+  });
+
+  tt('the editors: the Save button says what goes to review', () => {
+    assert.deepEqual(R.saveSummary([]), { label: 'Save', note: null, staged: [], direct: 0, count: 0 });
+    assert.deepEqual(R.saveSummary(null), { label: 'Save', note: null, staged: [], direct: 0, count: 0 });
+    assert.deepEqual(R.saveSummary([{ field: 'description', mode: 'direct' }, { field: 'genre', mode: 'direct' }]), { label: 'Save · applies at once', note: null, staged: [], direct: 2, count: 2 });
+    assert.deepEqual(R.saveSummary([{ field: 'trailer', mode: 'staged' }]), { label: 'Save · 1 change goes to review', note: 'Goes to review: the new trailer', staged: ['trailer'], direct: 0, count: 1 });
+    const mixed = R.saveSummary([{ field: 'title', mode: 'staged' }, { field: 'poster', mode: 'staged' }, { field: 'poster', mode: 'staged' }, { field: 'description', mode: 'direct' }, { mode: 'staged' }, null]);
+    assert.equal(mixed.label, 'Save · 2 changes go to review');
+    assert.equal(mixed.note, 'Goes to review: the new title and the poster; the rest applies at once');
+    assert.deepEqual(mixed.staged, ['title', 'poster']);
+    assert.equal(mixed.count, 4);
+    assert.equal(R.saveSummary([{ field: 'thumbnail', mode: 'staged' }, { field: 'name', mode: 'staged' }, { field: 'heroImage', mode: 'staged' }]).note, 'Goes to review: the still, the new name and the hero image');
+    assert.equal(R.saveSummary([{ field: 'somethingNew', mode: 'staged' }]).note, 'Goes to review: somethingNew');
+  });
+
   tt('season labels, kinds, nouns, public shows', () => {
     const show = { seasons: [{ number: 2, name: 'The Return' }, { number: 3, label: 'Finale' }] };
     assert.equal(R.seasonLabel(show, 2), 'Season 2 · The Return');
@@ -1007,6 +1045,8 @@ function suite(R, who) {
       ['trailer', 'review', 'Trailer still processing'],
       ['delay', 'info', 'Changes reach visitors within a few minutes']
     ]);
+    // A show that isn't public yet: its approved episodes aren't live.
+    assert.deepEqual(R.showProblems({ status: 'pending' }, [ep('e', 1, 1, { ...cf('ready') })]).map((p) => p.words), ['1 approved episode has no captions']);
     // A podcast isn't asked for captions; a private show has no delay line.
     const pod = R.showProblems({ status: 'pending', kind: 'podcast' }, [ep('p', 1, 1, { contentType: 'podcast', audioUrl: 'https://x/a.mp3' })]);
     assert.deepEqual(pod, []);
@@ -1027,7 +1067,132 @@ function suite(R, who) {
     assert.equal(R.needsYou({ status: 'pending', cloudflareState: 'pendingupload' }), 'The upload never finished');
     assert.equal(R.needsYou({ status: 'pending', cloudflareState: 'inprogress' }), null);
     assert.equal(R.needsYou({ status: 'approved', seriesStatus: 'approved', captionsUrl: '/x' }), null);
+    assert.equal(R.needsYou({ status: 'approved', seriesStatus: 'approved', seriesHeld: true, captionsUrl: '/x' }), 'Its show is pulled while an admin looks at it');
+    assert.equal(R.needsYou({ status: 'approved', held: true, seriesHeld: true }), 'Pulled while an admin looks at it');
+    assert.equal(R.needsYou({ status: 'pending', seriesHeld: true }), null);
     assert.equal(R.needsYou(null), null);
+  });
+
+  tt('showPickerTag: the words after a show in the submit page\'s picker (slice 2)', () => {
+    assert.deepEqual(R.showPickerTag({ state: 'live' }), { tag: null, ok: true });
+    assert.deepEqual(R.showPickerTag({ state: 'review' }), { tag: '(in review)', ok: true });
+    assert.deepEqual(R.showPickerTag({ state: 'ready' }), { tag: '(ready to go public)', ok: true });
+    assert.deepEqual(R.showPickerTag({ state: 'drafts' }), { tag: '(not public yet)', ok: true });
+    assert.deepEqual(R.showPickerTag({ state: 'empty' }), { tag: '(not public yet)', ok: true });
+    assert.deepEqual(R.showPickerTag({ state: 'removal' }), { tag: '(removal requested — can’t add)', ok: false });
+    assert.deepEqual(R.showPickerTag({ state: 'declined' }), { tag: '(not this time — fix it first)', ok: false });
+    assert.deepEqual(R.showPickerTag({ state: 'pulled' }), { tag: '(pulled — can’t add)', ok: false });
+    assert.deepEqual(R.showPickerTag({ state: 'live', kind: 'vertical' }), { tag: '(vertical — studio only)', ok: false });
+    // A series row without a state (lib/series.js's shape or the database's).
+    assert.deepEqual(R.showPickerTag({ status: 'approved' }), { tag: null, ok: true });
+    assert.deepEqual(R.showPickerTag({ status: 'pending' }), { tag: '(not public yet)', ok: true });
+    assert.deepEqual(R.showPickerTag({ status: 'approved', deletion_requested: true }), { tag: '(removal requested — can’t add)', ok: false });
+    assert.deepEqual(R.showPickerTag({ status: 'approved', deletionRequested: true }), { tag: '(removal requested — can’t add)', ok: false });
+    assert.deepEqual(R.showPickerTag({ status: 'rejected' }), { tag: '(not this time — fix it first)', ok: false });
+    assert.deepEqual(R.showPickerTag({ status: 'approved', moderation_hold: true }), { tag: '(pulled — can’t add)', ok: false });
+    assert.deepEqual(R.showPickerTag({ status: 'pending', kind: 'vertical' }), { tag: '(vertical — studio only)', ok: false });
+    assert.deepEqual(R.showPickerTag(null), { tag: null, ok: false });
+    // The answer is a copy: changing it never changes the table.
+    const a = R.showPickerTag({ state: 'review' });
+    a.tag = 'x';
+    assert.equal(R.showPickerTag({ state: 'review' }).tag, '(in review)');
+  });
+
+  tt('nextFreeExcept: the Place block\'s next free number leaves the draft being placed out (slice 2)', () => {
+    const answer = { taken: { 1: { id: 'a', kind: 'episode' }, 2: { id: 'b', kind: 'episode' }, 4: { id: 'draft-1', kind: 'draft' }, 900: { id: 'far', kind: 'episode' } }, duplicates: {}, parked: [900] };
+    assert.equal(R.nextFreeExcept(answer, 'draft-1'), 3);
+    assert.equal(R.nextFreeExcept(answer, null), 5);
+    assert.equal(R.nextFreeExcept(answer, ''), 5);
+    assert.equal(R.nextFreeExcept(answer, 'b'), 5, 'only the highest number decides');
+    // A number the draft shares with an episode still counts.
+    assert.equal(R.nextFreeExcept({ taken: { 1: { id: 'x' }, 2: { id: 'd2' } }, duplicates: { 2: ['d2', 'x2'] } }, 'd2'), 3);
+    assert.equal(R.nextFreeExcept({ taken: { 1: { id: 'x' }, 2: { id: 'd2' } }, duplicates: {} }, 'd2'), 2);
+    assert.equal(R.nextFreeExcept({ taken: {} }, 'x'), 1);
+    assert.equal(R.nextFreeExcept({ taken: { 3: { id: 'only' } } }, 'only'), 1);
+    assert.equal(R.nextFreeExcept(null), 1);
+    // It agrees with positionsFor when nothing is left out.
+    const rows = [ep('a', 1), ep('b', 2), ep('c', 5), ep('far', 1100)];
+    const p = R.positionsFor(rows, 1);
+    assert.equal(R.nextFreeExcept(p, null), p.nextFree);
+    assert.equal(R.nextFreeExcept(p, 'c'), 3);
+  });
+
+  tt('reorderBody: a single-season plan and its undo as the /reorder body (the control room)', () => {
+    const rows = [...run(7), { id: 'd1', kind: 'draft', form: { season: '1', seriesOrder: '8' }, contentType: 'series' }];
+    const plan = R.planMove(rows, 'e7', 2);
+    assert.ok(plan.ok);
+    const body = R.reorderBody(plan.writes);
+    assert.deepEqual(body, { season: 1, episodes: plan.episodes, drafts: plan.drafts });
+    assert.deepEqual(Object.fromEntries(body.episodes.map((x) => [x.id, x.number])), { e7: 3, e3: 4, e4: 5, e5: 6, e6: 7 });
+    const undo = R.reorderBody(plan.undo);
+    assert.deepEqual(Object.fromEntries(undo.episodes.map((x) => [x.id, x.number])), { e7: 7, e3: 3, e4: 4, e5: 5, e6: 6 });
+    assert.deepEqual(undo.drafts, []);
+    // A draft in the way moves in the draft list.
+    const withDraft = R.planMove(rows, 'd1', 0);
+    const b2 = R.reorderBody(withDraft.writes);
+    assert.deepEqual(b2.drafts, [{ id: 'd1', number: 1 }]);
+    assert.equal(b2.episodes.length, 7);
+    // Not one season, another show, or no number to go back to: null.
+    assert.equal(R.reorderBody([{ id: 'a', season: 1, number: 2 }, { id: 'b', season: 2, number: 1 }]), null);
+    assert.equal(R.reorderBody([{ id: 'a', season: 1, number: 2, seriesId: 'other' }]), null);
+    assert.equal(R.reorderBody([{ id: 'a', season: 1, number: null }]), null);
+    assert.equal(R.reorderBody([]), null);
+    assert.equal(R.reorderBody(null), null);
+  });
+
+  tt('undoMoveSteps: a cross-season move undone as a /move back then a /reorder of the rows it pushed', () => {
+    const answer = [
+      { id: 'x', seriesId: 'nb', season: 2, number: 1, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 3 },
+      { id: 'y', seriesId: 'nb', season: 2, number: 2, fromSeriesId: 'nb', fromSeason: 2, fromNumber: 1 },
+      { id: 'z', seriesId: 'nb', season: 2, number: 3, fromSeriesId: 'nb', fromSeason: 2, fromNumber: 2 }
+    ];
+    assert.deepEqual(R.undoMoveSteps(answer, 'x'), [
+      { route: 'move', body: { episodeId: 'x', toSeason: 1, toNumber: 3 } },
+      { route: 'reorder', body: { season: 2, episodes: [{ id: 'y', number: 1 }, { id: 'z', number: 2 }], drafts: [] } }
+    ]);
+    // Only the moved row: one step.
+    assert.deepEqual(R.undoMoveSteps([answer[0]], 'x'), [{ route: 'move', body: { episodeId: 'x', toSeason: 1, toNumber: 3 } }]);
+    // It changed show, had no number, or isn't in the answer: null.
+    assert.equal(R.undoMoveSteps([{ ...answer[0], seriesId: 'harbor' }], 'x'), null);
+    assert.equal(R.undoMoveSteps([{ ...answer[0], fromNumber: null }], 'x'), null);
+    assert.equal(R.undoMoveSteps(answer, 'nope'), null);
+    // A pushed row that changed season can't go back with a reorder.
+    assert.equal(R.undoMoveSteps([answer[0], { ...answer[1], fromSeason: 3 }], 'x'), null);
+  });
+
+  tt('rowPill: a row\'s pill on the show page', () => {
+    const draft = { id: 'd', kind: 'draft', master: 'none' };
+    assert.deepEqual(R.rowPill(draft), { label: 'Draft', tone: 'neutral', key: 'draft' });
+    assert.equal(R.rowPill(draft, { upload: { status: 'queued' } }).label, 'Queued');
+    assert.equal(R.rowPill(draft, { upload: { status: 'uploading', pct: 41.4 } }).label, 'Uploading 41%');
+    assert.equal(R.rowPill(draft, { upload: { status: 'starting' } }).label, 'Uploading 0%');
+    assert.equal(R.rowPill(draft, { upload: { status: 'uploading', pct: 140 } }).label, 'Uploading 100%');
+    assert.equal(R.rowPill({ ...draft, master: 'processing' }).label, 'Processing');
+    assert.equal(R.rowPill({ ...draft, master: 'unknown' }).label, 'Processing');
+    assert.equal(R.rowPill({ ...draft, master: 'uploading' }, { upload: { status: 'uploaded' } }).label, 'Processing', 'just uploaded beats an older read');
+    assert.equal(R.rowPill({ ...draft, master: 'ready' }, { upload: { status: 'uploaded' } }).label, 'Draft');
+    assert.equal(R.rowPill({ ...draft, master: 'uploading' }).label, 'Draft', 'a stopped upload is still a draft');
+    assert.equal(R.rowPill({ id: 'd2', kind: 'draft', video: { uid: 'u', state: 'processing' } }).label, 'Processing', 'without a master the row is read');
+    const e = (extra) => ({ id: 'e', kind: 'episode', status: 'approved', ...extra });
+    assert.deepEqual(R.rowPill(e()), { label: 'Live', tone: 'ok', key: 'live' });
+    assert.equal(R.rowPill(e(), { showPublic: false }).label, 'Approved');
+    assert.equal(R.rowPill(e({ status: 'pending' })).label, 'In review');
+    assert.equal(R.rowPill(e({ status: 'rejected' })).tone, 'warn');
+    assert.equal(R.rowPill(e({ held: true })).label, 'Pulled');
+    assert.equal(R.rowPill(e({ deletionRequested: true, held: true })).label, 'Pending deletion');
+    assert.equal(R.rowPill(e({ withdrawnAt: '2026-10-01' })).label, 'Withdrawn');
+    assert.equal(R.rowPill(null), null);
+  });
+
+  tt('fileMatches: a re-picked file is the draft\'s own by name and size', () => {
+    const f = { name: 'night-bus-s02e04.mov', size: 1234 };
+    assert.equal(R.fileMatches(f, { video: { name: 'night-bus-s02e04.mov', bytes: 1234 } }), true);
+    assert.equal(R.fileMatches(f, { file: { name: 'night-bus-s02e04.mov', bytes: 1234 } }), true);
+    assert.equal(R.fileMatches(f, { video: { name: 'night-bus-s02e04.mov', bytes: 1235 } }), false);
+    assert.equal(R.fileMatches(f, { video: { name: 'other.mov', bytes: 1234 } }), false);
+    assert.equal(R.fileMatches(f, { video: null, file: null }), false);
+    assert.equal(R.fileMatches(null, { video: { name: 'x', bytes: 1 } }), false);
+    assert.equal(R.fileMatches({ name: '', size: 1 }, { video: { name: '', bytes: 1 } }), false);
   });
 }
 

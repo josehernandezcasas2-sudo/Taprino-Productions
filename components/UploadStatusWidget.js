@@ -14,7 +14,7 @@ function formatBytes(bytes) {
 }
 
 export default function UploadStatusWidget() {
-  const { activeUpload, dismissUpload, retryUpload } = useUpload();
+  const { activeUpload, dismissUpload, retryUpload, queueHost } = useUpload();
   const [, forceTick] = useState(0);
 
   // Re-renders once a second while uploading, purely so elapsed-time and
@@ -27,6 +27,10 @@ export default function UploadStatusWidget() {
   }, [activeUpload && activeUpload.status]);
 
   if (!activeUpload) return null;
+  // A show page's queue (the series revamp): the page draws its own rows
+  // while it is open, so the corner stays clear there.
+  const queued = activeUpload.queue || null;
+  if (queued && queueHost && queueHost === queued.showId) return null;
 
   const pct = activeUpload.fileSize ? Math.min(100, Math.round((activeUpload.bytesUploaded / activeUpload.fileSize) * 100)) : 0;
   const elapsedSec = Math.floor((Date.now() - activeUpload.startedAt) / 1000);
@@ -40,7 +44,7 @@ export default function UploadStatusWidget() {
 
   const label = {
     'requesting-url': isUrlImport ? 'Asking Cloudflare to fetch your link…' : 'Preparing upload…',
-    uploading: activeUpload.phase === 'trailer' ? 'Uploading trailer (2 of 2)…' : 'Uploading…',
+    uploading: queued && queued.total > 1 ? `Uploading ${queued.index} of ${queued.total}…` : activeUpload.phase === 'trailer' ? 'Uploading trailer (2 of 2)…' : 'Uploading…',
     importing: 'Importing from your link…',
     saving: 'Saving submission…',
     done: doneMessages.label || 'Submitted for review',
@@ -64,7 +68,7 @@ export default function UploadStatusWidget() {
       {activeUpload.status === 'error' && (
         <div className="upload-widget-icon upload-widget-icon-error" aria-hidden="true">✕</div>
       )}
-      <div className="upload-widget-filename">{activeUpload.fileName}</div>
+      <div className="upload-widget-filename">{queued && queued.showName ? `${queued.showName} · ` : ''}{activeUpload.fileName}</div>
 
       {activeUpload.status === 'uploading' && (
         <>

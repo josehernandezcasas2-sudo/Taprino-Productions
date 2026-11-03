@@ -1,6 +1,8 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { applyCors } from '../../../lib/cors';
+import { sendError } from '../../../lib/apiErrors';
+import { setEpisodeRemoval } from '../../../lib/showPage';
 
 // This never deletes a row — it only flags one for an admin to act on
 // (see pages/api/admin/resolve-deletion.js). Setting deletion_requested
@@ -50,15 +52,13 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'That episode does not belong to you.' });
   }
 
-  const dbUpdates = action === 'request'
-    ? { deletion_requested: true, deletion_reason: reason, deletion_requested_at: new Date().toISOString() }
-    : { deletion_requested: false, deletion_reason: null, deletion_requested_at: null };
-
-  const { error } = await supabase.from('episodes').update(dbUpdates).eq('id', episodeId);
-
-  if (error) {
-    console.error('request-episode-deletion error:', error.message);
-    return res.status(500).json({ error: 'Could not save your request.' });
+  // The write, the cache and the audit line are the episode editor's own
+  // (lib/showPage.js setEpisodeRemoval, POST /api/show/episode/[id]/removal);
+  // this route keeps its checks and its answers for Your work and the app.
+  try {
+    await setEpisodeRemoval(existing.id, { action, reason: String(reason || '') }, { userId, isAdmin }, { strict: false });
+  } catch (err) {
+    return sendError(res, err, 'creator/request-episode-deletion', 'Could not save your request.');
   }
 
   return res.status(200).json({ ok: true, episodeId, deletionRequested: action === 'request' });

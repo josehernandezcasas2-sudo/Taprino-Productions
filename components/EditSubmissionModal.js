@@ -1,21 +1,24 @@
 import { useState } from 'react';
 import { SITE } from '../lib/siteConfig';
+import { MAIN_GENRES, SUBMIT_TYPES } from '../lib/submitRules';
 import RatingOptions from './RatingOptions';
 
-const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
-const CONTENT_TYPES = [
-  { value: 'short', label: 'Short' },
-  { value: 'movie', label: 'Movie' },
-  { value: 'series', label: 'Series episode' },
-  { value: 'vertical', label: 'Vertical' },
-  { value: 'podcast', label: 'Podcast' },
-  { value: 'bonus', label: 'Bonus content' }
-];
+// A standalone title's own types: the ones that sit in no show.
+const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical'].includes(t.value));
 
-// Only rendered for a submission whose status is still 'pending' — the API
-// enforces that too, but the UI shouldn't even offer the option once
-// there's nothing left to edit.
-export default function EditSubmissionModal({ submission, allSeries, onClose, onSaved }) {
+// Only rendered for a standalone title (a film, a short, a Snippet) whose
+// status is still 'pending' — the API enforces that too, but the UI
+// shouldn't even offer the option once there's nothing left to edit.
+//
+// A show's episode is edited in the episode editor on its show page since
+// the series revamp (slice 2): its show, season and number — and the old
+// '__new__' "a new series not listed here", which left an episode in no
+// show at all — are gone from here. Nothing this modal sends touches a
+// title's show or place (/api/creator/edit-submission leaves fields it
+// isn't sent as they are). The genres are lib/submitRules.js's (this list
+// had no Drama, the submit page's default, so a Drama title showed as
+// Comedy here).
+export default function EditSubmissionModal({ submission, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: submission.title || '',
     description: submission.description || '',
@@ -26,13 +29,16 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
     rating: submission.rating || '',
     genre: submission.genre || '',
     mainGenre: submission.mainGenre || MAIN_GENRES[0],
-    tier: submission.tier || 'free',
-    seriesId: submission.seriesId || '',
-    season: submission.season ? String(submission.season) : '1',
-    seriesOrder: submission.seriesOrder ? String(submission.seriesOrder) : ''
+    tier: submission.tier || 'free'
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  // A title of another type (an older one, or an extra whose show isn't
+  // one of this creator's) keeps its type; the list only adds it.
+  const types = STANDALONE_TYPES.some((t) => t.value === form.contentType)
+    ? STANDALONE_TYPES
+    : [...STANDALONE_TYPES, SUBMIT_TYPES.find((t) => t.value === form.contentType) || { value: form.contentType, label: form.contentType }];
+  const genres = MAIN_GENRES.includes(form.mainGenre) ? MAIN_GENRES : [form.mainGenre, ...MAIN_GENRES];
 
   function update(field, value) {
     setForm((f) => ({ ...f, [field]: value }));
@@ -93,7 +99,7 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
 
           <label>Content type</label>
           <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
-            {CONTENT_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+            {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
           </select>
 
           <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
@@ -102,31 +108,9 @@ export default function EditSubmissionModal({ submission, allSeries, onClose, on
             <RatingOptions />
           </select>
 
-          {/* Podcasts group into a "show" exactly the way series episodes
-              group into a series (same series_id/season/series_order
-              columns) — CreatorSubmissionForm treats the two identically
-              for this reason. This used to only render for 'series', which
-              meant a podcast episode's show/season/episode-number were
-              being silently cleared on every edit with no field here to
-              even show it was happening. */}
-          {(form.contentType === 'series' || form.contentType === 'podcast') && (
-            <>
-              <label>{form.contentType === 'podcast' ? 'Show' : 'Series'}</label>
-              <select value={form.seriesId} onChange={(e) => update('seriesId', e.target.value)} required>
-                <option value="">Choose a {form.contentType === 'podcast' ? 'show' : 'series'}…</option>
-                {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-                <option value="__new__">A new {form.contentType === 'podcast' ? 'show' : 'series'} not listed here</option>
-              </select>
-              <label>Season</label>
-              <input type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} required />
-              <label>Episode number within season</label>
-              <input type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} required />
-            </>
-          )}
-
           <label>Main genre</label>
           <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
-            {MAIN_GENRES.map((g) => <option key={g} value={g}>{g}</option>)}
+            {genres.map((g) => <option key={g} value={g}>{g}</option>)}
           </select>
 
           <label>Specific genre</label>

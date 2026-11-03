@@ -80,6 +80,8 @@ export const NOTIFICATION_TYPES = Object.freeze({
   show_numbering_fixed: kind('Numbering fixed', 'clapperboard', 'show'),
   show_owner_changed: kind('Show owner changed', 'clapperboard', 'show'),
   show_new_episodes: kind('New episodes', 'heart', 'series'),
+  // Slice 2: "Send N for review" on the show page, one notice per batch.
+  show_sent_for_review: kind('Sent for review', 'clapperboard', 'show'),
 
   // Creator Share: payouts, holds, departures, the numbers changing
   // (lib/creatorShare.js, lib/creatorShareBatch.js, lib/creatorStanding.js,

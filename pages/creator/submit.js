@@ -12,10 +12,13 @@ import {
 import { readVideoMetadata, formatRuntime } from '../../lib/videoMetadata';
 import { parseAdBreaksInput } from '../../lib/adBreaks';
 import { bytesLabel, runtimeClock } from '../../lib/creatorRights';
+import { showPickerTag, nextFreeExcept, MAX_EPISODE_NUMBER } from '../../lib/showRules';
+import { isTitleId } from '../../lib/titleIds';
 import { useUpload } from '../../contexts/UploadContext';
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
+import { WarningIcon } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
 // Creator Studio's submit, three steps (2026-10-31, from the creator-path
@@ -25,6 +28,18 @@ import { SITE } from '../../lib/siteConfig';
 // as a draft as the creator goes (/api/creator/drafts), so the hub lists
 // it and this page reopens at the same step; the stopped upload resumes
 // when the same file is picked again. Replaces the six-button modal page.
+//
+// Step 2's Place block (the series revamp, slice 2; the SubmitPlace
+// board): where a series or podcast episode goes comes first — the show
+// (only shows of the type's kind, each with where it stands; one that
+// takes nothing new is greyed with the reason), the season as chips, the
+// number with "E4 · next free" from GET /api/show/[id]/positions and the
+// live line when another episode holds it ("E3 is taken by “Pilot” — Use
+// E4 | Swap"; Swap moves that episode to the next free number when the
+// title is sent, and back if sending fails). Going on is blocked while the
+// number is taken. ?series=&season=&number= fill all three in (the show
+// page's "+ Add episode"); a title sent into a show lands on the hub with
+// "Open the show page".
 export async function getServerSideProps({ req, res, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -36,21 +51,43 @@ export async function getServerSideProps({ req, res, query }) {
     getPublicEpisodes(),
     query.draft ? getDraft(account.userId, String(query.draft)) : Promise.resolve(null)
   ]);
-  const type = SUBMIT_TYPES.some((t) => t.value === query.type) ? query.type : null;
+  const seriesId = typeof query.series === 'string' && isTitleId(query.series) ? query.series : null;
+  const seriesRow = seriesId ? allSeries.find((s) => s.id === seriesId) : null;
+  // Opened from a show page without a type: the show's kind says which.
+  const type = SUBMIT_TYPES.some((t) => t.value === query.type) ? query.type : seriesId ? (seriesRow && seriesRow.kind === 'podcast' ? 'podcast' : 'series') : null;
   return {
     props: {
-      allSeries: allSeries.map((s) => ({ id: s.id, name: s.name, status: s.status || 'approved', hasArt: Boolean(s.poster || s.thumbnail) })),
+      // What the picker needs before GET /api/show answers (the words
+      // after each name, the kind, the art beside the chosen one).
+      allSeries: allSeries.map((s) => ({
+        id: s.id,
+        name: s.name ?? null,
+        status: s.status || 'approved',
+        kind: s.kind || null,
+        held: Boolean(s.held),
+        deletionRequested: Boolean(s.deletionRequested),
+        art: s.poster || s.thumbnail || null,
+        creatorId: s.creatorId || null
+      })),
       mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
       isSignedIn: account.isSignedIn,
       isSubscriber: account.isSubscriber,
       email: account.email,
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
+      viewerId: account.userId || null,
       draft,
       initialType: type,
-      initialSeriesId: typeof query.series === 'string' ? query.series : null
+      initialSeriesId: seriesId,
+      initialSeason: placeNumber(query.season),
+      initialNumber: placeNumber(query.number)
     }
   };
+}
+
+function placeNumber(v) {
+  const n = Number(v);
+  return typeof v === 'string' && Number.isInteger(n) && n > 0 && n <= MAX_EPISODE_NUMBER ? n : null;
 }
 
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.m4v,.mkv,.webm';
@@ -72,18 +109,34 @@ async function postJson(url, body, method = 'POST') {
   return data;
 }
 
-function initialForm(draft, initialType, initialSeriesId) {
+function initialForm(draft, initialType, initialSeriesId, initialSeason, initialNumber) {
   const base = { ...EMPTY_SUBMIT_FORM, ...(draft ? draft.form : {}) };
   if (!draft && initialType) base.contentType = initialType;
   if (!draft && initialSeriesId) base.seriesId = initialSeriesId;
+  if (!draft && initialSeriesId && initialSeason) base.season = String(initialSeason);
+  if (!draft && initialSeriesId && initialNumber) base.seriesOrder = String(initialNumber);
   if (!draft && initialType === 'bonus') base.cutArtwork = false;
   return base;
 }
 
-export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, draft, initialType, initialSeriesId }) {
+function bgImage(url) {
+  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+}
+
+// The show kinds a type files into; a kind unknown (a database before
+// migration 118 with no word from GET /api/show) is let through and the
+// server decides.
+function kindFits(kind, contentType) {
+  if (contentType === 'bonus') return kind !== 'vertical';
+  if (contentType === 'series') return !kind || kind === 'series';
+  if (contentType === 'podcast') return !kind || kind === 'podcast';
+  return false;
+}
+
+export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, draft, initialType, initialSeriesId, initialSeason, initialNumber }) {
   const router = useRouter();
   const { activeUpload, startVideoUpload } = useUpload();
-  const [form, setForm] = useState(() => initialForm(draft, initialType, initialSeriesId));
+  const [form, setForm] = useState(() => initialForm(draft, initialType, initialSeriesId, initialSeason, initialNumber));
   const [video, setVideo] = useState(draft ? draft.video : null);
   const [trailer, setTrailer] = useState(draft ? draft.trailer : null);
   const [draftId, setDraftId] = useState(draft ? draft.id : null);
@@ -133,6 +186,152 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
 
   // Keep the step in the draft, so it reopens where it was.
   useEffect(() => { update('step', step); }, [step]);
+
+  // --- the Place block (slice 2) -------------------------------------------
+  // The viewer's shows as GET /api/show sums them up (kind, where each
+  // stands, counts, season names, whether they run it); the team's list is
+  // every show. Until it answers, the picker reads the page's own list.
+  const [summaries, setSummaries] = useState(null);
+  useEffect(() => {
+    let alive = true;
+    fetch(isAdmin ? '/api/show?all=1' : '/api/show?mine=1')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (alive && d && Array.isArray(d.shows)) setSummaries(d.shows); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, [isAdmin]);
+
+  const pickerShows = useMemo(() => {
+    const byId = new Map();
+    for (const s of allSeries) byId.set(s.id, { id: s.id, name: s.name, kind: s.kind, art: s.art, series: s, summary: null });
+    for (const sh of summaries || []) {
+      const cur = byId.get(sh.id) || { id: sh.id, name: sh.name, kind: sh.kind, art: null, series: null, summary: null };
+      byId.set(sh.id, { ...cur, name: sh.name || cur.name, kind: sh.kind || cur.kind, art: cur.art || sh.poster || sh.thumbnail || null, summary: sh });
+    }
+    return [...byId.values()]
+      .map((x) => ({ ...x, ...showPickerTag(x.summary || x.series || {}) }))
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'en', { sensitivity: 'base' }));
+  }, [allSeries, summaries]);
+
+  const placeType = typeNeedsShow(form.contentType);
+  const numbered = typeIsNumbered(form.contentType);
+  const newMode = placeType && form.contentType !== 'bonus' && String(form.newSeriesName || '').length > 0;
+  const season = Math.max(1, Math.floor(Number(form.season)) || 1);
+  const typedNumber = Number(form.seriesOrder) > 0 && Number.isInteger(Number(form.seriesOrder)) ? Number(form.seriesOrder) : null;
+  const chosen = placeType && form.seriesId && !newMode ? pickerShows.find((s) => s.id === form.seriesId) || null : null;
+  const placeOn = numbered && Boolean(form.seriesId) && !newMode && isTitleId(String(form.seriesId));
+
+  // The season's numbers (GET /api/show/[id]/positions): who holds which,
+  // and with a typed number whether another episode keeps it. Asked a
+  // moment after the show, season or number stops changing.
+  const [autoNumber, setAutoNumber] = useState(() => !String(initialForm(draft, initialType, initialSeriesId, initialSeason, initialNumber).seriesOrder || '').trim());
+  const [swap, setSwap] = useState(null); // { showId, season, number, holderId, holderTitle }
+  const [pos, setPos] = useState({ show: null, data: null, error: null });
+  const [posTick, setPosTick] = useState(0);
+  useEffect(() => {
+    if (!placeOn) {
+      setPos({ show: null, data: null, error: null });
+      return undefined;
+    }
+    let alive = true;
+    const showId = String(form.seriesId);
+    const t = setTimeout(async () => {
+      const q = new URLSearchParams({ season: String(season) });
+      if (typedNumber && typedNumber <= MAX_EPISODE_NUMBER) q.set('number', String(typedNumber));
+      if (draftId) q.set('exclude', draftId);
+      try {
+        const res = await fetch(`/api/show/${encodeURIComponent(showId)}/positions?${q}`);
+        const data = await res.json().catch(() => ({}));
+        if (!alive) return;
+        setPos(res.ok ? { show: showId, data, error: null } : { show: showId, data: null, error: data.error || 'Could not read the numbers.' });
+      } catch {
+        if (alive) setPos({ show: showId, data: null, error: 'Could not read the numbers.' });
+      }
+    }, 300);
+    return () => { alive = false; clearTimeout(t); };
+  }, [placeOn, form.seriesId, season, typedNumber, draftId, posTick]);
+
+  const posData = placeOn && pos.show === String(form.seriesId) && pos.data && pos.data.season === season ? pos.data : null;
+  const nextFree = posData ? nextFreeExcept(posData, draftId) : newMode ? 1 : null;
+  const check = posData && posData.check && posData.check.number === typedNumber ? posData.check : null;
+  const taken = Boolean(check && check.episodeFree === false);
+  const swapOn = Boolean(swap && taken && swap.showId === form.seriesId && swap.season === season && swap.number === typedNumber && check.holder && check.holder.id === swap.holderId);
+  // Swapping moves another episode of the show: its owner (or the team) only.
+  const canSwap = Boolean(chosen && (chosen.summary ? chosen.summary.canEdit : (isAdmin || (chosen.series && chosen.series.creatorId && chosen.series.creatorId === viewerId))));
+
+  // The number follows the show and the season until it's typed.
+  useEffect(() => {
+    if (!autoNumber) return;
+    if (placeOn && posData) {
+      const n = String(nextFreeExcept(posData, draftId));
+      if (String(form.seriesOrder || '') !== n) update('seriesOrder', n);
+    } else if (newMode && numbered && !String(form.seriesOrder || '').trim()) {
+      update('seriesOrder', '1');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoNumber, placeOn, posData, draftId, newMode, numbered]);
+
+  // Why the chosen show takes nothing (a kind it doesn't take, declined,
+  // pulled, leaving), or why the number can't be used.
+  let showProblem = null;
+  if (placeType && form.seriesId && !newMode) {
+    if (!chosen) showProblem = summaries ? `That ${showNoun(form.contentType)} isn’t one of yours — pick another.` : null;
+    else if (!kindFits(chosen.kind, form.contentType)) showProblem = chosen.kind === 'podcast' ? 'That show is a podcast: a series episode goes into a series.' : chosen.kind === 'vertical' ? 'Vertical series are set up by the studio.' : 'That show is a series: a podcast episode goes into a podcast.';
+    else if (!chosen.ok) showProblem = `${(chosen.summary && chosen.summary.pickReason) || 'That show takes nothing new'} — pick another.`;
+  }
+  const placeBlocker = showProblem ? `Pick another ${form.contentType === 'series' ? 'series' : 'show'} to go on.` : taken && !swapOn ? 'Pick a free number to go on.' : null;
+
+  function pickShow(value) {
+    setSwap(null);
+    if (value === '__new__') {
+      setForm((f) => ({ ...f, seriesId: '', newSeriesName: f.newSeriesName || ' ', season: '1', seriesOrder: '' }));
+      setAutoNumber(true);
+      return;
+    }
+    const sh = pickerShows.find((s) => s.id === value);
+    const seasons = sh && sh.summary && Array.isArray(sh.summary.seasons) ? sh.summary.seasons.map((x) => Number(x.number)).filter((n) => n > 0) : [];
+    // A new episode goes at the end of the show's latest season.
+    const last = seasons.length ? Math.max(...seasons) : 1;
+    setForm((f) => ({ ...f, seriesId: value, newSeriesName: '', newSeriesDescription: '', season: String(last), seriesOrder: '' }));
+    setAutoNumber(true);
+  }
+
+  function pickSeason(n) {
+    setSwap(null);
+    setForm((f) => ({ ...f, season: String(n), seriesOrder: '' }));
+    setAutoNumber(true);
+  }
+
+  function typeNumber(value) {
+    setSwap(null);
+    setAutoNumber(false);
+    update('seriesOrder', value);
+  }
+
+  function takeNumber(n) {
+    setSwap(null);
+    setAutoNumber(true);
+    update('seriesOrder', String(n));
+  }
+
+  // Swap, when the title is sent: the episode holding the number moves to
+  // the next free one first (POST /api/show/[id]/move, the show owner's or
+  // the team's), with fresh numbers so nothing moves on a stale view. The
+  // move to undo it when sending fails, or null when nothing had to move.
+  async function runSwap() {
+    const showId = String(form.seriesId);
+    const q = new URLSearchParams({ season: String(season), number: String(typedNumber) });
+    if (draftId) q.set('exclude', draftId);
+    const res = await fetch(`/api/show/${encodeURIComponent(showId)}/positions?${q}`);
+    const fresh = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(fresh.error || 'Could not read the numbers.');
+    const c = fresh.check;
+    if (!c || c.episodeFree) return null;
+    if (!c.holder || c.holder.id !== swap.holderId) throw new Error(`E${typedNumber} changed hands a moment ago — pick the number again.`);
+    const to = nextFreeExcept(fresh, draftId);
+    await postJson(`/api/show/${encodeURIComponent(showId)}/move`, { episodeId: swap.holderId, toSeason: season, toNumber: to });
+    return { showId, episodeId: swap.holderId, season, from: typedNumber };
+  }
 
   // The runtime field follows what the file said, until typed over.
   useEffect(() => {
@@ -239,7 +438,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
   }
 
   function next() {
-    const why = stepBlocker(step, form, media);
+    const why = stepBlocker(step, form, media) || (step === 2 ? placeBlocker : null);
     if (why) { setError(why); return; }
     setError(null);
     setStep((s) => Math.min(3, s + 1));
@@ -248,11 +447,25 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
 
   async function submit() {
     for (const s of [1, 2]) {
-      const why = stepBlocker(s, form, media);
+      const why = stepBlocker(s, form, media) || (s === 2 ? placeBlocker : null);
       if (why) { setError(why); setStep(s); return; }
     }
     setSubmitting(true);
     setError(null);
+    // Swap first: the episode on the number moves out of the way.
+    let swapped = null;
+    if (swapOn) {
+      try {
+        swapped = await runSwap();
+      } catch (err) {
+        setSwap(null);
+        setPosTick((n) => n + 1);
+        setError(err.message);
+        setSubmitting(false);
+        setStep(2);
+        return;
+      }
+    }
     try {
       const [posterBase64, thumbnailBase64, captionsBase64] = await Promise.all([readAsDataUrl(form.cutArtwork ? null : posterFile), readAsDataUrl(form.cutArtwork ? null : stillFile), readAsDataUrl(captionsFile)]);
       const body = toSubmitBody(form, media, {
@@ -265,12 +478,43 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
       const data = await postJson('/api/creator/submit-episode', body);
       if (saveTimer.current) clearTimeout(saveTimer.current);
       latest.current = { form: EMPTY_SUBMIT_FORM, video: null, trailer: null, draftId: null };
-      router.push(`/creator?submitted=${encodeURIComponent(form.title.trim())}&id=${encodeURIComponent(data.id)}`);
+      const showId = data.seriesId || (data.newShow && data.newShow.id) || null;
+      router.push(`/creator?submitted=${encodeURIComponent(form.title.trim())}&id=${encodeURIComponent(data.id)}${showId ? `&show=${encodeURIComponent(showId)}` : ''}`);
     } catch (err) {
+      // Sending failed after the swap: the episode goes back to its number.
+      if (swapped) {
+        await postJson(`/api/show/${encodeURIComponent(swapped.showId)}/move`, { episodeId: swapped.episodeId, toSeason: swapped.season, toNumber: swapped.from }).catch(() => {});
+        setSwap(null);
+      }
+      // A number taken meanwhile: back to step 2, where the line says so.
+      if (err.data && err.data.code === 'taken') {
+        setPosTick((n) => n + 1);
+        setStep(2);
+      }
       setError(err.message);
       setSubmitting(false);
     }
   }
+
+  // What the Place block draws.
+  const choices = pickerShows.filter((s) => kindFits(s.kind, form.contentType) || s.id === form.seriesId);
+  const chosenTag = chosen && chosen.tag ? chosen.tag.replace(/^\(|\)$/g, '') : null;
+  const chosenLine = chosen
+    ? (chosen.summary
+      ? [chosen.summary.statusLabel, chosen.summary.countLine].filter(Boolean).join(' · ')
+      : chosenTag ? `${chosenTag.charAt(0).toUpperCase()}${chosenTag.slice(1)}` : 'Live')
+    : null;
+  const holderTitle = check && check.holder && check.holder.title ? check.holder.title : 'another episode';
+  const seasonSource = (posData && posData.seasons) || (chosen && chosen.summary && chosen.summary.seasons) || [];
+  const knownSeasons = seasonSource.map((x) => Number(x.number)).filter((n) => n > 0);
+  const seasonChips = [...new Set([...(knownSeasons.length ? knownSeasons : [1]), season])].sort((a, b) => a - b).map((n) => {
+    const entry = seasonSource.find((x) => Number(x.number) === n);
+    const name = entry && entry.label ? String(entry.label).replace(/^Season\s+\d+\s*·\s*/, '') : '';
+    if (knownSeasons.length > 0 && !knownSeasons.includes(n)) return { n, text: `${n} · new` };
+    return { n, text: name && name !== `Season ${n}` ? `${n} · ${name}` : String(n) };
+  });
+  const nextSeason = Math.max(...seasonChips.map((c) => c.n)) + 1;
+  const fromShowPage = Boolean(!draft && initialSeriesId && form.seriesId === initialSeriesId);
 
   const stepInfo = STEPS[step - 1];
   const fileLine = video
@@ -368,8 +612,105 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
 
         {step === 2 && (
           <section className="sub-step">
+            {placeType && <div className="apl-eyebrow">{type.label}</div>}
             <h1 className="sub-h1">{stepInfo.title}</h1>
-            <p className="sub-lede">What viewers read on the page. Short is fine.</p>
+            <p className="sub-lede">{placeType ? 'Where it goes first, then what viewers read. Short is fine.' : 'What viewers read on the page. Short is fine.'}</p>
+
+            {placeType && (
+              <div className="apl-card sub-place" role="group" aria-label="Where it goes">
+                <div className="apl-field">
+                  <label className="apl-label" htmlFor="sub-show">{form.contentType === 'bonus' ? 'Which show is it for' : `The ${showNoun(form.contentType)}`}</label>
+                  <select id="sub-show" value={newMode ? '__new__' : (form.seriesId || '')} onChange={(e) => pickShow(e.target.value)}>
+                    <option value="">Choose…</option>
+                    {choices.map((s) => (
+                      <option key={s.id} value={s.id} disabled={!s.ok && s.id !== form.seriesId}>{s.name || 'Untitled show'}{s.tag ? ` ${s.tag}` : ''}</option>
+                    ))}
+                    {form.contentType !== 'bonus' && <option value="__new__">+ New {showNoun(form.contentType)}</option>}
+                  </select>
+                  {chosen && (
+                    <div className="sub-place-show">
+                      <span className="sub-place-art" style={bgImage(chosen.art)} aria-hidden="true" />
+                      <span>{chosenLine}</span>
+                    </div>
+                  )}
+                  {!chosen && !newMode && choices.length === 0 && summaries && (
+                    <p className="apl-help">{form.contentType === 'bonus' ? 'An extra goes with one of your shows — you have none yet.' : `No ${showNoun(form.contentType)} of yours yet: “+ New ${showNoun(form.contentType)}” starts one with this episode.`}</p>
+                  )}
+                  {showProblem && <p className="sub-place-warn" role="alert">{showProblem}</p>}
+                  {newMode && (
+                    <div className="sub-newshow">
+                      <div className="apl-field">
+                        <label className="apl-label" htmlFor="sub-newname">New {showNoun(form.contentType)} name</label>
+                        <input id="sub-newname" type="text" value={form.newSeriesName.trimStart()} onChange={(e) => update('newSeriesName', e.target.value || ' ')} maxLength={120} placeholder="The show this episode belongs to" />
+                      </div>
+                      <div className="apl-field">
+                        <label className="apl-label" htmlFor="sub-newdesc">About the {showNoun(form.contentType)} <em>optional</em></label>
+                        <textarea id="sub-newdesc" rows={2} value={form.newSeriesDescription} onChange={(e) => update('newSeriesDescription', e.target.value)} maxLength={2000} />
+                      </div>
+                      <p className="apl-help">The {showNoun(form.contentType)} is created with this episode and stays private until you make it public. Its own poster and trailer come later, on its show page.</p>
+                    </div>
+                  )}
+                </div>
+                {numbered && (
+                  <>
+                    <div className="apl-field">
+                      <div className="apl-label" id="sub-season-label">Season</div>
+                      <div className="sub-seasons" role="radiogroup" aria-labelledby="sub-season-label">
+                        {seasonChips.map((c) => (
+                          <button key={c.n} type="button" role="radio" aria-checked={c.n === season} className={`apl-pill${c.n === season ? ' on' : ''}`} onClick={() => pickSeason(c.n)}>{c.text}</button>
+                        ))}
+                        <button type="button" role="radio" aria-checked={false} className="apl-pill sub-season-new" onClick={() => pickSeason(nextSeason)}>+ {nextSeason} · new</button>
+                      </div>
+                    </div>
+                    <div className="apl-field">
+                      <label className="apl-label" htmlFor="sub-order">Episode number</label>
+                      <div className="sub-number-row">
+                        <span className={`sub-number${taken && !swapOn ? ' is-taken' : ''}`}>
+                          <span aria-hidden="true">E</span>
+                          <input id="sub-order" type="number" min="1" max={MAX_EPISODE_NUMBER} inputMode="numeric" value={form.seriesOrder} onChange={(e) => typeNumber(e.target.value)} aria-invalid={taken && !swapOn ? true : undefined} aria-describedby={taken ? 'sub-conflict' : undefined} />
+                        </span>
+                        {nextFree && (
+                          <button type="button" className={`sub-next-free${typedNumber === nextFree ? ' on' : ''}`} aria-label={`Use E${nextFree}, the next free number`} onClick={() => takeNumber(nextFree)}>
+                            E{nextFree} · <span>next free</span>
+                          </button>
+                        )}
+                      </div>
+                      {taken && !swapOn && (
+                        <div id="sub-conflict" className="sub-conflict" role="alert">
+                          <span className="sub-conflict-line">
+                            <WarningIcon size={15} />
+                            <span><b>E{typedNumber}</b> is taken by <b>{holderTitle}</b></span>
+                          </span>
+                          <span className="sub-conflict-acts">
+                            {nextFree && <button type="button" className="apl-btn sub-conflict-use" onClick={() => takeNumber(nextFree)}>Use E{nextFree}</button>}
+                            {canSwap && nextFree && (
+                              <button type="button" className="apl-btn-secondary sub-conflict-swap" onClick={() => setSwap({ showId: form.seriesId, season, number: typedNumber, holderId: check.holder.id, holderTitle: check.holder.title || null })}>
+                                <SwapGlyph /> Swap
+                              </button>
+                            )}
+                          </span>
+                          {canSwap && nextFree && <span className="sub-conflict-note">Swap moves {holderTitle} to E{nextFree}.</span>}
+                        </div>
+                      )}
+                      {swapOn && (
+                        <div id="sub-conflict" className="sub-conflict is-swap" role="status">
+                          <span className="sub-conflict-line"><SwapGlyph /><span>{holderTitle} moves to E{nextFree} when you send this one, and this one takes E{typedNumber}.</span></span>
+                          <span className="sub-conflict-acts"><button type="button" className="apl-link" onClick={() => setSwap(null)}>Keep {holderTitle} where it is</button></span>
+                        </div>
+                      )}
+                      {!taken && check && check.code === 'draft' && (
+                        <p className="apl-help sub-place-soft">{check.words} — that one will need another number before it’s sent.</p>
+                      )}
+                      {placeOn && pos.error && <p className="apl-help">{pos.error}</p>}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+            {placeType && fromShowPage && (
+              <p className="apl-help sub-place-note">Opened from the show page, so the {showNoun(form.contentType)}, season and number came filled in.</p>
+            )}
+
             <div className="apl-field">
               <label className="apl-label" htmlFor="sub-title">Title</label>
               <input id="sub-title" type="text" value={form.title} onChange={(e) => update('title', e.target.value)} maxLength={300} />
@@ -382,45 +723,6 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
               <label className="apl-label" htmlFor="sub-artist">Your name, as credited</label>
               <input id="sub-artist" type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} maxLength={200} />
             </div>
-
-            {typeNeedsShow(form.contentType) && (
-              <div className="apl-field">
-                <label className="apl-label" htmlFor="sub-show">{form.contentType === 'bonus' ? 'Which show is it for' : `The ${showNoun(form.contentType)}`}</label>
-                <select id="sub-show" value={String(form.newSeriesName || '').trim() ? '__new__' : form.seriesId} onChange={(e) => {
-                  if (e.target.value === '__new__') setForm((f) => ({ ...f, seriesId: '', newSeriesName: f.newSeriesName || ' ' }));
-                  else setForm((f) => ({ ...f, seriesId: e.target.value, newSeriesName: '', newSeriesDescription: '' }));
-                }}>
-                  <option value="">Choose…</option>
-                  {allSeries.map((s) => <option key={s.id} value={s.id}>{s.name}{s.status === 'pending' ? ' (in review)' : ''}</option>)}
-                  {form.contentType !== 'bonus' && <option value="__new__">+ New {showNoun(form.contentType)}</option>}
-                </select>
-                {String(form.newSeriesName || '').length > 0 && form.contentType !== 'bonus' && (
-                  <div className="sub-newshow">
-                    <div className="apl-field">
-                      <label className="apl-label" htmlFor="sub-newname">New {showNoun(form.contentType)} name</label>
-                      <input id="sub-newname" type="text" value={form.newSeriesName.trimStart()} onChange={(e) => update('newSeriesName', e.target.value || ' ')} maxLength={120} placeholder="The show this episode belongs to" />
-                    </div>
-                    <div className="apl-field">
-                      <label className="apl-label" htmlFor="sub-newdesc">About the {showNoun(form.contentType)} <em>optional</em></label>
-                      <textarea id="sub-newdesc" rows={2} value={form.newSeriesDescription} onChange={(e) => update('newSeriesDescription', e.target.value)} maxLength={2000} />
-                    </div>
-                    <p className="apl-help">The {showNoun(form.contentType)} is created with this episode. Its own poster and trailer come later, from Series management.</p>
-                  </div>
-                )}
-              </div>
-            )}
-            {typeIsNumbered(form.contentType) && (
-              <div className="apl-grid2">
-                <div className="apl-field">
-                  <label className="apl-label" htmlFor="sub-season">Season</label>
-                  <input id="sub-season" type="number" min="1" value={form.season} onChange={(e) => update('season', e.target.value)} />
-                </div>
-                <div className="apl-field">
-                  <label className="apl-label" htmlFor="sub-order">Episode number</label>
-                  <input id="sub-order" type="number" min="1" value={form.seriesOrder} onChange={(e) => update('seriesOrder', e.target.value)} />
-                </div>
-              </div>
-            )}
             <div className="apl-grid2">
               <div className="apl-field">
                 <label className="apl-label" htmlFor="sub-genre">Genre</label>
@@ -537,8 +839,11 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
         {error && <p className="admin-error" role="alert">{error}</p>}
 
         <div className="sub-foot">
+          {step === 2 && placeBlocker && (
+            <p className="sub-blocked" id="sub-next-blocked"><WarningIcon size={14} /> {placeBlocker}</p>
+          )}
           {step < 3 ? (
-            <button type="button" className="apl-btn" onClick={next}>{step === 1 ? 'Next: about it' : 'Next: artwork'}</button>
+            <button type="button" className="apl-btn" onClick={next} disabled={step === 2 && Boolean(placeBlocker)} aria-describedby={step === 2 && placeBlocker ? 'sub-next-blocked' : undefined}>{step === 1 ? 'Next: about it' : 'Next: artwork'}</button>
           ) : (
             <button type="button" className="apl-btn" onClick={submit} disabled={submitting}>{submitting ? 'Sending…' : 'Submit for review'}</button>
           )}
@@ -592,5 +897,17 @@ function MediaProgress({ name, bytes, state, upload, facts, onRemove, onResume }
         <button type="button" className="apl-link" onClick={onRemove}>Not this file</button>
       </div>
     </div>
+  );
+}
+
+// Two arrows passing each other: the Place block's Swap.
+function SwapGlyph() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M7 4L3 8l4 4" />
+      <path d="M3 8h14" />
+      <path d="M17 20l4-4-4-4" />
+      <path d="M21 16H7" />
+    </svg>
   );
 }

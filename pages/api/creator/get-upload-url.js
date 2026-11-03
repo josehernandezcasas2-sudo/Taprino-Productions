@@ -1,6 +1,8 @@
 import { getRoleContext } from '../../../lib/roles';
 import { createCloudflareTusUploadUrl, createCloudflareBasicUploadUrl } from '../../../lib/cloudflareUpload';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
+import { creatorOwnsSeries } from '../../../lib/series';
+import { isTitleId } from '../../../lib/titleIds';
 
 // Sanity ceiling only — not a real technical limit like the old 200MB one.
 // TUS itself has no meaningful size cap; this just guards against someone
@@ -24,9 +26,18 @@ export default async function handler(req, res) {
   // Rate limited per creator AND per IP — a compromised or careless
   // creator account shouldn't be able to spam upload-URL requests either
   // (each link reserves a Cloudflare upload; the per-account key was
-  // missing until 2026-10-28, the comment said otherwise).
-  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-upload-url'), 20, 3600)
-    && await checkRateLimit(`creator-upload-url:${userId}`, 20, 3600);
+  // missing until 2026-10-28, the comment said otherwise). 20 an hour; 60
+  // when the link is for one of the caller's own shows ("+ Add several",
+  // up to 30 files a drop, minted one at a time as each file's turn comes:
+  // amendment 1 of the series revamp) or the caller is an admin. The show
+  // comes in the body or the query string (UploadContext.startVideoUpload
+  // posts its own body, so the show page names it in urlEndpoint:
+  // /api/creator/get-upload-url?seriesId=<id>).
+  const seriesId = (req.body && req.body.seriesId) || (req.query && req.query.seriesId);
+  const forOwnShow = typeof seriesId === 'string' && isTitleId(seriesId) && await creatorOwnsSeries(userId, seriesId, { isAdmin });
+  const perHour = isAdmin || forOwnShow ? 60 : 20;
+  const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'creator-upload-url'), perHour, 3600)
+    && await checkRateLimit(`creator-upload-url:${userId}`, perHour, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many upload requests — please wait a bit and try again.' });
   }

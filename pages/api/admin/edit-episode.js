@@ -14,6 +14,7 @@ import { updateCompat } from '../../../lib/dbCompat';
 import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, slotCheck, slotTakenBody } from '../../../lib/showRules';
+import { syncNumberTitles } from '../../../lib/numberTitles';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -448,6 +449,8 @@ async function editEpisode(req, res, roleContext) {
     showRow = data || null;
   }
   const kindTaken = numbered ? await adoptShowKind(supabase, showRow, existing.id, type) : null;
+  // A title that is only its number follows a new number (lib/numberTitles.js).
+  if (placeChanged || 'title' in changed) await syncNumberTitles([existing.id]);
 
   // Every Cloudflare video the site plays demands a signed link: a new
   // video, a tier decided, and an approval — which covers the trailers
