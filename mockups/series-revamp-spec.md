@@ -68,6 +68,10 @@ The numbers are the canvas's Decisions board. Jose answered 2, 10, 11 and 13 (20
 
 ## Still open
 
+**Nothing, as of 2026-11-04.** Jose answered 22–24 below and a fourth question asked in chat on 2026-11-03
+(25: does a change to a live episode's title image or trailer wait for approval?): 22 yes, 23 everyone, 24 yes,
+25 yes. What each changes is under "Jose's answers (2026-11-04)". The questions stay below as they were asked.
+
 Answered by Jose on 2026-11-02: 19 (paid only; the owner chooses who gets the earnings; everyone on a show sees
 who runs it and who is paid), 20 (Made by the original creator on top, an optional Studio and Producer, the
 order optional), 21 (a whole-series sale goes to the show's owner, the original creator). Details in the
@@ -354,6 +358,31 @@ original creator. Let's start building and let's see what other things you need 
   approved episode stays public (`public_at` = its earliest episode release); an approved show with no approved
   episode becomes private (`status = 'pending'`), one notice per show; a pending show with approved episodes
   stays private and reads "Ready to go public". Nothing anyone can watch appears or disappears.
+
+### Jose's answers (2026-11-04) and what they change
+
+Jose: "22. yes, 23. everyone sees who runs the show and who gets paid. 24. yes. 25. yes, the change should wait
+for approval."
+
+- **22 — the chosen account accepts first.** Built as written under 19: choosing someone sends a `payee_invites`
+  row (notification, email, a "Get paid for Night Bus?" card in Creator Studio, web and app); until they
+  accept, the earnings keep going where they went; accepting opens a `title_payees` row from that moment.
+  Declining or the owner cancelling leaves everything as it was. Slice 3 builds the picker and the invite
+  (owner and admin); slice 6 points the money lanes at `payeeOf`.
+- **23 — "everyone sees who runs the show and who gets paid."** Read as the recommended answer: everyone
+  working on the show (the owner, the paid account(s), every uploader with an episode in it) and the team see
+  the "Runs it · Paid to" line on the show page and in the editors; viewers see only the credits (decision 20).
+  `seesWhoIsPaid` in lib/showRules.js already says this. *To confirm with Jose:* if "everyone" meant the
+  public too, the series page would add a "Paid to" line — a change to one rule and one component.
+- **24 — a whole-series sale follows the show's paid account** (`seriesSalePayee` = `series.paid_to ??
+  series.creator_id`): the original creator unless the owner chose someone else for the show's earnings, as
+  recommended.
+- **25 — on a live episode, a new title image or trailer waits for approval**, like the title, the poster, the
+  still and a new file already do (FIELD_POLICY's 'staged'). Slice 2 refused those two with their own line
+  because an episode had nowhere to keep the waiting value (a show already has: `series.pending_title_image_url`,
+  `pending_title_image_removal`, `pending_trailer_src`); **migration 119** (slice 3) adds the same three
+  columns to `episodes`, the review queue shows them beside the live ones like the other staged changes, and
+  the episode editors (web + app) stop refusing. The admin's decision applies or drops them; a dropped trailer file goes to the orphan queue.
 
 ## The spec
 
