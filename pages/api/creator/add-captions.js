@@ -32,6 +32,17 @@ async function discardOldTrack(existing, reason) {
 // homepage — a caption track only becomes visible to someone who has already
 // chosen to turn captions on, and a wrong or missing one is an accessibility
 // problem worth fixing in seconds rather than in a review cycle.
+// A new track (or none) answers the "captions may be out of date" flag a
+// replaced video sets (migration 118's captions_stale_at), so it clears
+// here; a database without that column saves the track all the same.
+async function updateCaptions(supabase, episodeId, patch) {
+  let res = await supabase.from('episodes').update({ ...patch, captions_stale_at: null }).eq('id', episodeId);
+  if (res.error && /captions_stale_at/.test(res.error.message || '')) {
+    res = await supabase.from('episodes').update(patch).eq('id', episodeId);
+  }
+  return res;
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -70,10 +81,7 @@ export default async function handler(req, res) {
   // Removing captions.
   if (remove) {
     await discardOldTrack(existing, `Caption track removed from "${existing.title}"`);
-    const { error: updateError } = await supabase
-      .from('episodes')
-      .update({ captions_url: null })
-      .eq('id', episodeId);
+    const { error: updateError } = await updateCaptions(supabase, episodeId, { captions_url: null });
     if (updateError) {
       return sendError(res, updateError, 'creator/add-captions', 'Could not remove the captions.');
     }
@@ -99,14 +107,11 @@ export default async function handler(req, res) {
 
   await discardOldTrack(existing, `Replaced caption track for "${existing.title}"`);
 
-  const { error: updateError } = await supabase
-    .from('episodes')
-    .update({
-      captions_url: uploaded.url,
-      captions_language: (language || 'en').slice(0, 12),
-      captions_label: (label || 'English').slice(0, 60)
-    })
-    .eq('id', episodeId);
+  const { error: updateError } = await updateCaptions(supabase, episodeId, {
+    captions_url: uploaded.url,
+    captions_language: (language || 'en').slice(0, 12),
+    captions_label: (label || 'English').slice(0, 60)
+  });
 
   if (updateError) {
     return sendError(res, updateError, 'creator/add-captions', 'Could not save the captions.');

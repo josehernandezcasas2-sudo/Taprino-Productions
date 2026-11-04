@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { listTipsForAdmin, refundTip, adminHideTipNote, adminDismissTipReports } from '../../../lib/tips';
 import { blockTipperFromTip } from '../../../lib/suspensions';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 
 // /admin/tips: recent tips, reported notes, refunds. Full admins only —
 // refunds move real money. POST { action: 'refund', tipId, reason } |
@@ -42,7 +43,8 @@ export default async function handler(req, res) {
     }
     return res.status(400).json({ error: 'Unknown action.' });
   } catch (err) {
-    console.error('admin/tips error:', err.message);
-    return res.status(400).json({ error: err.message || 'Something went wrong.' });
+    // A validation line reaches the admin; a database or Stripe error is
+    // logged and answered plainly (it named tables and columns before).
+    return sendError(res, err, 'admin/tips', 'Something went wrong.', { plainStatus: 400 });
   }
 }

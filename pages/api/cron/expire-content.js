@@ -87,7 +87,9 @@ export default async function handler(req, res) {
 
   if (flagged.length > 0) {
     await recordAudit({
-      adminId,
+      // audit_log.admin_id is not null: the scheduled run signs as 'cron'
+      // (as creator-payouts does), or Postgres refused the line every night.
+      adminId: adminId || 'cron',
       adminEmail: adminEmail || 'cron (scheduled)',
       action: 'auto_flag_expired_content',
       targetType: 'lifecycle',
