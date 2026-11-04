@@ -29,6 +29,9 @@ export default async function handler(req, res) {
         await mergeProgress(userId, body.merge);
       } else {
         if (!body.lessonId || typeof body.lessonId !== 'string') return res.status(400).json({ error: 'lessonId is required.' });
+        // uni_lessons.id is a uuid: anything else would make Postgres
+        // refuse the cast and answer a 500.
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(body.lessonId)) return res.status(400).json({ error: 'That lesson isn’t here.' });
         await setProgress(userId, body.lessonId, body.done !== false);
       }
     }

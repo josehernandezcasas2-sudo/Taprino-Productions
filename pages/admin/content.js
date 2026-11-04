@@ -16,6 +16,37 @@ const STATUS_LABEL = { approved: 'Published', pending: 'In review', rejected: 'R
 const TIER_LABEL = { red: 'Red', yellow: 'Yellow', minor: 'Minor' };
 const RANK = { red: 0, flag: 1, yellow: 2, minor: 3 };
 
+// Places, crew calls, productions and profiles (`connect` from the API,
+// lib/contentAdmin.js listReportedConnectContent) are decided through the
+// same decide() as titles (lib/moderation.js); the words say what each
+// choice really does to that kind of thing. A tip note's reports stay on
+// /admin/tips.
+const CONNECT_WORDS = {
+  location: { hidden: 'hidden from Locations', takeDown: 'Take the place down…', confirm: 'Take it down', why: 'Why it’s coming down (the host sees this)' },
+  call: { hidden: 'hidden from the board', takeDown: 'Remove the call…', confirm: 'Remove it', why: 'Why it’s coming off the board (the poster sees this)' },
+  production: { hidden: 'hidden from Productions', takeDown: 'Remove the production…', confirm: 'Remove it', why: 'Why it’s being removed (the owner sees this)' },
+  profile: { hidden: 'the profile stays up', takeDown: 'Uphold the reports…', confirm: 'Uphold the reports', why: 'What they’re told (the profile stays up; nothing else changes)' }
+};
+// Already removed (or a place not approved): Restore wouldn't bring it
+// back, so the reports are upheld or ignored.
+const GONE_WORDS = { takeDown: 'Uphold the reports…', confirm: 'Uphold the reports', why: 'Why (the owner is told; it stays down)' };
+
+function decisionWords(row) {
+  if (!row.connect) return { restore: row.held ? 'Restore' : 'Looks fine, clear', takeDown: 'Take down…', confirm: 'Take it down', why: 'Why it’s coming down (the owner sees this)' };
+  const words = row.gone ? GONE_WORDS : CONNECT_WORDS[row.type] || GONE_WORDS;
+  return { ...words, restore: row.gone ? null : row.type === 'profile' ? 'Looks fine, dismiss reports' : row.held ? 'Restore' : 'Looks fine, clear' };
+}
+
+function connectState(row) {
+  if (row.gone) return `${row.statusLabel} · not public`;
+  if (row.type === 'profile') return CONNECT_WORDS.profile.hidden;
+  if (row.held) return CONNECT_WORDS[row.type].hidden;
+  // Only a listed place is public: a paused one or one in review isn't up.
+  return row.type === 'location' && row.status !== 'listed' ? `${row.statusLabel} · not public` : `${row.statusLabel} · still up`;
+}
+
+const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+
 export default function AdminContent({ account, mainGenres }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -64,7 +95,7 @@ export default function AdminContent({ account, mainGenres }) {
     if (mod) for (const f of mod.flags) (m[`${f.target_type}:${f.target_id}`] = m[`${f.target_type}:${f.target_id}`] || []).push(f);
     return m;
   }, [mod]);
-  const rowByKey = useMemo(() => Object.fromEntries((data ? data.rows : []).map((r) => [`${r.type}:${r.id}`, r])), [data]);
+  const rowByKey = useMemo(() => Object.fromEntries((data ? [...data.rows, ...(data.connect || [])] : []).map((r) => [`${r.type}:${r.id}`, r])), [data]);
 
   const owners = useMemo(() => {
     const m = new Map();
@@ -98,9 +129,16 @@ export default function AdminContent({ account, mainGenres }) {
     }).filter((x) => x.row).sort((a, b) => RANK[a.level] - RANK[b.level] || ((b.rep ? b.rep.counted : 0) - (a.rep ? a.rep.counted : 0)));
   }, [mod, flagsByKey, rowByKey]);
 
+  // Tip notes are decided on /admin/tips, so they're left out of the
+  // tiles and the queue here and only counted for the pointer.
   const counts = useMemo(() => {
-    const c = { red: 0, yellow: 0, minor: 0, flag: mod ? new Set(mod.flags.map((f) => `${f.target_type}:${f.target_id}`)).size : 0 };
-    if (mod) for (const e of Object.values(mod.reportsByTarget)) if (e.tier) c[e.tier] += 1;
+    const c = { red: 0, yellow: 0, minor: 0, flag: mod ? new Set(mod.flags.filter((f) => f.target_type !== 'tip').map((f) => `${f.target_type}:${f.target_id}`)).size : 0, tipNotes: 0 };
+    if (mod) {
+      for (const [k, e] of Object.entries(mod.reportsByTarget)) {
+        if (k.startsWith('tip:')) { if (e.total > 0) c.tipNotes += 1; continue; }
+        if (e.tier) c[e.tier] += 1;
+      }
+    }
     return c;
   }, [mod]);
 
@@ -118,7 +156,7 @@ export default function AdminContent({ account, mainGenres }) {
           <div>
             <div className="eyebrow">Admin</div>
             <h1>All content</h1>
-            <p className="ca-sub">Every title from every user, including drafts, rejected work and channel uploads. Click an owner to see just their library.</p>
+            <p className="ca-sub">Every title from every user, including drafts, rejected work and channel uploads. Click an owner to see just their library. Reports on places, crew calls, productions and profiles come into the review queue below too.</p>
           </div>
           <Link href="/admin" className="library-back">← Back to admin</Link>
         </div>
@@ -203,47 +241,68 @@ export default function AdminContent({ account, mainGenres }) {
             </div>
 
             <div className="ac-sectionhead"><h2>Review queue</h2><span>red → admin flags → yellow → minor</span></div>
+            {data.connect === null && <div className="house-ad-error" role="alert">Reports on places, crew calls, productions and profiles couldn&rsquo;t be loaded. Reload to try again.</div>}
+            {counts.tipNotes > 0 && (
+              <p className="ca-sub ac-tipline">
+                {counts.tipNotes} reported tip {counts.tipNotes === 1 ? 'note' : 'notes'} → {account && account.isAdmin ? <Link href="/admin/tips">Admin → Tips</Link> : 'Admin → Tips (full admins)'}
+              </p>
+            )}
             {queue.length === 0 && <div className="ca-empty">Nothing to review.</div>}
             <div className="ac-queue">
-              {queue.map(({ key, row, rep, flags, level }) => (
-                <div key={key} className={`ac-qitem l-${level}`}>
-                  <div style={{ minWidth: 0 }}>
-                    <div className="ac-qmeta">
-                      {row.owner} · {row.kind}
-                      {rep ? ` · ${rep.counted} ${rep.counted === 1 ? 'person' : 'people'} reported${rep.topReason ? `, mostly "${rep.topReason}"` : ''}` : ''}
-                      {` · ${row.held ? 'pulled everywhere' : 'still up'}`}
-                    </div>
-                    <h3>{row.title} {level === 'flag' ? <span className="sch-chip bad">Admin flag</span> : <span className={`ac-rep ${level}`}>{TIER_LABEL[level]}</span>}</h3>
-                    {flags.map((f) => <p key={f.id}><b>{f.reasonLabel}</b>{f.note ? ` · ${f.note}` : ''} <small>({new Date(f.created_at).toLocaleDateString()})</small></p>)}
-                    {takingDown === key && (
-                      <div className="ac-takedown">
-                        <label className="sch-field"><span>Why it&rsquo;s coming down (the owner sees this)</span>
-                          <textarea id={`ac-td-${row.id}`} rows={2} value={takeDownNote} onChange={(e) => setTakeDownNote(e.target.value)} />
-                        </label>
-                        <div className="ac-acts">
-                          <button type="button" className="sch-btn danger" disabled={busy || !takeDownNote.trim()} onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'take_down', note: takeDownNote }, () => { setTakingDown(null); setTakeDownNote(''); })}>Take it down</button>
-                          <button type="button" className="sch-btn" onClick={() => setTakingDown(null)}>Cancel</button>
+              {queue.map(({ key, row, rep, flags, level }) => {
+                const words = decisionWords(row);
+                return (
+                  <div key={key} className={`ac-qitem l-${level}${row.connect ? ' connect' : ''}`} data-target={key}>
+                    <div style={{ minWidth: 0 }}>
+                      <div className="ac-qmeta">
+                        {row.connect ? `${row.ownerRole}: ${row.owner}` : `${row.owner} · ${row.kind}`}
+                        {rep ? ` · ${rep.counted} ${rep.counted === 1 ? 'person' : 'people'} reported${rep.topReason ? `, mostly "${rep.topReason}"` : ''}` : ''}
+                        {` · ${row.connect ? connectState(row) : row.held ? 'pulled everywhere' : 'still up'}`}
+                      </div>
+                      <h3>
+                        {row.connect && <span className="sch-chip ac-type">{row.typeLabel}</span>}
+                        {row.title} {level === 'flag' ? <span className="sch-chip bad">Admin flag</span> : <span className={`ac-rep ${level}`}>{TIER_LABEL[level]}</span>}
+                        {row.connect && row.gone && <span className="sch-chip bad">{row.statusLabel}</span>}
+                      </h3>
+                      {row.connect && row.sub && <p className="ac-qsub">{row.sub}</p>}
+                      {row.connect && row.recentReports.length > 0 && (
+                        <p className="ac-qreasons">
+                          {rep && rep.total > row.recentReports.length ? `Newest ${row.recentReports.length} of ${rep.total}: ` : 'Reports: '}
+                          {row.recentReports.map((r, i) => <span key={i}>{i > 0 ? ' · ' : ''}{r.reason} <small>({shortDate(r.at)})</small></span>)}
+                        </p>
+                      )}
+                      {flags.map((f) => <p key={f.id}><b>{f.reasonLabel}</b>{f.note ? ` · ${f.note}` : ''} <small>({new Date(f.created_at).toLocaleDateString()})</small></p>)}
+                      {takingDown === key && (
+                        <div className="ac-takedown">
+                          <label className="sch-field"><span>{words.why}</span>
+                            <textarea id={`ac-td-${row.id}`} rows={2} value={takeDownNote} onChange={(e) => setTakeDownNote(e.target.value)} />
+                          </label>
+                          <div className="ac-acts">
+                            <button type="button" className="sch-btn danger" disabled={busy || !takeDownNote.trim()} onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'take_down', note: takeDownNote }, () => { setTakingDown(null); setTakeDownNote(''); })}>{words.confirm}</button>
+                            <button type="button" className="sch-btn" onClick={() => setTakingDown(null)}>Cancel</button>
+                          </div>
                         </div>
+                      )}
+                    </div>
+                    {takingDown !== key && (canAct || (row.connect && row.publicHref)) && (
+                      <div className="ac-acts">
+                        {row.connect && row.publicHref && <Link href={row.publicHref} className="sch-btn" target="_blank" rel="noreferrer">Open page</Link>}
+                        {canAct && words.restore && <button type="button" className="sch-btn" disabled={busy} onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'restore' })}>{words.restore}</button>}
+                        {canAct && rep && !flags.length && <button type="button" className="sch-btn" disabled={busy} title="For spam reporting: keep it running and stop counting reports" onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'ignore_reports' })}>Ignore reports</button>}
+                        {canAct && <button type="button" className="sch-btn danger" disabled={busy} onClick={() => { setTakingDown(key); setTakeDownNote(''); }}>{words.takeDown}</button>}
                       </div>
                     )}
                   </div>
-                  {canAct && takingDown !== key && (
-                    <div className="ac-acts">
-                      <button type="button" className="sch-btn" disabled={busy} onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'restore' })}>{row.held ? 'Restore' : 'Looks fine, clear'}</button>
-                      {rep && !flags.length && <button type="button" className="sch-btn" disabled={busy} title="For spam reporting: keep it running and stop counting reports" onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'ignore_reports' })}>Ignore reports</button>}
-                      <button type="button" className="sch-btn danger" disabled={busy} onClick={() => { setTakingDown(key); setTakeDownNote(''); }}>Take down…</button>
-                    </div>
-                  )}
-                </div>
-              ))}
+                );
+              })}
               {Object.entries(mod.reportsByTarget).filter(([, e]) => e.ignored).map(([key, e]) => {
                 const row = rowByKey[key];
                 if (!row) return null;
                 return (
-                  <div key={`ign-${key}`} className="ac-qitem l-ignored">
+                  <div key={`ign-${key}`} className="ac-qitem l-ignored" data-target={key}>
                     <div>
-                      <div className="ac-qmeta">{row.owner} · {e.total} reports, not counted</div>
-                      <h3>{row.title} <span className="sch-chip">Reports ignored</span></h3>
+                      <div className="ac-qmeta">{row.connect ? `${row.ownerRole}: ${row.owner}` : row.owner} · {e.total} reports, not counted</div>
+                      <h3>{row.connect && <span className="sch-chip ac-type">{row.typeLabel}</span>}{row.title} <span className="sch-chip">Reports ignored</span></h3>
                       <p>Keeps running no matter how many reports come in.</p>
                     </div>
                     {canAct && <div className="ac-acts"><button type="button" className="sch-btn" disabled={busy} onClick={() => act({ op: 'decide', targetType: row.type, targetId: row.id, action: 'count_reports' })}>Count reports again</button></div>}

@@ -14,6 +14,7 @@ import { parseAdBreaksInput } from '../../lib/adBreaks';
 import { bytesLabel, runtimeClock } from '../../lib/creatorRights';
 import { showPickerTag, nextFreeExcept, MAX_EPISODE_NUMBER } from '../../lib/showRules';
 import { isTitleId } from '../../lib/titleIds';
+import { changedFields, mediaChanged } from '../../lib/draftPatch';
 import { useUpload } from '../../contexts/UploadContext';
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
@@ -154,6 +155,11 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
   const saveTimer = useRef(null);
   const latest = useRef({ form, video, trailer, draftId });
   latest.current = { form, video, trailer, draftId };
+  // What the server has from this page (the draft as opened, then each
+  // save), so a save sends only what changed since; and the save in
+  // flight, so the next one waits for it.
+  const saved = useRef({ form: draft ? initialForm(draft) : null, video: draft ? draft.video : null, trailer: draft ? draft.trailer : null });
+  const saving = useRef(Promise.resolve());
 
   const type = SUBMIT_TYPES.find((t) => t.value === form.contentType) || SUBMIT_TYPES[0];
   const media = useMemo(() => ({ video, trailer, audioUrl: form.audioUrl || null, audioBytes: form.audioBytes || null }), [video, trailer, form.audioUrl, form.audioBytes]);
@@ -163,20 +169,44 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
   }
 
   // The draft: saved a second after the last change, as long as there's
-  // something to keep (a file, or a title typed).
-  const saveDraft = useCallback(async () => {
+  // something to keep (a file, or a title typed). The first save creates
+  // it; after that only what changed goes (PATCH, lib/draftPatch.js), so
+  // the show page's upload queue putting a file on the same draft is never
+  // undone by this page, nor this page's form by it. One save at a time.
+  const saveNow = useCallback(async () => {
     const { form: f, video: v, trailer: t, draftId: id } = latest.current;
     if (!v && !t && !String(f.title || '').trim() && !f.audioUrl) return;
+    const last = saved.current;
+    let body = null;
+    if (id) {
+      const formPart = changedFields(last.form, f);
+      body = { id };
+      if (Object.keys(formPart).length) body.form = formPart;
+      if (mediaChanged(last.video, v)) body.video = v || null;
+      if (mediaChanged(last.trailer, t)) body.trailer = t || null;
+      if (Object.keys(body).length === 1) {
+        setSaveState('saved');
+        return;
+      }
+    }
     setSaveState('saving');
     try {
-      const data = await postJson('/api/creator/drafts', { id, form: f, video: v, trailer: t });
-      if (!id) setDraftId(data.draft.id);
+      const data = id ? await postJson('/api/creator/drafts', body, 'PATCH') : await postJson('/api/creator/drafts', { form: f, video: v, trailer: t });
+      saved.current = { form: f, video: v, trailer: t };
+      if (!id) {
+        latest.current = { ...latest.current, draftId: data.draft.id };
+        setDraftId(data.draft.id);
+      }
       setSaveState('saved');
     } catch (err) {
       setSaveState('failed');
       if (err.status === 503) setError(err.message);
     }
   }, []);
+  const saveDraft = useCallback(() => {
+    saving.current = saving.current.then(saveNow, saveNow);
+    return saving.current;
+  }, [saveNow]);
 
   useEffect(() => {
     if (saveTimer.current) clearTimeout(saveTimer.current);

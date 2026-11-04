@@ -5,6 +5,7 @@ import { useUpload } from '../../contexts/UploadContext';
 import { readVideoMetadata } from '../../lib/videoMetadata';
 import { bytesLabel, runtimeClock } from '../../lib/creatorRights';
 import { joinDescription, saveSummary, splitDescription } from '../../lib/showRules';
+import { changedFields } from '../../lib/draftPatch';
 import { SITE } from '../../lib/siteConfig';
 import MoveSheet from './MoveSheet';
 import { fileDrop, pickerKeys } from './roomBits';
@@ -15,9 +16,11 @@ import { CheckIcon, ClockIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 // The episode editor for a draft (series revamp slice 2): an episode that
 // isn't sent yet, a creator_drafts row whose form holds the show, season
 // and number. Same screen and layouts as EpisodeEditor, everything applies
-// at once (nothing is live), saved with POST /api/creator/drafts — which
-// replaces the form, the video and the trailer together, so every save
-// sends all three — and "Send for review" posts it to /api/show/[id]/send.
+// at once (nothing is live), saved with PATCH /api/creator/drafts — only
+// the fields the person changed (lib/draftPatch.js), so the show page's
+// upload queue, which puts the file on the same draft meanwhile, and this
+// screen never put back each other's older copy — and "Send for review"
+// posts it to /api/show/[id]/send.
 // The poster and still, captions, a trailer, its own page and the credits
 // come after it is sent (the episode editor then has them).
 
@@ -76,6 +79,19 @@ function draftValues(form) {
 }
 
 const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place' };
+
+// What a save sends: the fields changed since the draft was read (the
+// season and the number go together, as one place).
+function formChange(init, form) {
+  const was = draftValues(init);
+  const now = draftValues(form);
+  const change = changedFields(was, now);
+  if ('season' in change || 'seriesOrder' in change) {
+    change.season = now.season;
+    change.seriesOrder = now.seriesOrder;
+  }
+  return change;
+}
 
 function findRow(view, id) {
   for (const s of (view && view.seasons) || []) for (const r of s.rows || []) if (r.kind === 'draft' && r.id === id) return r;
@@ -251,10 +267,10 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [watching, draft.id]);
 
-  // A save of the media only: the draft as last saved, with this video.
+  // A save of the media only: this video, nothing else.
   const saveVideo = useCallback(async (nextVideo) => {
     const d = draftRef.current;
-    const r = await callApi('POST', '/api/creator/drafts', { id: d.id, form: d.form, video: nextVideo, trailer: d.trailer });
+    const r = await callApi('PATCH', '/api/creator/drafts', { id: d.id, video: nextVideo });
     if (r.ok && r.data.draft) setDraft(r.data.draft);
     return r;
   }, []);
@@ -321,12 +337,10 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
     }
     setSaving(true);
     setError(null);
-    // The show page's upload queue may have put a file on this draft since
-    // it was read: the route replaces the video and the trailer with what
-    // is sent, so they come from the draft as it is now.
-    const now = await callApi('GET', `/api/creator/drafts?id=${encodeURIComponent(draftRef.current.id)}`);
-    const d = now.ok && now.data.draft ? { ...draftRef.current, video: now.data.draft.video, trailer: now.data.draft.trailer } : draftRef.current;
-    const r = await callApi('POST', '/api/creator/drafts', { id: d.id, form: { ...(d.form || {}), ...draftValues(form) }, video: d.video, trailer: d.trailer });
+    // Only what the person changed: the show page's upload queue may be
+    // putting a file on this draft meanwhile, and the server merges both.
+    const d = draftRef.current;
+    const r = await callApi('PATCH', '/api/creator/drafts', { id: d.id, form: formChange(init, form) });
     setSaving(false);
     if (!r.ok) {
       setError(r.error);

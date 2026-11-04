@@ -10,13 +10,12 @@ import { abortUpload, currentUpload, startTusUpload, subscribeUpload } from './t
 // transfer at a time — so the queue keeps going while the creator moves
 // around the app (it lives in this module, not in a screen). Each upload is
 // saved onto its draft as it starts (the tus address, so a stopped one
-// resumes) and again when the last byte is in:
-//   POST /api/creator/drafts { id, form, video: { uid, state, name, bytes,
-//   uploadUrl, runtimeSeconds }, trailer }
-// with the draft's own form and trailer read just before (that route
-// replaces the form, the video and the trailer together). A closed app
-// stops the queue; picking the same file again resumes it from the
-// draft's saved address.
+// resumes) and again when the last byte is in — only the video:
+//   PATCH /api/creator/drafts { id, video: { uid, state, name, bytes,
+//   uploadUrl, runtimeSeconds } }
+// (lib/draftPatch.js), so the form and trailer the draft editor saves
+// meanwhile are never put back. A closed app stops the queue; picking the
+// same file again resumes it from the draft's saved address.
 //
 //   item: { key, batch, draftId, showId, showName, label, asset,
 //           runtimeSeconds, freshStart, status: 'queued' | 'starting' |
@@ -90,17 +89,14 @@ function tusBusy() {
   return Boolean(cur && ['requesting-url', 'uploading'].includes(cur.status));
 }
 
-// The draft as it is now, so a save never puts back an older form or
-// trailer.
+// The draft as it is now: whether this file resumes, or is there already.
 async function readDraft(draftId) {
   const r = await showCall('GET', `/api/creator/drafts?id=${encodeURIComponent(draftId)}`, undefined, tokenGetter);
   if (r.status === 404) return { gone: true };
   return r.ok && r.data.draft ? { draft: r.data.draft } : { failed: true };
 }
 async function saveDraftVideo(draftId, video) {
-  const now = await readDraft(draftId);
-  if (!now.draft) return false;
-  const r = await showCall('POST', '/api/creator/drafts', { id: draftId, form: now.draft.form || {}, video, trailer: now.draft.trailer || null }, tokenGetter);
+  const r = await showCall('PATCH', '/api/creator/drafts', { id: draftId, video }, tokenGetter);
   return r.ok;
 }
 

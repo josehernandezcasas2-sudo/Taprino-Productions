@@ -94,9 +94,9 @@ waits and carries on when it ends (it subscribes to `tusUpload`).
 
 What one file does, request by request (the website's UploadContext queue): `GET /api/creator/drafts?id=` (a gone
 draft is skipped; one with a processing/ready video is skipped) → `startTusUpload({ urlPath:
-'/api/creator/get-upload-url?seriesId=<show>', kind: 'main', resumeUrl })` → `POST /api/creator/drafts { id,
-form, video: { uid, state: 'uploading', name, bytes, uploadUrl, runtimeSeconds }, trailer }` (form and trailer
-read just before: that route replaces all three) → again with tus's own address when it is known → again with
+'/api/creator/get-upload-url?seriesId=<show>', kind: 'main', resumeUrl })` → `PATCH /api/creator/drafts { id,
+video: { uid, state: 'uploading', name, bytes, uploadUrl, runtimeSeconds } }` (only the video: the form and the
+trailer stay as they are, `lib/draftPatch.js`) → again with tus's own address when it is known → again with
 `state: 'processing'` when the last byte is in.
 
 ## `mobile/src/components/show/ShowBits.js` — the kit
@@ -237,8 +237,9 @@ cut out of these files and run on the real answers). **Not on a device.**
   with `moveTargets`; a move away `router.replace`s to the other show's editor), an extra's "Attached to" chips, Remove
   this episode… with the reason / Cancel removal. Banners: Changes awaiting review (Cancel each), Not this time + Send
   again for review (`resubmit: true` with the changes), Pulled, Removal requested + Cancel, Withdrawn, before 118.
-- **The draft editor** — the same screen over `/api/creator/drafts`: everything direct; Save re-reads the draft and
-  sends its whole form with its current video and trailer; **Send for review** (the bar's main button) →
+- **The draft editor** — the same screen over `/api/creator/drafts`: everything direct; Save sends only the fields
+  the person changed (`PATCH`, the season and number together; the server merges them onto the draft as it is
+  now); **Send for review** (the bar's main button) →
   `POST /api/show/<id>/send` → `router.replace` to the new episode's editor with `?sent=1` (a skip shows its reason and
   takes `nextFree`); Discard (Alert) → `cancelShowUpload` + `DELETE /api/creator/drafts`; the file goes through the
   show's upload queue (the row's progress / Queued / stopped lines show here); Place: a draft holder offers Swap /

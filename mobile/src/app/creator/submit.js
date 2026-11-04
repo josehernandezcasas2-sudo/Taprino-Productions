@@ -10,6 +10,7 @@ import {
   SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody, formatRuntime, bytesLabel
 } from '../../lib/submitRules';
 import { MAX_EPISODE_NUMBER, nextFreeExcept, showPickerTag } from '../../lib/showRules';
+import { changedFields, mediaChanged } from '../../lib/draftPatch';
 import { useAdminRole } from '../../lib/adminRole';
 import { useContentRatings } from '../../lib/contentAdvisory';
 import { colors, fonts, inkTint, okTint, dangerTint, brassTint, oliveTint } from '../../lib/theme';
@@ -116,6 +117,11 @@ export default function SubmitTitle() {
   const draftsBehind = useRef(false);
   const latest = useRef({ form, video, trailer, draftId });
   latest.current = { form, video, trailer, draftId };
+  // What the server has from this screen (the draft as opened, then each
+  // save), so a save sends only what changed since; and the save in
+  // flight, so the next one waits for it.
+  const saved = useRef({ form: null, video: null, trailer: null });
+  const saving = useRef(Promise.resolve());
 
   // The creator's shows for the picker (list-series: every show they run,
   // with its kind and art), and the draft when resuming one.
@@ -149,6 +155,7 @@ export default function SubmitTitle() {
           setVideo(d.draft.video);
           setTrailer(d.draft.trailer);
           setDraftId(d.draft.id);
+          saved.current = { form: initialForm(d.draft, {}), video: d.draft.video, trailer: d.draft.trailer };
           setAutoNumber(!String((d.draft.form && d.draft.form.seriesOrder) || '').trim());
           setStep(d.draft.form && d.draft.form.step ? Math.min(3, Math.max(1, Number(d.draft.form.step))) : 1);
         } catch (err) {
@@ -165,14 +172,37 @@ export default function SubmitTitle() {
   const media = useMemo(() => ({ video, trailer, audioUrl: form.audioUrl || null, audioBytes: form.audioBytes || null }), [video, trailer, form.audioUrl, form.audioBytes]);
   const update = (field, value) => setForm((f) => ({ ...f, [field]: value }));
 
-  const saveDraft = useCallback(async () => {
+  // The first save creates the draft; after that only what changed goes
+  // (PATCH, lib/draftPatch.js), so the show page's upload queue putting a
+  // file on the same draft is never undone by this screen, nor this
+  // screen's form by it. One save at a time.
+  const saveNow = useCallback(async () => {
     if (draftsBehind.current) return;
     const { form: f, video: v, trailer: t, draftId: id } = latest.current;
     if (!v && !t && !String(f.title || '').trim() && !f.audioUrl) return;
+    const last = saved.current;
+    let body = null;
+    if (id) {
+      const formPart = changedFields(last.form, f);
+      body = { id };
+      if (Object.keys(formPart).length) body.form = formPart;
+      if (mediaChanged(last.video, v)) body.video = v || null;
+      if (mediaChanged(last.trailer, t)) body.trailer = t || null;
+      if (Object.keys(body).length === 1) {
+        setSaveState('saved');
+        return;
+      }
+    }
     setSaveState('saving');
-    const r = await showCall('POST', '/api/creator/drafts', { id, form: f, video: v, trailer: t }, getToken);
+    const r = id
+      ? await showCall('PATCH', '/api/creator/drafts', body, getToken)
+      : await showCall('POST', '/api/creator/drafts', { form: f, video: v, trailer: t }, getToken);
     if (r.ok) {
-      if (!id && r.data.draft) setDraftId(r.data.draft.id);
+      saved.current = { form: f, video: v, trailer: t };
+      if (!id && r.data.draft) {
+        latest.current = { ...latest.current, draftId: r.data.draft.id };
+        setDraftId(r.data.draft.id);
+      }
       setSaveState('saved');
       setSaveLine(null);
       return;
@@ -188,6 +218,10 @@ export default function SubmitTitle() {
     setSaveState('failed');
     setSaveLine(r.status === 0 ? null : r.error);
   }, [getToken]);
+  const saveDraft = useCallback(() => {
+    saving.current = saving.current.then(saveNow, saveNow);
+    return saving.current;
+  }, [saveNow]);
 
   useEffect(() => {
     if (loading) return undefined;

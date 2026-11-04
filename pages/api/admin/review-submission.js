@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
 import { invalidateCache } from '../../../lib/redis';
+import { updateCompat } from '../../../lib/dbCompat';
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
@@ -39,8 +40,14 @@ export default async function handler(req, res) {
   if (decision === 'approve' && typeof featured === 'boolean') {
     updates.featured = featured;
   }
+  // Early screenings (migration 100) read the release from released_at,
+  // else the upload date — a title approved days after it was sent would
+  // skip its 24 premium hours. Approving starts it now, as the review queue
+  // does (lib/reviewQueue.js). Before the migration the column is missing;
+  // approve anyway.
+  if (decision === 'approve') updates.released_at = updates.reviewed_at;
 
-  const { error } = await supabase.from('episodes').update(updates).eq('id', episodeId).eq('status', 'pending');
+  const { error } = await updateCompat(supabase, 'episodes', updates, ['released_at'], (q) => q.eq('id', episodeId).eq('status', 'pending'));
 
   if (error) {
     console.error('review-submission error:', error.message);

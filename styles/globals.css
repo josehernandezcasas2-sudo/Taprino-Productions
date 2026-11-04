@@ -8643,6 +8643,12 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .ac-qmeta { font-family: var(--font-mono); font-size: 0.64rem; color: var(--ink-faint); }
 .ac-takedown { margin-top: 0.6rem; display: grid; gap: 0.5rem; }
 .ac-takedown .ac-acts { justify-content: flex-start; }
+/* Places, calls, productions and profiles in the review queue (2026-11-04) */
+.sch-chip.ac-type { background: transparent; border: 1px solid var(--ocean-ink); color: var(--ink); }
+.ac-qitem p.ac-qsub { margin-top: 0.15rem; font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); overflow-wrap: anywhere; }
+.ac-qitem p.ac-qreasons small { color: var(--ink-faint); }
+.ac-tipline { margin: 0 0 0.6rem; }
+.ac-tipline a { color: var(--brass); }
 .ac-takedown textarea, .report-body textarea { background: var(--surface-2); border: 1px solid var(--ocean-ink); color: var(--ink); border-radius: 8px; padding: 0.5rem; font: inherit; width: 100%; }
 .ac-reasons { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .ac-reasons legend { grid-column: 1 / -1; }

@@ -128,7 +128,8 @@ export default function AdminDashboard({ account, mainGenres, defaultCpmCents })
 function flaggedRows(m) {
   const mod = m.moderation || {};
   const byKey = {};
-  for (const r of m.rows || []) byKey[`${r.type}:${r.id}`] = r;
+  // Titles, plus the places, calls, productions and profiles with reports.
+  for (const r of [...(m.rows || []), ...(m.connect || [])]) byKey[`${r.type}:${r.id}`] = r;
   const out = [];
   for (const f of mod.flags || []) {
     const key = `${f.target_type}:${f.target_id}`;

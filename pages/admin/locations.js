@@ -147,7 +147,7 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
               </>
             )}
           </section>
-          <p className="crew-muted" style={{ maxWidth: '70ch' }}>Refunds reverse the host’s transfer and return the platform cut; Stripe keeps its processing fee, which the platform absorbs. A refund made in the Stripe dashboard is mirrored here through the webhook. Flags and reports on places are handled on <Link href="/admin/content">All content &amp; flags</Link> like any other title.</p>
+          <p className="crew-muted" style={{ maxWidth: '70ch' }}>Refunds reverse the host’s transfer and return the platform cut; Stripe keeps its processing fee, which the platform absorbs. A refund made in the Stripe dashboard is mirrored here through the webhook. Reports and flags on places come into the review queue on <Link href="/admin/content">All content &amp; flags</Link>, next to titles, calls, productions and profiles: restore the place, take it down (the host is told why) or ignore the reports there. Under Places, a listed or paused place shows how many open reports it has; pausing or removing it here doesn’t close them.</p>
         </div>
       )}
     </AdminShell>

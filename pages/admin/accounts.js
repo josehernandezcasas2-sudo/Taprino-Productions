@@ -244,7 +244,7 @@ export default function AccountsAdmin({ account, mainGenres, apiPath = '/api/adm
             {overview && overview.active.length === 0 && <div className="crew-mono">Nobody.</div>}
             {overview && overview.active.map((s) => (
               <button key={s.id} type="button" className="crew-btn ghost" style={{ justifyContent: 'space-between', textAlign: 'left' }} disabled={busy !== null} onClick={() => open(s.userId)}>
-                <span><b>{s.displayName}</b><br /><span className="crew-mono">{SCOPES[s.scope] ? SCOPES[s.scope].short.toLowerCase() : s.scope} · {untilLabel(s.untilAt)}</span></span>
+                <span><b>{s.displayName}</b><br /><span className="crew-mono">{s.handle ? `@${s.handle} · ` : ''}{SCOPES[s.scope] ? SCOPES[s.scope].short.toLowerCase() : s.scope} · {untilLabel(s.untilAt)}</span></span>
                 <span className={`payouts-pill ${s.scope === 'all' ? 'failed' : 'held'}`}>{SCOPES[s.scope] ? SCOPES[s.scope].short : s.scope}</span>
               </button>
             ))}
@@ -257,7 +257,7 @@ export default function AccountsAdmin({ account, mainGenres, apiPath = '/api/adm
             <div className="crew-panel" style={{ display: 'grid', gap: '0.3rem' }}>
               <H>Recent</H>
               {overview.recent.slice(0, 12).map((s) => (
-                <div key={s.id} className="crew-mono">{fmt(s.createdAt)} · <button type="button" className="welcome-linkbtn" style={{ color: 'var(--ink)', fontFamily: 'inherit', fontSize: 'inherit' }} onClick={() => open(s.userId)}>{s.displayName}</button> · {s.scope === 'all' ? 'suspended' : 'tips blocked'}{s.liftedAt ? ` · lifted ${fmt(s.liftedAt)}` : ''}</div>
+                <div key={s.id} className="crew-mono">{fmt(s.createdAt)} · <button type="button" className="welcome-linkbtn" style={{ color: 'var(--ink)', fontFamily: 'inherit', fontSize: 'inherit' }} onClick={() => open(s.userId)}>{s.displayName}</button>{s.handle ? ` @${s.handle}` : ''} · {s.scope === 'all' ? 'suspended' : 'tips blocked'}{s.liftedAt ? ` · lifted ${fmt(s.liftedAt)}` : ''}</div>
               ))}
             </div>
           )}

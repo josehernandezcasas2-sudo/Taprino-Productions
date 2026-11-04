@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { fileMatches, joinDescription, saveSummary, splitDescription } from '../../lib/showRules';
+import { changedFields } from '../../lib/draftPatch';
 import { bytesLabel, runtimeClock } from '../../lib/submitRules';
 import { migrationRefusal, showPath } from '../../lib/showApi';
 import { assetFile, assetRuntime, cancelShowUpload, enqueueShowUploads, useShowQueue } from '../../lib/showUploadQueue';
@@ -21,10 +22,11 @@ import { RoomToast, SmallButton, UploadIcon, episodeEditorRoute, shortDate, show
 // website's components/show/DraftEditor.js, the same words): an episode
 // that isn't sent yet, a creator_drafts row whose form holds the show,
 // season and number. The same screen as the episode editor, everything
-// applies at once (nothing is live), saved with POST /api/creator/drafts —
-// which replaces the form, the video and the trailer together, so every
-// save sends all three (the video and trailer read just before) — and
-// "Send for review" posts it to /api/show/<id>/send. The draft's file goes
+// applies at once (nothing is live), saved with PATCH /api/creator/drafts —
+// only the fields the person changed (lib/draftPatch.js), so the upload
+// queue, which puts the file on the same draft meanwhile, and this screen
+// never put back each other's older copy — and "Send for review" posts it
+// to /api/show/<id>/send. The draft's file goes
 // through the show page's upload queue (mobile/src/lib/showUploadQueue.js:
 // one upload at a time, saved onto the draft as it goes; the same file
 // picked again resumes). The poster and still, captions, a trailer, its
@@ -81,6 +83,19 @@ function draftValues(form) {
     season: String(Number(form.season) || 1),
     seriesOrder: String(form.number || '').trim()
   };
+}
+
+// What a save sends: the fields changed since the draft was read (the
+// season and the number go together, as one place).
+function formChange(init, form) {
+  const was = draftValues(init);
+  const now = draftValues(form);
+  const change = changedFields(was, now);
+  if ('season' in change || 'seriesOrder' in change) {
+    change.season = now.season;
+    change.seriesOrder = now.seriesOrder;
+  }
+  return change;
 }
 
 const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place' };
@@ -293,12 +308,9 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
     }
     setSaving(true);
     setError(null);
-    // The upload queue may have put a file on this draft since it was read:
-    // the route replaces the video and the trailer with what is sent, so
-    // they come from the draft as it is now.
-    const now = await call('GET', `/api/creator/drafts?id=${enc(draftRef.current.id)}`);
-    const d = now.ok && now.data.draft ? { ...draftRef.current, video: now.data.draft.video, trailer: now.data.draft.trailer } : draftRef.current;
-    const r = await call('POST', '/api/creator/drafts', { id: d.id, form: { ...(d.form || {}), ...draftValues(form) }, video: d.video, trailer: d.trailer });
+    // Only what the person changed: the upload queue may be putting a file
+    // on this draft meanwhile, and the server merges both.
+    const r = await call('PATCH', '/api/creator/drafts', { id: draftRef.current.id, form: formChange(init, form) });
     setSaving(false);
     if (!r.ok) {
       noteBehind(r);

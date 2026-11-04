@@ -1,11 +1,13 @@
 import { getRoleContext } from '../../../lib/roles';
 import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
-import { listAllContent } from '../../../lib/contentAdmin';
+import { listAllContent, listReportedConnectContent } from '../../../lib/contentAdmin';
 import { getModerationState, flagContent, decide, setReporterStatus } from '../../../lib/moderation';
 import { sendError } from '../../../lib/apiErrors';
 
 // GET  everything + reports/flags/reporters   (view_all_content or handle_flags)
+//      `connect`: places, crew calls, productions and profiles with open
+//      reports or flags, for the review queue (null when that read failed)
 // POST { op: 'flag', targetType, targetId, reason, note, emailOwner }
 //      { op: 'decide', targetType, targetId, action: restore | take_down | ignore_reports | count_reports, note? }
 //      { op: 'reporter', userId, status: cleared | muted | banned }
@@ -19,8 +21,14 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const [rows, moderation] = await Promise.all([listAllContent(), getModerationState()]);
-      return res.status(200).json({ rows, moderation, canAct });
+      const [rows, moderation, connect] = await Promise.all([
+        listAllContent(),
+        getModerationState(),
+        // The page still loads the titles if this one read fails; it says
+        // the rest couldn't be loaded.
+        listReportedConnectContent().catch((err) => { console.error('admin/content connect:', err.message); return null; })
+      ]);
+      return res.status(200).json({ rows, moderation, connect, canAct });
     }
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');

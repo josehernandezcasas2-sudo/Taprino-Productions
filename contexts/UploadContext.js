@@ -431,8 +431,7 @@ export function UploadProvider({ children }) {
   }
   const LIVE_ITEM = ['queued', 'starting', 'uploading'];
 
-  // The draft as it is now, so a save never puts back an older form or
-  // trailer (the drafts route replaces form, video and trailer together).
+  // The draft as it is now: whether this file resumes, or is there already.
   async function readDraft(draftId) {
     try {
       const res = await fetch(`/api/creator/drafts?id=${encodeURIComponent(draftId)}`, { credentials: 'same-origin' });
@@ -443,15 +442,16 @@ export function UploadProvider({ children }) {
       return { failed: true };
     }
   }
+  // Only the video goes (PATCH /api/creator/drafts, lib/draftPatch.js): the
+  // form and the trailer are the draft editor's, and a save of theirs that
+  // lands meanwhile is never put back by this one.
   async function saveDraftVideo(draftId, video) {
-    const now = await readDraft(draftId);
-    if (!now.draft) return false;
     try {
       const res = await fetch('/api/creator/drafts', {
-        method: 'POST',
+        method: 'PATCH',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: draftId, form: now.draft.form || {}, video, trailer: now.draft.trailer || null })
+        body: JSON.stringify({ id: draftId, video })
       });
       return res.ok;
     } catch {

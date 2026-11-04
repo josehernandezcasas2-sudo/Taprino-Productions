@@ -290,12 +290,16 @@ then: link to `submitHref`). The checks run in that order: who, the items, then 
 → `{ uploadUrl, uid, method: 'tus' }`; **60 an hour** for one of your own shows, 20 otherwise; over → 429 "Too many
 upload requests — please wait a bit and try again.") — with
 UploadContext: `startVideoUpload(file, { urlEndpoint: '/api/creator/get-upload-url?seriesId=<id>', resumeUrl:
-draft.video?.uploadUrl, kind: 'main', onUrl })` — and save it onto its draft with `POST /api/creator/drafts
-{ id: draft.id, form: draft.form, video: { uid, state: 'uploading', name, bytes, uploadUrl, runtimeSeconds }, trailer:
-draft.trailer }` → `{ draft }`. **That route replaces the form, the video and the trailer together**: always send the
-draft's whole `form` and its current `video` and `trailer` back — a video or trailer left out is discarded (deleted
-from Cloudflare when nothing else uses it). Re-picking the same file resumes it from `video.uploadUrl`. A draft is
-edited (title, genre, number…) the same way; `GET /api/creator/drafts?seriesId=<id>` lists the viewer's drafts of a
+draft.video?.uploadUrl, kind: 'main', onUrl })` — and save it onto its draft with `PATCH /api/creator/drafts
+{ id: draft.id, video: { uid, state: 'uploading', name, bytes, uploadUrl, runtimeSeconds } }` → `{ draft }`.
+**A PATCH is a partial change** (2026-11-04, `lib/draftPatch.js`): the `form` keys sent replace those keys and every
+other key stays; `video` / `trailer` are touched only when sent (null clears one — a replaced or cleared video is
+deleted from Cloudflare when nothing else uses it); the server merges onto the row as it is now, guarded by
+`updated_at`, and answers 409 "The draft changed while it was saving — try again." if it kept changing. So the queue
+sends only the video and the draft editor only the fields the person changed, and neither puts back the other's
+older copy (the whole-draft `POST { id, form, video, trailer }`, which replaces all three, still works for an old
+client). Re-picking the same file resumes it from `video.uploadUrl`. A draft is edited (title, genre, number…) with
+the same PATCH; `GET /api/creator/drafts?seriesId=<id>` lists the viewer's drafts of a
 show, `?id=` reads one; `DELETE /api/creator/drafts` with the body `{ id }` discards it (and its video when nothing
 else uses it). The drafts route and this one share one limit (240 an hour); its own 429 reads "Saving too often.
 Give it a moment.".
