@@ -124,6 +124,13 @@ export default function RootLayout() {
           <Stack.Screen name="apply" options={{ headerShown: false }} />
           <Stack.Screen name="creator/index" options={{ headerShown: false }} />
           <Stack.Screen name="creator/submit" options={{ headerShown: false }} />
+          {/* The show page (the series revamp, slice 5): New show, the
+              show page, the episode / draft editor and Edit show draw the
+              site header and their own Back pill. */}
+          <Stack.Screen name="creator/show/new" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/show/[id]/index" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/show/[id]/episode/[episodeId]" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/show/[id]/edit" options={{ headerShown: false }} />
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen name="admin/review" options={{ headerShown: false }} />
         </Stack>

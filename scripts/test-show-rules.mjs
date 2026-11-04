@@ -1160,6 +1160,39 @@ function suite(R, who) {
     assert.equal(R.undoMoveSteps([answer[0], { ...answer[1], fromSeason: 3 }], 'x'), null);
   });
 
+  tt('undoMoveSteps: inside one season (Insert here, Swap) everything goes back in one /reorder', () => {
+    // E7 inserted at E3: E3–E6 became E4–E7, so E7 (where it came from) is
+    // held by then and a /move back would be refused (409 taken).
+    const insert = [
+      { id: 'x', seriesId: 'nb', season: 1, number: 3, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 7 },
+      { id: 'a', seriesId: 'nb', season: 1, number: 4, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 3 },
+      { id: 'b', seriesId: 'nb', season: 1, number: 5, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 4 }
+    ];
+    assert.deepEqual(R.undoMoveSteps(insert, 'x'), [
+      { route: 'reorder', body: { season: 1, episodes: [{ id: 'x', number: 7 }, { id: 'a', number: 3 }, { id: 'b', number: 4 }], drafts: [] } }
+    ]);
+    // E3 swapped with E1: one reorder trades them back.
+    const swap = [
+      { id: 'b', seriesId: 'nb', season: 1, number: 3, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 1 },
+      { id: 'x', seriesId: 'nb', season: 1, number: 1, fromSeriesId: 'nb', fromSeason: 1, fromNumber: 3 }
+    ];
+    assert.deepEqual(R.undoMoveSteps(swap, 'x'), [
+      { route: 'reorder', body: { season: 1, episodes: [{ id: 'x', number: 3 }, { id: 'b', number: 1 }], drafts: [] } }
+    ]);
+    // To a free number: one reorder of the row alone.
+    assert.deepEqual(R.undoMoveSteps([{ id: 'x', seriesId: 'nb', season: 2, number: 9, fromSeason: 2, fromNumber: 4 }], 'x'), [
+      { route: 'reorder', body: { season: 2, episodes: [{ id: 'x', number: 4 }], drafts: [] } }
+    ]);
+    // A swap across seasons can't be undone with these two routes: null.
+    assert.equal(R.undoMoveSteps([
+      { id: 'x', seriesId: 'nb', season: 2, number: 1, fromSeason: 1, fromNumber: 3 },
+      { id: 'b', seriesId: 'nb', season: 1, number: 3, fromSeason: 2, fromNumber: 1 }
+    ], 'x'), null);
+    // A row in the answer from another season, or without a number to go back to: null.
+    assert.equal(R.undoMoveSteps([insert[0], { ...insert[1], season: 2, fromSeason: 2 }], 'x'), null);
+    assert.equal(R.undoMoveSteps([insert[0], { ...insert[1], fromNumber: null }], 'x'), null);
+  });
+
   tt('rowPill: a row\'s pill on the show page', () => {
     const draft = { id: 'd', kind: 'draft', master: 'none' };
     assert.deepEqual(R.rowPill(draft), { label: 'Draft', tone: 'neutral', key: 'draft' });

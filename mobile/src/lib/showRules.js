@@ -1938,11 +1938,14 @@ export function reorderBody(writes) {
 
 // How to undo a move POST /api/show/[id]/move made inside one show, from
 // its answer's rows ([{ id, season, number, seriesId, fromSeriesId,
-// fromSeason, fromNumber }]): the moved row back to its old place first
-// (a /move: that place is free again), then the rows it pushed along, one
-// /reorder per season. Steps: [{ route: 'move' | 'reorder', body }]. Null
-// when it can't be undone that way: it changed show, it had no number
-// before, or a row it pushed changed season.
+// fromSeason, fromNumber }]). Inside one season (a number typed in the
+// Move sheet, Insert here, Swap) the place it left is held by then, so
+// every row goes back in one /reorder of that season. Across seasons: the
+// moved row back to its old place first (a /move: that place is free
+// again), then the rows it pushed along, one /reorder per season. Steps:
+// [{ route: 'move' | 'reorder', body }]. Null when it can't be undone that
+// way: it changed show, it had no number before, or a row it pushed (or
+// swapped with) changed season.
 export function undoMoveSteps(rows, movedId) {
   const list = (rows || []).filter((r) => r && typeof r === 'object' && !blank(r.id));
   const moved = list.find((r) => sameId(r.id, movedId));
@@ -1950,6 +1953,17 @@ export function undoMoveSteps(rows, movedId) {
   const crossShow = (r) => !blank(r.fromSeriesId) && !blank(r.seriesId) && String(r.fromSeriesId) !== String(r.seriesId);
   const fromNumber = posInt(moved.fromNumber);
   if (crossShow(moved) || !fromNumber) return null;
+  const movedSeason = posInt(moved.season) || 1;
+  if ((posInt(moved.fromSeason) || 1) === movedSeason) {
+    const episodes = [{ id: moved.id, number: fromNumber }];
+    for (const r of list) {
+      if (r === moved) continue;
+      const back = posInt(r.fromNumber);
+      if (crossShow(r) || !back || (posInt(r.season) || 1) !== movedSeason || (posInt(r.fromSeason) || 1) !== movedSeason) return null;
+      episodes.push({ id: r.id, number: back });
+    }
+    return [{ route: 'reorder', body: { season: movedSeason, episodes, drafts: [] } }];
+  }
   const steps = [{ route: 'move', body: { episodeId: moved.id, toSeason: posInt(moved.fromSeason) || 1, toNumber: fromNumber } }];
   const bySeason = new Map();
   for (const r of list) {

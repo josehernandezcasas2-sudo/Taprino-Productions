@@ -21,11 +21,64 @@ const APP_ROUTES = [
   /^\/account(\/(purchases|wishlist|my-work|artist-support|membership|profile|preferences|security))?$/, /^\/pitches\/[^/]+$/, /^\/episode\/[^/]+$/, /^\/series\/[^/]+$/,
   /^\/podcasts\/[^/]+$/, /^\/profile\/[^/]+$/, /^\/locations(\/[^/]+)?$/, /^\/locations\/requests(\/[^/]+)?$/, /^\/university(\/.*)?$/
 ];
-const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist' };
+const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work' };
+
+// The show screens (the series revamp, slice 5) keep the part of the
+// address that says where to land: a row (the website's #ep-<id> /
+// #draft-<id> anchor, or ?ep= / ?draft=), the draft editor (?draft=1), the
+// art tab (?tab=art). The older /creator/series?series=<id> (Series
+// management, now the show pages) opens the show; the admin's show pages
+// (/admin/shows/<id>) stay on the website like every admin page.
+const enc = (x) => encodeURIComponent(String(x));
+const SHOW_ID = '([^/?#]+)';
+const SHOW_NEW = /^\/creator\/show\/new$/;
+const SHOW_PAGE = new RegExp(`^/creator/show/${SHOW_ID}$`);
+const SHOW_EPISODE = new RegExp(`^/creator/show/${SHOW_ID}/episode/${SHOW_ID}$`);
+const SHOW_EDIT = new RegExp(`^/creator/show/${SHOW_ID}/edit$`);
+
+function queryOf(href) {
+  const at = href.indexOf('?');
+  const q = at < 0 ? '' : href.slice(at + 1).split('#')[0];
+  const out = {};
+  for (const part of q.split('&')) {
+    if (!part) continue;
+    const [k, v = ''] = part.split('=');
+    try {
+      out[decodeURIComponent(k)] = decodeURIComponent(v.replace(/\+/g, ' '));
+    } catch {
+      // a broken pair is left out
+    }
+  }
+  return out;
+}
+
+function showScreen(path, href) {
+  if (SHOW_NEW.test(path)) return '/creator/show/new';
+  const q = queryOf(href);
+  const ep = SHOW_EPISODE.exec(path);
+  if (ep) return `/creator/show/${ep[1]}/episode/${ep[2]}${q.draft === '1' ? '?draft=1' : ''}`;
+  const edit = SHOW_EDIT.exec(path);
+  if (edit) return `/creator/show/${edit[1]}/edit${q.tab === 'art' ? '?tab=art' : ''}`;
+  const page = SHOW_PAGE.exec(path);
+  if (page) {
+    const hash = href.includes('#') ? href.slice(href.indexOf('#') + 1) : '';
+    const anchor = /^(ep|draft)-(.+)$/.exec(hash);
+    let row = null;
+    if (anchor) {
+      try { row = { key: anchor[1], id: decodeURIComponent(anchor[2]) }; } catch { row = null; }
+    } else if (q.ep) row = { key: 'ep', id: q.ep };
+    else if (q.draft) row = { key: 'draft', id: q.draft };
+    return `/creator/show/${page[1]}${row ? `?${row.key}=${enc(row.id)}` : ''}`;
+  }
+  if (path === '/creator/series') return q.series ? `/creator/show/${enc(q.series)}` : '/creator';
+  return null;
+}
 
 export function hrefToRoute(href) {
   if (typeof href !== 'string' || !href.startsWith('/')) return null;
   const path = href.split(/[?#]/)[0].replace(/\/$/, '') || '/';
+  const show = showScreen(path, href);
+  if (show) return { route: show };
   const target = ALIASES[path] || path;
   if (target === '/') return { route: '/' };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };

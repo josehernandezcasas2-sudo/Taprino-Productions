@@ -22,14 +22,37 @@ export async function pickVideo() {
   return result.assets[0];
 }
 
+// Several videos at once (the show page's "Add several", up to 30): the
+// assets in the order they were picked, [] when nothing was. Same asset
+// shape as pickVideo.
+export async function pickVideos({ limit = 30 } = {}) {
+  const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (!perm.granted) throw new Error('Library access is needed to pick the files.');
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ['videos'],
+    quality: 1,
+    allowsMultipleSelection: true,
+    selectionLimit: limit,
+    orderedSelection: true,
+    videoExportPreset: ImagePicker.VideoExportPreset ? ImagePicker.VideoExportPreset.Passthrough : undefined
+  });
+  if (result.canceled || !Array.isArray(result.assets)) return [];
+  return result.assets.slice(0, limit);
+}
+
 // An image as a JPEG data URL, sized for a poster (900 tall) or a still
-// (1280 wide), like the website's forms send them.
-export async function pickImageAsDataUrl({ width }) {
+// (1280 wide), like the website's forms send them. `format: 'png'` keeps
+// the transparency (a title image: the name set as a picture).
+export async function pickImageAsDataUrl({ width, format = 'jpeg' }) {
   const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (!perm.granted) throw new Error('Photo library access is needed to pick an image.');
   const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], quality: 1 });
   if (result.canceled || !result.assets || !result.assets[0]) return null;
   const rendered = await ImageManipulator.manipulate(result.assets[0].uri).resize({ width }).renderAsync();
+  if (format === 'png') {
+    const png = await rendered.saveAsync({ format: SaveFormat.PNG, base64: true });
+    return { uri: png.uri, base64: `data:image/png;base64,${png.base64}`, fileName: 'image.png' };
+  }
   const saved = await rendered.saveAsync({ format: SaveFormat.JPEG, compress: 0.85, base64: true });
   return { uri: saved.uri, base64: `data:image/jpeg;base64,${saved.base64}`, fileName: 'image.jpg' };
 }

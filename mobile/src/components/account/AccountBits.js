@@ -169,7 +169,12 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
 // The frame: TopNav, the stage, a Back pill (to the hub by default; the
 // hub itself has the standard Back to Stream), the title and the body;
 // the spinner / couldn't-load / sign-in states come first.
-export function AccountFrame({ title, aside = null, dashboard, onRetry, back = 'account', scrollRef, scrollEnabled = true, children }) {
+// `back` may also be { href, label } (the show page's "Creator Studio",
+// the editors' "<Show name>"): the pill then goes back to that screen (or
+// opens it in this one's place when it isn't in the stack). `overlay` is
+// drawn over the scroll, fixed (a toast); `refreshControl` rides on the
+// ScrollView.
+export function AccountFrame({ title, aside = null, dashboard, onRetry, back = 'account', scrollRef, scrollEnabled = true, overlay = null, refreshControl, children }) {
   const router = useRouter();
   const { signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
@@ -237,10 +242,22 @@ export function AccountFrame({ title, aside = null, dashboard, onRetry, back = '
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.stage} scrollEnabled={scrollEnabled} keyboardShouldPersistTaps="handled">
+      {/* automaticallyAdjustKeyboardInsets (iOS): the keyboard's height is
+          added under the content and the field being typed in is scrolled
+          into sight. Without it an iOS ScrollView never moves for the
+          keyboard, so a field low on a long form (the editors' notes and
+          removal reason, the show page's E-number and "Remove this show…")
+          sat under it. Android resizes the window for it already. */}
+      <ScrollView ref={scrollRef} style={styles.scrollView} contentContainerStyle={styles.stage} scrollEnabled={scrollEnabled} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets refreshControl={refreshControl}>
         {back === 'stream' ? (
           <Pressable style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace('/stream'))}>
             <BackArrowIcon /><Text style={styles.backText}>Back</Text>
+          </Pressable>
+        ) : back && typeof back === 'object' && back.href ? (
+          // dismissTo: back down the stack to that screen when it's there
+          // (navigate would push a second copy on top), else in its place.
+          <Pressable style={styles.backPill} onPress={() => router.dismissTo(back.href)} accessibilityRole="link">
+            <BackArrowIcon size={14} color={colors.inkDim} /><Text style={styles.backPillText} numberOfLines={1}>{back.label || 'Back'}</Text>
           </Pressable>
         ) : back ? (
           // navigate(): back to the hub if it's in the stack, else open it.
@@ -256,6 +273,7 @@ export function AccountFrame({ title, aside = null, dashboard, onRetry, back = '
         ) : null}
         {children}
       </ScrollView>
+      {overlay}
     </SafeAreaView>
   );
 }

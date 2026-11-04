@@ -15,6 +15,7 @@ import { apiPost } from './api';
 const CHUNK = 52428800; // 50 MB, Cloudflare's recommendation (a multiple of 256 KiB)
 const listeners = new Set();
 let current = null; // { uid, kind, name, bytes, sent, total, status, error, startedAt }
+let running = null; // the tus.Upload in flight, for abortUpload()
 
 function emit() {
   for (const fn of listeners) fn(current);
@@ -41,7 +42,9 @@ export function uidFromTusUrl(url) {
 // `done` settles when the last byte is in. `onUrl(url)` reports tus's own
 // address for this upload as soon as it is known.
 export async function startTusUpload({ asset, urlPath, token, resumeUrl = null, kind = 'main', onUrl = null }) {
-  if (current && current.status === 'uploading') throw new Error('An upload is already running. Let it finish first.');
+  // 'requesting-url' counts too: another caller between asking for its
+  // address and its first byte holds the one transfer as well.
+  if (current && ['requesting-url', 'uploading'].includes(current.status)) throw new Error('An upload is already running. Let it finish first.');
   const name = asset.fileName || asset.uri.split('/').pop() || 'video.mp4';
   const size = Number(asset.fileSize) || 0;
   current = { uid: null, kind, name, bytes: size, sent: 0, total: size, status: 'requesting-url', error: null, startedAt: Date.now() };
@@ -82,16 +85,38 @@ export async function startTusUpload({ asset, urlPath, token, resumeUrl = null, 
         resolve();
       }
     });
+    running = upload;
     upload.start();
   }).then(() => {
+    running = null;
     if (current && current.uid === uid) { current = { ...current, status: 'uploaded', sent: current.total }; emit(); }
     return { uid };
   }).catch((err) => {
+    running = null;
     if (current && current.uid === uid) { current = { ...current, status: 'error', error: err.message || String(err) }; emit(); }
     throw err;
   });
   done.catch(() => {});
   return { uid, uploadUrl, done };
+}
+
+// Stops the upload in flight (the show page's queue, when its draft is
+// discarded): tus keeps the address, so the same file picked again
+// resumes. Its `done` never settles after this — the caller stops
+// waiting on it. False when nothing was uploading.
+export function abortUpload(line = 'The upload was stopped.') {
+  const upload = running;
+  if (!upload || !current || current.status !== 'uploading') return false;
+  running = null;
+  try {
+    const p = upload.abort();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch {
+    // already stopped
+  }
+  current = { ...current, status: 'error', error: line };
+  emit();
+  return true;
 }
 
 export function clearUpload() {
