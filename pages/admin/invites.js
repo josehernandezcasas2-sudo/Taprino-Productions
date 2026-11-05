@@ -3,7 +3,8 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 
 // Private beta → Invites (migration 098, lib/betaInvites.js). Who can get
-// through the door while PRIVATE_BETA is on: send Clerk invitations (the
+// through the door while it is shut (Admin → Security's switch, or
+// PRIVATE_BETA=on in Vercel): send Clerk invitations (the
 // email with the link that creates an account), work the requests people
 // left at /welcome, and see who joined. Full admins only.
 export async function getServerSideProps(ctx) {
@@ -79,7 +80,7 @@ export default function InvitesAdmin({ account, mainGenres, apiPath = '/api/admi
       crumbs={['People']}
       intro="Who can get through the door while the site is private."
       actions={data && (
-        <span className={`payouts-pill ${data.enabled ? 'paid' : 'failed'}`} title="The PRIVATE_BETA environment variable in Vercel">
+        <span className={`payouts-pill ${data.enabled ? 'paid' : 'failed'}`} title="The door switch on Admin → Security">
           Private beta · {data.enabled ? 'ON' : 'OFF'}
         </span>
       )}
@@ -114,7 +115,7 @@ export default function InvitesAdmin({ account, mainGenres, apiPath = '/api/admi
                 <Stat n={data.counts.waiting} label="asking" warn={data.counts.waiting > 0} />
               </div>
               <p className="crew-muted" style={{ margin: 0 }}>
-                The door is the <b>PRIVATE_BETA</b> variable in Vercel (on = locked, blank = open). Pair it with Clerk → User &amp; authentication → Restrictions → <b>Sign-up mode: Restricted</b>, so only these addresses can make an account; sign-ins by invited people work in the app too. When the site launches, blank the variable and set Clerk back to Public: nothing here needs undoing.
+                The door is the <b>Private beta door</b> switch on <a href="/admin/security">Admin → Security</a> (PRIVATE_BETA=on in Vercel also keeps it shut). Pair it with Clerk → User &amp; authentication → Restrictions → <b>Sign-up mode: Restricted</b>, so only these addresses can make an account; sign-ins by invited people work in the app too. When the site launches, turn the door off and set Clerk back to Public: nothing here needs undoing.
               </p>
             </div>
           </div>

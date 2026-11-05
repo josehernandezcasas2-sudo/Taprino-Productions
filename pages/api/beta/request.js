@@ -1,5 +1,5 @@
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
-import { privateBetaOn } from '../../../lib/privateBetaRules';
+import { getSecuritySwitches } from '../../../lib/securitySwitches';
 import { saveRequest } from '../../../lib/betaInvites';
 import { applyCors } from '../../../lib/cors';
 
@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
   res.setHeader('Cache-Control', 'private, no-store');
-  if (!privateBetaOn()) return res.status(404).json({ error: 'The site is open; just sign up.' });
+  if (!(await getSecuritySwitches()).doorShut) return res.status(404).json({ error: 'The site is open; just sign up.' });
 
   const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'beta-request'), 5, 3600);
   if (!allowed) return res.status(429).json({ error: 'That’s a few requests already. Give it an hour.' });

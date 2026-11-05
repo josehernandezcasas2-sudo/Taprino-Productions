@@ -1,6 +1,7 @@
 import { clerkMiddleware } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
-import { privateBetaOn, isOpenPath, doorPath } from './lib/privateBetaRules';
+import { isOpenPath, doorPath } from './lib/privateBetaRules';
+import { getSecuritySwitches } from './lib/securitySwitches';
 import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from './lib/suspensionGate';
 import { robotsTag } from './lib/robotsRules';
 import { crossSiteWriteRefused } from './lib/cors';
@@ -19,8 +20,11 @@ import { crossSiteWriteRefused } from './lib/cors';
 //    sent the visitor in a 30-day cookie, last click wins. Checkout reads
 //    it to stamp the subscription with the referrer.
 //
-// 2. The private beta door (lib/privateBetaRules.js): while PRIVATE_BETA
-//    is "on", a signed-out visitor gets /welcome instead of any page that
+// 2. The private beta door (lib/privateBetaRules.js): while the door is
+//    shut (Admin → Security's switch, site_settings.private_beta from
+//    migration 119, read through lib/securitySwitches.js and cached half
+//    a minute; PRIVATE_BETA=on in Vercel keeps it shut whatever the
+//    switch says), a signed-out visitor gets /welcome instead of any page that
 //    isn't on the open list, and an API route answers 401 with
 //    { privateBeta: true } so the app can show its own door. Signed-in
 //    people (only invited emails can create an account while Clerk's
@@ -39,7 +43,8 @@ import { crossSiteWriteRefused } from './lib/cors';
 //
 // 4. Every response carries X-Robots-Tag: noai, noimageai (lib/robotsRules.js;
 //    Jose, 2026-10-25): a request to AI crawlers not to use the page or its
-//    images, with noindex, nofollow added while the beta door is shut. It
+//    images, with noindex, nofollow added while the beta door is shut or
+//    Admin → Security's "Keep out of search engines" is on. It
 //    lives here, not in next.config.js, so the two values never fight
 //    over the same header.
 //
@@ -61,9 +66,14 @@ const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
-export default clerkMiddleware(async (auth, req) => {
+export default clerkMiddleware(async (auth, req, event) => {
   const { pathname, search, searchParams } = req.nextUrl;
-  const beta = privateBetaOn();
+  // Served from this isolate's copy; a stale one is refreshed in the
+  // background (lib/securitySwitches.js), so no request waits on it once
+  // the isolate has read it once.
+  const sw = await getSecuritySwitches({ waitUntil: event && typeof event.waitUntil === 'function' ? (p) => event.waitUntil(p) : null });
+  const beta = sw.doorShut;
+  const tag = robotsTag({ privateBeta: beta, hidden: sw.hidden });
   const isApi = pathname.startsWith('/api/');
   let userId;
   const who = async () => {
@@ -73,7 +83,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   if (isApi && crossSiteWriteRefused({ method: req.method, pathname, origin: req.headers.get('origin'), host: req.headers.get('x-forwarded-host') || req.headers.get('host'), secFetchSite: req.headers.get('sec-fetch-site') })) {
     const refused = NextResponse.json({ error: 'Requests from other websites aren’t accepted.' }, { status: 403 });
-    refused.headers.set('X-Robots-Tag', robotsTag({ privateBeta: beta }));
+    refused.headers.set('X-Robots-Tag', tag);
     return refused;
   }
 
@@ -103,7 +113,7 @@ export default clerkMiddleware(async (auth, req) => {
   const setVia = via && /^[A-Za-z0-9_.-]+$/.test(via);
 
   if (!res) res = NextResponse.next();
-  res.headers.set('X-Robots-Tag', robotsTag({ privateBeta: beta }));
+  res.headers.set('X-Robots-Tag', tag);
   if (setVia) {
     res.cookies.set(VIA_COOKIE, via, {
       maxAge: VIA_MAX_AGE,

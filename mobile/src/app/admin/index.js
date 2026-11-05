@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../lib/api';
+import { apiGet, apiPost } from '../../lib/api';
+import { setCaptureAllowedByServer } from '../../lib/captureBlock';
 import { colors, fonts } from '../../lib/theme';
 import { useAdminRole } from '../../lib/adminRole';
 import TopNav from '../../components/TopNav';
@@ -21,6 +22,12 @@ export default function AdminHome() {
   const role = useAdminRole();
   const [state, setState] = useState({ loading: true, error: null, counts: null, byKind: null, stats: null });
   const [refreshing, setRefreshing] = useState(false);
+  // The screenshot switch (Jose, 2026-11-05: "place the screenshot switch
+  // on admin too"): the same one as Admin → AI security on the website,
+  // through /api/admin/security. Full admins only.
+  const [capture, setCapture] = useState(null);
+  const [captureBusy, setCaptureBusy] = useState(false);
+  const [captureError, setCaptureError] = useState(null);
 
   async function withToken() {
     return Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
@@ -37,12 +44,33 @@ export default function AdminHome() {
         apiGet('/api/admin/stats', token).catch(() => null)
       ]);
       setState({ loading: false, error: null, counts, byKind: queue ? queue.counts : null, stats });
+      if (role.isAdmin) {
+        apiGet('/api/admin/security', token)
+          .then((data) => setCapture(data && data.switches ? data.switches.screenCaptureBlock : null))
+          .catch(() => setCapture(null));
+      }
     } catch (err) {
       setState({ loading: false, error: err.message, counts: null, byKind: null, stats: null });
     }
   }
 
-  useFocusEffect(useCallback(() => { load(); }, []));
+  useFocusEffect(useCallback(() => { load(); }, [role.isAdmin]));
+
+  async function flipCapture(next) {
+    setCaptureBusy(true);
+    setCaptureError(null);
+    try {
+      const token = await withToken();
+      const data = await apiPost('/api/admin/security', { field: 'screenCaptureBlock', value: next }, token);
+      const sw = data && data.switches ? data.switches.screenCaptureBlock : null;
+      setCapture(sw);
+      if (sw) setCaptureAllowedByServer(sw.on);
+    } catch (err) {
+      setCaptureError(err.message);
+    } finally {
+      setCaptureBusy(false);
+    }
+  }
 
   async function refresh() {
     setRefreshing(true);
@@ -88,6 +116,34 @@ export default function AdminHome() {
               <View style={styles.allClear}><Text style={styles.allClearText}>Nothing waiting on review. Nice.</Text></View>
             )}
 
+            {role.isAdmin && capture ? (
+              <>
+                <Text style={styles.sectionLabel}>AI security</Text>
+                <View style={styles.switchCard} testID="capture-switch">
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.rowTitle}>Block screenshots and screen recording</Text>
+                    <Text style={[styles.switchState, { color: capture.on ? colors.brass : colors.warn }]}>
+                      {captureBusy ? 'Saving…' : capture.envOff ? 'Off (held off in Vercel)' : capture.on ? 'On' : 'Off for everyone'}
+                    </Text>
+                    <Text style={styles.switchSub}>
+                      On, a screenshot or recording of anything playing comes out black in the app. Turn it off to grab screenshots, and back on after. Other phones pick it up within about a minute.
+                    </Text>
+                    {capture.envOff ? <Text style={styles.switchNote}>SCREEN_CAPTURE_BLOCK=off is set in Vercel, which keeps it off whatever this says.</Text> : null}
+                    {capture.needsMigration ? <Text style={styles.switchNote}>Needs a database update first (migration 115).</Text> : null}
+                    {captureError ? <Text style={styles.switchError}>{captureError}</Text> : null}
+                  </View>
+                  <Switch
+                    value={capture.on}
+                    onValueChange={flipCapture}
+                    disabled={captureBusy || capture.envOff || capture.needsMigration}
+                    trackColor={{ false: colors.surface3, true: colors.brass }}
+                    thumbColor={colors.ink}
+                    accessibilityLabel="Block screenshots and screen recording"
+                  />
+                </View>
+              </>
+            ) : null}
+
             <Text style={styles.sectionLabel}>Queues</Text>
             {queues.map((q) => (
               <Pressable
@@ -108,6 +164,10 @@ export default function AdminHome() {
               ['Ads & new series', `${adsAndSeries ? `${adsAndSeries} waiting · ` : ''}Ads need a billing rate; series need a look at artwork`, '/admin/review'],
               ['Library & queues', 'Artwork, edits, deletions, orphaned media', '/admin/library'],
               ['Locations', 'Reported problems, hosts gone quiet, refunds, pause or remove a place', '/admin/locations'],
+              ...(role.isAdmin ? [
+                ['Security', 'The beta door, search engines, team two-step, keys', '/admin/security'],
+                ['AI security', 'AI crawlers, locking older uploads, the seal', '/admin/ai-security']
+              ] : []),
               ['Styles & Guides', 'Colors, icons, type', '/admin/styles'],
               ['Everything else', 'Settings, people, channels, ads', '/admin']
             ].map(([title, sub, href]) => (
@@ -155,5 +215,10 @@ const styles = StyleSheet.create({
   rowSub: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkFaint, marginTop: 2 },
   count: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
   countText: { fontFamily: fonts.monoBold, fontSize: 12, color: colors.onBrass },
-  chev: { fontFamily: fonts.mono, fontSize: 18, color: colors.inkFaint }
+  chev: { fontFamily: fonts.mono, fontSize: 18, color: colors.inkFaint },
+  switchCard: { flexDirection: 'row', alignItems: 'flex-start', gap: 12, backgroundColor: colors.surface1, borderWidth: 1, borderColor: colors.hairline, borderRadius: 12, padding: 14, marginBottom: 8 },
+  switchState: { fontFamily: fonts.monoBold, fontSize: 12, marginTop: 3 },
+  switchSub: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.inkDim, marginTop: 6 },
+  switchNote: { fontFamily: fonts.body, fontSize: 13, color: colors.warn, marginTop: 6 },
+  switchError: { fontFamily: fonts.body, fontSize: 13, color: colors.danger, marginTop: 6 }
 });

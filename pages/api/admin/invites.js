@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
 import { checkRateLimit } from '../../../lib/rateLimit';
-import { privateBetaOn } from '../../../lib/privateBetaRules';
+import { getSecuritySwitches } from '../../../lib/securitySwitches';
 import { getInvitesPage, inviteEmails, revokeInvitation, resendInvitation, dismissRequest } from '../../../lib/betaInvites';
 import { sendError } from '../../../lib/apiErrors';
 
@@ -17,7 +17,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       const page = await getInvitesPage();
-      return res.status(200).json({ enabled: privateBetaOn(), ...page });
+      return res.status(200).json({ enabled: (await getSecuritySwitches()).doorShut, ...page });
     }
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');

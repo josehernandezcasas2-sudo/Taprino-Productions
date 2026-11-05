@@ -3,6 +3,7 @@ import { termsWouldClear } from '../lib/ageGate';
 import { getRatings } from '../lib/ratings';
 import { getAllSeries } from '../lib/series';
 import { episodeHref } from '../lib/episodeLinks';
+import { getSecuritySwitches } from '../lib/securitySwitches';
 
 // Generated at request time rather than kept as a static file, so newly
 // published episodes appear without anyone remembering to regenerate
@@ -65,6 +66,18 @@ export async function getServerSideProps({ req, res }) {
   const proto = req.headers['x-forwarded-proto'] || 'https';
   const host = req.headers['x-forwarded-host'] || req.headers.host;
   const origin = `${proto}://${host}`;
+
+  // Withdrawn while the site is kept out of search engines or the beta
+  // door is shut (Admin → Security; lib/securitySwitches.js).
+  const sw = await getSecuritySwitches();
+  if (sw.hidden) {
+    res.statusCode = 404;
+    res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.write('Not listed.');
+    res.end();
+    return { props: {} };
+  }
 
   let episodes = [];
   let series = [];

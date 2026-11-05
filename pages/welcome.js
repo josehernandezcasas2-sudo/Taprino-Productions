@@ -4,7 +4,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { SignInButton, SignUp, useUser } from '@clerk/nextjs';
 import { getAuth } from '@clerk/nextjs/server';
-import { privateBetaOn, safeNext, REQUEST_KINDS } from '../lib/privateBetaRules';
+import { safeNext, REQUEST_KINDS } from '../lib/privateBetaRules';
+import { readSecurityRowFresh } from '../lib/securitySwitches';
+import { effectiveSwitches } from '../lib/securityRules';
 import { SITE } from '../lib/siteConfig';
 
 // The private beta door (Jose, 2026-10-21; mockup: the "Private beta gate"
@@ -17,21 +19,28 @@ import { SITE } from '../lib/siteConfig';
 // ticket into an account — the only way one can be made while Clerk's
 // sign-up mode is Restricted.
 //
-// With the switch off the page redirects home, except ?preview=1 so the
-// page can be looked at before flipping it.
+// The door is a switch on Admin → Security (2026-11-05), and each part of
+// the site keeps it for up to half a minute, so this page never redirects
+// a signed-out visitor anywhere: right after the door opens the middleware
+// may still send people here, and a redirect back would bounce between the
+// two (the home page has no ?next=). With the door open (a fresh read that
+// worked) the page says so with a Continue link; a read that failed shows
+// the door. ?preview=1 shows the door either way, signed in or not, with
+// the form switched off — how an admin looks at it.
 export async function getServerSideProps({ req, res, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const on = privateBetaOn();
-  const preview = !on && query.preview === '1';
-  if (!on && !preview) return { redirect: { destination: '/', permanent: false } };
+  const fresh = await readSecurityRowFresh();
+  const on = !fresh.ok || effectiveSwitches(fresh.row, process.env).doorShut;
+  const preview = query.preview === '1';
+  const opened = !on && !preview;
   const hasTicket = typeof query.__clerk_ticket === 'string' && query.__clerk_ticket.length > 0;
   const next = safeNext(query.next);
   const { userId } = getAuth(req);
   if (userId && !hasTicket && !preview) return { redirect: { destination: next, permanent: false } };
-  return { props: { next, hasTicket, preview } };
+  return { props: { next, hasTicket, preview, opened } };
 }
 
-export default function Welcome({ next, hasTicket, preview }) {
+export default function Welcome({ next, hasTicket, preview, opened = false }) {
   const router = useRouter();
   const { isSignedIn } = useUser();
   // Signed in through the modal (no reload): go where they were headed.
@@ -53,7 +62,8 @@ export default function Welcome({ next, hasTicket, preview }) {
         </header>
 
         <main id="main-content" className="welcome-main">
-          {preview && <p className="welcome-preview">Preview: the switch is off, so this page only shows with <code>?preview=1</code> and the form won’t send.</p>}
+          {preview && <p className="welcome-preview">Preview: this is what a visitor who isn’t signed in sees while the door is shut. The form won’t send.</p>}
+          {opened && <p className="welcome-preview">The site is open to everyone now. <a href={next}>Continue →</a> (if you land back here, give it half a minute).</p>}
 
           {hasTicket ? (
             <section className="welcome-hero">
@@ -81,7 +91,7 @@ export default function Welcome({ next, hasTicket, preview }) {
                 </div>
               </section>
 
-              <RequestForm preview={preview} />
+              <RequestForm preview={preview || opened} />
 
               <section className="welcome-makers">
                 <b>Make films?</b>

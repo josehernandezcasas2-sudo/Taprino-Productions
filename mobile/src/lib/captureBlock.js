@@ -15,7 +15,7 @@ import { apiGet } from './api';
 // One flag for the whole app: every playing screen holds a reference,
 // the block is on while any screen in focus holds one. The server decides
 // whether it applies at all: `captureBlock` from /api/site-settings is the
-// switch on Admin → Settings → Protection (site_settings.screen_capture_block,
+// switch on Admin → AI security and the app's Admin tab (site_settings.screen_capture_block,
 // migration 115; Jose, 2026-10-30, so he can screenshot the app for a
 // design round) and the SCREEN_CAPTURE_BLOCK=off kill switch in Vercel.
 // The app asks again every half minute while something plays, with a
@@ -50,6 +50,15 @@ function askServer() {
     })
     .catch(() => {})
     .finally(() => { asking = null; });
+}
+
+// The Admin tab's switch (mobile/src/app/admin/index.js) hands its answer
+// over at once, so the admin's own phone follows without waiting for the
+// next half-minute ask.
+export function setCaptureAllowedByServer(allows) {
+  serverAllows = allows !== false;
+  lastAsked = Date.now();
+  apply();
 }
 
 // `active`: true while this screen is actually playing something worth

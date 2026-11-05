@@ -7,6 +7,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { AiSealChip, AiSealStamp } from '../components/AiSeal';
 import { SITE } from '../lib/siteConfig';
+import { getSecuritySwitches } from '../lib/securitySwitches';
 
 // The AI policy (Jose, 2026-10-25; canvas
 // https://claude.ai/artifact/68Gq3NnvmRGaAYYinZ1KX5): what the site does
@@ -21,12 +22,15 @@ export async function getServerSideProps({ req, res }) {
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
-    res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
+    res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
     res.setHeader('Vary', 'Cookie');
   }
-  const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
+  // Card 01 follows Admin → AI security's "Block AI answer engines"
+  // (lib/securitySwitches.js, migration 119).
+  const [account, episodes, sw] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getSecuritySwitches()]);
   return {
     props: {
+      answerEnginesBlocked: sw.aiSearchBlocked,
       account: {
         mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
         isSignedIn: account.isSignedIn,
@@ -41,7 +45,7 @@ export async function getServerSideProps({ req, res }) {
 
 const UPDATED = 'October 25, 2026';
 
-export default function AiPolicy({ account = {} }) {
+export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) {
   return (
     <>
       <Head>
@@ -89,7 +93,12 @@ export default function AiPolicy({ account = {} }) {
             <div className="aip-card">
               <div className="aip-kicker">01 · Crawlers</div>
               <h3>We tell them no.</h3>
-              <p>Our robots file names every known AI training crawler and AI answer engine and turns them away. Every page carries a no-AI header, the European text-and-data-mining reservation, and a signal that says search yes, AI no.</p>
+              <p>
+                {answerEnginesBlocked
+                  ? 'Our robots file names every known AI training crawler and AI answer engine and turns them away.'
+                  : 'Our robots file names every known AI training crawler and turns it away. It does not name the AI answer engines (the search features of chatbots), though every page still asks not to be used by AI.'}
+                {' '}Every page carries a no-AI header, the European text-and-data-mining reservation, and a signal that says search yes, AI no.
+              </p>
             </div>
             <div className="aip-card">
               <div className="aip-kicker">02 · Video</div>

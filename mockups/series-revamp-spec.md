@@ -380,7 +380,7 @@ for approval."
 - **25 — on a live episode, a new title image or trailer waits for approval**, like the title, the poster, the
   still and a new file already do (FIELD_POLICY's 'staged'). Slice 2 refused those two with their own line
   because an episode had nowhere to keep the waiting value (a show already has: `series.pending_title_image_url`,
-  `pending_title_image_removal`, `pending_trailer_src`); **migration 119** (slice 3) adds the same three
+  `pending_title_image_removal`, `pending_trailer_src`); **migration 120** (slice 3; 119 went to the security switches, 2026-11-05) adds the same three
   columns to `episodes`, the review queue shows them beside the live ones like the other staged changes, and
   the episode editors (web + app) stop refusing. The admin's decision applies or drops them; a dropped trailer file goes to the orphan queue.
 
