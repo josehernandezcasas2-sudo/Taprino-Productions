@@ -3,6 +3,8 @@ import { getSupabase } from '../../../lib/supabase';
 import { deleteCloudflareVideo } from '../../../lib/cloudflareUpload';
 import { recordAudit } from '../../../lib/auditLog';
 import { videoInUse } from '../../../lib/videoOwnership';
+import { imageInUse } from '../../../lib/orphanedMedia';
+import { sendError } from '../../../lib/apiErrors';
 
 // This is the actual cleanup action, not just marking something reviewed —
 // it calls Cloudflare's or Supabase's real delete API. Permanent, no undo.
@@ -16,11 +18,15 @@ export default async function handler(req, res) {
   // calls this route is gated on (lib/adminAuth.js).
   const roleContext = await requireCapability(req, res, 'manage_deletions');
   if (!roleContext) return;
-  const { userId, email, isAdmin } = roleContext;
+  const { userId, email } = roleContext;
 
   const { orphanId } = req.body || {};
   if (!orphanId) {
     return res.status(400).json({ error: 'orphanId is required.' });
+  }
+  // orphaned_media.id is a uuid: anything else is simply not there.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(orphanId))) {
+    return res.status(404).json({ error: 'Not found — it may have already been cleaned up.' });
   }
 
   const supabase = getSupabase();
@@ -35,6 +41,10 @@ export default async function handler(req, res) {
   if (orphan.kind === 'cloudflare_video' && await videoInUse(orphan.reference)) {
     return res.status(409).json({ error: 'Something on the site still uses this video, so it wasn’t deleted. Dismiss it from the list instead.' });
   }
+  // The same for a picture (a show and its first episode can share one).
+  if (orphan.kind === 'storage_image' && await imageInUse(orphan.reference)) {
+    return res.status(409).json({ error: 'A title on the site still shows this picture, so it wasn’t deleted. Dismiss it from the list instead.' });
+  }
 
   try {
     if (orphan.kind === 'cloudflare_video') {
@@ -44,8 +54,8 @@ export default async function handler(req, res) {
       if (removeError) throw new Error(removeError.message);
     }
   } catch (err) {
-    console.error('cleanup-orphan error:', err.message);
-    return res.status(500).json({ error: `Could not delete this: ${err.message}` });
+    // Cloudflare's or Storage's own text is logged, never echoed.
+    return sendError(res, Object.assign(new Error(`cleanup-orphan: ${err && err.message ? err.message : err}`), { internal: true }), 'admin/cleanup-orphan', 'Could not delete this.');
   }
 
   await recordAudit({

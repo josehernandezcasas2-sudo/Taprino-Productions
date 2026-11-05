@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { rowPill } from '../../lib/showRules';
-import { ArrowDownIcon, ArrowUpIcon, ExternalLinkIcon, PencilIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ExternalLinkIcon, LockIcon, PencilIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { ChevronIcon, GripIcon, KebabIcon, SendIcon, ago, bg, bytesShort, minutesOf, pickerKeys } from './roomBits';
 
 // A season of the show page (series revamp slice 2; spec Screens, "Show
@@ -17,6 +17,13 @@ import { ChevronIcon, GripIcon, KebabIcon, SendIcon, ago, bg, bytesShort, minute
 // (its own still, else the show's), the title (or "Episode N"), the pill
 // (lib/showRules.js rowPill) and the meta line, the kebab. A tap on the
 // row opens the editor.
+//
+// On Admin → Shows (ctx.admin, slice 3a §5.3) a row in review also gets
+// Approve (with Free / Tapa +) and Reject… under it, "Use E9" when its
+// number is taken or missing (manage_episodes), and the line that stops it
+// being approved; a row whose removal is asked gets Confirm removal / Keep
+// it (manage_deletions); the kebab adds the Library's edit modal and, on a
+// live row, its ad plan.
 
 function RowMenu({ items, label }) {
   const [open, setOpen] = useState(false);
@@ -150,8 +157,15 @@ function rowMeta(row, ctx, upload) {
   if (row.captionsStale) parts.push({ warn: 'Captions may be out of sync' });
   const st = row.staged || {};
   if (st.title) parts.push({ wait: 'Title change waiting' });
-  if (st.poster || st.thumbnail) parts.push({ wait: 'Art waiting for approval' });
+  if (st.poster || st.thumbnail || st.titleImage) parts.push({ wait: 'Art waiting for approval' });
+  if (st.trailer) parts.push({ wait: 'New trailer waiting' });
   if (st.newVideo) parts.push({ wait: 'New file waiting' });
+  const review = ctx.admin && row.status === 'pending' ? ctx.admin.rows[row.id] || null : null;
+  if (review && review.editedAt) parts.push(`edited ${ago(review.editedAt)}`);
+  // What stops Approve, unless the line above already says it (a file that
+  // never finished uploading or failed).
+  const saidAlready = review && review.blocked && review.blocked.code === 'master-not-ready' && ['uploading', 'error'].includes(row.master);
+  if (review && review.blocked && review.blocked.line && !saidAlready) parts.push({ warn: review.blocked.line });
   if (row.hasPageChoice === true) parts.push('its own page');
   if (row.tier && ctx.defaultTier && row.tier !== ctx.defaultTier) parts.push(row.tier === 'free' ? 'free' : ctx.premiumWord);
   if (row.uploaderName) parts.push(`uploaded by ${row.uploaderName}`);
@@ -188,6 +202,8 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
   const note = ctx.rowNotes[row.id] || null;
   const busy = ctx.busyRow === row.id;
   const mine = row.mine || ctx.team;
+  const adminReview = ctx.admin && !isDraft && row.status === 'pending' ? ctx.admin.rows[row.id] || null : null;
+  const adminRemoval = Boolean(ctx.admin && !isDraft && row.deletionRequested && !row.withdrawnAt);
   const menu = [];
   if (openable) menu.push({ key: 'edit', label: 'Edit', icon: <PencilIcon size={15} />, onClick: () => actions.open(row) });
   if (ctx.canMove(row)) menu.push({ key: 'move', label: 'Move to…', icon: <ChevronIcon size={15} />, onClick: (e) => actions.openMove(row, e) });
@@ -199,6 +215,10 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
     if (ctx.kind !== 'podcast') menu.push({ key: 'captions', label: 'Captions', icon: <span className="show-menu-cc" aria-hidden="true">CC</span>, onClick: () => actions.open(row) });
   }
   if (!isDraft && row.status === 'approved' && ctx.showPublic && !row.held && !row.deletionRequested) menu.push({ key: 'view', label: 'View page', icon: <ExternalLinkIcon size={15} />, href: `/episode/${encodeURIComponent(row.id)}`, external: true });
+  if (!isDraft && ctx.admin && ctx.admin.can && (ctx.admin.can.edit || ctx.admin.can.fullAdmin)) {
+    menu.push({ key: 'library', label: 'Open in Library modal', icon: <PencilIcon size={15} />, href: `/admin/library?edit=${encodeURIComponent(row.id)}` });
+    if (row.status === 'approved') menu.push({ key: 'adplan', label: 'Ad plan', icon: <ExternalLinkIcon size={15} />, href: `/ad-plan/${encodeURIComponent(row.id)}` });
+  }
   if (isDraft && row.mine) {
     const stopped = (upload && upload.status === 'stopped') || row.master === 'uploading' || row.master === 'none' || row.master === 'error';
     if (stopped && !(upload && ['queued', 'starting', 'uploading'].includes(upload.status))) {
@@ -263,6 +283,12 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
         <div className="show-row-main">{main}</div>
       )}
       <RowMenu items={menu} label={`More for ${row.displayTitle || 'this episode'}`} />
+      {adminReview || adminRemoval ? (
+        <div className="show-row-foot show-adm-rowfoot">
+          {adminReview && <AdminReviewActions row={row} info={adminReview} ctx={ctx} actions={actions} busy={busy} />}
+          {adminRemoval && <AdminRemovalActions row={row} ctx={ctx} actions={actions} busy={busy} />}
+        </div>
+      ) : null}
       {(conflict || note) && (
         <div className="show-row-foot">
           {conflict && (
@@ -280,6 +306,67 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
         </div>
       )}
     </li>
+  );
+}
+
+// Admin → Shows: Approve (with who can watch) and Reject… for a row in
+// review, and "Use E9" when its place stops it (manage_episodes).
+function AdminReviewActions({ row, info, ctx, actions, busy }) {
+  const [tier, setTier] = useState(info.tier === 'premium' ? 'premium' : 'free');
+  const [rejecting, setRejecting] = useState(false);
+  const [reason, setReason] = useState('');
+  const can = ctx.admin.can || {};
+  const needs = ctx.admin.needs || {};
+  const blocked = info.blocked || null;
+  const placeBlock = blocked && (blocked.code === 'taken' || blocked.code === 'unnumbered');
+  const free = placeBlock ? Number(blocked.nextFree) || ctx.admin.nextFree(Number(row.season) || 1) : null;
+  const label = row.code || row.displayTitle || 'this episode';
+  if (rejecting) {
+    return (
+      <form className="show-adm-rowform" onSubmit={async (e) => { e.preventDefault(); if (await actions.rejectRow(row, reason.trim())) { setRejecting(false); setReason(''); } }}>
+        <label className="show-sr" htmlFor={`show-adm-reject-${row.id}`}>What needs fixing in {label}</label>
+        <input id={`show-adm-reject-${row.id}`} className="show-ed-input" type="text" maxLength={1000} value={reason} placeholder="What needs fixing (they read this)" autoFocus onChange={(e) => setReason(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') { setRejecting(false); setReason(''); } }} />
+        <button type="submit" className="show-danger-btn show-mini" disabled={busy}>{busy ? 'Sending…' : 'Send it back'}</button>
+        <button type="button" className="apl-link" onClick={() => { setRejecting(false); setReason(''); }}>Cancel</button>
+      </form>
+    );
+  }
+  return (
+    <>
+      <div className="show-adm-rowacts">
+        <label className="show-adm-tier">
+          <span className="show-sr">Who can watch {label}</span>
+          <select value={tier} disabled={!can.approve || busy} onChange={(e) => setTier(e.target.value)}>
+            <option value="free">Free</option>
+            <option value="premium">Tapa +</option>
+          </select>
+        </label>
+        <button type="button" className="apl-btn show-mini show-adm-approve" disabled={!can.approve || Boolean(blocked) || busy} title={blocked ? blocked.line : undefined} onClick={() => actions.approveRow(row, tier)}>
+          <CheckIcon size={14} /> {busy ? 'Working…' : 'Approve'}
+        </button>
+        <button type="button" className="apl-btn-secondary show-mini" disabled={!can.approve || busy} onClick={() => setRejecting(true)}>Reject…</button>
+        {placeBlock && free && can.edit ? (
+          <button type="button" className="apl-btn-secondary show-mini" disabled={busy} onClick={() => actions.useNumber(row, free)}>Use E{free}</button>
+        ) : null}
+      </div>
+      {!can.approve && needs.approve ? <p className="show-adm-need"><LockIcon size={11} /> <span>{needs.approve}</span></p> : null}
+    </>
+  );
+}
+
+// Admin → Shows: a row whose removal its uploader asked for.
+function AdminRemovalActions({ row, ctx, actions, busy }) {
+  const can = ctx.admin.can || {};
+  const needs = ctx.admin.needs || {};
+  return (
+    <>
+      <div className="show-adm-rowacts">
+        <span className="show-adm-rowk">Removal requested</span>
+        <button type="button" className="show-danger-btn show-mini" disabled={!can.deletions || busy} onClick={() => actions.decideRemoval(row, 'confirm')}>Confirm removal</button>
+        <button type="button" className="apl-btn-secondary show-mini" disabled={!can.deletions || busy} onClick={() => actions.decideRemoval(row, 'deny')}>Keep it</button>
+      </div>
+      {!can.deletions && needs.deletions ? <p className="show-adm-need"><LockIcon size={11} /> <span>{needs.deletions}</span></p> : null}
+    </>
   );
 }
 

@@ -65,9 +65,10 @@ export const NOTIFICATION_TYPES = Object.freeze({
   deletion_denied: kind('Removal declined', 'clapperboard', 'episode'),
   deletion_confirmed: kind('Removed', 'clapperboard', 'creator'),
 
-  // Shows (the series revamp; nothing sends these yet — the show page's
-  // slices do). show_live is a show made public; show_new_episodes goes to
-  // the people who saved the show.
+  // Shows (the series revamp). show_live is a show made public;
+  // show_new_episodes and show_pulled stay unsent (the people who saved a
+  // show are emailed, lib/seriesDrop.js; a hold tells the owner through
+  // `moderation`).
   show_live: kind('Show is public', 'clapperboard', 'series'),
   show_pulled: kind('Show pulled', 'lock', 'show'),
   show_edit_approved: kind('Show change approved', 'clapperboard', 'show'),
@@ -82,6 +83,12 @@ export const NOTIFICATION_TYPES = Object.freeze({
   show_new_episodes: kind('New episodes', 'heart', 'series'),
   // Slice 2: "Send N for review" on the show page, one notice per batch.
   show_sent_for_review: kind('Sent for review', 'clapperboard', 'show'),
+  // Slice 3a: the admin side. A show's episodes approved or sent back
+  // together (one notice per uploader per decision), and a show an admin
+  // set up for someone.
+  show_episodes_approved: kind('Episodes approved', 'clapperboard', 'show'),
+  show_episodes_rejected: kind('Not this time', 'clapperboard', 'show'),
+  show_set_up: kind('A show set up for you', 'clapperboard', 'show'),
 
   // Creator Share: payouts, holds, departures, the numbers changing
   // (lib/creatorShare.js, lib/creatorShareBatch.js, lib/creatorStanding.js,

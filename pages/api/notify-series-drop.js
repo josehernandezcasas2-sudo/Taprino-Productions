@@ -1,53 +1,19 @@
 import { timingSafeEqual } from 'node:crypto';
-import { findSeries } from '../../lib/series';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
-import { mailFrom } from '../../lib/notify';
-import { SITE } from '../../lib/siteConfig';
-import { getStripe } from '../../lib/stripe';
+import { isTitleId } from '../../lib/titleIds';
+import { tellSaversNow } from '../../lib/seriesDrop';
+import { ShowError } from '../../lib/showPage';
+import { sendError } from '../../lib/apiErrors';
 
-
-// This is a manually-triggered tool, not an automated pipeline — there's no
-// database watching for "a new episode was added," so you call this
-// yourself (curl, Postman, a bookmarked form, whatever's easiest) whenever
-// you actually publish a new episode in an existing series. See the README
-// for exactly how to call it.
+// The secret-guarded way to tell the people who saved a show about its new
+// episodes (curl, a bookmarked form). Since the series revamp's slice 3a
+// the daily cron does this by itself and Admin → Shows has a "Tell savers"
+// button; both go through lib/seriesDrop.js, as this does: one capped pass
+// over Stripe's customers (saved shows live in their metadata), once a day
+// per show, each person at most once a week per show, about the episodes
+// released since the show's savers were last told.
 //
-// Scale note: since wishlists live in Stripe customer metadata rather than a
-// real database, finding "everyone who wishlisted series X" means paginating
-// through every customer and checking their metadata client-side — Stripe's
-// API can't search inside a comma-separated string field. Fine at hundreds
-// to low thousands of customers; if this ever needs to scale further, that's
-// the point to introduce a real database for wishlists specifically.
-async function sendDropEmail(email, seriesName, seriesUrl) {
-  if (!process.env.RESEND_API_KEY) {
-    return { skipped: true, reason: 'RESEND_API_KEY not configured' };
-  }
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      from: mailFrom(),
-      reply_to: SITE.contactEmail,
-      to: email,
-      subject: `New episode of ${seriesName} just dropped`,
-      html: `<p>A new episode of <strong>${escapeHtml(seriesName)}</strong> is up — you saved this series to get notified.</p><p><a href="${escapeHtml(seriesUrl)}">${escapeHtml(seriesUrl)}</a></p>`
-    })
-  });
-  if (!res.ok) {
-    const body = await res.text();
-    throw new Error(`Resend API error: ${body}`);
-  }
-  return { sent: true };
-}
-
-// A series name is creator-typed text going into an email's HTML.
-function escapeHtml(value) {
-  return String(value || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-}
-
+//   POST { seriesId, secret } → { ok, seriesId, checked, notified }
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -57,16 +23,13 @@ export default async function handler(req, res) {
   const { seriesId, secret } = req.body || {};
 
   // Rate limit before checking the secret, not just after — this also
-  // throttles repeated guesses at ADMIN_NOTIFY_SECRET itself, not just
-  // abuse once someone already has it.
+  // throttles repeated guesses at ADMIN_NOTIFY_SECRET itself.
   const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'notify-series-drop'), 5, 3600);
   if (!allowed) {
     return res.status(429).json({ error: 'Too many requests.' });
   }
 
-  // Constant-time comparison (security round, 2026-10-26): `!==` returns
-  // early at the first differing character, which leaks the secret's
-  // prefix to anyone timing enough requests.
+  // Constant-time comparison (security round, 2026-10-26).
   const expected = process.env.ADMIN_NOTIFY_SECRET || '';
   const given = typeof secret === 'string' ? secret : '';
   const a = Buffer.from(given);
@@ -75,44 +38,15 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Missing or incorrect secret.' });
   }
 
-  const seriesInfo = await findSeries(seriesId);
-  if (!seriesInfo) {
-    return res.status(400).json({ error: `No series found with id "${seriesId}".` });
+  if (typeof seriesId !== 'string' || !isTitleId(seriesId)) {
+    return res.status(400).json({ error: 'seriesId is required.' });
   }
-
-  if (!process.env.STRIPE_SECRET_KEY) {
-    return res.status(500).json({ error: 'Stripe is not configured.' });
-  }
-
-  // The site's own address, never one taken from the request's headers
-  // (security round, 2026-10-26): this link goes out in emails.
-  const seriesUrl = `https://www.studiotapatv.site/series/${encodeURIComponent(seriesId)}`;
-
-  let notified = 0;
-  let checked = 0;
-  let startingAfter;
 
   try {
-    // Paginate through every customer, 100 at a time, checking metadata.
-    // eslint-disable-next-line no-constant-condition
-    while (true) {
-      const page = await getStripe().customers.list({ limit: 100, starting_after: startingAfter });
-      for (const customer of page.data) {
-        checked += 1;
-        const wishlist = (customer.metadata && customer.metadata.wishlist) || '';
-        const optedOut = customer.metadata && customer.metadata.newsletter === 'opted_out';
-        if (wishlist.split(',').includes(seriesId) && !optedOut && customer.email) {
-          await sendDropEmail(customer.email, seriesInfo.name, seriesUrl);
-          notified += 1;
-        }
-      }
-      if (!page.has_more) break;
-      startingAfter = page.data[page.data.length - 1].id;
-    }
-
-    return res.status(200).json({ ok: true, seriesId, checked, notified });
+    const out = await tellSaversNow(seriesId, { userId: 'system', email: 'notify-series-drop (secret)', isAdmin: true });
+    return res.status(200).json({ ok: true, seriesId, checked: out.checked, notified: out.matched });
   } catch (err) {
-    console.error('notify-series-drop error:', err.message);
-    return res.status(500).json({ error: 'Something went wrong sending notifications.' });
+    if (err instanceof ShowError) return res.status(err.status).json({ error: err.message, ...(err.extra || {}) });
+    return sendError(res, err, 'notify-series-drop', 'Something went wrong sending notifications.');
   }
 }

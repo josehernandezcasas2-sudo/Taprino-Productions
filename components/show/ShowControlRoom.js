@@ -19,6 +19,13 @@ import useSortableRows from './useSortableRows';
 import { callApi } from './EditorBits';
 import { isWideNow, roomPaths, useWide } from './roomBits';
 import { BackArrowIcon, CheckIcon, CloseIcon, InfoIcon, PlusIcon, UndoIcon, WarningIcon } from '../PlayerIcons';
+import FactsCard from './admin/FactsCard';
+import OwnerCard from './admin/OwnerCard';
+import AdminStatusCard from './admin/AdminStatusCard';
+import DecisionsCard from './admin/DecisionsCard';
+import StagedChangesCard from './admin/StagedChangesCard';
+import RemovalCard from './admin/RemovalCard';
+import HistoryCard from './admin/HistoryCard';
 
 // The show page — one control room for a series or a podcast (the series
 // revamp, slice 2; spec Screens "Show page (the control room, creator
@@ -47,8 +54,19 @@ import { BackArrowIcon, CheckIcon, CloseIcon, InfoIcon, PlusIcon, UndoIcon, Warn
 // in contexts/UploadContext.js, which keeps going while the creator moves
 // around the site.
 //
-// Props: { showId, mode: 'creator' (admin in slice 3), openEpisodeId,
-// openIsDraft, openShowEditor: 'details' | 'art' | null, created }.
+// Props: { showId, mode: 'creator' | 'admin', openEpisodeId, openIsDraft,
+// openShowEditor: 'details' | 'art' | null, created }.
+//
+// mode 'admin' (Admin → Shows, slice 3a: mockups/series-slice3a-contract.md
+// §5.2) is the same room inside the admin shell for the team: it also
+// reads GET /api/admin/show/[id] (on load, and with every read of the
+// show, so after every action, editor save, move and poll) and draws the
+// admin cards (components/show/admin/*: About this show, Who runs it,
+// Where it stands, Decisions, Waiting for approval, Remove this show,
+// History) in place of the creator's status card; rows in review get
+// Approve / Reject… inline. The Add bar, drop zones, the upload queue,
+// + Add season, Sell and the creator's Remove card are the owner's and
+// stay hidden.
 
 const POLL_MS = 20000;
 const TOAST_MS = 8000;
@@ -144,19 +162,41 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   const dirtyRef = useRef(false);
   const loadingRef = useRef(null);
   const sideRef = useRef(null);
+  const isAdminMode = mode === 'admin';
+  const [admin, setAdmin] = useState(null);
+  const [adminError, setAdminError] = useState(null);
+  const adminSeq = useRef(0);
+
+  // --- the admin cards' data (mode 'admin') --------------------------------------
+  // The newest answer wins: a slow read never overwrites a later one.
+  const loadAdmin = useCallback(async () => {
+    if (!isAdminMode) return null;
+    adminSeq.current += 1;
+    const seq = adminSeq.current;
+    const r = await callApi('GET', `/api/admin/show/${encodeURIComponent(showId)}`);
+    if (seq !== adminSeq.current) return r;
+    if (r.ok) {
+      setAdmin(r.data);
+      setAdminError(null);
+    } else {
+      setAdminError(r.error);
+    }
+    return r;
+  }, [isAdminMode, showId]);
 
   // --- reading the show -------------------------------------------------------
-  const load = useCallback(async ({ quiet = false, drafts = false } = {}) => {
+  const load = useCallback(async ({ quiet = false, drafts = false, withAdmin = true } = {}) => {
     // A read already on its way may have left before the change this caller
     // just made: the caller waits for one more read after it (shared by
     // everyone who asks meanwhile), so `await load()` always sees the change.
     const cur = loadingRef.current;
     if (cur) {
       cur.followDrafts = cur.followDrafts || drafts;
-      if (!cur.follow) cur.follow = cur.promise.catch(() => null).then(() => load({ quiet: true, drafts: cur.followDrafts }));
+      cur.followAdmin = cur.followAdmin || withAdmin;
+      if (!cur.follow) cur.follow = cur.promise.catch(() => null).then(() => load({ quiet: true, drafts: cur.followDrafts, withAdmin: cur.followAdmin }));
       return cur.follow;
     }
-    const run = { follow: null, followDrafts: false, promise: null };
+    const run = { follow: null, followDrafts: false, followAdmin: false, promise: null };
     loadingRef.current = run;
     run.promise = (async () => {
       try {
@@ -172,7 +212,14 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
             });
           }
         }
-        const r = await callApi('GET', `/api/show/${encodeURIComponent(showId)}`);
+        const [r] = await Promise.all([
+          callApi('GET', `/api/show/${encodeURIComponent(showId)}`),
+          // The admin cards read alongside on the first load and after an
+          // action, a save or a move — not on the poll or a return to the
+          // tab: each read signs the reviewers' players afresh, which would
+          // restart a clip someone is watching.
+          isAdminMode && withAdmin ? loadAdmin() : null
+        ]);
         if (r.ok) {
           setView(r.data);
           setPhase({ state: 'ready' });
@@ -185,7 +232,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       }
     })();
     return run.promise;
-  }, [showId]);
+  }, [showId, isAdminMode, loadAdmin]);
 
   useEffect(() => {
     setPhase({ state: 'loading' });
@@ -226,12 +273,12 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   useEffect(() => {
     if (!inFlux) return undefined;
     const t = setInterval(() => {
-      if (typeof document === 'undefined' || document.visibilityState === 'visible') load({ quiet: true, drafts: true });
+      if (typeof document === 'undefined' || document.visibilityState === 'visible') load({ quiet: true, drafts: true, withAdmin: false });
     }, POLL_MS);
     return () => clearInterval(t);
   }, [inFlux, load]);
   useEffect(() => {
-    const onVis = () => { if (document.visibilityState === 'visible' && viewRef.current) load({ quiet: true }); };
+    const onVis = () => { if (document.visibilityState === 'visible' && viewRef.current) load({ quiet: true, withAdmin: false }); };
     document.addEventListener('visibilitychange', onVis);
     return () => document.removeEventListener('visibilitychange', onVis);
   }, [load]);
@@ -293,7 +340,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   // ?created=1 (New show): say so once, open the drop zone of an empty show.
   useEffect(() => {
     if (!created || !view) return;
-    if (!flat.length) setDropSeason(1);
+    if (!flat.length && !isAdminMode) setDropSeason(1);
     const q = { ...router.query };
     delete q.created;
     router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true, scroll: false });
@@ -373,7 +420,9 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
         : removal ? 'Its removal is requested — it takes nothing new.'
           : declined && !team ? 'An admin declined this show — resubmit it before adding to it.'
             : null;
-  const canAdd = canRun && !locked;
+  // The team adds nothing from the admin page (drafts made there would be
+  // the admin's own); hand entry stays in Library & queues.
+  const canAdd = canRun && !locked && !isAdminMode;
   const kind = show ? show.kind : 'series';
   const seasonsShown = useMemo(() => {
     if (!view) return [];
@@ -619,8 +668,83 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       setExtraSeasons((s) => (s.includes(n) ? s : [...s, n]));
       setDropSeason(n);
     },
-    placeExtra: (x) => setSheet({ kind: 'place', extra: x })
+    placeExtra: (x) => setSheet({ kind: 'place', extra: x }),
+
+    // --- admin mode: a row in review, a row whose removal is asked ---------
+    approveRow: async (row, tier) => {
+      setBusyRow(row.id);
+      setNote(row.id, null);
+      // What the reviewer is looking at (its file): replaced since, the
+      // server refuses instead of releasing the new one unseen.
+      const inReview = admin && admin.review && admin.review.rows ? admin.review.rows[row.id] : null;
+      const r = await callApi('POST', `/api/admin/show/${encodeURIComponent(showId)}`, { action: 'approve', episodeIds: [row.id], tierOverride: tier === 'premium' ? 'premium' : tier === 'free' ? 'free' : 'keep', ...(inReview && inReview.seen ? { seen: { [row.id]: inReview.seen } } : {}) });
+      setBusyRow(null);
+      if (!r.ok) {
+        setNote(row.id, { tone: 'warn', text: r.error });
+        say({ tone: 'warn', title: 'Not approved', lines: [r.error] });
+        load({ quiet: true });
+        return;
+      }
+      const owner = admin && admin.ownerName ? admin.ownerName : 'its owner';
+      say({ tone: 'ok', title: `${row.code ? `${row.code} · ` : ''}${row.displayTitle || 'It'} is approved`, lines: [r.data.showPublic ? 'It’s live now.' : `It stays private until ${owner} makes the show public.`] }, 6000);
+      load({ quiet: true });
+    },
+    rejectRow: async (row, reason) => {
+      setBusyRow(row.id);
+      setNote(row.id, null);
+      const r = await callApi('POST', `/api/admin/show/${encodeURIComponent(showId)}`, { action: 'reject', episodeIds: [row.id], reason });
+      setBusyRow(null);
+      if (!r.ok) {
+        setNote(row.id, { tone: 'warn', text: r.error });
+        load({ quiet: true });
+        return false;
+      }
+      say({ tone: 'ok', title: `${row.displayTitle || 'It'} was sent back`, lines: ['The uploader was told why.'] }, 6000);
+      load({ quiet: true });
+      return true;
+    },
+    useNumber: async (row, n) => {
+      setBusyRow(row.id);
+      setNote(row.id, null);
+      const r = await callApi('PATCH', `/api/show/episode/${encodeURIComponent(row.id)}`, { season: Number(row.season) || 1, seriesOrder: n });
+      setBusyRow(null);
+      if (!r.ok) {
+        setNote(row.id, { tone: 'warn', text: r.error });
+        load({ quiet: true });
+        return;
+      }
+      say({ tone: 'ok', title: `It’s E${n} now` }, 4000);
+      load({ quiet: true });
+    },
+    decideRemoval: async (row, decision) => {
+      if (decision === 'confirm' && !window.confirm(`Remove ${row.displayTitle || 'this episode'} for good? Anyone who bought it keeps it.`)) return;
+      setBusyRow(row.id);
+      setNote(row.id, null);
+      const r = await callApi('POST', '/api/admin/resolve-deletion', { type: 'episode', id: row.id, decision });
+      setBusyRow(null);
+      if (!r.ok) {
+        setNote(row.id, { tone: 'warn', text: r.error });
+        load({ quiet: true });
+        return;
+      }
+      say({
+        tone: 'ok',
+        title: decision !== 'confirm' ? `${row.displayTitle || 'It'} stays up` : r.data && r.data.withdrawn ? `${row.displayTitle || 'It'} is off the site` : `${row.displayTitle || 'It'} is removed`,
+        lines: decision === 'confirm' && r.data && r.data.withdrawn ? ['Someone bought it, so it’s kept for them.'] : []
+      }, 5000);
+      load({ quiet: true });
+    }
   };
+
+  // An "Approve all" refused for a few rows: their own lines go on them.
+  const markProblems = useCallback((problems) => {
+    setRowNotes((n) => {
+      const next = { ...n };
+      for (const id of Object.keys(next)) if (next[id] && next[id].fromBatch) delete next[id];
+      for (const p of problems || []) if (p && p.episodeId) next[p.episodeId] = { tone: 'warn', text: p.words || p.error || 'This one can’t be approved yet.', fromBatch: true };
+      return next;
+    });
+  }, []);
 
   // --- adding files ------------------------------------------------------------------------
   const endpoint = `/api/creator/get-upload-url?seriesId=${encodeURIComponent(showId)}`;
@@ -752,6 +876,14 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     return load({ quiet: true });
   }
   function onProblem(p) {
+    // The team decides waiting changes on the Waiting for approval card.
+    if (isAdminMode && (p.code === 'staged' || p.code === 'staged-episodes')) {
+      const el = document.getElementById('show-adm-staged');
+      if (el) {
+        el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+        return;
+      }
+    }
     if (p.code === 'staged' || p.code === 'trailer' || p.code === 'trailer-failed') {
       openShow('art');
       return;
@@ -863,22 +995,29 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     return () => clearInterval(timer);
   }, [panelShow]);
 
+  // Inside the admin shell the page already has its <main>.
+  const Stage = isAdminMode ? 'div' : 'main';
+  const stageProps = isAdminMode ? { className: 'show-room-stage is-admin' } : { id: 'main-content', className: 'show-room-stage' };
+  const backLink = isAdminMode
+    ? <Link href="/admin/shows" className="acct-back show-room-back"><BackArrowIcon size={14} /> All shows</Link>
+    : <Link href="/creator" className="acct-back show-room-back"><BackArrowIcon size={14} /> Creator Studio</Link>;
+
   if (phase.state !== 'ready' || !view) {
     return (
-      <main id="main-content" className="show-room-stage">
+      <Stage {...stageProps}>
         <div className="show-room is-waiting" aria-busy={phase.state === 'loading' ? 'true' : undefined}>
-          <Link href="/creator" className="acct-back show-room-back"><BackArrowIcon size={14} /> Creator Studio</Link>
+          {backLink}
           {phase.state === 'loading' ? (
             <div className="show-room-skeleton" aria-label="Loading the show"><span /><span /><span /><span /></div>
           ) : (
             <div className="show-room-missing" role="alert">
               <strong>{phase.status === 404 ? 'That show isn’t there' : 'Couldn’t open the show'}</strong>
-              <p>{phase.status === 404 ? 'It may have been removed, or it belongs to someone else.' : phase.error}</p>
+              <p>{phase.status === 404 ? (isAdminMode ? 'It may have been removed.' : 'It may have been removed, or it belongs to someone else.') : phase.error}</p>
               {phase.status !== 404 && <button type="button" className="apl-btn-secondary" onClick={() => { setPhase({ state: 'loading' }); load(); }}>Try again</button>}
             </div>
           )}
         </div>
-      </main>
+      </Stage>
     );
   }
 
@@ -918,26 +1057,39 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     submitHref,
     nextFree,
     defaultTier: (show.defaults && show.defaults.tier) || null,
-    premiumWord: PREMIUM_WORD
+    premiumWord: PREMIUM_WORD,
+    // Admin mode: the rows in review (their place, what blocks them, when
+    // the owner last edited them), what this account may do and why not.
+    admin: isAdminMode && admin ? {
+      rows: (admin.review && admin.review.rows) || {},
+      can: admin.can || {},
+      needs: admin.needs || {},
+      nextFree
+    } : null
   };
 
   const noun = kind === 'podcast' ? 'show' : 'series';
-  const sellable = show.isPublic && canRun && !locked && kind !== 'vertical';
+  const sellable = show.isPublic && canRun && !locked && kind !== 'vertical' && !isAdminMode;
   const episodePrices = pricing && pricing.prices
     ? flat.filter((r) => r.kind === 'episode').map((r) => pricing.prices[`episode:${r.id}`]).filter((p) => p && p.status === 'on' && p.price_cents).map((p) => Number(p.price_cents))
     : [];
   const seasonsForSheets = seasonsShown.map((s) => ({ number: s.number, label: s.label }));
-  const flashLine = createdNote ? `${show.name} is ready. Drop its episodes.` : null;
+  const flashLine = !createdNote ? null
+    : isAdminMode ? `${show.name} is set up. ${show.ownerName || 'Its owner'} can add its episodes from Creator Studio.`
+      : `${show.name} is ready. Drop its episodes.`;
+  const adminAct = (action, body) => callApi('POST', `/api/admin/show/${encodeURIComponent(showId)}`, { action, ...(body || {}) });
+  const adminDone = () => load({ quiet: true });
+  const adminCards = isAdminMode && admin ? { admin, view, onAction: adminAct, onDone: adminDone, say } : null;
 
   return (
-    <main id="main-content" className="show-room-stage">
+    <Stage {...stageProps}>
       <Head>
-        <title>{`${show.name || 'Your show'} — Your ${noun} — ${SITE.name}`}</title>
+        <title>{isAdminMode ? `${show.name || 'A show'} — Shows — Admin — ${SITE.name}` : `${show.name || 'Your show'} — Your ${noun} — ${SITE.name}`}</title>
         <meta name="robots" content="noindex" />
       </Head>
-      <div className={`show-room ${panelEpisode || panelShow ? 'has-panel' : ''}`}>
+      <div className={`show-room ${isAdminMode ? 'is-admin' : ''} ${panelEpisode || panelShow ? 'has-panel' : ''}`}>
         <div className="show-room-side" ref={sideRef}>
-          <Link href="/creator" className="acct-back show-room-back"><BackArrowIcon size={14} /> Creator Studio</Link>
+          {backLink}
           {flashLine && (
             <div className="cs-flash show-room-flash" role="status">
               <CheckIcon size={15} /> <span><strong>{flashLine}</strong></span>
@@ -947,15 +1099,36 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
           {vertical && !team ? (
             <div className="show-status level-neutral"><h2 className="show-status-head"><InfoIcon size={18} /><span>Vertical series are set up by the studio.</span></h2></div>
           ) : null}
-          <ShowCard view={view} canEdit={Boolean(show.canEditShow) && !(vertical && !team)} onEdit={openShow} onCancelStaged={cancelStaged} busy={busy} />
-          <ShowStatusCard view={view} contributor={contributor} onProblem={onProblem} onMakePublic={makePublic} onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null} onResubmit={canRun ? resubmit : null} busy={busy} />
+          <ShowCard view={view} canEdit={Boolean(show.canEditShow) && !(vertical && !team)} onEdit={openShow} onCancelStaged={isAdminMode ? null : cancelStaged} busy={busy} />
+          {isAdminMode ? (
+            adminCards ? (
+              <>
+                <FactsCard {...adminCards} />
+                <OwnerCard {...adminCards} />
+                <AdminStatusCard {...adminCards} onProblem={onProblem} />
+                <DecisionsCard {...adminCards} onProblems={markProblems} />
+                <StagedChangesCard {...adminCards} />
+              </>
+            ) : (
+              <div className="show-side-card show-adm-card" role={adminError ? 'alert' : 'status'}>
+                {adminError ? (
+                  <>
+                    <p className="show-adm-error">{adminError}</p>
+                    <button type="button" className="apl-btn-secondary show-mini" onClick={() => loadAdmin()}>Try again</button>
+                  </>
+                ) : <p className="show-adm-line">Loading the team’s cards…</p>}
+              </div>
+            )
+          ) : (
+            <ShowStatusCard view={view} contributor={contributor} onProblem={onProblem} onMakePublic={makePublic} onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null} onResubmit={canRun ? resubmit : null} busy={busy} />
+          )}
           {sellable && <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) { const r = await callApi('GET', '/api/creator/pricing'); if (r.ok) setPricing(r.data); } setSellOpen(true); }} />}
           {canRun && !(vertical && !team) && <ChannelsCard view={view} canEdit={canRun} locked={held ? 'Locked while it’s pulled.' : removal ? 'Locked while its removal is requested.' : null} busy={busy === 'channels'} onToggle={toggleChannels} />}
-          {!(vertical && !team) && <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />}
+          {!isAdminMode && !(vertical && !team) && <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />}
         </div>
 
         <div className="show-room-main">
-          {!(vertical && !team) && (
+          {!isAdminMode && !(vertical && !team) && (
             <AddEpisodesBar
               view={view}
               ctx={ctx}
@@ -964,13 +1137,15 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
               onRss={() => setSheet({ kind: 'rss' })}
             />
           )}
-          <QueuePanel
-            items={myQueue.map((it) => ({ ...it, ...(uploads[it.draftId] || {}), key: it.key, status: it.status, name: it.file ? it.file.name : null }))}
-            paused={queuePaused}
-            stopped={canAdd ? stoppedDrafts.filter((r) => (r.master === 'uploading' || (r.master === 'none' && r.file)) && !(uploads[r.id] && uploads[r.id].status === 'stopped')).length : 0}
-            onRetry={() => retryQueueItems({ showId })}
-            onResumeFiles={onResumePicked}
-          />
+          {!isAdminMode && (
+            <QueuePanel
+              items={myQueue.map((it) => ({ ...it, ...(uploads[it.draftId] || {}), key: it.key, status: it.status, name: it.file ? it.file.name : null }))}
+              paused={queuePaused}
+              stopped={canAdd ? stoppedDrafts.filter((r) => (r.master === 'uploading' || (r.master === 'none' && r.file)) && !(uploads[r.id] && uploads[r.id].status === 'stopped')).length : 0}
+              onRetry={() => retryQueueItems({ showId })}
+              onResumeFiles={onResumePicked}
+            />
+          )}
           {canRun && !shows118 && (
             <p className="show-behind" role="status"><InfoIcon size={15} /> Reordering needs a database update (migration 118)</p>
           )}
@@ -994,6 +1169,8 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
             </button>
           )}
           {((view.extras || []).length > 0 || canAdd) && <ExtrasShelf view={view} ctx={ctx} actions={actions} />}
+          {adminCards && <RemovalCard {...adminCards} />}
+          {adminCards && <HistoryCard {...adminCards} />}
         </div>
       </div>
 
@@ -1102,7 +1279,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       )}
 
       <RoomToast toast={toast} onClose={() => say(null)} />
-    </main>
+    </Stage>
   );
 }
 

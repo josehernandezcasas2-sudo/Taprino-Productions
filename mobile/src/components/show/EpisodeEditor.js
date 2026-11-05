@@ -39,6 +39,9 @@ import {
 // payload's `policy` says: applies at once, waits for approval (the
 // waiting value with Cancel → DELETE …/staged), or is the team's (the
 // server's words under it). The Save bar names what goes to review.
+// On a live episode a new title image, its removal and a new trailer wait
+// too (migration 120, slice 3a; ShowEditor's Art tab, the same words);
+// before 120 the policy locks them with the server's line.
 //
 // The app's habits: a poster, still or title image picked from the library
 // is saved the moment it's picked (or cut from the film), and a trailer the
@@ -175,10 +178,16 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   // isn't): the server's own line, and the controls that need it grey.
   const [behind, setBehind] = useState({});
   const noteBehind = useCallback((r) => {
-    const m = migrationRefusal(r);
+    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && r.data.code === 'migration-120' ? { code: 'migration-120', line: r.error } : null);
     if (m) setBehind((b) => ({ ...b, [m.code]: m.line }));
     return Boolean(m);
   }, []);
+  // The title image and the trailer wait in 120's columns on a live
+  // episode; a 503 seen at run time locks them with the server's line.
+  const artPol = useCallback((f) => {
+    const p = policy[f] || LOCKED_FALLBACK;
+    return behind['migration-120'] && p.mode === 'staged' ? { mode: 'locked', line: behind['migration-120'] } : p;
+  }, [policy, behind]);
   const has118 = (!data.migration || data.migration.shows118 !== false) && !behind['migration-118'];
   const inShow = Boolean(show) && (ep.contentType === 'series' || ep.contentType === 'podcast');
   const isExtra = ep.contentType === 'bonus';
@@ -465,13 +474,16 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     setTrailerUp((t) => (t && t.uid === uid ? { ...t, state: 'saving' } : t));
     const r = await call('PATCH', epPath, { trailerUid: uid });
     if (!r.ok) {
+      noteBehind(r);
       setTrailerUp((t) => (t && t.uid === uid ? { ...t, state: 'failed', error: r.error } : t));
       return;
     }
     setTrailerUp(null);
     setData(r.data.view);
     const waits = (r.data.staged || []).includes('trailer');
-    say({ tone: 'ok', title: waits ? 'The trailer waits for approval' : 'Trailer saved', lines: r.data.notices || [] });
+    const liveTrailer = Boolean(r.data.view && r.data.view.episode && r.data.view.episode.trailer);
+    const waitLine = waits ? (liveTrailer ? 'The current one keeps playing until we approve it.' : 'No trailer plays until we approve it.') : null;
+    say({ tone: 'ok', title: waits ? 'The trailer waits for approval' : 'Trailer saved', lines: [waitLine, ...(r.data.notices || [])].filter(Boolean) });
   }
 
   async function pickTrailer() {
@@ -507,12 +519,17 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     const r = await call('PATCH', epPath, body);
     setBusy(null);
     if (!r.ok) {
+      noteBehind(r);
       say({ tone: 'warn', title: `${words} wasn’t saved`, lines: [r.error] }, 8000);
       return;
     }
     setData(r.data.view);
     const waits = (r.data.staged || []).length > 0;
-    say({ tone: 'ok', title: waits ? `${words} waits for approval` : `${words} is saved`, lines: [waits ? 'Visitors see the live one until we approve it.' : null, ...(r.data.notices || [])].filter(Boolean) });
+    say({
+      tone: 'ok',
+      title: r.data.unchanged ? 'Nothing changed' : waits ? `${words} waits for approval` : `${words} is saved`,
+      lines: [waits ? 'Visitors see the live one until we approve it.' : null, ...(r.data.notices || [])].filter(Boolean)
+    });
   }
   async function pickArt(field) {
     let img = null;
@@ -610,14 +627,22 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           : ep.status === 'rejected' ? 'Not this time'
             : show && !show.isPublic ? 'Approved · the show isn’t public yet'
               : `Live${ep.releasedAt || ep.reviewedAt ? ` since ${shortDate(ep.releasedAt || ep.reviewedAt)}` : ''}`;
+  const st = ep.staged || {};
   const stagedFields = [
-    ep.staged && ep.staged.title ? { field: 'title', words: `title “${ep.staged.title}”` } : null,
-    ep.staged && ep.staged.description ? { field: 'description', words: 'an edited description' } : null,
-    ep.staged && ep.staged.poster ? { field: 'poster', words: 'the poster' } : null,
-    ep.staged && ep.staged.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
-    ep.staged && ep.staged.video ? { field: 'video', words: `a new file (${ep.staged.video.ready ? 'ready' : masterWords(ep.staged.video.state).text.toLowerCase()})` } : null
+    st.title ? { field: 'title', words: `title “${st.title}”` } : null,
+    st.description ? { field: 'description', words: 'an edited description' } : null,
+    st.poster ? { field: 'poster', words: 'the poster' } : null,
+    st.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
+    // Migration 120: a waiting image replaces a waiting removal and the
+    // other way round, so at most one of these two is there.
+    st.titleImageUrl ? { field: 'titleImage', words: 'a new title image' } : st.titleImageRemoval ? { field: 'titleImage', words: 'removing the title image' } : null,
+    st.trailer ? { field: 'trailer', words: 'a new trailer' } : null,
+    st.video ? { field: 'video', words: `a new file (${st.video.ready ? 'ready' : masterWords(st.video.state).text.toLowerCase()})` } : null
   ].filter(Boolean);
   const canAct = viewer.isUploader || viewer.team;
+  // Taking back a waiting change is the uploader's (the team decides it on
+  // the website's admin page, where Deny tells them).
+  const canCancel = Boolean(viewer.isUploader);
 
   const banners = (
     <>
@@ -626,7 +651,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           {stagedFields.map((s) => (
             <View key={s.field} style={es.bannerItem}>
               <Text style={[ss.p, { flex: 1 }]}>{s.words}</Text>
-              {canAct ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
+              {canCancel ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
             </View>
           ))}
         </Banner>
@@ -684,7 +709,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
         </View>
       </View>
       {pendingVideo ? (
-        <StagedBox title="A new file waits for approval" onCancel={canAct ? () => cancelStaged('video') : null} busy={busy === 'cancel-video'}>
+        <StagedBox title="A new file waits for approval" onCancel={canCancel ? () => cancelStaged('video') : null} busy={busy === 'cancel-video'}>
           <Text style={ss.small}>{pendingVideo.ready ? 'Ready — we look at it next.' : `${masterWords(pendingVideo.state).text}.`} The current file keeps playing.</Text>
         </StagedBox>
       ) : null}
@@ -735,7 +760,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
         fallbackTag={show ? 'Using the show’s art' : null}
         staged={staged}
         stagedNote={`Visitors see the live ${field === 'poster' ? 'poster' : 'still'} until we approve this one.`}
-        onCancelStaged={canAct ? () => cancelStaged(field) : null}
+        onCancelStaged={canCancel ? () => cancelStaged(field) : null}
         cancelBusy={busy === `cancel-${field}`}
         emptyTitle="None yet"
         emptyText={show ? null : 'We use a frame of the film until you set one.'}
@@ -752,11 +777,12 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   };
 
   const capPolicy = pol('captions');
-  const trailerPolicy = pol('trailer');
+  const trailerPolicy = artPol('trailer');
   const aboutMax = DESC_MAX - (form.oneLine.trim() ? form.oneLine.trim().length + 2 : 0);
   const makerLine = (ep.creditLines || []).find((l) => l.key === 'maker');
   const makerName = makerLine ? makerLine.name : form.artist || (show && show.ownerName) || null;
-  const titlePolicy = pol('titleImage');
+  const titlePolicy = artPol('titleImage');
+  const titleWaiting = Boolean(st.titleImageUrl || st.titleImageRemoval);
   const webEditor = `/creator/show/${enc(theShowId)}/episode/${enc(ep.id)}`;
 
   // --- Place ---------------------------------------------------------------------
@@ -808,7 +834,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
               placeholder={placeholder}
               liveTitle={init.title}
               stagedTitle={ep.staged ? ep.staged.title : null}
-              onCancelStaged={canAct ? () => cancelStaged('title') : null}
+              onCancelStaged={canCancel ? () => cancelStaged('title') : null}
               cancelBusy={busy === 'cancel-title'}
               edited={edited('title')}
             />
@@ -827,16 +853,22 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             <ArtSlot
               kind="title"
               label="Title image · PNG"
-              status={art.titleImageUrl ? 'live' : null}
+              status={titleWaiting ? 'waiting' : art.titleImageUrl ? 'live' : null}
               policy={titlePolicy}
               live={art.titleImageUrl || null}
-              emptyTitle="None"
+              staged={st.titleImageUrl || null}
+              stagedNote="Visitors see the live title image until we approve this one."
+              onCancelStaged={canCancel ? () => cancelStaged('titleImage') : null}
+              cancelBusy={busy === 'cancel-titleImage'}
+              emptyTitle={st.titleImageRemoval ? 'Removal waits for approval' : 'None'}
               emptyText="The name set as a picture, shown on the art."
+              caption={st.titleImageRemoval && art.titleImageUrl ? 'Removal waits for approval — visitors see it until then.' : null}
               busy={busy === 'art-titleImage'}
               actions={isOpen(titlePolicy) ? (
                 <>
-                  <SmallButton label={art.titleImageUrl ? 'Replace' : 'Upload'} disabled={Boolean(busy)} onPress={() => pickArt('titleImage')} />
-                  {art.titleImageUrl ? <SmallButton label="Remove" disabled={Boolean(busy)} onPress={removeTitleImage} /> : null}
+                  <SmallButton label={art.titleImageUrl || st.titleImageUrl ? 'Replace' : 'Upload'} disabled={Boolean(busy)} onPress={() => pickArt('titleImage')} />
+                  {art.titleImageUrl && !st.titleImageRemoval ? <SmallButton label="Remove" disabled={Boolean(busy)} onPress={removeTitleImage} /> : null}
+                  {st.titleImageRemoval && !st.titleImageUrl && canCancel ? <CancelButton busy={busy === 'cancel-titleImage'} onPress={() => cancelStaged('titleImage')} /> : null}
                 </>
               ) : null}
             />
@@ -867,7 +899,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
                 {trailerPolicy.mode === 'staged' ? <ClockIcon size={12} color={colors.olive} /> : null}
                 <Text style={ss.cardK}>Trailer</Text>
               </View>
-              <Text style={[ss.mono, { color: ep.trailer ? colors.ok : colors.inkDim }]}>{trailerUp ? (trailerUp.state === 'stopped' ? 'STOPPED' : trailerUp.state === 'failed' ? 'NOT SAVED' : 'UPLOADING') : ep.trailer ? 'LIVE' : 'NONE'}</Text>
+              <Text style={[ss.mono, { color: !trailerUp && st.trailer ? colors.olive : ep.trailer ? colors.ok : colors.inkDim }]}>{trailerUp ? (trailerUp.state === 'stopped' ? 'STOPPED' : trailerUp.state === 'failed' ? 'NOT SAVED' : 'UPLOADING') : st.trailer ? 'WAITING FOR APPROVAL' : ep.trailer ? 'LIVE' : 'NONE'}</Text>
             </View>
             {trailerUp ? (
               <UploadLine
@@ -880,11 +912,15 @@ function EpisodeMode({ showId, initial, auth, sent }) {
                 {trailerUp.state === 'failed' ? <LinkText onPress={() => attachTrailer(trailerUp.uid)}>Try again</LinkText> : null}
                 {['stopped', 'failed'].includes(trailerUp.state) ? <LinkText onPress={() => setTrailerUp(null)}>Not this one</LinkText> : null}
               </UploadLine>
+            ) : st.trailer ? (
+              <StagedBox title="A new trailer waits for approval" onCancel={canCancel ? () => cancelStaged('trailer') : null} busy={busy === 'cancel-trailer'}>
+                <Text style={ss.small}>{ep.trailer ? 'The current one keeps playing until then.' : 'No trailer plays until then.'}</Text>
+              </StagedBox>
             ) : (
               <Text style={ss.small}>{ep.trailer ? 'A trailer is attached; it plays on its own page and in the show’s hero.' : 'A short clip, 15–30 seconds. Optional.'}</Text>
             )}
             {isOpen(trailerPolicy) && (!trailerUp || ['stopped', 'failed'].includes(trailerUp.state)) ? (
-              <SmallButton label={ep.trailer ? 'Replace the trailer' : 'Add a trailer'} icon={<UploadIcon size={15} color={colors.ink} />} disabled={busyUpload} onPress={pickTrailer} />
+              <SmallButton label={ep.trailer || st.trailer ? 'Replace the trailer' : 'Add a trailer'} icon={<UploadIcon size={15} color={colors.ink} />} disabled={busyUpload} onPress={pickTrailer} />
             ) : null}
             <FieldNote policy={trailerPolicy} />
           </View>

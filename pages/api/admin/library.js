@@ -1,6 +1,7 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { listPlanStates } from '../../../lib/adPlans';
+import { isTitleId } from '../../../lib/titleIds';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -14,9 +15,12 @@ export default async function handler(req, res) {
   // the page lets in isn't met by an empty, locked list.
   const roleContext = await requireCapability(req, res, ['manage_episodes', 'manage_artwork', 'manage_deletions']);
   if (!roleContext) return;
-  const { isAdmin } = roleContext;
 
-  const { q } = req.query || {};
+  // ?id=<titleId>: exactly that row (the Library's ?edit=<id> opens the
+  // edit modal for it, the admin show page's "Open in Library modal").
+  const { q, id } = req.query || {};
+  const one = typeof id === 'string' && id !== '' ? id : null;
+  if (one !== null && !isTitleId(one)) return res.status(404).json({ error: 'That title isn’t there.' });
 
   const supabase = getSupabase();
   // Every column the edit modal (components/AdminEditEpisodeModal.js)
@@ -35,7 +39,9 @@ export default async function handler(req, res) {
   // Simple free-text match on title or artist — good enough at the scale
   // of one studio's library; worth a real search index if this ever grows
   // into the thousands of episodes.
-  if (q && String(q).trim() !== '') {
+  if (one !== null) {
+    query = query.eq('id', one);
+  } else if (q && String(q).trim() !== '') {
     // The term goes into a PostgREST filter string: commas and parens would
     // rewrite it, and LIKE wildcards would match everything.
     const term = String(q).trim().slice(0, 80).replace(/[,()"]/g, ' ').replace(/[\\%_]/g, (c) => `\\${c}`);
@@ -47,6 +53,7 @@ export default async function handler(req, res) {
     console.error('admin library error:', error.message);
     return res.status(500).json({ error: 'Could not load the library.' });
   }
+  if (one !== null && (!data || data.length === 0)) return res.status(404).json({ error: 'That title isn’t there.' });
 
   // Episode Ad Curator state per row (lib/adPlans.js): default / draft / ready,
   // and the names of what the bonus rows hang under (below).

@@ -924,7 +924,7 @@ function suite(R, who) {
     const pinned = R.canMoveTo(mine, b, viewer, { sourceShow: a, pins: [{ channel: 'TapaTV' }] });
     assert.deepEqual([pinned.code, pinned.reason], ['pinned', 'Pinned on TapaTV — ask us to unpin it first.']);
     assert.equal(R.canMoveTo(mine, b, viewer, { sourceShow: a, pins: 1 }).reason, 'Pinned on a channel — ask us to unpin it first.');
-    const admin = R.canMoveTo(mine, { ...b, creatorId: 'u_other', status: 'pending' }, { isAdmin: true, userId: 'u_jose' }, { sourceShow: a, buyers: { source: 2, target: 1 }, pins: [{ channel: 'TapaTV' }, { channel: 'TapaTV' }], onChannel: true, names: { u_other: 'Other Person' } });
+    const admin = R.canMoveTo(mine, { ...b, creatorId: 'u_other', status: 'pending' }, { isAdmin: true, userId: 'u_jose' }, { sourceShow: a, buyers: { source: 2, target: 1 }, pins: [{ channel: 'TapaTV' }, { channel: 'TapaTV' }], onChannel: true, names: { u_other: 'Other Person' }, payeeRuleLive: true });
     assert.equal(admin.ok, true);
     assert.deepEqual([admin.payeeBefore, admin.payeeAfter, admin.earningsMove], ['u_mara', 'u_other', true]);
     assert.deepEqual(admin.buyersAffected, { lose: 2, gain: 1 });
@@ -951,13 +951,72 @@ function suite(R, who) {
     // Between two of the runner's shows when one pays a producer: allowed, and said.
     const a = { id: 'night-bus', name: 'Night Bus', creatorId: 'u_mara', kind: 'series', status: 'approved' };
     const paid = { ...a, id: 'paid-show', name: 'Paid Show', paidTo: 'u_prod', status: 'approved' };
-    const move = R.canMoveTo(ep('e3', 3, 1, { submittedBy: 'u_mara' }), paid, { userId: 'u_mara' }, { sourceShow: a });
+    const move = R.canMoveTo(ep('e3', 3, 1, { submittedBy: 'u_mara' }), paid, { userId: 'u_mara' }, { sourceShow: a, payeeRuleLive: true });
     assert.equal(move.ok, true);
     assert.equal(move.earningsMove, true);
     assert.deepEqual(move.lines, ['Future earnings go to the new show’s paid account']);
     // A title paid to someone itself keeps its payee wherever it goes.
-    const own = R.canMoveTo(ep('e4', 4, 1, { submittedBy: 'u_mara', paidTo: 'u_x' }), paid, { userId: 'u_mara' }, { sourceShow: a });
+    const own = R.canMoveTo(ep('e4', 4, 1, { submittedBy: 'u_mara', paidTo: 'u_x' }), paid, { userId: 'u_mara' }, { sourceShow: a, payeeRuleLive: true });
     assert.equal(own.earningsMove, false);
+  });
+
+  tt('canMoveTo: until slice 3b no move says earnings change (PAYEE_RULE_LIVE)', () => {
+    assert.equal(R.PAYEE_RULE_LIVE, false);
+    const a = { id: 'night-bus', name: 'Night Bus', creatorId: 'u_mara', kind: 'series', status: 'approved' };
+    const other = { id: 'day-bus', name: 'Day Bus', creatorId: 'u_dee', kind: 'series', status: 'approved' };
+    const mine = ep('e3', 3, 1, { submittedBy: 'u_mara' });
+    const admin = { isAdmin: true, userId: 'u_jose' };
+    const off = R.canMoveTo(mine, other, admin, { sourceShow: a, names: { u_mara: 'Mara Reyes', u_dee: 'Dee' } });
+    assert.equal(off.ok, true);
+    assert.equal(off.earningsMove, false);
+    assert.deepEqual([off.payeeBefore, off.payeeAfter], ['u_mara', 'u_dee'], 'who payeeOf would pick is still reported');
+    assert.deepEqual(off.lines, ['Its earnings stay with Mara Reyes.']);
+    assert.equal(off.lines.some((l) => /Future earnings/.test(l)), false);
+    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a }).lines, ['Its earnings stay with whoever uploaded it.']);
+    // The uploader runs the target: nothing to say.
+    assert.deepEqual(R.canMoveTo(mine, { ...other, creatorId: 'u_mara' }, admin, { sourceShow: a }).lines, []);
+    // payeeRuleLive: false is the same as leaving it out; true is today's rule.
+    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a, payeeRuleLive: false, names: { u_dee: 'Dee' } }).lines, ['Its earnings stay with whoever uploaded it.']);
+    const on = R.canMoveTo(mine, other, admin, { sourceShow: a, payeeRuleLive: true, names: { u_dee: 'Dee' } });
+    assert.equal(on.earningsMove, true);
+    assert.deepEqual(on.lines, ['Future earnings go to Dee']);
+  });
+
+  tt('approvalBlocker: why an episode can\'t be approved yet', () => {
+    const show = { id: 'night-bus', name: 'Night Bus', status: 'pending', creatorId: 'u_mara' };
+    const cf = (id) => `https://customer-x.cloudflarestream.com/${id}/manifest/video.m3u8`;
+    const e4 = ep('e4', 4, 1, { status: 'pending', src: cf('uid4') });
+    const rows = [ep('e1', 1), ep('e2', 2), ep('e3', 3), e4];
+    assert.equal(R.approvalBlocker(e4, { slotRows: rows, state: 'ready', show }), null);
+    assert.deepEqual(R.approvalBlocker(e4, { slotRows: rows, state: 'ready', show: { ...show, moderation_hold: true } }), { status: 409, code: 'show-held', error: 'Its show is pulled — restore the show first.' });
+    assert.deepEqual(R.approvalBlocker(e4, { slotRows: rows, state: 'ready', show: { ...show, deletionRequested: true } }), { status: 409, code: 'show-removal', error: 'Its show’s removal is requested — decide that first.' });
+    const bare = { ...e4, seriesOrder: null };
+    assert.deepEqual(R.approvalBlocker(bare, { slotRows: rows, state: 'ready', show }), { status: 409, code: 'unnumbered', error: 'Give it an episode number before approving it.' });
+    const taken = R.approvalBlocker({ ...e4, seriesOrder: 2 }, { slotRows: rows, state: 'ready', show });
+    assert.equal(taken.status, 409);
+    assert.equal(taken.code, 'taken');
+    assert.deepEqual(taken.holder, { id: 'e2', title: 'T-e2' });
+    assert.equal(taken.nextFree, 4, 'its own number counts as free');
+    assert.deepEqual([taken.season, taken.number], [1, 2]);
+    assert.match(taken.error, /E2 in Season 1 is taken by “T-e2”\. The next free number is E4\./);
+    // Its own row in slotRows doesn't count against it.
+    assert.equal(R.approvalBlocker(e4, { slotRows: rows, state: 'ready' }), null);
+    assert.deepEqual(R.approvalBlocker({ ...e4, src: null }, { slotRows: rows }), { status: 409, code: 'no-file', error: 'There’s no file to approve yet.', master: 'none' });
+    const not = (state) => R.approvalBlocker(e4, { slotRows: rows, state });
+    assert.deepEqual(not('pendingupload'), { status: 409, code: 'master-not-ready', error: 'Not yet: the video is still uploading.', master: 'uploading' });
+    assert.equal(not('inprogress').error, 'Not yet: Cloudflare is still processing the video.');
+    assert.equal(not('error').error, 'Not yet: Cloudflare could not process the video — replace it first.');
+    assert.equal(not('deleted').error, 'Not yet: Cloudflare could not process the video — replace it first.');
+    assert.equal(not(undefined), null, 'unknown doesn\'t block (amendment 3)');
+    assert.equal(not('something-else'), null);
+    assert.equal(R.approvalBlocker({ ...e4, src: null, audioUrl: 'https://x/a.mp3', contentType: 'podcast' }, { slotRows: rows }), null, 'an audio episode plays');
+    assert.equal(R.approvalBlocker({ ...e4, src: 'https://files.example.com/a.mp4' }, { slotRows: rows }), null, 'a self-hosted file plays');
+    // A standalone title is only asked about its master.
+    const film = { id: 'film-1', contentType: 'movie', status: 'pending', src: cf('f1') };
+    assert.equal(R.approvalBlocker(film, { state: 'ready' }), null);
+    assert.equal(R.approvalBlocker({ ...film, contentType: 'series', seriesId: null }, { state: 'ready' }), null, 'a series episode with no show has no number to check');
+    assert.equal(R.approvalBlocker(film, { state: 'processing' }).code, 'master-not-ready');
+    assert.equal(R.approvalBlocker(null).code, 'missing');
   });
 
   tt('cascadePlan: what removing a show takes and keeps (decision 15)', () => {
@@ -971,8 +1030,15 @@ function suite(R, who) {
     assert.equal(none.adminWords, '3 episodes · 2 extras · 0 with buyers (kept for them)');
     const one = R.cascadePlan(show, eps, extras, { titles: { b: 2, x2: 1 } }, { channelSlots: 1, outsideReferences: 3 });
     assert.deepEqual(one.rows.filter((r) => r.action === 'withdraw').map((r) => r.id), ['b', 'x2']);
-    assert.equal(one.words, 'Night Bus, its 3 episodes and 2 extras · 2 titles have buyers and will be kept for them');
-    assert.equal(one.adminWords, '3 episodes · 2 extras · 2 with buyers (kept for them) · channel slots: 1 · outside references kept by title');
+    assert.equal(one.show.action, 'withdraw', 'b is still filed in the show (no on-delete cascade), so the show is kept');
+    assert.equal(one.words, 'Night Bus, its 3 episodes and 2 extras · 2 titles have buyers, so they and the show are kept for them');
+    assert.equal(one.adminWords, '3 episodes · 2 extras · 2 with buyers (kept for them) · the show is kept (a title in it has buyers) · channel slots: 1 · outside references kept by title');
+    // Only an extra filed under an episode has buyers: the show itself can go.
+    const extraOnly = R.cascadePlan(show, eps, extras, { titles: { x2: 1 } });
+    assert.equal(extraOnly.show.action, 'delete');
+    assert.equal(extraOnly.words, 'Night Bus, its 3 episodes and 2 extras · 1 title has buyers and will be kept for them');
+    // An extra filed in the show itself with buyers keeps the show.
+    assert.equal(R.cascadePlan(show, eps, extras, { titles: { x1: 1 } }).show.action, 'withdraw');
     assert.deepEqual(one.counts, { episodes: 3, extras: 2, kept: 2, deleted: 3, seriesBuyers: 0, channelSlots: 1 });
     // A whole-series purchase keeps the show, every episode and the extras filed in it.
     const series = R.cascadePlan(show, eps, extras, { series: 4 });
@@ -981,8 +1047,11 @@ function suite(R, who) {
     assert.equal(series.words, 'Night Bus, its 3 episodes and 2 extras · 4 people bought the whole series, so it will be kept for them');
     assert.equal(series.adminWords, '3 episodes · 2 extras · 4 with buyers (kept for them) · 4 series buyers (the show is kept)');
     // An episode already withdrawn stays withdrawn; the small shows.
-    assert.equal(R.cascadePlan(show, [ep('w', 1, 1, { withdrawnAt: '2026-10-01' })], [], {}).rows[0].action, 'withdraw');
-    assert.equal(R.cascadePlan(show, [ep('a', 1)], [], { titles: { a: 1 } }).words, 'Night Bus and its 1 episode · 1 title has buyers and will be kept for them');
+    const withdrawn = R.cascadePlan(show, [ep('w', 1, 1, { withdrawnAt: '2026-10-01' })], [], {});
+    assert.equal(withdrawn.rows[0].action, 'withdraw');
+    assert.equal(withdrawn.show.action, 'withdraw', 'a withdrawn episode still filed in the show keeps it');
+    assert.equal(R.cascadePlan(show, [ep('a', 1)], [], { titles: { a: 1 } }).words, 'Night Bus and its 1 episode · 1 title has buyers, so it and the show are kept for them');
+    assert.equal(R.cascadePlan(show, [{ id: 'a', series_id: 'night-bus', content_type: 'series', season: 1, series_order: 1 }], [], { titles: { a: 1 } }).show.action, 'withdraw', 'the database shape too');
     assert.equal(R.cascadePlan(show, [], [{ id: 'x' }], {}).words, 'Night Bus and its 1 extra');
     assert.equal(R.cascadePlan(show, [], [], {}).words, 'Night Bus (nothing in it yet)');
     assert.equal(R.cascadePlan({ id: 's' }, [], [], { series: 1 }).words, 'This show (nothing in it yet) · 1 person bought the whole series, so it will be kept for them');
@@ -1051,6 +1120,17 @@ function suite(R, who) {
     const pod = R.showProblems({ status: 'pending', kind: 'podcast' }, [ep('p', 1, 1, { contentType: 'podcast', audioUrl: 'https://x/a.mp3' })]);
     assert.deepEqual(pod, []);
     assert.deepEqual(R.showProblems({ status: 'pending' }, [], { trailerState: 'error' }).map((p) => p.words), ['The trailer failed — replace it']);
+  });
+
+  tt('showProblems: a live episode\'s waiting title image, removal and trailer (migration 120)', () => {
+    const staged = (extra) => R.showProblems({ status: 'pending' }, [ep('z', 1, 1, { captionsUrl: '/c', ...extra })]).filter((p) => p.code === 'staged-episodes').map((p) => p.episodeIds);
+    assert.deepEqual(staged({ pending_title_image_url: 'https://x/t.png' }), [['z']]);
+    assert.deepEqual(staged({ pendingTitleImageUrl: 'https://x/t.png' }), [['z']]);
+    assert.deepEqual(staged({ pending_trailer_src: 'https://x/t.m3u8' }), [['z']]);
+    assert.deepEqual(staged({ pendingTrailerSrc: 'https://x/t.m3u8' }), [['z']]);
+    assert.deepEqual(staged({ pending_title_image_removal: true }), [['z']]);
+    assert.deepEqual(staged({ pendingTitleImageRemoval: true }), [['z']]);
+    assert.deepEqual(staged({ pending_title_image_removal: false, pending_title_image_url: null, pending_trailer_src: '' }), []);
   });
 
   tt('needsYou: one answer for the hub, Your work and the app', () => {

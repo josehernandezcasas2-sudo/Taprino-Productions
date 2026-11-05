@@ -140,6 +140,9 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
   const noun = 'show';
   const has118 = !view.migration || view.migration.shows118 !== false;
   const canEdit = Boolean(viewer.canEditShow);
+  // Taking back a waiting change is the owner's: the team decides it under
+  // Waiting for approval on the admin page, where Deny tells the owner.
+  const canCancel = Boolean(viewer.isOwner);
 
   const [form, setForm] = useState(() => showForm(initial));
   const [init, setInit] = useState(() => showForm(initial));
@@ -346,10 +349,11 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
             {stagedList.map((s) => (
               <li key={s.field}>
                 <span>{s.words}</span>
-                {canEdit && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
+                {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
               </li>
             ))}
           </ul>
+          {!canCancel && mode === 'admin' ? <p className="show-ed-banner-sub">Approve or deny these under Waiting for approval on the show page.</p> : null}
         </Banner>
       )}
       {!has118 && <Banner level="neutral" title="The defaults, the season names, the credits and the kind wait for a database update (migration 118)." />}
@@ -375,7 +379,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
         {st.name ? (
           <div className="show-ed-staged">
             <div className="show-ed-staged-text"><span className="show-ed-staged-k">Waiting for approval:</span><strong>{st.name}</strong></div>
-            {canEdit && <button type="button" className="show-ed-cancel" disabled={busy === 'cancel-name'} onClick={() => cancelStaged('name')}>{busy === 'cancel-name' ? '…' : 'Cancel'}</button>}
+            {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === 'cancel-name'} onClick={() => cancelStaged('name')}>{busy === 'cancel-name' ? '…' : 'Cancel'}</button>}
           </div>
         ) : null}
         <FieldNote policy={namePolicy.mode === 'staged' ? null : namePolicy} edited={edited('name') && namePolicy.mode !== 'staged'} />
@@ -499,9 +503,10 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
             picked={picked}
             removing={removing}
             pickedNote={picked || removing ? (p.mode === 'staged' ? 'Goes to review when you save' : 'Applies when you save') : null}
-            staged={staged}
+            // A new pick (or a removal) shows itself, not the one waiting.
+            staged={picked || removing ? null : staged}
             stagedNote={`Visitors see the live ${a.label.split(' ')[0].toLowerCase()} until we approve this one.`}
-            onCancelStaged={canEdit ? () => cancelStaged(a.field) : null}
+            onCancelStaged={canCancel ? () => cancelStaged(a.field) : null}
             cancelBusy={busy === `cancel-${a.field}`}
             emptyTitle={removing ? 'Removed when you save' : waitingRemoval ? 'Removal waits for approval' : a.field === 'heroImage' ? 'No hero image yet' : 'None'}
             emptyText={a.words}
@@ -539,7 +544,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
           ) : st.trailer ? (
             <div className="show-ed-staged">
               <div className="show-ed-staged-text"><span className="show-ed-staged-k">A new trailer waits for approval</span><span className="show-ed-staged-live">The {art.trailer ? 'current one keeps playing' : 'show page shows its art'} until then.</span></div>
-              {canEdit && <button type="button" className="show-ed-cancel" disabled={busy === 'cancel-trailer'} onClick={() => cancelStaged('trailer')}>{busy === 'cancel-trailer' ? '…' : 'Cancel'}</button>}
+              {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === 'cancel-trailer'} onClick={() => cancelStaged('trailer')}>{busy === 'cancel-trailer' ? '…' : 'Cancel'}</button>}
             </div>
           ) : (
             <p className="show-ed-hint">{art.trailer ? 'It plays behind the name at the top of the show page.' : 'A short clip, 15–30 seconds, behind the name at the top of the show page.'}</p>

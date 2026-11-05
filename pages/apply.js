@@ -206,6 +206,9 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
 
   const verdict = rightsVerdict(answers);
   const showForm = !creator && (!app || (app.status === 'declined' && reapply));
+  // Accept makes the applicant a creator, so their own accepted application
+  // ("You're in · Live") wins over the "You already have Creator Studio" card.
+  const acceptedHere = Boolean(app && app.status === 'accepted');
   const hasFile = Boolean(video) || Boolean(form.mediaLink.trim());
 
   // Why "Send" is off, in the order the applicant should fix things.
@@ -324,7 +327,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
           )}
         </div>
 
-        {creator && (
+        {creator && !acceptedHere && (
           <div className="apl-status level-ok">
             <span className="apl-status-tag">Creator Studio</span>
             <div className="apl-status-title">You already have Creator Studio.</div>
@@ -333,7 +336,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
           </div>
         )}
 
-        {!creator && app && (
+        {(!creator || acceptedHere) && app && (
           <StatusCard
             app={app}
             upload={uploadingHere ? activeUpload : null}

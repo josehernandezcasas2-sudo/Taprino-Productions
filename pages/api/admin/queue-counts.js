@@ -16,18 +16,20 @@ import { applyCors } from '../../../lib/cors';
 //             staged titles / names / descriptions for manage_episodes,
 //             removal requests not already withdrawn (a title kept for its
 //             buyers is done) for manage_deletions
-//   shows     the series revamp's Shows page (slice 3): across shows,
-//             episodes in review + staged changes (art, text, a new video
-//             waiting) + removal requests, for manage_episodes or
-//             review_submissions. No nav item reads it yet.
+//   shows     Admin → Shows (the series revamp, slice 3a): across shows,
+//             episodes in review + staged changes (art — an episode's
+//             title image, its removal and trailer since migration 120 —,
+//             text, a new video waiting) + removal requests, for
+//             manage_episodes or review_submissions.
 //   flags     open flags and titles with counted open reports
 //   pitch     reported Pitch Room comments (full admins)
 //
 // The staged and removal numbers come from two reads (one of episodes,
 // one of shows) that fetch only the rows that need someone and count them
 // here, rather than one count query per kind. `pending_src` (a staged
-// replacement video) is migration 118's: a database without it is read
-// without it.
+// replacement video) is migration 118's and an episode's waiting title
+// image (or its removal) and trailer are 120's: the read tries with all
+// of them, then without 120's, then without either.
 const EPISODE_FLAGS = 'id, series_id, status, pending_poster, pending_thumbnail, pending_title, pending_description, deletion_requested, withdrawn_at';
 const EPISODE_WANTED = [
   'pending_poster.not.is.null',
@@ -56,8 +58,12 @@ function isMissingColumn(error) {
 
 const has = (v) => v !== null && v !== undefined && v !== '';
 
+const EPISODE_120_FLAGS = 'pending_title_image_url, pending_title_image_removal, pending_trailer_src';
+const EPISODE_120_WANTED = ['pending_title_image_url.not.is.null', 'pending_title_image_removal.eq.true', 'pending_trailer_src.not.is.null'];
+
 async function episodesNeedingSomeone(supabase) {
-  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src`).or([...EPISODE_WANTED, 'pending_src.not.is.null'].join(','));
+  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED].join(','));
+  if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src`).or([...EPISODE_WANTED, 'pending_src.not.is.null'].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(EPISODE_FLAGS).or(EPISODE_WANTED.join(','));
   if (res.error) {
     console.error('queue-counts episodes:', res.error.message);
@@ -79,7 +85,7 @@ async function seriesNeedingSomeone(supabase) {
 // the read), once per queue it is in.
 function stagedCounts(episodes, series) {
   const removal = (r) => r.deletion_requested === true && !has(r.withdrawn_at);
-  const epArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail);
+  const epArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_title_image_url) || r.pending_title_image_removal === true || has(r.pending_trailer_src);
   const epText = (r) => has(r.pending_title) || has(r.pending_description);
   const epVideo = (r) => has(r.pending_src);
   const seArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_trailer_src) || has(r.pending_hero_image) || has(r.pending_title_image_url) || r.pending_title_image_removal === true;
@@ -118,7 +124,7 @@ export default async function handler(req, res) {
   const wantsStaged = can.artwork || can.edits || can.deletions || can.shows;
 
   const [queue, stagedEpisodes, stagedSeries, moderation, comments] = await Promise.all([
-    listReviewQueue(rc).catch(() => ({ counts: { total: 0, channel: 0 } })),
+    listReviewQueue(rc, { light: true }).catch(() => ({ counts: { total: 0, channel: 0 } })),
     wantsStaged ? episodesNeedingSomeone(supabase).catch(() => []) : [],
     wantsStaged ? seriesNeedingSomeone(supabase).catch(() => []) : [],
     can.flags ? getModerationState().catch(() => null) : null,

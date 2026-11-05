@@ -11,7 +11,6 @@ export default async function handler(req, res) {
   // calls this route is gated on (lib/adminAuth.js).
   const roleContext = await requireCapability(req, res, 'manage_deletions');
   if (!roleContext) return;
-  const { isAdmin } = roleContext;
 
   const supabase = getSupabase();
   const [episodesResult, seriesResult] = await Promise.all([
@@ -46,7 +45,10 @@ export default async function handler(req, res) {
       id: s.id,
       name: s.name,
       reason: s.deletion_reason,
-      requestedAt: s.deletion_requested_at
+      requestedAt: s.deletion_requested_at,
+      // A show is removed from its page on Admin → Shows, where its card
+      // says what goes with it (the series revamp, slice 3a).
+      href: `/admin/shows/${encodeURIComponent(s.id)}#removal`
     }))
   });
 }

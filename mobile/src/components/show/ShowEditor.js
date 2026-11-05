@@ -149,6 +149,9 @@ function ShowEditorReady({ initial, startTab, auth }) {
   const noun = 'show';
   const has118 = !view.migration || view.migration.shows118 !== false;
   const canEdit = Boolean(viewer.canEditShow);
+  // Taking back a waiting change is the owner's (the team decides it on
+  // the website's admin page, where Deny tells them).
+  const canCancel = Boolean(viewer.isOwner);
   const path = showPath(show.id);
 
   const [form, setForm] = useState(() => showForm(initial));
@@ -371,7 +374,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
           {stagedList.map((s) => (
             <View key={s.field} style={se.bannerItem}>
               <Text style={[ss.p, { flex: 1 }]}>{s.words}</Text>
-              {canEdit ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
+              {canCancel ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
             </View>
           ))}
         </Banner>
@@ -400,7 +403,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
           <FieldHead label="Name" staged={namePolicy.mode === 'staged'} locked={namePolicy.mode === 'locked'} count={form.name.length} max={form.name.length > 90 ? 120 : null} />
           <EdInput style={se.name} value={form.name} maxLength={120} disabled={!isOpen(namePolicy)} onChangeText={(t) => set('name', t)} accessibilityLabel="Name" />
           {namePolicy.mode === 'staged' ? <Text style={ss.small}>Changing a live {noun}’s name goes to us first.</Text> : null}
-          {st.name ? <StagedBox title="Waiting for approval:" value={st.name} onCancel={canEdit ? () => cancelStaged('name') : null} busy={busy === 'cancel-name'} /> : null}
+          {st.name ? <StagedBox title="Waiting for approval:" value={st.name} onCancel={canCancel ? () => cancelStaged('name') : null} busy={busy === 'cancel-name'} /> : null}
           <FieldNote policy={namePolicy.mode === 'staged' ? null : namePolicy} edited={edited('name') && namePolicy.mode !== 'staged'} />
         </View>
         <OneLineField value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={lockAll('description')} edited={edited('description')} />
@@ -505,7 +508,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
               live={live}
               staged={staged}
               stagedNote={`Visitors see the live ${a.label.split(' ')[0].toLowerCase()} until we approve this one.`}
-              onCancelStaged={canEdit ? () => cancelStaged(a.field) : null}
+              onCancelStaged={canCancel ? () => cancelStaged(a.field) : null}
               cancelBusy={busy === `cancel-${a.field}`}
               emptyTitle={waitingRemoval ? 'Removal waits for approval' : a.field === 'heroImage' ? 'No hero image yet' : 'None'}
               emptyText={a.words}
@@ -543,7 +546,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
               {['stopped', 'failed'].includes(trailerUp.state) ? <LinkText onPress={() => setTrailerUp(null)}>Not this one</LinkText> : null}
             </UploadLine>
           ) : st.trailer ? (
-            <StagedBox title="A new trailer waits for approval" onCancel={canEdit ? () => cancelStaged('trailer') : null} busy={busy === 'cancel-trailer'}>
+            <StagedBox title="A new trailer waits for approval" onCancel={canCancel ? () => cancelStaged('trailer') : null} busy={busy === 'cancel-trailer'}>
               <Text style={ss.small}>The {art.trailer ? 'current one keeps playing' : 'show page shows its art'} until then.</Text>
             </StagedBox>
           ) : (

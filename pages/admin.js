@@ -111,7 +111,7 @@ export default function AdminDashboard({ account, mainGenres, defaultCpmCents })
                 <div className="adm-log">
                   {auditLog.map((e) => (
                     <div key={e.id}>
-                      <b>{(e.adminEmail || 'unknown').split('@')[0]}</b> {e.action.replace(/_/g, ' ')}{e.details ? ` — ${e.details}` : ''} · {timeAgo(e.createdAt)}
+                      <b>{(e.adminEmail || 'unknown').split('@')[0]}</b> {e.action.replace(/_/g, ' ')}{(e.words || e.details) ? ` — ${e.words || e.details}` : ''} · {timeAgo(e.createdAt)}
                     </div>
                   ))}
                 </div>

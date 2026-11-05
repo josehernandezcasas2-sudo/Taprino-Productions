@@ -168,12 +168,18 @@ export default async function handler(req, res) {
   // the flag; approving a title protects its trailers from now on.
   const trailers = { videos: 0, failures: [] };
   const trailerRefs = [];
-  let { data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src, pending_src').or('trailer_src.not.is.null,pending_src.not.is.null');
+  // A live episode's waiting trailer (episodes.pending_trailer_src) is
+  // migration 120's: the read tries with it, then without it, then
+  // without pending_src (118) too.
+  let { data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src, pending_src, pending_trailer_src').or('trailer_src.not.is.null,pending_src.not.is.null,pending_trailer_src.not.is.null');
+  if (epTrailerError && /pending_trailer_src/.test(epTrailerError.message || '')) {
+    ({ data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src, pending_src').or('trailer_src.not.is.null,pending_src.not.is.null'));
+  }
   if (epTrailerError && /pending_src/.test(epTrailerError.message || '')) {
     ({ data: epTrailers, error: epTrailerError } = await supabase.from('episodes').select('id, title, trailer_src').not('trailer_src', 'is', null));
   }
   if (epTrailerError) trailers.failures.push({ id: 'episodes', title: 'trailers', error: epTrailerError.message });
-  for (const row of epTrailers || []) for (const src of [row.trailer_src, row.pending_src]) trailerRefs.push({ id: row.id, title: row.title, src });
+  for (const row of epTrailers || []) for (const src of [row.trailer_src, row.pending_src, row.pending_trailer_src]) trailerRefs.push({ id: row.id, title: row.title, src });
   const { data: showTrailers, error: showTrailerError } = await supabase.from('series').select('id, name, trailer_src, pending_trailer_src').or('trailer_src.not.is.null,pending_trailer_src.not.is.null');
   if (showTrailerError) trailers.failures.push({ id: 'series', title: 'show trailers', error: showTrailerError.message });
   for (const row of showTrailers || []) for (const src of [row.trailer_src, row.pending_trailer_src]) trailerRefs.push({ id: row.id, title: row.name, src });

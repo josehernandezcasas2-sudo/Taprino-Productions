@@ -1,5 +1,6 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
+import { seenFor } from '../../../lib/stagedChanges';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -36,14 +37,16 @@ export default async function handler(req, res) {
       currentTitle: e.title,
       currentDescription: e.description,
       pendingTitle: e.pending_title,
-      pendingDescription: e.pending_description
+      pendingDescription: e.pending_description,
+      seen: seenFor('episode', e, 'text')
     })),
     series: (seriesResult.data || []).map((s) => ({
       id: s.id,
       currentName: s.name,
       currentDescription: s.description,
       pendingName: s.pending_name,
-      pendingDescription: s.pending_description
+      pendingDescription: s.pending_description,
+      seen: seenFor('series', s, 'text')
     }))
   });
 }

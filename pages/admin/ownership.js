@@ -1,16 +1,7 @@
-import AdminShell from '../../components/AdminShell';
-import OwnershipPanel from '../../components/admin/OwnershipPanel';
-import { adminPageProps } from '../../lib/adminPage';
-
-export async function getServerSideProps(ctx) {
-  return adminPageProps(ctx);
+// Series ownership moved into Admin → Shows (the series revamp, slice 3a):
+// who runs a show is on that show's page, the roster is the Creators tab.
+// Kept so old links and bookmarks still land somewhere useful.
+export async function getServerSideProps() {
+  return { redirect: { destination: '/admin/shows', permanent: false } };
 }
-
-export default function AdminOwnership({ account, mainGenres }) {
-  return (
-    <AdminShell account={account} mainGenres={mainGenres} title="Series ownership" crumbs={['Content']}
-      intro="Which creator each show belongs to, plus the read-only roster of everyone with creator or admin access.">
-      <OwnershipPanel />
-    </AdminShell>
-  );
-}
+export default function Redirect() { return null; }

@@ -1011,6 +1011,39 @@ export function masterReady(row, state) {
   return s === 'ready' || s === 'audio' || s === 'external';
 }
 
+// Why an episode can't be approved right now, or null (the review queue's
+// Approve, a show's Approve all, the admin show page's rows). opts = {
+// slotRows (the show's rows, for its number), state (Cloudflare's word
+// for the master), show }. First match wins: the show pulled or its
+// removal requested, a show episode without a number or on a number
+// another episode holds, then the master (amendment 3: 'unknown' — nobody
+// could say — doesn't block). A standalone title is only asked about its
+// master. The answer is a 409 body.
+export function approvalBlocker(episode, { slotRows = [], state, show = null } = {}) {
+  if (!episode || typeof episode !== 'object') return { status: 409, code: 'missing', error: 'That episode isn’t there any more.' };
+  if (show && typeof show === 'object') {
+    if (isHeld(show)) return { status: 409, code: 'show-held', error: 'Its show is pulled — restore the show first.' };
+    if (removalRequested(show)) return { status: 409, code: 'show-removal', error: 'Its show’s removal is requested — decide that first.' };
+  }
+  const t = contentTypeOf(episode);
+  if (seriesIdOf(episode) && (t === 'series' || t === 'podcast')) {
+    if (!numberOf(episode)) return { status: 409, code: 'unnumbered', error: 'Give it an episode number before approving it.' };
+    const slot = slotCheck(slotRows, { season: seasonOf(episode), number: numberOf(episode), excludeId: episode.id });
+    if (!slot.free) return { status: 409, ...slotTakenBody(slot) };
+  }
+  const master = masterState(episode, state);
+  const masterLine = {
+    none: 'There’s no file to approve yet.',
+    uploading: 'Not yet: the video is still uploading.',
+    processing: 'Not yet: Cloudflare is still processing the video.',
+    error: 'Not yet: Cloudflare could not process the video — replace it first.',
+    deleted: 'Not yet: Cloudflare could not process the video — replace it first.'
+  };
+  if (master === 'none') return { status: 409, code: 'no-file', error: masterLine.none, master };
+  if (Object.prototype.hasOwnProperty.call(masterLine, master)) return { status: 409, code: 'master-not-ready', error: masterLine[master], master };
+  return null;
+}
+
 // --- what a show looks like from outside --------------------------------------
 
 function isPublicEpisode(ep) {
@@ -1608,6 +1641,11 @@ export function fieldPolicyLine(field, ctx = {}) {
 
 // --- moving a title between shows (decisions 7, 13, 19) ----------------------
 
+// Whether earnings follow payeeOf yet (slice 3b turns it on). Until then no
+// money lane reads payeeOf, so a move never says earnings change: it says
+// they stay with the person who uploaded the title.
+export const PAYEE_RULE_LIVE = false;
+
 function moveRefusal(code, reason, tag) {
   return { ok: false, code, reason, tag: tag || null };
 }
@@ -1622,7 +1660,8 @@ function moveRefusal(code, reason, tag) {
 // and a standalone title into a show only while it isn't live; never into
 // a declined, pulled or vertical show. An admin may move anything except
 // into a show whose removal is requested (or across kinds) and is told what
-// follows: whose future earnings change, how many series buyers gain or
+// follows: whose future earnings change (once PAYEE_RULE_LIVE; until then
+// that they stay with the uploader), how many series buyers gain or
 // lose it, which pins clear, that it leaves the site until a private show
 // goes public. Within one show this answers who may reorder (the owner or
 // an admin). `tag` is the greyed label a picker shows.
@@ -1682,13 +1721,18 @@ export function canMoveTo(episode, targetShow, viewer, opts = {}) {
     return moveRefusal('pinned', `Pinned on ${channel || 'a channel'} — ask us to unpin it first.`);
   }
 
+  const payeeRuleLive = (opts.payeeRuleLive ?? PAYEE_RULE_LIVE) === true;
   const payeeBefore = payeeOf(episode, sourceId ? source : null);
   const payeeAfter = payeeOf(episode, targetShow);
-  const earningsMove = payeeBefore !== payeeAfter;
+  const earningsMove = payeeRuleLive && payeeBefore !== payeeAfter;
   const leavesSite = statusOf(episode) === 'approved' && !isPublicShow(targetShow);
   const nameOf = nameLookup(opts.names);
   const lines = [];
   if (earningsMove) lines.push(`Future earnings go to ${nameOf(payeeAfter) || 'the new show’s paid account'}`);
+  else if (!payeeRuleLive && uploader !== targetRunner) {
+    const who = nameOf(uploader);
+    lines.push(who ? `Its earnings stay with ${who}.` : 'Its earnings stay with whoever uploaded it.');
+  }
   if (lose > 0) lines.push(`${pl(lose, 'series buyer loses', 'series buyers lose')} this episode`);
   if (gain > 0) lines.push(`${pl(gain, 'series buyer gains', 'series buyers gain')} this episode`);
   if (pins.length) {
@@ -1705,7 +1749,8 @@ export function canMoveTo(episode, targetShow, viewer, opts = {}) {
 // What "Remove this show" does, before it's asked: anything someone
 // bought is withdrawn and kept for them (a whole-series purchase keeps
 // the show, its episodes and the extras filed in it; an episode purchase
-// keeps that episode), everything else is deleted. buyers = { series: n,
+// keeps that episode, and the show with it while the episode is still filed
+// in it), everything else is deleted. buyers = { series: n,
 // titles: { [id]: n } }; opts = { channelSlots, outsideReferences }.
 // `words` is the creator's card, `adminWords` the admin's.
 export function cascadePlan(show, episodes, extras, buyers, opts = {}) {
@@ -1727,6 +1772,10 @@ export function cascadePlan(show, episodes, extras, buyers, opts = {}) {
   const episodeCount = rows.filter((r) => r.kind === 'episode').length;
   const extraCount = rows.filter((r) => r.kind === 'extra').length;
   const kept = rows.filter((r) => r.action === 'withdraw').length;
+  // episodes.series_id has no "on delete cascade": a kept row still filed in
+  // the show keeps the show too (withdrawn and hidden with it).
+  const keptInShow = showId !== null && [...(episodes || []), ...(extras || [])]
+    .some((r) => r && typeof r === 'object' && seriesIdOf(r) === showId && rows.some((x) => x.action === 'withdraw' && sameId(x.id, r.id)));
   const slots = Math.max(0, Number(opts.channelSlots) || 0);
   const outside = Math.max(0, Number(opts.outsideReferences) || 0);
 
@@ -1736,15 +1785,17 @@ export function cascadePlan(show, episodes, extras, buyers, opts = {}) {
   else if (extraCount) words = `${name} and its ${pl(extraCount, 'extra', 'extras')}`;
   else words = `${name} (nothing in it yet)`;
   if (seriesBuyers > 0) words += ` · ${pl(seriesBuyers, 'person', 'people')} bought the whole series, so it will be kept for them`;
+  else if (keptInShow) words += ` · ${kept === 1 ? '1 title has buyers, so it and the show are' : `${kept} titles have buyers, so they and the show are`} kept for them`;
   else if (kept > 0) words += ` · ${pl(kept, 'title has', 'titles have')} buyers and will be kept for them`;
 
   const parts = [pl(episodeCount, 'episode', 'episodes'), pl(extraCount, 'extra', 'extras'), `${kept} with buyers (kept for them)`];
   if (seriesBuyers > 0) parts.push(`${pl(seriesBuyers, 'series buyer', 'series buyers')} (the show is kept)`);
+  else if (keptInShow) parts.push('the show is kept (a title in it has buyers)');
   if (slots > 0) parts.push(`channel slots: ${slots}`);
   if (outside > 0) parts.push('outside references kept by title');
 
   return {
-    show: { id: showId, action: seriesBuyers > 0 ? 'withdraw' : 'delete' },
+    show: { id: showId, action: seriesBuyers > 0 || keptInShow ? 'withdraw' : 'delete' },
     rows,
     counts: { episodes: episodeCount, extras: extraCount, kept, deleted: rows.length - kept, seriesBuyers, channelSlots: slots },
     words,
@@ -1837,8 +1888,9 @@ export function showProblems(show, rows, opts = {}) {
     .filter(([camel, snake]) => !blank(pick(show, camel, snake)))
     .map(([, , word]) => word);
   if (showStaged.length) out.push({ code: 'staged', level: 'review', episodeIds: [], words: `Waiting for approval: the new ${listWords(showStaged)}` });
-  const stagedEpisodes = inPlay.filter((r) => ['pendingTitle', 'pendingPoster', 'pendingThumbnail', 'pendingSrc'].some((k) => !blank(r[k]))
-    || ['pending_title', 'pending_poster', 'pending_thumbnail', 'pending_src'].some((k) => !blank(r[k])));
+  const stagedEpisodes = inPlay.filter((r) => ['pendingTitle', 'pendingPoster', 'pendingThumbnail', 'pendingSrc', 'pendingTitleImageUrl', 'pendingTrailerSrc'].some((k) => !blank(r[k]))
+    || ['pending_title', 'pending_poster', 'pending_thumbnail', 'pending_src', 'pending_title_image_url', 'pending_trailer_src'].some((k) => !blank(r[k]))
+    || r.pendingTitleImageRemoval === true || r.pending_title_image_removal === true);
   if (stagedEpisodes.length) out.push({ code: 'staged-episodes', level: 'review', episodeIds: stagedEpisodes.map((r) => r.id), words: `${pl(stagedEpisodes.length, 'episode has', 'episodes have')} changes waiting for approval` });
   const trailer = videoStateOf(opts.trailerState);
   if (trailer === 'uploading' || trailer === 'processing') out.push({ code: 'trailer', level: 'review', episodeIds: [], words: 'Trailer still processing' });

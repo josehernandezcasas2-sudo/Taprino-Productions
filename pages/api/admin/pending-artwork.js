@@ -1,5 +1,10 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
+import { seenFor } from '../../../lib/stagedChanges';
+
+function isMissingColumn(error) {
+  return Boolean(error) && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -11,14 +16,24 @@ export default async function handler(req, res) {
   // calls this route is gated on (lib/adminAuth.js).
   const roleContext = await requireCapability(req, res, 'manage_artwork');
   if (!roleContext) return;
-  const { isAdmin } = roleContext;
 
   const supabase = getSupabase();
-  const [episodesResult, seriesResult] = await Promise.all([
-    supabase
+  // An episode's waiting title image (or its removal) and trailer are
+  // migration 120's: read with them, and without them on a database that
+  // hasn't run it.
+  const readEpisodes = async () => {
+    const withArt = await supabase
+      .from('episodes')
+      .select('id, title, poster, thumbnail, pending_poster, pending_thumbnail, title_image_url, trailer_src, pending_title_image_url, pending_title_image_removal, pending_trailer_src')
+      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null,pending_title_image_url.not.is.null,pending_title_image_removal.eq.true,pending_trailer_src.not.is.null');
+    if (!withArt.error || !isMissingColumn(withArt.error)) return withArt;
+    return supabase
       .from('episodes')
       .select('id, title, poster, thumbnail, pending_poster, pending_thumbnail')
-      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null'),
+      .or('pending_poster.not.is.null,pending_thumbnail.not.is.null');
+  };
+  const [episodesResult, seriesResult] = await Promise.all([
+    readEpisodes(),
     supabase
       .from('series')
       .select('id, name, poster, thumbnail, trailer_src, hero_image, title_image_url, pending_poster, pending_thumbnail, pending_trailer_src, pending_hero_image, pending_title_image_url, pending_title_image_removal')
@@ -37,7 +52,15 @@ export default async function handler(req, res) {
       currentPoster: e.poster,
       currentThumbnail: e.thumbnail,
       pendingPoster: e.pending_poster,
-      pendingThumbnail: e.pending_thumbnail
+      pendingThumbnail: e.pending_thumbnail,
+      currentTitleImageUrl: e.title_image_url ?? null,
+      pendingTitleImageUrl: e.pending_title_image_url ?? null,
+      pendingTitleImageRemoval: e.pending_title_image_removal === true,
+      currentTrailerSrc: e.trailer_src ?? null,
+      pendingTrailerSrc: e.pending_trailer_src ?? null,
+      // What this list shows waiting, sent back with the decision: only
+      // these are decided, and one replaced since is refused.
+      seen: seenFor('episode', e, 'art')
     })),
     series: (seriesResult.data || []).map((s) => ({
       id: s.id,
@@ -52,7 +75,8 @@ export default async function handler(req, res) {
       pendingTrailerSrc: s.pending_trailer_src,
       pendingHeroImage: s.pending_hero_image,
       pendingTitleImageUrl: s.pending_title_image_url,
-      pendingTitleImageRemoval: s.pending_title_image_removal
+      pendingTitleImageRemoval: s.pending_title_image_removal,
+      seen: seenFor('series', s, 'art')
     }))
   });
 }

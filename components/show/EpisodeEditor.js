@@ -123,7 +123,7 @@ function writeReplace(id, value) {
 }
 
 export default function EpisodeEditor(props) {
-  const { showId, episodeId, isDraft = false, layout = 'page', onClose } = props;
+  const { showId, episodeId, isDraft = false, layout = 'page', onClose, mode = 'creator' } = props;
   const [state, setState] = useState({ phase: 'loading' });
 
   const load = useCallback(async () => {
@@ -149,7 +149,7 @@ export default function EpisodeEditor(props) {
   return (
     <div className={`show-ed ${panel ? 'is-panel' : 'is-page'} is-waiting`} aria-busy={state.phase === 'loading' ? 'true' : undefined}>
       {!panel && showId && (
-        <Link href={`/creator/show/${encodeURIComponent(showId)}`} className="acct-back show-ed-back"><BackArrowIcon size={14} /> The show</Link>
+        <Link href={mode === 'admin' ? `/admin/shows/${encodeURIComponent(showId)}` : `/creator/show/${encodeURIComponent(showId)}`} className="acct-back show-ed-back"><BackArrowIcon size={14} /> The show</Link>
       )}
       {panel && onClose && <button type="button" className="show-ed-close is-floating" aria-label="Close the editor" onClick={onClose}><CloseIcon size={16} /></button>}
       {state.phase === 'loading' ? (
@@ -610,9 +610,17 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     ep.staged && ep.staged.description ? { field: 'description', words: 'an edited description' } : null,
     ep.staged && ep.staged.poster ? { field: 'poster', words: 'the poster' } : null,
     ep.staged && ep.staged.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
+    // Migration 120: a live episode's title image (or its removal) and
+    // trailer wait too; Cancel takes back either (titleImage clears both).
+    ep.staged && ep.staged.titleImageUrl ? { field: 'titleImage', words: 'a new title image' } : null,
+    ep.staged && !ep.staged.titleImageUrl && ep.staged.titleImageRemoval ? { field: 'titleImage', words: 'removing the title image' } : null,
+    ep.staged && ep.staged.trailer ? { field: 'trailer', words: 'a new trailer' } : null,
     ep.staged && ep.staged.video ? { field: 'video', words: `a new file (${ep.staged.video.ready ? 'ready' : masterWords(ep.staged.video.state).text.toLowerCase()})` } : null
   ].filter(Boolean);
   const canAct = viewer.isUploader || viewer.team;
+  // Taking back a waiting change is the uploader's: the team decides it
+  // under Waiting for approval on the admin page, where Deny tells them.
+  const canCancel = Boolean(viewer.isUploader);
 
   const banners = (
     <>
@@ -622,10 +630,11 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
             {stagedFields.map((s) => (
               <li key={s.field}>
                 <span>{s.words}</span>
-                {canAct && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
+                {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
               </li>
             ))}
           </ul>
+          {!canCancel && mode === 'admin' ? <p className="show-ed-banner-sub">Approve or deny these under Waiting for approval on the show page.</p> : null}
         </Banner>
       )}
       {ep.status === 'rejected' && (
@@ -678,7 +687,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         ) : null}
       </div>
       {pendingVideo && (
-        <StagedBox title="A new file waits for approval" onCancel={canAct ? () => cancelStaged('video') : null} busy={busy === 'cancel-video'}>
+        <StagedBox title="A new file waits for approval" onCancel={canCancel ? () => cancelStaged('video') : null} busy={busy === 'cancel-video'}>
           <span className="show-ed-staged-live">{pendingVideo.ready ? 'Ready — we look at it next.' : `${masterWords(pendingVideo.state).text}.`} The current file keeps playing.</span>
         </StagedBox>
       )}
@@ -724,7 +733,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         placeholder={placeholder}
         liveTitle={init.title}
         stagedTitle={ep.staged ? ep.staged.title : null}
-        onCancelStaged={canAct ? () => cancelStaged('title') : null}
+        onCancelStaged={canCancel ? () => cancelStaged('title') : null}
         cancelBusy={busy === 'cancel-title'}
         edited={edited('title')}
       />
@@ -756,9 +765,10 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         fallbackTag={show ? 'Using the show’s art' : null}
         picked={picked}
         pickedNote={cutting ? 'Cut from the film when you save' : picked ? (p.mode === 'staged' ? 'Goes to review when you save' : 'Saved when you save') : null}
-        staged={field === 'poster' ? posterStaged : stillStaged}
+        // A new pick (or a cut) shows itself, not the one waiting.
+        staged={picked || cutting ? null : field === 'poster' ? posterStaged : stillStaged}
         stagedNote={`Visitors see the live ${field === 'poster' ? 'poster' : 'still'} until we approve this one.`}
-        onCancelStaged={canAct ? () => cancelStaged(field) : null}
+        onCancelStaged={canCancel ? () => cancelStaged(field) : null}
         cancelBusy={busy === `cancel-${field}`}
         emptyTitle="None yet"
         emptyText={show ? null : 'We use a frame of the film until you set one.'}
@@ -780,6 +790,12 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const capPolicy = pol('captions');
   const captionsOpen = isOpen(capPolicy) && viewer.isUploader;
   const trailerPolicy = pol('trailer');
+  const titlePolicy = pol('titleImage');
+  // Migration 120: what waits for approval on a live episode.
+  const stagedNow = ep.staged || {};
+  const titleStaged = stagedNow.titleImageUrl || null;
+  const titleRemovalStaged = stagedNow.titleImageRemoval === true;
+  const trailerStaged = Boolean(stagedNow.trailer);
   const notesMax = NOTES_MAX;
   const aboutMax = DESC_MAX - (form.oneLine.trim() ? form.oneLine.trim().length + 2 : 0);
   const makerName = ep.creditLines && ep.creditLines.find((l) => l.key === 'maker') ? ep.creditLines.find((l) => l.key === 'maker').name : form.artist || (show && show.ownerName) || null;
@@ -795,24 +811,35 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       <ArtSlot
         kind="title"
         label="Title image · PNG"
-        status={files.titleImage ? 'new' : removeTitle ? 'new' : art.titleImageUrl ? 'live' : null}
-        policy={pol('titleImage')}
+        status={files.titleImage || removeTitle ? 'new' : titleStaged || titleRemovalStaged ? 'waiting' : art.titleImageUrl ? 'live' : null}
+        policy={titlePolicy}
         live={art.titleImageUrl || null}
         picked={files.titleImage}
         removing={removeTitle}
-        emptyTitle={removeTitle ? 'Removed when you save' : 'None'}
+        pickedNote={files.titleImage || removeTitle ? (titlePolicy.mode === 'staged' ? 'Goes to review when you save' : 'Saved when you save') : null}
+        // A new pick (or a removal) shows itself, not the one waiting.
+        staged={files.titleImage || removeTitle ? null : titleStaged}
+        stagedNote="Visitors see the live title image until we approve this one."
+        onCancelStaged={canCancel ? () => cancelStaged('titleImage') : null}
+        cancelBusy={busy === 'cancel-titleImage'}
+        emptyTitle={removeTitle ? 'Removed when you save' : titleRemovalStaged ? 'Removal waits for approval' : 'None'}
         emptyText="The name set as a picture, shown on the art."
-        actions={isOpen(pol('titleImage')) ? (
+        actions={isOpen(titlePolicy) ? (
           <>
-            <PickButton label={art.titleImageUrl || files.titleImage ? 'Replace' : 'Upload'} accept={TITLE_IMAGE_ACCEPT} onPick={(f) => { setFiles((x) => ({ ...x, titleImage: f })); setRemoveTitle(false); }} />
+            <PickButton label={art.titleImageUrl || titleStaged || files.titleImage ? 'Replace' : 'Upload'} accept={TITLE_IMAGE_ACCEPT} onPick={(f) => { setFiles((x) => ({ ...x, titleImage: f })); setRemoveTitle(false); }} />
             {files.titleImage || removeTitle ? (
               <button type="button" className="show-ed-mini" onClick={() => { setFiles((x) => ({ ...x, titleImage: null })); setRemoveTitle(false); }}>Undo</button>
-            ) : art.titleImageUrl ? (
+            ) : art.titleImageUrl && !titleRemovalStaged ? (
               <button type="button" className="show-ed-mini" onClick={() => setRemoveTitle(true)}>Remove</button>
             ) : null}
           </>
         ) : null}
       />
+      {titleRemovalStaged && !titleStaged && !files.titleImage && !removeTitle ? (
+        <StagedBox title="Removing the title image waits for approval" onCancel={canCancel ? () => cancelStaged('titleImage') : null} busy={busy === 'cancel-titleImage'}>
+          <span className="show-ed-staged-live">Visitors see the live title image until we approve it; then the name shows as text.</span>
+        </StagedBox>
+      ) : null}
       <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'ep', titleForAsk: `${show ? `${show.name} · ` : ''}${title}` }} />
 
       <div className="show-ed-card show-ed-captions">
@@ -847,7 +874,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       <div className="show-ed-card show-ed-trailer">
         <div className="show-ed-art-head">
           <span className="show-ed-label">{trailerPolicy.mode === 'staged' && <ClockIcon size={12} />}<span>Trailer</span></span>
-          {trailerUp ? <span className="show-ed-pill tone-review">{trailerUp.state === 'uploaded' ? (trailerPolicy.mode === 'staged' ? 'Goes to review' : 'Not saved yet') : trailerUp.state === 'stopped' ? 'Stopped' : 'Uploading'}</span> : ep.trailer ? <span className="show-ed-pill tone-ok">Live</span> : <span className="show-ed-pill tone-neutral">None</span>}
+          {trailerUp ? <span className="show-ed-pill tone-review">{trailerUp.state === 'uploaded' ? (trailerPolicy.mode === 'staged' ? 'Goes to review' : 'Not saved yet') : trailerUp.state === 'stopped' ? 'Stopped' : 'Uploading'}</span> : trailerStaged ? <span className="show-ed-pill tone-review">Waiting for approval</span> : ep.trailer ? <span className="show-ed-pill tone-ok">Live</span> : <span className="show-ed-pill tone-neutral">None</span>}
         </div>
         {trailerUp ? (
           <div className="apl-progress" aria-live="polite">
@@ -858,11 +885,15 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
               <button type="button" className="apl-link" onClick={() => setTrailerUp(null)}>Not this one</button>
             </div>
           </div>
+        ) : trailerStaged ? (
+          <StagedBox title="A new trailer waits for approval" onCancel={canCancel ? () => cancelStaged('trailer') : null} busy={busy === 'cancel-trailer'}>
+            <span className="show-ed-staged-live">{ep.trailer ? 'The current one keeps playing until then.' : 'No trailer plays until then.'}</span>
+          </StagedBox>
         ) : (
           <p className="show-ed-hint">{ep.trailer ? 'A trailer is attached; it plays on its own page and in the show’s hero.' : 'A short clip, 15–30 seconds. Optional.'}</p>
         )}
-        {isOpen(trailerPolicy) && !trailerUp ? <PickButton label={ep.trailer ? 'Replace the trailer' : 'Add a trailer'} accept={VIDEO_ACCEPT} disabled={busyUpload} onPick={pickTrailer} className="show-ed-slot" /> : null}
-        <FieldNote policy={trailerPolicy} />
+        {isOpen(trailerPolicy) && !trailerUp ? <PickButton label={ep.trailer || trailerStaged ? 'Replace the trailer' : 'Add a trailer'} accept={VIDEO_ACCEPT} disabled={busyUpload} onPick={pickTrailer} className="show-ed-slot" /> : null}
+        {isOpen(trailerPolicy) && trailerPolicy.mode === 'staged' && !trailerUp ? <p className="show-ed-line"><ClockIcon size={12} /> A new trailer on a live episode goes to us first; the current one keeps playing until we approve it.</p> : <FieldNote policy={trailerPolicy} />}
       </div>
 
       <div className="show-ed-field">
@@ -899,7 +930,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
               {data.extras.map((x) => <li key={x.id}><span>{x.title || 'Untitled extra'}</span><small>{x.status === 'approved' ? 'Live' : x.status === 'pending' ? 'In review' : x.status === 'rejected' ? 'Not this time' : x.status}</small></li>)}
             </ul>
           ) : <p className="show-ed-hint">None</p>}
-          <Link href={`/creator/submit?type=bonus&series=${encodeURIComponent(show.id)}`} className="show-ed-mini is-gold is-link"><PlusIcon size={12} /> Add extra</Link>
+          {mode !== 'admin' && <Link href={`/creator/submit?type=bonus&series=${encodeURIComponent(show.id)}`} className="show-ed-mini is-gold is-link"><PlusIcon size={12} /> Add extra</Link>}
         </div>
       )}
 
@@ -1050,7 +1081,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
             showToast({ title: result.unchanged ? 'Nothing moved' : 'Moved', lines: [result.words, ...(result.lines || [])].filter(Boolean) });
             if (result.toShowId && result.toShowId !== theShowId) {
               if (onSaved) onSaved({ ...ep, seriesId: result.toShowId }, { movedTo: result.toShowId });
-              if (layout !== 'panel') router.replace(`/creator/show/${encodeURIComponent(result.toShowId)}/episode/${encodeURIComponent(ep.id)}`);
+              if (layout !== 'panel') router.replace(`${mode === 'admin' ? '/admin/shows' : '/creator/show'}/${encodeURIComponent(result.toShowId)}/episode/${encodeURIComponent(ep.id)}`);
               return;
             }
             setBusy('place');

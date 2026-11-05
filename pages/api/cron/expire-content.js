@@ -2,6 +2,7 @@ import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
+import { runSaverStep } from '../../../lib/seriesDrop';
 
 // Runs daily via vercel.json's cron config, which Vercel authenticates
 // automatically: set CRON_SECRET as an env var and Vercel sends
@@ -85,7 +86,19 @@ export default async function handler(req, res) {
     }
   }
 
-  if (flagged.length > 0) {
+  // Then the daily step that tells people who saved a show about its new
+  // episodes (lib/seriesDrop.js: capped, it keeps its place for tomorrow).
+  // A failure here never undoes the flagging above.
+  let savers = null;
+  try {
+    const step = await runSaverStep();
+    savers = { shows: step.shows.length, checked: step.checked, sent: step.sent, finished: step.finished };
+  } catch (err) {
+    console.error('expire-content savers:', err && err.message ? err.message : err);
+    savers = { shows: 0, checked: 0, sent: 0, finished: false, failed: true };
+  }
+
+  if (flagged.length > 0 || (savers && (savers.shows > 0 || savers.failed))) {
     await recordAudit({
       // audit_log.admin_id is not null: the scheduled run signs as 'cron'
       // (as creator-payouts does), or Postgres refused the line every night.
@@ -94,9 +107,9 @@ export default async function handler(req, res) {
       action: 'auto_flag_expired_content',
       targetType: 'lifecycle',
       targetId: 'batch',
-      details: `${flagged.length} item(s): ${flagged.map((f) => f.title).join(', ')}`
+      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
     });
   }
 
-  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged });
+  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, savers });
 }

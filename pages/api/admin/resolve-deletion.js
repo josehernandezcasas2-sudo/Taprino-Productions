@@ -6,6 +6,10 @@ import { recordAudit } from '../../../lib/auditLog';
 import { notifyCreator } from '../../../lib/notify';
 import { invalidateCache } from '../../../lib/redis';
 import { hasBuyersIncludingSeries } from '../../../lib/purchases';
+import { isTitleId } from '../../../lib/titleIds';
+import { showRouteError } from '../../../lib/showRoute';
+import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
+import { creditAdShareBeforeDelete } from '../../../lib/adShare';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -24,17 +28,38 @@ export default async function handler(req, res) {
   // calls this route is gated on (lib/adminAuth.js).
   const roleContext = await requireCapability(req, res, 'manage_deletions');
   if (!roleContext) return;
-  const { userId, email, isAdmin } = roleContext;
+  const { userId, email } = roleContext;
 
   const { type, id, decision } = req.body || {};
   if (!['episode', 'series'].includes(type)) {
     return res.status(400).json({ error: 'type must be "episode" or "series".' });
   }
-  if (!id) {
+  if (!id || !isTitleId(String(id))) {
     return res.status(400).json({ error: 'id is required.' });
   }
   if (!['confirm', 'deny'].includes(decision)) {
     return res.status(400).json({ error: 'decision must be "confirm" or "deny".' });
+  }
+
+  // A show (the series revamp, slice 3a): removed with everything filed in
+  // it in one confirmation (lib/showDelete.js through lib/showAdmin.js
+  // removeShow — anything bought is withdrawn and kept for its buyers), the
+  // show's name typed back; or kept, with the owner told.
+  if (type === 'series') {
+    try {
+      if (decision === 'deny') {
+        await denyShowRemoval(String(id), { note: req.body && req.body.note }, roleContext);
+        return res.status(200).json({ ok: true, type, id, decision: 'deny' });
+      }
+      const confirmName = req.body && typeof req.body.confirmName === 'string' ? req.body.confirmName : '';
+      if (!confirmName.trim()) {
+        return res.status(409).json({ code: 'confirm-name', error: 'Type the show’s name to remove it — or open it in Admin → Shows to see what goes with it.', href: `/admin/shows/${encodeURIComponent(String(id))}#removal` });
+      }
+      const out = await removeShow(String(id), { confirmName }, roleContext);
+      return res.status(200).json({ ok: true, type, id, decision: 'confirm', ...out });
+    } catch (err) {
+      return showRouteError(res, err, 'admin/resolve-deletion', 'Could not resolve this request.');
+    }
   }
 
   const supabase = getSupabase();
@@ -63,25 +88,6 @@ export default async function handler(req, res) {
     return res.status(200).json({ ok: true, type, id, decision: 'deny' });
   }
 
-  // decision === 'confirm'
-  if (type === 'series') {
-    // A series can't be safely removed while episodes still point at it —
-    // the database's own foreign key would reject this anyway, but a
-    // clear message here beats a raw Postgres constraint error reaching
-    // the admin UI.
-    const { count, error: countError } = await supabase
-      .from('episodes')
-      .select('id', { count: 'exact', head: true })
-      .eq('series_id', id);
-    if (countError) {
-      console.error('resolve-deletion series count error:', countError.message);
-      return res.status(500).json({ error: 'Could not check this series for attached episodes.' });
-    }
-    if (count && count > 0) {
-      return res.status(400).json({ error: `This series still has ${count} episode${count === 1 ? '' : 's'} attached — reassign or delete those first.` });
-    }
-  }
-
   // Buy to own: a title somebody paid for is never deleted. Confirming
   // the request withdraws it instead — off the catalogue (the request
   // flag keeps it hidden), video kept, still playable for its owners.
@@ -104,26 +110,48 @@ export default async function handler(req, res) {
   }
 
   // Fetch what's about to be orphaned before the row itself is gone —
-  // there's no getting this back from a deleted row.
-  const selectCols = type === 'episode'
-    ? 'title, src, trailer_src, poster, thumbnail, submitted_by'
-    : 'name, trailer_src, poster, thumbnail';
-  const { data: row } = await supabase.from(table).select(selectCols).eq('id', id).maybeSingle();
+  // there's no getting this back from a deleted row. select('*') reads every
+  // file column a database has: the live ones, and the waiting ones
+  // (pending_src from 118, the waiting title image and trailer from 120).
+  const { data: row } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
 
   if (row) {
+    // An episode's ad plays not credited yet are credited now: once the row
+    // is gone the 1st's run can't tell whose they were.
+    if (type === 'episode') {
+      try {
+        let ownerId = null;
+        if (row.series_id && !row.submitted_by) {
+          const { data: parent } = await supabase.from('series').select('creator_id').eq('id', row.series_id).maybeSingle();
+          ownerId = parent ? parent.creator_id || null : null;
+        }
+        await creditAdShareBeforeDelete([row], { ownerId });
+      } catch (err) {
+        console.error('resolve-deletion ad share:', err && err.message ? err.message : err);
+        return res.status(503).json({ code: 'ad-share', error: 'Its ad earnings couldn’t be settled just now, so it wasn’t deleted. Try again in a minute.' });
+      }
+    }
     const context = type === 'episode' ? row.title : row.name;
     const reason = `${type} deleted`;
-    const videoUid = type === 'episode' ? cloudflareUidFromUrl(row.src) : null;
-    const trailerUid = cloudflareUidFromUrl(row.trailer_src);
-    const posterPath = storagePathFromUrl(row.poster);
-    const thumbnailPath = storagePathFromUrl(row.thumbnail);
-
-    await Promise.all([
-      videoUid ? recordOrphan({ kind: 'cloudflare_video', reference: videoUid, reason, context }) : null,
-      trailerUid ? recordOrphan({ kind: 'cloudflare_video', reference: trailerUid, reason: `${reason} (trailer)`, context }) : null,
-      posterPath ? recordOrphan({ kind: 'storage_image', reference: posterPath, reason: `${reason} (poster)`, context }) : null,
-      thumbnailPath ? recordOrphan({ kind: 'storage_image', reference: thumbnailPath, reason: `${reason} (thumbnail)`, context }) : null
-    ]);
+    const videoCols = type === 'episode' ? ['src', 'pending_src', 'trailer_src', 'pending_trailer_src'] : ['trailer_src', 'pending_trailer_src'];
+    const imageCols = ['poster', 'thumbnail', 'pending_poster', 'pending_thumbnail', 'title_image_url', 'pending_title_image_url', 'hero_image', 'pending_hero_image'];
+    const jobs = [];
+    const seen = new Set();
+    for (const col of videoCols) {
+      const uid = cloudflareUidFromUrl(row[col] || '');
+      if (uid && !seen.has(uid)) {
+        seen.add(uid);
+        jobs.push(recordOrphan({ kind: 'cloudflare_video', reference: uid, reason: col === 'src' ? reason : `${reason} (${col})`, context }));
+      }
+    }
+    for (const col of imageCols) {
+      const path = storagePathFromUrl(row[col] || '');
+      if (path && !seen.has(path)) {
+        seen.add(path);
+        jobs.push(recordOrphan({ kind: 'storage_image', reference: path, reason: `${reason} (${col})`, context }));
+      }
+    }
+    await Promise.all(jobs);
   }
 
   const { error } = await supabase.from(table).delete().eq('id', id).eq('deletion_requested', true);

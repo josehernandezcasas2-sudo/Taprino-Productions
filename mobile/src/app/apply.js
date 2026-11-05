@@ -154,6 +154,9 @@ export default function Apply() {
 
   const verdict = verdictFor(questions, answers);
   const showForm = Boolean(data) && !creator && (!app || (app.status === 'declined' && reapply));
+  // Accept makes the applicant a creator, so their own accepted application
+  // ("You're in · Live") wins over the "You already have Creator Studio" card.
+  const acceptedHere = Boolean(app && app.status === 'accepted');
   const hasFile = Boolean(video) || Boolean(form.mediaLink.trim());
 
   let blocker = null;
@@ -252,14 +255,14 @@ export default function Apply() {
           ) : null}
         </View>
 
-        {creator ? (
+        {creator && !acceptedHere ? (
           <StatusCard level="ok" tag="Creator Studio" title="You already have Creator Studio.">
             <Text style={cp.p}>No need to apply. Submit films, shorts and everything else there, and track their review.</Text>
             <View style={cp.actions}><PrimaryButton label="Open Creator Studio" onPress={() => router.push('/creator')} /></View>
           </StatusCard>
         ) : null}
 
-        {!creator && app ? (
+        {(!creator || acceptedHere) && app ? (
           <ApplicationStatus
             app={app}
             labels={statusLabels}

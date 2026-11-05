@@ -1,6 +1,15 @@
-import { getRoleContext, findUserByEmail, listCreatorsAndAdmins } from '../../../lib/roles';
+import { getRoleContext, listCreatorsAndAdmins } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { recordAudit } from '../../../lib/auditLog';
+import { isTitleId } from '../../../lib/titleIds';
+import { showRouteError } from '../../../lib/showRoute';
+import { setShowOwner } from '../../../lib/showAdmin';
+
+// GET → { series: [{ id, name, ownerEmail }] } (the old Series ownership
+// card; Admin → Shows' Creators tab reads the roster now).
+// POST { seriesId, ownerEmail } → { ok: true }: who runs a show, through
+// lib/showAdmin.js setShowOwner since the series revamp's slice 3a (both
+// accounts are told, the caches cleared, one audit line). A blank email
+// clears the owner. Full admins only.
 
 export default async function handler(req, res) {
   const { userId, email, isAdmin } = await getRoleContext(req);
@@ -33,37 +42,15 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { seriesId, ownerEmail } = req.body || {};
-    if (!seriesId) {
+    if (typeof seriesId !== 'string' || !isTitleId(seriesId)) {
       return res.status(400).json({ error: 'seriesId is required.' });
     }
-
-    // Blank ownerEmail is a valid, intentional action — it clears
-    // ownership back to unassigned, not an error.
-    let newOwnerId = null;
-    if (ownerEmail && ownerEmail.trim()) {
-      const owner = await findUserByEmail(ownerEmail.trim());
-      if (!owner) {
-        return res.status(404).json({ error: `No account found for ${ownerEmail} — they need to have signed up already.` });
-      }
-      newOwnerId = owner.id;
+    try {
+      await setShowOwner(seriesId, { email: typeof ownerEmail === 'string' ? ownerEmail : null }, { userId, email, isAdmin });
+      return res.status(200).json({ ok: true });
+    } catch (err) {
+      return showRouteError(res, err, 'admin/series-ownership', 'Could not update ownership.');
     }
-
-    const { error } = await supabase.from('series').update({ creator_id: newOwnerId }).eq('id', seriesId);
-    if (error) {
-      console.error('series-ownership POST error:', error.message);
-      return res.status(500).json({ error: 'Could not update ownership.' });
-    }
-
-    await recordAudit({
-      adminId: userId,
-      adminEmail: email,
-      action: newOwnerId ? 'series_ownership_assigned' : 'series_ownership_cleared',
-      targetType: 'series',
-      targetId: seriesId,
-      details: newOwnerId ? `Assigned to ${ownerEmail.trim()}` : 'Ownership cleared'
-    });
-
-    return res.status(200).json({ ok: true });
   }
 
   res.setHeader('Allow', 'GET, POST');

@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/router';
 import AdminEditEpisodeModal from '../AdminEditEpisodeModal';
 import ManualEpisodeForm from '../ManualEpisodeForm';
+import { isTitleId } from '../../lib/titleIds';
 
 // Content library and its queues: every episode (search + edit), the
 // homepage hero pool, pending artwork, pending edits, deletion
@@ -8,6 +11,13 @@ import ManualEpisodeForm from '../ManualEpisodeForm';
 // out of the old pages/admin.js hub (2026-10-08); rendered by
 // pages/admin/library.js. Section ids match the old hub's anchors so
 // old links still land in the right place.
+//
+// Since the series revamp's slice 3a a show's queue rows link to its page
+// on Admin → Shows (a show's removal is decided there, where its card says
+// what goes with it), an episode's waiting art lists its title image and
+// trailer too (migration 120), Orphaned media has Dismiss (off the list,
+// the file left alone), and ?edit=<id> opens the edit modal for that title
+// (the admin show page's "Open in Library modal").
 // 1780 -> "29:40" for the Ad plan link on a library row.
 function fmtAir(sec) {
   const s = Math.max(0, Math.round(Number(sec) || 0));
@@ -18,6 +28,7 @@ function fmtAir(sec) {
 }
 
 export default function LibraryPanel({ allSeries: initialAllSeries }) {
+  const router = useRouter();
   const [allSeries, setAllSeries] = useState(initialAllSeries || []);
   const [library, setLibrary] = useState(null);
   const [libraryLoading, setLibraryLoading] = useState(true);
@@ -100,6 +111,40 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
 
   useEffect(() => { loadLibrary(''); loadPendingArtwork(); loadPendingEdits(); loadDeletions(); loadOrphans(); }, []);
 
+  // ?edit=<id> (from a show's page): that title's edit modal, read on its own.
+  const editParam = router.isReady && typeof router.query.edit === 'string' ? router.query.edit : null;
+  const [editNote, setEditNote] = useState(null);
+  useEffect(() => {
+    if (!editParam) return undefined;
+    let alive = true;
+    if (!isTitleId(editParam)) {
+      setEditNote('That title isn’t there.');
+      return undefined;
+    }
+    fetch(`/api/admin/library?id=${encodeURIComponent(editParam)}`)
+      .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+      .then(({ ok, d }) => {
+        if (!alive) return;
+        const row = ok && Array.isArray(d.episodes) ? d.episodes[0] : null;
+        if (row) {
+          setEditingEpisode(row);
+          setEditNote(null);
+        } else setEditNote(d.error || 'That title isn’t there.');
+      })
+      .catch(() => { if (alive) setEditNote('Couldn’t open that title — try again.'); });
+    return () => { alive = false; };
+  }, [editParam]);
+
+  // Closing the modal opened from ?edit= leaves the address as the Library's.
+  function closeEdit() {
+    setEditingEpisode(null);
+    if (editParam) {
+      const q = { ...router.query };
+      delete q.edit;
+      router.replace({ pathname: router.pathname, query: q }, undefined, { shallow: true, scroll: false });
+    }
+  }
+
   // Debounced search — 300ms feels instant without hammering the endpoint.
   useEffect(() => {
     const t = setTimeout(() => loadLibrary(librarySearch), 300);
@@ -138,13 +183,19 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
     setBusy(null);
   }
 
-  const resolveArtwork = (type, id, decision) => postDecision('/api/admin/resolve-artwork', { type, id, decision }, setArtworkActionLoading, setArtworkError, `${type}-${id}`,
+  // `seen`: what the card showed waiting (from the list), so a change the
+  // creator replaced since is refused instead of going live unseen.
+  const resolveArtwork = (type, id, decision, seen) => postDecision('/api/admin/resolve-artwork', { type, id, decision, ...(seen ? { seen } : {}) }, setArtworkActionLoading, setArtworkError, `${type}-${id}`,
     () => Promise.all([loadPendingArtwork(), loadOrphans(), loadLibrary(librarySearch)]));
-  const resolveEdit = (type, id, decision) => postDecision('/api/admin/resolve-edit', { type, id, decision }, setEditActionLoading, setEditError, `${type}-${id}`,
+  const resolveEdit = (type, id, decision, seen) => postDecision('/api/admin/resolve-edit', { type, id, decision, ...(seen ? { seen } : {}) }, setEditActionLoading, setEditError, `${type}-${id}`,
     () => Promise.all([loadPendingEdits(), loadLibrary(librarySearch)]));
   const resolveDeletion = (type, id, decision) => postDecision('/api/admin/resolve-deletion', { type, id, decision }, setDeletionActionLoading, setDeletionError, `${type}-${id}`,
     () => Promise.all([loadDeletions(), loadLibrary(librarySearch), loadOrphans()]));
   const cleanupOrphan = (orphanId) => postDecision('/api/admin/cleanup-orphan', { orphanId }, setOrphanActionLoading, setOrphanError, orphanId, () => loadOrphans());
+  const dismissOrphan = (orphanId) => postDecision('/api/admin/orphaned-media', { orphanId }, setOrphanActionLoading, setOrphanError, `dismiss-${orphanId}`, () => loadOrphans());
+  const openShow = (id, hash = '') => (
+    <Link href={`/admin/shows/${encodeURIComponent(id)}${hash}`} className="account-btn-secondary" style={{ width: 'auto', textDecoration: 'none' }}>Open the show →</Link>
+  );
 
   const rowStyle = { borderTop: '1px solid rgba(251,232,211,0.1)', padding: '0.9rem 0' };
   const kindTag = (label, color) => <div style={{ fontFamily: 'var(--font-mono)', fontSize: '0.7rem', color, marginBottom: '0.2rem', textTransform: 'uppercase' }}>{label}</div>;
@@ -157,6 +208,7 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
 
   return (
     <>
+      {editNote && <p className="rq-error" role="alert">{editNote}</p>}
       <div id="library-all" className="account-card">
         <div className="account-eyebrow">Library</div>
         <h3>Every episode, any status</h3>
@@ -236,8 +288,11 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
               <div key={`episode-${e.id}`} style={rowStyle}>
                 {kindTag('Episode', 'var(--signal-amber)')}
                 <h4 style={{ margin: '0 0 0.3rem' }}>{e.title}</h4>
-                <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>{e.pendingPoster && 'New poster staged. '}{e.pendingThumbnail && 'New thumbnail staged.'}</p>
-                {decideButtons(artworkActionLoading === `episode-${e.id}`, () => resolveArtwork('episode', e.id, 'approve'), () => resolveArtwork('episode', e.id, 'deny'))}
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                  {e.pendingPoster && 'New poster staged. '}{e.pendingThumbnail && 'New thumbnail staged. '}
+                  {e.pendingTitleImageUrl && 'New title image staged. '}{e.pendingTitleImageRemoval && !e.pendingTitleImageUrl && 'Title image removal requested. '}{e.pendingTrailerSrc && 'New trailer staged.'}
+                </p>
+                {decideButtons(artworkActionLoading === `episode-${e.id}`, () => resolveArtwork('episode', e.id, 'approve', e.seen), () => resolveArtwork('episode', e.id, 'deny', e.seen))}
               </div>
             ))}
             {pendingArtwork.series.map((s) => (
@@ -248,7 +303,10 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                   {s.pendingPoster && 'New poster staged. '}{s.pendingThumbnail && 'New thumbnail staged. '}{s.pendingHeroImage && 'New hero image staged. '}
                   {s.pendingTitleImageUrl && 'New title image staged. '}{s.pendingTitleImageRemoval && 'Title image removal requested. '}{s.pendingTrailerSrc && 'New trailer staged.'}
                 </p>
-                {decideButtons(artworkActionLoading === `series-${s.id}`, () => resolveArtwork('series', s.id, 'approve'), () => resolveArtwork('series', s.id, 'deny'))}
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {decideButtons(artworkActionLoading === `series-${s.id}`, () => resolveArtwork('series', s.id, 'approve', s.seen), () => resolveArtwork('series', s.id, 'deny', s.seen))}
+                  {openShow(s.id)}
+                </div>
               </div>
             ))}
           </>
@@ -267,7 +325,7 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                 {kindTag('Episode', 'var(--signal-amber)')}
                 {e.pendingTitle && <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}><strong>Title:</strong> {e.currentTitle} <span style={{ color: 'var(--ink-dim)' }}>→</span> {e.pendingTitle}</p>}
                 {e.pendingDescription && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}><strong>Description:</strong> {e.currentDescription} <span>→</span> {e.pendingDescription}</p>}
-                {decideButtons(editActionLoading === `episode-${e.id}`, () => resolveEdit('episode', e.id, 'approve'), () => resolveEdit('episode', e.id, 'deny'))}
+                {decideButtons(editActionLoading === `episode-${e.id}`, () => resolveEdit('episode', e.id, 'approve', e.seen), () => resolveEdit('episode', e.id, 'deny', e.seen))}
               </div>
             ))}
             {pendingEdits.series.map((s) => (
@@ -275,7 +333,10 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                 {kindTag('Show / series', 'var(--brass)')}
                 {s.pendingName && <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}><strong>Name:</strong> {s.currentName} <span style={{ color: 'var(--ink-dim)' }}>→</span> {s.pendingName}</p>}
                 {s.pendingDescription && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}><strong>Description:</strong> {s.currentDescription} <span>→</span> {s.pendingDescription}</p>}
-                {decideButtons(editActionLoading === `series-${s.id}`, () => resolveEdit('series', s.id, 'approve'), () => resolveEdit('series', s.id, 'deny'))}
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
+                  {decideButtons(editActionLoading === `series-${s.id}`, () => resolveEdit('series', s.id, 'approve', s.seen), () => resolveEdit('series', s.id, 'deny', s.seen))}
+                  {openShow(s.id)}
+                </div>
               </div>
             ))}
           </>
@@ -301,8 +362,14 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
               <div key={`series-${s.id}`} style={rowStyle}>
                 {kindTag('Series', 'var(--brass)')}
                 <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
-                <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {s.reason}</p>
-                {decideButtons(deletionActionLoading === `series-${s.id}`, () => resolveDeletion('series', s.id, 'confirm'), () => resolveDeletion('series', s.id, 'deny'), '🗑 Confirm delete', 'Deny — restore it')}
+                <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>Reason: {s.reason}</p>
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>A show is removed from its page, where you can see what goes with it and what stays for its buyers.</p>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {openShow(s.id, '#removal')}
+                  <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={deletionActionLoading === `series-${s.id}`} onClick={() => resolveDeletion('series', s.id, 'deny')}>
+                    {deletionActionLoading === `series-${s.id}` ? 'Working…' : 'Deny — restore it'}
+                  </button>
+                </div>
               </div>
             ))}
           </>
@@ -312,7 +379,7 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
       <div id="library-orphans" className="account-card">
         <div className="account-eyebrow">Orphaned media</div>
         <h3>Files no longer referenced anywhere</h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Left behind by confirmed deletions and replaced videos or artwork. Deleting here is permanent.</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Left behind by confirmed deletions and replaced videos or artwork. Deleting here is permanent; Dismiss takes a row off this list and leaves the file where it is.</p>
         {orphanError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{orphanError}</p>}
         {!orphans ? <p>Loading…</p> : orphans.length === 0 ? <p className="adm-empty">Nothing orphaned right now.</p> : (
           orphans.map((o) => (
@@ -324,9 +391,14 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                 <div style={{ fontSize: '0.9rem' }}>{o.context || '(no title on file)'}</div>
                 <div style={{ fontSize: '0.78rem', color: 'var(--ink-dim)' }}>{o.reason}</div>
               </div>
-              <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={orphanActionLoading === o.id} onClick={() => cleanupOrphan(o.id)}>
-                {orphanActionLoading === o.id ? 'Deleting…' : '🗑 Delete now'}
-              </button>
+              <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={Boolean(orphanActionLoading)} onClick={() => cleanupOrphan(o.id)}>
+                  {orphanActionLoading === o.id ? 'Deleting…' : '🗑 Delete now'}
+                </button>
+                <button className="account-btn-secondary" style={{ width: 'auto' }} disabled={Boolean(orphanActionLoading)} title="Take it off this list and leave the file alone" onClick={() => dismissOrphan(o.id)}>
+                  {orphanActionLoading === `dismiss-${o.id}` ? 'Dismissing…' : 'Dismiss'}
+                </button>
+              </span>
             </div>
           ))
         )}
@@ -337,8 +409,8 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
           episode={editingEpisode}
           allSeries={allSeries}
           standaloneEpisodes={(library || []).filter((e) => ['movie', 'short'].includes(e.contentType) && e.id !== editingEpisode.id)}
-          onClose={() => setEditingEpisode(null)}
-          onSaved={() => { setEditingEpisode(null); loadLibrary(librarySearch); loadOrphans(); queueChanged(); }}
+          onClose={closeEdit}
+          onSaved={() => { closeEdit(); loadLibrary(librarySearch); loadOrphans(); queueChanged(); }}
         />
       )}
     </>

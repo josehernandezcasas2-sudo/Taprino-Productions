@@ -19,7 +19,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      return res.status(200).json(await listReviewQueue(rc));
+      return res.status(200).json(await listReviewQueue(rc, { light: req.query && req.query.light === '1' }));
     }
     if (req.method === 'POST') {
       const result = await decideReviewItem(rc, req.body || {});
@@ -28,6 +28,11 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
+    // A refusal with more to say than its line (a taken number's holder
+    // and the next free one, the master's state, a retired kind) answers
+    // with those fields too, as the show routes do.
+    const status = Number(err && err.status) || 0;
+    if (err && !err.internal && err.extra && status >= 400 && status < 500) return res.status(status).json({ error: err.message, ...err.extra });
     return sendError(res, err, 'admin/review-queue');
   }
 }
