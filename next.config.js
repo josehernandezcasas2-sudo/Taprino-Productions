@@ -40,7 +40,9 @@ function reportOnlyCsp() {
   const clerkSrc = [clerk ? `https://${clerk}` : null, 'https://*.clerk.accounts.dev', 'https://challenges.cloudflare.com'].filter(Boolean).join(' ');
   const supabase = supabaseHost() ? `https://${supabaseHost()}` : 'https://*.supabase.co';
   const stream = 'https://*.cloudflarestream.com https://videodelivery.net https://*.videodelivery.net';
-  const ads = 'https://imasdk.googleapis.com https://*.doubleclick.net https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.gstatic.com';
+  // adtrafficquality.google is the display-ads script's own traffic-quality
+  // check (a script, a frame and a config fetch on every page that loads it).
+  const ads = 'https://imasdk.googleapis.com https://*.doubleclick.net https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.gstatic.com https://*.adtrafficquality.google';
   return [
     "default-src 'self'",
     `script-src 'self' ${clerkSrc} ${ads}`,

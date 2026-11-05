@@ -3581,7 +3581,8 @@ button { font-family: inherit; cursor: pointer; }
 }
 .legal-crosslinks {
   display: flex;
-  gap: 1.2rem;
+  flex-wrap: wrap;
+  gap: 0.6rem 1.2rem;
   margin-top: 3rem;
   padding-top: 1.2rem;
   border-top: 1px solid rgba(251, 232, 211, 0.1);

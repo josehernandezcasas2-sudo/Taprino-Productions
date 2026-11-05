@@ -53,7 +53,7 @@ export default function Account(props) {
   const { isSignedIn, isSubscriber, tier = 'basic', plans = [], email, isAdmin, isSubAdmin, isCreator, isComped, mainGenres, newsletterStatus, subscriptionDetails, promoAccessExpiresAt, userId, twoFactorEnabled = false, teamTwoStep = null } = props;
   const router = useRouter();
   const { signOut } = useClerk();
-  const { profile } = useOwnProfile();
+  const { profile } = useOwnProfile({ enabled: !!isSignedIn });
   const [purchases, setPurchases] = useState(null);
   const [tipsSent, setTipsSent] = useState(null);
   const [money, setMoney] = useState(null);
