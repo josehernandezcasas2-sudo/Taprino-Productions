@@ -33,6 +33,15 @@ import { SITE } from '../lib/siteConfig';
 // public", with Make it public on the row (once per show). The "Series
 // management" link is gone (/creator/series forwards to the show pages).
 //
+// Who gets paid (the series revamp, slice 3b: mockups/series-slice3b-
+// contract.md §6.4), from GET /api/payees/mine beside the piles (a failure
+// hides both): "Get paid" (#get-paid, right under the head, only while an
+// invite waits) — one row per invite, "Get paid for Night Bus?", who asked
+// and when, what accepting means, Accept / Not now (POST /api/payees/
+// invites/<id>); and "Paid to you" after the piles — the titles whose
+// earnings come to this account, each with Stop getting it… (POST
+// /api/payees { action: 'step_down' }).
+//
 // SECURITY: same enforcement pattern as /admin — a non-creator is
 // redirected server-side before this page (or any creator-only data) ever
 // renders.
@@ -131,6 +140,14 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
   const [allShows, setAllShows] = useState(false);
   const [busyShow, setBusyShow] = useState(null);
   const [publicNote, setPublicNote] = useState(null); // { ok, text, showId }
+  // Who gets paid: null while loading or when it can't load (both pieces
+  // stay hidden); { invites, paidFor } once read.
+  const [mine, setMine] = useState(null);
+  const [inviteBusy, setInviteBusy] = useState(null); // `${id}:${action}`
+  const [inviteErrors, setInviteErrors] = useState({});
+  const [payNote, setPayNote] = useState(null); // { text, payouts }
+  const [paidBusy, setPaidBusy] = useState(null);
+  const [paidError, setPaidError] = useState(null);
   const submitted = typeof router.query.submitted === 'string' ? router.query.submitted : null;
   const submittedShow = typeof router.query.show === 'string' && isTitleId(router.query.show) ? router.query.show : null;
 
@@ -157,10 +174,80 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
     }
   }, []);
 
+  const loadMine = useCallback(async () => {
+    try {
+      const res = await fetch('/api/payees/mine');
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok || !Array.isArray(d.invites) || !Array.isArray(d.paidFor)) throw new Error('mine');
+      setMine({ invites: d.invites, paidFor: d.paidFor });
+    } catch {
+      setMine(null);
+    }
+  }, []);
+
   useEffect(() => {
     loadSubs();
     loadShows();
-  }, [loadSubs, loadShows]);
+    loadMine();
+  }, [loadSubs, loadShows, loadMine]);
+
+  // /creator#get-paid (the invite's notification and email): the card is
+  // drawn after the read, so the browser's own jump misses it.
+  const invitesShown = Boolean(mine && mine.invites.length > 0);
+  const [jumped, setJumped] = useState(false);
+  useEffect(() => {
+    if (jumped || !invitesShown || typeof window === 'undefined' || window.location.hash !== '#get-paid') return;
+    setJumped(true);
+    const el = document.getElementById('get-paid');
+    if (!el) return;
+    el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    const btn = el.querySelector('button:not([disabled])');
+    if (btn) btn.focus({ preventScroll: true });
+  }, [jumped, invitesShown]);
+
+  async function answerInvite(inv, action) {
+    setInviteBusy(`${inv.id}:${action}`);
+    setInviteErrors((e) => ({ ...e, [inv.id]: null }));
+    setPayNote(null);
+    try {
+      const res = await fetch(`/api/payees/invites/${encodeURIComponent(inv.id)}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setInviteErrors((e) => ({ ...e, [inv.id]: data.error || 'Something went wrong. Try again.' }));
+        // Answered or withdrawn meanwhile: the list says what's true now.
+        if (res.status === 409 || res.status === 404) loadMine();
+        return;
+      }
+      setPayNote({ text: data.words || (action === 'accept' ? 'Done.' : `${inv.inviterName} was told.`), payouts: action === 'accept' && data.payoutsReady === false });
+      setMine((m) => (m ? { ...m, invites: m.invites.filter((x) => x.id !== inv.id) } : m));
+      loadMine();
+    } catch {
+      setInviteErrors((e) => ({ ...e, [inv.id]: 'Couldn’t reach the site — check the connection and try again.' }));
+    } finally {
+      setInviteBusy(null);
+    }
+  }
+
+  async function stopGetting(t) {
+    const what = t.titleType === 'series' ? t.title : `“${t.title}”`;
+    const back = t.titleType === 'series' ? 'whoever runs it' : t.showId ? 'the show’s paid account' : 'whoever uploaded it';
+    if (!window.confirm(`Stop getting the earnings of ${what}? They go back to ${back} from now on; what’s already credited to you stays yours.`)) return;
+    setPaidBusy(`${t.titleType}:${t.titleId}`);
+    setPaidError(null);
+    setPayNote(null);
+    try {
+      const res = await fetch('/api/payees', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'step_down', type: t.titleType, id: t.titleId }) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Something went wrong. Try again.');
+      setPayNote({ text: data.words || 'Done.', payouts: false });
+      loadMine();
+    } catch (err) {
+      setPaidError(err.message);
+      loadMine();
+    } finally {
+      setPaidBusy(null);
+    }
+  }
 
   async function discardDraft(id) {
     if (!window.confirm('Discard this draft? Its uploaded file is deleted too.')) return;
@@ -265,6 +352,47 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
           <div className="apl-eyebrow">Creator Studio</div>
           <h1 className="cs-h1">Your titles, in one place.</h1>
         </div>
+
+        {payNote && (
+          <div className="cs-flash" role="status">
+            <strong>{payNote.text}</strong>
+            {payNote.payouts && <> To receive it, set up payouts under <Link href="/creator/money#payouts" className="cs-flash-link">Money</Link>.</>}
+          </div>
+        )}
+
+        {invitesShown && (
+          <section id="get-paid" className="cs-pile cs-invites" aria-labelledby="cs-invites-k">
+            <div className="cs-pile-head"><h2 className="apl-card-k cs-invites-k" id="cs-invites-k">Get paid</h2><span className="cs-count">{mine.invites.length}</span></div>
+            {mine.invites.map((inv) => {
+              const busyHere = inviteBusy && inviteBusy.startsWith(`${inv.id}:`);
+              return (
+                <div key={inv.id} className="cs-row cs-invite">
+                  <div className="cs-row-main cs-invite-main">
+                    <h3 className="cs-row-title cs-invite-title">{inv.headline}</h3>
+                    <span className="cs-row-meta">{inv.inviterName} asked on {inv.sentLabel}</span>
+                    <ul className="cs-invite-body">
+                      {(inv.body || []).map((l) => (
+                        <li key={l}>
+                          {l === 'To receive it, set up payouts under Money.'
+                            ? <>To receive it, set up payouts under <Link href="/creator/money#payouts" className="apl-link cs-invite-money">Money</Link>.</>
+                            : l}
+                        </li>
+                      ))}
+                    </ul>
+                    {inviteErrors[inv.id] && <p className="admin-error" role="alert">{inviteErrors[inv.id]}</p>}
+                  </div>
+                  <div className="cs-row-acts cs-invite-acts">
+                    <div className="cs-invite-btns">
+                      <button type="button" className="apl-btn cs-invite-btn" disabled={Boolean(busyHere)} onClick={() => answerInvite(inv, 'accept')}>{inviteBusy === `${inv.id}:accept` ? 'Accepting…' : 'Accept'}</button>
+                      <button type="button" className="apl-btn-secondary cs-invite-btn" disabled={Boolean(busyHere)} onClick={() => answerInvite(inv, 'decline')}>{inviteBusy === `${inv.id}:decline` ? 'Telling them…' : 'Not now'}</button>
+                    </div>
+                    <p className="cs-invite-foot">Not now tells {inv.inviterName} you said no. They can ask again.</p>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+        )}
 
         {submitted && (
           <div className="cs-flash" role="status">
@@ -376,6 +504,30 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
             {live.slice(0, PILE_LIMIT).map((s) => titleRow(s, `${s.viewCount} view${s.viewCount === 1 ? '' : 's'}`, `/episode/${s.id}`))}
           </Pile>
         </div>
+
+        {mine && mine.paidFor.length > 0 && (
+          <section className="cs-pile cs-paid" aria-labelledby="cs-paid-k">
+            <div className="cs-pile-head"><h2 className="apl-card-k cs-invites-k" id="cs-paid-k">Paid to you</h2><span className="cs-count">{mine.paidFor.length}</span></div>
+            {mine.paidFor.map((t) => {
+              const key = `${t.titleType}:${t.titleId}`;
+              const meta = `${t.scopeWords}${t.sinceLabel ? ` · since ${t.sinceLabel}` : ''}`;
+              return (
+                <div key={key} className="cs-row cs-paid-row">
+                  <div className="cs-row-main">
+                    {t.href ? <Link href={t.href} className="cs-row-title cs-paid-title">{t.title}</Link> : <span className="cs-row-title">{t.title}</span>}
+                    <span className="cs-row-meta">{meta}</span>
+                  </div>
+                  {t.canStepDown ? (
+                    <div className="cs-row-acts">
+                      <button type="button" className="apl-link" disabled={paidBusy === key} onClick={() => stopGetting(t)}>{paidBusy === key ? 'Stopping…' : 'Stop getting it…'}</button>
+                    </div>
+                  ) : t.lockedLine ? <span className="cs-row-meta">{t.lockedLine}</span> : null}
+                </div>
+              );
+            })}
+            {paidError && <p className="admin-error" role="alert">{paidError}</p>}
+          </section>
+        )}
 
         <nav className="cs-links" aria-label="Creator Studio">
           <Link href="/creator/my-work">Your work</Link>

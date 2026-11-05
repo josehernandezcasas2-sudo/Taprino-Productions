@@ -19,6 +19,7 @@ import {
 import { AboutField, MoreOptions, NOT_SAVED_WORDS, OneLineField, PlaceBlock, SameAsShow, StagedLegend, TitleField, askHref } from './EpisodeFields';
 import { BackArrowIcon, CheckIcon, ClockIcon, CloseIcon, ExternalLinkIcon, PlusIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { PREVIEW_BUILT } from './ShowCards';
+import PayeeCard, { PayeeLine } from './PayeeCard';
 
 // The episode editor (series revamp slice 2; spec Screens, "Episode
 // editor"; boards EditorBasics, EditorMoreInfo, EditorPlace, ShowLaptop).
@@ -38,6 +39,11 @@ import { PREVIEW_BUILT } from './ShowCards';
 // captions, a removal is POST …/removal, a move POST /api/show/[id]/move.
 // A draft (a creator_drafts row: an episode not sent yet) opens in
 // DraftEditor, the same screen over /api/creator/drafts.
+//
+// Who gets paid (slice 3b): the "Runs it · Paid to" line under the title
+// and the Who gets paid card at the end of More info (components/show/
+// PayeeCard.js), for those who may see who is paid; /…/episode/<id>
+// #who-gets-paid (Your work's row menu) opens More info at that card.
 //
 // Props: { showId, episodeId, mode: 'creator' | 'admin', layout,
 // isDraft (skip the episode read: the control room knows), onClose(),
@@ -203,6 +209,20 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const [anchorEpisodes, setAnchorEpisodes] = useState(null);
   const [toast, showToast] = useToast();
 
+  // #who-gets-paid: More info, scrolled to the Who gets paid card.
+  useEffect(() => {
+    if (typeof window === 'undefined' || window.location.hash !== '#who-gets-paid') return undefined;
+    setTab('more');
+    const t = setTimeout(() => {
+      const el = document.getElementById('ep-payee');
+      if (!el) return;
+      el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      const btn = el.querySelector('button:not([disabled])');
+      if (btn) btn.focus({ preventScroll: true });
+    }, 150);
+    return () => clearTimeout(t);
+  }, []);
+
   const set = useCallback((key, value) => {
     setForm((f) => ({ ...f, [key]: value }));
     setResets((r) => {
@@ -246,6 +266,14 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     if (r.ok) applyView(r.data, opts);
     return r;
   }, [ep.id, applyView]);
+
+  // Who gets paid changed: its words, then the editor (and the room) again.
+  const onPayeeChanged = useCallback(async (next, words) => {
+    if (next) setData((d) => ({ ...d, payee: next }));
+    if (words) showToast({ title: words });
+    await reload({});
+    if (onSaved) onSaved(ep, { payee: true });
+  }, [reload, showToast, onSaved, ep]);
 
   // --- what changed, and what saving it does -------------------------------
   const creditOpts = useMemo(() => ({ inherit: Boolean(show), showOrder: null }), [show]);
@@ -935,6 +963,8 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       )}
 
       <MoreOptions idPrefix="ep" form={form} set={set} pol={pol} live={live} />
+
+      {data.payee ? <PayeeCard payee={data.payee} mode="section" onChanged={onPayeeChanged} titleWord={`“${title}”`} /> : null}
     </>
   );
 
@@ -1062,6 +1092,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         eyebrow={eyebrow}
         pill={pill}
         title={title}
+        titleNote={data.payee && data.payee.line ? <PayeeLine payee={data.payee} className="show-ed-paid" /> : null}
         banners={banners}
         sections={sections}
         active={tab}

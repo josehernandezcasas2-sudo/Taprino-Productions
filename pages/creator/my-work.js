@@ -16,8 +16,9 @@ import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
+import { PayeeModal } from '../../components/show/PayeeCard';
 import Footer from '../../components/Footer';
-import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, UndoIcon, TicketIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, UndoIcon, TicketIcon, AccountIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { dollars } from '../../lib/purchaseRules';
 
@@ -50,6 +51,15 @@ const SHOW_STATE_CLASS = { live: 'live', ready: 'ready', review: 'private', draf
 // old modals. Its extras follow it. Films, shorts and Snippets keep their
 // rows and their modals until the editor learns them (the next pass).
 // Needs attention is the hub's Needs you (lib/showRules.js needsYou).
+//
+// Who gets paid (the series revamp, slice 3b: mockups/series-slice3b-
+// contract.md §6.3): every row's menu has it — a show's title opens its
+// editor at the Who gets paid card, a title of its own opens the card in
+// a sheet (components/show/PayeeCard.js PayeeModal). Prices are set by
+// whoever runs a title (`canPrice` on each row from my-submissions): Sell
+// is hidden on a row the viewer doesn't run, and the Sell modal says when
+// the title's paid account can't take a sale yet (/api/creator/pricing
+// `blocked`).
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -167,6 +177,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   // (/api/creator/pricing) and the title the Sell modal is open for.
   const [pricing, setPricing] = useState({ prices: {}, settings: {} });
   const [sellTarget, setSellTarget] = useState(null); // { type, id, title, sub }
+  // Who gets paid for a title of its own (a show's title opens its editor).
+  const [payeeTarget, setPayeeTarget] = useState(null); // { id, title }
 
   async function loadPricing() {
     try {
@@ -403,7 +415,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     const key = `episode:${s.id}`;
     const onSite = live(s);
     const canExtract = s.contentType === 'podcast' && s.hasVideo && !s.hasAudio;
-    if (forShow && !onSite && !canExtract) return <span className="yw-gear-space" aria-hidden="true" />;
+    // A row the viewer doesn't run never shows Sell (slice 3b).
+    const canSell = s.canPrice !== false;
     return (
       <span className="yw-gear-wrap">
         <button
@@ -444,7 +457,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 </button>
               </>
             )}
-            {forShow && onSite && s.contentType !== 'bonus' && (
+            {forShow && onSite && s.contentType !== 'bonus' && canSell && (
               <button
                 className="dropdown-item"
                 role="menuitem"
@@ -455,6 +468,15 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
               >
                 <TicketIcon size={12} src={iconOverrides.ticket} /> {pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell'}
                 {pricing.prices[`episode:${s.id}`] && pricing.prices[`episode:${s.id}`].price_cents ? <span className="yw-menu-price">{dollars(pricing.prices[`episode:${s.id}`].price_cents)}</span> : null}
+              </button>
+            )}
+            {forShow ? (
+              <Link className="dropdown-item" role="menuitem" href={`${editorHref(showIdOf(s), s.id)}#who-gets-paid`} onClick={() => setOpenDropdown(null)}>
+                <AccountIcon size={12} src={iconOverrides.account} /> Who gets paid
+              </Link>
+            ) : (
+              <button className="dropdown-item" role="menuitem" onClick={() => { setPayeeTarget({ id: s.id, title: displayTitle(s) }); setOpenDropdown(null); }}>
+                <AccountIcon size={12} src={iconOverrides.account} /> Who gets paid
               </button>
             )}
             {forShow && canExtract && (
@@ -655,7 +677,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           {!s.deletionRequested && s.contentType !== 'podcast' && (
             <button onClick={() => setCaptionSubmission(s)} title={s.captionsUrl ? 'Replace captions' : 'Add captions'}><ChatIcon size={14} src={iconOverrides.chat} /></button>
           )}
-          {!s.deletionRequested && s.status === 'approved' && !s.held && s.contentType !== 'bonus' && (
+          {!s.deletionRequested && s.status === 'approved' && !s.held && s.contentType !== 'bonus' && s.canPrice !== false && (
             <button
               className={pricing.prices[`episode:${s.id}`] && priceState(pricing.prices[`episode:${s.id}`]) === 'on' ? 'sell-on' : ''}
               onClick={() => setSellTarget({ type: 'episode', id: s.id, title: s.title, sub: [s.contentType, s.runtime, s.seriesName].filter(Boolean).join(' · ') })}
@@ -875,11 +897,22 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
         />
       )}
 
+      {payeeTarget && (
+        <PayeeModal
+          type="episode"
+          id={payeeTarget.id}
+          title={payeeTarget.title}
+          onClose={() => setPayeeTarget(null)}
+          onChanged={() => { loadSubmissions(); loadPricing(); }}
+        />
+      )}
+
       {sellTarget && (
         <SellTitleModal
           target={sellTarget}
           price={pricing.prices[`${sellTarget.type}:${sellTarget.id}`] || null}
           settings={pricing.settings}
+          blocked={pricing.blocked ? pricing.blocked[`${sellTarget.type}:${sellTarget.id}`] || null : null}
           isAdmin={isAdmin}
           onClose={() => setSellTarget(null)}
           onSaved={loadPricing}

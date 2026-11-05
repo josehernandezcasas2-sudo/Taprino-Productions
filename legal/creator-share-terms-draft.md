@@ -40,6 +40,12 @@ Grants from The Juanita Foundation / From the Heart are a separate nonprofit's m
 >
 > **For creators.** Tips reach your Stripe account at the moment they're paid, less our cut and the processing fee the fan covered. The payout-account and tax terms above apply.
 
+## 3b. Terms of Service · section 5 · add (2026-11)
+
+Live on the site since slice 3b of the series revamp (a paragraph after **Ad share**, before **Getting paid and taxes**):
+
+> **Which account a title pays.** What a title earns — its member share and ad share above, its sales (section 15) and the tips on its page (section 16) — goes to the account the title is attached to on Studio Tapa TV: whoever runs it, or another account they choose, which has to accept first; a change applies only to what the title earns after it, and credits and payments already made stay where they were made.
+
 ## 4. Privacy Policy · add
 
 > We use your viewing history on Studio Tapa TV to allocate the creator share of your membership when you haven't chosen creators yourself.
@@ -53,6 +59,7 @@ Grants from The Juanita Foundation / From the Heart are a separate nonprofit's m
 5. **Automatic renewal.** The existing section 4 and Stripe's customer portal handle cancellation. Anything the share adds under California's ARL?
 6. **Minors.** Members must pass the site's age gate; creators under 18 cannot hold Stripe Express accounts. Anything to add for a minor whose work is on the site?
 7. **Stripe's platform agreement.** The LLC is responsible as the platform for refunds, disputes and fraud on connected accounts. Any wording the creator terms should carry from it?
+8. **Paid accounts.** A title's earnings (member share, ad share, sales, tips) go to the account it is attached to — by default whoever runs it, or an account they pick that accepts first (a producer can be paid for someone else's upload). Who is the payee for tax reporting in that case, and does section 5's licence need the uploader's agreement that another account may be paid for their work?
 
 ## 6. The numbers to confirm
 

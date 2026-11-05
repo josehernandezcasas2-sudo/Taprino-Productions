@@ -79,6 +79,85 @@ t('a different percent and an empty month', () => {
   assert.deepEqual(empty, { lines: [], skipped: [], percent: 50, impressions: 0, creditCents: 0, totalCents: 0 });
 });
 
+t('one account all month: one line, as before (slice 3b)', () => {
+  const rows = [
+    { episode_id: 'e1', day: '2026-10-02', impressions: 10, credit_cents: 6 },
+    { episode_id: 'e1', day: '2026-10-25', impressions: 10, credit_cents: 6 }
+  ];
+  const out = adShareLines({ rows, episodes: EPISODES, percent: 50, period: '2026-10', payeeOn: () => 'user_pat' });
+  assert.equal(out.lines.length, 1);
+  assert.equal(out.lines[0].creator_id, 'user_pat', 'the paid account, not the uploader');
+  assert.equal(out.lines[0].split, false);
+  assert.equal(out.lines[0].segmentPayee, 'user_pat');
+  assert.equal(out.lines[0].note, 'Night Shift · 20 ads · October 2026', 'no day range on a whole month');
+});
+
+t('a month that spans a change of paid account: one line per account, by the day the ad played', () => {
+  // Oct 1–14 the uploader (the old rule), Oct 15–20 the show's owner, Oct 21–31 Pat.
+  const who = (id, day) => (day < '2026-10-15' ? 'user_dee' : day <= '2026-10-20' ? 'user_mara' : 'user_pat');
+  const rows = [
+    { episode_id: 'e1', day: '2026-10-01', impressions: 100, credit_cents: 60 },
+    { episode_id: 'e1', day: '2026-10-14', impressions: 100, credit_cents: 60 },
+    { episode_id: 'e1', day: '2026-10-15', impressions: 50, credit_cents: 30 },
+    { episode_id: 'e1', day: '2026-10-20', impressions: 50, credit_cents: 30 },
+    { episode_id: 'e1', day: '2026-10-31', impressions: 10, credit_cents: 6 },
+    { episode_id: 'e2', day: '2026-10-05', impressions: 10, credit_cents: 6 }
+  ];
+  const out = adShareLines({ rows, episodes: EPISODES, percent: 50, period: '2026-10', payeeOn: (id, day) => (id === 'e1' ? who(id, day) : 'user_mara') });
+  const e1 = out.lines.filter((l) => l.episode_id === 'e1');
+  assert.deepEqual(e1.map((l) => [l.creator_id, l.cents, l.units, l.split]), [['user_dee', 60, 200, true], ['user_mara', 30, 100, true], ['user_pat', 3, 10, true]]);
+  assert.deepEqual(e1.map((l) => l.note), [
+    'Night Shift · 200 ads · October 2026 (Oct 1–14)',
+    'Night Shift · 100 ads · October 2026 (Oct 15–20)',
+    'Night Shift · 10 ads · October 2026 (Oct 31)'
+  ]);
+  const e2 = out.lines.filter((l) => l.episode_id === 'e2');
+  assert.equal(e2.length, 1);
+  assert.equal(e2[0].split, false);
+  assert.equal(out.totalCents, 96);
+});
+
+t('a payee paid twice in one month with someone else between: one line, the day ranges as runs', () => {
+  // Mara Oct 15–19, Pat Oct 20–25 (then Pat steps down), Mara Oct 26–31.
+  const who = (id, day) => (day >= '2026-10-20' && day <= '2026-10-25' ? 'user_pat' : 'user_mara');
+  const rows = [
+    { episode_id: 'e1', day: '2026-10-15', impressions: 10, credit_cents: 20 },
+    { episode_id: 'e1', day: '2026-10-19', impressions: 10, credit_cents: 20 },
+    { episode_id: 'e1', day: '2026-10-20', impressions: 10, credit_cents: 20 },
+    { episode_id: 'e1', day: '2026-10-25', impressions: 10, credit_cents: 20 },
+    { episode_id: 'e1', day: '2026-10-26', impressions: 10, credit_cents: 20 },
+    { episode_id: 'e1', day: '2026-10-31', impressions: 10, credit_cents: 20 }
+  ];
+  const out = adShareLines({ rows, episodes: EPISODES, percent: 50, period: '2026-10', payeeOn: who });
+  assert.deepEqual(out.lines.map((l) => [l.creator_id, l.cents, l.units]), [['user_mara', 40, 40], ['user_pat', 20, 20]]);
+  assert.deepEqual(out.lines.map((l) => l.note), [
+    'Night Shift · 40 ads · October 2026 (Oct 15–19, Oct 26–31)',
+    'Night Shift · 20 ads · October 2026 (Oct 20–25)'
+  ]);
+});
+
+t('a split month: an excluded (studio) segment and a segment with nobody earn nothing, the rest is credited', () => {
+  const rows = [
+    { episode_id: 'e1', day: '2026-10-03', impressions: 100, credit_cents: 60 },
+    { episode_id: 'e1', day: '2026-10-18', impressions: 100, credit_cents: 60 },
+    { episode_id: 'e1', day: '2026-10-28', impressions: 100, credit_cents: 60 }
+  ];
+  const payeeOn = (id, day) => (day < '2026-10-10' ? 'user_admin' : day < '2026-10-25' ? null : 'user_pat');
+  const out = adShareLines({ rows, episodes: EPISODES, percent: 50, period: '2026-10', payeeOn }, { excludeCreators: new Set(['user_admin']) });
+  assert.deepEqual(out.lines.map((l) => [l.creator_id, l.cents, l.split]), [['user_pat', 30, true]]);
+  assert.deepEqual(out.skipped.map((x) => [x.episodeId, x.reason]), [['e1', 'creator excluded'], ['e1', 'no creator']]);
+});
+
+t('a podcast is skipped whole, split or not', () => {
+  const rows = [
+    { episode_id: 'e3', day: '2026-10-03', impressions: 100, credit_cents: 60 },
+    { episode_id: 'e3', day: '2026-10-28', impressions: 100, credit_cents: 60 }
+  ];
+  const out = adShareLines({ rows, episodes: EPISODES, percent: 50, period: '2026-10', payeeOn: (id, day) => (day < '2026-10-15' ? 'user_a' : 'user_b') });
+  assert.deepEqual(out.lines, []);
+  assert.deepEqual(out.skipped, [{ episodeId: 'e3', reason: 'podcast' }]);
+});
+
 t('title ids are text slugs, not uuids (migration 117)', () => {
   // Every id the site makes: a title slug plus a stamp, a placeholder, an
   // older catalogue id, and a uuid (which fits too) — and the ids minted

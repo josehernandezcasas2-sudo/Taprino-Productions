@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { CloseIcon, usePlayerIconOverrides } from '../PlayerIcons';
 import { dollars, salePriceCents, splitPurchase, SALE_PERCENTS, SALE_MAX_DAYS, PRICE_MIN_CENTS, PRICE_MAX_CENTS, DEFAULT_CUT_PERCENT } from '../../lib/purchaseRules';
 import { SITE } from '../../lib/siteConfig';
@@ -11,13 +11,38 @@ import { SITE } from '../../lib/siteConfig';
 //
 // target: { type: 'episode' | 'series', id, title, sub }
 // price: the title_prices row or null · settings: from the GET
+// blocked: the GET's `blocked['<type>:<id>']` line (slice 3b) — the title's
+// paid account can't take a sale yet, so it can't be bought until they can.
+// Who each sale pays is the title's paid account (slice 3b), which isn't
+// always whoever sets the price: the modal reads it from /api/payees and
+// names them ("Pat Lee receives, per sale"; "Studio Tapa keeps it" for the
+// studio's own); without an answer (before migration 118) it reads "You".
+
+// The title's paid account as the price maths names it, or null for "you".
+export function useSaleReceiver(target) {
+  const [receiver, setReceiver] = useState(null);
+  useEffect(() => {
+    if (!target || !target.type || !target.id) return undefined;
+    let off = false;
+    fetch(`/api/payees?type=${encodeURIComponent(target.type)}&id=${encodeURIComponent(target.id)}`, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        const p = d && d.payee;
+        if (off || !p || p.available === false || !p.ruleLive || !p.paidTo || !p.line) return;
+        setReceiver(p.line.paidTo === 'You' ? null : { house: Boolean(p.paidTo.house), name: p.paidTo.name || p.line.paidTo });
+      })
+      .catch(() => {});
+    return () => { off = true; };
+  }, [target && target.type, target && target.id]);
+  return receiver;
+}
 export const priceState = (price) => (!price ? 'none' : price.pending_cents != null ? 'pending' : price.status);
 export const STATE_LABEL = { on: 'On sale', pending: 'In review', rejected: 'Not approved', off: 'Not selling', none: 'Not for sale' };
 
 const toCents = (s) => Math.round(Number(String(s).replace(/[^0-9.]/g, '')) * 100);
 const plusDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
-export default function SellTitleModal({ target, price, settings = {}, isAdmin = false, onClose, onSaved }) {
+export default function SellTitleModal({ target, price, settings = {}, blocked = null, isAdmin = false, onClose, onSaved }) {
   const iconOverrides = usePlayerIconOverrides();
   const cut = settings.cutPercent ?? DEFAULT_CUT_PERCENT;
   const minCents = settings.minCents ?? PRICE_MIN_CENTS;
@@ -35,12 +60,15 @@ export default function SellTitleModal({ target, price, settings = {}, isAdmin =
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
+  const receiver = useSaleReceiver(target);
+  const house = Boolean(receiver && receiver.house);
+  const receiveLabel = house ? `${SITE.studio} keeps it, per sale` : receiver ? `${receiver.name} receives, per sale` : 'You receive, per sale';
   const cents = toCents(priceInput);
   const validCents = Number.isFinite(cents) && cents >= minCents && cents <= maxCents;
-  const split = validCents ? splitPurchase(cents, cut) : null;
+  const split = validCents ? splitPurchase(cents, cut, { house }) : null;
   const saleBase = liveCents || (validCents ? cents : 0);
   const saleCents = saleBase ? salePriceCents(saleBase, salePercent, minCents) : 0;
-  const saleSplit = saleCents ? splitPurchase(saleCents, cut) : null;
+  const saleSplit = saleCents ? splitPurchase(saleCents, cut, { house }) : null;
   const unchanged = state === 'on' && liveCents === cents && price.pending_cents == null;
 
   async function act(action, body, done) {
@@ -82,6 +110,7 @@ export default function SellTitleModal({ target, price, settings = {}, isAdmin =
           {price && price.pending_cents != null && (
             <p className="sell-hint">Waiting for review: {dollars(price.pending_cents)}{liveCents && state === 'on' ? ` (still on sale at ${dollars(liveCents)} meanwhile)` : ''}.</p>
           )}
+          {blocked && <p className="sell-hint tone-warn" role="note">{blocked}</p>}
           <label className="sell-label" htmlFor="sell-price">
             Price
             <div className="sell-price">
@@ -94,11 +123,13 @@ export default function SellTitleModal({ target, price, settings = {}, isAdmin =
             <div className="sell-math">
               <div><span>Buyer pays</span><span>{dollars(split.paidCents)}</span></div>
               <div><span>Card processing (Stripe)</span><span>− {dollars(split.feeCents)}</span></div>
-              <div><span>{SITE.name}, {cut}%</span><span>− {dollars(split.paidCents - split.feeCents - split.creatorCents)}</span></div>
-              <div className="total"><span>You receive, per sale</span><span>{dollars(split.creatorCents)}</span></div>
+              {!house && <div><span>{SITE.name}, {cut}%</span><span>− {dollars(split.paidCents - split.feeCents - split.creatorCents)}</span></div>}
+              <div className="total"><span>{receiveLabel}</span><span>{dollars(house ? split.paidCents - split.feeCents : split.creatorCents)}</span></div>
             </div>
           )}
-          <span className="sell-hint">Paid straight into your Stripe account at the moment of each sale, like Pitch Room backing. The studio&rsquo;s share covers hosting it for every buyer, for as long as they own it.</span>
+          <span className="sell-hint">{house
+            ? 'It pays the studio, so the studio keeps each sale.'
+            : <>Paid straight into {receiver ? `${receiver.name}’s` : 'your'} Stripe account at the moment of each sale, like Pitch Room backing. The studio&rsquo;s share covers hosting it for every buyer, for as long as they own it.</>}</span>
           {price && price.rejection_note && (
             <div className="sell-why">
               <b>Why it wasn&rsquo;t approved</b>
@@ -147,7 +178,7 @@ export default function SellTitleModal({ target, price, settings = {}, isAdmin =
             {saleSplit && (
               <div className="sell-math">
                 <div><span>Buyers see</span><span className="own-price sm"><b>{dollars(saleCents)}</b><s>{dollars(liveCents)}</s></span></div>
-                <div className="total"><span>You receive, per sale</span><span>{dollars(saleSplit.creatorCents)}</span></div>
+                <div className="total"><span>{receiveLabel}</span><span>{dollars(house ? saleSplit.paidCents - saleSplit.feeCents : saleSplit.creatorCents)}</span></div>
               </div>
             )}
             <div className="sell-actions">

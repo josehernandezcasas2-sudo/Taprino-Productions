@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, getDailyWatchSeconds, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 import { applyCors } from '../../../lib/cors';
+import { paidEpisodeIds } from '../../../lib/payees';
 
 // The full picture for exactly one episode, from the day it was uploaded
 // through today — a separate call rather than folding into the main
@@ -57,6 +58,10 @@ export default async function handler(req, res) {
       .eq('id', episode.series_id)
       .maybeSingle();
     owns = !!seriesRow && seriesRow.creator_id === userId;
+  }
+  // A title paid to them (slice 3b) too.
+  if (!owns) {
+    owns = (await paidEpisodeIds(userId).catch(() => [])).includes(episode.id);
   }
   if (!owns) {
     return res.status(403).json({ error: 'You can only view analytics for your own work.' });

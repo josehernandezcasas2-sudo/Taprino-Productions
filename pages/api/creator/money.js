@@ -1,13 +1,15 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getOwnListings } from '../../../lib/locations';
 import { getCreatorMoneyPage, getCreatorMoneyCsv } from '../../../lib/creatorMoney';
+import { hasPayeeInterest } from '../../../lib/payees';
 import { applyCors } from '../../../lib/cors';
 
 // The creator's Money page (lib/creatorMoney.js): GET ?period=YYYY-MM
 // (default this month; a bare YYYY gives the whole year) → everything the
 // page shows; ?format=csv → the same lines as a file. Creators and
 // admins, plus anyone who hosts a place (the Bookings lane is theirs
-// too, like /api/creator/payouts). CORS-open for the app.
+// too, like /api/creator/payouts), and anyone a title pays or with an
+// invite to be paid (slice 3b). CORS-open for the app.
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -21,8 +23,8 @@ export default async function handler(req, res) {
   const { userId, isCreator, isAdmin } = await getRoleContext(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   if (!isCreator && !isAdmin) {
-    const listings = await getOwnListings(userId).catch(() => []);
-    if (!listings.length) return res.status(403).json({ error: 'Creator access required.' });
+    const [listings, payee] = await Promise.all([getOwnListings(userId).catch(() => []), hasPayeeInterest(userId).catch(() => false)]);
+    if (!listings.length && !payee) return res.status(403).json({ error: 'Creator access required.' });
   }
   const period = typeof req.query.period === 'string' ? req.query.period : null;
   try {

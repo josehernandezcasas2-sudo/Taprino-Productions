@@ -23,6 +23,19 @@ pushed as (
   -- highest + 1000 rather than guess which copy was meant.
   select s.name, e.season, e.series_order from episodes e join series s on s.id = e.series_id
    where e.series_order >= 1000 and e.status <> 'rejected' and e.withdrawn_at is null
+),
+payee_out_of_step as (
+  -- Who gets paid (slice 3b): an episode's open history row should name
+  -- the account its columns pay (its own, else its show's, else the
+  -- show's owner, else the uploader). The daily cron puts a stray right.
+  select e.id from title_payees tp
+    join episodes e on e.id = tp.title_id
+    left join series s on s.id = e.series_id
+   where tp.title_type = 'episode' and tp.to_at is null
+     and tp.payee_id is distinct from coalesce(nullif(e.paid_to, ''), nullif(s.paid_to, ''), s.creator_id, e.submitted_by)
+),
+payee_invites_old as (
+  select id from payee_invites where status = 'pending' and created_at < now() - interval '30 days'
 )
 select section, item, how_many, detail, what_to_do from (
 
@@ -74,6 +87,12 @@ select section, item, how_many, detail, what_to_do from (
          'Admin → Content.'
 
   union all
+  select 10, 'Needs you', 'Payee invites waiting over 30 days',
+         (select count(*) from payee_invites_old),
+         null,
+         'Someone was asked to be paid for a title and hasn''t answered in a month. Its earnings keep going where they went; the show''s owner can withdraw the invite on the show page (Who gets paid).'
+
+  union all
   select 9, 'Needs you', 'Deletion requests',
          (select count(*) from episodes where deletion_requested = true and withdrawn_at is null)
            + (select count(*) from series where deletion_requested = true and withdrawn_at is null),
@@ -105,6 +124,12 @@ select section, item, how_many, detail, what_to_do from (
                               where c.relname = 'episodes_show_position_uq' and i.indisvalid)),
          null,
          'The unique index migration 118 made is missing or invalid; run 118 again (it is safe to repeat).'
+
+  union all
+  select 25, 'Should be 0', 'Payee rows out of step',
+         (select count(*) from payee_out_of_step),
+         (select left(string_agg(id, ', '), 300) from payee_out_of_step),
+         'An episode''s "who gets paid" history disagrees with who it pays now. The daily cron (creator reminders) closes the stray row and opens the right one; if the number stays above 0 after a day, look in Vercel → Logs for "payees: repaired".'
 
   union all
   select 24, 'Should be 0', 'Tables open to the public API',

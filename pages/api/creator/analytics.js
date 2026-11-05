@@ -3,6 +3,8 @@ import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 import { applyCors } from '../../../lib/cors';
+import { paidEpisodeIds } from '../../../lib/payees';
+import { isTitleId } from '../../../lib/titleIds';
 
 // Everything a creator can see about how their own work is performing.
 //
@@ -56,6 +58,16 @@ export default async function handler(req, res) {
   const orConditions = [`submitted_by.eq.${userId}`];
   if (ownedSeriesIds.length > 0) {
     orConditions.push(`series_id.in.(${ownedSeriesIds.join(',')})`);
+  }
+  // And, since slice 3b, the titles paid to them: their own paid account,
+  // or one in a show paid to them that has none of its own (numbers are
+  // views, not money, so an uploader keeps seeing their upload too).
+  const paidIds = (await paidEpisodeIds(userId).catch((err) => {
+    console.error('creator analytics paid titles:', err && err.message);
+    return [];
+  })).filter((id) => isTitleId(id)).slice(0, 500);
+  if (paidIds.length > 0) {
+    orConditions.push(`id.in.(${paidIds.join(',')})`);
   }
 
   const { data: episodes, error } = await supabase

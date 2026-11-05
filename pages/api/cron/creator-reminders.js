@@ -2,12 +2,19 @@ import { timingSafeEqual } from 'node:crypto';
 import { getRoleContext } from '../../../lib/roles';
 import { sendCollectReminders } from '../../../lib/creatorShareBatch';
 import { releaseDueCrewPay } from '../../../lib/crewPay';
+import { payeeCutoverStep, realignPriceOwners, repairTitlePayees } from '../../../lib/payees';
 import { sendError } from '../../../lib/apiErrors';
 
 // Daily: "time to collect" reminders for creators who left (Terms section
 // 5) — lib/creatorShareBatch.js sendCollectReminders — and, since
 // 2026-10-28, the secured crew pay whose release hold has lifted
-// (lib/crewPay.js releaseDueCrewPay; migration 114). Vercel's cron sends
+// (lib/crewPay.js releaseDueCrewPay; migration 114), and since slice 3b
+// who gets paid: the one-off cut-over step (lib/payees.js
+// payeeCutoverStep: from PAYEE_RULE_FROM a contributor's episode in
+// someone else's show pays the show's paid account, written into its
+// history, the uploader told once), the daily repair of any history row
+// that disagrees with the titles (repairTitlePayees), and prices set before
+// 3b pointed at whoever runs the title (realignPriceOwners). Vercel's cron sends
 // `Authorization: Bearer <CRON_SECRET>`, same as the other crons; a full
 // admin can also POST it by hand.
 function sameSecret(a, b) {
@@ -31,7 +38,12 @@ export default async function handler(req, res) {
   try {
     const result = await sendCollectReminders();
     const crewPay = await releaseDueCrewPay().catch((err) => { console.error('releaseDueCrewPay:', err.message); return { released: 0, error: true }; });
-    return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay });
+    const payeeCutover = await payeeCutoverStep().catch((err) => { console.error('payeeCutoverStep:', err.message); return { ran: false, error: true }; });
+    const payeeRepair = await repairTitlePayees().catch((err) => { console.error('repairTitlePayees:', err.message); return { repaired: 0, error: true }; });
+    // Prices set before 3b by a contributor follow whoever runs the title.
+    const priceOwners = await realignPriceOwners().catch((err) => { console.error('realignPriceOwners:', err.message); return { moved: 0, error: true }; });
+    if (payeeCutover.ran || payeeRepair.repaired || payeeRepair.invitesWithdrawn || priceOwners.moved) console.log(`cron/creator-reminders payees: cut-over ${payeeCutover.stamped || 0} stamped, ${payeeCutover.told || 0} told; repair ${payeeRepair.repaired || 0} rows, ${payeeRepair.invitesWithdrawn || 0} invites withdrawn; ${priceOwners.moved || 0} prices now with whoever runs the title`);
+    return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay, payeeCutover, payeeRepair, priceOwners });
   } catch (err) {
     console.error('cron/creator-reminders error:', err.message);
     return sendError(res, err, 'cron/creator-reminders');

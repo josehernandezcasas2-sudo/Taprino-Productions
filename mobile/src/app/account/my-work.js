@@ -16,7 +16,8 @@ import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 import SellTitleSheet, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/SellTitleSheet';
-import { ChevronIcon, KindChip, StateChip, episodeEditorRoute, showRoute } from '../../components/show/ShowBits';
+import { ChevronIcon, KindChip, Sheet, StateChip, episodeEditorRoute, showRoute, ss } from '../../components/show/ShowBits';
+import PayeeCard from '../../components/show/PayeeCard';
 import { dollars } from '../../lib/purchaseRules';
 
 // The www host: the bare studiotapatv.site 308-redirects there, so a
@@ -177,6 +178,10 @@ export default function MyWork() {
   // (/api/creator/pricing) and the title the Sell sheet is open for.
   const [pricing, setPricing] = useState({ prices: {}, settings: {} });
   const [sellModal, setSellModal] = useState(null); // { type, id, title, sub }
+  // "Who gets paid" for a title of its own (slice 3b): GET /api/payees'
+  // block, drawn by PayeeCard in a sheet (a show's episode opens its
+  // editor instead, where the same card sits under More info).
+  const [payeeSheet, setPayeeSheet] = useState(null); // { id, title, block, error, words }
 
   async function loadPricing() {
     try {
@@ -256,6 +261,12 @@ export default function MyWork() {
     } finally {
       setDeleteSaving(false);
     }
+  }
+
+  async function openPayee(s) {
+    setPayeeSheet({ id: s.id, title: s.title || 'this title', block: null, error: null, words: null });
+    const r = await showCall('GET', `/api/payees?type=episode&id=${encodeURIComponent(s.id)}`, undefined, getToken);
+    setPayeeSheet((cur) => (cur && cur.id === s.id ? { ...cur, block: r.ok ? r.data.payee || null : null, error: r.ok ? (r.data.payee ? null : 'Couldn’t read who gets paid.') : r.error } : cur));
   }
 
   async function cancelDeletion(episodeId) {
@@ -642,6 +653,7 @@ export default function MyWork() {
               copiedId={copiedId}
               pricing={pricing}
               onSell={(target) => { setActionSheet(null); setTimeout(() => setSellModal(target), SHEET_HANDOFF_MS); }}
+              onPayee={(item) => { setActionSheet(null); setTimeout(() => openPayee(item), SHEET_HANDOFF_MS); }}
             /> : null}
           </Pressable>
         </Pressable>
@@ -654,6 +666,7 @@ export default function MyWork() {
             {sellModal ? <SellTitleSheet
               target={sellModal}
               price={pricing.prices[`${sellModal.type}:${sellModal.id}`] || null}
+              blocked={pricing.blocked ? pricing.blocked[`${sellModal.type}:${sellModal.id}`] || null : null}
               settings={pricing.settings}
               getToken={() => freshToken(getToken)}
               onClose={() => setSellModal(null)}
@@ -662,6 +675,25 @@ export default function MyWork() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Who gets paid for a title of its own (slice 3b) */}
+      {payeeSheet ? (
+        <Sheet title={`Who gets paid for “${payeeSheet.title}”`} onClose={() => setPayeeSheet(null)}>
+          {payeeSheet.words ? <Text style={ss.okText} accessibilityLiveRegion="polite">{payeeSheet.words}</Text> : null}
+          {payeeSheet.error ? <Text style={ss.error}>{payeeSheet.error}</Text> : !payeeSheet.block ? <ActivityIndicator color={colors.olive} /> : (
+            <PayeeCard
+              payee={payeeSheet.block}
+              mode="modal"
+              onChanged={(next, words) => {
+                // (null, null): the block was out of date — read it again.
+                if (!next && !words) openPayee({ id: payeeSheet.id, title: payeeSheet.title });
+                else setPayeeSheet((cur) => (cur ? { ...cur, block: next || cur.block, words } : cur));
+                loadSubmissions();
+              }}
+            />
+          )}
+        </Sheet>
+      ) : null}
 
       {/* Edit a film's title/description (sent for approval) */}
       <Modal visible={!!editModal} transparent animationType="fade" onRequestClose={() => setEditModal(null)}>
@@ -715,7 +747,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, onOpenEditor, onOpenShow, copiedId, pricing, onSell }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, onOpenEditor, onOpenShow, copiedId, pricing, onSell, onPayee }) {
   const { type, item: s } = actionSheet;
 
   // A show's episode or extra: the editor and the show screen do the rest
@@ -732,6 +764,9 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
         <Pressable style={styles.sheetRow} onPress={() => onOpenShow(actionSheet.showId, s)}>
           <ChevronIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Open on the show page</Text>
         </Pressable>
+        <Pressable style={styles.sheetRow} onPress={() => onOpenEditor(actionSheet.showId, s)} accessibilityHint="Opens its editor; Who gets paid is under More info">
+          <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>Who gets paid</Text>
+        </Pressable>
         {actionSheet.onSite ? (
           <>
             <Pressable style={styles.sheetRow} onPress={() => onOpenPublic(s)}>
@@ -740,7 +775,7 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
             <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
               <LinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{copiedId === s.id ? 'Link copied!' : 'Copy link'}</Text>
             </Pressable>
-            {!extra ? (
+            {!extra && s.canPrice !== false ? (
               <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'episode', id: s.id, title: displayTitle(s), sub: [episodeCode(s), minutes(s.runtime), s.seriesName].filter(Boolean).join(' · ') })}>
                 <Text style={[styles.sheetRowText, styles.dollar]}>$</Text>
                 <Text style={styles.sheetRowText}>{price ? 'Price and sales' : 'Sell'}{price && price.price_cents ? ` · ${dollars(price.price_cents)}` : ''}</Text>
@@ -764,7 +799,7 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
           <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
             <LinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{copiedId === s.id ? 'Link copied!' : 'Copy public link'}</Text>
           </Pressable>
-          {!s.deletionRequested && !s.held && s.contentType !== 'bonus' ? (
+          {!s.deletionRequested && !s.held && s.contentType !== 'bonus' && s.canPrice !== false ? (
             <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'episode', id: s.id, title: s.title, sub: [s.contentType, s.runtime, s.seriesName].filter(Boolean).join(' · ') })}>
               <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>{pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell this title'}</Text>
             </Pressable>
@@ -776,6 +811,9 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
           <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Edit title &amp; description</Text>
         </Pressable>
       ) : null}
+      <Pressable style={styles.sheetRow} onPress={() => onPayee(s)}>
+        <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>Who gets paid</Text>
+      </Pressable>
       <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/my-work`)}>
         <ImageIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Manage artwork, video &amp; captions (on website)</Text>
       </Pressable>

@@ -29,6 +29,14 @@ import { KindChip, PlusIcon, StateChip, showRoute } from '../../components/show/
 // episode of a show that isn't public yet is never Live: it waits in Needs
 // you as "Ready to go public", once per show, with Make it public on the
 // row. A show's drafts share one row that opens the show.
+//
+// Who gets paid (slice 3b: mockups/series-slice3b-contract.md §6.4, §7;
+// GET /api/payees/mine): "Get paid" at the top — one card per invite to be
+// paid for a title ("Get paid for Night Bus?"), with Accept and Not now;
+// nothing about the money moves until Accept — and "Paid to you" after
+// Live, the titles whose own paid account is this one, each with "Stop
+// getting it…". A notification's /creator#get-paid lands here (the card
+// is the first thing on the screen). Both hide when the read fails.
 const PILE_LIMIT = 4;
 // A show's numbering lines worth a row in Needs you (the rest of its
 // problems are rows of their own already: a failed file, no captions).
@@ -103,6 +111,12 @@ export default function CreatorStudio() {
   const [showsFailed, setShowsFailed] = useState(false);
   const [busyShow, setBusyShow] = useState(null);
   const [publicNote, setPublicNote] = useState(null); // { ok, text, showId }
+  // GET /api/payees/mine: { invites, paidFor }; null while loading or when
+  // it can't load (both pieces hide).
+  const [payees, setPayees] = useState(null);
+  const [payeeBusy, setPayeeBusy] = useState(null); // an invite id, or 'step:<type>:<id>'
+  const [payeeErrors, setPayeeErrors] = useState({}); // invite id → the server's line
+  const [payeeFlash, setPayeeFlash] = useState(null); // { text, money }
 
   const loadSubs = useCallback(async () => {
     const [work, drafts] = await Promise.all([
@@ -135,13 +149,22 @@ export default function CreatorStudio() {
     setShowsFailed(false);
   }, [getToken]);
 
+  const loadPayees = useCallback(async () => {
+    const r = await showCall('GET', '/api/payees/mine', undefined, getToken);
+    if (!r.ok || !r.data || r.data.available === false) {
+      setPayees(r.ok ? { invites: [], paidFor: [] } : null);
+      return;
+    }
+    setPayees({ invites: Array.isArray(r.data.invites) ? r.data.invites : [], paidFor: Array.isArray(r.data.paidFor) ? r.data.paidFor : [] });
+  }, [getToken]);
+
   const load = useCallback(async () => {
     if (!isSignedIn) {
       setState({ loading: false, error: null, forbidden: true, subs: null, drafts: [] });
       return;
     }
-    await Promise.all([loadSubs(), loadShows()]);
-  }, [isSignedIn, loadSubs, loadShows]);
+    await Promise.all([loadSubs(), loadShows(), loadPayees()]);
+  }, [isSignedIn, loadSubs, loadShows, loadPayees]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function discardDraft(id) {
@@ -175,6 +198,56 @@ export default function CreatorStudio() {
       } }
     ]);
   }
+
+  // Accept / Not now on a "Get paid for …?" card.
+  async function answerInvite(inv, action) {
+    setPayeeBusy(inv.id);
+    setPayeeErrors((e) => ({ ...e, [inv.id]: null }));
+    setPayeeFlash(null);
+    const r = await showCall('POST', `/api/payees/invites/${encodeURIComponent(inv.id)}`, { action }, getToken);
+    setPayeeBusy(null);
+    if (!r.ok) {
+      setPayeeErrors((e) => ({ ...e, [inv.id]: r.error }));
+      // Answered, withdrawn or changed meanwhile: read the cards again (the
+      // website does the same on any 409 or 404).
+      if (r.status === 404 || r.status === 409) loadPayees();
+      return;
+    }
+    setPayees((p) => (p ? { ...p, invites: p.invites.filter((x) => x.id !== inv.id) } : p));
+    setPayeeFlash({ text: r.data.words || (action === 'accept' ? 'Done.' : `${inv.inviterName} was told.`), money: action === 'accept' && r.data.payoutsReady === false });
+    loadPayees();
+  }
+
+  // "Stop getting it…" on a Paid to you row: who it goes back to comes
+  // from its block (GET /api/payees), then the question, then step_down.
+  async function stepDown(t) {
+    const key = `step:${t.titleType}:${t.titleId}`;
+    setPayeeBusy(key);
+    const b = await showCall('GET', `/api/payees?type=${encodeURIComponent(t.titleType)}&id=${encodeURIComponent(t.titleId)}`, undefined, getToken);
+    setPayeeBusy(null);
+    const block = b.ok ? b.data.payee : null;
+    const back = block && block.defaultChoice && block.defaultChoice.name ? block.defaultChoice.name : 'the account it paid before';
+    const word = t.titleType === 'series' ? t.title : `“${t.title}”`;
+    Alert.alert(`Stop getting the earnings of ${word}?`, `They go back to ${back} from now on; what’s already credited to you stays yours.`, [
+      { text: 'Keep them', style: 'cancel' },
+      { text: 'Stop getting them', style: 'destructive', onPress: async () => {
+        setPayeeBusy(key);
+        setPayeeFlash(null);
+        const r = await showCall('POST', '/api/payees', { action: 'step_down', type: t.titleType, id: t.titleId }, getToken);
+        setPayeeBusy(null);
+        if (!r.ok) {
+          Alert.alert('Nothing changed', r.error);
+          if (r.status === 409 || r.status === 404) loadPayees();
+          return;
+        }
+        setPayeeFlash({ text: r.data.words || 'Done.', money: false });
+        loadPayees();
+      } }
+    ]);
+  }
+
+  const invites = payees ? payees.invites : [];
+  const paidFor = payees ? payees.paidFor : [];
 
   const list = state.subs || [];
   const titleById = new Map(list.map((x) => [x.id, x]));
@@ -261,6 +334,29 @@ export default function CreatorStudio() {
           </View>
         ) : (
           <>
+            {payeeFlash ? (
+              <View style={s.flash} accessibilityLiveRegion="polite">
+                <Text style={cp.p}><Text style={cp.strong}>{payeeFlash.text}</Text></Text>
+                {payeeFlash.money ? <Text style={cp.p}>To receive it, set up payouts under <Text style={cp.link} onPress={() => router.push('/creator/money')}>Money</Text>.</Text> : null}
+              </View>
+            ) : null}
+            {invites.length > 0 ? (
+              <View style={[s.pile, s.pileInvite]} accessibilityLabel="Get paid">
+                <View style={s.pileHead}><Text style={cp.cardK}>Get paid</Text><Text style={s.count}>{invites.length}</Text></View>
+                {invites.map((inv) => (
+                  <InviteCard
+                    key={inv.id}
+                    inv={inv}
+                    busy={payeeBusy === inv.id}
+                    disabled={Boolean(payeeBusy)}
+                    error={payeeErrors[inv.id] || null}
+                    onAccept={() => answerInvite(inv, 'accept')}
+                    onDecline={() => answerInvite(inv, 'decline')}
+                    onMoney={() => router.push('/creator/money')}
+                  />
+                ))}
+              </View>
+            ) : null}
             {submitted ? (
               <View style={s.flash} accessibilityLiveRegion="polite">
                 <Text style={cp.p}><Text style={cp.strong}>“{submitted}” is in.</Text> It sits under In review until we&rsquo;ve watched it.</Text>
@@ -376,6 +472,26 @@ export default function CreatorStudio() {
               {live.slice(0, PILE_LIMIT).map((x) => titleRow(x, `${x.viewCount || 0} view${x.viewCount === 1 ? '' : 's'}`, () => router.push(`/episode/${encodeURIComponent(x.id)}`)))}
             </Pile>
 
+            {paidFor.length > 0 ? (
+              <Pile k="Paid to you" count={paidFor.length} empty="">
+                {paidFor.map((t) => {
+                  const key = `step:${t.titleType}:${t.titleId}`;
+                  const to = t.showId ? showRoute(t.showId, t.titleType === 'episode' ? { ep: t.titleId } : null) : null;
+                  return (
+                    <View key={`${t.titleType}-${t.titleId}`} style={s.row}>
+                      <Pressable style={({ pressed }) => [{ flex: 1, gap: 2 }, pressed && to && s.pressed]} disabled={!to} onPress={() => to && router.push(to)} accessibilityRole={to ? 'link' : 'text'}>
+                        <Text style={s.rowTitle} numberOfLines={1}>{t.titleType === 'series' ? t.title : `“${t.title}”`}</Text>
+                        <Text style={s.rowMeta} numberOfLines={2}>{[t.scopeWords, t.sinceLabel ? `since ${t.sinceLabel}` : null].filter(Boolean).join(' · ')}</Text>
+                      </Pressable>
+                      {t.canStepDown ? (
+                        <Text style={[cp.link, payeeBusy === key && { opacity: 0.5 }]} onPress={payeeBusy ? undefined : () => stepDown(t)} accessibilityRole="button">{payeeBusy === key ? '…' : 'Stop getting it…'}</Text>
+                      ) : t.lockedLine ? <Text style={[s.rowMeta, { maxWidth: 140 }]} numberOfLines={3}>{t.lockedLine}</Text> : null}
+                    </View>
+                  );
+                })}
+              </Pile>
+            ) : null}
+
             <View style={s.links}>
               {[['Your work', '/account/my-work'], ['Your numbers', '/creator/numbers'], ['Money', '/creator/money'], ['Pitch Room', '/creator/pitches']].map(([label, href]) => (
                 <Pressable key={href} onPress={() => router.push(href)}><Text style={s.linkText}>{label.toUpperCase()}</Text></Pressable>
@@ -476,6 +592,32 @@ function Pile({ k, count, empty, tone, dashed, onAll, children }) {
   );
 }
 
+// "Get paid for Night Bus?": who asked and when, what accepting means (the
+// server's lines; "set up payouts under Money" links there), Accept and
+// Not now, and what Not now does.
+function InviteCard({ inv, busy, disabled, error, onAccept, onDecline, onMoney }) {
+  return (
+    <View style={s.invite} accessibilityLabel={inv.headline}>
+      <Text style={s.inviteTitle} accessibilityRole="header">{inv.headline}</Text>
+      <Text style={s.rowMeta}>{inv.inviterName} asked{inv.sentLabel ? ` on ${inv.sentLabel}` : ''}</Text>
+      {(inv.body || []).map((line, i) => {
+        const money = /under Money\.$/.test(line);
+        return (
+          <Text key={`${i}-${line}`} style={cp.p}>
+            {money ? <>{line.replace(/Money\.$/, '')}<Text style={cp.link} onPress={onMoney}>Money</Text>.</> : line}
+          </Text>
+        );
+      })}
+      {error ? <Text style={cp.error} accessibilityLiveRegion="assertive">{error}</Text> : null}
+      <View style={s.inviteActions}>
+        <PrimaryButton label="Accept" busy={busy} disabled={disabled} onPress={onAccept} style={s.inviteBtn} />
+        <SecondaryButton label="Not now" disabled={disabled} onPress={onDecline} style={s.inviteBtn} />
+      </View>
+      <Text style={cp.help}>Not now tells {inv.inviterName} you said no. They can ask again.</Text>
+    </View>
+  );
+}
+
 // "NIGHT BUS · S1 E3" over a pile row: a long show name is cut, never the
 // episode's code.
 function Eyebrow({ name, code }) {
@@ -507,6 +649,11 @@ const s = StyleSheet.create({
   pileWarn: { borderColor: brassTint(0.45) },
   pileOk: { borderColor: okTint(0.4) },
   pileDashed: { borderStyle: 'dashed' },
+  pileInvite: { borderColor: oliveTint(0.5), backgroundColor: oliveTint(0.06) },
+  invite: { gap: 8, paddingTop: 10, borderTopWidth: 1, borderTopColor: inkTint(0.08) },
+  inviteTitle: { fontFamily: fonts.displaySemi, fontSize: 16, lineHeight: 21, color: colors.ink },
+  inviteActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 2 },
+  inviteBtn: { flexGrow: 1, minWidth: 130 },
   pileHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   count: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkDim },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 7, borderTopWidth: 1, borderTopColor: inkTint(0.08) },

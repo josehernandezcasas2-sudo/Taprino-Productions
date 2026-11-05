@@ -67,6 +67,9 @@ export function rowMeta(row, ctx, upload) {
   if (row.hasPageChoice === true) add('its own page');
   if (row.tier && ctx.defaultTier && row.tier !== ctx.defaultTier) add(row.tier === 'free' ? 'free' : ctx.premiumWord);
   if (row.uploaderName) add(`uploaded by ${row.uploaderName}`);
+  // Slice 3b: an episode with a paid account of its own says whose (the
+  // server sends paidOwn only to those who may see who is paid).
+  if (row.paidOwn && row.paidTo) add(`paid to ${row.paidTo === ctx.viewerId ? 'you' : row.paidToName || 'another account'}`);
   return parts;
 }
 

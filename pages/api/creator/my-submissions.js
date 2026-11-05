@@ -4,7 +4,7 @@ import { getCloudflareVideoStatus, cloudflareUidFromUrl } from '../../../lib/clo
 import { getViewCounts } from '../../../lib/redis';
 import { captionsHref } from '../../../lib/episodes';
 import { sortEpisodes } from '../../../lib/seriesResume';
-import { kindOf } from '../../../lib/showRules';
+import { kindOf, titleRunnerOf } from '../../../lib/showRules';
 import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
 
@@ -180,6 +180,9 @@ export default async function handler(req, res) {
       seriesKind: show ? kindOf(show, rowsByShow[ep.series_id]) : null,
       seriesStatus: show ? show.status || 'approved' : null,
       seriesHeld: Boolean(show && show.moderation_hold),
+      // Whoever runs a title prices it (slice 3b): a show's episode, the
+      // show's owner; a standalone title, its uploader; and full admins.
+      canPrice: Boolean(isAdmin || titleRunnerOf(ep, show) === userId),
       season: ep.season ?? null,
       seriesOrder: ep.series_order ?? null,
       artist: ep.artist ?? null,

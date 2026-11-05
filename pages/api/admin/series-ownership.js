@@ -46,7 +46,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'seriesId is required.' });
     }
     try {
-      await setShowOwner(seriesId, { email: typeof ownerEmail === 'string' ? ownerEmail : null }, { userId, email, isAdmin });
+      // The old card has no earnings question: keep — every episode keeps
+      // paying the account it paid (a show nobody ran: each episode's
+      // uploader, pinned on the episode; lib/showAdmin.js setShowOwner).
+      await setShowOwner(seriesId, { email: typeof ownerEmail === 'string' ? ownerEmail : null, earnings: 'keep' }, { userId, email, isAdmin });
       return res.status(200).json({ ok: true });
     } catch (err) {
       return showRouteError(res, err, 'admin/series-ownership', 'Could not update ownership.');

@@ -9,6 +9,7 @@ import { BackArrowIcon } from '../../components/PlayerIcons';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getOwnListings } from '../../lib/locations';
+import { hasPayeeInterest } from '../../lib/payees';
 import { SITE } from '../../lib/siteConfig';
 
 // The creator's Money page (mockup signed off 2026-10-23): every lane
@@ -26,9 +27,10 @@ export async function getServerSideProps({ req, res }) {
   const account = await getAccountContext(req);
   if (!account.isSignedIn) return { redirect: { destination: '/account', permanent: false } };
   if (!account.isCreator && !account.isAdmin) {
-    // A host who isn't a creator has a Bookings lane of their own.
-    const listings = await getOwnListings(account.userId).catch(() => []);
-    if (!listings.length) return { redirect: { destination: '/account', permanent: false } };
+    // A host who isn't a creator has a Bookings lane of their own; anyone a
+    // title pays (or who is invited to be paid) has its money (slice 3b).
+    const [listings, payee] = await Promise.all([getOwnListings(account.userId).catch(() => []), hasPayeeInterest(account.userId).catch(() => false)]);
+    if (!listings.length && !payee) return { redirect: { destination: '/account', permanent: false } };
   }
   const episodes = await getPublicEpisodes();
   return {

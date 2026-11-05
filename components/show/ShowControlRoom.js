@@ -26,6 +26,7 @@ import DecisionsCard from './admin/DecisionsCard';
 import StagedChangesCard from './admin/StagedChangesCard';
 import RemovalCard from './admin/RemovalCard';
 import HistoryCard from './admin/HistoryCard';
+import PayeeCard from './PayeeCard';
 
 // The show page — one control room for a series or a podcast (the series
 // revamp, slice 2; spec Screens "Show page (the control room, creator
@@ -157,7 +158,9 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   const [draftInfo, setDraftInfo] = useState({});
   const [myShows, setMyShows] = useState(null);
   const [pricing, setPricing] = useState(null);
-  const [sellOpen, setSellOpen] = useState(false);
+  // The Sell modal's title: the whole series (the Sell card) or one of its
+  // episodes (a row's "Sell…", slice 3b) — { type, id, title, sub }.
+  const [sellTarget, setSellTarget] = useState(null);
   const [createdNote, setCreatedNote] = useState(Boolean(created));
   const dirtyRef = useRef(false);
   const loadingRef = useRef(null);
@@ -333,7 +336,19 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   useEffect(() => {
     if (!view || arrived.current || typeof window === 'undefined') return;
     arrived.current = true;
-    const m = /^#(ep|draft|gap)-(.+)$/.exec(window.location.hash || '');
+    const hash = window.location.hash || '';
+    // "Who gets paid" (the Owner card's link, Edit show's line): the card.
+    if (hash === '#show-payee') {
+      setTimeout(() => {
+        const el = document.getElementById('show-payee');
+        if (!el) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const btn = el.querySelector('button:not([disabled]), a[href]');
+        if (btn) btn.focus({ preventScroll: true });
+      }, 120);
+      return;
+    }
+    const m = /^#(ep|draft|gap)-(.+)$/.exec(hash);
     if (m) setTimeout(() => flash(`${m[1]}-${m[2]}`, m[1] === 'gap' ? null : decodeURIComponent(m[2])), 120);
   }, [view, flash]);
 
@@ -353,7 +368,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   const canRun = isOwner || team;
   useEffect(() => {
     if (!show || !show.isPublic || !canRun || pricing) return;
-    callApi('GET', '/api/creator/pricing').then((r) => { if (r.ok) setPricing(r.data); });
+    callApi('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`).then((r) => { if (r.ok) setPricing(r.data); });
   }, [show, canRun, pricing]);
 
   // --- routing: the panel on a laptop, the page on a phone -----------------------
@@ -597,6 +612,15 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       return load({ quiet: true });
     },
     askRemove: (row) => setSheet({ kind: 'remove', row }),
+    // A live episode's price (slice 3b: whoever runs the show prices its
+    // episodes, a contributor's included).
+    sell: async (row) => {
+      if (!pricing) {
+        const r = await callApi('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`);
+        if (r.ok) setPricing(r.data);
+      }
+      setSellTarget({ type: 'episode', id: row.id, title: row.displayTitle || row.title || 'This episode', sub: [row.code, show ? show.name : null].filter(Boolean).join(' · ') });
+    },
     discard: async (row) => {
       if (!window.confirm(`Discard ${row.displayTitle || 'this draft'}? Its uploaded file is deleted too.`)) return;
       cancelQueueItem(row.id);
@@ -867,6 +891,13 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     say({ tone: 'ok', title: on ? 'Channels may air the whole show' : 'Channels won’t air it' }, 4000);
     return load({ quiet: true });
   }
+  // Who gets paid changed (the card, a withdrawn invite): its words, then
+  // the page again — the rows' "paid to" and the show card's line follow.
+  function onPayeeChanged(next, words) {
+    if (next) setView((v) => (v ? { ...v, payee: next } : v));
+    if (words) say({ tone: 'ok', title: words }, 7000);
+    load({ quiet: true });
+  }
   async function cancelStaged(field) {
     setBusy(`staged-${field}`);
     const r = await callApi('DELETE', `/api/show/${encodeURIComponent(showId)}/staged?field=${encodeURIComponent(field)}`);
@@ -1058,6 +1089,11 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     nextFree,
     defaultTier: (show.defaults && show.defaults.tier) || null,
     premiumWord: PREMIUM_WORD,
+    // Slice 3b: who it pays (rows with a paid account of their own say so)
+    // and the runner's "Sell…" on a live row (not on the admin page).
+    viewerId: viewer.userId || null,
+    canSell: !isAdminMode && (isOwner || Boolean(viewer.isAdmin)) && show.isPublic && !locked && kind !== 'vertical',
+    priceOf: (id) => (pricing && pricing.prices ? pricing.prices[`episode:${id}`] || null : null),
     // Admin mode: the rows in review (their place, what blocks them, when
     // the owner last edited them), what this account may do and why not.
     admin: isAdminMode && admin ? {
@@ -1105,6 +1141,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
               <>
                 <FactsCard {...adminCards} />
                 <OwnerCard {...adminCards} />
+                {view.payee && <PayeeCard payee={view.payee} mode="card" onChanged={onPayeeChanged} />}
                 <AdminStatusCard {...adminCards} onProblem={onProblem} />
                 <DecisionsCard {...adminCards} onProblems={markProblems} />
                 <StagedChangesCard {...adminCards} />
@@ -1122,7 +1159,8 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
           ) : (
             <ShowStatusCard view={view} contributor={contributor} onProblem={onProblem} onMakePublic={makePublic} onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null} onResubmit={canRun ? resubmit : null} busy={busy} />
           )}
-          {sellable && <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) { const r = await callApi('GET', '/api/creator/pricing'); if (r.ok) setPricing(r.data); } setSellOpen(true); }} />}
+          {sellable && <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) { const r = await callApi('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`); if (r.ok) setPricing(r.data); } setSellTarget({ type: 'series', id: showId, title: show.name, sub: countLine(view.seasons) }); }} />}
+          {!isAdminMode && view.payee && <PayeeCard payee={view.payee} mode="card" onChanged={onPayeeChanged} />}
           {canRun && !(vertical && !team) && <ChannelsCard view={view} canEdit={canRun} locked={held ? 'Locked while it’s pulled.' : removal ? 'Locked while its removal is requested.' : null} busy={busy === 'channels'} onToggle={toggleChannels} />}
           {!isAdminMode && !(vertical && !team) && <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />}
         </div>
@@ -1263,15 +1301,16 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
           </div>
         </RoomSheet>
       )}
-      {sellOpen && pricing && (
+      {sellTarget && pricing && (
         <SellTitleModal
-          target={{ type: 'series', id: showId, title: show.name, sub: countLine(view.seasons) }}
-          price={pricing.prices ? pricing.prices[`series:${showId}`] || null : null}
+          target={sellTarget}
+          price={pricing.prices ? pricing.prices[`${sellTarget.type}:${sellTarget.id}`] || null : null}
           settings={pricing.settings || {}}
+          blocked={pricing.blocked ? pricing.blocked[`${sellTarget.type}:${sellTarget.id}`] || null : null}
           isAdmin={Boolean(viewer.isAdmin)}
-          onClose={() => setSellOpen(false)}
+          onClose={() => setSellTarget(null)}
           onSaved={async () => {
-            const r = await callApi('GET', '/api/creator/pricing');
+            const r = await callApi('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`);
             if (r.ok) setPricing(r.data);
             load({ quiet: true });
           }}

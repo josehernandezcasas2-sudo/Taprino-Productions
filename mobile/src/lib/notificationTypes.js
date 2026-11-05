@@ -90,6 +90,13 @@ export const NOTIFICATION_TYPES = Object.freeze({
   show_episodes_rejected: kind('Not this time', 'clapperboard', 'show'),
   show_set_up: kind('A show set up for you', 'clapperboard', 'show'),
 
+  // Who gets paid (lib/payees.js, slice 3b).
+  payee_invite: kind('Get paid for a title', 'card', 'creator'),
+  payee_invite_accepted: kind('Invite accepted', 'card', 'show'),
+  payee_invite_declined: kind('Invite declined', 'card', 'show'),
+  payee_invite_cancelled: kind('Invite withdrawn', 'card', 'creator'),
+  payee_changed: kind('Earnings moved', 'card', 'money'),
+
   // Creator Share: payouts, holds, departures, the numbers changing
   // (lib/creatorShare.js, lib/creatorShareBatch.js, lib/creatorStanding.js,
   // lib/creatorShareSettings.js).

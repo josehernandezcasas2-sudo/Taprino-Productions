@@ -13,8 +13,9 @@ import { internalError, sendError } from '../../../lib/apiErrors';
 import { updateCompat } from '../../../lib/dbCompat';
 import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
-import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, slotCheck, slotTakenBody } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
+import { cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, withPayeeStamps } from '../../../lib/payees';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -302,6 +303,23 @@ async function editEpisode(req, res, roleContext) {
     targetShow = data;
   }
 
+  // Since slice 3b, putting a title in another show (or out of one) can
+  // change who it pays (lib/showRules.js payeeOf). Moving money is for full
+  // admins: a sub-admin's edit that would is refused before anything is
+  // written; one that leaves it paying the same account goes on (before
+  // migration 118, which brings paid_to, every lane pays the old rule).
+  if ('series_id' in changed && !roleContext.isAdmin && 'paid_to' in existing && payeeRuleLiveNow()) {
+    let showNow = null;
+    if (existing.series_id && isTitleId(String(existing.series_id))) {
+      const { data, error } = await supabase.from('series').select('*').eq('id', existing.series_id).maybeSingle();
+      if (error) throw internalError(error, 'edit-episode show before');
+      showNow = data || null;
+    }
+    if (payeeOf(existing, showNow) !== payeeOf({ ...existing, series_id: changed.series_id || null }, targetShow)) {
+      return res.status(403).json({ error: 'That moves its earnings to another account. A full admin does this.', code: 'who' });
+    }
+  }
+
   // What bonus content belongs under: there, and not bonus content itself.
   if (type === 'bonus' && ('bonus_parent_type' in changed || 'bonus_parent_id' in changed || 'content_type' in changed)) {
     const parentIsShow = next.bonus_parent_type === 'series';
@@ -404,7 +422,30 @@ async function editEpisode(req, res, roleContext) {
     return res.status(200).json({ ok: true, episodeId: existing.id, changed: [] });
   }
 
-  const { error } = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => q.eq('id', existing.id));
+  // A move to another show (or out of one) can change who the title pays
+  // (lib/showRules.js payeeOf): its history is written with the save
+  // (lib/payees.js, slice 3b). The write's own error is answered below.
+  const movesShow = 'series_id' in changed;
+  let writeResult = null;
+  const doWrite = async () => {
+    writeResult = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => q.eq('id', existing.id));
+    if (writeResult.error) throw Object.assign(new Error('edit-episode write'), { editWriteFailed: true });
+  };
+  let stamped = null;
+  if (movesShow) {
+    try {
+      stamped = await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: { series_id: changed.series_id || null } } }, write: doWrite, setBy: `edit:${userId}` });
+    } catch (err) {
+      if (!(err && err.editWriteFailed)) throw err;
+    }
+  } else {
+    try {
+      await doWrite();
+    } catch (err) {
+      if (!(err && err.editWriteFailed)) throw err;
+    }
+  }
+  const { error } = writeResult || {};
   if (error) {
     for (const url of [poster, thumbnail, titleImageUrl]) {
       const path = storagePathFromUrl(url || '');
@@ -436,6 +477,30 @@ async function editEpisode(req, res, roleContext) {
     const oldUid = cloudflareUidFromUrl(existing.src);
     if (oldUid && oldUid !== cloudflareVideoUid) {
       await recordOrphan({ kind: 'cloudflare_video', reference: oldUid, reason: 'video manually replaced by admin', context: existing.title });
+    }
+  }
+
+  // Whoever it paid until now is told, as a pick would tell them.
+  if (stamped && stamped.changed && stamped.changed.length) {
+    await noticeEarningsMoved({ changed: stamped.changed, viewer: { userId, email }, how: 'moved' }).catch((err) => console.error('edit-episode earnings notice:', err && err.message));
+  }
+
+  // A new runner didn't send its invites and prices it from now on.
+  if (movesShow) {
+    let showBefore = null;
+    if (existing.series_id) {
+      const { data } = await supabase.from('series').select('creator_id').eq('id', existing.series_id).maybeSingle();
+      showBefore = data || null;
+    }
+    const runnerBefore = titleRunnerOf(existing, showBefore);
+    const runnerAfter = titleRunnerOf(existing, targetShow);
+    if (runnerBefore !== runnerAfter) {
+      await cancelPendingInvites({ titles: [{ type: 'episode', id: existing.id }], reason: 'runner', actor: { userId, email, isAdmin: true } })
+        .catch((err) => console.error('edit-episode invites:', err && err.message));
+      if (runnerAfter) {
+        const { error: priceError } = await supabase.from('title_prices').update({ creator_id: runnerAfter }).eq('target_type', 'episode').eq('target_id', existing.id);
+        if (priceError && !/title_prices|PGRST205|does not exist/i.test(priceError.message || '')) console.error('edit-episode price owner:', priceError.message);
+      }
     }
   }
 
@@ -492,11 +557,11 @@ async function editEpisode(req, res, roleContext) {
     });
   }
 
-  // A move into a show someone else runs: every money lane still pays the
-  // title's uploader today, so its earnings stay with them.
+  // A move into a show someone else runs: before the cut-over its earnings
+  // stayed with the uploader; from it they follow the show's paid account
+  // (slice 3b) unless the title has its own.
   const answer = { ok: true, episodeId: existing.id, changed: columns };
   if (targetShow && targetShow.creator_id && targetShow.creator_id !== existing.submitted_by) {
-    answer.earningsStayWith = existing.submitted_by || null;
     answer.showOwner = targetShow.creator_id;
   }
   // An approved title in a show that isn't public stays off the site until

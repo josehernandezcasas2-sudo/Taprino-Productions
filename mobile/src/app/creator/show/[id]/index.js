@@ -22,6 +22,7 @@ import SeasonSection, { rowMenuItems } from '../../../../components/show/SeasonS
 import AddEpisodesBar, { AddSeveralSheet, LinkSheet, QueuePanel } from '../../../../components/show/AddEpisodesBar';
 import MoveSheet from '../../../../components/show/MoveSheet';
 import { PlaceExtraSheet, RemoveEpisodeSheet } from '../../../../components/show/RowSheets';
+import PayeeCard from '../../../../components/show/PayeeCard';
 
 // The show page in the app (the series revamp, slice 5; spec "App — New
 // show, Show page, Episode editor" and "The app"; the website's
@@ -29,7 +30,8 @@ import { PlaceExtraSheet, RemoveEpisodeSheet } from '../../../../components/show
 // status card (Make it public, Resubmit, Cancel request, the problem
 // lines), the Add bar and its uploads, the seasons with ↑/↓ and the
 // E-badge on every row (no drag in the app), + Add season, Extras, Sell,
-// the channels switch and "Remove this show…". Everything is read from
+// "Who gets paid" (slice 3b: components/show/PayeeCard.js), the channels
+// switch and "Remove this show…". Everything is read from
 // GET /api/show/<id> and changed through the /api/show routes
 // (mockups/series-slice2-api.md); the rules are mobile/src/lib/showRules.js
 // (the website's, word for word).
@@ -138,7 +140,9 @@ function ShowScreen() {
   const [flashId, setFlashId] = useState(null);
   const [myShows, setMyShows] = useState(null);
   const [pricing, setPricing] = useState(null);
-  const [sellOpen, setSellOpen] = useState(false);
+  // What the Sell sheet is open for: the whole series (the Sell card) or
+  // one episode (the row's Sell…, slice 3b): { type, id, title, sub }.
+  const [sellTarget, setSellTarget] = useState(null);
   const [createdNote, setCreatedNote] = useState(params.created === '1');
   const [picking, setPicking] = useState(false);
   // A 503 seen at run time (the page said the migration was there, the
@@ -269,11 +273,13 @@ function ShowScreen() {
   const isOwner = Boolean(viewer.isOwner);
   const team = Boolean(viewer.teamEdits);
   const canRun = isOwner || team;
+  // Every price of this show's titles (?show=: whoever holds the row), so
+  // a price set before slice 3b by a contributor still shows here.
   const loadPricing = useCallback(async () => {
-    const r = await call('GET', '/api/creator/pricing');
+    const r = await call('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`);
     if (r.ok) setPricing(r.data);
     return r.ok;
-  }, [call]);
+  }, [call, showId]);
   useEffect(() => {
     if (!show || !show.isPublic || !canRun || pricing) return;
     loadPricing();
@@ -287,7 +293,9 @@ function ShowScreen() {
   const declined = Boolean(show && show.status === 'rejected' && !held);
   const vertical = Boolean(show && show.kind === 'vertical');
   const locked = held || removal || (declined && !team) || (vertical && !team);
-  const contributor = Boolean(viewer.isContributor && !isOwner && !team);
+  // An uploader into someone else's show, or an account it pays (slice 3b:
+  // the page opens read-only to a paid account), sees it as a contributor.
+  const contributor = Boolean((viewer.isContributor || viewer.isPayee) && !isOwner && !team);
   const canReorder = canRun && !locked;
   const reorderOpen = canReorder && shows118;
   const behind118Line = behind.m118 || 'Reordering needs a database update (migration 118)';
@@ -819,6 +827,37 @@ function ShowScreen() {
     );
   }
 
+  // "Who gets paid" changed (an invite sent, a pick, a withdrawal, a
+  // step-down): the server's words, its new block at once, then the page
+  // again (rows' "Paid to", the show card's line). (null, null) = the
+  // card's block was out of date: just read the page again.
+  const onPayeeChanged = (next, words) => {
+    if (words) say({ tone: 'ok', title: words }, 7000);
+    if (next) setView((v) => (v ? { ...v, payee: next } : v));
+    load({ quiet: true });
+  };
+
+  // The row's Sell… (slice 3b, §2 row 4): whoever runs the show prices any
+  // live episode in it, a contributor's included; a full admin too. Put
+  // before the divider that leads to Discard / Remove….
+  const runsIt = isOwner || Boolean(viewer.isAdmin);
+  const withSell = (items, row) => {
+    const liveRow = row.kind === 'episode' && row.status === 'approved' && show.isPublic && !row.held && !row.deletionRequested && !row.withdrawnAt;
+    if (!runsIt || !liveRow || locked || kind === 'vertical') return items;
+    const priced = pricing && pricing.prices ? pricing.prices[`episode:${row.id}`] : null;
+    const sell = {
+      key: 'sell',
+      label: priced ? 'Price and sales' : 'Sell…',
+      icon: <Text style={sx.dollar}>$</Text>,
+      onPress: async () => {
+        if (!pricing) await loadPricing();
+        setSellTarget({ type: 'episode', id: row.id, title: row.displayTitle || row.title || 'This episode', sub: [row.code, show.name].filter(Boolean).join(' · ') });
+      }
+    };
+    const at = items.findIndex((it) => it && it.divider);
+    return at < 0 ? [...items, sell] : [...items.slice(0, at), sell, ...items.slice(at)];
+  };
+
   const ctx = {
     showId,
     kind,
@@ -849,6 +888,7 @@ function ShowScreen() {
     lastSeason,
     defaultTier: (show.defaults && show.defaults.tier) || null,
     premiumWord: PREMIUM_WORD,
+    viewerId: viewer.userId || null,
     rowRef
   };
 
@@ -884,6 +924,7 @@ function ShowScreen() {
 
         <ShowCard
           view={view}
+          payee={view.payee || null}
           canEdit={Boolean(show.canEditShow) && !(vertical && !team)}
           onEdit={(tab) => router.push(showEditRoute(showId, tab))}
           onView={() => router.push(publicRoute(show))}
@@ -954,8 +995,9 @@ function ShowScreen() {
         ) : null}
 
         {sellable ? (
-          <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) await loadPricing(); setSellOpen(true); }} />
+          <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) await loadPricing(); setSellTarget({ type: 'series', id: showId, title: show.name, sub: countLine(view.seasons) }); }} />
         ) : null}
+        {view.payee ? <PayeeCard payee={view.payee} mode="card" onChanged={onPayeeChanged} /> : null}
         {canRun && !(vertical && !team) ? (
           <ChannelsCard view={view} canEdit={canRun} locked={held ? 'Locked while it’s pulled.' : removal ? 'Locked while its removal is requested.' : null} busy={busy === 'channels'} onToggle={toggleChannels} />
         ) : null}
@@ -965,7 +1007,7 @@ function ShowScreen() {
       </View>
 
       {sheet && sheet.kind === 'row' && sheetRow ? (
-        <ActionSheet title={sheetRow.displayTitle || 'This episode'} eyebrow={sheetRow.code || (sheetRow.kind === 'draft' ? 'Draft' : null)} items={rowMenuItems(sheetRow, ctx, rowActions)} onClose={() => setSheet(null)} />
+        <ActionSheet title={sheetRow.displayTitle || 'This episode'} eyebrow={sheetRow.code || (sheetRow.kind === 'draft' ? 'Draft' : null)} items={withSell(rowMenuItems(sheetRow, ctx, rowActions), sheetRow)} onClose={() => setSheet(null)} />
       ) : null}
       {extraItems ? (
         <ActionSheet title={sheet.extra.displayTitle} eyebrow="Extra" items={extraItems} onClose={() => setSheet(null)} />
@@ -1011,18 +1053,19 @@ function ShowScreen() {
       {sheet && sheet.kind === 'place' ? (
         <PlaceExtraSheet extra={sheet.extra} showId={showId} episodes={flat.filter((r) => r.kind === 'episode' && r.status !== 'rejected')} busy={sheetBusy} error={sheetError} onPlace={placeExtra} onClose={() => { setSheet(null); setSheetError(null); }} />
       ) : null}
-      <Modal visible={sellOpen && Boolean(pricing)} transparent animationType="fade" onRequestClose={() => setSellOpen(false)}>
+      <Modal visible={Boolean(sellTarget) && Boolean(pricing)} transparent animationType="fade" onRequestClose={() => setSellTarget(null)}>
         <View style={sx.modalBackdrop}>
-          <Pressable style={absoluteFill} onPress={() => setSellOpen(false)} accessibilityRole="button" accessibilityLabel="Close" />
+          <Pressable style={absoluteFill} onPress={() => setSellTarget(null)} accessibilityRole="button" accessibilityLabel="Close" />
           <View style={sx.modalCard}>
-            {sellOpen && pricing ? (
+            {sellTarget && pricing ? (
               <SellTitleSheet
-                target={{ type: 'series', id: showId, title: show.name, sub: countLine(view.seasons) }}
-                price={pricing.prices ? pricing.prices[`series:${showId}`] || null : null}
+                target={sellTarget}
+                price={pricing.prices ? pricing.prices[`${sellTarget.type}:${sellTarget.id}`] || null : null}
+                blocked={pricing.blocked ? pricing.blocked[`${sellTarget.type}:${sellTarget.id}`] || null : null}
                 settings={pricing.settings || {}}
                 isAdmin={Boolean(viewer.isAdmin)}
                 getToken={() => freshToken(getToken)}
-                onClose={() => setSellOpen(false)}
+                onClose={() => setSellTarget(null)}
                 onSaved={() => { loadPricing(); load({ quiet: true }); }}
               />
             ) : null}
@@ -1041,5 +1084,6 @@ const sx = StyleSheet.create({
   addSeason: { gap: 4, padding: 14, borderRadius: 10, borderWidth: 1, borderStyle: 'dashed', borderColor: inkTint(0.25) },
   addSeasonText: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: colors.surface1, borderRadius: 14, padding: 18, width: '100%', maxWidth: 420 }
+  modalCard: { backgroundColor: colors.surface1, borderRadius: 14, padding: 18, width: '100%', maxWidth: 420 },
+  dollar: { fontFamily: fonts.monoBold, fontSize: 15, color: colors.olive }
 });

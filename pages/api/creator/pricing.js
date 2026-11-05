@@ -1,13 +1,18 @@
 import { getRoleContext } from '../../../lib/roles';
-import { endSale, getPricesForCreator, getPurchaseSettings, requestPrice, setSale, startSelling, stopSelling } from '../../../lib/purchases';
+import { blockedPrices, endSale, getPricesForCreator, getPricesForShow, getPurchaseSettings, requestPrice, setSale, startSelling, stopSelling } from '../../../lib/purchases';
+import { isTitleId } from '../../../lib/titleIds';
 import { recordAudit } from '../../../lib/auditLog';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
 
 // The creator's half of Buy to own (My Work's "Sell this title" card and
-// the app's equivalent). GET: every price of theirs plus the rules.
-// POST { action, type, id, … }: set (cents) · stop · start · sale
-// (percent, endsAt, membersOnly) · end_sale.
+// the app's equivalent). GET: every price of theirs plus the rules (with
+// ?show=<id>, also every price of that show's titles for whoever runs it or
+// a full admin), and
+// `blocked` — { '<type>:<id>': line } for a priced title whose paid account
+// can't take a sale yet (slice 3b). POST { action, type, id, … }: set
+// (cents) · stop · start · sale (percent, endsAt, membersOnly) · end_sale;
+// only whoever runs the title (or a full admin) — 403 { code: 'not-pricer' }.
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -19,8 +24,20 @@ export default async function handler(req, res) {
   if (!rc.isCreator && !rc.isAdmin) return res.status(403).json({ error: 'Creator access required.' });
   try {
     if (req.method === 'GET') {
-      const [prices, settings] = await Promise.all([getPricesForCreator(rc.userId), getPurchaseSettings()]);
-      return res.status(200).json({ prices, settings });
+      // ?show=<id>: also every price of that show and its titles, for
+      // whoever runs it or a full admin (the show page reads by title).
+      const showId = typeof req.query.show === 'string' && isTitleId(req.query.show) ? req.query.show : null;
+      const [mine, settings, ofShow] = await Promise.all([
+        getPricesForCreator(rc.userId),
+        getPurchaseSettings(),
+        showId ? getPricesForShow(showId, { userId: rc.userId, isAdmin: rc.isAdmin }) : null
+      ]);
+      const prices = { ...mine, ...(ofShow || {}) };
+      const blocked = await blockedPrices(prices).catch((err) => {
+        console.error('creator/pricing blocked:', err && err.message);
+        return {};
+      });
+      return res.status(200).json({ prices, settings, blocked });
     }
     if (req.method !== 'POST') {
       res.setHeader('Allow', 'GET, POST');
@@ -40,7 +57,7 @@ export default async function handler(req, res) {
     recordAudit({ adminId: rc.userId, adminEmail: rc.email || null, action: `title_price_${body.action}`, targetType: body.type, targetId: body.id, details: [body.cents ? `$${(Number(body.cents) / 100).toFixed(2)}` : null, body.percent ? `${body.percent}% until ${body.endsAt}` : null].filter(Boolean).join(' · ') || null }).catch(() => {});
     return res.status(200).json({ ok: true, price: row });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
+    if (err.status && !err.internal) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
     console.error('creator/pricing error:', err.message);
     return sendError(res, err, 'creator/pricing');
   }

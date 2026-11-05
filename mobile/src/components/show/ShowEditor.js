@@ -18,6 +18,7 @@ import {
   SaveButton, StagedBox, SwitchRow, TabRow, UploadLine, isOpen, useFootSpace, useKeyboardShown, useLeaveGuard, useShowAuth
 } from './EditorBits';
 import { AboutField, OneLineField } from './EpisodeFields';
+import { PaidLine } from './PayeeCard';
 import { InfoIcon, LinkText, PREMIUM_WORD, RoomToast, SmallButton, UploadIcon, askUs, publicRoute, shortDate, showRoute, ss, useRoomToast } from './ShowBits';
 
 // Edit show in the app (the series revamp, slice 5; the website's
@@ -398,6 +399,15 @@ function ShowEditorReady({ initial, startTab, auth }) {
 
   const details = (
     <>
+      {/* Slice 3b: who runs it and who it pays; the choice itself lives on
+          the show page's "Who gets paid" card. */}
+      {view.payee && view.payee.line ? (
+        <View style={ss.card}>
+          <Text style={ss.cardK}>Who gets paid</Text>
+          <PaidLine payee={view.payee} />
+          <LinkText onPress={() => router.dismissTo(showRoute(show.id))}>Change it on the show page</LinkText>
+        </View>
+      ) : null}
       <View style={ss.card}>
         <View style={{ gap: 6 }}>
           <FieldHead label="Name" staged={namePolicy.mode === 'staged'} locked={namePolicy.mode === 'locked'} count={form.name.length} max={form.name.length > 90 ? 120 : null} />

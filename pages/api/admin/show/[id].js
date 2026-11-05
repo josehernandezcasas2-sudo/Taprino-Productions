@@ -17,8 +17,8 @@ import {
 //
 //   GET → the admin cards' data (getAdminShow)
 //   POST { action, … } → approve | reject | fix_numbering | staged | hold |
-//     take_down | restore | owner | grant_creator | remove | deny_removal |
-//     tell_savers
+//     take_down | restore | owner (email, earnings: 'keep' | 'move' — slice
+//     3b) | grant_creator | remove | deny_removal | tell_savers
 const STAGED_MAX = 50;
 
 function hasOwn(o, k) {
@@ -101,7 +101,7 @@ export default async function handler(req, res) {
       case 'restore':
         return res.status(200).json(await restoreShow(id, rc));
       case 'owner':
-        return res.status(200).json(await setShowOwner(id, { email: typeof body.email === 'string' ? body.email : null }, rc));
+        return res.status(200).json(await setShowOwner(id, { email: typeof body.email === 'string' ? body.email : null, earnings: body.earnings === 'keep' || body.earnings === 'move' ? body.earnings : null }, rc));
       case 'grant_creator':
         return res.status(200).json(await grantOwnerCreator(id, rc));
       case 'remove':

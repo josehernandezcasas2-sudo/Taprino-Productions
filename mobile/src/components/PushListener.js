@@ -22,6 +22,14 @@ const APP_ROUTES = [
   /^\/podcasts\/[^/]+$/, /^\/profile\/[^/]+$/, /^\/locations(\/[^/]+)?$/, /^\/locations\/requests(\/[^/]+)?$/, /^\/university(\/.*)?$/
 ];
 const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work' };
+// Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:
+//   /creator#get-paid           → /creator (payee_invite, payee_invite_cancelled;
+//                                 the hash goes before the match, and the
+//                                 Get paid card is the hub's first thing)
+//   /creator/money              → /creator/money (payee_changed)
+//   /creator/show/<id>#ep-<eid> → /creator/show/<id>?ep=<eid> (payee_invite_accepted
+//                                 / _declined, payee_changed from the cut-over)
+//   /creator/my-work            → /account/my-work (the same for a title of its own)
 
 // The show screens (the series revamp, slice 5) keep the part of the
 // address that says where to land: a row (the website's #ep-<id> /

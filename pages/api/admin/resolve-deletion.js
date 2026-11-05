@@ -10,6 +10,7 @@ import { isTitleId } from '../../../lib/titleIds';
 import { showRouteError } from '../../../lib/showRoute';
 import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
 import { creditAdShareBeforeDelete } from '../../../lib/adShare';
+import { cancelPendingInvites } from '../../../lib/payees';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -120,16 +121,22 @@ export default async function handler(req, res) {
     // is gone the 1st's run can't tell whose they were.
     if (type === 'episode') {
       try {
-        let ownerId = null;
-        if (row.series_id && !row.submitted_by) {
-          const { data: parent } = await supabase.from('series').select('creator_id').eq('id', row.series_id).maybeSingle();
-          ownerId = parent ? parent.creator_id || null : null;
+        // Split by who it paid on each day (lib/payees.js): its show and
+        // its history are read before the row goes.
+        let series = null;
+        if (row.series_id) {
+          const { data: parent } = await supabase.from('series').select('*').eq('id', row.series_id).maybeSingle();
+          series = parent || null;
         }
-        await creditAdShareBeforeDelete([row], { ownerId });
+        await creditAdShareBeforeDelete([row], { series, ownerId: series ? series.creator_id || null : null });
       } catch (err) {
         console.error('resolve-deletion ad share:', err && err.message ? err.message : err);
         return res.status(503).json({ code: 'ad-share', error: 'Its ad earnings couldn’t be settled just now, so it wasn’t deleted. Try again in a minute.' });
       }
+      // Its invites to be paid are withdrawn while it can still be named
+      // (slice 3b); its title_payees history stays as a record.
+      await cancelPendingInvites({ titles: [{ type: 'episode', id: row.id }], reason: 'removed_title', actor: { userId, email, isAdmin: true } })
+        .catch((err) => console.error('resolve-deletion invites:', err && err.message));
     }
     const context = type === 'episode' ? row.title : row.name;
     const reason = `${type} deleted`;

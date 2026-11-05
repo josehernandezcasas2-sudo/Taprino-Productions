@@ -5,6 +5,7 @@ import { internalError, sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
 import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
+import { withPayeeStamps } from '../../../lib/payees';
 
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
@@ -204,13 +205,24 @@ async function editSubmission(req, res) {
   // The `.eq('status', 'pending')` here is the real enforcement, same
   // pattern as review-submission.js — even if two requests race, only one
   // can land while status is still pending.
-  const { data: saved, error } = await supabase
-    .from('episodes')
-    .update(dbUpdates)
-    .eq('id', existing.id)
-    .eq('submitted_by', userId)
-    .eq('status', 'pending')
-    .select('id');
+  // A move into another show can change who the title pays (slice 3b):
+  // its history is written with the save (lib/payees.js).
+  let saveResult = null;
+  const doSave = async () => {
+    saveResult = await supabase
+      .from('episodes')
+      .update(dbUpdates)
+      .eq('id', existing.id)
+      .eq('submitted_by', userId)
+      .eq('status', 'pending')
+      .select('id');
+  };
+  if ('series_id' in dbUpdates && (dbUpdates.series_id || null) !== (existing.series_id || null)) {
+    await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: { series_id: dbUpdates.series_id || null } } }, write: doSave, setBy: `edit:${userId}` });
+  } else {
+    await doSave();
+  }
+  const { data: saved, error } = saveResult;
 
   if (error) {
     // Taken between the check and the write (two saves at once), under

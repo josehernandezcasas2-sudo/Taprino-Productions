@@ -4,6 +4,7 @@ import { askHref } from './EpisodeFields';
 import { CheckIcon, ClockIcon, ExternalLinkIcon, EyeIcon, LockIcon, PencilIcon, PlusIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { BanIcon, ChevronIcon, KebabIcon, NoEyeIcon, bg, minutesOf } from './roomBits';
 import { shortDate } from './EditorBits';
+import { PayeeLine } from './PayeeCard';
 
 // The show page's cards (series revamp slice 2; spec Screens, "Show page",
 // boards Main, ShowStates, ShowLaptop): the show card, the status card, the
@@ -75,6 +76,8 @@ export function ShowCard({ view, canEdit, onEdit, onCancelStaged, busy }) {
           {firstLine && <p className="show-card-desc">{firstLine}</p>}
         </div>
       </div>
+      {/* Who runs it and who it pays (slice 3b), for those who may see who is paid. */}
+      {view.payee && view.payee.line ? <PayeeLine payee={view.payee} className="show-card-paid" /> : null}
       {staged.length > 0 && (
         <ul className="show-card-staged">
           {staged.map((s) => (

@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { colors, fonts } from '../lib/theme';
-import { apiPost } from '../lib/api';
+import { apiGet, apiPost } from '../lib/api';
 import { dollars, salePriceCents, splitPurchase, SALE_PERCENTS, SALE_MAX_DAYS, PRICE_MIN_CENTS, PRICE_MAX_CENTS, DEFAULT_CUT_PERCENT } from '../lib/purchaseRules';
 
 // "Sell this title" + "Run a sale", the app's copy of
 // components/creator/SellTitleModal.js: opened from My Work for an
-// episode or a whole series; talks to /api/creator/pricing.
+// episode or a whole series; talks to /api/creator/pricing. `blocked`
+// (slice 3b: GET /api/creator/pricing's blocked['<type>:<id>']) is the
+// line saying its paid account can't take a sale yet — shown above the
+// price; buyers see no Buy button until then.
 export const priceState = (price) => (!price ? 'none' : price.pending_cents != null ? 'pending' : price.status);
 export const STATE_LABEL = { on: 'On sale', pending: 'In review', rejected: 'Not approved', off: 'Not selling', none: 'Not for sale' };
 const STATE_COLOR = { on: colors.ok, pending: colors.olive, rejected: colors.danger, off: colors.inkDim, none: colors.inkDim };
@@ -14,7 +17,32 @@ const STATE_COLOR = { on: colors.ok, pending: colors.olive, rejected: colors.dan
 const toCents = (s) => Math.round(Number(String(s).replace(/[^0-9.]/g, '')) * 100);
 const plusDays = (n) => new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
 
-export default function SellTitleSheet({ target, price, settings = {}, isAdmin = false, getToken, onClose, onSaved }) {
+// Who each sale pays is the title's paid account (slice 3b), which isn't
+// always whoever sets the price: read from /api/payees (the website's
+// SellTitleModal does the same); null = "you" (and before migration 118).
+function useSaleReceiver(target, getToken) {
+  const [receiver, setReceiver] = useState(null);
+  const tokenRef = useRef(getToken);
+  tokenRef.current = getToken;
+  useEffect(() => {
+    if (!target || !target.type || !target.id || !tokenRef.current) return undefined;
+    let off = false;
+    (async () => {
+      try {
+        const d = await apiGet(`/api/payees?type=${encodeURIComponent(target.type)}&id=${encodeURIComponent(target.id)}`, await tokenRef.current());
+        const p = d && d.payee;
+        if (off || !p || p.available === false || !p.ruleLive || !p.paidTo || !p.line) return;
+        setReceiver(p.line.paidTo === 'You' ? null : { house: Boolean(p.paidTo.house), name: p.paidTo.name || p.line.paidTo });
+      } catch (err) {
+        // No answer: the sheet keeps "You receive".
+      }
+    })();
+    return () => { off = true; };
+  }, [target && target.type, target && target.id]);
+  return receiver;
+}
+
+export default function SellTitleSheet({ target, price, settings = {}, isAdmin = false, blocked = null, getToken, onClose, onSaved }) {
   const cut = settings.cutPercent ?? DEFAULT_CUT_PERCENT;
   const minCents = settings.minCents ?? PRICE_MIN_CENTS;
   const maxCents = settings.maxCents ?? PRICE_MAX_CENTS;
@@ -29,12 +57,15 @@ export default function SellTitleSheet({ target, price, settings = {}, isAdmin =
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
 
+  const receiver = useSaleReceiver(target, getToken);
+  const house = Boolean(receiver && receiver.house);
+  const receiveLabel = house ? 'Studio Tapa keeps it, per sale' : receiver ? `${receiver.name} receives, per sale` : 'You receive, per sale';
   const cents = toCents(priceInput);
   const validCents = Number.isFinite(cents) && cents >= minCents && cents <= maxCents;
-  const split = validCents ? splitPurchase(cents, cut) : null;
+  const split = validCents ? splitPurchase(cents, cut, { house }) : null;
   const saleBase = liveCents || 0;
   const saleCents = saleBase ? salePriceCents(saleBase, salePercent, minCents) : 0;
-  const saleSplit = saleCents ? splitPurchase(saleCents, cut) : null;
+  const saleSplit = saleCents ? splitPurchase(saleCents, cut, { house }) : null;
   const unchanged = state === 'on' && liveCents === cents && price.pending_cents == null;
 
   async function act(action, body, done) {
@@ -66,6 +97,7 @@ export default function SellTitleSheet({ target, price, settings = {}, isAdmin =
           <View style={[styles.state, { borderColor: STATE_COLOR[state] }]}><Text style={[styles.stateText, { color: STATE_COLOR[state] }]}>{STATE_LABEL[state]}{state === 'on' && liveCents ? ` · ${dollars(liveCents)}` : ''}</Text></View>
         </View>
         <Text style={styles.body}>People can buy this {target.type === 'series' ? 'series' : 'title'} outright and keep it, ad-free, for good.{target.type === 'series' ? ' One price covers every episode, including ones you add later.' : ''} You set the price; {isAdmin ? 'as an admin yours goes live at once' : 'we check it before it goes live'}. Members still watch it as part of their plan.</Text>
+        {blocked ? <Text style={styles.blocked} accessibilityRole="alert">{blocked}</Text> : null}
         {price && price.pending_cents != null ? <Text style={styles.hint}>Waiting for review: {dollars(price.pending_cents)}{liveCents && state === 'on' ? ` (still on sale at ${dollars(liveCents)} meanwhile)` : ''}.</Text> : null}
         <Text style={styles.label}>Price</Text>
         <View style={styles.priceBox}>
@@ -77,11 +109,11 @@ export default function SellTitleSheet({ target, price, settings = {}, isAdmin =
           <View style={styles.math}>
             <Row l="Buyer pays" r={dollars(split.paidCents)} />
             <Row l="Card processing (Stripe)" r={`− ${dollars(split.feeCents)}`} />
-            <Row l={`Studio Tapa TV, ${cut}%`} r={`− ${dollars(split.paidCents - split.feeCents - split.creatorCents)}`} />
-            <Row l="You receive, per sale" r={dollars(split.creatorCents)} total />
+            {!house ? <Row l={`Studio Tapa TV, ${cut}%`} r={`− ${dollars(split.paidCents - split.feeCents - split.creatorCents)}`} /> : null}
+            <Row l={receiveLabel} r={dollars(house ? split.paidCents - split.feeCents : split.creatorCents)} total />
           </View>
         ) : null}
-        <Text style={styles.hint}>Paid straight into your Stripe account at the moment of each sale, like Pitch Room backing.</Text>
+        <Text style={styles.hint}>{house ? 'It pays the studio, so the studio keeps each sale.' : `Paid straight into ${receiver ? `${receiver.name}’s` : 'your'} Stripe account at the moment of each sale, like Pitch Room backing.`}</Text>
         {price && price.rejection_note ? (
           <View style={styles.why}><Text style={styles.whyTitle}>Why it wasn't approved</Text><Text style={styles.whyBody}>{price.rejection_note}</Text></View>
         ) : null}
@@ -126,7 +158,7 @@ export default function SellTitleSheet({ target, price, settings = {}, isAdmin =
           {saleSplit ? (
             <View style={styles.math}>
               <Row l="Buyers see" r={`${dollars(saleCents)}  (was ${dollars(liveCents)})`} />
-              <Row l="You receive, per sale" r={dollars(saleSplit.creatorCents)} total />
+              <Row l={receiveLabel} r={dollars(house ? saleSplit.paidCents - saleSplit.feeCents : saleSplit.creatorCents)} total />
             </View>
           ) : null}
           <Pressable style={[styles.ghost, busy !== null && { opacity: 0.5 }]} disabled={busy !== null} onPress={() => act('sale', { percent: salePercent, endsAt: saleEnds, membersOnly }, `${salePercent}% off until ${saleEnds}.`)}>
@@ -182,6 +214,7 @@ const styles = StyleSheet.create({
   whyTitle: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink },
   whyBody: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.ink },
   error: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.danger },
+  blocked: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.brass },
   ok: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.ok },
   btn: { minHeight: 46, borderRadius: 999, backgroundColor: colors.brass, alignItems: 'center', justifyContent: 'center' },
   btnText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },

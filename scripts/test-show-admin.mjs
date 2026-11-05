@@ -126,6 +126,11 @@ t('historyEntry: owner rows name the owner, admin rows the admin and â€œ(admin)â
   const forged = R.historyEntry({ admin_id: 'u_jose', admin_email: 'jose@example.com', action: 'approve_submission', details: typed }, {});
   assert.deepEqual([forged.actor, forged.words, forged.who], [null, typed, 'jose@example.com']);
   assert.equal(R.historyEntry({ action: 'show_live', details: JSON.stringify({ actor: 'owner', words: 'w' }) }, {}).actor, 'owner');
+  // Who gets paid (slice 3b): an invitee answering, a paid account stepping down.
+  const payee = R.historyEntry({ admin_id: 'u_pat', admin_email: 'pat@example.com', action: 'payee_invite_accepted', details: JSON.stringify({ actor: 'payee', words: 'Night Bus: Pat Lee accepted' }) }, { u_pat: 'Pat Lee' });
+  assert.deepEqual([payee.actor, payee.who, payee.words], ['payee', 'Pat Lee', 'Night Bus: Pat Lee accepted']);
+  assert.equal(R.historyEntry({ admin_id: 'u_x', action: 'payee_stepped_down', details: JSON.stringify({ actor: 'payee', words: 'w' }) }, {}).who, 'The paid account');
+  for (const action of ['payee_invite_sent', 'payee_invite_cancelled', 'payee_invite_declined', 'payee_set', 'payee_cutover', 'payee_repaired']) assert.ok(R.JSON_DETAIL_ACTIONS.has(action), action);
 });
 
 console.log(`\n${n} show-admin checks passed`);

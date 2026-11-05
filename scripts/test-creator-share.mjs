@@ -5,7 +5,7 @@ import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
   standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
-  fitShareToPayment
+  fitShareToPayment, countWatched
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -245,6 +245,29 @@ test('fitShareToPayment: a paid month only, and never more than was paid', () =>
   assert.deepEqual(fitShareToPayment({ amountCents: 100, billingReason: 'subscription_create', shareCents: 350, bonusCents: 150 }), { shareCents: 70, bonusCents: 30 });
   // Older invoices without billing_reason count as a month.
   assert.deepEqual(fitShareToPayment({ amountCents: 1299, shareCents: 350, bonusCents: 0 }), { shareCents: 350, bonusCents: 0 });
+});
+
+test('countWatched: each watch counts for the account the title paid when it was watched (slice 3b)', () => {
+  // "Pilot" paid Mara until Oct 20 15:00, Pat from then; "Shorts" is the studio's.
+  const payee = (r) => (r.episode_id === 'shorts' ? 'user_admin' : r.watched_at < '2026-10-20T15:00:00Z' ? 'user_mara' : 'user_pat');
+  const rows = [
+    { episode_id: 'pilot', watched_at: '2026-10-19T10:00:00Z' },
+    { episode_id: 'pilot', watched_at: '2026-10-20T14:59:59Z' },
+    { episode_id: 'pilot', watched_at: '2026-10-20T15:00:00Z' },
+    { episode_id: 'pilot', watched_at: '2026-10-25T09:00:00Z' },
+    { episode_id: 'shorts', watched_at: '2026-10-21T09:00:00Z' },
+    { episode_id: 'gone', watched_at: '2026-10-22T09:00:00Z' }
+  ];
+  const house = new Set(['user_admin']);
+  const eligible = (id) => !house.has(id);
+  const by = (r) => (r.episode_id === 'gone' ? null : payee(r));
+  assert.deepEqual(countWatched(rows, by, eligible, 'user_member'), { user_mara: 2, user_pat: 2 });
+  // The member's own titles don't count for them.
+  assert.deepEqual(countWatched(rows, by, eligible, 'user_pat'), { user_mara: 2 });
+  // Without an eligibility rule the studio would count; with it, never.
+  assert.equal(countWatched(rows, by, () => true, 'user_member').user_admin, 1);
+  assert.deepEqual(countWatched([], by, eligible, 'x'), {});
+  assert.deepEqual(countWatched(null, by, eligible, 'x'), {});
 });
 
 console.log(`\n${passed} passed`);

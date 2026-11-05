@@ -6,6 +6,7 @@ import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../
 import { normalizeSurface } from '../../../lib/adShareRules';
 import { verifyImpression } from '../../../lib/adImpressionSig';
 import { isTitleId } from '../../../lib/titleIds';
+import { payeeOf, titleRunnerOf } from '../../../lib/showRules';
 
 // Ad ids are uuids; title ids are text slugs (lib/titleIds.js).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -35,12 +36,21 @@ async function adMayCount(supabase, adId) {
 // (security round 2, 2026-10-28): the advertiser's impression still
 // counts (the ad played), the title's row does not. The pixel is fired
 // from the viewer's own browser, so their session cookie says who they are.
+// "Their own" since slice 3b: the account the title pays (lib/showRules.js
+// payeeOf on its columns, which its history agrees with), whoever runs it
+// and whoever uploaded it — the paid account is the one an ad play credits.
 async function isOwnTitle(supabase, req, episodeId) {
   try {
     const { userId } = getAuth(req);
     if (!userId) return false;
-    const { data } = await supabase.from('episodes').select('submitted_by').eq('id', episodeId).maybeSingle();
-    return Boolean(data && data.submitted_by && data.submitted_by === userId);
+    const { data: ep } = await supabase.from('episodes').select('*').eq('id', episodeId).maybeSingle();
+    if (!ep) return false;
+    let show = null;
+    if (ep.series_id && isTitleId(String(ep.series_id))) {
+      const { data } = await supabase.from('series').select('*').eq('id', ep.series_id).maybeSingle();
+      show = data || null;
+    }
+    return [ep.submitted_by, titleRunnerOf(ep, show), payeeOf(ep, show)].filter(Boolean).includes(userId);
   } catch (err) {
     return false;
   }

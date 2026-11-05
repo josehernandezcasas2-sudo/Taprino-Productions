@@ -1387,13 +1387,28 @@ export function saveSummary(changes) {
   };
 }
 
-// --- who gets paid (decisions 13, 19, 21) ------------------------------------
+// --- who gets paid (decisions 13, 19, 21–24) ----------------------------------
+
+// Earnings follow a title's paid account (slice 3b) from PAYEE_RULE_FROM
+// on: money a title earned before that instant follows the old rule (the
+// uploader, else the show's owner: legacyPayeeOf), money it earns from then
+// on follows payeeOf, read through the title's history (payeeAt). The
+// server may move the instant earlier outside production
+// (lib/payees.js payeeRuleFrom); set at commit time to 00:00 UTC of the
+// day the rule shipped.
+export const PAYEE_RULE_LIVE = true;
+export const PAYEE_RULE_FROM = '2026-11-09T00:00:00.000Z';
+
+// Is the rule in force at `at`?
+export function payeeRuleLiveAt(at, from = PAYEE_RULE_FROM) {
+  const t = timeOf(at);
+  const f = timeOf(from);
+  return PAYEE_RULE_LIVE === true && t !== null && f !== null && t >= f;
+}
 
 // The account a title's earnings go to: the title's own paid account, else
 // the show's, else the show's owner, else whoever uploaded it. Money
-// already credited never moves; the lanes adopt this once someone can set
-// paid_to (until then every paid_to is null and this is the show's owner
-// or the uploader).
+// already credited never moves (payeeAt reads it through time).
 export function payeeOf(episode, series) {
   return text(pick(episode, 'paidTo', 'paid_to'))
     || text(series ? pick(series, 'paidTo', 'paid_to') : null)
@@ -1402,19 +1417,45 @@ export function payeeOf(episode, series) {
     || null;
 }
 
-// A whole-series sale goes to the show's paid account (decision 21; the
-// original creator unless the owner chose someone): an episode paid to
+// A whole-series sale goes to the show's paid account (decisions 21, 24;
+// the original creator unless the owner chose someone): an episode paid to
 // someone else takes no share of it.
 export function seriesSalePayee(series) {
   return text(pick(series, 'paidTo', 'paid_to')) || runnerOf(series) || null;
 }
 
-// Who a title paid on a given day, from its title_payees history ({
-// payee_id, from_at, to_at }); null when no row covers it (then payeeOf
-// applies). A month that spans a change is split by this.
-export function payeeOnDate(history, at) {
-  const t = timeOf(at);
-  if (t === null) return null;
+// What every lane paid before the rule: the uploader, else the show's owner.
+export function legacyPayeeOf(episode, series) {
+  return uploaderOf(episode) || runnerOf(series) || null;
+}
+
+// Who runs a title — sets its price and picks who is paid: a show's
+// episode, the show's owner; a standalone title (or one in a show nobody
+// owns), its uploader.
+export function titleRunnerOf(episode, series) {
+  return runnerOf(series) || uploaderOf(episode) || null;
+}
+
+// Who "back to the default" pays: for a show, whoever runs it; for an
+// episode, the show's paid account (else its owner), else the uploader.
+export function payeeFallback(scope, episode, series) {
+  if (scope === 'series') return runnerOf(series);
+  const fromShow = series ? (text(pick(series, 'paidTo', 'paid_to')) || runnerOf(series)) : null;
+  return fromShow || uploaderOf(episode) || null;
+}
+
+// Which part of payeeOf answered.
+export function payeeSourceOf(episode, series) {
+  if (text(pick(episode, 'paidTo', 'paid_to'))) return 'own';
+  if (series && text(pick(series, 'paidTo', 'paid_to'))) return 'show';
+  if (runnerOf(series)) return 'runner';
+  if (uploaderOf(episode)) return 'uploader';
+  return null;
+}
+
+// The history row covering `t` (ms): from_at ≤ t < to_at (open rows run on);
+// the latest from_at wins.
+function coveringRow(history, t) {
   let best = null;
   for (const h of history || []) {
     const from = timeOf(pick(h, 'fromAt', 'from_at'));
@@ -1423,22 +1464,190 @@ export function payeeOnDate(history, at) {
     if (to !== null && to <= t) continue;
     if (!best || from > best.from) best = { from, payee: text(pick(h, 'payeeId', 'payee_id')) };
   }
-  return best ? best.payee : null;
+  return best;
 }
 
-// What choosing a paid account takes (question 22, built as recommended):
-// 'none' when nothing changes; 'direct' for an admin (audited, both told),
-// for choosing yourself, or for going back to the default (null); 'invite'
-// otherwise — the person accepts first and until then the earnings keep
-// going where they went.
-export function payeeChange({ current, next, actorId, isAdmin } = {}) {
-  const a = text(current);
-  const b = text(next);
-  if (a === b) return 'none';
-  if (isAdmin === true) return 'direct';
-  if (b === null) return 'direct';
-  if (b === text(actorId)) return 'direct';
-  return 'invite';
+// Who a title paid on a given day, from its title_payees history ({
+// payee_id, from_at, to_at }); null when no row covers it.
+export function payeeOnDate(history, at) {
+  const t = timeOf(at);
+  if (t === null) return null;
+  const row = coveringRow(history, t);
+  return row ? row.payee : null;
+}
+
+// Who an episode paid at instant `at` (every lane's rule): a history row
+// covering it; else, before the rule, the legacy payee; else payeeOf on
+// the title's columns now. A bad `at` → null.
+export function payeeAt({ history, episode, series, at, from = PAYEE_RULE_FROM } = {}) {
+  const t = timeOf(at);
+  if (t === null) return null;
+  const row = coveringRow(history, t);
+  if (row) return row.payee;
+  if (!payeeRuleLiveAt(t, from)) return legacyPayeeOf(episode, series);
+  return payeeOf(episode, series);
+}
+
+// 'YYYY-MM-DD' → its first instant, UTC.
+export function dayStartIso(day) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(typeof day === 'string' ? day.trim() : '');
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])));
+  if (!Number.isFinite(d.getTime()) || d.toISOString().slice(0, 10) !== `${m[1]}-${m[2]}-${m[3]}`) return null;
+  return d.toISOString();
+}
+
+function utcParts(v) {
+  const t = timeOf(typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v.trim()) ? dayStartIso(v) : v);
+  if (t === null) return null;
+  const d = new Date(t);
+  try {
+    return { month: d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' }), day: d.getUTCDate(), key: d.toISOString().slice(0, 10) };
+  } catch (err) {
+    return null;
+  }
+}
+
+// 'Nov 9' (UTC): the cut-over's and the history's words.
+export function utcDayLabel(v) {
+  const p = utcParts(v);
+  return p ? `${p.month} ${p.day}` : null;
+}
+
+// 'Oct 1–14' | 'Oct 20' | 'Oct 30 – Nov 2' (UTC).
+export function dayRangeLabel(fromDay, toDay) {
+  const a = utcParts(fromDay);
+  const b = toDay === undefined || toDay === null ? null : utcParts(toDay);
+  if (!a) return b ? `${b.month} ${b.day}` : null;
+  if (!b || b.key === a.key) return `${a.month} ${a.day}`;
+  if (b.month === a.month && b.key.slice(0, 7) === a.key.slice(0, 7)) return `${a.month} ${a.day}–${b.day}`;
+  return `${a.month} ${a.day} – ${b.month} ${b.day}`;
+}
+
+// What choosing a paid account takes (question 22, as built in 3b):
+// 'none' when nothing changes; 'direct' when nobody's money changes, for
+// going back to the default, or for picking yourself on a title you run;
+// 'refused' for picking yourself on a title you don't run; otherwise
+// 'invite' — the person accepts first (an admin's pick too) and until then
+// the earnings keep going where they went. `store` is what the title's own
+// paid_to holds after it (picking whoever the default pays stores null).
+//   current = the title's own paid_to now; next = the account picked (null =
+//   back to the default); fallback = payeeFallback(scope, …).
+export function payeePickKind({ scope, current, next, fallback, actorId, isRunner } = {}) {
+  const cur = text(current);
+  const nx = text(next);
+  const fb = text(fallback);
+  const actor = text(actorId);
+  const target = nx === fb ? null : nx;
+  const effNow = cur || fb;
+  const effAfter = target || fb;
+  if (target === cur) return { kind: 'none', store: cur };
+  if (effAfter === effNow) return { kind: 'direct', store: target };
+  if (target === null) return { kind: 'direct', store: null };
+  if (target === actor && isRunner === true) return { kind: 'direct', store: target };
+  if (target === actor) return { kind: 'refused', store: cur, code: 'self-not-runner' };
+  return { kind: 'invite', store: target, scope: scope === 'series' ? 'series' : 'episode' };
+}
+
+function isoAt(ms) {
+  return new Date(ms).toISOString();
+}
+
+// The title_payees writes for a change of paid account at `at`. titles = [{
+// type: 'series' | 'episode', id, before (who it paid until now), after
+// (who it pays from now), rows (that title's history) }]. A title whose
+// open row already pays `after` (or that has none and doesn't change) is
+// left alone. With no open row, a `baseline` row [gapStart, at) records
+// what the rule was answering until now (gapStart = the cut-over or the
+// last row's end); an open row is closed at `at` and a new one opened. The
+// closes come before the opens, so the one upsert never holds two open
+// rows for one title. Nothing before the rule is live.
+//   → { live, baseline: rows[], upsert: rows[] } (rows carry the table's
+//   columns; an open's id is null — the server fills it)
+export function stampPlan({ titles, at, from = PAYEE_RULE_FROM, setBy = null } = {}) {
+  if (!payeeRuleLiveAt(at, from)) return { live: false, baseline: [], upsert: [] };
+  const atMs = timeOf(at);
+  const fromMs = timeOf(from);
+  const baseline = [];
+  const closes = [];
+  const opens = [];
+  for (const t of titles || []) {
+    if (!t || !text(t.id)) continue;
+    const type = t.type === 'series' ? 'series' : 'episode';
+    const id = text(t.id);
+    const before = text(t.before);
+    const after = text(t.after);
+    const rows = Array.isArray(t.rows) ? t.rows : [];
+    let open = null;
+    for (const r of rows) {
+      if (!blank(pick(r, 'toAt', 'to_at'))) continue;
+      if (!open || (timeOf(pick(r, 'fromAt', 'from_at')) || 0) > (timeOf(pick(open, 'fromAt', 'from_at')) || 0)) open = r;
+    }
+    const openPayee = open ? text(pick(open, 'payeeId', 'payee_id')) : null;
+    if ((open && openPayee === after) || (!open && before === after)) continue;
+    let when = atMs;
+    if (open) {
+      const openFrom = timeOf(pick(open, 'fromAt', 'from_at'));
+      if (openFrom !== null && openFrom > when) when = openFrom;
+    }
+    const whenIso = isoAt(when);
+    if (!open && before) {
+      let gapStart = fromMs;
+      for (const r of rows) {
+        const to = timeOf(pick(r, 'toAt', 'to_at'));
+        if (to !== null && to > gapStart) gapStart = to;
+      }
+      if (gapStart < when) baseline.push({ title_type: type, title_id: id, payee_id: before, from_at: isoAt(gapStart), to_at: whenIso, set_by: 'baseline' });
+    }
+    if (open) {
+      const openFrom = timeOf(pick(open, 'fromAt', 'from_at'));
+      closes.push({ id: text(open.id), title_type: type, title_id: id, payee_id: openPayee, from_at: openFrom === null ? whenIso : isoAt(openFrom), to_at: whenIso, set_by: text(pick(open, 'setBy', 'set_by')) });
+    }
+    if (after) opens.push({ id: null, title_type: type, title_id: id, payee_id: after, from_at: whenIso, to_at: null, set_by: text(setBy) });
+  }
+  return { live: true, baseline, upsert: [...closes, ...opens] };
+}
+
+// "Runs it: Mara Reyes · Paid to: You" — runsIt / paidTo are { id, name };
+// a house title pays Studio Tapa.
+export function paidLine({ runsIt, paidTo, viewerId, pendingName, house } = {}) {
+  const me = text(viewerId);
+  const runsId = runsIt ? text(runsIt.id) : null;
+  const paidId = paidTo ? text(paidTo.id) : null;
+  const runsWord = me && runsId === me ? 'You' : (text(runsIt && runsIt.name) || 'No one yet');
+  const paidWord = house === true ? 'Studio Tapa' : me && paidId === me ? 'You' : (text(paidTo && paidTo.name) || 'No one yet');
+  const pending = text(pendingName);
+  return { runsIt: runsWord, paidTo: paidWord, text: `Runs it: ${runsWord} · Paid to: ${paidWord}`, pending: pending ? `Waiting on ${pending} to accept` : null };
+}
+
+// Where the paid account comes from, in words beside its name.
+export function payeeSourceWords(source, showName) {
+  if (source === 'own') return '(its own)';
+  if (source === 'show' && text(showName)) return `(${text(showName)}’s)`;
+  return null;
+}
+
+export function seriesSaleNote(showName, seriesPayeeName) {
+  return `Whole-series sales of ${text(showName) || 'the show'} still go to ${text(seriesPayeeName) || 'the show’s paid account'}.`;
+}
+
+// A title named in an invite or a notice: the show, an episode of a show,
+// or a standalone title.
+export function titleWords({ titleType, titleName, showName, code } = {}) {
+  const show = text(showName);
+  if (titleType === 'series') return show || text(titleName) || 'this show';
+  const name = text(titleName) || 'this title';
+  if (show) return `“${name}” (${show}${text(code) ? ` · ${text(code)}` : ''})`;
+  return `“${name}”`;
+}
+
+export function inviteHeadline(args) {
+  return `Get paid for ${titleWords(args)}?`;
+}
+
+export function inviteStateWords(status) {
+  const words = { pending: 'Waiting for an answer', accepted: 'Accepted', declined: 'Said no', cancelled: 'Withdrawn' };
+  return typeof status === 'string' && Object.prototype.hasOwnProperty.call(words, status) ? words[status] : null;
 }
 
 // Who sees "Runs it · Paid to" (question 23, as recommended): the team,
@@ -1641,11 +1850,6 @@ export function fieldPolicyLine(field, ctx = {}) {
 
 // --- moving a title between shows (decisions 7, 13, 19) ----------------------
 
-// Whether earnings follow payeeOf yet (slice 3b turns it on). Until then no
-// money lane reads payeeOf, so a move never says earnings change: it says
-// they stay with the person who uploaded the title.
-export const PAYEE_RULE_LIVE = false;
-
 function moveRefusal(code, reason, tag) {
   return { ok: false, code, reason, tag: tag || null };
 }
@@ -1654,14 +1858,16 @@ function moveRefusal(code, reason, tag) {
 // isAdmin }; opts = { sourceShow (the show it's in now), buyers: {
 // source, target } (whole-series buyers of each), pins (the channel
 // slots that start their run at this episode: { channel } each, or a
-// count), onChannel (a channel airs the source show), names }.
+// count), onChannel (a channel airs the source show), names, payeeRuleLive
+// (the server passes it; else whether the rule is in force at opts.now,
+// default now) }.
 // A creator moves only what they uploaded, between their own shows of the
 // same kind, never in or out of a show with buyers or off a pinned slot,
 // and a standalone title into a show only while it isn't live; never into
 // a declined, pulled or vertical show. An admin may move anything except
 // into a show whose removal is requested (or across kinds) and is told what
-// follows: whose future earnings change (once PAYEE_RULE_LIVE; until then
-// that they stay with the uploader), how many series buyers gain or
+// follows: whose future earnings change (once the rule is live; before
+// PAYEE_RULE_FROM, that they stay with the uploader), how many series buyers gain or
 // lose it, which pins clear, that it leaves the site until a private show
 // goes public. Within one show this answers who may reorder (the owner or
 // an admin). `tag` is the greyed label a picker shows.
@@ -1721,7 +1927,7 @@ export function canMoveTo(episode, targetShow, viewer, opts = {}) {
     return moveRefusal('pinned', `Pinned on ${channel || 'a channel'} — ask us to unpin it first.`);
   }
 
-  const payeeRuleLive = (opts.payeeRuleLive ?? PAYEE_RULE_LIVE) === true;
+  const payeeRuleLive = (opts.payeeRuleLive ?? payeeRuleLiveAt(opts.now ?? new Date())) === true;
   const payeeBefore = payeeOf(episode, sourceId ? source : null);
   const payeeAfter = payeeOf(episode, targetShow);
   const earningsMove = payeeRuleLive && payeeBefore !== payeeAfter;

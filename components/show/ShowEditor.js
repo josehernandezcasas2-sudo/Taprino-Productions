@@ -12,6 +12,7 @@ import {
   callApi, isOpen, readAsDataUrl, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast
 } from './EditorBits';
 import { AboutField, NOT_SAVED_WORDS, OneLineField, askHref } from './EpisodeFields';
+import { PayeeLine } from './PayeeCard';
 import { BackArrowIcon, ClockIcon, CloseIcon, ExternalLinkIcon, InfoIcon, WarningIcon } from '../PlayerIcons';
 
 // Edit show (series revamp slice 2; amendment 13, boards ShowEditor and
@@ -370,8 +371,42 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
   const kindPolicy = has118 ? lockAll('kind') : { mode: 'locked', line: 'Needs a database update (migration 118).' };
   const makerLine = (show.creditLines || []).find((l) => l.key === 'maker');
 
+  // Who gets paid (slice 3b): the line, and the way to the show page's
+  // card — over the room, the panel closes onto it.
+  const payeeHref = `${mode === 'admin' ? '/admin/shows' : '/creator/show'}/${encodeURIComponent(show.id)}#show-payee`;
+  const toPayeeCard = (e) => {
+    if (dirty && !window.confirm('Leave without saving your changes?')) {
+      e.preventDefault();
+      return;
+    }
+    if (layout !== 'panel' || !onClose) return;
+    e.preventDefault();
+    onClose();
+    // The room under the panel (or the room page this editor's address
+    // goes back to) draws the card once the panel is gone: wait for it.
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      const el = document.getElementById('show-payee');
+      const panelGone = !document.querySelector('.show-ed.is-panel');
+      if ((el && panelGone) || tries > 60) {
+        clearInterval(timer);
+        if (!el || !panelGone) return;
+        el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const btn = el.querySelector('button:not([disabled]), a[href]');
+        if (btn) btn.focus({ preventScroll: true });
+      }
+    }, 150);
+  };
+
   const details = (
     <>
+      {view.payee && view.payee.line ? (
+        <div className="show-ed-card show-ed-paid-card">
+          <PayeeLine payee={view.payee} className="show-ed-paid" />
+          <Link className="apl-link show-ed-paid-link" href={payeeHref} onClick={toPayeeCard}>Change it under Who gets paid →</Link>
+        </div>
+      ) : null}
       <div className="show-ed-field">
         <FieldHead htmlFor="sh-name" label="Name" staged={namePolicy.mode === 'staged'} locked={namePolicy.mode === 'locked'} count={form.name.length} max={form.name.length > 90 ? 120 : null} />
         <input id="sh-name" className="show-ed-input is-title" type="text" value={form.name} maxLength={120} disabled={!isOpen(namePolicy)} onChange={(e) => set('name', e.target.value)} />

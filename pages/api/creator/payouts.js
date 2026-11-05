@@ -4,6 +4,7 @@ import { getPayoutAccount, refreshPayoutAccount, createOnboardingLink, createDas
 import { getOwnListings } from '../../../lib/locations';
 import { getOwnCard } from '../../../lib/crewCards';
 import { hasCrewPayInterest } from '../../../lib/crewPay';
+import { hasPayeeInterest } from '../../../lib/payees';
 import { applyCors } from '../../../lib/cors';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { sendError } from '../../../lib/apiErrors';
@@ -25,10 +26,12 @@ export default async function handler(req, res) {
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   // Creators get paid for backing; a host (anyone with a place listed)
   // gets paid for bookings through the same account; crew with a working
-  // card, or with secured pay waiting on them (migration 110), too.
+  // card, or with secured pay waiting on them (migration 110), too; and
+  // anyone a title pays, or with an invite to be paid (slice 3b), even if
+  // their role changes later.
   if (!isCreator && !isAdmin) {
-    const [listings, card, crewPay] = await Promise.all([getOwnListings(userId).catch(() => []), getOwnCard(userId).catch(() => null), hasCrewPayInterest(userId).catch(() => false)]);
-    if (listings.length === 0 && !card && !crewPay) return res.status(403).json({ error: 'Creator access required.' });
+    const [listings, card, crewPay, payee] = await Promise.all([getOwnListings(userId).catch(() => []), getOwnCard(userId).catch(() => null), hasCrewPayInterest(userId).catch(() => false), hasPayeeInterest(userId).catch(() => false)]);
+    if (listings.length === 0 && !card && !crewPay && !payee) return res.status(403).json({ error: 'Creator access required.' });
   }
 
   try {

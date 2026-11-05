@@ -8,6 +8,7 @@ import {
   BanIcon, CheckIcon, ChevronIcon, KebabIcon, KindChip, LinkText, NoEyeIcon, Pill, PlusIcon, SmallButton, StateChip, TONE,
   askUs, countLine, minutesOf, shortDate, ss
 } from './ShowBits';
+import { PaidLine } from './PayeeCard';
 
 // The show page's cards in the app (the series revamp, slice 5; the
 // website's components/show/ShowCards.js): the show card, the status card,
@@ -21,8 +22,10 @@ export const PREVIEW_BUILT = false;
 // The show card: the poster (tap → Edit show, art), the name (or its
 // title image), Series | Podcast, where it stands, the count line, the
 // description's first paragraph, what waits for approval (each with
-// Cancel), Edit show and View page.
-export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy }) {
+// Cancel), Edit show and View page. `payee` (slice 3b, the show's "Who gets
+// paid" block; null for a viewer who may not see who is paid) adds
+// "RUNS IT … · PAID TO …" under the count line.
+export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy, payee = null }) {
   const show = view.show;
   const st = show.staged || {};
   const art = show.art || {};
@@ -58,6 +61,7 @@ export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy }
             <StateChip state={show.state} label={show.statusLabel} />
           </View>
           <Text style={cs.count}>{countLine(view.seasons)}</Text>
+          <PaidLine payee={payee} />
           {firstLine ? <Text style={cs.desc} numberOfLines={2}>{firstLine}</Text> : null}
         </View>
       </View>

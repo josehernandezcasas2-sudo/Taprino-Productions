@@ -22,6 +22,7 @@ import {
 } from './EditorBits';
 import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, StagedLegend, TitleField } from './EpisodeFields';
 import { PREVIEW_BUILT } from './ShowCards';
+import PayeeCard, { PaidLine } from './PayeeCard';
 import {
   CheckIcon, LinkText, PlusIcon, RoomToast, SmallButton, UploadIcon, askUs, episodeEditorRoute, episodePublicRoute,
   shortDate, showRoute, ss, submitRoute, useRoomToast
@@ -254,6 +255,14 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     if (r.ok) applyView(r.data, opts);
     return r;
   }, [call, epPath, applyView]);
+
+  // "Who gets paid" changed (slice 3b): the server's words, its new block
+  // at once, then the editor again (the form stays as it is).
+  const onPayeeChanged = useCallback((next, words) => {
+    if (words) say({ tone: 'ok', title: words }, 7000);
+    if (next) setData((d) => ({ ...d, payee: next }));
+    reload();
+  }, [say, reload]);
 
   // --- what changed, and what saving it does -------------------------------
   const creditOpts = useMemo(() => ({ inherit: Boolean(show), showOrder: null }), [show]);
@@ -821,7 +830,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
         )}
       >
         <View style={es.body} onLayout={(e) => { bodyY.current = e.nativeEvent.layout.y; }}>
-          <EditorHead eyebrow={eyebrow} pill={pill} title={title} />
+          <EditorHead eyebrow={eyebrow} pill={pill} title={title} note={data.payee ? <PaidLine payee={data.payee} /> : null} />
           {banners}
 
           <SectionHead label="Basics" />
@@ -967,6 +976,10 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           ) : null}
 
           <MoreOptions form={form} set={set} pol={pol} live={live} />
+
+          {/* Slice 3b: who its earnings go to, at the end of More info
+              (null for a viewer who may not see who is paid). */}
+          {data.payee ? <PayeeCard payee={data.payee} mode="section" onChanged={onPayeeChanged} /> : null}
 
           <SectionHead label="Place" onLayout={(e) => { placeY.current = e.nativeEvent.layout.y; }} />
           <View style={ss.card}>

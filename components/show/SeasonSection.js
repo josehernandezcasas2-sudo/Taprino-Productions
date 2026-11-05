@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { rowPill } from '../../lib/showRules';
-import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ExternalLinkIcon, LockIcon, PencilIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
+import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ExternalLinkIcon, LockIcon, PencilIcon, TicketIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { ChevronIcon, GripIcon, KebabIcon, SendIcon, ago, bg, bytesShort, minutesOf, pickerKeys } from './roomBits';
 
 // A season of the show page (series revamp slice 2; spec Screens, "Show
@@ -169,6 +169,8 @@ function rowMeta(row, ctx, upload) {
   if (row.hasPageChoice === true) parts.push('its own page');
   if (row.tier && ctx.defaultTier && row.tier !== ctx.defaultTier) parts.push(row.tier === 'free' ? 'free' : ctx.premiumWord);
   if (row.uploaderName) parts.push(`uploaded by ${row.uploaderName}`);
+  // Slice 3b: an episode with a paid account of its own says whose.
+  if (row.paidOwn && row.paidTo) parts.push(`paid to ${row.paidTo === ctx.viewerId ? 'you' : row.paidToName || 'another account'}`);
   return parts;
 }
 
@@ -215,6 +217,11 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
     if (ctx.kind !== 'podcast') menu.push({ key: 'captions', label: 'Captions', icon: <span className="show-menu-cc" aria-hidden="true">CC</span>, onClick: () => actions.open(row) });
   }
   if (!isDraft && row.status === 'approved' && ctx.showPublic && !row.held && !row.deletionRequested) menu.push({ key: 'view', label: 'View page', icon: <ExternalLinkIcon size={15} />, href: `/episode/${encodeURIComponent(row.id)}`, external: true });
+  // Whoever runs the show prices its live episodes (slice 3b), a
+  // contributor's included; never on the admin page.
+  if (!isDraft && ctx.canSell && row.status === 'approved' && !row.held && !row.deletionRequested && !row.withdrawnAt) {
+    menu.push({ key: 'sell', label: ctx.priceOf(row.id) ? 'Price and sales' : 'Sell…', icon: <TicketIcon size={15} />, onClick: () => actions.sell(row) });
+  }
   if (!isDraft && ctx.admin && ctx.admin.can && (ctx.admin.can.edit || ctx.admin.can.fullAdmin)) {
     menu.push({ key: 'library', label: 'Open in Library modal', icon: <PencilIcon size={15} />, href: `/admin/library?edit=${encodeURIComponent(row.id)}` });
     if (row.status === 'approved') menu.push({ key: 'adplan', label: 'Ad plan', icon: <ExternalLinkIcon size={15} />, href: `/ad-plan/${encodeURIComponent(row.id)}` });

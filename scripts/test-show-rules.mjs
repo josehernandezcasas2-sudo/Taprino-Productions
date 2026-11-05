@@ -703,7 +703,7 @@ function suite(R, who) {
     assert.equal(R.runnerOf({ creator_id: 'u_mara' }), 'u_mara');
   });
 
-  tt('who gets paid: payeeOf, a series sale, a date, a change, who sees it (decisions 13, 19, 21)', () => {
+  tt('who gets paid: payeeOf, a series sale, a date, who sees it (decisions 13, 19, 21)', () => {
     const show = { id: 's', creatorId: 'u_mara', paidTo: null };
     assert.equal(R.payeeOf({ submittedBy: 'u_up' }, show), 'u_mara', 'the show\'s owner before the uploader');
     assert.equal(R.payeeOf({ submittedBy: 'u_up' }, { ...show, paidTo: 'u_prod' }), 'u_prod');
@@ -727,12 +727,7 @@ function suite(R, who) {
     assert.equal(R.payeeOnDate([], '2026-01-01'), null);
     assert.equal(R.payeeOnDate(history, 'not a date'), null);
 
-    assert.equal(R.payeeChange({ current: 'u_mara', next: 'u_mara', actorId: 'u_mara' }), 'none');
-    assert.equal(R.payeeChange({ current: null, next: 'u_prod', actorId: 'u_mara' }), 'invite');
-    assert.equal(R.payeeChange({ current: 'u_prod', next: null, actorId: 'u_mara' }), 'direct');
-    assert.equal(R.payeeChange({ current: 'u_prod', next: 'u_mara', actorId: 'u_mara' }), 'direct');
-    assert.equal(R.payeeChange({ current: null, next: 'u_prod', actorId: 'u_admin', isAdmin: true }), 'direct');
-    assert.equal(R.payeeChange({ current: '', next: '  ' }), 'none');
+    assert.equal('payeeChange' in R, false, 'slice 3b replaced payeeChange with payeePickKind');
 
     const eps = [{ submittedBy: 'u_contrib' }, { submittedBy: 'u_mara', paidTo: 'u_epPay' }];
     const showPaid = { creatorId: 'u_mara', paidTo: 'u_prod' };
@@ -740,6 +735,161 @@ function suite(R, who) {
     assert.equal(R.seesWhoIsPaid({ viewerId: 'u_viewer', show: showPaid, episodes: eps }), false);
     assert.equal(R.seesWhoIsPaid({ viewerId: null, show: showPaid, episodes: eps }), false);
     assert.equal(R.seesWhoIsPaid({ isAdmin: true }), true);
+  });
+
+  tt('the rule in time: PAYEE_RULE_FROM, payeeRuleLiveAt (slice 3b)', () => {
+    assert.equal(R.PAYEE_RULE_LIVE, true);
+    assert.match(R.PAYEE_RULE_FROM, /^\d{4}-\d{2}-\d{2}T00:00:00\.000Z$/, 'midnight UTC of a day');
+    const from = '2026-10-15T00:00:00.000Z';
+    assert.equal(R.payeeRuleLiveAt('2026-10-15T00:00:00.000Z', from), true, 'at the instant');
+    assert.equal(R.payeeRuleLiveAt('2026-10-14T23:59:59.999Z', from), false, 'just before');
+    assert.equal(R.payeeRuleLiveAt('2026-10-15T00:00:00.001Z', from), true);
+    assert.equal(R.payeeRuleLiveAt(Date.parse('2026-11-01'), from), true, 'a number');
+    assert.equal(R.payeeRuleLiveAt(new Date('2026-10-01'), from), false, 'a Date');
+    assert.equal(R.payeeRuleLiveAt('not a date', from), false);
+    assert.equal(R.payeeRuleLiveAt('2026-11-01', 'nope'), false);
+    assert.equal(R.payeeRuleLiveAt(null, from), false);
+    assert.equal(R.payeeRuleLiveAt(R.PAYEE_RULE_FROM), true, 'the default instant');
+  });
+
+  tt('who runs a title, the legacy payee, the default and where the payee comes from', () => {
+    const show = { id: 's', creator_id: 'u_mara', paid_to: null };
+    const paid = { ...show, paid_to: 'u_prod' };
+    const ep = { submitted_by: 'u_dee' };
+    assert.equal(R.legacyPayeeOf(ep, show), 'u_dee', 'the uploader first, as every lane paid before 3b');
+    assert.equal(R.legacyPayeeOf({}, show), 'u_mara', 'else the show\'s owner');
+    assert.equal(R.legacyPayeeOf({ submittedBy: '  ' }, null), null);
+    assert.equal(R.titleRunnerOf(ep, show), 'u_mara', 'a show\'s episode: its owner');
+    assert.equal(R.titleRunnerOf(ep, null), 'u_dee', 'a standalone title: its uploader');
+    assert.equal(R.titleRunnerOf(ep, { creator_id: null }), 'u_dee', 'a show nobody owns: the uploader');
+    assert.equal(R.titleRunnerOf({}, null), null);
+    assert.equal(R.payeeFallback('series', null, show), 'u_mara');
+    assert.equal(R.payeeFallback('series', null, paid), 'u_mara', 'a show\'s default is whoever runs it');
+    assert.equal(R.payeeFallback('episode', ep, show), 'u_mara');
+    assert.equal(R.payeeFallback('episode', ep, paid), 'u_prod', 'an episode\'s default is the show\'s paid account');
+    assert.equal(R.payeeFallback('episode', ep, null), 'u_dee', 'a standalone title\'s, its uploader');
+    assert.equal(R.payeeFallback('episode', ep, { creator_id: '', paid_to: '' }), 'u_dee', 'blanks are no one');
+    assert.equal(R.payeeSourceOf({ ...ep, paid_to: 'u_x' }, paid), 'own');
+    assert.equal(R.payeeSourceOf(ep, paid), 'show');
+    assert.equal(R.payeeSourceOf(ep, show), 'runner');
+    assert.equal(R.payeeSourceOf(ep, null), 'uploader');
+    assert.equal(R.payeeSourceOf({ paidTo: ' ' }, { paidTo: '' }), null);
+  });
+
+  tt('payeeAt: history first, then the old rule before the cut-over, then payeeOf', () => {
+    const from = '2026-10-15T00:00:00.000Z';
+    const show = { creator_id: 'u_mara', paid_to: null };
+    const ep = { submitted_by: 'u_dee' };
+    const history = [
+      { payee_id: 'u_mara', from_at: '2026-10-15T00:00:00Z', to_at: '2026-10-20T15:00:00Z' },
+      { payeeId: 'u_pat', fromAt: '2026-10-20T15:00:00Z', toAt: null }
+    ];
+    const at = (t) => R.payeeAt({ history, episode: ep, series: show, at: t, from });
+    assert.equal(at('2026-10-01'), 'u_dee', 'before the cut-over with no row: legacy');
+    assert.equal(at('2026-10-15T00:00:00Z'), 'u_mara', 'a covering row');
+    assert.equal(at('2026-10-20T14:59:59Z'), 'u_mara');
+    assert.equal(at('2026-10-20T15:00:00Z'), 'u_pat', 'to_at is exclusive');
+    assert.equal(at('2027-01-01'), 'u_pat', 'an open row runs on');
+    // The latest from_at wins where two rows cover the instant.
+    const overlap = [{ payee_id: 'u_a', from_at: '2026-10-01', to_at: null }, { payee_id: 'u_b', from_at: '2026-10-05', to_at: '2026-10-10' }];
+    assert.equal(R.payeeAt({ history: overlap, episode: ep, series: show, at: '2026-10-06', from }), 'u_b');
+    assert.equal(R.payeeAt({ history: overlap, episode: ep, series: show, at: '2026-10-11', from }), 'u_a');
+    // No history: legacy before, payeeOf after.
+    assert.equal(R.payeeAt({ history: [], episode: ep, series: show, at: '2026-10-14T23:00:00Z', from }), 'u_dee');
+    assert.equal(R.payeeAt({ history: [], episode: ep, series: show, at: '2026-10-16', from }), 'u_mara');
+    assert.equal(R.payeeAt({ episode: { ...ep, paid_to: 'u_x' }, series: show, at: '2026-10-16', from }), 'u_x');
+    assert.equal(R.payeeAt({ episode: ep, series: null, at: '2026-10-16', from }), 'u_dee', 'a standalone title pays its uploader either way');
+    assert.equal(R.payeeAt({ history, episode: ep, series: show, at: 'nope', from }), null);
+    // A database before 118: the cut-over never comes (from is +∞).
+    assert.equal(R.payeeAt({ episode: ep, series: show, at: '2027-01-01', from: Infinity }), 'u_dee');
+  });
+
+  tt('payeePickKind: none, the default, yourself, a pin, an invite (question 22, as built)', () => {
+    const k = (o) => R.payeePickKind({ scope: 'episode', fallback: 'u_mara', actorId: 'u_mara', isRunner: true, ...o });
+    assert.deepEqual(k({ current: null, next: null }), { kind: 'none', store: null });
+    assert.deepEqual(k({ current: 'u_pat', next: 'u_pat' }), { kind: 'none', store: 'u_pat' });
+    assert.deepEqual(k({ current: 'u_pat', next: null }), { kind: 'direct', store: null }, 'back to the default');
+    assert.deepEqual(k({ current: 'u_pat', next: 'u_mara' }), { kind: 'direct', store: null }, 'picking whoever the default pays is the default');
+    assert.deepEqual(k({ current: null, next: 'u_mara' }), { kind: 'none', store: null });
+    // Yourself on a title you run (the default pays someone else here).
+    assert.deepEqual(R.payeePickKind({ scope: 'episode', current: null, next: 'u_mara', fallback: 'u_prod', actorId: 'u_mara', isRunner: true }), { kind: 'direct', store: 'u_mara' });
+    // Yourself on a title you don't run: refused.
+    assert.deepEqual(R.payeePickKind({ scope: 'series', current: null, next: 'u_admin', fallback: 'u_mara', actorId: 'u_admin', isRunner: false }), { kind: 'refused', store: null, code: 'self-not-runner' });
+    // A pin that moves nobody's money (the show pays Pat; pin Pat on the episode).
+    assert.deepEqual(R.payeePickKind({ scope: 'episode', current: null, next: 'u_pat', fallback: 'u_pat', actorId: 'u_mara', isRunner: true }), { kind: 'none', store: null }, 'picking whoever the default pays stores nothing');
+    assert.deepEqual(R.payeePickKind({ scope: 'episode', current: 'u_pat', next: null, fallback: 'u_pat', actorId: 'u_mara', isRunner: true }), { kind: 'direct', store: null }, 'an unpin moves nobody\'s money');
+    // Another account: an invite, an admin's pick included.
+    assert.deepEqual(k({ current: null, next: 'u_pat' }), { kind: 'invite', store: 'u_pat', scope: 'episode' });
+    assert.deepEqual(R.payeePickKind({ scope: 'series', current: null, next: 'u_pat', fallback: 'u_mara', actorId: 'u_admin', isRunner: false }), { kind: 'invite', store: 'u_pat', scope: 'series' });
+    assert.equal(k({ current: 'u_pat', next: 'u_zed' }).kind, 'invite');
+    assert.deepEqual(k({ current: '  ', next: '' }), { kind: 'none', store: null }, 'blanks are no one');
+  });
+
+  tt('stampPlan: baseline rows, closes before opens, nothing before the cut-over', () => {
+    const from = '2026-10-15T00:00:00.000Z';
+    const at = '2026-10-20T15:00:00.000Z';
+    assert.deepEqual(R.stampPlan({ titles: [{ type: 'episode', id: 'e1', before: 'u_a', after: 'u_b', rows: [] }], at: '2026-10-01T00:00:00Z', from, setBy: 'x' }), { live: false, baseline: [], upsert: [] });
+    // Unchanged: nothing.
+    assert.deepEqual(R.stampPlan({ titles: [{ type: 'episode', id: 'e1', before: 'u_a', after: 'u_a', rows: [] }], at, from }), { live: true, baseline: [], upsert: [] });
+    assert.deepEqual(R.stampPlan({ titles: [{ type: 'episode', id: 'e1', before: 'u_x', after: 'u_a', rows: [{ id: 'r1', payee_id: 'u_a', from_at: from, to_at: null }] }], at, from }).upsert, [], 'the open row already pays it');
+    // The first change after the cut-over: a baseline [from, at) and an open row.
+    const first = R.stampPlan({ titles: [{ type: 'episode', id: 'e1', before: 'u_mara', after: 'u_pat', rows: [] }], at, from, setBy: 'invite:i1' });
+    assert.deepEqual(first.baseline, [{ title_type: 'episode', title_id: 'e1', payee_id: 'u_mara', from_at: from, to_at: at, set_by: 'baseline' }]);
+    assert.deepEqual(first.upsert, [{ id: null, title_type: 'episode', title_id: 'e1', payee_id: 'u_pat', from_at: at, to_at: null, set_by: 'invite:i1' }]);
+    // A change with an open row: close + open, every close first.
+    const two = R.stampPlan({
+      titles: [
+        { type: 'series', id: 's1', before: 'u_mara', after: 'u_pat', rows: [{ id: 'r1', payee_id: 'u_mara', from_at: '2026-10-16T00:00:00Z', to_at: null, set_by: 'cutover' }] },
+        { type: 'episode', id: 'e2', before: 'u_mara', after: 'u_pat', rows: [{ id: 'r2', payee_id: 'u_mara', from_at: '2026-10-16T00:00:00Z', to_at: null }] }
+      ], at, from, setBy: 'user:u_mara'
+    });
+    assert.deepEqual(two.baseline, []);
+    assert.deepEqual(two.upsert.map((r) => [r.id, r.title_id, r.to_at === null ? 'open' : 'closed']), [['r1', 's1', 'closed'], ['r2', 'e2', 'closed'], [null, 's1', 'open'], [null, 'e2', 'open']]);
+    assert.deepEqual(two.upsert[0], { id: 'r1', title_type: 'series', title_id: 's1', payee_id: 'u_mara', from_at: '2026-10-16T00:00:00.000Z', to_at: at, set_by: 'cutover' });
+    // A gap after a closed row: the baseline starts where that row ended.
+    const gap = R.stampPlan({ titles: [{ type: 'episode', id: 'e3', before: 'u_dee', after: 'u_pat', rows: [{ id: 'r3', payee_id: 'u_a', from_at: '2026-10-15T00:00:00Z', to_at: '2026-10-18T00:00:00Z' }] }], at, from, setBy: 'x' });
+    assert.equal(gap.baseline[0].from_at, '2026-10-18T00:00:00.000Z');
+    assert.equal(gap.baseline[0].payee_id, 'u_dee');
+    // after null: close only. before null: no baseline.
+    const closeOnly = R.stampPlan({ titles: [{ type: 'episode', id: 'e4', before: 'u_a', after: null, rows: [{ id: 'r4', payee_id: 'u_a', from_at: from, to_at: null }] }], at, from });
+    assert.deepEqual(closeOnly.upsert.map((r) => r.id), ['r4']);
+    const noBefore = R.stampPlan({ titles: [{ type: 'episode', id: 'e5', before: null, after: 'u_b', rows: [] }], at, from, setBy: 'x' });
+    assert.deepEqual([noBefore.baseline.length, noBefore.upsert.length], [0, 1]);
+    // An open row that starts after `at` (a clock a little behind): never a period that ends before it starts.
+    const skew = R.stampPlan({ titles: [{ type: 'episode', id: 'e6', before: 'u_a', after: 'u_b', rows: [{ id: 'r6', payee_id: 'u_a', from_at: '2026-10-20T15:00:01Z', to_at: null }] }], at, from, setBy: 'x' });
+    assert.ok(skew.upsert.every((r) => r.to_at === null || Date.parse(r.to_at) >= Date.parse(r.from_at)));
+    assert.equal(skew.upsert[1].from_at, skew.upsert[0].to_at, 'no gap, no overlap');
+  });
+
+  tt('words: paidLine, the source, the series-sale note, titleWords, invites, day ranges', () => {
+    const mara = { id: 'u_mara', name: 'Mara Reyes' };
+    const pat = { id: 'u_pat', name: 'Pat Lee' };
+    assert.deepEqual(R.paidLine({ runsIt: mara, paidTo: pat, viewerId: 'u_pat' }), { runsIt: 'Mara Reyes', paidTo: 'You', text: 'Runs it: Mara Reyes · Paid to: You', pending: null });
+    assert.equal(R.paidLine({ runsIt: mara, paidTo: mara, viewerId: 'u_mara' }).text, 'Runs it: You · Paid to: You');
+    assert.equal(R.paidLine({ runsIt: mara, paidTo: { id: 'u_admin', name: 'Jose' }, viewerId: 'u_mara', house: true }).paidTo, 'Studio Tapa');
+    assert.equal(R.paidLine({ runsIt: null, paidTo: null }).text, 'Runs it: No one yet · Paid to: No one yet');
+    assert.equal(R.paidLine({ runsIt: mara, paidTo: mara, viewerId: 'u_zed', pendingName: 'Pat Lee' }).pending, 'Waiting on Pat Lee to accept');
+    assert.equal(R.payeeSourceWords('own', 'Night Bus'), '(its own)');
+    assert.equal(R.payeeSourceWords('show', 'Night Bus'), '(Night Bus’s)');
+    assert.equal(R.payeeSourceWords('runner', 'Night Bus'), null);
+    assert.equal(R.seriesSaleNote('Night Bus', 'Mara Reyes'), 'Whole-series sales of Night Bus still go to Mara Reyes.');
+    assert.equal(R.titleWords({ titleType: 'series', titleName: 'Night Bus', showName: 'Night Bus' }), 'Night Bus');
+    assert.equal(R.titleWords({ titleType: 'episode', titleName: 'Pilot', showName: 'Night Bus', code: 'S1 E1' }), '“Pilot” (Night Bus · S1 E1)');
+    assert.equal(R.titleWords({ titleType: 'episode', titleName: 'The Long Road' }), '“The Long Road”');
+    assert.equal(R.inviteHeadline({ titleType: 'series', showName: 'Night Bus' }), 'Get paid for Night Bus?');
+    assert.equal(R.inviteHeadline({ titleType: 'episode', titleName: 'Pilot', showName: 'Night Bus', code: 'S1 E1' }), 'Get paid for “Pilot” (Night Bus · S1 E1)?');
+    assert.equal(R.inviteHeadline({ titleType: 'episode', titleName: 'The Long Road' }), 'Get paid for “The Long Road”?');
+    assert.deepEqual(['pending', 'accepted', 'declined', 'cancelled', 'odd', 'constructor', null].map(R.inviteStateWords), ['Waiting for an answer', 'Accepted', 'Said no', 'Withdrawn', null, null, null]);
+    assert.equal(R.dayStartIso('2026-10-20'), '2026-10-20T00:00:00.000Z');
+    assert.equal(R.dayStartIso('2026-02-30'), null);
+    assert.equal(R.dayStartIso('nope'), null);
+    assert.equal(R.utcDayLabel('2026-11-09T00:00:00.000Z'), 'Nov 9');
+    assert.equal(R.utcDayLabel('2026-11-09T23:30:00.000Z'), 'Nov 9', 'UTC, not Pacific');
+    assert.equal(R.dayRangeLabel('2026-10-01', '2026-10-14'), 'Oct 1–14');
+    assert.equal(R.dayRangeLabel('2026-10-20', '2026-10-20'), 'Oct 20');
+    assert.equal(R.dayRangeLabel('2026-10-20'), 'Oct 20');
+    assert.equal(R.dayRangeLabel('2026-10-30', '2026-11-02'), 'Oct 30 – Nov 2');
+    assert.equal(R.dayRangeLabel('nope', 'nope'), null);
   });
 
   tt('credits: Made by on top, optional Studio and Producer, the order the runner picks (decision 20)', () => {
@@ -960,21 +1110,27 @@ function suite(R, who) {
     assert.equal(own.earningsMove, false);
   });
 
-  tt('canMoveTo: until slice 3b no move says earnings change (PAYEE_RULE_LIVE)', () => {
-    assert.equal(R.PAYEE_RULE_LIVE, false);
+  tt('canMoveTo: before PAYEE_RULE_FROM no move says earnings change; from it the rule says who', () => {
+    assert.equal(R.PAYEE_RULE_LIVE, true);
     const a = { id: 'night-bus', name: 'Night Bus', creatorId: 'u_mara', kind: 'series', status: 'approved' };
     const other = { id: 'day-bus', name: 'Day Bus', creatorId: 'u_dee', kind: 'series', status: 'approved' };
     const mine = ep('e3', 3, 1, { submittedBy: 'u_mara' });
     const admin = { isAdmin: true, userId: 'u_jose' };
-    const off = R.canMoveTo(mine, other, admin, { sourceShow: a, names: { u_mara: 'Mara Reyes', u_dee: 'Dee' } });
+    const before = new Date(Date.parse(R.PAYEE_RULE_FROM) - 1);
+    const off = R.canMoveTo(mine, other, admin, { sourceShow: a, names: { u_mara: 'Mara Reyes', u_dee: 'Dee' }, now: before });
     assert.equal(off.ok, true);
     assert.equal(off.earningsMove, false);
     assert.deepEqual([off.payeeBefore, off.payeeAfter], ['u_mara', 'u_dee'], 'who payeeOf would pick is still reported');
     assert.deepEqual(off.lines, ['Its earnings stay with Mara Reyes.']);
     assert.equal(off.lines.some((l) => /Future earnings/.test(l)), false);
-    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a }).lines, ['Its earnings stay with whoever uploaded it.']);
+    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a, now: before }).lines, ['Its earnings stay with whoever uploaded it.']);
+    // From the cut-over on, the default (no payeeRuleLive) is the rule.
+    const after = new Date(Date.parse(R.PAYEE_RULE_FROM) + 1000);
+    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a, now: after, names: { u_dee: 'Dee' } }).lines, ['Future earnings go to Dee']);
+    assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a, now: R.PAYEE_RULE_FROM, names: { u_dee: 'Dee' } }).lines, ['Future earnings go to Dee'], 'at the instant itself');
     // The uploader runs the target: nothing to say.
-    assert.deepEqual(R.canMoveTo(mine, { ...other, creatorId: 'u_mara' }, admin, { sourceShow: a }).lines, []);
+    assert.deepEqual(R.canMoveTo(mine, { ...other, creatorId: 'u_mara' }, admin, { sourceShow: a, now: before }).lines, []);
+    assert.deepEqual(R.canMoveTo(mine, { ...other, creatorId: 'u_mara' }, admin, { sourceShow: a, now: after }).lines, [], 'the same account either side: nothing to say');
     // payeeRuleLive: false is the same as leaving it out; true is today's rule.
     assert.deepEqual(R.canMoveTo(mine, other, admin, { sourceShow: a, payeeRuleLive: false, names: { u_dee: 'Dee' } }).lines, ['Its earnings stay with whoever uploaded it.']);
     const on = R.canMoveTo(mine, other, admin, { sourceShow: a, payeeRuleLive: true, names: { u_dee: 'Dee' } });
