@@ -4,9 +4,9 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import SmartImage from './SmartImage';
-import { colors, fonts, absoluteFill } from '../lib/theme';
+import { colors, fonts, absoluteFill, okTint } from '../lib/theme';
 import { formatRuntimeLong } from '../lib/runtime';
-import { seriesPlayLabel } from '../lib/seriesResume';
+import { freePlayNote, seriesPlayLabel } from '../lib/seriesResume';
 
 const ROTATE_MS = 9000;
 
@@ -19,6 +19,41 @@ function tierMeta(tier, adsEnabled) {
   if (tier === 'premium') return { label: 'Tapa +', bg: colors.brass, fg: '#241a05' };
   if (adsEnabled === false) return { label: 'Free', bg: colors.ok, fg: '#14261a' };
   return { label: 'Free with ads', bg: colors.brass, fg: '#241a05' };
+}
+
+// What a series hero says about the whole show (decision 10, option A;
+// the series revamp, slice 4): `rollupTier` 'free' → one pill with
+// `freeLabel` ("Free with ads" / "Free"); 'premium' → "Tapa +"; 'mixed' →
+// "Tapa +" and the green chip ("E1 free", "E1–E3 free", "2 free"). A
+// candidate without a roll-up (a film, or a server before slice 4) keeps
+// its single tier pill. The genre screen's hero passes its own pill and
+// chip styles.
+export function RollupTier({ ep, pillStyle, textStyle, chipStyle, chipTextStyle }) {
+  const kind = ep ? ep.rollupTier : null;
+  if (kind === 'free' || kind === 'premium' || kind === 'mixed') {
+    const label = kind === 'free' ? ep.freeLabel || 'Free with ads' : ep.tierLabel || 'Tapa +';
+    const look = kind === 'free' ? tierMeta('free', label !== 'Free') : tierMeta('premium');
+    return (
+      <>
+        <View style={[styles.tierBadge, pillStyle, { backgroundColor: look.bg }]}><Text style={[styles.tierBadgeText, textStyle, { color: look.fg }]}>{label}</Text></View>
+        {kind === 'mixed' && ep.freeLabel ? (
+          <View style={[styles.freeChip, chipStyle]}><Text style={[styles.freeChipText, chipTextStyle]}>{ep.freeLabel}</Text></View>
+        ) : null}
+      </>
+    );
+  }
+  const tier = tierMeta(ep && ep.tier, ep && ep.adsEnabled);
+  return <View style={[styles.tierBadge, pillStyle, { backgroundColor: tier.bg }]}><Text style={[styles.tierBadgeText, textStyle, { color: tier.fg }]}>{tier.label}</Text></View>;
+}
+
+// A series hero's Play words: "Play first episode", "Continue S1 E2",
+// "Play S1 E4" — and " · free" when a non-member's Play opens a free
+// episode of a show that's partly Tapa + (lib/seriesResume.js
+// freePlayNote: "Play first episode · free").
+export function heroPlayLabel(ep, isMember) {
+  if (!ep || !ep.isSeries) return 'Play';
+  const free = freePlayNote({ resume: ep.resume || null, rollup: { tier: ep.rollupTier || null, firstFree: ep.firstFree === true }, isMember: Boolean(isMember) });
+  return seriesPlayLabel(ep.resume || null, 'Play first episode', { free });
 }
 
 export function PlayIcon({ size = 16, color = '#1a1408' }) {
@@ -82,7 +117,7 @@ function TrailerBackground({ src, muted, paused, height }) {
 // (pages/episode/[id].js) reuse this: it labels the hero Movie/Short, has
 // Play / Save / Back-this-project buttons, and plays a trailer even when
 // artwork exists.
-export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, renderActions, preferTrailer }) {
+export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, renderActions, preferTrailer, isMember = false }) {
   const { height: windowHeight } = useWindowDimensions();
   const [index, setIndex] = useState(Math.max(pool.length - 1, 0));
   const [paused, setPaused] = useState(false);
@@ -108,7 +143,6 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
     ? (ep.trailerSrc ? null : (ep.heroImage || ep.poster || ep.thumbnail))
     : (ep.heroImage || fallbackImage);
   const isImageMode = !!imageSrc;
-  const tier = tierMeta(ep.tier, ep.adsEnabled);
   const runtime = formatRuntimeLong(ep.runtime) || ep.runtime;
   const metaText = [ep.mainGenre, ep.releaseYear, runtime].filter(Boolean).join(' · ');
   const goTo = (i) => setIndex(((i % pool.length) + pool.length) % pool.length);
@@ -157,7 +191,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
           <Text style={styles.title}>{ep.title}</Text>
         )}
         <View style={styles.meta}>
-          <View style={[styles.tierBadge, { backgroundColor: tier.bg }]}><Text style={[styles.tierBadgeText, { color: tier.fg }]}>{tier.label}</Text></View>
+          <RollupTier ep={ep} />
           {metaText ? (<><Text style={styles.metaDot}>{'•'}</Text><Text style={styles.metaText}>{metaText}</Text></>) : null}
           {ep.rating ? (<><Text style={styles.metaDot}>{'•'}</Text><View style={styles.ratingTag}><Text style={styles.ratingText}>{ep.rating}</Text></View></>) : null}
           {ep.isOriginal ? (<><Text style={styles.metaDot}>{'•'}</Text><View style={styles.originalTag}><Text style={styles.originalText}>Tapa Original</Text></View></>) : null}
@@ -168,7 +202,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
         <View style={styles.actions}>
           <Pressable style={styles.playBtn} onPress={() => onPlay(ep)}>
             <PlayIcon />
-            <Text style={styles.playText}>{ep.isSeries ? seriesPlayLabel(ep.resume) : 'Play'}</Text>
+            <Text style={styles.playText}>{heroPlayLabel(ep, isMember)}</Text>
           </Pressable>
           <Pressable style={styles.infoBtn} onPress={() => onTrailer(ep)}>
             <InfoIcon />
@@ -199,6 +233,9 @@ const styles = StyleSheet.create({
   meta: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', columnGap: 10, rowGap: 8, marginBottom: 16 },
   tierBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 6 },
   tierBadgeText: { fontFamily: fonts.monoBold, fontSize: 11.5, letterSpacing: 0.2 },
+  // The green free chip beside "Tapa +" (the website's .free-chip).
+  freeChip: { paddingHorizontal: 11, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.ok, backgroundColor: okTint(0.14) },
+  freeChipText: { fontFamily: fonts.monoBold, fontSize: 11.5, letterSpacing: 0.2, color: colors.ok },
   metaDot: { color: colors.inkDim, opacity: 0.6, fontFamily: fonts.mono, fontSize: 12.5 },
   metaText: { color: colors.inkDim, fontFamily: fonts.mono, fontSize: 12.5, ...shadow, textShadowRadius: 6 },
   ratingTag: { borderWidth: 1, borderColor: 'rgba(251,232,211,0.35)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 1.5 },

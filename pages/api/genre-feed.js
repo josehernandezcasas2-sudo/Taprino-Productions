@@ -1,6 +1,7 @@
 import { getGenreFeedData } from '../../lib/genreFeed';
 import { limitPublicRead } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { getAccountContext } from '../../lib/accountContext';
 
 // The mobile app's equivalent of pages/genre/[genre].js — deliberately
 // NOT sharing that page's own getServerSideProps (same reasoning as
@@ -34,5 +35,9 @@ export default async function handler(req, res) {
   if (!genre) return res.status(400).json({ error: 'genre is required.' });
 
   const data = await getGenreFeedData(genre, hasSession ? req : null);
-  return res.status(200).json(data);
+  // Whether the viewer is a member (slice 4: a series hero's Play says
+  // " · free" only to a non-member). False signed out, so the cached copy
+  // stays the same for everyone.
+  const isSubscriber = hasSession ? Boolean((await getAccountContext(req)).isSubscriber) : false;
+  return res.status(200).json({ ...data, isSubscriber });
 }

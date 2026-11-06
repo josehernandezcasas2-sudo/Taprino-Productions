@@ -1492,6 +1492,120 @@ function suite(R, who) {
     assert.equal(R.rowPill(null), null);
   });
 
+  tt('showRollup with includeInReview: the preview\'s hero counts the episode in review', () => {
+    const pendingOnly = [ep('p1', 1, 1, { status: 'pending', tier: 'free', rating: 'TV-14' })];
+    assert.equal(R.showRollup(pendingOnly, {}).tier, null, 'without it nothing is public');
+    const r = R.showRollup(pendingOnly, {}, { includeInReview: true });
+    assert.equal(r.tier, 'free');
+    assert.equal(r.freeLabel, 'Free with ads');
+    assert.equal(r.episodeCount, 1);
+    assert.equal(r.seasonCount, 1);
+    assert.equal(r.rating, 'TV-14');
+    // Declined, pulled and withdrawn rows stay out of a preview too.
+    const noisy = [...pendingOnly, ep('d', 2, 1, { status: 'rejected' }), ep('h', 3, 1, { status: 'pending', held: true }), ep('w', 4, 1, { status: 'pending', withdrawnAt: '2026-10-01' }), ep('x', null, 1, { status: 'pending', contentType: 'bonus' })];
+    assert.equal(R.showRollup(noisy, {}, { includeInReview: true }).episodeCount, 1);
+    assert.equal(R.showRollup(noisy, {}, { includeInReview: 'yes' }).episodeCount, 0, 'only true turns it on');
+  });
+
+  tt('rowTierWord: FREE / TAPA + only in a mixed show (D10)', () => {
+    const mixed = R.showRollup([ep('a', 1, 1, { tier: 'free' }), ep('b', 2, 1, { tier: 'premium' })], {});
+    assert.equal(R.rowTierWord({ tier: 'free' }, mixed), 'Free');
+    assert.equal(R.rowTierWord({ tier: 'premium' }, mixed), 'Tapa +');
+    assert.equal(R.rowTierWord({ tier: null }, mixed), 'Free');
+    assert.equal(R.rowTierWord({ tier: 'free' }, R.showRollup([ep('a', 1, 1, { tier: 'free' })], {})), null);
+    assert.equal(R.rowTierWord({ tier: 'premium' }, R.showRollup([ep('a', 1, 1, { tier: 'premium' })], {})), null);
+    assert.equal(R.rowTierWord({ tier: 'premium' }, null), null);
+  });
+
+  tt('episodeCodeOf: the same spelling as episodeCode', () => {
+    assert.equal(R.episodeCodeOf(ep('a', 3, 1)), 'S1 E3');
+    assert.equal(R.episodeCodeOf({ season: 2, series_order: 1 }), 'S2 E1');
+    assert.equal(R.episodeCodeOf({ seriesOrder: 4 }), 'S1 E4');
+    assert.equal(R.episodeCodeOf({ seriesOrder: null }), null);
+    assert.equal(R.episodeCodeOf(null), null);
+  });
+
+  tt('extraGroups: with the show first, then after each episode in play order', () => {
+    const eps = [ep('e3', 3, 1, { title: 'Transfer' }), ep('s2e1', 1, 2, { title: 'Cold Open' }), ep('e1', 1, 1, { title: 'Last Stop' }), { id: 'pilot', title: 'Pilot', contentType: 'series', seriesOrder: null }];
+    const x = (id, parentType, parentId, extra = {}) => ({ id, title: id, contentType: 'bonus', bonusParentType: parentType, bonusParentId: parentId, ...extra });
+    const extras = [
+      x('scene-b', 'episode', 'e3', { seriesOrder: 2 }),
+      x('wheel', 'series', 'night-bus'),
+      { id: 'cold-x', title: 'cold-x', content_type: 'bonus', bonus_parent_type: 'episode', bonus_parent_id: 's2e1' },
+      x('scene-a', 'episode', 'e3', { seriesOrder: 1 }),
+      x('gone', 'episode', 'pending-ep'),
+      x('pilot-x', 'episode', 'pilot')
+    ];
+    const g = R.extraGroups(extras, eps);
+    // Pilot has no number: it plays after season 1's numbered episodes, before season 2.
+    assert.deepEqual(g.map((x2) => x2.key), ['show', 'episode:e3', 'episode:pilot', 'episode:s2e1']);
+    assert.deepEqual(g.map((x2) => x2.heading), ['With the show', 'After S1 E3 · Transfer', 'After Pilot', 'After S2 E1 · Cold Open']);
+    assert.deepEqual(g.map((x2) => x2.parentId), [null, 'e3', 'pilot', 's2e1']);
+    assert.deepEqual(g[1].items.map((i) => i.id), ['scene-a', 'scene-b'], 'shelf order');
+    assert.ok(!g.some((x2) => x2.items.some((i) => i.id === 'gone')), 'an extra on an episode not on the page is dropped, never moved to the show');
+    // Shelf order: numbered first, then the oldest, then the id.
+    const shelf = R.extraGroups([x('n', 'series', 's', { createdAt: '2026-10-01' }), x('m', 'series', 's', { createdAt: '2026-09-01' }), x('k', 'series', 's', { seriesOrder: 5 })], []);
+    assert.deepEqual(shelf[0].items.map((i) => i.id), ['k', 'm', 'n']);
+    assert.deepEqual(R.extraGroups([], eps), []);
+    assert.deepEqual(R.extraGroups(null, null), []);
+    assert.deepEqual(R.extraGroups([x('gone', 'episode', 'nope')], eps), [], 'empty groups are left out');
+  });
+
+  tt('previewBarWords: every row of the contract\'s table (§6.3)', () => {
+    const show = (role, state, extra = {}) => R.previewBarWords({ scope: 'show', role, state, ownerName: 'Mara Reyes', showName: 'Harbor Lights', ...extra });
+    for (const st of ['empty', 'drafts', 'review']) {
+      assert.deepEqual(show('owner', st), { strong: 'Only you can see this.', text: 'Once an episode is approved, press Make it public when you’re ready.' });
+    }
+    assert.deepEqual(show('owner', 'ready'), { strong: 'Only you can see this.', text: 'It goes public when you press Make it public.' });
+    assert.deepEqual(show('owner', 'pulled', { headline: 'Pulled by an admin: the licence is missing' }), { strong: 'Only you and our team can see this.', text: 'Pulled by an admin: the licence is missing.' });
+    assert.deepEqual(show('owner', 'removal', { headline: 'Removal requested on Nov 3' }), { strong: 'Only you and our team can see this.', text: 'Removal requested on Nov 3.' });
+    assert.deepEqual(show('owner', 'declined', { headline: 'An admin declined this show: wrong rights' }), { strong: 'Only you and our team can see this.', text: 'An admin declined this show: wrong rights. Fix what it needs and resubmit it from your show page.' });
+    assert.equal(show('owner', 'pulled', { headline: 'Pulled by an admin: no licence.' }).text, 'Pulled by an admin: no licence.', 'no second full stop');
+    for (const st of ['empty', 'drafts', 'review', 'ready']) {
+      assert.deepEqual(show('contributor', st), { strong: 'Only the people working on this show can see this.', text: 'Mara makes it public when they’re ready.' });
+      assert.deepEqual(show('team', st), { strong: 'Only Mara Reyes and our team can see this.', text: 'Mara makes it public when they’re ready.' });
+    }
+    for (const st of ['pulled', 'removal', 'declined']) {
+      assert.deepEqual(show('contributor', st, { headline: 'Removal requested on Nov 3' }), { strong: 'Only the people working on this show can see this.', text: 'Removal requested on Nov 3.' });
+      assert.deepEqual(show('team', st, { headline: 'Pulled by an admin' }), { strong: 'Only Mara Reyes and our team can see this.', text: 'Pulled by an admin.' });
+    }
+    assert.deepEqual(show('team', 'review', { ownerName: null }), { strong: 'Only its owner and our team can see this.', text: 'Its owner makes it public when they’re ready.' });
+    assert.equal(show('contributor', 'ready', { ownerName: '' }).text, 'Its owner makes it public when they’re ready.');
+
+    const epi = (role, episodeStatus, extra = {}) => R.previewBarWords({ scope: 'episode', role, state: 'review', showName: 'Harbor Lights', ownerName: 'Mara Reyes', episodeStatus, ...extra });
+    assert.deepEqual(epi('owner', 'pending', { state: 'live' }), { strong: 'Only you can see this page.', text: 'It’s in review. It goes live once it’s approved.' });
+    assert.deepEqual(epi('owner', 'pending', { standalone: true, showName: null }), { strong: 'Only you can see this page.', text: 'It’s in review. It goes live once it’s approved.' });
+    assert.deepEqual(epi('owner', 'pending'), { strong: 'Only you can see this page.', text: 'It’s in review. Once it’s approved, it goes live when Harbor Lights is made public.' });
+    assert.deepEqual(epi('owner', 'approved', { state: 'ready' }), { strong: 'Only you can see this page.', text: 'It’s approved. It goes live when Harbor Lights is made public.' });
+    for (const role of ['owner', 'team']) {
+      assert.deepEqual(epi(role, 'approved', { held: true }), { strong: 'Only you and our team can see this page.', text: 'Pulled while our team looks at it.' });
+      assert.deepEqual(epi(role, 'pending', { removal: true }), { strong: 'Only you and our team can see this page.', text: 'Its removal is requested.' });
+    }
+    assert.equal(epi('owner', 'pending', { held: true, removal: true }).text, 'Pulled while our team looks at it.', 'held first');
+    assert.deepEqual(epi('team', 'pending'), { strong: 'Only the people on this title and our team can see this page.', text: 'It’s in review. Once it’s approved, it goes live when Harbor Lights is made public.' });
+    assert.deepEqual(epi('team', 'approved', { state: 'ready' }), { strong: 'Only the people on this title and our team can see this page.', text: 'It’s approved. It goes live when Harbor Lights is made public.' });
+    // V3's own row, verbatim.
+    assert.equal(R.previewBarWords({ scope: 'show', role: 'owner', state: 'review' }).text, 'Once an episode is approved, press Make it public when you’re ready.');
+    for (const w of [show('owner', 'review'), show('team', 'ready'), epi('owner', 'pending')]) assert.ok(!/'/.test(w.text + w.strong), 'curly apostrophes only');
+  });
+
+  tt('previewRowNote: the pill and the note on a preview row', () => {
+    const now = Date.parse('2026-11-06T12:00:00Z');
+    const at = (h) => new Date(now - h * 3600000).toISOString();
+    assert.deepEqual(R.previewRowNote({ status: 'pending', createdAt: at(0.5) }, now), { pill: 'In review', note: 'sent just now' });
+    assert.deepEqual(R.previewRowNote({ status: 'pending', createdAt: at(3) }, now), { pill: 'In review', note: 'sent 3 h ago' });
+    assert.deepEqual(R.previewRowNote({ status: 'pending', created_at: at(30) }, now), { pill: 'In review', note: 'sent yesterday' });
+    assert.deepEqual(R.previewRowNote({ status: 'pending', createdAt: at(4 * 24 + 2) }, now), { pill: 'In review', note: 'sent 4 days ago' });
+    assert.deepEqual(R.previewRowNote({ status: 'pending' }, now), { pill: 'In review', note: null });
+    assert.deepEqual(R.previewRowNote({ status: 'pending', held: true, createdAt: at(3) }, now), { pill: 'Pulled', note: null }, 'held before pending');
+    assert.deepEqual(R.previewRowNote({ status: 'approved', moderation_hold: true }, now), { pill: 'Pulled', note: null });
+    assert.deepEqual(R.previewRowNote({ status: 'approved', deletionRequested: true }, now), { pill: 'Removal requested', note: null });
+    assert.deepEqual(R.previewRowNote({ status: 'approved', showPublic: false }, now), { pill: 'Approved', note: 'goes public with the show' });
+    assert.equal(R.previewRowNote({ status: 'approved', showPublic: true }, now), null, 'a public approved row has nothing to say');
+    assert.equal(R.previewRowNote({ status: 'approved' }, now), null);
+    assert.equal(R.previewRowNote(null, now), null);
+  });
+
   tt('fileMatches: a re-picked file is the draft\'s own by name and size', () => {
     const f = { name: 'night-bus-s02e04.mov', size: 1234 };
     assert.equal(R.fileMatches(f, { video: { name: 'night-bus-s02e04.mov', bytes: 1234 } }), true);

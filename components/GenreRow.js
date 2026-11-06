@@ -35,7 +35,8 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
     type: 'standalone',
     key: ep.id,
     rank: vc[ep.id] || 0,
-    hasNew: isRecentlyAdded(ep.createdAt),
+    // From when it went public (released_at), not its upload.
+    hasNew: isRecentlyAdded(ep.releasedAt || ep.createdAt),
     ep
   }));
   const seriesCards = seriesIds
@@ -48,16 +49,22 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
       // lightly-watched standalone short, which a per-episode-only
       // comparison wouldn't reflect.
       const rank = eps.reduce((sum, e) => sum + (vc[e.id] || 0), 0);
+      // What viewers see of the show (decision 10): the whole show's
+      // pill, free chip and episode count (lib/showRollups.js, from every
+      // public episode — this row may hold only one of them).
+      const rollup = info.rollup || null;
       return {
-        type: 'series', key: info.id, rank, info, count: eps.length,
-        tier: eps.some((e) => e.tier === 'premium') ? 'premium' : 'free',
+        type: 'series', key: info.id, rank, info, rollup,
+        count: rollup ? rollup.episodeCount : eps.length,
+        tier: rollup ? (rollup.tier === 'free' ? 'free' : 'premium') : (eps.some((e) => e.tier === 'premium') ? 'premium' : 'free'),
         // Ad-free only if every episode is — one ad-supported episode is
         // enough to call the whole show ad-supported.
         adsEnabled: eps.some((e) => e.adsEnabled !== false),
         // True the moment any single episode in the show is within the
         // new-episode window — the whole point is "this show has
-        // something new," not "this show is itself new."
-        hasNew: eps.some((e) => isRecentlyAdded(e.createdAt))
+        // something new," not "this show is itself new." Counted from
+        // released_at, so Make it public (which restarts it) starts it.
+        hasNew: eps.some((e) => isRecentlyAdded(e.releasedAt || e.createdAt))
       };
     })
     .filter(Boolean);
@@ -113,7 +120,20 @@ export default function CategoryRow({ title, episodes, allSeries, currentId, onS
               <div className="ep-thumb">
                 {card.hasNew && <span className="new-episode-banner">New episode</span>}
                 {card.info.thumbnail && <Image src={card.info.thumbnail} alt="" fill sizes={ROW_CARD_SIZES} className="ep-thumb-img" />}
-                <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
+                {card.rollup && card.rollup.tier ? (
+                  <span className="ep-badges">
+                    {card.rollup.tier === 'free' ? (
+                      <span className={`ep-badge ${card.rollup.freeLabel === 'Free' ? 'is-free-noads' : 'is-free-ads'}`}>{card.rollup.freeLabel}</span>
+                    ) : (
+                      <>
+                        <span className="ep-badge is-plus">{card.rollup.tierLabel || 'Tapa +'}</span>
+                        {card.rollup.tier === 'mixed' && card.rollup.freeLabel && <span className="ep-badge free-chip">{card.rollup.freeLabel}</span>}
+                      </>
+                    )}
+                  </span>
+                ) : (
+                  <span className="ep-badge">{tierBadge(card.tier, card.adsEnabled).label}</span>
+                )}
                 {!card.info.thumbnail && '▤ series'}
               </div>
               <div className="ep-info">

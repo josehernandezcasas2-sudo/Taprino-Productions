@@ -1,6 +1,7 @@
 import { getTypeFeedData } from '../../lib/typeFeed';
 import { limitPublicRead } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { getAccountContext } from '../../lib/accountContext';
 
 // The mobile app's equivalent of pages/type/[type].js — public, content-
 // type-scoped browse data (Series, Movies, Shorts, Vertical, Podcasts).
@@ -28,5 +29,8 @@ export default async function handler(req, res) {
   if (!feed) {
     return res.status(404).json({ error: 'Unknown type.' });
   }
-  return res.status(200).json(feed);
+  // Whether the viewer is a member (slice 4: a series hero's Play says
+  // " · free" only to a non-member). False signed out.
+  const isSubscriber = hasSession ? Boolean((await getAccountContext(req)).isSubscriber) : false;
+  return res.status(200).json({ ...feed, isSubscriber });
 }

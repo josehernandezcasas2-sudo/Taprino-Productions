@@ -1053,6 +1053,11 @@ function isPublicEpisode(ep) {
   return !isWithdrawn(ep) && !isHeld(ep) && !removalRequested(ep);
 }
 
+function isInReviewEpisode(ep) {
+  if (!ep || typeof ep !== 'object' || !numberedType(ep)) return false;
+  return statusOf(ep) === 'pending' && !isWithdrawn(ep) && !isHeld(ep) && !removalRequested(ep);
+}
+
 function latestFirst(a, b) {
   const ta = createdAt(a);
   const tb = createdAt(b);
@@ -1152,9 +1157,13 @@ function mixedFreeLabel(eps, free) {
 // the episodes (unrated = 17+; a real rating beats "Not Rated" at the same
 // age; then the most common, then the latest). Only public episodes count:
 // pass the show's episodes and the rest (drafts, in review, declined,
-// pulled, withdrawn, extras) are left out.
+// pulled, withdrawn, extras) are left out. With opts.includeInReview an
+// episode in review counts too (the owner's preview of a show that isn't
+// public yet: V3 reads "Free with ads · TV-14 · 1 season · 1 episode"
+// while its one episode is in review).
 export function showRollup(episodes, show, opts = {}) {
-  const eps = (episodes || []).filter(isPublicEpisode).sort(compareEpisodes);
+  const counts = opts.includeInReview === true ? (e) => isPublicEpisode(e) || isInReviewEpisode(e) : isPublicEpisode;
+  const eps = (episodes || []).filter(counts).sort(compareEpisodes);
   if (!eps.length) {
     return { tier: null, tierLabel: null, freeLabel: null, firstFree: false, freeIds: [], episodeCount: 0, seasonCount: 0, rating: null, minAge: null, mainGenre: null };
   }
@@ -1182,6 +1191,86 @@ export function showRollup(episodes, show, opts = {}) {
     minAge: rating ? rating.minAge : null,
     mainGenre: majority(eps, (e) => text(pick(e, 'mainGenre', 'main_genre')))
   };
+}
+
+// The FREE / TAPA + word on a row of the series page (decision 10, board
+// D10): only in a mixed show; an all-free or all-Tapa + show says it once,
+// in the hero. CSS uppercases it.
+export function rowTierWord(ep, rollup) {
+  if (!rollup || rollup.tier !== 'mixed') return null;
+  return tierOf(ep) === 'free' ? 'Free' : 'Tapa +';
+}
+
+// "S1 E3", or null without a number: the same spelling as episodeCode in
+// lib/seriesResume.js (the Continue Watching card's).
+export function episodeCodeOf(ep) {
+  const n = numberOf(ep);
+  return n ? `S${seasonOf(ep)} E${n}` : null;
+}
+
+function extraParentType(row) {
+  return text(pick(row, 'bonusParentType', 'bonus_parent_type'));
+}
+
+function extraParentId(row) {
+  return text(pick(row, 'bonusParentId', 'bonus_parent_id'));
+}
+
+function shelfOrder(a, b) {
+  const na = numberOf(a);
+  const nb = numberOf(b);
+  if (na !== nb) {
+    if (na === null) return 1;
+    if (nb === null) return -1;
+    return na - nb;
+  }
+  const ta = createdAt(a);
+  const tb = createdAt(b);
+  if (ta !== tb) {
+    if (ta === null) return 1;
+    if (tb === null) return -1;
+    return ta - tb;
+  }
+  const ia = String(a && a.id !== undefined && a.id !== null ? a.id : '');
+  const ib = String(b && b.id !== undefined && b.id !== null ? b.id : '');
+  return ia < ib ? -1 : ia > ib ? 1 : 0;
+}
+
+// The Extras tab of a series page (board V1): the show's own extras first
+// ("With the show"), then one group per episode they hang on, in play
+// order ("After S1 E3 · Transfer"; "After Pilot" without a number).
+// `extras` are content_type 'bonus' rows, `episodes` the show's episodes
+// on the page: an extra whose episode isn't among them is left out
+// (amendment 23 — never moved to "With the show"). Within a group, shelf
+// order (series_order; none last), then the oldest, then the id.
+export function extraGroups(extras, episodes) {
+  const eps = (episodes || []).filter((e) => e && typeof e === 'object' && e.id !== undefined && e.id !== null);
+  const byId = new Map(eps.map((e) => [String(e.id), e]));
+  const show = [];
+  const hung = new Map();
+  for (const x of extras || []) {
+    if (!x || typeof x !== 'object') continue;
+    const type = extraParentType(x);
+    if (type === 'series') {
+      show.push(x);
+      continue;
+    }
+    if (type !== 'episode') continue;
+    const pid = extraParentId(x);
+    if (!pid || !byId.has(pid)) continue;
+    if (!hung.has(pid)) hung.set(pid, []);
+    hung.get(pid).push(x);
+  }
+  const out = [];
+  if (show.length) out.push({ key: 'show', parentId: null, heading: 'With the show', items: [...show].sort(shelfOrder) });
+  const parents = [...hung.keys()].map((pid) => byId.get(pid)).sort(compareEpisodes);
+  for (const parent of parents) {
+    const pid = String(parent.id);
+    const code = episodeCodeOf(parent);
+    const title = titleOf(parent) || 'Untitled';
+    out.push({ key: `episode:${pid}`, parentId: pid, heading: code ? `After ${code} · ${title}` : `After ${title}`, items: [...hung.get(pid)].sort(shelfOrder) });
+  }
+  return out;
 }
 
 // --- a show's defaults ---------------------------------------------------------
@@ -2313,6 +2402,101 @@ export function rowPill(row, ctx = {}) {
   if (st === 'pending') return { label: 'In review', tone: 'review', key: 'review' };
   if (ctx.showPublic === false) return { label: 'Approved', tone: 'ok', key: 'approved' };
   return { label: 'Live', tone: 'ok', key: 'live' };
+}
+
+// --- the owner's preview (decision 2, amendment 5; board V3) ----------------
+
+function sentence(v) {
+  const s = text(v);
+  if (!s) return '';
+  return /[.!?]$/.test(s) ? s : `${s}.`;
+}
+
+function capFirst(s) {
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+}
+
+const OPEN_STATES = ['empty', 'drafts', 'review', 'ready', 'live'];
+
+// The words on the preview bar over a page that isn't public: { strong,
+// text }. scope 'show' | 'episode'; role 'owner' | 'contributor' | 'team'
+// (an owner who is also on the team is 'owner'; on an episode, its
+// uploader counts as 'owner'); state / headline = showState(...).key /
+// .headline (the show's, on an episode too); ownerName = the show owner's
+// display name or null; showName = the show's name; episodeStatus,
+// held and removal (or deletionRequested) the episode's own; standalone =
+// an episode with no show.
+export function previewBarWords(args = {}) {
+  const a = args && typeof args === 'object' ? args : {};
+  const role = a.role === 'team' || a.role === 'contributor' ? a.role : 'owner';
+  const ownerName = text(a.ownerName);
+  const firstWord = ownerName ? ownerName.split(/\s+/)[0] : null;
+  const first = firstWord || 'its owner';
+  if (a.scope === 'episode') {
+    const held = a.held === true;
+    const removal = a.removal === true || a.deletionRequested === true;
+    if (held) return { strong: 'Only you and our team can see this page.', text: 'Pulled while our team looks at it.' };
+    if (removal) return { strong: 'Only you and our team can see this page.', text: 'Its removal is requested.' };
+    const show = text(a.showName);
+    const showPublic = a.standalone === true || !show || a.state === 'live';
+    const status = text(a.episodeStatus);
+    let words;
+    if (status === 'pending') {
+      words = showPublic ? 'It’s in review. It goes live once it’s approved.' : `It’s in review. Once it’s approved, it goes live when ${show} is made public.`;
+    } else if (status === 'approved' && !showPublic) {
+      words = `It’s approved. It goes live when ${show} is made public.`;
+    } else {
+      words = 'It isn’t public yet.';
+    }
+    return {
+      strong: role === 'team' ? 'Only the people on this title and our team can see this page.' : 'Only you can see this page.',
+      text: words
+    };
+  }
+  const state = text(a.state);
+  const trouble = state === 'pulled' || state === 'removal' || state === 'declined';
+  const headlineText = sentence(a.headline);
+  if (role === 'owner') {
+    if (trouble) {
+      return {
+        strong: 'Only you and our team can see this.',
+        text: state === 'declined' ? `${headlineText} Fix what it needs and resubmit it from your show page.`.trim() : headlineText
+      };
+    }
+    if (state === 'ready') return { strong: 'Only you can see this.', text: 'It goes public when you press Make it public.' };
+    return { strong: 'Only you can see this.', text: 'Once an episode is approved, press Make it public when you’re ready.' };
+  }
+  const strong = role === 'contributor'
+    ? 'Only the people working on this show can see this.'
+    : `Only ${ownerName || 'its owner'} and our team can see this.`;
+  if (trouble) return { strong, text: headlineText };
+  return { strong, text: `${capFirst(first)} makes it public when they’re ready.` };
+}
+
+function agoWords(t, now) {
+  const hours = (now - t) / 3600000;
+  if (!(hours >= 0)) return 'just now';
+  if (hours < 1) return 'just now';
+  if (hours < 24) return `${Math.floor(hours)} h ago`;
+  if (hours < 48) return 'yesterday';
+  return `${Math.floor(hours / 24)} days ago`;
+}
+
+// A preview row's pill and note on the series page (V3): "IN REVIEW ·
+// sent 3 h ago", "APPROVED · goes public with the show", "PULLED",
+// "REMOVAL REQUESTED"; null for a row that is simply public. The server
+// calls this and sends the words, so the page and its hydration agree.
+export function previewRowNote(row, now = Date.now()) {
+  if (!row || typeof row !== 'object') return null;
+  if (isHeld(row)) return { pill: 'Pulled', note: null };
+  if (removalRequested(row)) return { pill: 'Removal requested', note: null };
+  const st = statusOf(row);
+  if (st === 'pending') {
+    const t = createdAt(row);
+    return { pill: 'In review', note: t === null ? null : `sent ${agoWords(t, typeof now === 'number' ? now : timeOf(now) || Date.now())}` };
+  }
+  if ((st === 'approved' || st === null) && row.showPublic === false) return { pill: 'Approved', note: 'goes public with the show' };
+  return null;
 }
 
 // Whether a picked file is the one a draft was made from — the same name

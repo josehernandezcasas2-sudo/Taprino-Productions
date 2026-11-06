@@ -82,6 +82,19 @@ function showScreen(path, href) {
   return null;
 }
 
+// The public series and episode screens (the series revamp, slice 4) keep
+// the part of the address that says what to open: ?season=2 opens season
+// 2, ?preview=1 the owner's preview, ?autoplay=1 the player. Anything else
+// in the query is left behind, as on every other route.
+const PUBLIC_TITLE = /^\/(episode|series)\/[^/]+$/;
+const PUBLIC_KEEP = { season: /^\d{1,4}$/, preview: /^1$/, autoplay: /^1$/ };
+
+function keptQuery(href) {
+  const q = queryOf(href);
+  const kept = Object.keys(PUBLIC_KEEP).filter((k) => typeof q[k] === 'string' && PUBLIC_KEEP[k].test(q[k]));
+  return kept.length ? `?${kept.map((k) => `${k}=${enc(q[k])}`).join('&')}` : '';
+}
+
 export function hrefToRoute(href) {
   if (typeof href !== 'string' || !href.startsWith('/')) return null;
   const path = href.split(/[?#]/)[0].replace(/\/$/, '') || '/';
@@ -89,6 +102,7 @@ export function hrefToRoute(href) {
   if (show) return { route: show };
   const target = ALIASES[path] || path;
   if (target === '/') return { route: '/' };
+  if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };
   return { url: `${API_BASE_URL}${href}` };
 }

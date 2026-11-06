@@ -13,10 +13,11 @@ import { PayeeLine } from './PayeeCard';
 
 const STATE_CHIP = { live: 'state-live', ready: 'state-ready', review: 'state-private', drafts: 'state-private', empty: 'state-private', pulled: 'state-pulled', removal: 'state-removal', declined: 'state-declined' };
 
-// The private preview of a show or an episode page (?preview=1) is the
-// series revamp's slice 4; until it is built the preview links stay hidden
-// (they led to a 404 for the owner). EpisodeEditor reads the same flag.
-export const PREVIEW_BUILT = false;
+// The private preview of a show or an episode page (?preview=1), built in
+// the series revamp's slice 4: the owner, anyone with an episode in the
+// show and the team see the page under a preview bar. EpisodeEditor reads
+// the same flag.
+export const PREVIEW_BUILT = true;
 
 export function publicHref(show, preview = false) {
   const base = show.kind === 'podcast' ? `/podcasts/${encodeURIComponent(show.id)}` : `/series/${encodeURIComponent(show.id)}`;

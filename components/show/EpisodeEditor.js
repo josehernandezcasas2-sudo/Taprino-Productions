@@ -939,7 +939,10 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
             <FieldHead htmlFor="ep-notes" label="Notes" hint=" blank lines make paragraphs" count={form.pageNotes.length} max={notesMax} />
             <textarea id="ep-notes" className="show-ed-textarea" rows={6} value={form.pageNotes} maxLength={notesMax} disabled={!has118 || !isOpen(pol('pageNotes'))} placeholder="How it was made, who’s in it, the story behind a scene." onChange={(e) => set('pageNotes', e.target.value)} />
             <FieldNote policy={pol('pageNotes')} edited={edited('pageNotes')} />
-            {(viewable || PREVIEW_BUILT) && <a className="show-ed-mini is-link" href={`/episode/${encodeURIComponent(ep.id)}${viewable ? '' : '?preview=1'}`} target="_blank" rel="noreferrer"><ExternalLinkIcon size={12} /> {viewable ? 'Open page' : 'Preview page'}</a>}
+            {/* "Open page" once it's live; before that its preview (slice 4) —
+                an episode in review, approved in a private show, or pulled;
+                never a declined or withdrawn one (nothing to preview). */}
+            {(viewable || (PREVIEW_BUILT && ep.status !== 'rejected' && !ep.withdrawnAt)) && <a className="show-ed-mini is-link" href={`/episode/${encodeURIComponent(ep.id)}${viewable ? '' : '?preview=1'}`} target="_blank" rel="noreferrer"><ExternalLinkIcon size={12} /> {viewable ? 'Open page' : 'Preview page'}</a>}
           </div>
         )}
         {!has118 && <p className="show-ed-line locked">Needs a database update (migration 118).</p>}

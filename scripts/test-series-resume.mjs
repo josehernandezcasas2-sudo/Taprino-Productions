@@ -314,10 +314,54 @@ t('the words agree between the copies', () => {
   for (const r of resumes) {
     assert.equal(app.seriesPlayLabel(r), web.seriesPlayLabel(r));
     assert.equal(app.seriesPlayLabel(r, 'Play S1 E1'), web.seriesPlayLabel(r, 'Play S1 E1'));
+    assert.equal(app.seriesPlayLabel(r, 'Play S1 E1', { free: true }), web.seriesPlayLabel(r, 'Play S1 E1', { free: true }));
     assert.equal(app.episodeCode(r), web.episodeCode(r));
   }
   const heroes = [null, {}, { firstEpisodeId: 'e1' }, { resume: { episodeId: 'e3' }, firstEpisodeId: 'e1' }, { resume: {} }];
   for (const h of heroes) assert.equal(app.seriesPlayEpisodeId(h), web.seriesPlayEpisodeId(h));
+});
+
+t('every resume point says whether the episode it opens is free', () => {
+  const mixed = [ep('e1', 1, 1, { tier: 'free' }), ep('e2', 1, 2, { tier: 'premium' }), ep('e3', 1, 3, { tier: 'free' })];
+  assert.equal(seriesResumePoint(mixed, null).tier, 'free');
+  assert.equal(seriesResumePoint(mixed, { progress: { e2: 40 }, watched: new Set() }).tier, 'premium');
+  assert.equal(seriesResumePoint(mixed, { progress: {}, watched: new Set(['e2']) }).tier, 'free');
+  assert.equal(seriesResumePoint([ep('x', 1, 1)], null).tier, 'free', 'no tier reads as free');
+});
+
+t('the " · free" on a non-member\'s Play (decision 10)', () => {
+  const mixed = { tier: 'mixed', firstFree: true };
+  const first = { state: 'first', season: 1, seriesOrder: 1, tier: 'free' };
+  const nextFree = { state: 'next', season: 1, seriesOrder: 2, tier: 'free' };
+  const nextPaid = { state: 'next', season: 1, seriesOrder: 2, tier: 'premium' };
+  const resumeFree = { state: 'resume', season: 1, seriesOrder: 2, tier: 'free' };
+  for (const R of [web, app]) {
+    // first
+    assert.equal(R.freePlayNote({ resume: first, rollup: mixed }), true);
+    assert.equal(R.seriesPlayLabel(first, 'Play S1 E1', { free: true }), 'Play S1 E1 · free');
+    // next on a free S1 E2
+    assert.equal(R.freePlayNote({ resume: nextFree, rollup: mixed }), true);
+    assert.equal(R.seriesPlayLabel(nextFree, 'Play S1 E1', { free: true }), 'Play S1 E2 · free');
+    assert.equal(R.freePlayNote({ resume: nextPaid, rollup: mixed }), false);
+    assert.equal(R.seriesPlayLabel(nextPaid, 'Play S1 E1', { free: false }), 'Play S1 E2');
+    // resume: never
+    assert.equal(R.freePlayNote({ resume: resumeFree, rollup: mixed }), false);
+    assert.equal(R.seriesPlayLabel(resumeFree, 'Play S1 E1', { free: true }), 'Continue S1 E2', 'already watching');
+    // all-free and all-Tapa + shows: no note
+    assert.equal(R.freePlayNote({ resume: first, rollup: { tier: 'free', firstFree: true } }), false);
+    assert.equal(R.freePlayNote({ resume: first, rollup: { tier: 'premium', firstFree: false } }), false);
+    assert.equal(R.freePlayNote({ resume: first, rollup: null }), false);
+    // a member, a bundle owner
+    assert.equal(R.freePlayNote({ resume: first, rollup: mixed, isMember: true }), false);
+    assert.equal(R.freePlayNote({ resume: first, rollup: mixed, ownsSeries: true }), false);
+    // a signed-out hero with no resume
+    assert.equal(R.freePlayNote({ resume: null, rollup: mixed }), true);
+    assert.equal(R.freePlayNote({ resume: null, rollup: { tier: 'mixed', firstFree: false } }), false);
+    assert.equal(R.seriesPlayLabel(null, 'Play first episode', { free: true }), 'Play first episode · free');
+    assert.equal(R.seriesPlayLabel(null, undefined, { free: true }), 'Play first episode · free');
+    assert.equal(R.seriesPlayLabel(null), 'Play first episode');
+    assert.equal(R.freePlayNote(), false);
+  }
 });
 
 console.log(`\n${n} series-resume checks passed${showRules ? ' (lib/showRules.js compareEpisodes checked too)' : ''}`);

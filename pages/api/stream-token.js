@@ -50,7 +50,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { episodeId, seriesId, part } = req.body || {};
+  const { episodeId, seriesId, part, preview } = req.body || {};
   if (part === 'trailer') return trailerToken(req, res, { episodeId, seriesId });
   if (part !== undefined && part !== null && part !== 'main') {
     return res.status(400).json({ error: 'part must be "main" or "trailer".' });
@@ -72,9 +72,13 @@ export default async function handler(req, res) {
   // cache keep one.
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
 
-  const gate = await playbackGate(req, episodeId);
+  // preview: true — the owner's private preview of an episode that isn't
+  // live (slice 4; lib/playbackGate.js): its uploader, the show's owner and
+  // the team, on the same budget.
+  const gate = await playbackGate(req, episodeId, { preview: preview === true });
   if (gate.denied) return res.status(gate.denied.status).json(gate.denied.body);
   const { episode, owned } = gate;
+  const previewFlag = gate.preview === true ? { preview: true } : {};
 
   if (!episode.src) {
     return res.status(404).json({ error: 'No video attached to this episode.' });
@@ -88,10 +92,10 @@ export default async function handler(req, res) {
     // permanent address (lib/videoSigning.js unsignedFallback).
     const fallback = unsignedFallback(episode.src);
     if (!fallback) return res.status(503).json({ error: 'Playback is having a moment — try again shortly.' });
-    return res.status(200).json({ src: fallback, signed: false });
+    return res.status(200).json({ src: fallback, signed: false, ...previewFlag });
   }
 
-  return res.status(200).json({ src: signed.src, expiresAt: signed.expiresAt, signed: true, owned });
+  return res.status(200).json({ src: signed.src, expiresAt: signed.expiresAt, signed: true, owned, ...previewFlag });
 }
 
 // The trailer half (see the top of the file). Answers { src, expiresAt,

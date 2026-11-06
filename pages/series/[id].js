@@ -2,21 +2,29 @@ import { useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/router';
 import BackButton from '../../components/BackButton';
 import { getSeriesHubData } from '../../lib/seriesHub';
 import { useWishlist } from '../../lib/useWishlist';
 import HeaderNav from '../../components/HeaderNav';
 import SeriesHero from '../../components/SeriesHero';
 import MobileTabBar from '../../components/MobileTabBar';
+import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
 import { PlayIcon, LockIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
-import { SITE } from '../../lib/siteConfig';
+import { ChevronIcon } from '../../components/show/roomBits';
+import { SITE, absoluteSiteUrl } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
-import { formatRuntimeLong } from '../../lib/videoMetadata';
-import { seriesPlayLabel, episodeCode, sortEpisodes } from '../../lib/seriesResume';
-import { BundleCard, BuyChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
+import { parseRuntimeToSeconds } from '../../lib/videoMetadata';
+import { seriesPlayLabel, freePlayNote, episodeCode } from '../../lib/seriesResume';
+import { rowTierWord, episodeCodeOf } from '../../lib/showRules';
+import { BundleCard, BuyChip, OwnedChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
 
 import Footer from '../../components/Footer';
+
 export async function getServerSideProps({ req, params, res, query }) {
+  // ?preview=1: the owner's private preview of a show that isn't public
+  // (decision 2, amendment 5; slice 4) — never cached, whatever comes back.
+  const preview = query.preview === '1';
   // CDN caching, but ONLY for signed-out visitors.
   //
   // This page returns per-user props (email, wishlist, isAdmin,
@@ -31,7 +39,9 @@ export async function getServerSideProps({ req, params, res, query }) {
   // exposure. The Vary header is what keeps the two populations in
   // separate cache entries.
   const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
-  if (hasSession) {
+  if (preview) {
+    res.setHeader('Cache-Control', 'private, no-store');
+  } else if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
@@ -39,12 +49,12 @@ export async function getServerSideProps({ req, params, res, query }) {
   }
 
   // ?season=2 opens that season's tab (lib/seriesHub.js answers `season`).
-  const data = await getSeriesHubData(params.id, req, { season: typeof query.season === 'string' ? query.season : null });
+  const data = await getSeriesHubData(params.id, req, { season: typeof query.season === 'string' ? query.season : null, preview });
   if (!data) {
     return { notFound: true };
   }
   // A podcast lives at /podcasts/<id> (the series revamp: a show's kind),
-  // with whatever the link carried (?bought=, ...).
+  // with whatever the link carried (?bought=, ?preview=1, ...).
   if (data.redirect) {
     const rest = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
@@ -59,23 +69,105 @@ export async function getServerSideProps({ req, params, res, query }) {
   return { props: { ...data, bought: typeof query.bought === 'string' ? query.bought : null } };
 }
 
-export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, bonusContent, mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true, resume = null, heroTrailer = null, season = null }) {
+// "23 min" from a "23:00" runtime (the episode page's spelling).
+function minutesLabel(runtime) {
+  const s = parseRuntimeToSeconds(runtime);
+  return s ? `${Math.max(1, Math.round(s / 60))} min` : (runtime || '');
+}
+
+function seasonNumberOf(e) {
+  return Number.isInteger(Number(e.season)) && Number(e.season) > 0 ? Number(e.season) : 1;
+}
+
+// One episode on the series page (board V1; slice 4): the art with a play
+// (or a lock) disc, the code with its FREE / TAPA + word in a mixed show,
+// the title and the runtime, its own description, then Buy / Owned on the
+// left and "Details" on the right when the episode has its own page. In a
+// preview the foot carries the row's state instead ("IN REVIEW · sent 3 h
+// ago"), and a contributor's row for someone else's episode isn't a link.
+function EpisodeRow({ ep, rollup, offer, locked, preview, onBuy, buyBusy, iconOverrides }) {
+  const code = episodeCodeOf(ep) || `Season ${seasonNumberOf(ep)}`;
+  const word = rowTierWord(ep, rollup);
+  const href = `/episode/${encodeURIComponent(ep.id)}?autoplay=1${preview ? '&preview=1' : ''}`;
+  const openable = !preview || ep.canOpen !== false;
+  const label = `${code}, ${ep.title}${locked ? ', locked' : ''}`;
+  const inner = (
+    <>
+      <span className={`spg-thumb ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
+        {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 899px) 120px, 176px" className="spg-thumb-img" />}
+        {/* No play disc on a row this viewer can't open (a preview). */}
+        {openable && (
+          <span className="spg-disc" aria-hidden="true">
+            {locked ? <LockIcon size={13} src={iconOverrides.admin_lock} /> : <PlayIcon size={13} src={iconOverrides.play} />}
+          </span>
+        )}
+      </span>
+      <span className="spg-head">
+        <span className="spg-code-line">
+          <span className="spg-code">{code}</span>
+          {word && <span className={`spg-tierword ${word === 'Free' ? 'is-free' : 'is-plus'}`}>{word}</span>}
+        </span>
+        <span className="spg-title">{ep.title}</span>
+        {ep.runtime && <span className="spg-runtime">{minutesLabel(ep.runtime)}</span>}
+      </span>
+      {ep.desc && <span className="spg-desc">{ep.desc}</span>}
+    </>
+  );
+  const owned = Boolean(offer && offer.owned);
+  return (
+    <div className="spg-row" data-episode={ep.id}>
+      {openable ? (
+        <Link href={href} className="spg-top" aria-label={label}>{inner}</Link>
+      ) : (
+        <div className="spg-top is-static">{inner}</div>
+      )}
+      <div className="spg-foot">
+        {preview ? (
+          ep.previewNote ? (
+            <span className="spg-note">
+              <span className="pvbar-pill">{ep.previewNote.pill}</span>
+              {ep.previewNote.note && <span className="spg-note-text">{ep.previewNote.note}</span>}
+            </span>
+          ) : <span />
+        ) : (
+          <span className="spg-foot-left">
+            {owned ? <OwnedChip small /> : <BuyChip offer={offer} onBuy={onBuy} busy={buyBusy} />}
+          </span>
+        )}
+        {ep.hasPage && openable && (
+          <Link href={`/episode/${encodeURIComponent(ep.id)}${preview ? '?preview=1' : ''}`} className="spg-details" aria-label={`Details: ${ep.title} has its own page`}>
+            Details <ChevronIcon size={14} />
+          </Link>
+        )}
+      </div>
+    </div>
+  );
+}
+
+export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishlist, email, seriesEpisodes, extraGroups = [], mainGenres, isAdmin, isCreator, crewCalls = [], crew = [], shotAt = [], bundle = null, episodeOffers = {}, bought = null, aiSeal = true, resume = null, heroTrailer = null, season = null, rollup = null, credits = [], year = null, seasons = [], preview = null }) {
+  const router = useRouter();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const iconOverrides = usePlayerIconOverrides();
   const { buy: buyTitle, busy: buyBusy, error: buyError } = useBuyTitle({ isSignedIn });
   const ownsEp = (ep) => Boolean(episodeOffers[ep.id] && episodeOffers[ep.id].owned);
+  const previewing = Boolean(preview);
 
   // Group by season — episodes without an explicit season are in season 1
-  // (the sorter's rule), so existing single-season series don't need
-  // every episode retagged.
-  const seasonOf = (e) => (Number.isInteger(Number(e.season)) && Number(e.season) > 0 ? Number(e.season) : 1);
-  const seasonNumbers = [...new Set(seriesEpisodes.map(seasonOf))].sort((a, b) => a - b);
+  // (the sorter's rule). The server sends them in play order.
+  const seasonNumbers = [...new Set(seriesEpisodes.map(seasonNumberOf))].sort((a, b) => a - b);
+  const seasonList = seasonNumbers.map((n) => (seasons.find((s) => s.number === n) || { number: n, label: `Season ${n}` }));
   // The season the link asked for (?season=, checked by lib/seriesHub.js).
   const [activeSeason, setActiveSeason] = useState(seasonNumbers.includes(season) ? season : (seasonNumbers[0] || 1));
   const [activeTab, setActiveTab] = useState('episodes');
+  const activeSeasonEpisodes = seriesEpisodes.filter((e) => seasonNumberOf(e) === activeSeason);
+  const activeLabel = (seasonList.find((s) => s.number === activeSeason) || { label: `Season ${activeSeason}` }).label;
 
-  // Play order, the one sorter (lib/seriesResume.js).
-  const activeSeasonEpisodes = sortEpisodes(seriesEpisodes.filter((e) => seasonOf(e) === activeSeason));
+  // A season tab writes ?season= (no reload), so a shared link and a
+  // reload open the same season.
+  function pickSeason(n) {
+    setActiveSeason(n);
+    router.replace({ pathname: router.pathname, query: { ...router.query, season: String(n) } }, undefined, { shallow: true, scroll: false });
+  }
 
   // The hero's trailer: the show's own, else its first episode's, signed
   // by lib/seriesHub.js (heroTrailer = { src, expiresAt, ref }; src null
@@ -85,34 +177,64 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
   // heroImage (series-level or from the rep episode) always wins over
   // video when present.
   const heroEpisode = seriesEpisodes[0];
-  // SECURITY: a trailer only, never the full episode's real src — this
-  // hero is visible to everyone browsing the series page, subscribed or
-  // not; entitlement is only checked once someone actually clicks into an
-  // episode page.
+  // SECURITY: a trailer only, never the full episode's real src.
   const heroImage = seriesInfo.heroImage || (heroEpisode && heroEpisode.heroImage);
-  // The artwork stands in for a trailer while its link loads or when it
-  // can't play; a show with no trailer keeps the gradient it always had.
   const heroFallbackImage = heroTrailer ? (seriesInfo.thumbnail || seriesInfo.poster || (heroEpisode && (heroEpisode.thumbnail || heroEpisode.poster)) || null) : null;
 
-  // About tab content — genre/rating aren't series-level fields (only
-  // episodes carry them), so they're derived from what's actually in this
-  // show rather than left blank. Genre is every distinct genre across the
-  // show's own episodes, not the sitewide list used for header nav.
+  // About: the genre labels across the show's own episodes.
   const seriesGenres = [...new Set(seriesEpisodes.map((e) => e.genre).filter(Boolean))];
-  const representativeRating = seriesEpisodes.find((e) => e.rating)?.rating;
-  const seriesArtist = seriesInfo.artist || heroEpisode?.artist;
   const isOriginal = seriesInfo.isOriginal || seriesEpisodes.some((e) => e.isOriginal);
+  const makerLine = (credits || []).find((c) => c.key === 'maker') || null;
+  // What the bundle card calls the maker: the first name when the line is
+  // an account's, else the whole line.
+  const makerShort = makerLine ? (makerLine.href ? makerLine.name.split(/\s+/)[0] : makerLine.name) : null;
+  const ownsSeries = Boolean(bundle && bundle.owned);
+  const episodeCount = rollup ? rollup.episodeCount : seriesEpisodes.length;
+  const seasonCount = rollup ? rollup.seasonCount : seasonNumbers.length;
+
   // Play: the first episode before the viewer has started the show, the
-  // episode they're on once they have (lib/seriesResume.js; the episode
-  // page resumes at the saved position by itself).
-  const playEpisodeId = (resume && resume.episodeId) || (heroEpisode && heroEpisode.id) || null;
-  const playLabel = seriesPlayLabel(resume, heroEpisode && episodeCode(heroEpisode) ? `Play ${episodeCode(heroEpisode)}` : 'Play first episode');
+  // episode they're on once they have (lib/seriesResume.js), " · free" for
+  // a non-member when that episode is free in a mixed show (decision 10).
+  // A preview plays the first episode in preview.
+  // In a preview it is the first episode this viewer may open (a
+  // contributor opens only their own), and no Play when there is none.
+  let playLabel = null;
+  let playHref = null;
+  if (previewing) {
+    const firstOpen = seriesEpisodes.find((e) => e.canOpen !== false) || null;
+    if (firstOpen) {
+      playLabel = `Preview ${episodeCode(firstOpen) || 'first episode'}`;
+      playHref = `/episode/${encodeURIComponent(firstOpen.id)}?preview=1&autoplay=1`;
+    }
+  } else if (heroEpisode) {
+    const firstLabel = episodeCode(heroEpisode) ? `Play ${episodeCode(heroEpisode)}` : 'Play first episode';
+    playLabel = seriesPlayLabel(resume, firstLabel, { free: freePlayNote({ resume, rollup, isMember: isSubscriber, ownsSeries }) });
+    playHref = `/episode/${encodeURIComponent((resume && resume.episodeId) || heroEpisode.id)}?autoplay=1`;
+  }
+
+  // Link previews (row 8 of the slice 4 contract's table): landscape art.
+  const ogImage = absoluteSiteUrl(seriesInfo.thumbnail) || absoluteSiteUrl(seriesInfo.poster) || absoluteSiteUrl(heroImage) || absoluteSiteUrl('/og-image.png');
+  const ogDescription = (seriesInfo.desc || '').slice(0, 200);
+  const extrasTotal = extraGroups.reduce((n, g) => n + g.items.length, 0);
 
   return (
     <>
       <Head>
         <title>{`${seriesInfo.name} — ${SITE.name}`}</title>
-        <meta name="description" content={seriesInfo.desc} />
+        <meta name="description" content={seriesInfo.desc || ''} />
+        {previewing ? (
+          <meta name="robots" content="noindex, nofollow" />
+        ) : (
+          <>
+            <meta property="og:title" content={seriesInfo.name} />
+            <meta property="og:description" content={ogDescription} />
+            <meta property="og:image" content={ogImage} />
+            <meta property="og:type" content="video.tv_show" />
+            <meta name="twitter:card" content="summary_large_image" />
+            <meta name="twitter:title" content={seriesInfo.name} />
+            <meta name="twitter:image" content={ogImage} />
+          </>
+        )}
       </Head>
 
       <HeaderNav
@@ -126,6 +248,8 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         isSubscriber={isSubscriber}
       />
 
+      <PreviewBar preview={preview} />
+
       <SeriesHero
         title={seriesInfo.name}
         titleImageUrl={seriesInfo.titleImageUrl}
@@ -136,104 +260,116 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
         fallbackImageSrc={heroFallbackImage}
         imageSrc={heroImage}
         playLabel={playLabel}
-        onPlay={() => { if (playEpisodeId) window.location.href = `/episode/${playEpisodeId}?autoplay=1`; }}
+        onPlay={playHref ? () => { window.location.href = playHref; } : null}
         tierLabel={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).label : null}
         tierKey={heroEpisode ? tierBadge(heroEpisode.tier, heroEpisode.adsEnabled).key : null}
-        episodeCount={seriesEpisodes.length}
-        seasonCount={seasonNumbers.length}
-        artist={seriesArtist}
+        rollup={rollup}
+        credits={credits}
+        year={year}
+        episodeCount={episodeCount}
+        seasonCount={seasonCount}
+        artist={heroEpisode ? heroEpisode.artist : null}
         isOriginal={isOriginal}
         isSaved={isWishlisted(seriesInfo.id)}
-        onToggleSave={() => toggleWishlist(seriesInfo.id)}
+        onToggleSave={previewing ? null : () => toggleWishlist(seriesInfo.id)}
         aiSeal={aiSeal}
       />
 
-      <main className="library-stage">
+      <main className="library-stage spg-stage">
         <BackButton fallbackHref="/stream" />
 
         <BoughtBanner bought={bought} title={bought && bought !== 'cancelled' && bundle && bundle.owned ? `${seriesInfo.name} (the whole series)` : seriesInfo.name} email={email} />
-        {bundle && bundle.owned && (
+        {ownsSeries && (
           <p className="own-fine" style={{ margin: '0.8rem 0 1rem' }}>You own this series: every episode plays ad-free, including ones added later.</p>
         )}
-        <BundleCard
-          bundle={bundle}
-          series={seriesInfo}
-          creatorName={seriesArtist}
-          isSignedIn={isSignedIn}
-          isSubscriber={isSubscriber}
-          episodeTitles={Object.fromEntries(seriesEpisodes.map((e) => [e.id, e.seriesOrder ? `Episode ${e.seriesOrder}` : e.title]))}
-        />
+        {!previewing && (
+          <BundleCard
+            bundle={bundle}
+            series={seriesInfo}
+            creatorName={makerShort}
+            isSignedIn={isSignedIn}
+            ownedCodes={Object.fromEntries(seriesEpisodes.map((e) => [e.id, episodeCodeOf(e) || e.title]))}
+          />
+        )}
         {buyError && <p className="own-error">{buyError}</p>}
 
-        <div className="series-tabs">
-          <button className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>
-          {bonusContent.length > 0 && (
-            <button className={`series-tab ${activeTab === 'bonus' ? 'on' : ''}`} onClick={() => setActiveTab('bonus')}>Bonus Content</button>
+        {/* Plain toggle buttons (aria-pressed, like the season chips): a
+            tablist role promises arrow keys and panels this row doesn't have. */}
+        <div className="series-tabs spg-tabs">
+          <button type="button" aria-pressed={activeTab === 'episodes'} className={`series-tab ${activeTab === 'episodes' ? 'on' : ''}`} onClick={() => setActiveTab('episodes')}>Episodes</button>
+          {extrasTotal > 0 && (
+            <button type="button" aria-pressed={activeTab === 'extras'} className={`series-tab ${activeTab === 'extras' ? 'on' : ''}`} onClick={() => setActiveTab('extras')}>Extras</button>
           )}
-          <button className={`series-tab ${activeTab === 'about' ? 'on' : ''}`} onClick={() => setActiveTab('about')}>About</button>
+          <button type="button" aria-pressed={activeTab === 'about'} className={`series-tab ${activeTab === 'about' ? 'on' : ''}`} onClick={() => setActiveTab('about')}>About</button>
         </div>
 
         {activeTab === 'episodes' && (
           seriesEpisodes.length === 0 ? (
-            <div className="poster-empty">Nothing published in this series yet — check back soon.</div>
+            <div className="poster-empty">{previewing ? 'No episodes here yet. Episodes you send for review show up here.' : 'Nothing published in this series yet — check back soon.'}</div>
           ) : (
             <>
-              {seasonNumbers.length > 1 && (
-                <div className="season-tabs">
-                  {seasonNumbers.map((num) => (
+              {seasonList.length > 1 ? (
+                <div className="season-tabs spg-seasons">
+                  {seasonList.map((s) => (
                     <button
-                      key={num}
-                      className={`season-tab ${num === activeSeason ? 'active' : ''}`}
-                      onClick={() => setActiveSeason(num)}
+                      key={s.number}
+                      type="button"
+                      className={`season-tab ${s.number === activeSeason ? 'active' : ''}`}
+                      aria-pressed={s.number === activeSeason}
+                      onClick={() => pickSeason(s.number)}
                     >
-                      Season {num}
+                      {s.label}
                     </button>
                   ))}
                 </div>
+              ) : (
+                <div className="series-season-heading">{activeLabel}</div>
               )}
-              {seasonNumbers.length <= 1 && <div className="series-season-heading">Season {activeSeason}</div>}
 
-              <div className="episode-list">
+              <div className="spg-list">
                 {activeSeasonEpisodes.map((ep) => (
-                  <div key={ep.id} className="episode-row">
-                    <Link href={`/episode/${ep.id}?autoplay=1`} className={`episode-row-link ${tierBadge(ep.tier, ep.adsEnabled).key}`}>
-                      <div className="episode-row-thumb">
-                        {ep.thumbnail && <Image src={ep.thumbnail} alt="" fill sizes="(max-width: 640px) 40vw, 200px" className="ep-thumb-img" />}
-                        <span className="episode-row-badge">{tierBadge(ep.tier, ep.adsEnabled).label}</span>
-                        {!ep.thumbnail && (ep.tier === 'premium' && !isSubscriber && !ownsEp(ep) ? <><LockIcon size={13} src={iconOverrides.admin_lock} /> locked</> : <><PlayIcon size={13} src={iconOverrides.play} /> {ownsEp(ep) ? 'yours' : 'preview'}</>)}
-                      </div>
-                      <div className="episode-row-info">
-                        <h4>{ep.title}</h4>
-                        <div className="episode-row-meta">
-                          <span>{ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : `Season ${ep.season || 1}`}</span>
-                          {ep.runtime && <span>{formatRuntimeLong(ep.runtime) || ep.runtime}</span>}
-                          {ep.rating && <span className="meta-pill">{ep.rating}</span>}
-                          {ep.hasAudioDescription && <span className="meta-pill" title="Audio description available">AD</span>}
-                          {ep.hasCaptions && <span className="meta-pill" title="Captions available">CC</span>}
-                        </div>
-                        <p>{ep.desc}</p>
-                      </div>
-                    </Link>
-                    {/* Buy to own: the episode's own price, or Owned. A
-                        bought series covers every episode. */}
-                    <BuyChip offer={episodeOffers[ep.id]} onBuy={() => buyTitle('episode', ep.id)} busy={buyBusy} />
-                  </div>
+                  <EpisodeRow
+                    key={ep.id}
+                    ep={ep}
+                    rollup={rollup}
+                    offer={episodeOffers[ep.id]}
+                    locked={ep.tier === 'premium' && !isSubscriber && !ownsEp(ep) && !ownsSeries && !previewing}
+                    preview={previewing}
+                    onBuy={() => buyTitle('episode', ep.id)}
+                    buyBusy={buyBusy}
+                    iconOverrides={iconOverrides}
+                  />
                 ))}
               </div>
             </>
           )
         )}
 
-        {activeTab === 'bonus' && (
-          <div className="series-bonus-grid">
-            {bonusContent.map((b) => (
-              <Link key={b.id} href={`/episode/${b.id}?autoplay=1`} className="series-bonus-card">
-                <div className="series-bonus-thumb">
-                  {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="200px" />}
+        {activeTab === 'extras' && (
+          <div className="spg-extras">
+            {extraGroups.map((g) => (
+              <section key={g.key} className="spg-extra-group" aria-label={g.heading}>
+                <h3 className="spg-extra-heading">{g.heading}</h3>
+                <div className="spg-extra-grid">
+                  {g.items.map((x) => {
+                    const inner = (
+                      <>
+                        <span className="spg-extra-art">
+                          {x.thumbnail && <Image src={x.thumbnail} alt="" fill sizes="(max-width: 639px) 46vw, (max-width: 899px) 30vw, 220px" className="spg-thumb-img" />}
+                        </span>
+                        <span className="spg-extra-title">{x.title}</span>
+                        <span className="spg-extra-meta">{x.runtime ? `Extra · ${minutesLabel(x.runtime)}` : 'Extra'}</span>
+                      </>
+                    );
+                    // In a preview, someone else's extra isn't a link (as the rows).
+                    return previewing && x.canOpen === false ? (
+                      <div key={x.id} className="spg-extra-card is-static">{inner}</div>
+                    ) : (
+                      <Link key={x.id} href={`/episode/${encodeURIComponent(x.id)}${previewing ? '?preview=1' : ''}`} className="spg-extra-card">{inner}</Link>
+                    );
+                  })}
                 </div>
-                <h6>{b.title}</h6>
-                <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
-              </Link>
+              </section>
             ))}
           </div>
         )}
@@ -256,9 +392,25 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
               <div className="label">Genre</div>
               <div className="value">{seriesGenres.length > 0 ? seriesGenres.join(', ') : '—'}</div>
             </div>
+            {(credits || []).map((c) => (
+              <div key={c.key} className="series-about-box">
+                <div className="label">{c.key === 'maker' ? c.label : c.key === 'studio' ? 'Studio' : 'Producer'}</div>
+                <div className="value">{c.href ? <Link href={c.href}>{c.name}</Link> : c.name}</div>
+              </div>
+            ))}
+            {year && (
+              <div className="series-about-box">
+                <div className="label">Year</div>
+                <div className="value">{year}</div>
+              </div>
+            )}
             <div className="series-about-box">
-              <div className="label">Creator</div>
-              <div className="value">{seriesArtist || '—'}</div>
+              <div className="label">Rating</div>
+              <div className="value">{rollup && rollup.rating && rollup.rating !== 'Not Rated' ? rollup.rating : 'Not rated'}</div>
+            </div>
+            <div className="series-about-box">
+              <div className="label">Episodes</div>
+              <div className="value">{episodeCount} across {seasonCount} season{seasonCount === 1 ? '' : 's'}</div>
             </div>
             {shotAt.length > 0 && (
               <div className="series-about-box">
@@ -272,16 +424,10 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                 <div className="value">{crew.map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small style={{ color: 'var(--ink-faint)' }}>({c.role})</small></span>)}</div>
               </div>
             )}
-            <div className="series-about-box">
-              <div className="label">Rating</div>
-              <div className="value">{representativeRating || 'Not rated'}</div>
-            </div>
-            <div className="series-about-box">
-              <div className="label">Episodes</div>
-              <div className="value">{seriesEpisodes.length} across {seasonNumbers.length} season{seasonNumbers.length === 1 ? '' : 's'}</div>
-            </div>
           </div>
         )}
+
+        {previewing && <PreviewFootnote />}
       </main>
       <Footer />
       <MobileTabBar />

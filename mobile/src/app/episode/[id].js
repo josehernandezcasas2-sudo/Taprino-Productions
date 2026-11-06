@@ -10,13 +10,16 @@ import { apiGet, apiPost } from '../../lib/api';
 import { readViewingTerms, saveViewingTerms, withTerms, TERMS_URL } from '../../lib/viewingTerms';
 import { advisoryFor, useContentRatings } from '../../lib/contentAdvisory';
 import ContentAdvisory from '../../components/ContentAdvisory';
-import { colors, fonts, absoluteFill } from '../../lib/theme';
+import { colors, fonts, absoluteFill, inkTint, oliveTint } from '../../lib/theme';
 import { parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { episodeCode } from '../../lib/seriesResume';
+import { episodeHasPage } from '../../lib/showRules';
+import { CONTACT_EMAIL } from '../../lib/suspensionRules';
+import PreviewBar, { PreviewFootnote, openSiteHref } from '../../components/PreviewBar';
 import { endCardFor } from '../../lib/endCardRules';
 import TopNav from '../../components/TopNav';
 import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
@@ -36,6 +39,29 @@ const MIN_AGE_BY_RATING = { G: 0, 'TV-Y': 0, 'TV-G': 0, PG: 0, 'TV-PG': 0, 'TV-Y
 
 function withTimeout(promise, ms) {
   return Promise.race([promise, new Promise((resolve) => setTimeout(() => resolve(null), ms))]);
+}
+
+const enc = (x) => encodeURIComponent(String(x));
+
+// A token colour at an alpha (the landing strip's tag and button over the
+// still: the show pages' color-mix habit).
+function tint(hex, a) {
+  const n = parseInt(String(hex).slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
+}
+
+// A title that opens on the V2 landing when it has its own page (decision
+// 11, board V2): an episode of a show (or a podcast's), or an extra. Films
+// and shorts keep their hero landing (question 1 of slice 4). The same
+// test as the website's ownPageLayout.
+function opensOnOwnPage(ep) {
+  if (!ep) return false;
+  return ep.contentType === 'bonus' || ((ep.contentType === 'series' || ep.contentType === 'podcast') && Boolean(ep.seriesId));
+}
+
+// The notes' paragraphs: a blank line starts a new one.
+function paragraphs(text) {
+  return String(text || '').split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
 }
 
 // "22 min" from a "22:00" runtime (the website's minutesLabel).
@@ -113,8 +139,20 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // saved (lib/useWatchProgress.js), like the website. Not on mobile yet:
 // ad breaks (paused) and captions / audio description (the website's
 // AccessibilityPanel).
+//
+// The series revamp, slice 4 (boards V2 and V3): an episode of a show (or
+// an extra) whose own page is on opens on the V2 landing — the still or
+// the trailer in a 16:9 strip, the title block, Play / Save / Tip, the
+// creator's notes, the credit lines, the full Own card, the season strip
+// ("Now open") — and Play turns it into the player in place (?autoplay=1).
+// With the page off (the default for a show's episodes) it plays at once.
+// ?preview=1 is the owner's private preview of an episode that isn't live:
+// the preview bar, a signed play with no views, progress, Tip, Own, Buy or
+// end card, and the "Pulled" panel while it's held (the team still plays
+// it).
 export default function Episode() {
-  const { id, autoplay, trailer } = useLocalSearchParams();
+  const { id, autoplay, trailer, preview: previewParam } = useLocalSearchParams();
+  const previewAsked = previewParam === '1';
   const router = useRouter();
   const { getToken } = useAuth();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
@@ -134,25 +172,31 @@ export default function Episode() {
     (async () => {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        const page = await apiGet(await withTerms(`/api/episode-page?id=${encodeURIComponent(id)}`), token);
+        const page = await apiGet(await withTerms(`/api/episode-page?id=${encodeURIComponent(id)}${previewAsked ? '&preview=1' : ''}`), token);
         if (cancelled) return;
         setState({ loading: false, error: null, page });
         if (page.episode) {
           setShowingTrailer(trailer === '1');
-          setShowPlayer(page.episode.contentType === 'series' || autoplay === '1' || trailer === '1');
+          // Its own page (decision 11) unless it was opened to play.
+          setShowPlayer(!episodeHasPage(page.episode) || autoplay === '1' || trailer === '1');
         }
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, page: null });
       }
     })();
     return () => { cancelled = true; };
-  }, [id, reloadKey]);
+  }, [id, reloadKey, previewAsked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const episode = state.page && state.page.episode;
-  const purchase = state.page && state.page.purchase;
+  // The owner's preview (?preview=1): the server's { role, status, held,
+  // canPlay, strong, text, linkHref, linkLabel }, or null on a public title.
+  const previewInfo = state.page && state.page.preview && typeof state.page.preview === 'object' ? state.page.preview : null;
+  const previewing = Boolean(previewInfo);
+  const canPlay = !previewing || previewInfo.canPlay !== false;
+  const purchase = previewing ? null : state.page && state.page.purchase;
   const owned = Boolean(purchase && purchase.owned);
-  // Tips: the end-of-episode card, once per title (components/TipSheet.js).
-  const tipping = state.page && state.page.tipping;
+  // Tips (components/TipSheet.js): never in a preview.
+  const tipping = previewing ? null : state.page && state.page.tipping;
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => null), 4000),
     router,
@@ -164,15 +208,21 @@ export default function Episode() {
   // is actually shown — never for the landing view.
   useEffect(() => {
     if (!episode || !showPlayer || showingTrailer || playback.src || playback.locked || playback.loading) return undefined;
+    // A held title in a preview plays for the team only.
+    if (!canPlay) { setPlayback({ loading: false, src: null, locked: 'held', error: null }); return undefined; }
     let cancelled = false;
     setPlayback((p) => ({ ...p, loading: true }));
     (async () => {
       try {
         const token = await withTimeout(getToken().catch(() => null), 4000);
-        const res = await apiPost('/api/stream-token', { episodeId: episode.id, terms: await readViewingTerms() }, token);
+        const body = { episodeId: episode.id, terms: await readViewingTerms() };
+        if (previewing) body.preview = true;
+        const res = await apiPost('/api/stream-token', body, token);
         if (!cancelled) setPlayback({ loading: false, src: res.src, locked: false, error: null });
       } catch (err) {
         if (cancelled) return;
+        // A preview of a title pulled while the team looks at it (403 held).
+        if (/pulled while/i.test(err.message || '')) { setPlayback({ loading: false, src: null, locked: 'held', error: null }); return; }
         // Early screenings (the website's lib/earlyAccess.js): the first
         // day after release is Premium's; the server says so in the message.
         const earlyLock = /early screening/i.test(err.message || '');
@@ -181,7 +231,7 @@ export default function Episode() {
       }
     })();
     return () => { cancelled = true; };
-  }, [episode, showPlayer, showingTrailer]);
+  }, [episode, showPlayer, showingTrailer]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
@@ -189,11 +239,12 @@ export default function Episode() {
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const ratingsList = useContentRatings();
   const advisoryInfo = episode && !showingTrailer ? advisoryFor(episode, ratingsList) : null;
-  const resumeSeconds = (state.page && state.page.resumeSeconds) || 0;
+  // A preview starts at the beginning and saves no progress.
+  const resumeSeconds = previewing ? 0 : (state.page && state.page.resumeSeconds) || 0;
   useWatchProgress({
     player,
     episodeId: episode && episode.id,
-    enabled: Boolean(state.page && state.page.isSignedIn && !showingTrailer && playback.src),
+    enabled: Boolean(state.page && state.page.isSignedIn && !previewing && !showingTrailer && playback.src),
     startAt: resumeSeconds,
     getToken: () => withTimeout(getToken().catch(() => null), 4000)
   });
@@ -222,7 +273,7 @@ export default function Episode() {
   const [endedSrc, setEndedSrc] = useState(null);
   const endCard = useMemo(() => {
     const p = state.page;
-    if (!p || !p.episode) return null;
+    if (!p || !p.episode || (p.preview && typeof p.preview === 'object')) return null;
     return endCardFor({ episode: p.episode, nextEpisode: p.nextEpisode, pick: p.afterShow, seriesName: p.parentSeriesName, trailer: showingTrailer });
   }, [state.page, showingTrailer]);
   useEffect(() => {
@@ -243,7 +294,7 @@ export default function Episode() {
 
   function goBack() {
     if (router.canGoBack()) { router.back(); return; }
-    if (episode && episode.contentType === 'series' && episode.seriesId) router.replace(`/series/${episode.seriesId}`);
+    if (episode && episode.contentType === 'series' && episode.seriesId) router.replace(`/series/${episode.seriesId}${previewing ? '?preview=1' : ''}`);
     else if (episode && episode.contentType === 'podcast') router.replace('/watch/podcasts');
     else router.replace('/stream');
   }
@@ -337,16 +388,54 @@ export default function Episode() {
   const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
   const tier = tierBadge(episode.tier, episode.adsEnabled);
   const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
-  const upNext = isSeries && !showingTrailer ? nextEpisode : null;
+  // Never a title this viewer may not open (a preview: someone else's).
+  const upNext = isSeries && showPlayer && !showingTrailer && nextEpisode && nextEpisode.canOpen !== false ? nextEpisode : null;
   const returnTo = `/episode/${episode.id}`;
   const tokenFn = () => withTimeout(getToken().catch(() => null), 4000);
+  // Every link that opens another title keeps the preview (?preview=1).
+  const pq = previewing ? 'preview=1&' : '';
+  const playHref = (eid) => `/episode/${enc(eid)}?${pq}autoplay=1`;
+  // The show's page at this episode's season (the kicker, See all).
+  const seasonN = Number(episode.season) || 1;
+  const seriesHref = episode.seriesId ? `/series/${enc(episode.seriesId)}?${pq}season=${seasonN}` : null;
+  // The V2 landing (decision 11): its own page, not opened to play, and an
+  // episode of a show or an extra (films keep their hero).
+  const landing = !showPlayer && opensOnOwnPage(episode);
+  const filmHero = !showPlayer && !landing;
+  const still = episode.thumbnail || episode.poster || episode.heroImage || null;
+  const notes = paragraphs(episode.pageNotes);
+  const notesFrom = page.notesFrom || null;
+  // The credit lines (decision 20): Made by, then the optional Studio and
+  // Producer in the owner's order; before slice 4's server, Made by alone.
+  const credits = Array.isArray(page.credits) && page.credits.length ? page.credits
+    : episode.artist ? [{ key: 'maker', label: 'Made by', name: episode.artist, href: null }] : [];
+  // Play on the landing: the player in place, and ?autoplay=1 in the
+  // address (the website's shallow replace).
+  const playHere = () => {
+    setShowPlayer(true);
+    router.setParams({ autoplay: '1' });
+  };
+  const ownCard = !previewing ? (
+    <OwnTitleCard
+      offer={purchase}
+      bundle={page.bundle}
+      episode={episode}
+      creatorName={episode.artist}
+      isSubscriber={page.isSubscriber}
+      busy={buyBusy}
+      onBuy={() => buy('episode', episode.id, returnTo)}
+      onSeePlans={() => router.push('/account')}
+      onSeries={() => router.push(`/series/${episode.seriesId}`)}
+    />
+  ) : null;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView contentContainerStyle={styles.scroll}>
+        {previewing ? <PreviewBar preview={previewInfo} /> : null}
 
-        {!showPlayer ? (
+        {filmHero ? (
           <HeroSpotlight
             pool={[episode]}
             preferTrailer
@@ -358,11 +447,14 @@ export default function Episode() {
                 <Pressable style={heroButtonStyles.playBtn} onPress={() => setShowPlayer(true)}>
                   <PlayIcon /><Text style={heroButtonStyles.playText}>Play</Text>
                 </Pressable>
-                <Pressable style={heroButtonStyles.infoBtn} onPress={() => toggleWishlist(episode.id)}>
-                  <HeartIcon active={saved} size={16} color={saved ? colors.danger : colors.ink} />
-                  <Text style={heroButtonStyles.infoText}>{saved ? 'Saved' : 'Save for later'}</Text>
-                </Pressable>
-                {episode.fundingUrl ? (
+                {!previewing ? (
+                  <Pressable style={heroButtonStyles.infoBtn} onPress={() => toggleWishlist(episode.id)}>
+                    <HeartIcon active={saved} size={16} color={saved ? colors.danger : colors.ink} />
+                    <Text style={heroButtonStyles.infoText}>{saved ? 'Saved' : 'Save for later'}</Text>
+                  </Pressable>
+                ) : null}
+                {/* Back it is a money link: never in a preview (the website's rule). */}
+                {episode.fundingUrl && !previewing ? (
                   <Pressable style={heroButtonStyles.infoBtn} onPress={() => Linking.openURL(episode.fundingUrl)}>
                     <DiamondIcon size={14} />
                     <Text style={heroButtonStyles.infoText}>Back this project</Text>
@@ -371,9 +463,35 @@ export default function Episode() {
               </View>
             )}
           />
+        ) : landing ? (
+          // The strip (board V2): the still at the player's size, with the
+          // trailer behind a round button when there is one.
+          <View style={styles.strip}>
+            {still ? <SmartImage uri={still} style={absoluteFill} /> : null}
+            {episode.trailerSrc ? <View style={styles.stripTag}><Text style={styles.stripTagText}>Trailer</Text></View> : null}
+            <Pressable
+              style={({ pressed }) => [styles.stripBtn, pressed && { opacity: 0.8 }]}
+              onPress={() => {
+                if (episode.trailerSrc) { setShowingTrailer(true); setShowPlayer(true); } else playHere();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={episode.trailerSrc ? 'Play the trailer' : 'Play'}
+            >
+              <PlayIcon size={22} color={colors.ink} />
+            </Pressable>
+          </View>
         ) : (
           <View style={styles.playerWrap}>
-            {playback.locked ? (
+            {playback.locked === 'held' ? (
+              <View style={styles.lockPanel}>
+                <Text style={styles.lockGlyph}>{'◈'}</Text>
+                <Text style={styles.lockTitle}>Pulled while our team looks at it</Text>
+                <Text style={styles.lockBody}>It plays again once it’s restored.</Text>
+                <Pressable style={styles.unlockBtn} onPress={() => Linking.openURL(`mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent(`Pulled: ${episode.title}`)}`).catch(() => {})}>
+                  <Text style={styles.unlockText}>Email us</Text>
+                </Pressable>
+              </View>
+            ) : playback.locked ? (
               playback.locked === 'early' ? (
                 <View style={styles.lockPanel}>
                   <Text style={styles.lockGlyph}>{'◈'}</Text>
@@ -429,7 +547,7 @@ export default function Episode() {
                 playing={isPlaying}
                 heading={{ kicker: showingTrailer ? 'Trailer' : seriesKicker, title: episode.title }}
                 rating={episode.rating || null}
-                onNext={upNext ? () => router.replace(`/episode/${upNext.id}?autoplay=1`) : null}
+                onNext={upNext ? () => router.replace(playHref(upNext.id)) : null}
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
                 resumeSeconds={showingTrailer ? 0 : resumeSeconds}
                 endCard={endCardProps}
@@ -457,9 +575,9 @@ export default function Episode() {
           {/* The title block (pages/episode/[id].js .ep-head). */}
           <View style={styles.kickerRow}>
             {isSeries ? (
-              <Pressable style={styles.kickerLink} onPress={() => router.push(`/series/${episode.seriesId}`)} hitSlop={6}>
+              <Pressable style={styles.kickerLink} onPress={() => router.push(seriesHref)} hitSlop={6} accessibilityRole="link">
                 <Text style={styles.kickerLinkText} numberOfLines={1}>
-                  {(parentSeriesName || 'Series').toUpperCase()}{episode.seriesOrder ? ` · SEASON ${episode.season || 1} · EPISODE ${episode.seriesOrder}` : ''}
+                  {(parentSeriesName || 'Series').toUpperCase()}{episode.seriesOrder ? ` · SEASON ${seasonN} · EPISODE ${episode.seriesOrder}` : ''}
                 </Text>
                 <ChevronIcon />
               </Pressable>
@@ -471,82 +589,109 @@ export default function Episode() {
             {showingTrailer ? <Text style={styles.kickerNote}>TRAILER</Text> : null}
             {owned ? <OwnedChip small /> : null}
           </View>
-          <Text style={styles.title}>{episode.title}</Text>
+          <Text style={[styles.title, landing && styles.titleLanding]}>{episode.title}</Text>
           <View style={styles.metaRow}>
             {metaLine ? <Text style={styles.metaText}>{metaLine}</Text> : null}
             {episode.rating ? <View style={styles.ratingTag}><Text style={styles.ratingText}>{episode.rating}</Text></View> : null}
-            <View style={[styles.tierPill, { backgroundColor: owned ? 'rgba(242,193,78,0.2)' : tier.bg }]}>
+            <View style={[styles.tierPill, { backgroundColor: owned ? oliveTint(0.2) : tier.bg }]}>
               <Text style={[styles.tierPillText, { color: owned ? colors.ink : tier.fg }]}>{owned ? 'Yours · ad-free' : tier.label}</Text>
             </View>
             {episode.isOriginal ? <View style={styles.originalTag}><Text style={styles.originalText}>Tapa Original</Text></View> : null}
           </View>
 
-          {/* Four round actions: Save, Tip, Own, Trailer (Back it when the title has a funding link). */}
-          <View style={styles.actions}>
-            <Pressable style={styles.action} onPress={() => toggleWishlist(episode.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}>
-              <View style={[styles.ring, saved && styles.ringOn]}><HeartIcon active={saved} size={18} color={saved ? colors.danger : colors.ink} /></View>
-              <Text style={styles.actionLabel}>{saved ? 'SAVED' : 'SAVE'}</Text>
-            </Pressable>
-            {/* Tips: only once the maker's Stripe account can take charges. */}
-            <TipButton
-              tipping={tipping}
-              isSignedIn={isSignedIn}
-              router={router}
-              getToken={tokenFn}
-              returnTo={returnTo}
-              style={styles.action}
-              renderInner={() => (
-                <>
-                  <View style={[styles.ring, styles.ringTip]}><TipGlyph size={18} color={colors.olive} /></View>
-                  <Text style={[styles.actionLabel, { color: colors.olive }]}>TIP {tipFirstName.toUpperCase()}</Text>
-                </>
-              )}
-            />
-            {/* Buy to own: compact while playing; the full card sits on the landing view. */}
-            {showPlayer && !showingTrailer && purchase && purchase.forSale && !owned ? (
-              <Pressable style={[styles.action, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)} accessibilityRole="button">
-                <View style={styles.ring}><TicketIcon /></View>
-                <Text style={styles.actionLabel}>{buyBusy ? 'OPENING…' : `OWN · ${dollars(purchase.payCents)}`}</Text>
+          {landing ? (
+            // The landing's actions (board V2): pills that wrap rather than shrink.
+            <View style={styles.pills}>
+              <Pressable style={({ pressed }) => [styles.pillPlay, pressed && { opacity: 0.85 }]} onPress={playHere} accessibilityRole="button">
+                <PlayIcon size={16} />
+                <Text style={styles.pillPlayText}>{resumeSeconds > 0 && !previewing ? 'Continue' : 'Play'}</Text>
               </Pressable>
-            ) : null}
-            {episode.trailerSrc ? (showingTrailer ? (
-              <Pressable style={styles.action} onPress={() => setShowingTrailer(false)} accessibilityRole="button">
-                <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
-                <Text style={styles.actionLabel}>FULL EPISODE</Text>
-              </Pressable>
-            ) : (
-              <Pressable style={styles.action} onPress={() => { setShowingTrailer(true); setShowPlayer(true); }} accessibilityRole="button">
-                <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
-                <Text style={styles.actionLabel}>TRAILER</Text>
-              </Pressable>
-            )) : null}
-            {episode.fundingUrl ? (
-              <Pressable style={styles.action} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
-                <View style={styles.ring}><DiamondIcon /></View>
-                <Text style={styles.actionLabel}>BACK IT</Text>
-              </Pressable>
-            ) : null}
-          </View>
+              {!previewing ? (
+                <Pressable style={[styles.pill, saved && { borderColor: colors.danger }]} onPress={() => toggleWishlist(episode.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}>
+                  <HeartIcon active={saved} size={16} color={saved ? colors.danger : colors.ink} />
+                  <Text style={styles.pillText}>{saved ? 'Saved' : 'Save'}</Text>
+                </Pressable>
+              ) : null}
+              <TipButton
+                tipping={tipping}
+                isSignedIn={isSignedIn}
+                router={router}
+                getToken={tokenFn}
+                returnTo={returnTo}
+                style={[styles.pill, styles.pillTip]}
+                renderInner={() => (
+                  <>
+                    <TipGlyph size={16} color={colors.olive} />
+                    <Text style={[styles.pillText, { color: colors.olive }]}>Tip {tipFirstName}</Text>
+                  </>
+                )}
+              />
+              {/* Back it is a money link: never in a preview (the website's rule). */}
+              {episode.fundingUrl && !previewing ? (
+                <Pressable style={styles.pill} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
+                  <DiamondIcon size={14} />
+                  <Text style={styles.pillText}>Back it</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          ) : (
+            // Four round actions: Save, Tip, Own, Trailer (Back it when the title has a funding link).
+            <View style={styles.actions}>
+              {!previewing ? (
+                <Pressable style={styles.action} onPress={() => toggleWishlist(episode.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}>
+                  <View style={[styles.ring, saved && styles.ringOn]}><HeartIcon active={saved} size={18} color={saved ? colors.danger : colors.ink} /></View>
+                  <Text style={styles.actionLabel}>{saved ? 'SAVED' : 'SAVE'}</Text>
+                </Pressable>
+              ) : null}
+              {/* Tips: only once the maker's Stripe account can take charges. */}
+              <TipButton
+                tipping={tipping}
+                isSignedIn={isSignedIn}
+                router={router}
+                getToken={tokenFn}
+                returnTo={returnTo}
+                style={styles.action}
+                renderInner={() => (
+                  <>
+                    <View style={[styles.ring, styles.ringTip]}><TipGlyph size={18} color={colors.olive} /></View>
+                    <Text style={[styles.actionLabel, { color: colors.olive }]}>TIP {tipFirstName.toUpperCase()}</Text>
+                  </>
+                )}
+              />
+              {/* Buy to own: compact while playing; the full card sits on the landing view. */}
+              {showPlayer && !showingTrailer && purchase && purchase.forSale && !owned ? (
+                <Pressable style={[styles.action, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)} accessibilityRole="button">
+                  <View style={styles.ring}><TicketIcon /></View>
+                  <Text style={styles.actionLabel}>{buyBusy ? 'OPENING…' : `OWN · ${dollars(purchase.payCents)}`}</Text>
+                </Pressable>
+              ) : null}
+              {episode.trailerSrc ? (showingTrailer ? (
+                <Pressable style={styles.action} onPress={() => setShowingTrailer(false)} accessibilityRole="button">
+                  <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
+                  <Text style={styles.actionLabel}>FULL EPISODE</Text>
+                </Pressable>
+              ) : (
+                <Pressable style={styles.action} onPress={() => { setShowingTrailer(true); setShowPlayer(true); }} accessibilityRole="button">
+                  <View style={styles.ring}><PlayIcon size={16} color={colors.ink} /></View>
+                  <Text style={styles.actionLabel}>TRAILER</Text>
+                </Pressable>
+              )) : null}
+              {episode.fundingUrl && !previewing ? (
+                <Pressable style={styles.action} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
+                  <View style={styles.ring}><DiamondIcon /></View>
+                  <Text style={styles.actionLabel}>BACK IT</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          )}
 
-          {!showPlayer ? (
-            <OwnTitleCard
-              offer={purchase}
-              bundle={page.bundle}
-              episode={episode}
-              creatorName={episode.artist}
-              isSubscriber={page.isSubscriber}
-              busy={buyBusy}
-              onBuy={() => buy('episode', episode.id, returnTo)}
-              onSeePlans={() => router.push('/account')}
-              onSeries={() => router.push(`/series/${episode.seriesId}`)}
-            />
-          ) : null}
+          {filmHero ? ownCard : null}
 
           {upNext ? (
-            <Pressable style={styles.upNext} onPress={() => router.replace(`/episode/${upNext.id}?autoplay=1`)} accessibilityRole="button" accessibilityLabel={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}>
+            <Pressable style={styles.upNext} onPress={() => router.replace(playHref(upNext.id))} accessibilityRole="button" accessibilityLabel={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}>
               <View style={styles.upNextThumb}>
                 {upNext.thumbnail ? <SmartImage uri={upNext.thumbnail} style={absoluteFill} /> : null}
-                <PlayIcon size={22} color="rgba(251,232,211,0.85)" />
+                <PlayIcon size={22} color={inkTint(0.85)} />
                 {upNext.runtime ? <View style={styles.upNextDur}><Text style={styles.upNextDurText}>{minutesLabel(upNext.runtime)}</Text></View> : null}
               </View>
               <View style={styles.upNextText}>
@@ -557,40 +702,62 @@ export default function Episode() {
             </Pressable>
           ) : null}
 
-          {episode.desc ? <Text style={styles.desc}>{episode.desc}</Text> : null}
+          {/* The creator's notes on the landing ("Notes from Mara"); without them, the description. */}
+          {landing && notes.length > 0 ? (
+            <View style={styles.notes}>
+              <Text style={styles.notesHeading}>{notesFrom ? `Notes from ${notesFrom}` : 'Notes'}</Text>
+              {notes.map((p, i) => <Text key={i} style={styles.notesText}>{p}</Text>)}
+            </View>
+          ) : episode.desc ? <Text style={styles.desc}>{episode.desc}</Text> : null}
           {page.withdrawn ? (
             <View style={styles.withdrawn}><Text style={styles.withdrawnText}>No longer on Studio Tapa TV · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you.</Text></View>
           ) : null}
 
+          {/* The credit lines (decision 20), then the maker's seal. */}
           <View style={styles.credits}>
-            {episode.artist ? (
-              <View style={styles.maker}>
-                <View style={styles.makerAvatar}><Text style={styles.makerInitial}>{episode.artist.trim().charAt(0).toUpperCase()}</Text></View>
-                <Text style={styles.makerText}>Made by {episode.artist}</Text>
-              </View>
-            ) : null}
+            {credits.map((c) => {
+              // "Made by Mara Reyes": the name links to its profile when it's an account's.
+              const text = (
+                <Text style={styles.makerText}>
+                  {c.label}{' '}
+                  {c.href ? <Text style={styles.creditLink} onPress={() => openSiteHref(router, c.href)} accessibilityRole="link">{c.name}</Text> : c.name}
+                </Text>
+              );
+              return c.key === 'maker' ? (
+                <View key={c.key} style={styles.maker}>
+                  <View style={styles.makerAvatar}><Text style={styles.makerInitial}>{String(c.name).trim().charAt(0).toUpperCase()}</Text></View>
+                  {text}
+                </View>
+              ) : <View key={c.key}>{text}</View>;
+            })}
             {/* The maker's "Not for AI training" seal (components/AiSeal.js). */}
             {page.aiSeal !== false ? <AiSealChip /> : null}
           </View>
 
+          {previewing ? <PreviewFootnote /> : null}
+
+          {landing ? ownCard : null}
+          {landing && ownCard && purchase && purchase.forSale && !owned ? <View style={{ height: 22 }} /> : null}
+
           {isSeries && seasonEpisodes.length > 1 ? (
             <EpisodeStrip
-              title={`Episodes · Season ${episode.season || 1}`}
+              title={`Episodes · Season ${seasonN}`}
               items={seasonEpisodes}
-              onPressItem={(e) => { if (e.id !== episode.id) router.replace(`/episode/${e.id}?autoplay=1`); }}
-              onSeeAll={() => router.push(`/series/${episode.seriesId}`)}
+              currentLabel={showPlayer ? 'Now playing' : 'Now open'}
+              onPressItem={(e) => { if (e.id !== episode.id && e.canOpen !== false) router.replace(playHref(e.id)); }}
+              onSeeAll={() => router.push(seriesHref)}
             />
           ) : null}
           {isSeries && seasonEpisodes.length <= 1 ? (
             <View style={styles.note}>
               <Text style={styles.noteHeading}>Episodes</Text>
-              <Text style={styles.noteText}>This is the only episode in this show so far.</Text>
-              <Pressable style={styles.noteBtn} onPress={() => router.push(`/series/${episode.seriesId}`)}>
+              <Text style={styles.noteText}>{(page.showEpisodeCount || 0) > seasonEpisodes.length ? `This is the only episode in Season ${seasonN} so far.` : 'This is the only episode in this show so far.'}</Text>
+              <Pressable style={styles.noteBtn} onPress={() => router.push(seriesHref)}>
                 <Text style={styles.noteBtnText}>See show page</Text>
               </Pressable>
             </View>
           ) : null}
-          {!isSeries && isSignedIn && watchNext.length > 0 ? (
+          {!isSeries && !previewing && isSignedIn && watchNext.length > 0 ? (
             <EpisodeStrip
               title="Watch next"
               items={watchNext}
@@ -598,7 +765,7 @@ export default function Episode() {
               onPressItem={(item) => router.push(item.contentType === 'podcast' && item.seriesId ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`)}
             />
           ) : null}
-          {!isSeries && !isSignedIn ? (
+          {!isSeries && !previewing && !isSignedIn ? (
             <View style={styles.note}>
               <Text style={styles.noteHeading}>Watch next</Text>
               <Text style={styles.noteText}>Sign in to get picks based on your wishlist and what you've watched.</Text>
@@ -606,7 +773,7 @@ export default function Episode() {
           ) : null}
 
           {bonusContent.length > 0 ? (
-            <CardRow title="Bonus Content" cards={bonusContent} onPressCard={(b) => router.push(`/episode/${b.id}`)} />
+            <CardRow title="Extras" cards={bonusContent} onPressCard={(b) => { if (b.canOpen !== false) router.push(`/episode/${enc(b.id)}${previewing ? '?preview=1' : ''}`); }} />
           ) : null}
         </View>
       </ScrollView>
@@ -621,6 +788,13 @@ const styles = StyleSheet.create({
   errorText: { color: colors.danger, fontSize: 15, textAlign: 'center', fontFamily: fonts.display },
 
   playerWrap: { width: '100%', backgroundColor: '#000' },
+
+  // The V2 landing's strip (.epl-strip): the player's box, the still as
+  // cover, "Trailer" top-left, a round button in the middle.
+  strip: { width: '100%', aspectRatio: 16 / 9, maxHeight: 600, backgroundColor: colors.surface1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  stripTag: { position: 'absolute', top: 12, left: 12, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, backgroundColor: tint(colors.surface0, 0.78) },
+  stripTagText: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 1, textTransform: 'uppercase', color: colors.ink },
+  stripBtn: { width: 56, height: 56, borderRadius: 28, borderWidth: 1.5, borderColor: colors.ink, backgroundColor: tint(colors.surface0, 0.55), alignItems: 'center', justifyContent: 'center', paddingLeft: 3 },
   player: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000' },
 
   // .lock-panel / .unlock-btn
@@ -643,6 +817,7 @@ const styles = StyleSheet.create({
   kickerType: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6 },
   kickerNote: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.inkDim },
   title: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 29, letterSpacing: -0.3, color: colors.ink, marginBottom: 6 },
+  titleLanding: { fontSize: 30, lineHeight: 33 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   metaText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, color: colors.inkDim },
   ratingTag: { borderWidth: 1, borderColor: 'rgba(202,181,158,0.7)', borderRadius: 3, paddingHorizontal: 5, paddingVertical: 1 },
@@ -659,6 +834,19 @@ const styles = StyleSheet.create({
   ringOn: { borderColor: 'rgba(239,91,91,0.6)' },
   ringTip: { borderColor: 'rgba(242,193,78,0.6)' },
   actionLabel: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1, color: colors.inkDim, textAlign: 'center' },
+
+  // .epl-actions: Play (cream, flex 1), Save, Tip, Back it — 48pt pills.
+  pills: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 },
+  pillPlay: { flexGrow: 1, flexBasis: 140, minHeight: 48, borderRadius: 999, backgroundColor: colors.ink, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18 },
+  pillPlayText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.surface0 },
+  pill: { minHeight: 48, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.45), flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, paddingHorizontal: 16 },
+  pillTip: { borderColor: oliveTint(0.7) },
+  pillText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink },
+
+  // .epl-notes ("Notes from Mara")
+  notes: { marginTop: 18, gap: 10 },
+  notesHeading: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.4, textTransform: 'uppercase', color: colors.inkDim },
+  notesText: { fontFamily: fonts.body, fontSize: 15.5, lineHeight: 24.8, color: colors.ink },
 
   // .ep-upnext
   upNext: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 8, borderRadius: 10, backgroundColor: colors.surface2, marginTop: 16 },
@@ -677,6 +865,7 @@ const styles = StyleSheet.create({
   makerAvatar: { width: 26, height: 26, borderRadius: 13, backgroundColor: colors.olive, alignItems: 'center', justifyContent: 'center' },
   makerInitial: { fontFamily: fonts.displayBold, fontSize: 12, color: '#241a05' },
   makerText: { fontFamily: fonts.body, fontSize: 14, color: colors.ink },
+  creditLink: { textDecorationLine: 'underline', textDecorationColor: inkTint(0.4) },
   withdrawn: { padding: 10, borderRadius: 10, backgroundColor: 'rgba(242,193,78,0.1)', borderWidth: 1, borderColor: 'rgba(242,193,78,0.4)', marginTop: 12 },
   withdrawnText: { fontFamily: fonts.body, fontSize: 13, lineHeight: 19, color: colors.inkDim },
 

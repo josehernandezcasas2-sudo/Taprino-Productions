@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { tierBadge } from '../lib/tierBadge';
 import { formatRuntimeLong } from '../lib/videoMetadata';
-import { seriesPlayLabel } from '../lib/seriesResume';
+import { seriesPlayLabel, freePlayNote } from '../lib/seriesResume';
 import { PlayIcon, PauseIcon, VolumeIcon, InfoIcon, usePlayerIconOverrides } from './PlayerIcons';
 
 const ROTATE_MS = 9000;
@@ -172,7 +172,13 @@ export function useHeroTrailer({ trailerKey, src = null, expiresAt = null, ref =
 // `heroImage` on an episode/series to use a still instead of forcing
 // video. If both are present the image wins; the poster/thumbnail is the
 // fallback for content without a playable trailer.
-export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
+//
+// A series candidate carries what viewers see of the show (decision 10;
+// lib/heroCandidates.js from lib/showRollups.js): rollupTier, tierLabel,
+// freeLabel, firstFree and its highest rating — drawn as the "Tapa +"
+// pill and the green "E1 free" chip, and a non-member's (`isMember` false)
+// Play reads "Play first episode · free" when it opens a free episode.
+export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed, isMember = false }) {
   const iconOverrides = usePlayerIconOverrides();
   const [index, setIndex] = useState(Math.max(pool.length - 1, 0));
   const [paused, setPaused] = useState(false);
@@ -290,7 +296,18 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
             ) : ep.title}
           </h2>
           <div className="hero-meta">
-            <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>
+            {ep.isSeries && ep.rollupTier ? (
+              ep.rollupTier === 'free' ? (
+                <span className={`hero-badge-tier ${ep.freeLabel === 'Free' ? 'free-noads' : 'free-ads'}`}>{ep.freeLabel}</span>
+              ) : (
+                <>
+                  <span className="hero-badge-tier premium">{ep.tierLabel || 'Tapa +'}</span>
+                  {ep.rollupTier === 'mixed' && ep.freeLabel && <span className="free-chip">{ep.freeLabel}</span>}
+                </>
+              )
+            ) : (
+              <span className={`hero-badge-tier ${tierBadge(ep.tier, ep.adsEnabled).key}`}>{tierBadge(ep.tier, ep.adsEnabled).label}</span>
+            )}
             {(ep.mainGenre || ep.releaseYear || ep.runtime) && (
               <>
                 <span className="hero-meta-dot">&bull;</span>
@@ -325,7 +342,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, fullBleed }) {
           <p>{ep.desc}</p>
           <div className="hero-actions">
             <button className="hero-play" onClick={() => onPlay(ep)}>
-              <PlayIcon size={16} src={iconOverrides.play} /> {ep.isSeries ? seriesPlayLabel(ep.resume) : 'Play'}
+              <PlayIcon size={16} src={iconOverrides.play} /> {ep.isSeries ? seriesPlayLabel(ep.resume, 'Play first episode', { free: freePlayNote({ resume: ep.resume || null, rollup: ep.rollupTier ? { tier: ep.rollupTier, firstFree: ep.firstFree === true } : null, isMember }) }) : 'Play'}
             </button>
             <button className="hero-trailer" onClick={() => onTrailer(ep)}>
               <InfoIcon size={16} src={iconOverrides.info} /> More info

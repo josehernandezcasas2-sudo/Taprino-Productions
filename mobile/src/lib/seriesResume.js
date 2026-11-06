@@ -101,11 +101,27 @@ export function episodeCode(ep) {
   return `S${ep.season || 1} E${ep.seriesOrder}`;
 }
 
-export function seriesPlayLabel(resume, firstLabel = 'Play first episode') {
-  if (!resume || resume.state === 'first') return firstLabel;
+// The button's words (the website's seriesPlayLabel, word for word):
+// opts.free (freePlayNote) adds " · free" when it starts or picks up a
+// free episode — "Play S1 E1 · free", "Play first episode · free" — never
+// on "Continue S1 E2". The server's resume point carries `tier`.
+export function seriesPlayLabel(resume, firstLabel = 'Play first episode', opts = {}) {
+  const free = Boolean(opts && opts.free === true);
+  if (!resume || resume.state === 'first') return free ? `${firstLabel} · free` : firstLabel;
   const code = episodeCode(resume);
   if (resume.state === 'resume') return code ? `Continue ${code}` : 'Continue watching';
-  return code ? `Play ${code}` : 'Play next episode';
+  const label = code ? `Play ${code}` : 'Play next episode';
+  return free ? `${label} · free` : label;
+}
+
+// Whether a non-member's Play says " · free" (decision 10, option A): a
+// mixed show only, never for a member or the owner of the whole series,
+// and only when the episode it opens is free (the resume point's tier, or
+// for a hero with no viewer, rollup.firstFree).
+export function freePlayNote({ resume = null, rollup = null, isMember = false, ownsSeries = false } = {}) {
+  if (!rollup || rollup.tier !== 'mixed' || isMember || ownsSeries) return false;
+  if (resume) return resume.state !== 'resume' && resume.tier === 'free';
+  return rollup.firstFree === true;
 }
 
 // Where a series hero's Play goes: the resume point's episode, else the

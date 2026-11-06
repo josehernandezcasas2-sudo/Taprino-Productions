@@ -52,6 +52,7 @@
   --brass-rgb: 255, 140, 66;
   --olive-rgb: 242, 193, 78;
   --danger-rgb: 239, 91, 91;
+  --ok-rgb: 132, 205, 152;
 
   /* Content-type accents — mint and blue are sampled directly from the
      logo but were never exposed as variables until now; rust is the
@@ -13060,3 +13061,355 @@ body.show-dragging * { cursor: grabbing !important; }
   .cs-invite-acts { width: 100%; }
 }
 /* --- end series revamp: who gets paid (slice 3b) --- */
+
+/* --- series revamp: the public pages (slice 4) ---------------------------
+   Decision 10 (board D10): a show reads "Tapa +" with a green "E1 free"
+   chip, or one "Free with ads" pill. The series page (board V1), the
+   owner's preview bar (V3) and an episode's own page (V2). */
+.free-chip {
+  display: inline-flex;
+  align-items: center;
+  text-shadow: none;
+  font-size: 13px;
+  line-height: 1.2;
+  color: var(--ok);
+  border: 1px solid var(--ok);
+  background: rgba(var(--ok-rgb), 0.14);
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.spg-hero-meta { gap: 9px 12px; }
+.spg-hero-meta .hero-rating-tag { font-family: var(--font-mono); font-size: 11px; border: 1px solid var(--ink); }
+.series-hero-meta-pill.free-ads { background: var(--olive-deep); color: var(--ink); }
+
+/* Cards in rows: the pill and the chip at the art's bottom-left, wrapping
+   upward on a narrow card. */
+.ep-badges {
+  position: absolute;
+  left: 0.4rem;
+  right: 0.4rem;
+  bottom: 0.4rem;
+  display: flex;
+  flex-wrap: wrap-reverse;
+  gap: 4px;
+  pointer-events: none;
+  z-index: 2;
+}
+.ep-badges .ep-badge { position: static; }
+.row-card .ep-thumb .ep-badges .ep-badge { top: auto; bottom: auto; left: auto; }
+.ep-badges .ep-badge.free-chip {
+  background: var(--surface-0);
+  border: 1px solid var(--ok);
+  color: var(--ok);
+  border-radius: inherit;
+  font-weight: 700;
+}
+.row-card .ep-thumb .ep-badge.free-chip { font-size: 0.5rem; padding: 0.18rem 0.4rem; }
+.ep-badges .ep-badge.is-plus { background: var(--brass); color: var(--surface-0); }
+.ep-badges .ep-badge.is-free-ads { background: var(--olive-deep); color: var(--ink); }
+.ep-badges .ep-badge.is-free-noads { background: var(--ok); color: var(--surface-0); }
+
+/* The preview bar (board V3). */
+.pvbar {
+  width: 100%;
+  background: rgba(var(--olive-rgb), 0.12);
+  border-bottom: 1px solid rgba(var(--olive-rgb), 0.4);
+  padding: 12px 19px 14px;
+}
+@media (min-width: 1024px) { .pvbar { padding-left: 2.4rem; padding-right: 2.4rem; } }
+.pvbar-inner { display: flex; gap: 10px; align-items: flex-start; max-width: 1400px; }
+.pvbar-icon { color: var(--olive); flex: 0 0 auto; display: inline-flex; padding-top: 1px; }
+.pvbar-body { display: grid; gap: 10px; min-width: 0; justify-items: start; }
+.pvbar-line { margin: 0; font-size: 14px; line-height: 1.45; color: var(--ink); }
+.pvbar-line strong { font-weight: 700; }
+.pvbar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--olive-rgb), 0.7);
+  color: var(--olive);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 13.5px;
+  text-decoration: none;
+}
+.pvbar-link:hover, .pvbar-link:focus-visible { background: rgba(var(--olive-rgb), 0.12); }
+.pvbar-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(var(--olive-rgb), 0.2);
+  color: var(--olive);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.pvbar-foot {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 1.6rem 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+}
+.pvbar-foot svg { flex: 0 0 auto; margin-top: 1px; }
+
+/* The series page (board V1). */
+.spg-tabs .series-tab { min-height: 40px; }
+.spg-seasons .season-tab {
+  min-height: 38px;
+  border-radius: 999px;
+  background: var(--surface-1);
+  border: 1px solid color-mix(in srgb, var(--ink) 14%, transparent);
+  color: var(--ink-dim);
+  cursor: pointer;
+}
+.spg-seasons .season-tab.active {
+  background: var(--olive);
+  border-color: var(--olive);
+  color: var(--olive-shadow);
+}
+.spg-stage .series-season-heading { font-size: 11px; letter-spacing: 1.4px; }
+.spg-list { display: flex; flex-direction: column; max-width: 860px; }
+.spg-row {
+  border-top: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  padding: 14px 0;
+  display: grid;
+  gap: 8px;
+}
+.spg-row:last-child { border-bottom: 1px solid color-mix(in srgb, var(--ink) 10%, transparent); }
+.spg-top {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  grid-template-areas: "thumb head" "desc desc";
+  column-gap: 12px;
+  row-gap: 8px;
+  color: var(--ink);
+  text-decoration: none;
+  border-radius: 8px;
+}
+.spg-top:focus-visible { outline: 2px solid var(--brass); outline-offset: 4px; }
+a.spg-top:hover .spg-title { color: var(--brass); }
+.spg-thumb {
+  grid-area: thumb;
+  position: relative;
+  width: 120px;
+  height: 68px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--olive-shadow), var(--surface-1) 70%);
+}
+.spg-thumb-img { object-fit: cover; }
+.spg-disc {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 28px;
+  height: 28px;
+  margin: -14px 0 0 -14px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-0) 62%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ink) 40%, transparent);
+}
+.spg-head { grid-area: head; display: grid; gap: 3px; align-content: start; min-width: 0; }
+.spg-code-line { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.spg-code { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 1.2px; color: var(--ink-dim); text-transform: uppercase; }
+.spg-tierword { font-family: var(--font-mono); font-size: 10px; letter-spacing: 1px; text-transform: uppercase; white-space: nowrap; }
+.spg-tierword.is-free { color: var(--ok); }
+.spg-tierword.is-plus { color: var(--brass); }
+.spg-title {
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.spg-runtime { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-dim); }
+.spg-desc {
+  grid-area: desc;
+  font-family: var(--font-body, inherit);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.spg-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; min-height: 0; }
+.spg-foot:empty { display: none; }
+.spg-foot .buy-chip { min-height: 34px; }
+.spg-details {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-height: 44px;
+  padding: 0 4px 0 10px;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-decoration: none;
+  margin-left: auto;
+}
+.spg-details:hover, .spg-details:focus-visible { color: var(--brass); }
+.spg-note { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.spg-note-text { font-family: var(--font-mono); font-size: 10.5px; color: var(--ink-dim); }
+@media (min-width: 900px) {
+  .spg-top {
+    grid-template-columns: 176px minmax(0, 1fr);
+    grid-template-areas: "thumb head" "thumb desc";
+    grid-template-rows: auto 1fr;
+    column-gap: 16px;
+  }
+  .spg-thumb { width: 176px; height: 99px; }
+  .spg-foot { padding-left: calc(176px + 16px); }
+}
+
+/* Extras (board V1): grouped, a grid of 16:9 cards. */
+.spg-extras { display: grid; gap: 1.6rem; }
+.spg-extra-heading {
+  margin: 0 0 10px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.spg-extra-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+@media (min-width: 640px) { .spg-extra-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (min-width: 900px) { .spg-extra-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.spg-extra-card { display: grid; gap: 5px; color: var(--ink); text-decoration: none; min-width: 0; }
+.spg-extra-art {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  background: linear-gradient(135deg, var(--olive-shadow), var(--surface-1) 70%);
+}
+.spg-extra-title { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+a.spg-extra-card:hover .spg-extra-title { color: var(--brass); }
+.spg-extra-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-dim); }
+
+/* The compact bundle card (board V1). */
+.own-card.bundle.compact {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px 14px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: var(--surface-2);
+  border: 1px solid rgba(var(--olive-rgb), 0.55);
+  max-width: 860px;
+}
+.own-compact-text { display: grid; gap: 3px; min-width: 0; }
+.own-compact-title { margin: 0; font-family: var(--font-display); font-size: 16.5px; font-weight: 600; }
+.own-compact-line, .own-compact-sale, .own-compact-credit { margin: 0; font-size: 13.5px; line-height: 1.4; color: var(--ink-dim); }
+.own-compact-sale { color: var(--olive); }
+.own-compact-btn { min-height: 44px; background: var(--olive); color: var(--surface-0); white-space: nowrap; }
+.own-compact-error { grid-column: 1 / -1; margin: 0; }
+
+/* An episode's own page (board V2): the strip in the player's place, the
+   Play / Save / Tip row, the creator's notes. */
+.epl-strip {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  max-height: min(600px, 72vh);
+  max-height: min(600px, 72svh);
+  background: var(--surface-0);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.epl-strip-art { object-fit: cover; }
+.epl-strip-tag {
+  position: absolute;
+  left: 14px;
+  top: 14px;
+  z-index: 2;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: color-mix(in srgb, var(--surface-0) 78%, transparent);
+}
+.epl-strip-play {
+  position: relative;
+  z-index: 2;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  border: 1.5px solid var(--ink);
+  background: color-mix(in srgb, var(--surface-0) 55%, transparent);
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.epl-strip-play:hover, .epl-strip-play:focus-visible { background: color-mix(in srgb, var(--surface-0) 30%, transparent); }
+.epl-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
+.epl-btn {
+  min-height: 48px;
+  padding: 0 18px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.epl-btn:hover, .epl-btn:focus-visible { background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.epl-btn.is-play { flex: 1 1 140px; background: var(--ink); color: var(--surface-0); border-color: var(--ink); }
+.epl-btn.is-play:hover, .epl-btn.is-play:focus-visible { background: var(--olive-bright); border-color: var(--olive-bright); }
+.epl-btn.is-tip { border-color: rgba(var(--olive-rgb), 0.7); color: var(--olive); }
+.epl-btn.is-on { color: var(--danger); border-color: rgba(var(--danger-rgb), 0.6); }
+.epl-notes { display: grid; gap: 10px; }
+.epl-notes-heading {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.epl-notes p { margin: 0; font-size: 15.5px; line-height: 1.6; color: var(--ink); }
+.ep-landing .ep-title { font-size: 30px; }
+@media (min-width: 1024px) { .ep-landing .ep-title { font-size: clamp(1.9rem, 3.2vw, 2.4rem); } }
+.ep-credit-name { color: var(--ink); text-decoration: none; }
+a.ep-credit-name:hover { color: var(--brass); }
+.ep-body .own-wrap { margin-top: 0.6rem; }
+/* --- end series revamp: the public pages (slice 4) --- */

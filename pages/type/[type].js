@@ -3,6 +3,8 @@ import Head from 'next/head';
 import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
+import { attachShowRollups } from '../../lib/showRollups';
+import { getRatings } from '../../lib/ratings';
 import { getAccountContext } from '../../lib/accountContext';
 import { useWishlist } from '../../lib/useWishlist';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
@@ -48,7 +50,10 @@ export async function getServerSideProps({ req, params, res }) {
   if (!TYPE_LABELS[type]) {
     return { notFound: true };
   }
-  const [episodesRaw, allSeries, genreIcons, siteSettings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getGenreIcons(), getSiteSettings()]);
+  const [episodesRaw, seriesRows, genreIcons, siteSettings] = await Promise.all([getPublicEpisodes(), getAllSeries(), getGenreIcons(), getSiteSettings()]);
+  // What viewers see of each show (decision 10; lib/showRollups.js), from
+  // every public episode — before the type filter below.
+  const allSeries = attachShowRollups(seriesRows, episodesRaw, await getRatings().catch(() => null));
 
   const account = await getAccountContext(req);
 
@@ -140,6 +145,7 @@ export default function TypePage({ type, isSubscriber, isSignedIn, wishlist, her
           onPlay={(item) => { window.location.href = item.isSeries ? (seriesPlayEpisodeId(item) ? `/episode/${seriesPlayEpisodeId(item)}?autoplay=1` : `/series/${item.id}`) : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}?autoplay=1`; }}
           onTrailer={(item) => { window.location.href = item.isSeries ? `/series/${item.id}` : (item.contentType === 'podcast' && item.seriesId) ? `/podcasts/${item.seriesId}` : `/episode/${item.id}`; }}
           fullBleed
+          isMember={isSubscriber}
         />
       )}
 

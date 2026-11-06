@@ -25,7 +25,9 @@ export default async function handler(req, res) {
   if (!(await limitPublicRead(req, res, 'captions', { max: 120, windowSeconds: 3600 }))) return undefined;
 
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
-  const gate = await playbackGate(req, id);
+  // ?preview=1: the owner's preview of an episode that isn't live (slice
+  // 4) — the same gate the video's preview goes through.
+  const gate = await playbackGate(req, id, { preview: req.query.preview === '1' });
   if (gate.denied) return res.status(gate.denied.status).json(gate.denied.body);
   const { episode } = gate;
   if (!episode.captionsRef) return res.status(404).json({ error: 'No captions for this title.' });

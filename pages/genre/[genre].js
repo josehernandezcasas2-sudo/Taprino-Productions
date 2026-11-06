@@ -3,6 +3,8 @@ import Head from 'next/head';
 import BackButton from '../../components/BackButton';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getAllSeries } from '../../lib/series';
+import { attachShowRollups } from '../../lib/showRollups';
+import { getRatings } from '../../lib/ratings';
 import { getAccountContext } from '../../lib/accountContext';
 import { getViewCounts, isRedisConfigured } from '../../lib/redis';
 import { buildHeroCandidates, signHeroTrailers } from '../../lib/heroCandidates';
@@ -44,7 +46,7 @@ export async function getServerSideProps({ req, params, res }) {
   let genre = params.genre;
   try { genre = decodeURIComponent(genre); } catch (err) { /* keep as is */ }
   const needsViewCounts = isRedisConfigured();
-  const [episodesWithBonus, allSeries, account, viewCountsResult, lifecycleSettings] = await Promise.all([
+  const [episodesWithBonus, seriesRows, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getAccountContext(req),
@@ -53,6 +55,9 @@ export async function getServerSideProps({ req, params, res }) {
   ]);
 
   const episodesNoBonus = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  // What viewers see of each show (decision 10; lib/showRollups.js), from
+  // every public episode — before the genre filter below.
+  const allSeries = attachShowRollups(seriesRows, episodesWithBonus, await getRatings().catch(() => null));
   // Every genre still needs representing in the nav's genre picker, so
   // this stays unfiltered — only the content actually shown on the page
   // below narrows down to this one genre.
@@ -163,7 +168,7 @@ export default function GenreLibrary({ genre, mainGenres, isSubscriber, isSigned
         isSubscriber={isSubscriber}
       />
 
-      <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
+      <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed isMember={isSubscriber} />
 
       <main id="main-content" className="stage stage-single stage-wide">
         <div>

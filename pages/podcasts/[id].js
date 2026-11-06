@@ -14,10 +14,14 @@ import { formatRuntimeLong, formatRuntime } from '../../lib/videoMetadata';
 import { useRouter } from 'next/router';
 import { takeViewingTerms } from '../../lib/viewingTerms';
 import { useWatchProgress } from '../../lib/useWatchProgress';
+import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
 
-export async function getServerSideProps({ req, res, params }) {
-  res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
-  const data = await getPodcastShowHubData(params.id, req);
+export async function getServerSideProps({ req, res, params, query }) {
+  // ?preview=1: the owner's private preview of a show that isn't public
+  // (slice 4) — never cached; strangers get the same 404.
+  const preview = query.preview === '1';
+  res.setHeader('Cache-Control', preview ? 'private, no-store' : 'private, no-cache, no-store, must-revalidate');
+  const data = await getPodcastShowHubData(params.id, req, { preview });
   if (!data) return { notFound: true };
   return { props: data };
 }
@@ -27,7 +31,8 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
-export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes, resume = {} }) {
+export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes, resume = {}, preview = null }) {
+  const previewing = Boolean(preview);
   const player = usePodcastPlayer();
   const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
@@ -57,7 +62,9 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
       showTitle: show.name,
       showArt: show.poster || show.thumbnail,
       audioUrl: ep.audioUrl,
-      startAt: getPosition(ep.id)
+      startAt: previewing ? 0 : getPosition(ep.id),
+      // A preview's plays don't count and aren't saved (slice 4).
+      noProgress: previewing
     });
   }
 
@@ -79,7 +86,11 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
       <Head>
         <title>{show.name} — Podcasts — {SITE.name}</title>
         <meta name="description" content={show.desc || `Listen to ${show.name} on ${SITE.name}.`} />
-        <link rel="alternate" type="application/rss+xml" title={`${show.name} RSS Feed`} href={`/api/podcasts/${show.id}/rss.xml`} />
+        {previewing ? (
+          <meta name="robots" content="noindex, nofollow" />
+        ) : (
+          <link rel="alternate" type="application/rss+xml" title={`${show.name} RSS Feed`} href={`/api/podcasts/${show.id}/rss.xml`} />
+        )}
       </Head>
 
       <HeaderNav
@@ -91,6 +102,8 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
         isCreator={isCreator}
         isSubscriber={isSubscriber}
       />
+
+      <PreviewBar preview={preview} />
 
       <main className="library-stage">
         <BackButton fallbackHref="/podcasts" />
@@ -110,7 +123,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
               {host && `Hosted by ${host} · `}{episodes.length} episode{episodes.length === 1 ? '' : 's'}
             </div>
             {show.desc && <p>{show.desc}</p>}
-            {episodes.some((ep) => ep.tier === 'free' && ep.audioUrl) && (
+            {!previewing && episodes.some((ep) => ep.tier === 'free' && ep.audioUrl) && (
               <a href={`/api/podcasts/${show.id}/rss.xml`} className="podcast-rss-link" target="_blank" rel="noopener noreferrer">
                 RSS Feed — for Apple Podcasts, Spotify, etc. →
               </a>
@@ -125,12 +138,16 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
           const hasVideo = !!ep.src;
           const playing = isCurrentlyPlaying(ep);
           const loaded = player && player.currentEpisode && player.currentEpisode.id === ep.id;
-          const resumeAt = hasAudio && !ep.locked && !loaded ? getPosition(ep.id) : 0;
+          const resumeAt = hasAudio && !ep.locked && !loaded && !previewing ? getPosition(ep.id) : 0;
           return (
             <Fragment key={ep.id}>
             <div className="podcast-episode-row">
               {ep.locked ? (
-                <button className="ep-play-btn" disabled title={ep.ageRestricted ? 'Age-restricted — set your age on your account' : `${SITE.premiumTier} required`}><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
+                <button
+                  className="ep-play-btn"
+                  disabled
+                  title={ep.previewLock === 'held' ? 'Pulled while our team looks at it.' : ep.previewLock === 'others' ? 'Only the person who sent it and the show’s owner can play it here.' : ep.ageRestricted ? 'Age-restricted — set your age on your account' : `${SITE.premiumTier} required`}
+                ><LockIcon size={15} src={iconOverrides.admin_lock} /></button>
               ) : hasAudio ? (
                 <button className={`ep-play-btn ${playing ? 'playing' : ''}`} onClick={() => playAudio(ep)} aria-label={playing ? 'Pause' : 'Play'}>
                   {playing ? <PauseIcon size={15} src={iconOverrides.pause} /> : <PlayIcon size={15} src={iconOverrides.play} />}
@@ -142,6 +159,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
               )}
               <div className="podcast-episode-row-info">
                 <h4>{ep.title}</h4>
+                {previewing && ep.previewLock === 'held' ? <span className="pvbar-pill">Pulled</span> : previewing && ep.status === 'pending' && <span className="pvbar-pill">In review</span>}
                 {ep.desc && <p>{ep.desc}</p>}
               </div>
               <div className="podcast-episode-row-meta">
@@ -160,14 +178,17 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
                 <VideoPlayer
                   episode={ep}
                   signedPlayback={Boolean(ep.signedPlayback)}
-                  adsEnabled={!adFree && !isAdmin && ep.adsEnabled !== false}
+                  adsEnabled={!previewing && !adFree && !isAdmin && ep.adsEnabled !== false}
                   onEnded={() => setExpandedVideoId(null)}
+                  initialPosition={0}
                 />
               </div>
             )}
             </Fragment>
           );
         })}
+        {previewing && episodes.length === 0 && <div className="poster-empty">No episodes here yet. Episodes you send for review show up here.</div>}
+        {previewing && <PreviewFootnote />}
       </main>
       <Footer />
       <MobileTabBar />

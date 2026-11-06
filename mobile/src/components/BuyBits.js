@@ -3,12 +3,12 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
-import { colors, fonts } from '../lib/theme';
+import { colors, fonts, oliveTint } from '../lib/theme';
 import { dollars } from '../lib/purchaseRules';
 
 // Buy to own, the app's side — mirrors components/BuyBits.js on the
-// website: "Own this title" on the episode screen, "Own the whole
-// series" on the series screen, the Owned / Buy chips on episode rows.
+// website: "Own this title" ("Own this episode" for a show's episode) on
+// the episode screen, "Own the whole series" on the series screen, the Owned / Buy chips on episode rows.
 // Buying opens Stripe Checkout in the in-app browser (like a membership);
 // the caller reloads its screen when the browser closes.
 
@@ -60,11 +60,13 @@ function Bullet({ children }) {
 
 export function OwnTitleCard({ offer, bundle, episode, creatorName, isSubscriber, busy, onBuy, onSeePlans, onSeries, refundDays = 14, refundWatchPercent = 10 }) {
   if (!offer || !offer.forSale || offer.owned) return null;
+  // An episode of a show is "this episode"; a film or a short "this title".
+  const noun = episode && episode.contentType === 'series' && episode.seriesId ? 'episode' : 'title';
   return (
     <View style={{ marginTop: 16, gap: 10 }}>
       <View style={styles.card}>
         <View style={styles.head}>
-          <Text style={styles.title}>Own this title</Text>
+          <Text style={styles.title}>Own this {noun}</Text>
           <PriceTag offer={offer} />
         </View>
         {offer.onSale ? <Text style={styles.sale}>{offer.salePercent}% off{offer.saleEndsAt ? ` until ${fmtDay(offer.saleEndsAt)}` : ''}</Text> : null}
@@ -94,29 +96,35 @@ export function OwnTitleCard({ offer, bundle, episode, creatorName, isSubscriber
   );
 }
 
-export function BundleCard({ bundle, creatorName, isSubscriber, busy, onBuy, ownedNames = [] }) {
+// "Own the whole series" on the series screen (board V1, slice 4): one
+// compact card — the words left, the button right — so the episode list
+// starts on the first screen. `makerName` is what the line calls the
+// maker ("Mara"); `ownedNames` the codes of episodes this viewer already
+// bought ("S1 E3"), which come off the price.
+function andList(items) {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+export function BundleCard({ bundle, makerName, busy, onBuy, ownedNames = [] }) {
   if (!bundle || !bundle.forSale || bundle.owned) return null;
-  const who = creatorName || 'the creator';
+  const who = makerName || 'the creator';
+  const count = Number(bundle.episodeCount) || 0;
+  const owned = ownedNames.filter(Boolean);
   const ownedCount = (bundle.ownedEpisodeIds || []).length;
   return (
-    <View style={[styles.card, { marginHorizontal: 16, marginTop: 14 }]}>
-      <View style={styles.head}>
-        <Text style={styles.title}>Own the whole series</Text>
-        <PriceTag offer={bundle} />
+    <View style={styles.bundle} accessibilityLabel="Own the whole series">
+      <View style={styles.bundleText}>
+        <Text style={styles.bundleTitle}>Own the whole series</Text>
+        <Text style={styles.bundleLine}>{count ? `All ${count} episode${count === 1 ? '' : 's'}` : 'Every episode'} and any {who} adds later</Text>
+        {bundle.onSale ? <Text style={styles.sale}>{bundle.salePercent}% off{bundle.saleEndsAt ? ` until ${fmtDay(bundle.saleEndsAt)}` : ''}</Text> : null}
+        {ownedCount > 0 && bundle.creditCents > 0 ? (
+          <Text style={styles.bundleLine}>You own {owned.length ? andList(owned) : `${ownedCount} episode${ownedCount === 1 ? '' : 's'}`}, so it’s {dollars(bundle.creditCents)} less.</Text>
+        ) : null}
       </View>
-      {bundle.onSale ? <Text style={styles.sale}>{bundle.salePercent}% off{bundle.saleEndsAt ? ` until ${fmtDay(bundle.saleEndsAt)}` : ''}</Text> : null}
-      <View style={{ gap: 4 }}>
-        <Bullet>All {bundle.episodeCount || ''} episodes, and any {who} adds later</Bullet>
-        <Bullet>No ads, yours for good</Bullet>
-        <Bullet>Watch in the app and on the website</Bullet>
-      </View>
-      <Pressable style={[styles.btn, busy && { opacity: 0.6 }]} disabled={busy} onPress={onBuy}>
-        <Text style={styles.btnText}>{busy ? 'Opening Stripe…' : `Buy the series for ${dollars(bundle.payCents)}`}</Text>
+      <Pressable style={[styles.bundleBtn, busy && { opacity: 0.6 }]} disabled={busy} onPress={onBuy} accessibilityRole="button">
+        <Text style={styles.bundleBtnText}>{busy ? 'Opening Stripe…' : `Buy ${dollars(bundle.payCents)}`}</Text>
       </Pressable>
-      <Text style={styles.fine}>Or buy episodes one at a time below.{!isSubscriber ? ' Members watch the whole series as part of Tapa +.' : ''}</Text>
-      {ownedCount > 0 ? (
-        <Text style={[styles.fine, { color: colors.inkDim }]}>You already own {ownedNames.length ? ownedNames.join(', ') : `${ownedCount} episode${ownedCount === 1 ? '' : 's'}`}. Buying the series takes {dollars(bundle.creditCents)} off: {dollars(bundle.payCents)}.</Text>
-      ) : null}
     </View>
   );
 }
@@ -179,6 +187,13 @@ const styles = StyleSheet.create({
   buyChip: { flexDirection: 'row', alignItems: 'baseline', gap: 6, paddingVertical: 8, paddingHorizontal: 12, borderRadius: 999, borderWidth: 1, borderColor: colors.olive, alignSelf: 'flex-start' },
   buyChipText: { fontFamily: fonts.displaySemi, fontSize: 13, color: colors.olive },
   buyChipStrike: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkFaint, textDecorationLine: 'line-through' },
+  // The compact series card (.own-card.bundle.compact).
+  bundle: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14, paddingHorizontal: 16, borderRadius: 12, backgroundColor: colors.surface2, borderWidth: 1, borderColor: oliveTint(0.55), marginBottom: 16 },
+  bundleText: { flex: 1, minWidth: 0, gap: 3 },
+  bundleTitle: { fontFamily: fonts.displaySemi, fontSize: 16.5, color: colors.ink },
+  bundleLine: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.inkDim },
+  bundleBtn: { minHeight: 44, paddingHorizontal: 16, borderRadius: 999, backgroundColor: colors.olive, alignItems: 'center', justifyContent: 'center' },
+  bundleBtnText: { fontFamily: fonts.displayBold, fontSize: 14.5, color: colors.surface0 },
   banner: { flexDirection: 'row', gap: 12, alignItems: 'flex-start', padding: 14, borderRadius: 12, backgroundColor: colors.surface2, borderWidth: 1, borderColor: 'rgba(242,193,78,0.55)', marginBottom: 14 },
   check: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.oliveShadow, borderWidth: 1, borderColor: colors.olive, alignItems: 'center', justifyContent: 'center' },
   bannerTitle: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink },

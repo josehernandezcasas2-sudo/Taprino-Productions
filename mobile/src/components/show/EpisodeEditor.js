@@ -949,7 +949,9 @@ function EpisodeMode({ showId, initial, auth, sent }) {
                 <FieldHead label="Notes" hint="blank lines make paragraphs" count={form.pageNotes.length} max={NOTES_MAX} />
                 <EdInput multiline style={{ minHeight: 120 }} value={form.pageNotes} maxLength={NOTES_MAX} disabled={!has118 || !isOpen(pol('pageNotes'))} placeholder="How it was made, who’s in it, the story behind a scene." onChangeText={(t) => set('pageNotes', t)} accessibilityLabel="Notes" />
                 <FieldNote policy={pol('pageNotes')} edited={edited('pageNotes')} />
-                {viewable || PREVIEW_BUILT ? <LinkText onPress={() => router.push(episodePublicRoute(ep.id))}>{viewable ? 'Open page' : 'Preview page'}</LinkText> : null}
+                {/* Open page when it's live; else the owner's preview (?preview=1, slice 4) unless it was declined. */}
+                {viewable ? <LinkText onPress={() => router.push(episodePublicRoute(ep.id))}>Open page</LinkText>
+                  : PREVIEW_BUILT && ep.status !== 'rejected' && !ep.withdrawnAt ? <LinkText onPress={() => router.push(episodePublicRoute(ep.id, { preview: true }))}>Preview page</LinkText> : null}
               </View>
             ) : null}
             {!has118 ? <FieldNote policy={NEEDS_118} /> : null}

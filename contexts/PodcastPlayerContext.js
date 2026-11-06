@@ -25,7 +25,7 @@ const PAUSE_GUARD_MS = 3000;
 // where continuing to listen while doing something else is the whole
 // point.
 export function PodcastPlayerProvider({ children }) {
-  const [currentEpisode, setCurrentEpisode] = useState(null); // { id, title, showTitle, showArt, audioUrl, startAt }
+  const [currentEpisode, setCurrentEpisode] = useState(null); // { id, title, showTitle, showArt, audioUrl, startAt, noProgress }
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -47,6 +47,9 @@ export function PodcastPlayerProvider({ children }) {
     const el = audioRef.current;
     const ep = currentRef.current;
     if (!el || !ep) return;
+    // A preview of a show that isn't public (slice 4) never saves: its
+    // plays don't count, and nothing is kept for later.
+    if (ep.noProgress) return;
     const total = el.duration || 0;
     const at = finished ? total || el.currentTime : el.currentTime;
     if (!(at > 0)) return;

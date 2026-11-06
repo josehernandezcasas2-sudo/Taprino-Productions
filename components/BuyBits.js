@@ -65,7 +65,7 @@ export function OwnTitleCard({ offer, bundle, episode, creatorName, isSignedIn, 
     <div className="own-wrap">
       <div className="own-card">
         <div className="own-head">
-          <h3>Own this title</h3>
+          <h3>{episode.contentType === 'series' && episode.seriesId ? 'Own this episode' : 'Own this title'}</h3>
           <PriceTag offer={offer} />
         </div>
         {offer.onSale && (
@@ -102,40 +102,38 @@ export function OwnTitleCard({ offer, bundle, episode, creatorName, isSignedIn, 
   );
 }
 
-// The series page's card: the bundle, with the credit for episodes
-// already bought one by one.
-export function BundleCard({ bundle, series, creatorName, isSignedIn, isSubscriber, episodeTitles = {} }) {
+// The series page's card (board V1 of the series revamp, slice 4): one
+// compact row — "Own the whole series", "All 5 episodes and any Mara adds
+// later", the sale and the credit for episodes already bought, "Buy
+// $9.99" on the right. `creatorName` is what the line calls the maker
+// (the Made by line's first name, else the whole line); `ownedCodes`
+// maps an owned episode's id to its code ("S1 E3").
+export function BundleCard({ bundle, series, creatorName, isSignedIn, ownedCodes = {} }) {
   const { buy, busy, error } = useBuyTitle({ isSignedIn });
   if (!bundle || !bundle.forSale || bundle.owned) return null;
   const who = creatorName || 'the creator';
-  const ownedCount = (bundle.ownedEpisodeIds || []).length;
-  const ownedNames = (bundle.ownedEpisodeIds || []).map((id) => episodeTitles[id]).filter(Boolean);
+  const count = bundle.episodeCount || 0;
+  const ownedIds = bundle.ownedEpisodeIds || [];
+  const codes = ownedIds.map((id) => ownedCodes[id]).filter(Boolean);
+  const codeWords = codes.length > 1 ? `${codes.slice(0, -1).join(', ')} and ${codes[codes.length - 1]}` : codes[0] || null;
   return (
-    <div className="own-card bundle">
-      <div className="own-head">
-        <h3>Own the whole series</h3>
-        <PriceTag offer={bundle} />
+    <div className="own-card bundle compact">
+      <div className="own-compact-text">
+        <h3 className="own-compact-title">Own the whole series</h3>
+        <p className="own-compact-line">{count ? `All ${count} episode${count === 1 ? '' : 's'}` : 'Every episode'} and any {who} adds later</p>
+        {bundle.onSale && (
+          <p className="own-compact-sale">{bundle.salePercent}% off{bundle.saleEndsAt ? ` until ${fmtDay(bundle.saleEndsAt)}` : ''}</p>
+        )}
+        {ownedIds.length > 0 && bundle.creditCents > 0 && (
+          <p className="own-compact-credit">
+            You own {codeWords || `${ownedIds.length} episode${ownedIds.length === 1 ? '' : 's'}`}, so it&rsquo;s {dollars(bundle.creditCents)} less.
+          </p>
+        )}
       </div>
-      {bundle.onSale && (
-        <div className="own-sale">{bundle.salePercent}% off{bundle.saleEndsAt ? ` until ${fmtDay(bundle.saleEndsAt)}` : ''}</div>
-      )}
-      <ul className="own-bullets">
-        <li>All {bundle.episodeCount || ''} episodes, and any {who} adds later</li>
-        <li>No ads, yours for good</li>
-        <li>Watch on the website and in the app</li>
-      </ul>
-      <button type="button" className="own-btn" onClick={() => buy('series', series.id)} disabled={busy}>
-        {busy ? 'Opening Stripe…' : `Buy the series for ${dollars(bundle.payCents)}`}
+      <button type="button" className="own-btn own-compact-btn" onClick={() => buy('series', series.id)} disabled={busy}>
+        {busy ? 'Opening Stripe…' : `Buy ${dollars(bundle.payCents)}`}
       </button>
-      {error && <p className="own-error">{error}</p>}
-      <p className="own-fine">
-        Or buy episodes one at a time below.{!isSubscriber ? ` Members watch the whole series as part of ${SITE.premiumTier}.` : ''}
-      </p>
-      {ownedCount > 0 && (
-        <p className="own-fine credit">
-          You already own {ownedNames.length ? ownedNames.join(', ') : `${ownedCount} episode${ownedCount === 1 ? '' : 's'}`}. Buying the series takes {dollars(bundle.creditCents)} off for {ownedCount === 1 ? 'it' : 'them'}: {dollars(bundle.payCents)}.
-        </p>
-      )}
+      {error && <p className="own-error own-compact-error">{error}</p>}
     </div>
   );
 }

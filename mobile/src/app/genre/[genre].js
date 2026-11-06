@@ -5,9 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
-import { seriesPlayLabel, seriesPlayEpisodeId } from '../../lib/seriesResume';
+import { seriesPlayEpisodeId } from '../../lib/seriesResume';
 import SmartImage from '../../components/SmartImage';
-import { PlayIcon } from '../../components/HeroSpotlight';
+import { PlayIcon, RollupTier, heroPlayLabel } from '../../components/HeroSpotlight';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus content' };
 
@@ -86,6 +86,9 @@ export default function GenreLibrary() {
 
   const { heroPool, rows, totalCount } = state.feed;
   const hero = heroPool[0];
+  // A non-member's Play on a partly-free show says " · free" (slice 4;
+  // /api/genre-feed carries isSubscriber).
+  const isMember = Boolean(state.feed.isSubscriber);
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
@@ -100,14 +103,20 @@ export default function GenreLibrary() {
             <View style={styles.heroContent}>
               <Text style={styles.heroEyebrow}>{genre}</Text>
               <Text style={styles.heroTitle} numberOfLines={2}>{hero.title}</Text>
-              <View style={styles.badge}>
-                <Text style={[styles.badgeText, { color: tierBadge(hero.tier, hero.adsEnabled).text }]}>{tierBadge(hero.tier, hero.adsEnabled).label}</Text>
-              </View>
+              {hero.isSeries && hero.rollupTier ? (
+                <View style={styles.heroChips}>
+                  <RollupTier ep={hero} pillStyle={styles.chipPill} textStyle={styles.chipText} chipStyle={styles.chipPill} chipTextStyle={styles.chipText} />
+                </View>
+              ) : (
+                <View style={styles.badge}>
+                  <Text style={[styles.badgeText, { color: tierBadge(hero.tier, hero.adsEnabled).text }]}>{tierBadge(hero.tier, hero.adsEnabled).label}</Text>
+                </View>
+              )}
               {hero.desc ? <Text style={styles.heroDesc} numberOfLines={2}>{hero.desc}</Text> : null}
               <View style={styles.heroActions}>
                 <Pressable style={styles.playBtn} onPress={() => playHero(hero)}>
                   <PlayIcon size={13} />
-                  <Text style={styles.playBtnText}>{hero.isSeries ? seriesPlayLabel(hero.resume) : 'Play'}</Text>
+                  <Text style={styles.playBtnText}>{heroPlayLabel(hero, isMember)}</Text>
                 </Pressable>
                 <Pressable style={styles.infoBtn} onPress={() => goToCard(hero)}><Text style={styles.infoBtnText}>ⓘ More info</Text></Pressable>
               </View>
@@ -171,6 +180,9 @@ const styles = StyleSheet.create({
   heroTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', marginBottom: 8 },
   badge: { alignSelf: 'flex-start', borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9, backgroundColor: colors.surface3, marginBottom: 8 },
   badgeText: { fontSize: 10, fontWeight: '700' },
+  heroChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+  chipPill: { borderRadius: 999, paddingVertical: 3, paddingHorizontal: 9 },
+  chipText: { fontSize: 10 },
   heroDesc: { color: colors.ink, fontSize: 13, opacity: 0.9, lineHeight: 18, marginBottom: 12 },
   heroActions: { flexDirection: 'row', gap: 10 },
   playBtn: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 11, paddingHorizontal: 18 },

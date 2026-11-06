@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getAllSeries } from '../lib/series';
+import { attachShowRollups } from '../lib/showRollups';
+import { getRatings } from '../lib/ratings';
 import { getAccountContext } from '../lib/accountContext';
 import { getViewCounts, isRedisConfigured } from '../lib/redis';
 import { buildHeroCandidates, signHeroTrailers } from '../lib/heroCandidates';
@@ -58,7 +60,7 @@ export async function getServerSideProps({ req, res }) {
   // compute bills for exactly that: how long the function is active,
   // including time spent awaiting a response.
   const needsViewCounts = isRedisConfigured();
-  const [episodesWithBonus, allSeries, liveStream, account, viewCountsResult, lifecycleSettings] = await Promise.all([
+  const [episodesWithBonus, seriesRows, liveStream, account, viewCountsResult, lifecycleSettings] = await Promise.all([
     getPublicEpisodes(),
     getAllSeries(),
     getCurrentLiveStream(),
@@ -74,6 +76,10 @@ export async function getServerSideProps({ req, res }) {
   // and filter below gets the right set automatically instead of needing
   // its own bonus-content exclusion.
   const episodesWithBonusRemoved = episodesWithBonus.filter((e) => e.contentType !== 'bonus');
+  // What viewers see of each show (decision 10; lib/showRollups.js): the
+  // Tapa + pill and the free chip on its cards and hero, counted from
+  // every public episode before any row narrows them down.
+  const allSeries = attachShowRollups(seriesRows, episodesWithBonus, await getRatings().catch(() => null));
 
   // Age restriction is enforced at the point someone actually tries to
   // watch (pages/episode/[id].js), not here. Hiding cards from browsing
@@ -298,7 +304,7 @@ export default function Home({ liveStream, isSubscriber, isSignedIn, showNewslet
         </Link>
       )}
 
-      <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed />
+      <HeroSpotlight pool={heroPool} onPlay={goToEpisode} onTrailer={goToTrailer} fullBleed isMember={isSubscriber} />
 
       <main id="main-content" className="stage stage-single stage-wide">
         <div>

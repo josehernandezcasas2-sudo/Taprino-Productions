@@ -54,6 +54,40 @@ function cardBadge(tier, adsEnabled) {
   return { label: 'Free with ads', bg: colors.oliveDeep, fg: colors.ink };
 }
 
+// What a series card says about the whole show (decision 10, option A;
+// the website's .ep-badges): "Tapa +" and, in a mixed show, the green
+// free chip ("E1 free", "E1–E3 free", "2 free"); one pill "Free with ads"
+// / "Free" when all of it is free. The server reads it once per show from
+// every public episode (lib/showRollups.js), so a row holding only S2 E1
+// still says "E1 free". A card from a server before slice 4 (no
+// freeLabel / tierLabel) keeps its single pill.
+function SeriesBadges({ card }) {
+  const tierLabel = card.tierLabel || null;
+  const freeLabel = card.freeLabel || null;
+  if (!tierLabel && !freeLabel) {
+    const badge = cardBadge(card.tier, card.adsEnabled);
+    return (
+      <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+        <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
+      </View>
+    );
+  }
+  const allFree = !tierLabel;
+  const free = allFree ? cardBadge('free', freeLabel !== 'Free') : null;
+  return (
+    <View style={styles.badges} pointerEvents="none">
+      {allFree ? (
+        <View style={[styles.badgeIn, { backgroundColor: free.bg }]}><Text style={[styles.badgeText, { color: free.fg }]}>{freeLabel}</Text></View>
+      ) : (
+        <>
+          <View style={[styles.badgeIn, { backgroundColor: colors.brass }]}><Text style={[styles.badgeText, { color: colors.onBrass }]}>{tierLabel}</Text></View>
+          {freeLabel ? <View style={[styles.badgeIn, styles.freeChip]}><Text style={[styles.badgeText, { color: colors.ok }]}>{freeLabel}</Text></View> : null}
+        </>
+      )}
+    </View>
+  );
+}
+
 function PlayGlyph({ size = 11 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="rgba(251,232,211,0.5)">
@@ -110,9 +144,11 @@ export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onT
                 )}
                 {card.hasNew ? <View style={styles.newBanner}><Text style={styles.newBannerText}>New episode</Text></View> : null}
                 {onToggleWishlist ? <WishlistHeart active={isWishlisted(card.id)} onToggle={() => onToggleWishlist(card.id)} top={card.hasNew ? 27 : 7} /> : null}
-                <View style={[styles.badge, { backgroundColor: badge.bg }]}>
-                  <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
-                </View>
+                {isSeries ? <SeriesBadges card={card} /> : (
+                  <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+                    <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
+                  </View>
+                )}
               </View>
               <View style={styles.info}>
                 <Text style={styles.cardTitle} numberOfLines={2}>{card.title}</Text>
@@ -193,8 +229,10 @@ function CheckGlyph({ size = 9 }) {
 // anything partway through. `items` are /api/episode-page's
 // seasonEpisodes ({ id, title, season, seriesOrder, runtime, thumbnail,
 // watched, resumeSeconds, current }); the standalone title's "Watch next"
-// picks use it too, without the codes.
-export function EpisodeStrip({ title, items, onPressItem, onSeeAll, showCode = true }) {
+// picks use it too, without the codes. `currentLabel` is the current
+// card's pill: "Now playing" while it plays, "Now open" on an episode's own
+// page before Play (slice 4, board V2).
+export function EpisodeStrip({ title, items, onPressItem, onSeeAll, showCode = true, currentLabel = 'Now playing' }) {
   const { width } = useWindowDimensions();
   if (!items || items.length === 0) return null;
   const m = rowMetrics(width);
@@ -207,17 +245,20 @@ export function EpisodeStrip({ title, items, onPressItem, onSeeAll, showCode = t
           const pct = ep.resumeSeconds && total ? Math.min(100, Math.round((ep.resumeSeconds / total) * 100)) : 0;
           const code = showCode && ep.seriesOrder ? `S${ep.season || 1} E${ep.seriesOrder}` : null;
           const mins = total ? `${Math.max(1, Math.round(total / 60))} min` : (ep.runtime || '');
+          // In a preview, a title this viewer may not open (someone else's,
+          // not public yet) is a plain card: no tap, no play disc.
+          const openable = ep.canOpen !== false;
           return (
-            <Pressable key={ep.id} style={{ width: m.landscapeW }} onPress={() => onPressItem(ep)} accessibilityState={{ selected: Boolean(ep.current) }}>
+            <Pressable key={ep.id} style={{ width: m.landscapeW }} onPress={openable ? () => onPressItem(ep) : undefined} disabled={!openable} accessibilityState={{ selected: Boolean(ep.current), disabled: !openable }}>
               <View style={[styles.thumb, { width: m.landscapeW, height: m.landscapeH }, ep.current && styles.thumbCurrent, ep.watched && !ep.current && { opacity: 0.75 }]}>
                 {ep.thumbnail ? <SmartImage uri={ep.thumbnail} style={absoluteFill} /> : null}
                 {ep.current ? (
-                  <View style={[styles.stripPill, styles.stripPillNow]}><Text style={styles.stripPillNowText}>Now playing</Text></View>
+                  <View style={[styles.stripPill, styles.stripPillNow]}><Text style={styles.stripPillNowText}>{currentLabel}</Text></View>
                 ) : ep.watched ? (
                   <View style={styles.stripPill}><CheckGlyph /><Text style={styles.stripPillText}>Watched</Text></View>
-                ) : (
+                ) : openable ? (
                   <PlayGlyph size={20} />
-                )}
+                ) : null}
                 {pct > 0 ? (
                   <View style={styles.progressTrack}><View style={[styles.progressFill, { width: `${pct}%` }]} /></View>
                 ) : null}
@@ -250,6 +291,10 @@ const styles = StyleSheet.create({
   // Bottom-left of the art: on a 110pt card it can't share the top edge
   // with the heart (the website's .row-card .ep-thumb .ep-badge).
   badge: { position: 'absolute', left: 7, bottom: 7, paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
+  // A series card's two chips, bottom-left, wrapping upward on a narrow card.
+  badges: { position: 'absolute', left: 7, right: 7, bottom: 7, flexDirection: 'row', flexWrap: 'wrap-reverse', alignItems: 'flex-end', gap: 4 },
+  badgeIn: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
+  freeChip: { backgroundColor: colors.surface0, borderWidth: 1, borderColor: colors.ok, paddingVertical: 2, paddingHorizontal: 6 },
   badgeText: { fontFamily: fonts.mono, fontSize: 8, letterSpacing: 0.6, textTransform: 'uppercase' },
   newBanner: { position: 'absolute', top: 0, left: 0, right: 0, backgroundColor: colors.sky, paddingVertical: 5 },
   newBannerText: { color: colors.surface0, fontFamily: fonts.monoBold, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', textAlign: 'center' },

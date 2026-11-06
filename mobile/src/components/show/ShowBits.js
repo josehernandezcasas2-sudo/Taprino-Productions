@@ -34,11 +34,16 @@ export function submitRoute({ kind, showId, season = null, number = null, type =
   return `/creator/submit?type=${enc(t)}&series=${enc(showId)}${season ? `&season=${enc(season)}` : ''}${number ? `&number=${enc(number)}` : ''}`;
 }
 // The public page in the app: the series screen, or the podcast screen.
-export function publicRoute(show) {
-  return show && show.kind === 'podcast' ? `/podcasts/${enc(show.id)}` : `/series/${enc(show.id)}`;
+// `preview` asks for the owner's private preview (?preview=1, slice 4):
+// the series screen draws it; the app's podcast screen has none (the
+// website's /podcasts/<id>?preview=1 does), so a podcast keeps its plain
+// address.
+export function publicRoute(show, { preview = false } = {}) {
+  if (show && show.kind === 'podcast') return `/podcasts/${enc(show.id)}`;
+  return `/series/${enc(show.id)}${preview ? '?preview=1' : ''}`;
 }
-export function episodePublicRoute(id) {
-  return `/episode/${enc(id)}`;
+export function episodePublicRoute(id, { preview = false } = {}) {
+  return `/episode/${enc(id)}${preview ? '?preview=1' : ''}`;
 }
 // "Email us" with a subject (the website's askHref).
 export function askUs(subject) {

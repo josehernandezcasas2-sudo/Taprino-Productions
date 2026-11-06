@@ -113,7 +113,7 @@ export default function TypeBrowseScreen({ type }) {
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
 
-        {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToEpisode} />}
+        {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToEpisode} isMember={Boolean(state.feed.isSubscriber)} />}
 
         <View style={styles.stage}>
           <Pressable style={styles.backBtn} onPress={goBack}>

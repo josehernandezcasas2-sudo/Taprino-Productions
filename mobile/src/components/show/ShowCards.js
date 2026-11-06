@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import { colors, fonts, inkTint } from '../../lib/theme';
 import SmartImage from '../SmartImage';
 import { Switch } from '../CreatorBits';
-import { ClockIcon, PencilIcon, TrashIcon, WarningIcon, ExternalLinkIcon } from '../WorkIcons';
+import { ClockIcon, EyeIcon, PencilIcon, TrashIcon, WarningIcon, ExternalLinkIcon } from '../WorkIcons';
 import {
   BanIcon, CheckIcon, ChevronIcon, KebabIcon, KindChip, LinkText, NoEyeIcon, Pill, PlusIcon, SmallButton, StateChip, TONE,
-  askUs, countLine, minutesOf, shortDate, ss
+  askUs, countLine, minutesOf, publicRoute, shortDate, ss
 } from './ShowBits';
 import { PaidLine } from './PayeeCard';
 
@@ -16,8 +17,15 @@ import { PaidLine } from './PayeeCard';
 // shelf. Presentational: the screen (app/creator/show/[id]/index.js) owns
 // the data and every request.
 
-// The private preview (?preview=1) is slice 4: its links stay hidden.
-export const PREVIEW_BUILT = false;
+// The private preview (?preview=1, slice 4): the series screen opens a
+// show that isn't public for its owner, anyone with an episode in it and
+// the team. The app has no podcast preview (the website does), so the
+// buttons are for a series only.
+export const PREVIEW_BUILT = true;
+
+function previewable(show) {
+  return PREVIEW_BUILT && Boolean(show) && show.kind !== 'podcast';
+}
 
 // The show card: the poster (tap → Edit show, art), the name (or its
 // title image), Series | Podcast, where it stands, the count line, the
@@ -26,6 +34,7 @@ export const PREVIEW_BUILT = false;
 // paid" block; null for a viewer who may not see who is paid) adds
 // "RUNS IT … · PAID TO …" under the count line.
 export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy, payee = null }) {
+  const router = useRouter();
   const show = view.show;
   const st = show.staged || {};
   const art = show.art || {};
@@ -81,6 +90,9 @@ export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy, 
       <View style={ss.wrap}>
         {canEdit ? <SmallButton label="Edit show" icon={<PencilIcon size={14} color={colors.ink} />} onPress={() => onEdit('details')} /> : null}
         {show.isPublic ? <SmallButton label="View page" icon={<ExternalLinkIcon size={14} color={colors.ink} />} onPress={onView} /> : null}
+        {!show.isPublic && previewable(show) ? (
+          <SmallButton label="Preview · not public yet" icon={<EyeIcon size={14} color={colors.ink} />} onPress={() => router.push(publicRoute(show, { preview: true }))} />
+        ) : null}
       </View>
     </View>
   );
@@ -101,6 +113,7 @@ function agoWords(iso) {
 // public, Cancel request, Resubmit) and the problem lines (showProblems),
 // each leading to its row.
 export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onCancelRemoval, onResubmit, busy }) {
+  const router = useRouter();
   const show = view.show;
   const noun = show.kind === 'podcast' ? 'show' : 'series';
   const state = show.state;
@@ -127,9 +140,14 @@ export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onC
   } else if (state === 'ready') {
     icon = <CheckIcon size={18} color={tone.fg} />;
     body = <Text style={ss.p}>{firstApproved ? <Text style={ss.strong}>{firstApproved.displayTitle} is approved. </Text> : null}{show.name} stays private until you make it public, so you can wait for more episodes and open a whole season at once. Episodes approved after that go live straight away.</Text>;
-    acts = make && make.ok ? (
-      <SmallButton label={busy === 'public' ? 'Making it public…' : 'Make it public'} tone="primary" busy={busy === 'public'} onPress={onMakePublic} />
-    ) : make && make.reason ? <Text style={ss.small}>{make.reason}</Text> : null;
+    acts = (
+      <View style={ss.wrap}>
+        {make && make.ok ? (
+          <SmallButton label={busy === 'public' ? 'Making it public…' : 'Make it public'} tone="primary" busy={busy === 'public'} onPress={onMakePublic} />
+        ) : make && make.reason ? <Text style={ss.small}>{make.reason}</Text> : null}
+        {previewable(show) ? <SmallButton label="Preview the page" onPress={() => router.push(publicRoute(show, { preview: true }))} /> : null}
+      </View>
+    );
   } else if (state === 'pulled') {
     icon = <BanIcon size={18} color={tone.fg} />;
     body = <Text style={ss.p}>You can still replace the file (the new one comes to us first), add captions and edit page notes. <Text style={ss.link} onPress={() => askUs(`Pulled: ${show.name}`)}>Email us</Text></Text>;

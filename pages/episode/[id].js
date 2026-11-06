@@ -22,7 +22,8 @@ import HeaderNav from '../../components/HeaderNav';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
 import AccessibilityPanel from '../../components/AccessibilityPanel';
-import { SITE } from '../../lib/siteConfig';
+import { SITE, absoluteSiteUrl } from '../../lib/siteConfig';
+import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
 import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
 import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../components/BuyBits';
@@ -46,6 +47,45 @@ function minutesLabel(runtime) {
   return s ? `${Math.max(1, Math.round(s / 60))} min` : (runtime || '');
 }
 
+// The page's <title> and link-preview tags (slice 4): "S1 E3 · Transfer —
+// Night Bus · Studio Tapa TV", the still as og:image. The gate cards
+// (viewing terms, age) carry the same ones: a link-preview crawler never
+// has the viewing-terms cookie, so for a rated title the gate is the page
+// it reads.
+function headWords({ title, desc, season, seriesOrder, seriesId, showName, thumbnail, poster }) {
+  const code = episodeCode({ season, seriesOrder });
+  const named = showName && seriesId;
+  const ogTitle = named ? (code ? `${code} · ${title} — ${showName}` : `${title} — ${showName}`) : (title || '');
+  return {
+    docTitle: named ? `${ogTitle} · ${SITE.name}` : `${title} — ${SITE.name}`,
+    ogTitle,
+    desc: desc || '',
+    ogImage: absoluteSiteUrl(thumbnail) || absoluteSiteUrl(poster) || absoluteSiteUrl('/og-image.png')
+  };
+}
+
+function HeadTags({ words, preview = false, docTitle = null }) {
+  return (
+    <Head>
+      <title>{docTitle || words.docTitle}</title>
+      <meta name="description" content={words.desc} />
+      {preview ? (
+        <meta name="robots" content="noindex, nofollow" />
+      ) : (
+        <>
+          <meta property="og:title" content={words.ogTitle} />
+          <meta property="og:description" content={words.desc.slice(0, 200)} />
+          <meta property="og:image" content={words.ogImage} />
+          <meta property="og:type" content="video.episode" />
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={words.ogTitle} />
+          <meta name="twitter:image" content={words.ogImage} />
+        </>
+      )}
+    </Head>
+  );
+}
+
 function CheckGlyph() {
   return (
     <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -60,7 +100,7 @@ function CheckGlyph() {
 // anything partway through. Two across + a peek on a phone, a vertical
 // list beside the player on a laptop (.ep-strip). Also the standalone
 // title's "Watch next" picks, without the codes.
-function EpisodeStrip({ heading, items, seeAllHref, seeAllLabel = 'See all', iconOverrides, showCode = true }) {
+function EpisodeStrip({ heading, items, seeAllHref, seeAllLabel = 'See all', iconOverrides, showCode = true, currentLabel = 'Now playing' }) {
   return (
     <section className="ep-episodes" aria-label={heading}>
       <div className="ep-strip-head">
@@ -72,28 +112,32 @@ function EpisodeStrip({ heading, items, seeAllHref, seeAllLabel = 'See all', ico
           const total = parseRuntimeToSeconds(it.runtime);
           const pct = it.resumeSeconds && total ? Math.min(100, Math.round((it.resumeSeconds / total) * 100)) : 0;
           const code = showCode ? episodeCode(it) : null;
-          return (
-            <Link
-              key={it.id}
-              href={it.href}
-              className={`ep-strip-card ${it.current ? 'is-current' : ''} ${it.watched && !it.current ? 'is-watched' : ''}`}
-              aria-current={it.current ? 'true' : undefined}
-            >
+          // In a preview, a title this viewer may not open (someone else's,
+          // not public yet) is a plain card: no link, no play disc.
+          const openable = it.canOpen !== false;
+          const className = `ep-strip-card ${it.current ? 'is-current' : ''} ${it.watched && !it.current ? 'is-watched' : ''} ${openable ? '' : 'is-static'}`;
+          const inner = (
+            <>
               <span className="ep-strip-thumb" style={it.thumbnail ? { backgroundImage: `url(${it.thumbnail})` } : undefined}>
                 {it.current ? (
-                  <span className="ep-strip-pill now">Now playing</span>
+                  <span className="ep-strip-pill now">{currentLabel}</span>
                 ) : it.watched ? (
                   <span className="ep-strip-pill watched"><CheckGlyph /> Watched</span>
-                ) : (
+                ) : openable ? (
                   <span className="ep-strip-play"><PlayIcon size={20} src={iconOverrides.play} /></span>
-                )}
+                ) : null}
                 {pct > 0 && <span className="ep-strip-progress" aria-hidden="true"><span style={{ width: `${pct}%` }} /></span>}
               </span>
               <span className="ep-strip-info">
                 <span className="ep-strip-title">{it.title}</span>
                 <span className="ep-strip-meta">{[code, minutesLabel(it.runtime)].filter(Boolean).join(' · ')}</span>
               </span>
-            </Link>
+            </>
+          );
+          return openable ? (
+            <Link key={it.id} href={it.href} className={className} aria-current={it.current ? 'true' : undefined}>{inner}</Link>
+          ) : (
+            <div key={it.id} className={className}>{inner}</div>
           );
         })}
       </div>
@@ -107,7 +151,10 @@ export async function getServerSideProps({ req, params, query, res }) {
   // come from lib/episodePage.js (shared with the mobile app's
   // /api/episode-page). Only the entitlement-gated playback URL is decided
   // here, since the app gets that from /api/stream-token instead.
-  const data = await getEpisodePageData(params.id, req);
+  // ?preview=1: the owner's private preview of an episode that isn't live
+  // (slice 4). Strangers get the same 404 as a missing id.
+  const preview = query.preview === '1';
+  const data = await getEpisodePageData(params.id, req, { preview });
   if (data.notFound) {
     return { notFound: true };
   }
@@ -121,7 +168,8 @@ export async function getServerSideProps({ req, params, query, res }) {
         termsRequired: Boolean(data.termsRequired),
         requiredRating: data.requiredRating,
         requiredAge: data.requiredAge ?? null,
-        isSignedIn: data.isSignedIn
+        isSignedIn: data.isSignedIn,
+        head: data.head || null
       }
     };
   }
@@ -140,7 +188,12 @@ export async function getServerSideProps({ req, params, query, res }) {
   // Early screenings (lib/earlyAccess.js): for the first day only
   // Premium/Sponsor, admins, the creator and buyers get the file.
   const earlyAccess = data.earlyAccess || { early: false, locked: false, opensAt: null };
-  const entitled = (episode.tier === 'free' || account.isSubscriber || owned) && !earlyAccess.locked;
+  // A preview is the title's own people: they watch it unless it is pulled
+  // and they aren't the team (preview.canPlay).
+  const previewInfo = data.preview || null;
+  const entitled = previewInfo
+    ? previewInfo.canPlay === true
+    : (episode.tier === 'free' || account.isSubscriber || owned) && !earlyAccess.locked;
   const purchaseSettings = data.purchase && data.purchase.forSale && !owned ? await getPurchaseSettings() : null;
 
   // Every video is served through a short-lived Cloudflare signed URL
@@ -170,12 +223,15 @@ export async function getServerSideProps({ req, params, query, res }) {
   // Captions and transcripts are the title's dialogue in text: they go to
   // the browser only with the video (the lock screen used to carry them),
   // and never the stored reference, only the gated route.
+  // Who uploaded it stays on the server (slice 4's contract, section 3):
+  // the page names people through `credits`.
+  const { submittedBy: _uploader, ...publicEpisode } = episode;
   const safeEpisode = {
-    ...episode,
+    ...publicEpisode,
     src: playbackSrc,
     audioDescriptionSrc: describedSrc,
     audioUrl: entitled ? episode.audioUrl || null : null,
-    captionsUrl: entitled ? episode.captionsUrl || null : null,
+    captionsUrl: entitled && episode.captionsUrl ? (previewInfo ? `${episode.captionsUrl}?preview=1` : episode.captionsUrl) : null,
     transcriptUrl: entitled ? episode.transcriptUrl || null : null,
     captionsRef: null
   };
@@ -202,6 +258,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       previousEpisode: data.previousEpisode,
       previousEpisodeWatched: data.previousEpisodeWatched,
       seasonEpisodes: data.seasonEpisodes || [],
+      showEpisodeCount: data.showEpisodeCount || 0,
       watchNext: data.watchNext,
       // The end card's pick once the show is over or a film ends (lib/endCardRules.js).
       afterShow: data.afterShow || null,
@@ -219,12 +276,18 @@ export async function getServerSideProps({ req, params, query, res }) {
       aiSeal: data.aiSeal !== false,
       bought: typeof query.bought === 'string' ? query.bought : null,
       refundDays: purchaseSettings ? purchaseSettings.refundDays : 14,
-      refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10
+      refundWatchPercent: purchaseSettings ? purchaseSettings.refundWatchPercent : 10,
+      // Slice 4: the credit lines (decision 20), whose notes the own page
+      // shows, and the preview bar (null unless ?preview=1 opened a title
+      // that isn't live).
+      credits: data.credits || [],
+      notesFrom: data.notesFrom || null,
+      preview: previewInfo
     }
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, afterShow = null, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, afterShow = null, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10, credits = [], notesFrom = null, preview = null, head = null, showEpisodeCount = 0 }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -244,7 +307,38 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // ?autoplay=1, which means the choice to watch was already made —
   // landing on an info page after clicking Play would defeat the point of
   // having a separate Play button at all.
-  const [showPlayer, setShowPlayer] = useState(episode.contentType === 'series' || Boolean(startOnTrailer) || Boolean(startPlaying));
+  //
+  // Decision 11 (slice 4): what decides it now is whether the title has
+  // its own page (episode.hasPage; a film or a short by type, a show's
+  // episode only when its owner switched it on). Without one it plays at
+  // once, as a series episode always did; an extra, a podcast or a
+  // vertical title opened bare now plays too.
+  const [showPlayer, setShowPlayer] = useState(!episode.hasPage || Boolean(startOnTrailer) || Boolean(startPlaying));
+  // A link from this page to another title (the strip, Up next, Extras)
+  // keeps the component mounted with the new props: start that title the
+  // way a fresh load would (its own page, or the player), not with this
+  // one's state — reset while rendering, so the old view never flashes.
+  const startKey = `${episode.id}|${startOnTrailer ? 1 : 0}|${startPlaying ? 1 : 0}`;
+  const [shownFor, setShownFor] = useState(startKey);
+  if (shownFor !== startKey) {
+    setShownFor(startKey);
+    setShowPlayer(!episode.hasPage || Boolean(startOnTrailer) || Boolean(startPlaying));
+    setShowingTrailer(Boolean(startOnTrailer));
+  }
+  const previewing = Boolean(preview);
+  // An episode's own page (board V2) for a show's episode or an extra;
+  // films and shorts keep their hero landing (question 1 for Jose).
+  const ownPageLayout = Boolean(episode.hasPage) && (episode.contentType === 'bonus' || ((episode.contentType === 'series' || episode.contentType === 'podcast') && Boolean(episode.seriesId)));
+  // The player in a preview fetches its fresh link with preview: true.
+  const refreshPreviewSrc = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stream-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episodeId: episode.id, preview: true }) });
+      const data = await res.json().catch(() => ({}));
+      return data && data.src ? data.src : null;
+    } catch (err) {
+      return null;
+    }
+  }, [episode.id]);
   const [describedActive, setDescribedActive] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
@@ -265,13 +359,13 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // episode with a ten-second timer, or the pick once the show is over.
   // Memoised so a re-render never restarts its timer.
   const endCard = useMemo(
-    () => endCardFor({ episode, nextEpisode, pick: afterShow, seriesName: parentSeriesName, trailer: showingTrailer }),
+    () => (preview ? null : endCardFor({ episode, nextEpisode, pick: afterShow, seriesName: parentSeriesName, trailer: showingTrailer })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [episode.id, nextEpisode && nextEpisode.id, afterShow && afterShow.id, parentSeriesName, showingTrailer]
+    [episode.id, nextEpisode && nextEpisode.id, afterShow && afterShow.id, parentSeriesName, showingTrailer, Boolean(preview)]
   );
-  const lockedNow = (episode.tier === 'premium' && !isSubscriber && !owned) || Boolean(earlyAccess && earlyAccess.locked);
+  const lockedNow = preview ? preview.canPlay === false : (episode.tier === 'premium' && !isSubscriber && !owned) || Boolean(earlyAccess && earlyAccess.locked);
   useEffect(() => {
-    if (!showPlayer || showingTrailer || lockedNow || !episode.id || resumeToastFor.current === episode.id) return undefined;
+    if (preview || !showPlayer || showingTrailer || lockedNow || !episode.id || resumeToastFor.current === episode.id) return undefined;
     const pos = getPosition(episode.id);
     if (!(pos > 0)) return undefined;
     resumeToastFor.current = episode.id;
@@ -296,7 +390,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     src: episode.trailerSrc || null,
     expiresAt: episode.trailerExpiresAt || null,
     ref: episode.trailerRef || null,
-    active: !showPlayer
+    // The own page (V2) shows a still with a Trailer button instead.
+    active: !showPlayer && !ownPageLayout
   });
   const landingTrailerSrc = !showPlayer && landingTrailer.hasTrailer ? landingTrailer.src : null;
   // episode.id too: the <video> is keyed by it, so moving to another title
@@ -352,7 +447,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     const requiredAge = requiredAgeProp ?? 13;
     return (
       <>
-        <Head><title>A quick confirmation — {SITE.name}</title></Head>
+        {head ? <HeadTags words={headWords(head)} /> : <Head><title>A quick confirmation — {SITE.name}</title></Head>}
         <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
         <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
           <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
@@ -380,7 +475,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     const requiredAge = requiredAgeProp ?? MIN_AGE_BY_RATING[requiredRating] ?? 17;
     return (
       <>
-        <Head><title>Content restricted — {SITE.name}</title></Head>
+        {head ? <HeadTags words={headWords(head)} /> : <Head><title>Content restricted — {SITE.name}</title></Head>}
         <HeaderNav activeType="All" mainGenres={mainGenres} isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
         <main id="main-content" className="stage stage-single" style={{ textAlign: 'center', paddingTop: '4rem' }}>
           <div className="account-card" style={{ maxWidth: 480, margin: '0 auto' }}>
@@ -429,8 +524,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // Early screenings: the first day after release is Premium's. The server
   // already withheld the file (entitled is false), so this only picks the
   // panel; trailers still play.
-  const earlyLocked = Boolean(earlyAccess && earlyAccess.locked) && !showingTrailer;
-  const locked = (episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer) || earlyLocked;
+  const earlyLocked = !previewing && Boolean(earlyAccess && earlyAccess.locked) && !showingTrailer;
+  // A preview plays for the title's own people whatever its tier; a
+  // pulled one plays for the team only (preview.canPlay).
+  const previewPulled = previewing && preview.canPlay === false && !showingTrailer;
+  const locked = previewing ? previewPulled : (episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer) || earlyLocked;
   const playingEpisode = showingTrailer
     ? { ...episode, src: episode.trailerSrc }
     : describedActive && episode.audioDescriptionSrc
@@ -445,14 +543,32 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
   const tier = tierBadge(episode.tier, episode.adsEnabled);
   const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
-  const upNext = isSeries && !showingTrailer ? nextEpisode : null;
+  // The own page (board V2): nothing plays yet, so no Up next card.
+  const landingV2 = !showPlayer && ownPageLayout;
+  const upNext = isSeries && !showingTrailer && !landingV2 && nextEpisode && nextEpisode.canOpen !== false ? nextEpisode : null;
+  const seasonNumber = Number(episode.season) > 0 ? Number(episode.season) : 1;
+  const showHref = episode.seriesId ? `/series/${encodeURIComponent(episode.seriesId)}?season=${seasonNumber}${previewing ? '&preview=1' : ''}` : null;
+  const previewQs = previewing ? '&preview=1' : '';
+  // <title> names the show (slice 4): "S1 E3 · Transfer — Night Bus".
+  const words = headWords({ ...episode, showName: parentSeriesName });
+  const makerLine = (credits || []).find((c) => c.key === 'maker') || null;
+  const notes = typeof episode.pageNotes === 'string' && episode.pageNotes.trim() ? episode.pageNotes.trim().split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean) : [];
+  const resumeAt = watchProgress && Number(watchProgress[episode.id]) > 0;
+  // Play on the own page: the player in place, and ?autoplay=1 in the URL
+  // so a reload (or a shared link) opens the player.
+  function playHere() {
+    setShowPlayer(true);
+    router.replace({ pathname: router.pathname, query: { ...router.query, autoplay: '1' } }, undefined, { shallow: true, scroll: false });
+  }
 
   function goToType(t) {
     router.push(t === 'All' ? '/' : `/?type=${encodeURIComponent(t)}`);
   }
 
+  // The full-screen "Next" pill plays the next episode, like Up next and
+  // the end card (an episode with its own page would otherwise open on it).
   function goToNextEpisode() {
-    if (nextEpisode) router.push(`/episode/${nextEpisode.id}`);
+    if (upNext) router.push(`/episode/${upNext.id}?autoplay=1${previewQs}`);
   }
 
   function handleEnded() {
@@ -485,17 +601,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
   return (
     <>
-      <Head>
-        <title>{`${episode.title} — ${SITE.name}`}</title>
-        <meta name="description" content={episode.desc} />
-        <meta property="og:title" content={`${episode.title} — ${SITE.name}`} />
-        <meta property="og:description" content={episode.desc} />
-        <meta property="og:image" content="/og-image.png" />
-        <meta property="og:type" content="video.episode" />
-        <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content={episode.title} />
-        <meta name="twitter:image" content="/og-image.png" />
-      </Head>
+      <HeadTags words={words} preview={previewing} />
 
       <HeaderNav
         activeType="All"
@@ -507,7 +613,29 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
         isSubscriber={isSubscriber}
       />
 
-      {!showPlayer ? (
+      <PreviewBar preview={preview} />
+
+      {landingV2 ? (
+        // An episode's own page (board V2): the still (or the trailer's
+        // button) in the player's place, the player's box exactly.
+        <div className="epl-strip">
+          {(episode.thumbnail || episode.poster || episode.heroImage) && (
+            <Image src={episode.thumbnail || episode.poster || episode.heroImage} alt="" fill priority sizes="100vw" className="epl-strip-art" />
+          )}
+          {(episode.trailerSrc || episode.trailerRef) ? (
+            <>
+              <span className="epl-strip-tag">Trailer</span>
+              <button type="button" className="epl-strip-play" aria-label="Play the trailer" onClick={() => { setShowingTrailer(true); setShowPlayer(true); }}>
+                <PlayIcon size={20} src={iconOverrides.play} />
+              </button>
+            </>
+          ) : (
+            <button type="button" className="epl-strip-play" aria-label="Play" onClick={playHere}>
+              <PlayIcon size={20} src={iconOverrides.play} />
+            </button>
+          )}
+        </div>
+      ) : !showPlayer ? (
         <div className="hero-carousel full-bleed">
           {landingTrailer.hasTrailer ? (
             // The link is attached by the effect above (hls.js where needed);
@@ -581,6 +709,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 <button className="hero-play" onClick={() => setShowPlayer(true)}>
                   <PlayIcon size={16} src={iconOverrides.play} /> Play
                 </button>
+                {!previewing && (
                 <button
                   className="hero-trailer"
                   onClick={() => toggleWishlist(episode.id)}
@@ -588,7 +717,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 >
                   <HeartIcon size={16} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved' : 'Save for later'}
                 </button>
-                {episode.fundingUrl && (
+                )}
+                {episode.fundingUrl && !previewing && (
                   <a href={episode.fundingUrl} target="_blank" rel="noopener noreferrer" className="hero-trailer">
                     &#9670; Back this project
                   </a>
@@ -600,7 +730,14 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       ) : (
         <div className="player-full-bleed">
           {locked ? (
-            earlyLocked ? (
+            previewPulled ? (
+              <div className="lock-panel">
+                <div className="glyph">◈</div>
+                <h3>Pulled while our team looks at it</h3>
+                <p>It plays again once it&rsquo;s restored.</p>
+                <a className="unlock-btn" href={`mailto:${SITE.contactEmail}`}>Email us</a>
+              </div>
+            ) : earlyLocked ? (
               <div className="lock-panel">
                 <div className="glyph">◈</div>
                 <h3>Early screening</h3>
@@ -664,16 +801,17 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 // get them on premium titles too; only Premium/Sponsor are
                 // ad-free (lib/membershipTiers.js adFree). A buyer paid for this
                 // title, so it plays ad-free for them (Buy to own).
-                adsEnabled={!showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
+                // A preview never shows ads (nothing about it counts).
+                adsEnabled={!previewing && !showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
                 onEnded={handleEnded}
                 advisory={!showingTrailer}
                 // The film refreshes its own token through /api/stream-token;
                 // the trailer's link is signed too, and refreshes through its
                 // own (refreshTrailerSrc above).
                 signedPlayback={showingTrailer ? Boolean(episode.trailerRef) : signedPlayback}
-                refreshSrc={showingTrailer ? refreshTrailerSrc : null}
-                initialPosition={showingTrailer ? 0 : getPosition(episode.id)}
-                onProgress={showingTrailer ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+                refreshSrc={showingTrailer ? refreshTrailerSrc : previewing ? refreshPreviewSrc : null}
+                initialPosition={showingTrailer || previewing ? 0 : getPosition(episode.id)}
+                onProgress={showingTrailer || previewing ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
                 // Full screen: the site's own chrome (the "After Play" canvas).
                 heading={{ kicker: showingTrailer ? 'Trailer' : seriesKicker, title: episode.title }}
                 rating={episode.rating || null}
@@ -682,7 +820,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 // The end card once the title plays out (lib/endCardRules.js).
                 endCard={endCard}
                 onEndCardGo={(href) => router.push(href)}
-                topRight={!showingTrailer ? (
+                topRight={!showingTrailer && !previewing ? (
                   <TipButton tipping={tipping} isSignedIn={isSignedIn} className="tp-fs-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
                     <TipIcon size={13} src={iconOverrides.tip} /> Tip {tipFirstName}
                   </TipButton>
@@ -700,7 +838,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
       <main id="main-content" className="stage stage-single ep-after">
         <BackButton
-          fallbackHref={isSeries ? `/series/${episode.seriesId}` : episode.contentType === 'podcast' ? '/podcasts' : '/stream'}
+          fallbackHref={isSeries ? showHref : episode.contentType === 'podcast' ? '/podcasts' : '/stream'}
         />
 
         <BoughtBanner bought={bought} title={episode.title} email={email} />
@@ -713,11 +851,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             description and credits, then the season as a strip. On a
             laptop the Up next card and the strip sit beside the title
             block (.ep-layout's grid areas). */}
-        <div className={`ep-layout ${upNext ? '' : 'no-upnext'}`}>
+        <div className={`ep-layout ${upNext ? '' : 'no-upnext'} ${landingV2 ? 'ep-landing' : ''}`}>
           <section className="ep-head" aria-label="Now screening">
             <div className="ep-kicker">
               {isSeries ? (
-                <Link href={`/series/${episode.seriesId}`} className="ep-kicker-link">
+                <Link href={showHref} className="ep-kicker-link">
                   {parentSeriesName || 'Series'}
                   {episode.seriesOrder ? ` · Season ${episode.season || 1} · Episode ${episode.seriesOrder}` : ''}
                   <ArrowRightIcon size={11} src={iconOverrides.arrow_right} />
@@ -741,7 +879,9 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                   {describedActive && <span className="ep-meta-note">Audio described</span>}
                 </div>
               </div>
+              {!landingV2 && (
               <div className="ep-actions">
+                {!previewing && (
                 <button
                   type="button"
                   className={`ep-action ${isWishlisted(episode.id) ? 'is-on' : ''}`}
@@ -751,6 +891,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                   <span className="ep-action-ring"><HeartIcon size={18} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /></span>
                   <span className="ep-action-label">{isWishlisted(episode.id) ? 'Saved' : 'Save'}</span>
                 </button>
+                )}
                 {/* Tips: only once the maker's Stripe account can take charges. */}
                 <TipButton tipping={tipping} isSignedIn={isSignedIn} className="ep-action ep-action-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
                   <span className="ep-action-ring"><TipIcon size={18} src={iconOverrides.tip} /></span>
@@ -774,15 +915,40 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                     <span className="ep-action-label">Trailer</span>
                   </button>
                 ))}
-                {episode.fundingUrl && (
+                {episode.fundingUrl && !previewing && (
                   <a className="ep-action" href={episode.fundingUrl} target="_blank" rel="noopener noreferrer">
                     <span className="ep-action-ring"><DiamondIcon size={16} src={iconOverrides.diamond} /></span>
                     <span className="ep-action-label">Back it</span>
                   </a>
                 )}
               </div>
+              )}
             </div>
-            {!showPlayer && (
+            {landingV2 && (
+              // The own page's row (board V2): pills that wrap rather
+              // than shrink.
+              <div className="epl-actions">
+                <button type="button" className="epl-btn is-play" onClick={playHere}>
+                  <PlayIcon size={16} src={iconOverrides.play} /> {resumeAt && !previewing ? 'Continue' : 'Play'}
+                </button>
+                {!previewing && (
+                  <button type="button" className={`epl-btn ${isWishlisted(episode.id) ? 'is-on' : ''}`} onClick={() => toggleWishlist(episode.id)} aria-pressed={isWishlisted(episode.id)}>
+                    <HeartIcon size={16} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved' : 'Save'}
+                  </button>
+                )}
+                {!previewing && (
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} className="epl-btn is-tip" title={tipping && tipping.enabled ? `Tip ${tipping.creatorName}` : undefined}>
+                    <TipIcon size={16} src={iconOverrides.tip} /> Tip {tipFirstName}
+                  </TipButton>
+                )}
+                {episode.fundingUrl && !previewing && (
+                  <a className="epl-btn" href={episode.fundingUrl} target="_blank" rel="noopener noreferrer">
+                    <DiamondIcon size={14} src={iconOverrides.diamond} /> Back it
+                  </a>
+                )}
+              </div>
+            )}
+            {!showPlayer && !landingV2 && !previewing && (
               <OwnTitleCard
                 offer={purchase}
                 bundle={bundle}
@@ -799,7 +965,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
           {upNext && (
             <Link
-              href={`/episode/${upNext.id}?autoplay=1`}
+              href={`/episode/${upNext.id}?autoplay=1${previewQs}`}
               className="ep-upnext"
               aria-label={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}
             >
@@ -816,17 +982,30 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
           )}
 
           <section className="ep-body">
-            {episode.desc && <p className="ep-desc">{episode.desc}</p>}
+            {landingV2 && notes.length > 0 ? (
+              <div className="epl-notes">
+                <h2 className="epl-notes-heading">{notesFrom ? `Notes from ${notesFrom}` : 'Notes'}</h2>
+                {notes.map((p, i) => <p key={i}>{p}</p>)}
+              </div>
+            ) : (
+              episode.desc && <p className="ep-desc">{episode.desc}</p>
+            )}
             {withdrawn && (
               <p className="own-withdrawn">No longer on {SITE.name} · still yours. The creator took this title down, so it isn&rsquo;t in the catalogue any more, but you bought it and it keeps playing for you here and in the app.</p>
             )}
             <div className="ep-credits">
-              {episode.artist && (
-                <span className="ep-maker">
-                  <span className="ep-maker-avatar" aria-hidden="true">{episode.artist.trim().charAt(0).toUpperCase()}</span>
-                  Made by {episode.artist}
-                </span>
-              )}
+              {/* The credit lines (decision 20): Made by, then the
+                  optional Studio and Producer, in the owner's order. */}
+              {(credits && credits.length ? credits : (episode.artist ? [{ key: 'maker', label: 'Made by', name: episode.artist, href: null }] : [])).map((c) => (
+                c.key === 'maker' ? (
+                  <span key={c.key} className="ep-maker">
+                    <span className="ep-maker-avatar" aria-hidden="true">{c.name.trim().charAt(0).toUpperCase()}</span>
+                    {c.label} {c.href ? <Link href={c.href} className="ep-credit-name">{c.name}</Link> : c.name}
+                  </span>
+                ) : (
+                  <span key={c.key} className="ep-credit-line">{c.label} {c.href ? <Link href={c.href} className="ep-credit-name">{c.name}</Link> : c.name}</span>
+                )
+              ))}
               {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
               {aiSeal && <AiSealChip />}
               {crew.length > 0 && <span className="ep-credit-line">With {crew.slice(0, 6).map((c, i) => <span key={c.userId}>{i > 0 ? ', ' : ''}<Link href={c.profilePath}>{c.displayName}</Link> <small>({c.role})</small></span>)}{crew.length > 6 ? ` and ${crew.length - 6} more` : ''}</span>}
@@ -834,29 +1013,47 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               {owned && purchase.boughtAt && (
                 <span className="ep-credit-line">Bought {new Date(purchase.boughtAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
               )}
-              <ReportButton targetType="episode" targetId={episode.id} title={episode.title} className="ep-report" />
+              {!previewing && <ReportButton targetType="episode" targetId={episode.id} title={episode.title} className="ep-report" />}
             </div>
-            {!locked && (
+            {previewing && <PreviewFootnote />}
+            {!locked && !landingV2 && (
               <AccessibilityPanel
                 episode={episode}
                 describedActive={describedActive}
                 onPlayDescribed={() => setDescribedActive((d) => !d)}
               />
             )}
+            {landingV2 && !previewing && (
+              <OwnTitleCard
+                offer={purchase}
+                bundle={bundle}
+                episode={episode}
+                creatorName={makerLine ? makerLine.name : episode.artist}
+                isSignedIn={isSignedIn}
+                isSubscriber={isSubscriber}
+                refundDays={refundDays}
+                refundWatchPercent={refundWatchPercent}
+                onSeePlans={startCheckout}
+              />
+            )}
           </section>
 
           {isSeries && seasonEpisodes.length > 1 && (
             <EpisodeStrip
-              heading={`Episodes · Season ${episode.season || 1}`}
-              items={seasonEpisodes.map((e) => ({ ...e, href: `/episode/${e.id}?autoplay=1` }))}
-              seeAllHref={`/series/${episode.seriesId}`}
+              heading={`Episodes · Season ${seasonNumber}`}
+              items={seasonEpisodes.map((e) => ({ ...e, href: `/episode/${e.id}?autoplay=1${previewQs}` }))}
+              seeAllHref={showHref}
               iconOverrides={iconOverrides}
+              currentLabel={landingV2 ? 'Now open' : 'Now playing'}
             />
           )}
           {isSeries && seasonEpisodes.length <= 1 && (
             <section className="ep-episodes" aria-label="Episodes">
               <div className="ep-strip-head"><h2>Episodes</h2></div>
-              <p className="ep-strip-note">This is the only episode in this show so far. <Link href={`/series/${episode.seriesId}`}>See the show page</Link>.</p>
+              <p className="ep-strip-note">
+                {showEpisodeCount > seasonEpisodes.length ? `This is the only episode in Season ${seasonNumber} so far.` : 'This is the only episode in this show so far.'}{' '}
+                <Link href={showHref}>See the show page</Link>.
+              </p>
             </section>
           )}
           {!isSeries && isSignedIn && watchNext.length > 0 && (
@@ -877,11 +1074,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
         {bonusContent.length > 0 && (
           <div className="cat-row" style={{ marginTop: '2.4rem' }}>
-            <div className="cat-row-heading"><span>Bonus Content</span></div>
+            <div className="cat-row-heading"><span>Extras</span></div>
             <div className="cat-row-track">
-              {bonusContent.map((b) => (
-                <div key={b.id} className="card-wrap row-card">
-                  <Link href={`/episode/${b.id}`} className={`ep-card ${b.tier}`}>
+              {bonusContent.map((b) => {
+                const inner = (
+                  <>
                     <div className="ep-thumb">
                       {b.thumbnail && <Image src={b.thumbnail} alt="" fill sizes="(max-width: 640px) 32vw, (max-width: 1024px) 24vw, 220px" className="ep-thumb-img" />}
                     </div>
@@ -889,9 +1086,18 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                       <h4>{b.title}</h4>
                       <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
                     </div>
-                  </Link>
-                </div>
-              ))}
+                  </>
+                );
+                return (
+                  <div key={b.id} className="card-wrap row-card">
+                    {b.canOpen === false ? (
+                      <div className={`ep-card ${b.tier}`}>{inner}</div>
+                    ) : (
+                      <Link href={`/episode/${b.id}${previewing ? '?preview=1' : ''}`} className={`ep-card ${b.tier}`}>{inner}</Link>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

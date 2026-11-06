@@ -99,7 +99,7 @@ export default function Stream() {
 
         {liveStream ? <LiveBanner title={liveStream.title} onPress={() => router.push('/live')} /> : null}
 
-        {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToInfo} />}
+        {heroPool.length > 0 && <HeroSpotlight pool={heroPool} onPlay={playHero} onTrailer={goToInfo} isMember={Boolean(isSubscriber)} />}
 
         <View style={styles.stage}>
           <ContinueWatchingRow items={continueWatching} onPressItem={(ep) => router.push(ep.contentType === 'podcast' && ep.seriesId ? `/podcasts/${ep.seriesId}` : `/episode/${ep.id}?autoplay=1`)} />

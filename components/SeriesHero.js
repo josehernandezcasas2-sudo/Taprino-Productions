@@ -17,7 +17,19 @@ import { AiSealChip } from './AiSeal';
 //                     trailer (and while its link loads); without it, the
 //                     gradient below
 // imageSrc (a hero image) still wins over any trailer.
-export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, trailerRef = null, trailerExpiresAt = null, fallbackImageSrc = null, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave, aiSeal = false }) {
+//
+// What viewers see of the show (decision 10, board D10; slice 4):
+//   rollup   { tier, tierLabel, freeLabel, rating, episodeCount, seasonCount }
+//            from lib/showRollups.js — 'mixed' draws the "Tapa +" pill and
+//            the green "E1 free" chip, 'premium' the pill alone, 'free' one
+//            "Free with ads" / "Free" pill; without one, tierLabel/tierKey
+//            (the first episode's badge) as before
+//   credits  the credit lines (decision 20): "Made by Mara Reyes",
+//            "Studio Harbor Films", "Producer Lux Tan", in the owner's order
+//   year     the show's year
+// onPlay without a label draws no Play button (an empty preview);
+// onToggleSave null draws no Save (a preview).
+export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, trailerRef = null, trailerExpiresAt = null, fallbackImageSrc = null, imageSrc, playLabel, onPlay, tierLabel, tierKey, episodeCount, seasonCount, artist, isOriginal, isSaved, onToggleSave, aiSeal = false, rollup = null, credits = null, year = null }) {
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const [muted, setMuted] = useState(true);
@@ -107,19 +119,36 @@ export default function SeriesHero({ title, titleImageUrl, desc, videoSrc, trail
             ) : title}
           </h2>
           <p>{desc}</p>
-          <div className="series-hero-meta">
-            {tierLabel && <span className={`series-hero-meta-pill ${tierKey || ''}`}>{tierLabel}</span>}
+          <div className="series-hero-meta spg-hero-meta">
+            {rollup && rollup.tier ? (
+              rollup.tier === 'free' ? (
+                <span className={`series-hero-meta-pill ${rollup.freeLabel === 'Free' ? 'free-noads' : 'free-ads'}`}>{rollup.freeLabel}</span>
+              ) : (
+                <>
+                  <span className="series-hero-meta-pill premium">{rollup.tierLabel || 'Tapa +'}</span>
+                  {rollup.tier === 'mixed' && rollup.freeLabel && <span className="free-chip">{rollup.freeLabel}</span>}
+                </>
+              )
+            ) : (
+              tierLabel && <span className={`series-hero-meta-pill ${tierKey || ''}`}>{tierLabel}</span>
+            )}
+            {rollup && rollup.rating && rollup.rating !== 'Not Rated' && <span className="hero-rating-tag spg-rating">{rollup.rating}</span>}
             {(seasonCount || episodeCount) ? (
               <span>
-                {seasonCount > 1 ? `${seasonCount} seasons · ` : ''}{episodeCount} episode{episodeCount === 1 ? '' : 's'}
+                {`${seasonCount || 1} season${(seasonCount || 1) === 1 ? '' : 's'} · ${episodeCount} episode${episodeCount === 1 ? '' : 's'}`}
               </span>
             ) : null}
-            {artist && <span>Made by {artist}</span>}
+            {Array.isArray(credits) && credits.length > 0
+              ? credits.map((c) => <span key={c.key} className="spg-credit">{`${c.label} ${c.name}`}</span>)
+              : artist && <span>Made by {artist}</span>}
+            {year && <span>{year}</span>}
             {/* The maker's "Not for AI training" seal (lib/aiPolicyRules.js). */}
             {aiSeal && <AiSealChip />}
           </div>
           <div className="hero-actions">
-            <button className="hero-play" onClick={onPlay}><PlayIcon size={14} src={iconOverrides.play} /> {playLabel || 'Play first episode'}</button>
+            {playLabel !== null && onPlay && (
+              <button className="hero-play" onClick={onPlay}><PlayIcon size={14} src={iconOverrides.play} /> {playLabel || 'Play first episode'}</button>
+            )}
             {onToggleSave && (
               <button className="hero-trailer" onClick={onToggleSave}>
                 <HeartIcon size={16} active={isSaved} src={isSaved ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isSaved ? 'Saved' : 'Save this series'}
