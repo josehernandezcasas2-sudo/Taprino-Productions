@@ -42,9 +42,9 @@ Grants from The Juanita Foundation / From the Heart are a separate nonprofit's m
 
 ## 3b. Terms of Service · section 5 · add (2026-11)
 
-Live on the site since slice 3b of the series revamp (a paragraph after **Ad share**, before **Getting paid and taxes**):
+Live on the site since slice 3b of the series revamp (a paragraph after **Ad share**, before **Getting paid and taxes**; revised 2026-11-06 — tips on a title's page go to whoever made it, and an extra filed under a show follows the show):
 
-> **Which account a title pays.** What a title earns — its member share and ad share above, its sales (section 15) and the tips on its page (section 16) — goes to the account the title is attached to on Studio Tapa TV: whoever runs it, or another account they choose, which has to accept first; a change applies only to what the title earns after it, and credits and payments already made stay where they were made.
+> **Which account a title pays.** What a title earns — its member share and ad share above and its sales (section 15) — goes to the account the title is attached to on Studio Tapa TV: whoever runs it, or another account they choose, which has to accept first; an extra filed under a show is attached the way the show's episodes are. A change applies only to what the title earns after it, and credits and payments already made stay where they were made. Tips on a title's page (section 16) go to whoever made the title.
 
 ## 4. Privacy Policy · add
 
@@ -59,7 +59,7 @@ Live on the site since slice 3b of the series revamp (a paragraph after **Ad sha
 5. **Automatic renewal.** The existing section 4 and Stripe's customer portal handle cancellation. Anything the share adds under California's ARL?
 6. **Minors.** Members must pass the site's age gate; creators under 18 cannot hold Stripe Express accounts. Anything to add for a minor whose work is on the site?
 7. **Stripe's platform agreement.** The LLC is responsible as the platform for refunds, disputes and fraud on connected accounts. Any wording the creator terms should carry from it?
-8. **Paid accounts.** A title's earnings (member share, ad share, sales, tips) go to the account it is attached to — by default whoever runs it, or an account they pick that accepts first (a producer can be paid for someone else's upload). Who is the payee for tax reporting in that case, and does section 5's licence need the uploader's agreement that another account may be paid for their work?
+8. **Paid accounts.** A title's earnings (member share, ad share, sales — not tips, which always go to whoever made the title) go to the account it is attached to — by default whoever runs it, or an account they pick that accepts first (a producer can be paid for someone else's upload; an extra uploaded under someone else's show pays that show's account). Who is the payee for tax reporting in that case, and does section 5's licence need the uploader's agreement that another account may be paid for their work?
 
 ## 6. The numbers to confirm
 

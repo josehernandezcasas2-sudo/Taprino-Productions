@@ -3,7 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 import { applyCors } from '../../../lib/cors';
-import { paidEpisodeIds } from '../../../lib/payees';
+import { paidEpisodeIds, showExtraIds } from '../../../lib/payees';
 import { isTitleId } from '../../../lib/titleIds';
 
 // Everything a creator can see about how their own work is performing.
@@ -62,10 +62,16 @@ export default async function handler(req, res) {
   // And, since slice 3b, the titles paid to them: their own paid account,
   // or one in a show paid to them that has none of its own (numbers are
   // views, not money, so an uploader keeps seeing their upload too).
-  const paidIds = (await paidEpisodeIds(userId).catch((err) => {
+  // The extras of the shows they run, those filed only through
+  // bonus_parent_* too: extras follow their show (Jose, 2026-11-06).
+  const extraIds = await showExtraIds(ownedSeriesIds).catch((err) => {
+    console.error('creator analytics show extras:', err && err.message);
+    return [];
+  });
+  const paidIds = [...new Set([...(await paidEpisodeIds(userId).catch((err) => {
     console.error('creator analytics paid titles:', err && err.message);
     return [];
-  })).filter((id) => isTitleId(id)).slice(0, 500);
+  })), ...extraIds])].filter((id) => isTitleId(id)).slice(0, 500);
   if (paidIds.length > 0) {
     orConditions.push(`id.in.(${paidIds.join(',')})`);
   }

@@ -15,7 +15,7 @@ import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
-import { cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, withPayeeStamps } from '../../../lib/payees';
+import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, payeeShowIds, withPayeeStamps } from '../../../lib/payees';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -303,19 +303,55 @@ async function editEpisode(req, res, roleContext) {
     targetShow = data;
   }
 
-  // Since slice 3b, putting a title in another show (or out of one) can
-  // change who it pays (lib/showRules.js payeeOf). Moving money is for full
-  // admins: a sub-admin's edit that would is refused before anything is
-  // written; one that leaves it paying the same account goes on (before
-  // migration 118, which brings paid_to, every lane pays the old rule).
-  if ('series_id' in changed && !roleContext.isAdmin && 'paid_to' in existing && payeeRuleLiveNow()) {
-    let showNow = null;
-    if (existing.series_id && isTitleId(String(existing.series_id))) {
-      const { data, error } = await supabase.from('series').select('*').eq('id', existing.series_id).maybeSingle();
-      if (error) throw internalError(error, 'edit-episode show before');
-      showNow = data || null;
+  // The show its money follows before and after the save (lib/showRules.js
+  // payeeShowIdOf: its series_id, or an extra's show through
+  // bonus_parent_*), and the extras filed under it, which follow it to
+  // another show (Jose, 2026-11-06: extras follow their show).
+  // The extras filed after an episode follow its series_id (payeeShowIdOf
+  // reads the parent's), which can change while the show its own money
+  // follows doesn't: re-filed as an extra of the same show, it leaves them
+  // none. So they're compared on their own: their show before and after.
+  let affectsPayee = false;
+  let showBefore = null;
+  let showAfter = null;
+  let followingExtras = [];
+  let extrasShowBefore = null;
+  let extrasShowAfter = null;
+  if (['series_id', 'bonus_parent_type', 'bonus_parent_id', 'content_type'].some((c) => c in changed)) {
+    const [before, after] = await Promise.all([payeeShowIds([existing]), payeeShowIds([next])]);
+    const sidBefore = before.get(existing.id) || null;
+    const sidAfter = after.get(existing.id) || null;
+    const extrasSidBefore = existing.content_type !== 'bonus' ? existing.series_id || null : null;
+    const extrasSidAfter = existing.content_type !== 'bonus' ? next.series_id || null : null;
+    if (existing.content_type !== 'bonus' && extrasSidBefore !== extrasSidAfter) followingExtras = await anchoredExtras({ episodeIds: [existing.id] });
+    affectsPayee = sidBefore !== sidAfter || followingExtras.length > 0;
+    if (affectsPayee) {
+      const shows = new Map();
+      const readShow = async (sid) => {
+        if (!sid || !isTitleId(String(sid))) return null;
+        if (targetShow && targetShow.id === sid) return targetShow;
+        if (!shows.has(sid)) {
+          shows.set(sid, supabase.from('series').select('*').eq('id', sid).maybeSingle().then(({ data, error }) => {
+            if (error) throw internalError(error, 'edit-episode show before');
+            return data || null;
+          }));
+        }
+        return shows.get(sid);
+      };
+      [showBefore, showAfter, extrasShowBefore, extrasShowAfter] = await Promise.all([readShow(sidBefore), readShow(sidAfter), readShow(extrasSidBefore), readShow(extrasSidAfter)]);
     }
-    if (payeeOf(existing, showNow) !== payeeOf({ ...existing, series_id: changed.series_id || null }, targetShow)) {
+  }
+
+  // Since slice 3b, putting a title in another show (or out of one) can
+  // change who it pays (lib/showRules.js payeeOf), and who its extras pay.
+  // Moving money is for full admins: a sub-admin's edit that would is
+  // refused before anything is written; one that leaves them paying the
+  // same accounts goes on (before migration 118, which brings paid_to,
+  // every lane pays the old rule).
+  if (affectsPayee && !roleContext.isAdmin && 'paid_to' in existing && payeeRuleLiveNow()) {
+    const moves = payeeOf(existing, showBefore) !== payeeOf(next, showAfter)
+      || followingExtras.some((x) => payeeOf(x, extrasShowBefore) !== payeeOf(x, extrasShowAfter));
+    if (moves) {
       return res.status(403).json({ error: 'That moves its earnings to another account. A full admin does this.', code: 'who' });
     }
   }
@@ -422,10 +458,12 @@ async function editEpisode(req, res, roleContext) {
     return res.status(200).json({ ok: true, episodeId: existing.id, changed: [] });
   }
 
-  // A move to another show (or out of one) can change who the title pays
-  // (lib/showRules.js payeeOf): its history is written with the save
-  // (lib/payees.js, slice 3b). The write's own error is answered below.
-  const movesShow = 'series_id' in changed;
+  // A move to another show (or out of one) — an extra's new parent in
+  // another show too — can change who the title pays (lib/showRules.js
+  // payeeOf), and who the extras filed under it pay: their history is
+  // written with the save (lib/payees.js, slice 3b; withPayeeStamps takes
+  // the extras along). The write's own error is answered below.
+  const movesShow = affectsPayee;
   let writeResult = null;
   const doWrite = async () => {
     writeResult = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => q.eq('id', existing.id));
@@ -434,7 +472,8 @@ async function editEpisode(req, res, roleContext) {
   let stamped = null;
   if (movesShow) {
     try {
-      stamped = await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: { series_id: changed.series_id || null } } }, write: doWrite, setBy: `edit:${userId}` });
+      const placePatch = { series_id: next.series_id || null, bonus_parent_type: next.bonus_parent_type || null, bonus_parent_id: next.bonus_parent_id || null, content_type: next.content_type || null };
+      stamped = await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: placePatch } }, write: doWrite, setBy: `edit:${userId}` });
     } catch (err) {
       if (!(err && err.editWriteFailed)) throw err;
     }
@@ -485,20 +524,27 @@ async function editEpisode(req, res, roleContext) {
     await noticeEarningsMoved({ changed: stamped.changed, viewer: { userId, email }, how: 'moved' }).catch((err) => console.error('edit-episode earnings notice:', err && err.message));
   }
 
-  // A new runner didn't send its invites and prices it from now on.
+  // A new runner didn't send its invites and prices it — and the extras
+  // filed under it — from now on.
   if (movesShow) {
-    let showBefore = null;
-    if (existing.series_id) {
-      const { data } = await supabase.from('series').select('creator_id').eq('id', existing.series_id).maybeSingle();
-      showBefore = data || null;
-    }
-    const runnerBefore = titleRunnerOf(existing, showBefore);
-    const runnerAfter = titleRunnerOf(existing, targetShow);
-    if (runnerBefore !== runnerAfter) {
-      await cancelPendingInvites({ titles: [{ type: 'episode', id: existing.id }], reason: 'runner', actor: { userId, email, isAdmin: true } })
+    // Each title against its own show before and after: the title's, and
+    // the one its extras follow (its series_id).
+    const byRunner = new Map();
+    const runnerMove = (id, before, after) => {
+      if (before === after) return;
+      const key = after || '';
+      if (!byRunner.has(key)) byRunner.set(key, []);
+      byRunner.get(key).push(id);
+    };
+    runnerMove(existing.id, titleRunnerOf(existing, showBefore), titleRunnerOf(next, showAfter));
+    for (const x of followingExtras) runnerMove(x.id, titleRunnerOf(x, extrasShowBefore), titleRunnerOf(x, extrasShowAfter));
+    const moved = [...byRunner.values()].flat();
+    if (moved.length) {
+      await cancelPendingInvites({ titles: moved.map((id) => ({ type: 'episode', id })), reason: 'runner', actor: { userId, email, isAdmin: true } })
         .catch((err) => console.error('edit-episode invites:', err && err.message));
-      if (runnerAfter) {
-        const { error: priceError } = await supabase.from('title_prices').update({ creator_id: runnerAfter }).eq('target_type', 'episode').eq('target_id', existing.id);
+      for (const [runnerAfter, ids] of byRunner) {
+        if (!runnerAfter) continue;
+        const { error: priceError } = await supabase.from('title_prices').update({ creator_id: runnerAfter }).eq('target_type', 'episode').in('target_id', ids);
         if (priceError && !/title_prices|PGRST205|does not exist/i.test(priceError.message || '')) console.error('edit-episode price owner:', priceError.message);
       }
     }

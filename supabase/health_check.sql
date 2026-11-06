@@ -27,10 +27,18 @@ pushed as (
 payee_out_of_step as (
   -- Who gets paid (slice 3b): an episode's open history row should name
   -- the account its columns pay (its own, else its show's, else the
-  -- show's owner, else the uploader). The daily cron puts a stray right.
+  -- show's owner, else the uploader). The show is the one its money
+  -- follows: its series_id, else an extra filed only through
+  -- bonus_parent_* follows that show, or its parent episode's show
+  -- (lib/showRules.js payeeShowIdOf; Jose, 2026-11-06). The daily cron
+  -- puts a stray right.
   select e.id from title_payees tp
     join episodes e on e.id = tp.title_id
-    left join series s on s.id = e.series_id
+    left join episodes pe on e.series_id is null and e.content_type = 'bonus'
+                         and e.bonus_parent_type = 'episode' and pe.id = nullif(e.bonus_parent_id, '')
+    left join series s on s.id = coalesce(e.series_id,
+                                          case when e.content_type = 'bonus' and e.bonus_parent_type = 'series' then nullif(e.bonus_parent_id, '')
+                                               when e.content_type = 'bonus' and e.bonus_parent_type = 'episode' then pe.series_id end)
    where tp.title_type = 'episode' and tp.to_at is null
      and tp.payee_id is distinct from coalesce(nullif(e.paid_to, ''), nullif(s.paid_to, ''), s.creator_id, e.submitted_by)
 ),

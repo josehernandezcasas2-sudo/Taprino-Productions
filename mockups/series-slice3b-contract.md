@@ -1087,3 +1087,220 @@ clean; both app exports build.
 **Still open:** an invite left `accepted` with nothing moved (a crash between the claim and the column write, or a
 failed put-back) is not shown or re-offered anywhere; the extras question above; a pool view is still counted only
 when the payee can be read (a failed read skips the credit, not the view).
+
+---
+
+## Jose's changes (2026-11-06)
+
+Jose answered the slice 3b decisions on 2026-11-06. Two of them change code that was built and passing; this section
+supersedes §1 item 7's "the episode page's Tip button (the paid account)", §2 row 12, §5.5 "Tips", the tip words of
+§6.2 / §6.4 / §6.7, and "After the two reviews" item 17 (and the extras half of its "Still open").
+
+### A. Tips go to the maker
+
+**What changed.** The episode page's Tip button (website: the round Tip action in `pages/episode/[id].js` and the
+full-screen player's Tip in `VideoPlayer`'s top row; app: `mobile/src/app/episode/[id].js` and its full-screen Tip
+pill) tips the title's **maker** — `episodes.submitted_by`, whoever uploaded it — whatever account its other earnings
+go to. It never reads who the title pays: `lib/episodePage.js` builds `tipping` from
+`getTipping(episode.submittedBy, { viewerId })`, exactly as before 3b, so the button follows the maker's own tipping
+state (payout account ready, a creator or admin role, not yourself, not suspended or blocked). `lib/tips.js` is back to
+its pre-3b text (the `forTitle` option and the `'house'` reason are gone). Kept from the 3b reviews: with no Tip button
+the answer is `{ enabled: false, reason }` with no account id (on `/api/episode-page` and the page props alike), and
+`isMaker` appears nowhere. Unchanged: the pool-view credit on the episode page still goes to the **paid account**
+(`payeeNowForEpisode`); the profile's Tip button is the profile's person; `/api/tips/checkout` tips the `creatorId`
+the page sends, which is now the maker again. Consequences worth knowing: a title paid to the studio but made by a
+creator shows that creator's Tip button; a title the studio's own (full admin) account uploaded shows a Tip button for
+that account when it has a ready payout account (as before 3b); a failed read of the payee tables no longer hides the
+Tip button (tips don't read them).
+
+**Words.** Every sentence that said tips follow the paid account now leaves tips out or says where they go:
+- `lib/payees.js` — the PayeeBlock's `notReady`: "… hasn’t set up payouts yet, so it can’t be bought until they do.
+  Its earnings wait for them." (and "You haven’t set up payouts yet, so it can’t be bought until you do. …"); the
+  invite body (Creator Studio's Get paid card and the email, web and app): "Its share of ad money and members’ support
+  and its sales come to you from the moment you accept. What it earned before stays where it went. Tips on its page
+  still go to whoever made it."
+- `components/show/PayeeCard.js` and `mobile/src/components/show/PayeeCard.js` — the card's foot: "Its share of ad
+  money and members’ support and its sales go to this account. What it already earned stays where it went. Tips on
+  its page go to whoever made it."
+- `pages/terms.js` section 5, **Which account a title pays.**: "What a title earns — its member share and ad share
+  above and its sales (section 15) — goes to the account the title is attached to …; an extra filed under a show is
+  attached the way the show’s episodes are. A change applies only to what the title earns after it, and credits and
+  payments already made stay where they were made. Tips on a title’s page (section 16) go to whoever made the
+  title." `TEXT_UPDATED` 2026-11-06.
+- `legal/creator-share-terms-draft.md` — the 3b section carries the revised paragraph (dated), and question 8 reads
+  "member share, ad share, sales — not tips, which always go to whoever made the title" and names the extras case.
+- Checked and needing no change: Creator Studio's invite card (`pages/creator.js`, `mobile/src/app/creator/index.js`
+  — they draw the server's `body`), the admin Owner card and its hand-over words, `SellTitleModal` /
+  `SellTitleSheet`, the notification texts (none mentions tips).
+
+### B. Extras follow their show
+
+**The rule.** An extra (`content_type 'bonus'`) stored with `series_id` null and filed under a show only through
+`bonus_parent_type` / `bonus_parent_id` now follows that show for who gets paid, from the cut-over on (before it,
+`legacyPayeeOf` = the uploader, unchanged). The show its money follows = `series_id ??` (`bonus_parent_type ===
+'series'` ? `bonus_parent_id` : the parent episode's `series_id`). Then `payeeOf(extra, show)` (its own `paid_to`,
+else the show's `paid_to`, else the show's owner, else its uploader) and the runner `titleRunnerOf(extra, show)` = the
+show's owner, who prices it and picks for it. **An extra of a standalone title** (no show anywhere up the chain — say
+the extra of a film) is a title of its own and keeps paying its uploader, who runs it.
+
+**One place for the resolution.**
+- Pure, `lib/showRules.js` + `mobile/src/lib/showRules.js` (word for word): `extraParentOf(episode)` →
+  `{ type: 'series' | 'episode', id } | null` (only a bonus row with no `series_id` and a parent) and
+  `payeeShowIdOf(episode, parent = null)` → the show id or null (the parent must be the row the extra names).
+  `scripts/test-show-rules.mjs` tests both on both copies (131 checks).
+- Server, `lib/payees.js`: `payeeShowIds(rows, { known })` → `Map id → showId` (parent episodes read in bulk, rows
+  already read reused); `anchoredExtras({ seriesIds, episodeIds })` (extras filed only through `bonus_parent_*` under
+  those shows / episodes); `showTitleRows(seriesId)` (a show's episodes and every extra of it); `payeeShowOf(ctx, id)`
+  (the show row from a payee context); `showExtraIds(seriesIds)` (Your numbers).
+
+**Where it is used** (every payee path that took a show from `e.series_id`):
+- `lib/payees.js` — `readPayeeContext` (carries `showOf`), `payeeAtFor`, `payeeNowForEpisode` (its `seriesId` is the
+  show the money follows); `loadTitle` (an extra's show, and `episodes` = every title of the show, so the extra's
+  uploader still reads its block); `getPayeeBlock` (the picker on an extra is the show runner's; the show's block no
+  longer says "Its N extras are paid on their own…", an extra's no longer says "It’s an extra, so it’s paid on its
+  own…"; the show's "paid elsewhere" notes now include an extra with a paid account of its own, "N more titles have
+  their own paid account"); `withPayeeStamps` (a show scope takes every title of the show; an episode scope takes the
+  extras filed under it; each title's before / predicted / actual payee is read through the show its money follows,
+  patched parents included — so a show-level pick, acceptance, step-down and hand-over keep/move stamp the extras, and
+  a parent episode's move stamps its extras); `paidForUser` / `paidEpisodeIds` (a show paid to you covers its extras);
+  `payeeCutoverStep` (extras made before the cut-over whose payee moves from the uploader to the show's runner get
+  their `[from, ∞)` row and one notice, like episodes; an extra of a standalone title is never stamped);
+  `repairTitlePayees`, `realignPriceOwners` (an extra's price belongs to the show's owner).
+- `lib/showAdmin.js setShowOwner` — `keep` on a show nobody ran pins the extras to their uploaders like the episodes;
+  the hand-over withdraws the pending invites of every title of the show and moves every title's price to the new
+  owner (extras included).
+- `lib/showPage.js` — `getShowPage` reads the extras' payees through the context (the shelf's `paidTo` is the show's
+  account), lets an extra's own paid account open the page read-only, and counts the extras for `seesWhoIsPaid`;
+  `moveForViewer` — moving a parent episode to another show moves its extras' payee (stamped by `withPayeeStamps`,
+  the losers told through `noticeEarningsMoved`), the sub-admin refusal ("That moves its earnings to another account.
+  A full admin does this.") counts the extras once the rule is live, and when the runner changes the extras' pending invites are withdrawn
+  and their prices follow.
+- `pages/api/admin/edit-episode.js` — a change of `series_id`, `bonus_parent_*` or `content_type` that changes the
+  show a title's money follows is stamped (`withPayeeStamps` with all four columns in the patch; the extras filed
+  under a moved parent come along), counted in the sub-admin refusal, the losers told, and on a change of runner the
+  title's and its extras' invites withdrawn and prices moved. (The creator's episode editor can only re-place an extra
+  inside its own show, so its PATCH changes no payee.)
+- `lib/purchases.js` — `getTitleRecord` (an extra's sale pays the show's account; its runner prices it; the fallback
+  when the payee read fails resolves the show too); `getPricesForShow` (`?show=` lists the extras' prices).
+- `lib/adShare.js` — `creditAdShare` and `creditAdShareBeforeDelete` through the context (`episodesOf` uses the
+  resolved show); `lib/creatorShare.js` follows through `readPayeeContext` unchanged.
+- `pages/api/house-ads/impression.js` — the self-dealing guard resolves an extra's show with the pure helpers.
+- Your numbers — `pages/api/creator/analytics.js` (the show's runner sees its extras: `showExtraIds`; a show paid to
+  you covers its extras through `paidEpisodeIds`), `pages/api/creator/episode-detail-analytics.js` (owns = the show
+  the money follows); `pages/api/creator/my-submissions.js` (`canPrice` on an extra = its show's runner).
+- `supabase/health_check.sql` — "Payee rows out of step" resolves an extra's show the same way (a left join on the
+  parent episode), so extras don't all read as out of step. Proved on PGlite: the scratchpad's
+  `s3b/check-payee-writes-pg.mjs`, 28 checks (3 new: extras under a show and after an episode in step, out of step
+  when the show's account changes, the standalone film's extra).
+- **The show page's Extras shelf gets "Sell…" / "Price and sales"** for whoever runs the show on a live extra
+  (`components/show/ShowCards.js` `ExtrasShelf`, the app's extra sheet in `mobile/src/app/creator/show/[id]/index.js`
+  through `withSell`). Not asked for in so many words, but without it a contributor's extra could only be priced by a
+  full admin: its uploader no longer runs it, and Your work lists only your own uploads.
+
+### Tests
+
+`pw/payees-http.js` (146): case 11 — the Tip button on Ad Night (Dee's upload, paid to Pat) tips **Dee** and its
+Checkout's destination is `acct_dee`; a title paid to the studio but made by Pat shows Pat's Tip button; the studio's
+own upload with no payout account shows none and names no one. Case 17 (title_payees failing) — the Tip button
+doesn't read the payee tables (a maker with payouts keeps it). Case 16 — the maker before 118 as after. New case 18 —
+an extra under the show and one after its episode (series_id null, uploaded before the cut-over by a contributor): the
+cut-over stamps both to the show's runner and tells the uploader once; October's ad share splits Oct 3 → uploader,
+Oct 20 → the show's account; the extra's block is the runner's to pick, the uploader reads it and is refused; the
+show page's shelf pays the show's account; a show-level acceptance stamps the extras; the runner prices the extra (the
+uploader can't), `?show=` lists it, its sale pays the show's account (`acct_pat`); moving the parent episode moves the
+extra's payee (stamped `move:`, the old payee told); a sub-admin's move and Library edit that would move only an
+extra's earnings are refused; a full admin's Library re-file of an extra under another show is stamped `edit:`; an
+extra of a standalone film keeps its uploader; the health check's rule and the daily repair agree; Your numbers for
+the runner and the show's paid account; the impression guard. `pw/payees.js` and `pw/payees-app-http.js` read the new
+sentences.
+
+### Decided by the builder, and still open
+
+- **The Extras shelf's "Sell…"** (web and app) is new UI, added so a contributor's extra can still be priced by the
+  show's runner (above). Say if it should go.
+- **Notes**: the show block's count line now reads "N more titles have their own paid account" (extras with a paid
+  account of their own are listed with the episodes).
+- ~~**Still open — a parent episode removed on its own**~~ — closed by the reviews (below): the extras are filed
+  under the show before their parent goes. (The note was also wrong: the change was retroactive for every extra
+  without a history row, and the repair never saw it.)
+- **Still open — the Move sheet's line** ("Future earnings go to …") names only the moved episode's own new payee;
+  when its extras' payee changes too (they follow the show) the sheet doesn't say so, though the move stamps them and
+  tells the account that stops being paid.
+- Before 118 nothing here changes (every lane reads the old rule; extras pay their uploader as they always did).
+
+### After the reviews (2026-11-06)
+
+Two reviewers read the change above; seven findings, all checked against the code and the stand-ins.
+
+1. **A parent episode deleted on its own** (`pages/api/admin/resolve-deletion.js`) — real. The extras filed after it
+   resolved to no show once it was gone and paid their uploaders, back to the cut-over for every instant without a
+   history row (an extra made after the cut-over has none), with no record and no notice. **Fixed:** before the
+   delete, `refileExtrasUnderShow([row])` (new, `lib/payees.js`) files those extras (`series_id` null,
+   `bonus_parent_type 'episode'`, this parent) under the show itself (`bonus_parent_type 'series'`,
+   `bonus_parent_id` = the old `series_id`), so who they pay, who runs them and their prices don't move and nothing
+   needs stamping; a failed move answers 503 `extras` and deletes nothing; the audit line says "N extras filed after
+   it are now filed under its show"; the answer carries `extrasRefiled`. A parent with no show (a film) leaves its
+   extras alone: they paid their uploader before and after. (This is the "moved under the show" answer to the
+   question the builder left open; say if they should go with their parent instead.)
+2. **A show removed while only an extra kept for its buyers** (`lib/showRules.js cascadePlan`, `lib/showDelete.js`) —
+   real. `keptInShow` counted only rows with the show's `series_id`, so a kept extra filed through
+   `bonus_parent_*` let the show row be deleted and the extra fell back to its uploader. **Fixed:** a kept extra
+   filed under the show or after one of its episodes keeps the show (withdrawn) like a kept episode (both copies of
+   the rules, word for word; `scripts/test-show-rules.mjs`: the old "the show itself can go" case now keeps it, plus
+   the database shape and an extra of another show that never holds it); and `deleteShowCascade` files a kept
+   extra whose parent episode is deleted under the show first (`refileExtrasUnderShow`).
+3. **A Library edit that changes the extras' show while the title's own doesn't** (`pages/api/admin/edit-episode.js`)
+   — real (re-filing a show's episode as an extra of the same show left the extras after it no show, unstamped, past
+   the sub-admin refusal). **Fixed:** the extras after a non-bonus episode are compared on their own — their show
+   before is the episode's `series_id`, after it the patched one — so any change of it reads them, goes through
+   `withPayeeStamps` (which already predicted them through the patched parent), counts in the sub-admin refusal,
+   tells whoever stops being paid, and moves their invites and prices by their own runner before and after. (The
+   rule itself is unchanged: an extra follows its parent's `series_id`; re-filed that way they now pay their
+   uploaders from the edit on, recorded.)
+4. **The creator's old edit route** (`pages/api/creator/edit-submission.js`) — real: moving a pending episode out of
+   another person's show carried the extras after it (others' approved, earning titles) into the mover's show.
+   **Fixed:** as on the show page (`canMoveTo`), a creator carries along only extras they run
+   (`titleRunnerOf(extra, the source show) === them`), else 403 `extras` "Extras filed after it would move with it,
+   and they aren’t yours to move. Ask an admin."; a full admin's move takes them, tells whoever stops being paid
+   (the extras' own changes only) and moves their invites and prices to a new runner.
+5. **The tips sentence on a show's card and a show's invite** — real: "Tips on its page…" read as the show's tips,
+   and a show has no Tip button. **Fixed:** `payeeTipsLine(titleType)` (new, both copies of `lib/showRules.js`,
+   tested): a show → "Tips on its episodes’ pages go to whoever made each one."; a title → "Tips on its page go to
+   whoever made it." Used by `components/show/PayeeCard.js`, `mobile/src/components/show/PayeeCard.js` and
+   `lib/payees.js inviteBody` (Creator Studio's Get paid card and the email). The invite line lost its "still".
+6. **The app's extra sheet put Sell… after the red Remove…** (`mobile/src/app/creator/show/[id]/index.js`) — real.
+   **Fixed:** Remove… sits after a divider (only when it's there), so `withSell` puts Sell… before it, as on the
+   episode rows.
+7. **Tests** — real gaps. **Added:** case 11 checks `tipping.creatorName` ("Dee Marsh", never Pat's; "Pat Lee" on
+   the studio-paid title); a new case 19 in `pw/payees-http.js` (Rae's shows, UP's extras made after the cut-over,
+   who-was-paid read on Oct 20 and 25 through a small loader, `s3b/loader/run-payeeon.mjs`): a parent deleted on its
+   own (the extra re-filed, still Rae on both days, no history row, the audit line), the same-show re-file as an
+   extra (a sub-admin refused; a full admin's stamped Rae → UP `edit:`, Rae told, both days still Rae), the old
+   creator route refused with `extras`, and a show removed while only an extra after a deleted episode is bought
+   (show withdrawn and kept, the extra filed under it, still Rae). `pw/payees.js`: the show card's and the series
+   invite's new tips line, an extra on the fixture show (a contributor's, filed under the show) whose shelf menu
+   offers the runner Sell… and opens the Sell modal, and a new part 8 — the episode page's round Tip action reads
+   "Tip Dee" (title "Tip Dee Marsh") on Dee's episode paid to Mara's show, at 1280 and 390.
+   `pw/payees-app-http.js`: the card source and the app rules' `payeeTipsLine`, the episode invite's line, and 5b —
+   a Bearer read of `/api/episode-page` names the maker (Uri, by id and name), not the show's account.
+
+Files: `lib/showRules.js`, `mobile/src/lib/showRules.js`, `scripts/test-show-rules.mjs`, `lib/payees.js`,
+`lib/showDelete.js`, `pages/api/admin/resolve-deletion.js`, `pages/api/admin/edit-episode.js`,
+`pages/api/creator/edit-submission.js`, `components/show/PayeeCard.js`, `mobile/src/components/show/PayeeCard.js`,
+`mobile/src/app/creator/show/[id]/index.js`; scratchpad `pw/payees-http.js`, `pw/payees.js`,
+`pw/payees-app-http.js`, `s3b/loader/run-payeeon.mjs`.
+
+**Verified** (2026-11-06): check:refs, lint, all 26 `scripts/test-*.mjs` (show rules 131 on both copies), the
+PGlite proof (`s3b/check-payee-writes-pg.mjs`, 28 — `health_check.sql` is unchanged by the reviews), both app
+exports, and through the runner (`final/summary-3bf-fix.log`): payees-http 157, payees-app-http 46, money 24,
+title-ids 20, show-admin-http 194, api-post 186, show-data 177, creator-path 62, end-card 53, episode-after 26 — all
+0 failed; the browser suite (`final/summary-3bf-fix-payees.log`) 283 ok, 0 failed after two test-only fixes (part 8
+gives Dee fake Clerk's creator role, and reads the 390 label case-blind); its first run also had one Google Fonts
+CORS console line on Quinn's Your work that did not come back.
+
+**Still open.** The Move sheet's "Future earnings go to …" names only the moved episode's payee, not its extras'
+(the move stamps them and tells whoever stops being paid). `/admin/test-content` deleting a single episode still
+leaves the extras after it with no show — as before, that tool settles nothing (no ad share, no invites either);
+it is for placeholders. A creator's re-filed extra (item 1 and the cascade) isn't told its place moved from "after
+E3" to the show's own shelf — nothing it earns changes.
+

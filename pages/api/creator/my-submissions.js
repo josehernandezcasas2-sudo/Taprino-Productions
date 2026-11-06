@@ -5,6 +5,7 @@ import { getViewCounts } from '../../../lib/redis';
 import { captionsHref } from '../../../lib/episodes';
 import { sortEpisodes } from '../../../lib/seriesResume';
 import { kindOf, titleRunnerOf } from '../../../lib/showRules';
+import { payeeShowIds } from '../../../lib/payees';
 import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
 
@@ -139,8 +140,13 @@ export default async function handler(req, res) {
   }
   const rows = data || [];
 
-  // Only the shows these rows are in.
-  const seriesIds = [...new Set(rows.map((ep) => ep.series_id).filter(Boolean))];
+  // Only the shows these rows are in — and the shows extras filed only
+  // through bonus_parent_* follow for who runs them (Jose, 2026-11-06).
+  const payShowOf = await payeeShowIds(rows).catch((err) => {
+    console.error('my-submissions extra shows:', err && err.message);
+    return new Map();
+  });
+  const seriesIds = [...new Set([...rows.map((ep) => ep.series_id), ...payShowOf.values()].filter(Boolean))];
   let seriesRows = [];
   if (seriesIds.length > 0) {
     const { data: found, error: seriesError } = await supabase.from('series').select('*').in('id', seriesIds);
@@ -180,9 +186,10 @@ export default async function handler(req, res) {
       seriesKind: show ? kindOf(show, rowsByShow[ep.series_id]) : null,
       seriesStatus: show ? show.status || 'approved' : null,
       seriesHeld: Boolean(show && show.moderation_hold),
-      // Whoever runs a title prices it (slice 3b): a show's episode, the
-      // show's owner; a standalone title, its uploader; and full admins.
-      canPrice: Boolean(isAdmin || titleRunnerOf(ep, show) === userId),
+      // Whoever runs a title prices it (slice 3b): a show's episode — or an
+      // extra filed under a show — the show's owner; a standalone title,
+      // its uploader; and full admins.
+      canPrice: Boolean(isAdmin || titleRunnerOf(ep, seriesById[payShowOf.get(ep.id) || ep.series_id] || null) === userId),
       season: ep.season ?? null,
       seriesOrder: ep.series_order ?? null,
       artist: ep.artist ?? null,

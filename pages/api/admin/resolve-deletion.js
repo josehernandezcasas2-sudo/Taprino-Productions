@@ -10,7 +10,7 @@ import { isTitleId } from '../../../lib/titleIds';
 import { showRouteError } from '../../../lib/showRoute';
 import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
 import { creditAdShareBeforeDelete } from '../../../lib/adShare';
-import { cancelPendingInvites } from '../../../lib/payees';
+import { cancelPendingInvites, refileExtrasUnderShow } from '../../../lib/payees';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -115,6 +115,7 @@ export default async function handler(req, res) {
   // file column a database has: the live ones, and the waiting ones
   // (pending_src from 118, the waiting title image and trailer from 120).
   const { data: row } = await supabase.from(table).select('*').eq('id', id).maybeSingle();
+  let refiled = [];
 
   if (row) {
     // An episode's ad plays not credited yet are credited now: once the row
@@ -137,6 +138,18 @@ export default async function handler(req, res) {
       // (slice 3b); its title_payees history stays as a record.
       await cancelPendingInvites({ titles: [{ type: 'episode', id: row.id }], reason: 'removed_title', actor: { userId, email, isAdmin: true } })
         .catch((err) => console.error('resolve-deletion invites:', err && err.message));
+      // The extras filed after it follow its show (Jose, 2026-11-06): once
+      // it's gone they'd follow none and pay their uploaders, back to the
+      // cut-over. They're filed under the show itself first, so nothing
+      // they earn moves (lib/payees.js refileExtrasUnderShow).
+      if (row.deletion_requested === true) {
+        try {
+          refiled = await refileExtrasUnderShow([row]);
+        } catch (err) {
+          console.error('resolve-deletion extras:', err && err.message ? err.message : err);
+          return res.status(503).json({ code: 'extras', error: 'The extras filed after it couldn’t be moved under its show just now, so it wasn’t deleted. Try again in a minute.' });
+        }
+      }
     }
     const context = type === 'episode' ? row.title : row.name;
     const reason = `${type} deleted`;
@@ -168,10 +181,12 @@ export default async function handler(req, res) {
   }
   await invalidateCache(type === 'episode' ? 'public_episodes_v1' : 'all_series_approved_v1');
 
-  await recordAudit({ adminId: userId, adminEmail: email, action: `confirm_${type}_deletion`, targetType: type, targetId: id, details: row ? (type === 'episode' ? row.title : row.name) : undefined });
+  const auditName = row ? (type === 'episode' ? row.title : row.name) : undefined;
+  const refiledWords = refiled.length ? ` · ${refiled.length === 1 ? '1 extra filed after it is' : `${refiled.length} extras filed after it are`} now filed under its show` : '';
+  await recordAudit({ adminId: userId, adminEmail: email, action: `confirm_${type}_deletion`, targetType: type, targetId: id, details: auditName !== undefined ? `${auditName}${refiledWords}` : undefined });
   if (type === 'episode' && row) {
     await notifyCreator({ userId: row.submitted_by, type: 'deletion_confirmed', message: `"${row.title}" was permanently deleted, as requested.`, episodeId: null });
   }
 
-  return res.status(200).json({ ok: true, type, id, decision: 'confirm' });
+  return res.status(200).json({ ok: true, type, id, decision: 'confirm', ...(refiled.length ? { extrasRefiled: refiled.length } : {}) });
 }

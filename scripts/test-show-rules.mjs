@@ -776,6 +776,36 @@ function suite(R, who) {
     assert.equal(R.payeeSourceOf({ paidTo: ' ' }, { paidTo: '' }), null);
   });
 
+  tt('extras follow their show: extraParentOf and payeeShowIdOf (Jose, 2026-11-06)', () => {
+    const show = { id: 'night-bus', creator_id: 'u_mara', paid_to: 'u_pat' };
+    const parentEp = { id: 'pilot', series_id: 'night-bus', submitted_by: 'u_dee', content_type: 'series' };
+    const underShow = { id: 'x1', content_type: 'bonus', series_id: null, bonus_parent_type: 'series', bonus_parent_id: 'night-bus', submitted_by: 'u_dee' };
+    const underEp = { id: 'x2', contentType: 'bonus', seriesId: null, bonusParentType: 'episode', bonusParentId: 'pilot', submittedBy: 'u_dee' };
+    assert.deepEqual(R.extraParentOf(underShow), { type: 'series', id: 'night-bus' });
+    assert.deepEqual(R.extraParentOf(underEp), { type: 'episode', id: 'pilot' }, 'camelCase rows too');
+    assert.equal(R.extraParentOf({ ...underShow, series_id: 'other' }), null, 'a series_id of its own wins');
+    assert.equal(R.extraParentOf({ ...underShow, content_type: 'short' }), null, 'only an extra');
+    assert.equal(R.extraParentOf({ ...underShow, bonus_parent_type: 'channel' }), null);
+    assert.equal(R.extraParentOf({ ...underShow, bonus_parent_id: '  ' }), null, 'blanks are no parent');
+    assert.equal(R.extraParentOf(null), null);
+    assert.equal(R.payeeShowIdOf(parentEp), 'night-bus', 'an episode: its own series_id');
+    assert.equal(R.payeeShowIdOf({ ...underShow, series_id: 'other' }), 'other');
+    assert.equal(R.payeeShowIdOf(underShow), 'night-bus', 'an extra under the show');
+    assert.equal(R.payeeShowIdOf(underEp, parentEp), 'night-bus', 'an extra under an episode: the episode\'s show');
+    assert.equal(R.payeeShowIdOf(underEp, { id: 'pilot', seriesId: 'other-show' }), 'other-show', 'the parent as it is (a moved parent takes its extras)');
+    assert.equal(R.payeeShowIdOf(underEp, null), null, 'the parent unknown: no show');
+    assert.equal(R.payeeShowIdOf(underEp, { id: 'someone-else', series_id: 'night-bus' }), null, 'another row is not its parent');
+    assert.equal(R.payeeShowIdOf(underEp, { id: 'pilot', series_id: null }), null, 'an extra of a standalone film: a title of its own');
+    assert.equal(R.payeeShowIdOf({ id: 'film', content_type: 'short', submitted_by: 'u_dee' }), null);
+    // With the show resolved, an extra pays like the show's episodes.
+    assert.equal(R.payeeOf(underShow, show), 'u_pat', 'the show\'s paid account');
+    assert.equal(R.payeeOf(underEp, { ...show, paid_to: null }), 'u_mara', 'else whoever runs it');
+    assert.equal(R.payeeOf({ ...underShow, paid_to: 'u_own' }, show), 'u_own', 'its own paid account first');
+    assert.equal(R.payeeOf(underEp, null), 'u_dee', 'a standalone extra: its uploader');
+    assert.equal(R.titleRunnerOf(underShow, show), 'u_mara', 'the show\'s owner prices it and picks for it');
+    assert.equal(R.legacyPayeeOf(underShow, show), 'u_dee', 'before the cut-over: the uploader, as before');
+  });
+
   tt('payeeAt: history first, then the old rule before the cut-over, then payeeOf', () => {
     const from = '2026-10-15T00:00:00.000Z';
     const show = { creator_id: 'u_mara', paid_to: null };
@@ -873,6 +903,9 @@ function suite(R, who) {
     assert.equal(R.payeeSourceWords('show', 'Night Bus'), '(Night Bus’s)');
     assert.equal(R.payeeSourceWords('runner', 'Night Bus'), null);
     assert.equal(R.seriesSaleNote('Night Bus', 'Mara Reyes'), 'Whole-series sales of Night Bus still go to Mara Reyes.');
+    // Tips go to the maker (Jose, 2026-11-06): a show's episodes each tip their own.
+    assert.equal(R.payeeTipsLine('series'), 'Tips on its episodes’ pages go to whoever made each one.');
+    assert.equal(R.payeeTipsLine('episode'), 'Tips on its page go to whoever made it.');
     assert.equal(R.titleWords({ titleType: 'series', titleName: 'Night Bus', showName: 'Night Bus' }), 'Night Bus');
     assert.equal(R.titleWords({ titleType: 'episode', titleName: 'Pilot', showName: 'Night Bus', code: 'S1 E1' }), '“Pilot” (Night Bus · S1 E1)');
     assert.equal(R.titleWords({ titleType: 'episode', titleName: 'The Long Road' }), '“The Long Road”');
@@ -1189,10 +1222,16 @@ function suite(R, who) {
     assert.equal(one.show.action, 'withdraw', 'b is still filed in the show (no on-delete cascade), so the show is kept');
     assert.equal(one.words, 'Night Bus, its 3 episodes and 2 extras · 2 titles have buyers, so they and the show are kept for them');
     assert.equal(one.adminWords, '3 episodes · 2 extras · 2 with buyers (kept for them) · the show is kept (a title in it has buyers) · channel slots: 1 · outside references kept by title');
-    // Only an extra filed under an episode has buyers: the show itself can go.
+    // Only an extra filed after an episode has buyers: the show is kept too —
+    // the extra's money follows the show (Jose, 2026-11-06).
     const extraOnly = R.cascadePlan(show, eps, extras, { titles: { x2: 1 } });
-    assert.equal(extraOnly.show.action, 'delete');
-    assert.equal(extraOnly.words, 'Night Bus, its 3 episodes and 2 extras · 1 title has buyers and will be kept for them');
+    assert.equal(extraOnly.show.action, 'withdraw');
+    assert.equal(extraOnly.words, 'Night Bus, its 3 episodes and 2 extras · 1 title has buyers, so it and the show are kept for them');
+    // …and one filed only under the show itself, the database shape.
+    assert.equal(R.cascadePlan(show, eps, [{ id: 'x3', content_type: 'bonus', series_id: null, bonus_parent_type: 'series', bonus_parent_id: 'night-bus' }], { titles: { x3: 1 } }).show.action, 'withdraw');
+    // An extra that isn't filed in this show (another show's, an unknown
+    // episode's) never holds it.
+    assert.equal(R.cascadePlan(show, eps, [{ id: 'y1', contentType: 'bonus', bonusParentType: 'series', bonusParentId: 'other-show' }, { id: 'y2', contentType: 'bonus', bonusParentType: 'episode', bonusParentId: 'zz' }], { titles: { y1: 1, y2: 1 } }).show.action, 'delete');
     // An extra filed in the show itself with buyers keeps the show.
     assert.equal(R.cascadePlan(show, eps, extras, { titles: { x1: 1 } }).show.action, 'withdraw');
     assert.deepEqual(one.counts, { episodes: 3, extras: 2, kept: 2, deleted: 3, seriesBuyers: 0, channelSlots: 1 });

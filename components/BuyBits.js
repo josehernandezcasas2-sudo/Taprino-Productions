@@ -61,7 +61,6 @@ export function PriceTag({ offer, size = 'lg' }) {
 export function OwnTitleCard({ offer, bundle, episode, creatorName, isSignedIn, isSubscriber, refundDays = 14, refundWatchPercent = 10, onSeePlans }) {
   const { buy, busy, error } = useBuyTitle({ isSignedIn });
   if (!offer || !offer.forSale || offer.owned) return null;
-  const who = creatorName || 'the creator';
   return (
     <div className="own-wrap">
       <div className="own-card">
@@ -82,7 +81,7 @@ export function OwnTitleCard({ offer, bundle, episode, creatorName, isSignedIn, 
         </button>
         {error && <p className="own-error">{error}</p>}
         <p className="own-fine">
-          One payment on Stripe&rsquo;s secure page. Most of it goes to {who}. Change your mind? Refund yourself within {refundDays} days, as long as you&rsquo;ve watched less than {refundWatchPercent}% of it.
+          One payment on Stripe&rsquo;s secure page. Most of it goes to the people who made it. Change your mind? Refund yourself within {refundDays} days, as long as you&rsquo;ve watched less than {refundWatchPercent}% of it.
         </p>
         {bundle && bundle.forSale && !bundle.owned && (
           <p className="own-fine">

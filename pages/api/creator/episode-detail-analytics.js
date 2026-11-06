@@ -3,7 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { getViewCounts, getDailyViews, getWatchSecondsTotals, getDailyWatchSeconds, isRedisConfigured } from '../../../lib/redis';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 import { applyCors } from '../../../lib/cors';
-import { paidEpisodeIds } from '../../../lib/payees';
+import { paidEpisodeIds, payeeShowIds } from '../../../lib/payees';
 
 // The full picture for exactly one episode, from the day it was uploaded
 // through today — a separate call rather than folding into the main
@@ -36,7 +36,7 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const { data: episode, error } = await supabase
     .from('episodes')
-    .select('id, title, tier, status, content_type, series_id, season, series_order, created_at, submitted_by, ads_enabled, runtime')
+    .select('id, title, tier, status, content_type, series_id, bonus_parent_type, bonus_parent_id, season, series_order, created_at, submitted_by, ads_enabled, runtime')
     .eq('id', episodeId)
     .maybeSingle();
 
@@ -50,12 +50,15 @@ export default async function handler(req, res) {
 
   // Ownership check, same logic as the main analytics endpoint — either
   // this creator submitted it directly, or it belongs to a show they own.
+  // The show is the one its money follows: an extra filed under a show
+  // only through bonus_parent_* follows that show (Jose, 2026-11-06).
   let owns = episode.submitted_by === userId;
-  if (!owns && episode.series_id) {
+  const showId = owns ? null : episode.series_id || (await payeeShowIds([episode]).catch(() => new Map())).get(episode.id) || null;
+  if (!owns && showId) {
     const { data: seriesRow } = await supabase
       .from('series')
       .select('creator_id')
-      .eq('id', episode.series_id)
+      .eq('id', showId)
       .maybeSingle();
     owns = !!seriesRow && seriesRow.creator_id === userId;
   }

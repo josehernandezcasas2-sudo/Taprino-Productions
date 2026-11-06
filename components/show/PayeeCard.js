@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
-import { seriesSaleNote } from '../../lib/showRules';
+import { payeeTipsLine, seriesSaleNote } from '../../lib/showRules';
 import { callApi } from './EditorBits';
 import { RoomSheet } from './AddEpisodesBar';
 import { CheckIcon, ClockIcon, LockIcon } from '../PlayerIcons';
@@ -308,7 +308,7 @@ export default function PayeeCard({ payee, mode = 'card', onChanged = null, titl
 
       {error && <p className="admin-error show-payee-error" role="alert" tabIndex={-1} ref={errorRef}>{error}</p>}
       {mode === 'card' && payee.available !== false && (
-        <p className="show-payee-foot">Its share of ad money and members’ support, its sales and its tips go to this account. What it already earned stays where it went.</p>
+        <p className="show-payee-foot">Its share of ad money and members’ support and its sales go to this account. What it already earned stays where it went. {payeeTipsLine(payee.titleType)}</p>
       )}
     </>
   );

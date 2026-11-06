@@ -3,9 +3,9 @@ import { getSupabase } from '../../../lib/supabase';
 import { creatorOwnsSeries } from '../../../lib/series';
 import { internalError, sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
-import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
-import { withPayeeStamps } from '../../../lib/payees';
+import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, withPayeeStamps } from '../../../lib/payees';
 
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
@@ -64,7 +64,7 @@ export default async function handler(req, res) {
 }
 
 async function editSubmission(req, res) {
-  const { userId, isCreator, isAdmin } = await getRoleContext(req);
+  const { userId, email, isCreator, isAdmin } = await getRoleContext(req);
   if (!isCreator && !isAdmin) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
@@ -202,6 +202,31 @@ async function editSubmission(req, res) {
     if (!slot.free) return res.status(409).json(slotTakenBody(slot));
   }
 
+  // The extras filed after it follow its show (Jose, 2026-11-06), so a
+  // move to another show (or out of one) takes them along — earnings, price
+  // and all. Here, as on the show page (lib/showRules.js canMoveTo), a
+  // creator only carries along extras they run; a full admin carries any,
+  // and whoever stops being paid is told.
+  const showMove = 'series_id' in dbUpdates && (dbUpdates.series_id || null) !== (existing.series_id || null);
+  let movingExtras = [];
+  let fromShow = null;
+  let toShow = null;
+  if (showMove && existing.content_type !== 'bonus') {
+    movingExtras = await anchoredExtras({ episodeIds: [existing.id] });
+    if (movingExtras.length) {
+      const readShow = async (sid) => {
+        if (!sid || !isTitleId(String(sid))) return null;
+        const { data, error: showError } = await supabase.from('series').select('*').eq('id', sid).maybeSingle();
+        if (showError) throw internalError(showError, 'edit-submission show');
+        return data || null;
+      };
+      [fromShow, toShow] = await Promise.all([readShow(existing.series_id), readShow(dbUpdates.series_id)]);
+      if (!isAdmin && movingExtras.some((x) => titleRunnerOf(x, fromShow) !== userId)) {
+        return res.status(403).json({ error: 'Extras filed after it would move with it, and they aren’t yours to move. Ask an admin.', code: 'extras' });
+      }
+    }
+  }
+
   // The `.eq('status', 'pending')` here is the real enforcement, same
   // pattern as review-submission.js — even if two requests race, only one
   // can land while status is still pending.
@@ -217,8 +242,9 @@ async function editSubmission(req, res) {
       .eq('status', 'pending')
       .select('id');
   };
-  if ('series_id' in dbUpdates && (dbUpdates.series_id || null) !== (existing.series_id || null)) {
-    await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: { series_id: dbUpdates.series_id || null } } }, write: doSave, setBy: `edit:${userId}` });
+  let stamped = null;
+  if (showMove) {
+    stamped = await withPayeeStamps({ scope: { episodeIds: [existing.id] }, patch: { episodes: { [existing.id]: { series_id: dbUpdates.series_id || null } } }, write: doSave, setBy: `edit:${userId}` });
   } else {
     await doSave();
   }
@@ -236,6 +262,34 @@ async function editSubmission(req, res) {
   // and the creator is told why (it used to answer ok).
   if (!saved || saved.length === 0) {
     return res.status(400).json({ error: 'Only submissions still pending review can be edited — this one has already been reviewed.' });
+  }
+
+  // Its extras went with it: whoever they stopped paying is told, and a new
+  // runner sends their invites and sets their prices from now on.
+  if (movingExtras.length) {
+    const extraIds = new Set(movingExtras.map((x) => x.id));
+    const changedExtras = stamped && stamped.changed ? stamped.changed.filter((c) => c.type === 'episode' && extraIds.has(c.id)) : [];
+    if (changedExtras.length) {
+      await noticeEarningsMoved({ changed: changedExtras, viewer: { userId, email }, how: 'moved' }).catch((err) => console.error('edit-submission earnings notice:', err && err.message));
+    }
+    const byRunner = new Map();
+    for (const x of movingExtras) {
+      const before = titleRunnerOf(x, fromShow);
+      const after = titleRunnerOf(x, toShow);
+      if (before === after) continue;
+      if (!byRunner.has(after || '')) byRunner.set(after || '', []);
+      byRunner.get(after || '').push(x.id);
+    }
+    const moved = [...byRunner.values()].flat();
+    if (moved.length) {
+      await cancelPendingInvites({ titles: moved.map((id) => ({ type: 'episode', id })), reason: 'runner', actor: { userId, email, isAdmin } })
+        .catch((err) => console.error('edit-submission invites:', err && err.message));
+      for (const [runner, ids] of byRunner) {
+        if (!runner) continue;
+        const { error: priceError } = await supabase.from('title_prices').update({ creator_id: runner }).eq('target_type', 'episode').in('target_id', ids);
+        if (priceError && !/title_prices|PGRST205|does not exist/i.test(priceError.message || '')) console.error('edit-submission price owner:', priceError.message);
+      }
+    }
   }
 
   // A title that is only its number follows a new number (lib/numberTitles.js).

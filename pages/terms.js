@@ -68,7 +68,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-05';
+const TEXT_UPDATED = '2026-11-06';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -216,10 +216,11 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       </p>
       <p>
         <strong>Which account a title pays.</strong> What a title earns &mdash; its member share and ad share
-        above, its sales (section 15) and the tips on its page (section 16) &mdash; goes to the account the
-        title is attached to on {SITE.name}: whoever runs it, or another account they choose, which has to
-        accept first; a change applies only to what the title earns after it, and credits and payments already
-        made stay where they were made.
+        above and its sales (section 15) &mdash; goes to the account the title is attached to on {SITE.name}:
+        whoever runs it, or another account they choose, which has to accept first; an extra filed under a show
+        is attached the way the show&rsquo;s episodes are. A change applies only to what the title earns after
+        it, and credits and payments already made stay where they were made. Tips on a title&rsquo;s page
+        (section 16) go to whoever made the title.
       </p>
       <p>
         <strong>Getting paid and taxes.</strong> Payouts go through Stripe Connect to an account in your

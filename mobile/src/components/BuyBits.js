@@ -60,7 +60,6 @@ function Bullet({ children }) {
 
 export function OwnTitleCard({ offer, bundle, episode, creatorName, isSubscriber, busy, onBuy, onSeePlans, onSeries, refundDays = 14, refundWatchPercent = 10 }) {
   if (!offer || !offer.forSale || offer.owned) return null;
-  const who = creatorName || 'the creator';
   return (
     <View style={{ marginTop: 16, gap: 10 }}>
       <View style={styles.card}>
@@ -77,7 +76,7 @@ export function OwnTitleCard({ offer, bundle, episode, creatorName, isSubscriber
         <Pressable style={[styles.btn, busy && { opacity: 0.6 }]} disabled={busy} onPress={onBuy}>
           <Text style={styles.btnText}>{busy ? 'Opening Stripe…' : `Buy for ${dollars(offer.payCents)}`}</Text>
         </Pressable>
-        <Text style={styles.fine}>One payment on Stripe's secure page. Most of it goes to {who}. Change your mind? Refund yourself within {refundDays} days, as long as you've watched less than {refundWatchPercent}% of it.</Text>
+        <Text style={styles.fine}>One payment on Stripe's secure page. Most of it goes to the people who made it. Change your mind? Refund yourself within {refundDays} days, as long as you've watched less than {refundWatchPercent}% of it.</Text>
         {bundle && bundle.forSale && !bundle.owned ? (
           <Text style={styles.fine}>Or <Text style={styles.link} onPress={onSeries}>own the whole series for {dollars(bundle.payCents)}</Text>: every episode, and any added later.</Text>
         ) : null}

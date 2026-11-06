@@ -301,6 +301,9 @@ export function ExtrasShelf({ view, ctx, actions }) {
                       items={[
                         mine ? { label: 'Edit', onClick: () => actions.open(x) } : null,
                         ctx.isOwner || mine ? { label: 'Place after…', onClick: () => actions.placeExtra(x) } : null,
+                        // Extras follow their show (Jose, 2026-11-06): whoever
+                        // runs it prices a live extra, a contributor's too.
+                        ctx.canSell && x.status === 'approved' && !x.held && !x.deletionRequested && !x.withdrawnAt ? { label: ctx.priceOf(x.id) ? 'Price and sales' : 'Sell…', onClick: () => actions.sell(x) } : null,
                         x.mine && !x.deletionRequested ? { label: 'Remove…', danger: true, onClick: () => actions.askRemove(x) } : null
                       ]}
                     />

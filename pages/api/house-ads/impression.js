@@ -6,7 +6,7 @@ import { checkRateLimit, firstInWindow, rateLimitKeyForRequest } from '../../../
 import { normalizeSurface } from '../../../lib/adShareRules';
 import { verifyImpression } from '../../../lib/adImpressionSig';
 import { isTitleId } from '../../../lib/titleIds';
-import { payeeOf, titleRunnerOf } from '../../../lib/showRules';
+import { extraParentOf, payeeOf, payeeShowIdOf, titleRunnerOf } from '../../../lib/showRules';
 
 // Ad ids are uuids; title ids are text slugs (lib/titleIds.js).
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,15 +39,25 @@ async function adMayCount(supabase, adId) {
 // "Their own" since slice 3b: the account the title pays (lib/showRules.js
 // payeeOf on its columns, which its history agrees with), whoever runs it
 // and whoever uploaded it — the paid account is the one an ad play credits.
+// The show is the one its money follows (payeeShowIdOf): an extra filed
+// under a show only through bonus_parent_* follows that show (Jose,
+// 2026-11-06), as every lane reads it.
 async function isOwnTitle(supabase, req, episodeId) {
   try {
     const { userId } = getAuth(req);
     if (!userId) return false;
     const { data: ep } = await supabase.from('episodes').select('*').eq('id', episodeId).maybeSingle();
     if (!ep) return false;
+    const ref = extraParentOf(ep);
+    let parent = null;
+    if (ref && ref.type === 'episode' && isTitleId(ref.id)) {
+      const { data } = await supabase.from('episodes').select('id, series_id').eq('id', ref.id).maybeSingle();
+      parent = data || null;
+    }
+    const showId = payeeShowIdOf(ep, parent);
     let show = null;
-    if (ep.series_id && isTitleId(String(ep.series_id))) {
-      const { data } = await supabase.from('series').select('*').eq('id', ep.series_id).maybeSingle();
+    if (showId && isTitleId(String(showId))) {
+      const { data } = await supabase.from('series').select('*').eq('id', showId).maybeSingle();
       show = data || null;
     }
     return [ep.submitted_by, titleRunnerOf(ep, show), payeeOf(ep, show)].filter(Boolean).includes(userId);

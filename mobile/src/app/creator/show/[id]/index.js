@@ -838,11 +838,12 @@ function ShowScreen() {
   };
 
   // The row's Sell… (slice 3b, §2 row 4): whoever runs the show prices any
-  // live episode in it, a contributor's included; a full admin too. Put
+  // live episode in it, a contributor's included — and any live extra,
+  // which follows its show (Jose, 2026-11-06); a full admin too. Put
   // before the divider that leads to Discard / Remove….
   const runsIt = isOwner || Boolean(viewer.isAdmin);
   const withSell = (items, row) => {
-    const liveRow = row.kind === 'episode' && row.status === 'approved' && show.isPublic && !row.held && !row.deletionRequested && !row.withdrawnAt;
+    const liveRow = (row.kind === 'episode' || row.kind === 'extra') && row.status === 'approved' && show.isPublic && !row.held && !row.deletionRequested && !row.withdrawnAt;
     if (!runsIt || !liveRow || locked || kind === 'vertical') return items;
     const priced = pricing && pricing.prices ? pricing.prices[`episode:${row.id}`] : null;
     const sell = {
@@ -898,11 +899,17 @@ function ShowScreen() {
     : [];
   const seasonsForSheets = seasonsShown.map((s) => ({ number: s.number, label: s.label }));
   const sheetRow = sheet && sheet.row ? sheet.row : null;
-  const extraItems = sheet && sheet.kind === 'extra' ? [
+  // Remove… comes last, after a divider, as on the episode rows (withSell
+  // puts Sell… before the divider).
+  const extraRemovable = sheet && sheet.kind === 'extra' && sheet.extra.mine && !sheet.extra.deletionRequested;
+  const extraItems = sheet && sheet.kind === 'extra' ? withSell([
     sheet.extra.mine || team ? { key: 'edit', label: 'Edit', icon: <PencilIcon size={15} color={colors.ink} />, onPress: () => openRow(sheet.extra) } : null,
     isOwner || sheet.extra.mine || team ? { key: 'place', label: 'Place after…', icon: <PlusIcon size={15} color={colors.ink} />, onPress: () => { setSheetError(null); setSheet({ kind: 'place', extra: sheet.extra }); } } : null,
-    sheet.extra.mine && !sheet.extra.deletionRequested ? { key: 'remove', label: 'Remove…', danger: true, icon: <TrashIcon size={15} color={colors.danger} />, onPress: () => { setSheetError(null); setSheet({ kind: 'remove', row: sheet.extra }); } } : null
-  ] : null;
+    ...(extraRemovable ? [
+      { divider: true },
+      { key: 'remove', label: 'Remove…', danger: true, icon: <TrashIcon size={15} color={colors.danger} />, onPress: () => { setSheetError(null); setSheet({ kind: 'remove', row: sheet.extra }); } }
+    ] : [])
+  ], sheet.extra) : null;
 
   return (
     <AccountFrame

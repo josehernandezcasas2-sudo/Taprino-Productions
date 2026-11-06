@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { seriesSaleNote, titleWords } from '../../lib/showRules';
+import { payeeTipsLine, seriesSaleNote, titleWords } from '../../lib/showRules';
 import { migrationRefusal } from '../../lib/showApi';
 import { colors, fonts, inkTint, oliveTint } from '../../lib/theme';
 import { WarningIcon } from '../WorkIcons';
@@ -357,7 +357,7 @@ export default function PayeeCard({ payee, mode = 'card', onChanged }) {
       <Text style={ss.cardK} accessibilityRole="header">Who gets paid</Text>
       {body}
       {mode === 'card' ? (
-        <Text style={pc.help}>Its share of ad money and members’ support, its sales and its tips go to this account. What it already earned stays where it went.</Text>
+        <Text style={pc.help}>Its share of ad money and members’ support and its sales go to this account. What it already earned stays where it went. {payeeTipsLine(payee.titleType)}</Text>
       ) : null}
       <Sheet visible={open} title="Who gets paid" eyebrow={titleWord} onClose={closeForm} foot={buttons}>
         {fields}
