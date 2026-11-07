@@ -64,6 +64,9 @@ export const oliveTint = (a) => `rgba(242,193,78,${a})`;
 export const dangerTint = (a) => `rgba(239,91,91,${a})`;
 // colors.ok's tint (the show page's Live pills and "ready" lines).
 export const okTint = (a) => `rgba(132,205,152,${a})`;
+// surface0 (the page background, #0c131f) at an alpha: scrims over a
+// picture (the review deck's chips and notes).
+export const surfaceTint = (a) => `rgba(12,19,31,${a})`;
 // The website's rgba(251, 232, 211, a): hairlines, pressed fills, the
 // header's circle buttons.
 export const inkTint = (a) => `rgba(251,232,211,${a})`;

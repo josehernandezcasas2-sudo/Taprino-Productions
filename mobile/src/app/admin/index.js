@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth, useUser } from '@clerk/expo';
 import { apiGet, apiPost } from '../../lib/api';
 import { setCaptureAllowedByServer } from '../../lib/captureBlock';
 import { colors, fonts } from '../../lib/theme';
@@ -10,6 +10,20 @@ import { useAdminRole } from '../../lib/adminRole';
 import TopNav from '../../components/TopNav';
 
 const SITE_ORIGIN = 'https://www.studiotapatv.site';
+
+// The capabilities that open Admin → Shows on the website (lib/adminNav.js
+// takes them from lib/showAdminRules.js SHOW_ADMIN_CAPS; copied here, the
+// app imports nothing from the website). Change both together.
+const SHOW_ADMIN_CAPS = ['manage_episodes', 'review_submissions', 'manage_artwork', 'manage_deletions', 'handle_flags'];
+
+// A sub-admin's capabilities ride on their Clerk account (publicMetadata
+// .permissions, set on Admin → Team); the website checks them again when
+// the page opens, so this only decides whether the row is drawn.
+function holdsAny(user, caps) {
+  const meta = user && user.publicMetadata ? user.publicMetadata : {};
+  const mine = Array.isArray(meta.permissions) ? meta.permissions : [];
+  return caps.some((c) => mine.includes(c));
+}
 
 // Admin home on the phone (2026-10-08): the numbers, then the queues you
 // can clear from here (each opens the card-by-card review screen), then
@@ -20,6 +34,7 @@ export default function AdminHome() {
   const router = useRouter();
   const { getToken } = useAuth();
   const role = useAdminRole();
+  const { user } = useUser();
   const [state, setState] = useState({ loading: true, error: null, counts: null, byKind: null, stats: null });
   const [refreshing, setRefreshing] = useState(false);
   // The screenshot switch (Jose, 2026-11-05: "place the screenshot switch
@@ -37,7 +52,8 @@ export default function AdminHome() {
     try {
       const token = await withToken();
       // queue-counts only splits out channel uploads; the review queue
-      // itself carries a count per kind (submission/ad/series/channel/location).
+      // itself carries a count per kind (submission/ad/channel/location/
+      // price/application).
       const [counts, queue, stats] = await Promise.all([
         apiGet('/api/admin/queue-counts', token),
         apiGet('/api/admin/review-queue', token).catch(() => null),
@@ -86,7 +102,12 @@ export default function AdminHome() {
     ...(role.isAdmin ? [{ key: 'location', title: 'Places', sub: 'New and re-verified Locations listings', n: byKind ? byKind.location || 0 : 0, kind: 'location' }] : []),
     { key: 'flags', title: 'Flags & reports', sub: 'Opens the web admin', n: counts.flags || 0, web: '/admin/content', warn: true }
   ] : [];
-  const adsAndSeries = byKind ? (byKind.ad || 0) + (byKind.series || 0) : 0;
+  const ads = byKind ? byKind.ad || 0 : 0;
+  // Admin → Shows (the series revamp, slice 5): full admins, and sub-admins
+  // holding any of its capabilities. The list and the show pages stay on
+  // the website; the deck approves episodes here.
+  const seesShows = Boolean(role.isAdmin || (role.canAccessAdmin && holdsAny(user, SHOW_ADMIN_CAPS)));
+  const showsWaiting = counts && Number(counts.shows) > 0 ? Number(counts.shows) : 0;
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
@@ -161,7 +182,8 @@ export default function AdminHome() {
 
             <Text style={styles.sectionLabel}>On the web</Text>
             {[
-              ['Ads & new series', `${adsAndSeries ? `${adsAndSeries} waiting · ` : ''}Ads need a billing rate; series need a look at artwork`, '/admin/review'],
+              ['Ads', `${ads ? `${ads} waiting · ` : ''}Ads need a billing rate`, '/admin/review'],
+              ...(seesShows ? [['Shows', `${showsWaiting ? `${showsWaiting} waiting · ` : ''}Every series and podcast: what’s in review, what waits for approval, and who runs each one.`, '/admin/shows']] : []),
               ['Library & queues', 'Artwork, edits, deletions, orphaned media', '/admin/library'],
               ['Locations', 'Reported problems, hosts gone quiet, refunds, pause or remove a place', '/admin/locations'],
               ...(role.isAdmin ? [

@@ -30,7 +30,7 @@ export default async function handler(req, res) {
         adminEmail: email,
         action: 'delete_test_content',
         targetType: 'content',
-        details: `Deleted ${total} (titles ${d.episode}, series ${d.series}, pitches ${d.pitch}, locations ${d.location}, calls ${d.call}); ${result.media} media to Orphaned media${result.skipped.length ? `; skipped ${result.skipped.length}` : ''}: ${result.titles.slice(0, 40).join(', ')}`.slice(0, 1900)
+        details: `Deleted ${total} (titles ${d.episode}, series ${d.series}, pitches ${d.pitch}, locations ${d.location}, calls ${d.call}); ${result.media} media to Orphaned media${result.refiled && result.refiled.length ? `; ${result.refiled.length} extras filed under their show` : ''}${result.skipped.length ? `; skipped ${result.skipped.length}` : ''}: ${result.titles.slice(0, 40).join(', ')}`.slice(0, 1900)
       });
       return res.status(200).json({ ok: true, total, ...result });
     }

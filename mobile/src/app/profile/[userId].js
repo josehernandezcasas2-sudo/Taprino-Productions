@@ -53,9 +53,10 @@ function hostnameFor(url) {
   }
 }
 function workTypeLabel(item) {
+  // A podcast show (type series) reads "Podcast", like its episodes.
+  if (item.contentType === 'podcast') return 'Podcast';
   if (item.contentType === 'series' || item.type === 'series') return 'Series';
   if (item.contentType === 'movie') return 'Film';
-  if (item.contentType === 'podcast') return 'Podcast';
   return 'Short';
 }
 function workHref(item) {
@@ -453,6 +454,8 @@ export default function PublicProfile() {
         ) : null}
 
         <View style={styles.divider} />
+        {/* A crew role, or a Studio / Producer credit linked to this account
+            (decision 20), reads after the type: "Series · Producer". */}
         <Text style={styles.sectionLabel}>Tagged in</Text>
         {creditedWork.length === 0 ? (
           <Text style={styles.emptyText}>Nothing tagged here yet — this fills in once {profile.displayName} is credited on something.</Text>
@@ -462,7 +465,7 @@ export default function PublicProfile() {
               <Pressable key={`${item.type}-${item.id}`} style={styles.workItem} onPress={() => router.push(workHref(item))}>
                 {item.poster ? <SmartImage uri={item.poster} style={styles.workPoster} /> : <View style={styles.workPoster} />}
                 <Text style={styles.workTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.workType}>{workTypeLabel(item)}</Text>
+                <Text style={styles.workType} numberOfLines={2}>{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</Text>
               </Pressable>
             ))}
           </View>

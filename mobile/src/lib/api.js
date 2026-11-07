@@ -29,11 +29,14 @@ export function absoluteUrl(path) {
 }
 
 // A failed request's body. A 403 { suspended } (middleware.js, migration
-// 102) is reported so the gate shows at once, whatever screen asked.
+// 102) is reported so the gate shows at once, whatever screen asked. The
+// error carries the status (a 409 refusal reloads the admin deck).
 async function failed(res) {
   const data = await res.json().catch(() => ({}));
   if (res.status === 403 && data && data.suspended) reportSuspension(data.suspended);
-  return new Error(data.error || `Request failed (${res.status})`);
+  const err = new Error((data && data.error) || `Request failed (${res.status})`);
+  err.status = res.status;
+  return err;
 }
 
 // A Clerk session token lasts about a minute, so a token fetched when a

@@ -151,6 +151,7 @@ export default function AdminTestContent({ account, mainGenres }) {
         <div className="tc-done">
           <b>Deleted {result.total}.</b>{' '}
           {result.media > 0 ? `${result.media} video${result.media === 1 ? '' : 's'} and image${result.media === 1 ? '' : 's'} are waiting in Orphaned media (Library & queues): clear them there to stop paying for the storage.` : 'No media to clean up.'}
+          {Array.isArray(result.refiled) && result.refiled.length > 0 && <span className="tc-meta">{result.refiled.length === 1 ? '1 extra' : `${result.refiled.length} extras`} filed after a deleted episode now sit{result.refiled.length === 1 ? 's' : ''} under its show.</span>}
           {result.skipped.length > 0 && <span className="tc-meta">Skipped: {result.skipped.map((s) => `${s.title} (${s.reason})`).join('; ')}</span>}
         </div>
       )}

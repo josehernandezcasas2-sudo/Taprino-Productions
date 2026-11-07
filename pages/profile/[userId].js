@@ -49,9 +49,10 @@ function hostnameFor(url) {
 }
 
 function workTypeLabel(item) {
+  // A podcast show (type series) reads "Podcast", like its episodes.
+  if (item.contentType === 'podcast') return 'Podcast';
   if (item.contentType === 'series' || item.type === 'series') return 'Series';
   if (item.contentType === 'movie') return 'Film';
-  if (item.contentType === 'podcast') return 'Podcast';
   return 'Short';
 }
 

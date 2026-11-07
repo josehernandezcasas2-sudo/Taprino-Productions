@@ -1,10 +1,10 @@
 import { useState } from 'react';
 
-// Reused for both an episode (title/description) and a show/series
-// (name/description) edit request — the field labels differ, but the
-// shape and the "this goes to admin for approval, doesn't apply
-// instantly" behavior are identical either way.
-export default function RequestEditModal({ type, currentValues, onClose, onSubmitted }) {
+// A standalone title's title/description edit request (Your work): it
+// goes to an admin for approval and doesn't apply at once. A show's
+// details are edited on its show page since the series revamp (the
+// series half and its route, request-series-edit, retired in slice 6).
+export default function RequestEditModal({ type = 'episode', currentValues, onClose, onSubmitted }) {
   const isEpisode = type === 'episode';
   const [nameValue, setNameValue] = useState(isEpisode ? currentValues.title : currentValues.name);
   const [description, setDescription] = useState(currentValues.description || '');
@@ -17,14 +17,11 @@ export default function RequestEditModal({ type, currentValues, onClose, onSubmi
     setSaving(true);
     setError(null);
     try {
-      const endpoint = isEpisode ? '/api/creator/request-episode-edit' : '/api/creator/request-series-edit';
-      const body = isEpisode
-        ? { episodeId: currentValues.id, title: nameValue, description }
-        : { seriesId: currentValues.id, name: nameValue, description };
-      const res = await fetch(endpoint, {
+      if (!isEpisode) throw new Error('Edit a show on its show page.');
+      const res = await fetch('/api/creator/request-episode-edit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ episodeId: currentValues.id, title: nameValue, description })
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not submit your request.');

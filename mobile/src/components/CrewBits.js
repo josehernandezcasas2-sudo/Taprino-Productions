@@ -246,12 +246,12 @@ export function GearRows({ gear, onRemove }) {
 
 export function CreditRows({ auto = [], manual = [], onRemove, onOpenWork }) {
   if (auto.length === 0 && manual.length === 0) return <Text style={crew.muted}>No credits yet.</Text>;
-  const kind = (w) => (w.contentType === 'series' || w.type === 'series' ? 'Series' : w.contentType === 'movie' ? 'Film' : w.contentType === 'podcast' ? 'Podcast' : 'Short');
+  const kind = (w) => (w.contentType === 'podcast' ? 'Podcast' : w.contentType === 'series' || w.type === 'series' ? 'Series' : w.contentType === 'movie' ? 'Film' : 'Short');
   return (
     <View style={{ gap: 6 }}>
       {auto.map((w) => (
         <Pressable key={`${w.type}-${w.id}`} style={crew.gearRow} onPress={onOpenWork ? () => onOpenWork(w) : undefined}>
-          <Text style={[crew.rowText, { flex: 1 }]}>{w.title} <Text style={crew.cat}>· {kind(w)}{w.createdAt ? ` · ${new Date(w.createdAt).getFullYear()}` : ''}</Text></Text>
+          <Text style={[crew.rowText, { flex: 1 }]}>{w.title} <Text style={crew.cat}>· {kind(w)}{w.role ? ` · ${w.role}` : ''}{w.createdAt ? ` · ${new Date(w.createdAt).getFullYear()}` : ''}</Text></Text>
           <View style={[crew.chip, crew.chipOk]}><Text style={[crew.chipText, crew.chipOk]}>✓ on Studio Tapa</Text></View>
         </Pressable>
       ))}

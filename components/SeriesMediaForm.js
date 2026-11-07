@@ -1,6 +1,12 @@
 import { useState } from 'react';
 import * as tus from 'tus-js-client';
 
+// Caller-less since the series revamp (the show page's editors replaced
+// it), and kept in the tree as the spec says. The route it saved through,
+// /api/creator/series-media, was deleted in slice 6: don't bring this
+// form back without a new route (a show's art is saved through
+// /api/show/<id>).
+
 function readAsDataUrl(f) {
   if (!f) return Promise.resolve(null);
   return new Promise((resolve, reject) => {
