@@ -26,6 +26,7 @@ import { SITE, absoluteSiteUrl } from '../../lib/siteConfig';
 import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
 import { tierBadge } from '../../lib/tierBadge';
 import { contentTypeTag } from '../../lib/contentTypeTags';
+import { extraKindLabel, extraMetaLine } from '../../lib/extraKinds';
 import { OwnTitleCard, BoughtBanner, OwnedChip, useBuyTitle } from '../../components/BuyBits';
 import { getPurchaseSettings } from '../../lib/purchases';
 import { dollars } from '../../lib/purchaseRules';
@@ -537,9 +538,12 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
   // The title block under the player (the "After Play" canvas).
   const isSeries = episode.contentType === 'series' && Boolean(episode.seriesId);
+  // An extra with a kind says it ("Making-of", migration 121) where the
+  // type word goes; without one, as before.
+  const typeWord = episode.contentType === 'bonus' && episode.extraKind ? extraKindLabel(episode.extraKind) : contentTypeTag(episode.contentType).label;
   const seriesKicker = isSeries
     ? [parentSeriesName, episodeCode(episode)].filter(Boolean).join(' · ')
-    : contentTypeTag(episode.contentType).label;
+    : typeWord;
   const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
   const tier = tierBadge(episode.tier, episode.adsEnabled);
   const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
@@ -862,7 +866,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 </Link>
               ) : (
                 <span className={`ep-kicker-type ${contentTypeTag(episode.contentType).key}`}>
-                  {contentTypeTag(episode.contentType).label}{episode.mainGenre ? ` · ${episode.mainGenre}` : ''}
+                  {typeWord}{episode.mainGenre ? ` · ${episode.mainGenre}` : ''}
                 </span>
               )}
               {showingTrailer && <span className="ep-kicker-note">Trailer</span>}
@@ -1084,7 +1088,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                     </div>
                     <div className="ep-info">
                       <h4>{b.title}</h4>
-                      <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>
+                      {/* "MAKING-OF · 6 MINUTES" with a kind (migration 121); the runtime alone without one, as before. */}
+                      {b.extraKind
+                        ? <span className="ep-extra-kind">{extraMetaLine(b.extraKind, formatRuntimeLong(b.runtime) || b.runtime)}</span>
+                        : <span>{formatRuntimeLong(b.runtime) || b.runtime}</span>}
                     </div>
                   </>
                 );

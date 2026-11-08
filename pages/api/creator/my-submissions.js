@@ -8,6 +8,7 @@ import { kindOf, titleRunnerOf } from '../../../lib/showRules';
 import { payeeShowIds } from '../../../lib/payees';
 import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
+import { normalizeExtraKind } from '../../../lib/extraKinds';
 
 // A creator's own titles, every status, for Creator Studio's piles, Your
 // work (web + app) and the app's hub. Filtered by the signed-in account,
@@ -202,6 +203,8 @@ export default async function handler(req, res) {
       availableUntil: ep.available_until ?? null,
       bonusParentType: ep.bonus_parent_type ?? null,
       bonusParentId: ep.bonus_parent_id ?? null,
+      // What kind of extra (migration 121): null without one, and before 121.
+      extraKind: ep.content_type === 'bonus' ? normalizeExtraKind(ep.extra_kind) : null,
       featured: !!ep.featured,
       discoverCurated: !!ep.discover_curated,
       fundingUrl: ep.funding_url || '',

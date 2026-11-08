@@ -23,6 +23,7 @@ import AddEpisodesBar, { AddSeveralSheet, LinkSheet, QueuePanel } from '../../..
 import MoveSheet from '../../../../components/show/MoveSheet';
 import { PlaceExtraSheet, RemoveEpisodeSheet } from '../../../../components/show/RowSheets';
 import PayeeCard from '../../../../components/show/PayeeCard';
+import { extraKindLabel } from '../../../../lib/extraKinds';
 
 // The show page in the app (the series revamp, slice 5; spec "App — New
 // show, Show page, Episode editor" and "The app"; the website's
@@ -1017,7 +1018,7 @@ function ShowScreen() {
         <ActionSheet title={sheetRow.displayTitle || 'This episode'} eyebrow={sheetRow.code || (sheetRow.kind === 'draft' ? 'Draft' : null)} items={withSell(rowMenuItems(sheetRow, ctx, rowActions), sheetRow)} onClose={() => setSheet(null)} />
       ) : null}
       {extraItems ? (
-        <ActionSheet title={sheet.extra.displayTitle} eyebrow="Extra" items={extraItems} onClose={() => setSheet(null)} />
+        <ActionSheet title={sheet.extra.displayTitle} eyebrow={extraKindLabel(sheet.extra.extraKind)} items={extraItems} onClose={() => setSheet(null)} />
       ) : null}
       {sheet && sheet.kind === 'move' && sheetRow ? (
         <MoveSheet

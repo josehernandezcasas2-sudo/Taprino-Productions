@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, fonts, inkTint, oliveTint } from '../../lib/theme';
 import { Sheet, SmallButton, ss } from './ShowBits';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // Two small sheets of the show page in the app (the series revamp, slice
 // 5; the website's RemoveEpisodeSheet and "Place <extra>" RoomSheet in
@@ -44,7 +45,7 @@ export function PlaceExtraSheet({ extra, showId, episodes, busy, error, onPlace,
   return (
     <Sheet
       title={`Place ${extra.displayTitle}`}
-      eyebrow="Extra"
+      eyebrow={extraKindLabel(extra.extraKind)}
       onClose={onClose}
       foot={error ? <Text style={ss.error}>{error}</Text> : null}
     >

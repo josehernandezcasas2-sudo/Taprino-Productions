@@ -21,6 +21,7 @@ import Footer from '../../components/Footer';
 import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, UndoIcon, TicketIcon, AccountIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { dollars } from '../../lib/purchaseRules';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // The creator path's words (2026-10-31): In review / Live / Not this time.
 const STATUS_LABEL = {
@@ -513,6 +514,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     if (s.cloudflareState && !['ready', 'error', 'pendingupload'].includes(s.cloudflareState)) parts.push(CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState);
     else if (s.runtime) parts.push(minutes(s.runtime));
     if (s.contentType === 'bonus') {
+      // What kind of extra (migration 121), when it has one.
+      if (s.extraKind) parts.push(extraKindLabel(s.extraKind));
       if (s.bonusParentType === 'episode') {
         const parent = byId.get(s.bonusParentId);
         parts.push(parent && episodeCode(parent) ? `after ${episodeCode(parent)}` : 'after an episode');

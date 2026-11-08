@@ -13307,7 +13307,22 @@ a.spg-top:hover .spg-title { color: var(--brass); }
 }
 .spg-extra-title { font-family: var(--font-display); font-size: 13.5px; font-weight: 600; line-height: 1.25; }
 a.spg-extra-card:hover .spg-extra-title { color: var(--brass); }
-.spg-extra-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-dim); }
+.spg-extra-meta { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.8px; text-transform: uppercase; color: var(--ink-dim); overflow-wrap: anywhere; }
+
+/* What kind of extra (migration 121, lib/extraKinds.js): only a label.
+   The uploader's own words are public and up to 40 characters, so every
+   line that prints one wraps anywhere rather than pushing a card wider. */
+.ep-extra-kind { text-transform: uppercase; letter-spacing: 0.08em; overflow-wrap: anywhere; }
+.ep-kicker-type.bonus { min-width: 0; overflow-wrap: anywhere; }
+.tp-fs-kicker { overflow-wrap: anywhere; }
+.show-extra-kind { color: var(--olive); letter-spacing: 0.06em; text-transform: uppercase; overflow-wrap: anywhere; min-width: 0; }
+.yw-meta-text { min-width: 0; overflow-wrap: anywhere; }
+.xk-field { display: flex; flex-direction: column; gap: 0.5rem; min-width: 0; }
+.xk-other { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.xk-other-row { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.xk-field .apl-help, .xk-field .show-ed-hint { margin: 0; }
+.xk-input { width: 100%; box-sizing: border-box; height: 44px; padding: 0 0.75rem; border-radius: 8px; border: 1px solid color-mix(in srgb, var(--ink) 20%, transparent); background: var(--void); color: var(--ink); font-family: var(--font-body); font-size: 0.95rem; }
+.xk-input:focus { outline: none; border-color: var(--brass); }
 
 /* The compact bundle card (board V1). */
 .own-card.bundle.compact {

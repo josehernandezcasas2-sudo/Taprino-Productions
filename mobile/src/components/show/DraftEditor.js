@@ -12,11 +12,13 @@ import { pickVideo } from '../CreatorBits';
 import { ClockIcon, TrashIcon, WarningIcon } from '../WorkIcons';
 import MoveSheet from './MoveSheet';
 import {
-  Banner, DIRECT, EdInput, EditorFoot, EditorHead, FieldHead, FootNote, SaveButton, SectionHead, StatusLine, UploadLine,
+  Banner, DIRECT, EdInput, EditorFoot, EditorHead, FieldHead, FieldNote, FootNote, SaveButton, SectionHead, StatusLine, UploadLine,
   masterWords, useFootSpace, useInFront, useKeyboardShown, useLeaveGuard
 } from './EditorBits';
 import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, TitleField } from './EpisodeFields';
 import { RoomToast, SmallButton, UploadIcon, episodeEditorRoute, shortDate, showRoute, ss, useRoomToast } from './ShowBits';
+import ExtraKindField from '../ExtraKindField';
+import { extraKindChoice } from '../../lib/extraKinds';
 
 // The editor for a draft in the app (the series revamp, slice 5; the
 // website's components/show/DraftEditor.js, the same words): an episode
@@ -58,7 +60,11 @@ function draftFormOf(d) {
     featured: f.featured === true,
     isOriginal: f.isOriginal === true,
     season: Number(f.season) || 1,
-    number: f.seriesOrder ? String(f.seriesOrder) : ''
+    number: f.seriesOrder ? String(f.seriesOrder) : '',
+    // An extra's kind (migration 121), kept in the draft as the field holds
+    // it (the submit screen's keys); a draft with only `extraKind` opens on that.
+    extraKindChoice: typeof f.extraKindChoice === 'string' ? f.extraKindChoice : extraKindChoice(f.extraKind).choice,
+    extraKindOther: typeof f.extraKindOther === 'string' ? f.extraKindOther : extraKindChoice(f.extraKind).other
   };
 }
 
@@ -81,7 +87,9 @@ function draftValues(form) {
     featured: form.featured,
     isOriginal: form.isOriginal,
     season: String(Number(form.season) || 1),
-    seriesOrder: String(form.number || '').trim()
+    seriesOrder: String(form.number || '').trim(),
+    extraKindChoice: form.extraKindChoice || '',
+    extraKindOther: form.extraKindOther || ''
   };
 }
 
@@ -95,10 +103,15 @@ function formChange(init, form) {
     change.season = now.season;
     change.seriesOrder = now.seriesOrder;
   }
+  // The kind's chip and its words go together, as one field.
+  if ('extraKindChoice' in change || 'extraKindOther' in change) {
+    change.extraKindChoice = now.extraKindChoice;
+    change.extraKindOther = now.extraKindOther;
+  }
   return change;
 }
 
-const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place' };
+const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place', extraKindChoice: 'extraKind', extraKindOther: 'extraKind' };
 
 function findRow(view, id) {
   for (const s of (view && view.seasons) || []) for (const r of s.rows || []) if (r.kind === 'draft' && r.id === id) return r;
@@ -452,6 +465,17 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
             <TitleField value={form.title} onChange={(v) => set('title', v)} policy={DIRECT} placeholder={init.number ? `Episode ${init.number}` : 'Title'} edited={edited('title')} />
             <OneLineField value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={DIRECT} edited={edited('description')} />
           </View>
+          {draft && draft.form && draft.form.contentType === 'bonus' ? (
+            <View style={ss.card}>
+              <ExtraKindField
+                choice={form.extraKindChoice}
+                other={form.extraKindOther}
+                onChange={(v) => setForm((f) => ({ ...f, extraKindChoice: v.choice, extraKindOther: v.other }))}
+              >
+                <FieldNote policy={DIRECT} edited={edited('extraKind')} />
+              </ExtraKindField>
+            </View>
+          ) : null}
 
           <SectionHead label="More info" />
           <View style={ss.card}>

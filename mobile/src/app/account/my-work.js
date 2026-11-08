@@ -19,6 +19,7 @@ import SellTitleSheet, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../
 import { ChevronIcon, KindChip, Sheet, StateChip, episodeEditorRoute, showRoute, ss } from '../../components/show/ShowBits';
 import PayeeCard from '../../components/show/PayeeCard';
 import { dollars } from '../../lib/purchaseRules';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // The www host: the bare studiotapatv.site 308-redirects there, so a
 // copied link should already be the address it lands on.
@@ -390,6 +391,8 @@ export default function MyWork() {
     if (s.cloudflareState && !['ready', 'error', 'pendingupload'].includes(s.cloudflareState)) parts.push(CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState);
     else if (s.runtime) parts.push(minutes(s.runtime));
     if (s.contentType === 'bonus') {
+      // What kind of extra (migration 121), when it has one.
+      if (s.extraKind) parts.push(extraKindLabel(s.extraKind));
       if (s.bonusParentType === 'episode') {
         const parent = byId.get(s.bonusParentId);
         parts.push(parent && episodeCode(parent) ? `after ${episodeCode(parent)}` : 'after an episode');

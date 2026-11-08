@@ -20,6 +20,8 @@ import { AboutField, MoreOptions, NOT_SAVED_WORDS, OneLineField, PlaceBlock, Sam
 import { BackArrowIcon, CheckIcon, ClockIcon, CloseIcon, ExternalLinkIcon, PlusIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { PREVIEW_BUILT } from './ShowCards';
 import PayeeCard, { PayeeLine } from './PayeeCard';
+import ExtraKindField from '../ExtraKindField';
+import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
 
 // The episode editor (series revamp slice 2; spec Screens, "Episode
 // editor"; boards EditorBasics, EditorMoreInfo, EditorPlace, ShowLaptop).
@@ -98,7 +100,11 @@ function episodeForm(ep, hasShow) {
     season: Number(ep.season) || 1,
     number: ep.seriesOrder ? String(ep.seriesOrder) : '',
     bonusParentType: ep.bonus ? ep.bonus.parentType || null : null,
-    bonusParentId: ep.bonus ? ep.bonus.parentId || null : null
+    bonusParentId: ep.bonus ? ep.bonus.parentId || null : null,
+    // What kind of extra (migration 121): which chip is on, and the words
+    // in "Your category" when it is Other.
+    extraKindChoice: extraKindChoice(ep.extraKind).choice,
+    extraKindOther: extraKindChoice(ep.extraKind).other
   };
 }
 
@@ -307,6 +313,10 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       body.season = Number(form.season);
       body.seriesOrder = Number(form.number) || form.number;
       changes.push({ field: 'place', mode: pol('season').mode });
+    }
+    if (isExtra) {
+      const kind = extraKindFromChoice(form.extraKindChoice, form.extraKindOther);
+      if (kind !== extraKindFromChoice(init.extraKindChoice, init.extraKindOther)) add('extraKind', 'extraKind', kind);
     }
     if (isExtra && (form.bonusParentType !== init.bonusParentType || form.bonusParentId !== init.bonusParentId)) {
       body.bonusParentType = form.bonusParentType;
@@ -623,7 +633,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   // --- the head, the banners --------------------------------------------------
   const title = ep.displayTitle || ep.title || 'Untitled';
   const placeholder = ep.inherited && ep.inherited.title && !ep.title ? ep.inherited.title : ep.seriesOrder ? `Episode ${ep.seriesOrder}` : 'Title';
-  const eyebrow = [show ? show.name : isExtra ? 'Extra' : null, ep.code || (isExtra && ep.bonus && ep.bonus.code ? `After ${ep.bonus.code}` : null)].filter(Boolean).join(' · ');
+  const eyebrow = [show ? show.name : isExtra ? extraKindLabel(ep.extraKind) : null, ep.code || (isExtra && ep.bonus && ep.bonus.code ? `After ${ep.bonus.code}` : null)].filter(Boolean).join(' · ');
   const pill = { text: ep.statusLabel || 'Live', tone: PILL_TONE[ep.statusLabel] || 'neutral', since: layout === 'panel' && ep.statusLabel === 'Live' && (ep.releasedAt || ep.reviewedAt) ? `since ${shortDate(ep.releasedAt || ep.reviewedAt)}` : null };
   const viewable = live && !ep.held && !ep.deletionRequested && !ep.withdrawnAt && (!show || show.isPublic);
   const statusLine = ep.withdrawnAt ? 'Withdrawn · kept for its buyers'
@@ -766,6 +776,19 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         edited={edited('title')}
       />
       <OneLineField id="ep-oneline" value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={pol('description')} edited={edited('description')} />
+      {isExtra && (
+        <div className="show-ed-field">
+          <ExtraKindField
+            idPrefix="ep-kind"
+            choice={form.extraKindChoice}
+            other={form.extraKindOther}
+            disabled={!isOpen(pol('extraKind'))}
+            onChange={(v) => setForm((f) => ({ ...f, extraKindChoice: v.choice, extraKindOther: v.other }))}
+          >
+            <FieldNote policy={pol('extraKind')} edited={edited('extraKind')} />
+          </ExtraKindField>
+        </div>
+      )}
     </>
   );
 

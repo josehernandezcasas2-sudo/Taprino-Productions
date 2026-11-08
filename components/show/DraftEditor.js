@@ -9,9 +9,11 @@ import { changedFields } from '../../lib/draftPatch';
 import { SITE } from '../../lib/siteConfig';
 import MoveSheet from './MoveSheet';
 import { fileDrop, pickerKeys } from './roomBits';
-import { Banner, EditorFrame, FieldHead, Toast, callApi, masterWords, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast } from './EditorBits';
+import { Banner, EditorFrame, FieldHead, FieldNote, Toast, callApi, masterWords, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast } from './EditorBits';
 import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, TitleField } from './EpisodeFields';
 import { CheckIcon, ClockIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
+import ExtraKindField from '../ExtraKindField';
+import { extraKindChoice } from '../../lib/extraKinds';
 
 // The episode editor for a draft (series revamp slice 2): an episode that
 // isn't sent yet, a creator_drafts row whose form holds the show, season
@@ -51,7 +53,12 @@ function draftFormOf(d) {
     featured: f.featured === true,
     isOriginal: f.isOriginal === true,
     season: Number(f.season) || 1,
-    number: f.seriesOrder ? String(f.seriesOrder) : ''
+    number: f.seriesOrder ? String(f.seriesOrder) : '',
+    // An extra's kind (migration 121), kept in the draft as the field holds
+    // it (the three-step submit's keys); a draft with only `extraKind`
+    // opens on that.
+    extraKindChoice: typeof f.extraKindChoice === 'string' ? f.extraKindChoice : extraKindChoice(f.extraKind).choice,
+    extraKindOther: typeof f.extraKindOther === 'string' ? f.extraKindOther : extraKindChoice(f.extraKind).other
   };
 }
 
@@ -74,11 +81,13 @@ function draftValues(form) {
     featured: form.featured,
     isOriginal: form.isOriginal,
     season: String(Number(form.season) || 1),
-    seriesOrder: String(form.number || '').trim()
+    seriesOrder: String(form.number || '').trim(),
+    extraKindChoice: form.extraKindChoice || '',
+    extraKindOther: form.extraKindOther || ''
   };
 }
 
-const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place' };
+const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place', extraKindChoice: 'extraKind', extraKindOther: 'extraKind' };
 
 // What a save sends: the fields changed since the draft was read (the
 // season and the number go together, as one place).
@@ -89,6 +98,11 @@ function formChange(init, form) {
   if ('season' in change || 'seriesOrder' in change) {
     change.season = now.season;
     change.seriesOrder = now.seriesOrder;
+  }
+  // The kind's chip and its words go together, as one field.
+  if ('extraKindChoice' in change || 'extraKindOther' in change) {
+    change.extraKindChoice = now.extraKindChoice;
+    change.extraKindOther = now.extraKindOther;
   }
   return change;
 }
@@ -135,6 +149,9 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
 
   const show = view ? view.show : null;
   const row = view ? findRow(view, draft.id) : null;
+  // An extra still in draft (a three-step submit of bonus content) gets the
+  // kind field too.
+  const draftIsExtra = Boolean(draft && draft.form && draft.form.contentType === 'bonus');
   const defaults = (show && show.defaults) || {};
   const kind = show ? show.kind : 'series';
 
@@ -459,6 +476,18 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
       {fileCard}
       <TitleField id="dr-title" value={form.title} onChange={(v) => set('title', v)} policy={DIRECT} placeholder={init.number ? `Episode ${init.number}` : 'Title'} edited={edited('title')} />
       <OneLineField id="dr-oneline" value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={DIRECT} edited={edited('description')} />
+      {draftIsExtra && (
+        <div className="show-ed-field">
+          <ExtraKindField
+            idPrefix="dr-kind"
+            choice={form.extraKindChoice}
+            other={form.extraKindOther}
+            onChange={(v) => setForm((f) => ({ ...f, extraKindChoice: v.choice, extraKindOther: v.other }))}
+          >
+            <FieldNote policy={DIRECT} edited={edited('extraKind')} />
+          </ExtraKindField>
+        </div>
+      )}
     </>
   );
 

@@ -19,6 +19,7 @@ import { useUpload } from '../../contexts/UploadContext';
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
+import ExtraKindField from '../../components/ExtraKindField';
 import { WarningIcon } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -222,11 +223,17 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
   // stands, counts, season names, whether they run it); the team's list is
   // every show. Until it answers, the picker reads the page's own list.
   const [summaries, setSummaries] = useState(null);
+  // Before migration 121 "What kind of extra?" is greyed with the server's line.
+  const [kindLocked, setKindLocked] = useState(null);
   useEffect(() => {
     let alive = true;
     fetch(isAdmin ? '/api/show?all=1' : '/api/show?mine=1')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (alive && d && Array.isArray(d.shows)) setSummaries(d.shows); })
+      .then((d) => {
+        if (!alive || !d) return;
+        if (Array.isArray(d.shows)) setSummaries(d.shows);
+        if (d.extraKind && d.extraKind.ready === false) setKindLocked(d.extraKind.line || 'Needs a database update (migration 121).');
+      })
       .catch(() => {});
     return () => { alive = false; };
   }, [isAdmin]);
@@ -739,6 +746,21 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
             )}
             {placeType && fromShowPage && (
               <p className="apl-help sub-place-note">Opened from the show page, so the {showNoun(form.contentType)}, season and number came filled in.</p>
+            )}
+
+            {/* What kind of extra (migration 121): only a label on its card
+                and its page; it stays under the show's Extras. */}
+            {form.contentType === 'bonus' && (
+              <ExtraKindField
+                idPrefix="sub-kind"
+                variant="apply"
+                choice={form.extraKindChoice || ''}
+                other={form.extraKindOther || ''}
+                disabled={Boolean(kindLocked)}
+                onChange={(v) => setForm((f) => ({ ...f, extraKindChoice: v.choice, extraKindOther: v.other }))}
+              >
+                {kindLocked ? <p className="apl-help xk-locked">{kindLocked}</p> : null}
+              </ExtraKindField>
             )}
 
             <div className="apl-field">

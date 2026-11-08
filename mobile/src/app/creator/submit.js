@@ -22,6 +22,7 @@ import {
 import { BackArrowIcon } from '../../components/account/AccountBits';
 import { WarningIcon } from '../../components/WorkIcons';
 import { Chip, ChevronIcon, PlusIcon, Sheet, SmallButton } from '../../components/show/ShowBits';
+import ExtraKindField from '../../components/ExtraKindField';
 
 // Creator Studio's submit, three steps (mirrors pages/creator/submit.js,
 // 2026-10-31): the file (uploading from the moment it's picked), about it
@@ -262,10 +263,14 @@ export default function SubmitTitle() {
   // stands, counts, season names, whether they run it); the team's list is
   // every show. Until it answers, the picker reads list-series.
   const [summaries, setSummaries] = useState(null);
+  // Before migration 121 "What kind of extra?" is greyed with the server's line.
+  const [kindLocked, setKindLocked] = useState(null);
   useEffect(() => {
     let alive = true;
     showCall('GET', isAdmin ? '/api/show?all=1' : '/api/show?mine=1', undefined, getToken).then((r) => {
-      if (alive && r.ok && Array.isArray(r.data.shows)) setSummaries(r.data.shows);
+      if (!alive || !r.ok) return;
+      if (Array.isArray(r.data.shows)) setSummaries(r.data.shows);
+      if (r.data.extraKind && r.data.extraKind.ready === false) setKindLocked(r.data.extraKind.line || 'Needs a database update (migration 121).');
     });
     return () => { alive = false; };
   }, [isAdmin, getToken]);
@@ -741,6 +746,18 @@ export default function SubmitTitle() {
             ) : null}
             {placeType && fromShowPage ? (
               <Text style={cp.help}>Opened from the show page, so the {noun}, season and number came filled in.</Text>
+            ) : null}
+
+            {/* What kind of extra (migration 121): only a label on its card and its page. */}
+            {form.contentType === 'bonus' ? (
+              <ExtraKindField
+                choice={form.extraKindChoice || ''}
+                other={form.extraKindOther || ''}
+                disabled={Boolean(kindLocked)}
+                onChange={(v) => setForm((f) => ({ ...f, extraKindChoice: v.choice, extraKindOther: v.other }))}
+              >
+                {kindLocked ? <Text style={cp.help}>{kindLocked}</Text> : null}
+              </ExtraKindField>
             ) : null}
 
             <Field label="Title"><Input value={form.title} onChangeText={(v) => update('title', v)} maxLength={300} /></Field>

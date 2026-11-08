@@ -1,6 +1,8 @@
 // Mirrors lib/submitRules.js on the website: Creator Studio's three-step
 // submit, the client-safe part. Change both together.
 
+import { extraKindFromChoice } from './extraKinds';
+
 export const SUBMIT_TYPES = [
   { value: 'movie', label: 'Film', noun: 'film' },
   { value: 'short', label: 'Short', noun: 'short' },
@@ -40,6 +42,10 @@ export const EMPTY_SUBMIT_FORM = {
   featured: false,
   isOriginal: false,
   fundingUrl: '',
+  // What kind of extra (bonus content only; migration 121): the chip that
+  // is on ('', a preset's id or 'other') and the words under Other.
+  extraKindChoice: '',
+  extraKindOther: '',
   cutArtwork: true,
   step: 1
 };
@@ -110,6 +116,7 @@ export function toSubmitBody(form, media, extras = {}) {
     featured: f.featured === true,
     isOriginal: f.isOriginal === true,
     fundingUrl: String(f.fundingUrl || '').trim(),
+    ...(f.contentType === 'bonus' ? { extraKind: extraKindFromChoice(f.extraKindChoice, f.extraKindOther) } : {}),
     ...(media && media.video ? { videoUid: media.video.uid, runtimeSeconds: media.video.runtimeSeconds || undefined } : {}),
     ...(media && media.trailer ? { trailerUid: media.trailer.uid } : {}),
     ...(media && media.audioUrl ? { audioUrl: media.audioUrl, audioBytes: media.audioBytes || null } : {}),

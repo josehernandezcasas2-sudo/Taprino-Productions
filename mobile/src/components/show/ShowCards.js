@@ -10,6 +10,7 @@ import {
   askUs, countLine, minutesOf, publicRoute, shortDate, ss
 } from './ShowBits';
 import { PaidLine } from './PayeeCard';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // The show page's cards in the app (the series revamp, slice 5; the
 // website's components/show/ShowCards.js): the show card, the status card,
@@ -293,11 +294,13 @@ export function ExtrasShelf({ view, ctx, onOpen, onMenu, onAdd }) {
         const menu = ctx.isOwner || mine;
         return (
           <View key={x.id} style={[cs.extra, ctx.flashId === x.id && cs.flash]}>
-            <Pressable style={cs.extraMain} disabled={!mine} onPress={() => onOpen(x)} accessibilityRole="button" accessibilityLabel={`${x.displayTitle}, ${tag}`}>
+            <Pressable style={cs.extraMain} disabled={!mine} onPress={() => onOpen(x)} accessibilityRole="button" accessibilityLabel={`${x.displayTitle}, ${x.extraKind ? `${extraKindLabel(x.extraKind)}, ` : ''}${tag}`}>
               {art ? <SmartImage uri={art} style={cs.extraArt} resizeMode="cover" /> : <View style={[cs.extraArt, cs.posterEmpty]}><Text style={cs.thumbName} numberOfLines={2}>{x.displayTitle}</Text></View>}
               <View style={{ flex: 1, gap: 3 }}>
                 <Text style={cs.extraTitle} numberOfLines={2}>{x.displayTitle}</Text>
                 <View style={ss.wrap}>
+                  {/* What kind of extra (migration 121), when it has one. */}
+                  {x.extraKind ? <Text style={cs.extraKind} numberOfLines={1}>{extraKindLabel(x.extraKind).toUpperCase()}</Text> : null}
                   <Text style={cs.extraTag}>{tag}</Text>
                   {minutesOf(x.runtime) ? <Text style={ss.mono}>{minutesOf(x.runtime)}</Text> : null}
                   {x.status === 'pending' ? <Text style={[ss.mono, { color: colors.olive }]}>in review</Text> : x.status === 'rejected' ? <Text style={[ss.mono, { color: colors.brass }]}>not this time</Text> : null}
@@ -351,6 +354,7 @@ export const cs = StyleSheet.create({
   extraArt: { width: 96, height: 54, borderRadius: 6, backgroundColor: colors.surface2 },
   extraTitle: { fontFamily: fonts.displaySemi, fontSize: 14, lineHeight: 18, color: colors.ink },
   extraTag: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.olive },
+  extraKind: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, color: colors.ink, flexShrink: 1 },
   kebab: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18 },
   flash: { borderColor: colors.olive }
 });

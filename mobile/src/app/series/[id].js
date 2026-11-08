@@ -16,6 +16,7 @@ import { AiSealChip } from '../../components/AiSeal';
 import PreviewBar, { PreviewFootnote, openSiteHref } from '../../components/PreviewBar';
 import { freePlayNote, seriesPlayLabel, sortEpisodes } from '../../lib/seriesResume';
 import { episodeCodeOf, rowTierWord } from '../../lib/showRules';
+import { extraKindLabel, extraMetaLine } from '../../lib/extraKinds';
 
 // Mirrors components/GenreRow.js's tierBadge classes (the same pills as
 // LibraryRows.js): free-ads = olive-deep, free-noads = green, premium = brass.
@@ -484,11 +485,12 @@ export default function SeriesHub() {
                           onPress={openable ? () => router.push(`/episode/${enc(x.id)}${previewing ? '?preview=1' : ''}`) : undefined}
                           disabled={!openable}
                           accessibilityRole={openable ? 'link' : undefined}
-                          accessibilityLabel={`${x.title}, Extra${mins ? `, ${mins}` : ''}`}
+                          accessibilityLabel={`${x.title}, ${extraKindLabel(x.extraKind)}${mins ? `, ${mins}` : ''}`}
                         >
                           {x.thumbnail ? <SmartImage uri={x.thumbnail} style={styles.extraThumb} /> : <View style={styles.extraThumb} />}
                           <Text style={styles.extraTitle} numberOfLines={2}>{x.title}</Text>
-                          <Text style={styles.extraMeta}>{mins ? `Extra · ${mins}` : 'Extra'}</Text>
+                          {/* "MAKING-OF · 6 MIN" (migration 121), "EXTRA · 6 MIN" without a kind. */}
+                          <Text style={styles.extraMeta} numberOfLines={2}>{extraMetaLine(x.extraKind, mins || null)}</Text>
                         </Pressable>
                       );
                     })}
