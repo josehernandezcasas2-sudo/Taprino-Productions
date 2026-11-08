@@ -17,14 +17,13 @@ import { PaidLine } from './PayeeCard';
 // shelf. Presentational: the screen (app/creator/show/[id]/index.js) owns
 // the data and every request.
 
-// The private preview (?preview=1, slice 4): the series screen opens a
-// show that isn't public for its owner, anyone with an episode in it and
-// the team. The app has no podcast preview (the website does), so the
-// buttons are for a series only.
+// The private preview (?preview=1, slice 4): the series screen and the
+// podcast screen open a show that isn't public for its owner, anyone with
+// an episode in it and the team, as the website's do.
 export const PREVIEW_BUILT = true;
 
 function previewable(show) {
-  return PREVIEW_BUILT && Boolean(show) && show.kind !== 'podcast';
+  return PREVIEW_BUILT && Boolean(show);
 }
 
 // The show card: the poster (tap → Edit show, art), the name (or its

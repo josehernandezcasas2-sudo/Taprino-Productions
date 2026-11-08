@@ -5,12 +5,23 @@ import { ADVISORY_MS } from '../lib/contentAdvisory';
 
 // The content advisory card over the player (components/ContentAdvisory.js
 // on the web): shows once per title when playback first starts, fades on
-// its own after a few seconds, a tap dismisses it.
-export default function ContentAdvisory({ info, playing, episodeId }) {
+// its own after a few seconds, a tap dismisses it. `onVisibleChange(bool)`
+// tells the screen while it is up (the player keeps its captions off the
+// card, as the website's player hides its middle controls under it).
+export default function ContentAdvisory({ info, playing, episodeId, onVisibleChange = null }) {
   const [visible, setVisible] = useState(false);
   const shownFor = useRef(null);
   const timers = useRef([]);
   const opacity = useRef(new Animated.Value(1)).current;
+  const report = useRef(onVisibleChange);
+  report.current = onVisibleChange;
+  const up = Boolean(info && visible);
+  useEffect(() => {
+    if (report.current) report.current(up);
+  }, [up]);
+  // Gone (the player moved between its inline and full-screen views, or
+  // the screen closed): it isn't up any more.
+  useEffect(() => () => { if (report.current) report.current(false); }, []);
 
   useEffect(() => {
     if (!info || !playing || shownFor.current === episodeId) return;

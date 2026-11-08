@@ -159,9 +159,10 @@ export default function SeriesHub() {
         const q = `id=${enc(id)}${seasonParam ? `&season=${enc(seasonParam)}` : ''}${previewAsked ? '&preview=1' : ''}`;
         const data = await apiGet(`/api/series-hub?${q}`, token);
         if (cancelled) return;
-        // A podcast lives on the podcast screen (the website 302s there).
+        // A podcast lives on the podcast screen (the website 302s there,
+        // keeping ?preview=1: the podcast screen has the preview too).
         if (data && typeof data.redirect === 'string' && /^\/podcasts\/[^/?#]+$/.test(data.redirect)) {
-          router.replace(data.redirect);
+          router.replace(`${data.redirect}${previewAsked ? '?preview=1' : ''}`);
           return;
         }
         setState({ loading: false, error: null, data });

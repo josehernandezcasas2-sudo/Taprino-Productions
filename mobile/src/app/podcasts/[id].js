@@ -6,10 +6,20 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useAuth } from '@clerk/expo';
 import { apiGet } from '../../lib/api';
-import { colors } from '../../lib/theme';
+import { colors, fonts, oliveTint } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
+import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
 import { withTerms } from '../../lib/viewingTerms';
 import { useWatchProgress } from '../../lib/useWatchProgress';
+
+const enc = (x) => encodeURIComponent(String(x));
+
+// Why a row of the owner's preview won't play here (pages/podcasts/[id].js's
+// lock titles, the same words).
+const PREVIEW_LOCK_WORDS = {
+  held: 'Pulled while our team looks at it.',
+  others: 'Only the person who sent it and the show’s owner can play it here.'
+};
 
 function PlayIcon({ size = 15, color = colors.ink }) {
   return (
@@ -90,8 +100,22 @@ function formatRuntimeLong(runtime) {
 // verified against a real audio file (the dev seed data's podcast
 // episodes are all placeholders with no audio_url attached) — worth a
 // real-device check once there's real audio content to test against.
+//
+// ?preview=1 (the series revamp, slice 4; the website's
+// /podcasts/<id>?preview=1): the owner's private preview of a show that
+// isn't public, from GET /api/podcast-show?preview=1 (lib/podcastShowHub.js)
+// — for the show's owner, anyone with an episode in it and the team;
+// anyone else gets the same "not found" as a missing id. The preview bar
+// on top, episodes in review listed with an "In review" pill, and what
+// plays decided by who is looking, not the tier: the team plays every
+// row, the owner and each uploader their own, everyone else's rows are
+// locked with the website's line, and while the show is pulled only the
+// team plays anything. A video episode opens the episode screen's own
+// preview (?preview=1), which asks the server again. Nothing is counted
+// or saved (no progress), and there's no RSS line, Save, Buy or Tip.
 export default function PodcastShow() {
-  const { id } = useLocalSearchParams();
+  const { id, preview: previewParam } = useLocalSearchParams();
+  const previewAsked = previewParam === '1';
   const router = useRouter();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const { isLoaded, isSignedIn, getToken } = useAuth();
@@ -104,34 +128,40 @@ export default function PodcastShow() {
   // Same progress as the episode screen (mobile/src/lib/useWatchProgress.js):
   // picks up where this listener left the episode (`resume` from
   // /api/podcast-show) and saves as it plays. Signed in only, like the web.
-  const resume = (state.data && state.data.resume) || {};
+  // A preview (the server's bar words, or null) saves nothing and starts
+  // every episode at the beginning.
+  const previewInfo = state.data && state.data.preview && typeof state.data.preview === 'object' ? state.data.preview : null;
+  const previewing = Boolean(previewInfo);
+  const resume = (!previewing && state.data && state.data.resume) || {};
   useWatchProgress({
     player,
     episodeId: playingId,
-    enabled: Boolean(isSignedIn && playingId && audioSrc),
-    startAt: (playingId && resume[playingId]) || 0,
+    enabled: Boolean(isSignedIn && playingId && audioSrc && !previewing),
+    startAt: (!previewing && playingId && resume[playingId]) || 0,
     getToken: tokenWithTimeout
   });
 
   // With the sign-in token the server knows the viewer's membership and
   // age; without it every premium episode showed as locked, even for a
   // subscriber.
+  // A preview waits for Clerk: asked without the token it is a stranger's
+  // request, and the answer would be "not found".
   useEffect(() => {
-    if (!id) return undefined;
+    if (!id || (previewAsked && !isLoaded)) return undefined;
     let cancelled = false;
     (async () => {
       const token = isLoaded && isSignedIn
         ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))])
         : null;
       try {
-        const data = await apiGet(await withTerms(`/api/podcast-show?id=${encodeURIComponent(id)}`), token);
+        const data = await apiGet(await withTerms(`/api/podcast-show?id=${encodeURIComponent(id)}${previewAsked ? '&preview=1' : ''}`), token);
         if (!cancelled) setState({ loading: false, error: null, data });
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });
       }
     })();
     return () => { cancelled = true; };
-  }, [id, isLoaded, isSignedIn]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [id, isLoaded, isSignedIn, previewAsked]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!player) return;
@@ -174,62 +204,75 @@ export default function PodcastShow() {
   const firstEpisode = episodes[0];
   const host = firstEpisode ? firstEpisode.artist : null;
   const art = show.poster || show.thumbnail;
+  // A video episode opens the episode screen; in a preview, its preview.
+  const watchRoute = (ep) => `/episode/${enc(ep.id)}${previewing ? '?preview=1' : ''}`;
 
   return (
     <SafeAreaView style={styles.screen} edges={['bottom']}>
       <Stack.Screen options={{ title: show.name }} />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
-        <View style={styles.header}>
-          {art ? <SmartImage uri={art} style={styles.art} /> : <View style={styles.art} />}
-          <View style={styles.headerInfo}>
-            <Text style={styles.eyebrow}>Podcast</Text>
-            <Text style={styles.showTitle}>{show.name}</Text>
-            <Text style={styles.hostLine}>
-              {host ? `Hosted by ${host} · ` : ''}{episodes.length} episode{episodes.length === 1 ? '' : 's'}
-            </Text>
-            {show.desc ? <Text style={styles.showDesc}>{show.desc}</Text> : null}
-          </View>
-        </View>
-
-        <Text style={styles.sectionLabel}>Episodes</Text>
-
-        {episodes.map((ep) => {
-          const hasAudio = !!ep.audioUrl;
-          const hasVideo = !!ep.src;
-          const playing = playingId === ep.id && isPlaying;
-          const resumeAt = hasAudio && !ep.locked && playingId !== ep.id ? resume[ep.id] || 0 : 0;
-          return (
-            <View key={ep.id} style={styles.row}>
-              {ep.locked ? (
-                <View style={styles.playBtn}><LockIcon size={14} /></View>
-              ) : hasAudio ? (
-                <Pressable style={styles.playBtn} onPress={() => playAudio(ep)}>
-                  {playing ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
-                </Pressable>
-              ) : hasVideo ? (
-                <Pressable style={styles.playBtn} onPress={() => router.push(`/episode/${ep.id}`)}>
-                  <PlayIcon size={14} />
-                </Pressable>
-              ) : (
-                <View style={styles.playBtn} />
-              )}
-              <View style={styles.rowInfo}>
-                <Text style={styles.rowTitle} numberOfLines={2}>{ep.title}</Text>
-                {ep.desc ? <Text style={styles.rowDesc} numberOfLines={2}>{ep.desc}</Text> : null}
-                <View style={styles.rowMetaLine}>
-                  <Text style={styles.rowMeta}>{formatDate(ep.createdAt)}</Text>
-                  {ep.runtime ? <Text style={styles.rowMeta}> · {formatRuntimeLong(ep.runtime) || ep.runtime}</Text> : null}
-                  {resumeAt > 0 ? <Text style={styles.rowMeta}> · Resume at {formatClock(resumeAt)}</Text> : null}
-                </View>
-                {hasVideo && !ep.locked ? (
-                  <Pressable onPress={() => router.push(`/episode/${ep.id}`)}>
-                    <Text style={styles.watchLink}>{hasAudio ? 'Watch instead →' : 'Watch →'}</Text>
-                  </Pressable>
-                ) : null}
-              </View>
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollOuter}>
+        {previewing ? <PreviewBar preview={previewInfo} /> : null}
+        <View style={styles.scroll}>
+          <View style={styles.header}>
+            {art ? <SmartImage uri={art} style={styles.art} /> : <View style={styles.art} />}
+            <View style={styles.headerInfo}>
+              <Text style={styles.eyebrow}>Podcast</Text>
+              <Text style={styles.showTitle}>{show.name}</Text>
+              <Text style={styles.hostLine}>
+                {host ? `Hosted by ${host} · ` : ''}{episodes.length} episode{episodes.length === 1 ? '' : 's'}
+              </Text>
+              {show.desc ? <Text style={styles.showDesc}>{show.desc}</Text> : null}
             </View>
-          );
-        })}
+          </View>
+
+          <Text style={styles.sectionLabel}>Episodes</Text>
+
+          {episodes.map((ep) => {
+            const hasAudio = !!ep.audioUrl;
+            const hasVideo = !!ep.src;
+            const playing = playingId === ep.id && isPlaying;
+            const resumeAt = hasAudio && !ep.locked && playingId !== ep.id && !previewing ? resume[ep.id] || 0 : 0;
+            // The preview's pills (the website's .pvbar-pill) and the line for
+            // a row this viewer may not play.
+            const pill = !previewing ? null : ep.previewLock === 'held' ? 'Pulled' : ep.status === 'pending' ? 'In review' : null;
+            const lockLine = previewing && ep.locked ? PREVIEW_LOCK_WORDS[ep.previewLock] || null : null;
+            return (
+              <View key={ep.id} style={styles.row}>
+                {ep.locked ? (
+                  <View style={styles.playBtn} accessible accessibilityLabel={lockLine || 'Locked'}><LockIcon size={14} /></View>
+                ) : hasAudio ? (
+                  <Pressable style={styles.playBtn} onPress={() => playAudio(ep)}>
+                    {playing ? <PauseIcon size={14} /> : <PlayIcon size={14} />}
+                  </Pressable>
+                ) : hasVideo ? (
+                  <Pressable style={styles.playBtn} onPress={() => router.push(watchRoute(ep))} accessibilityRole="button" accessibilityLabel="Watch">
+                    <PlayIcon size={14} />
+                  </Pressable>
+                ) : (
+                  <View style={styles.playBtn} />
+                )}
+                <View style={styles.rowInfo}>
+                  <Text style={styles.rowTitle} numberOfLines={2}>{ep.title}</Text>
+                  {pill ? <View style={styles.pill}><Text style={styles.pillText}>{pill}</Text></View> : null}
+                  {ep.desc ? <Text style={styles.rowDesc} numberOfLines={2}>{ep.desc}</Text> : null}
+                  {lockLine ? <Text style={styles.lockLine}>{lockLine}</Text> : null}
+                  <View style={styles.rowMetaLine}>
+                    <Text style={styles.rowMeta}>{formatDate(ep.createdAt)}</Text>
+                    {ep.runtime ? <Text style={styles.rowMeta}> · {formatRuntimeLong(ep.runtime) || ep.runtime}</Text> : null}
+                    {resumeAt > 0 ? <Text style={styles.rowMeta}> · Resume at {formatClock(resumeAt)}</Text> : null}
+                  </View>
+                  {hasVideo && !ep.locked ? (
+                    <Pressable onPress={() => router.push(watchRoute(ep))}>
+                      <Text style={styles.watchLink}>{hasAudio ? 'Watch instead →' : 'Watch →'}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              </View>
+            );
+          })}
+          {previewing && episodes.length === 0 ? <Text style={styles.empty}>No episodes here yet. Episodes you send for review show up here.</Text> : null}
+          {previewing ? <PreviewFootnote /> : null}
+        </View>
       </ScrollView>
       {/* Mounted but visually collapsed — expo-video's audio output isn't
           tied to the view's visible size, but some platforms want a real
@@ -242,7 +285,8 @@ export default function PodcastShow() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 120 },
+  scrollOuter: { paddingBottom: 120 },
+  scroll: { paddingHorizontal: 16, paddingTop: 16 },
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
   errorText: { color: colors.danger, fontSize: 15, textAlign: 'center' },
   hiddenPlayer: { width: 1, height: 1, position: 'absolute', bottom: 0, left: 0, opacity: 0 },
@@ -264,5 +308,11 @@ const styles = StyleSheet.create({
   rowDesc: { color: colors.inkDim, fontSize: 11.5, lineHeight: 15, marginBottom: 4 },
   rowMetaLine: { flexDirection: 'row', marginBottom: 2 },
   rowMeta: { color: colors.inkFaint, fontSize: 10.5 },
-  watchLink: { color: colors.olive, fontSize: 11, fontWeight: '600', marginTop: 2 }
+  watchLink: { color: colors.olive, fontSize: 11, fontWeight: '600', marginTop: 2 },
+
+  // The preview's row pill (.pvbar-pill), its locked-row line, the empty list.
+  pill: { alignSelf: 'flex-start', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 999, backgroundColor: oliveTint(0.2), marginBottom: 4 },
+  pillText: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 1, textTransform: 'uppercase', color: colors.olive },
+  lockLine: { fontFamily: fonts.mono, fontSize: 10.5, lineHeight: 15, color: colors.inkDim, marginBottom: 4 },
+  empty: { color: colors.inkDim, fontSize: 13, lineHeight: 19, paddingVertical: 18, textAlign: 'center' }
 });

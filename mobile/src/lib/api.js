@@ -59,6 +59,16 @@ export async function apiGet(path, token) {
   return res.json();
 }
 
+// apiGet for a route that answers with text rather than JSON (an episode's
+// caption track, /api/captions/<id>): the same token, the same failure
+// shape. A 302 to a track still at a public address is followed.
+export async function apiGetText(path, token) {
+  const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
+  const res = await fetch(`${API_BASE_URL}${path}`, { headers });
+  if (!res.ok) throw await failed(res);
+  return res.text();
+}
+
 // `token` is a Clerk session token (from useAuth().getToken()) — sent the
 // same way the site's own player would send its session cookie, so
 // entitlement-gated routes like /api/stream-token can tell who's asking.

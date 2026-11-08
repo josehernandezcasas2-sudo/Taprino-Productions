@@ -16,6 +16,7 @@ import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useFullscreenChrome } from '../../lib/fullscreenChrome';
+import { withQueryFlag } from '../../lib/captions';
 import { episodeCode } from '../../lib/seriesResume';
 import { episodeHasPage } from '../../lib/showRules';
 import { CONTACT_EMAIL } from '../../lib/suspensionRules';
@@ -136,9 +137,13 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // ten-second timer, or one pick once the show is over.
 //
 // Signed-in viewers resume where they left off and their progress is
-// saved (lib/useWatchProgress.js), like the website. Not on mobile yet:
-// ad breaks (paused) and captions / audio description (the website's
-// AccessibilityPanel).
+// saved (lib/useWatchProgress.js), like the website. Captions play from
+// the same gated track as the website's (/api/captions/<id>, with
+// ?preview=1 in a preview), drawn by the player with its CC button
+// (components/EpisodePlayer.js); `captionsUrl` is on the episode only for
+// a viewer who may watch it, and never for a trailer. Not on mobile yet:
+// ad breaks (paused), audio description and the website's Accessibility
+// panel under the description (AccessibilityPanel).
 //
 // The series revamp, slice 4 (boards V2 and V3): an episode of a show (or
 // an extra) whose own page is on opens on the V2 landing — the still or
@@ -239,6 +244,8 @@ export default function Episode() {
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const ratingsList = useContentRatings();
   const advisoryInfo = episode && !showingTrailer ? advisoryFor(episode, ratingsList) : null;
+  // While the advisory card is up the player keeps its captions off it.
+  const [advisoryOn, setAdvisoryOn] = useState(false);
   // A preview starts at the beginning and saves no progress.
   const resumeSeconds = previewing ? 0 : (state.page && state.page.resumeSeconds) || 0;
   useWatchProgress({
@@ -392,6 +399,12 @@ export default function Episode() {
   const upNext = isSeries && showPlayer && !showingTrailer && nextEpisode && nextEpisode.canOpen !== false ? nextEpisode : null;
   const returnTo = `/episode/${episode.id}`;
   const tokenFn = () => withTimeout(getToken().catch(() => null), 4000);
+  // The title's caption track (never the trailer's): the gated route the
+  // website's <track> reads, which the server put on the episode only
+  // because this viewer may watch it; a preview asks it the preview's way.
+  const captions = !showingTrailer && playback.src && episode.captionsUrl
+    ? { path: previewing ? withQueryFlag(episode.captionsUrl, 'preview') : episode.captionsUrl, label: episode.captionsLabel || 'English' }
+    : null;
   // Every link that opens another title keeps the preview (?preview=1).
   const pq = previewing ? 'preview=1&' : '';
   const playHref = (eid) => `/episode/${enc(eid)}?${pq}autoplay=1`;
@@ -551,13 +564,16 @@ export default function Episode() {
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
                 resumeSeconds={showingTrailer ? 0 : resumeSeconds}
                 endCard={endCardProps}
+                captions={captions}
+                getToken={tokenFn}
+                advisoryOn={advisoryOn}
                 topRight={!showingTrailer ? (
                   <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
                     Tip {tipFirstName}
                   </TipButton>
                 ) : null}
               >
-                <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} />
+                <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} onVisibleChange={setAdvisoryOn} />
               </EpisodePlayer>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>

@@ -24,7 +24,10 @@ export function useWatchProgress({ player, episodeId, enabled, startAt = 0, getT
     if (!player || !episodeId || !enabled) return undefined;
     lastSavedPos.current = 0;
     lastSaveAt.current = 0;
-    player.timeUpdateEventInterval = 1;
+    // A second is enough here; the episode player asks for a finer tick
+    // (its scrubber and captions), which is kept.
+    const tick = Number(player.timeUpdateEventInterval);
+    if (!(tick > 0 && tick <= 1)) player.timeUpdateEventInterval = 1;
 
     async function send(path, body) {
       try {

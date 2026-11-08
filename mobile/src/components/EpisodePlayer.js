@@ -5,14 +5,21 @@ import { VideoView } from 'expo-video';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
-import { colors, fonts, absoluteFill } from '../lib/theme';
+import { colors, fonts, absoluteFill, oliveTint, surfaceTint } from '../lib/theme';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 import { FullscreenChrome } from '../lib/fullscreenChrome';
+import { useCaptionTrack, useCaptionsPref } from '../lib/captions';
+import { captionTextAt } from '../lib/vtt';
 import EndCard from './EndCard';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
 const DOUBLE_TAP_MS = 300;
+// How often the player reports its time: the scrubber's thumb and the
+// caption on screen follow it, so a quarter of a second keeps a cue within
+// a beat of its line (lib/useWatchProgress.js only needs a second and
+// keeps a finer tick when it finds one).
+const TIME_TICK_SECONDS = 0.25;
 
 // The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
 // Jose, 2026-10-30: the controls run to the screen's edges and grow with
@@ -47,6 +54,15 @@ function fullChrome(c) {
     nextText: { fontSize: s(12) },
     nextGlyph: s(13),
     fsIcon: s(20),
+    ccBtnText: { fontSize: s(12), letterSpacing: s(1) },
+    // The caption: bottom centre, clear of the bar while the controls are
+    // up (the bar is s(81) tall over the bottom inset: the scrubber's s(29)
+    // + the s(44) row + s(8)), near the foot of the screen once they fade
+    // (the website lifts its cues the same way while its controls show).
+    ccUp: { bottom: s(81) + c.padBottom + s(6), paddingLeft: c.padLeft + s(48), paddingRight: c.padRight + s(48) },
+    ccDown: { bottom: c.padBottom + s(18), paddingLeft: c.padLeft + s(48), paddingRight: c.padRight + s(48) },
+    ccLine: { paddingVertical: s(2), paddingHorizontal: s(8), borderRadius: s(3) },
+    ccText: { fontSize: s(17), lineHeight: s(22.5) },
     fillToastWrap: { top: s(78) + c.padTop },
     fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
     fillToastText: { fontSize: s(11.5) }
@@ -108,7 +124,20 @@ function RestoreGlyph({ size = 11 }) {
 // screen and the whole picture. `endCard` = { card, onGo, onBack, onStay }
 // draws the end card (components/EndCard.js) over the last frame in
 // place of the controls once the title plays out; null for none.
-export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, children }) {
+//
+// Captions (the website's <track> + CC button): `captions` = { path,
+// label } — the episode's gated /api/captions/<id> (with ?preview=1 in a
+// preview), null for a title without them and always for a trailer — and
+// `getToken` for the request. A CC button in the bar turns them on and off
+// (remembered on the phone, mobile/src/lib/captions.js); the file is
+// fetched the first time they're on, parsed by mobile/src/lib/vtt.js, and
+// the cue at the player's time drawn bottom centre on a dark box, in both
+// views. Inline they make way while the controls are up (the strip has no
+// room between the buttons and the bar); in full screen they rise above
+// the bar. Never over the end card, nor while `advisoryOn` (the content
+// advisory card the screen passes as a child is up). A file that can't be
+// fetched or has no cue takes the button away and says nothing.
+export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -126,10 +155,19 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const trackWidth = useRef(1);
   const durationRef = useRef(0);
 
-  // Times straight from the player (lib/useWatchProgress.js already asks
-  // for timeUpdate every second; a finer tick keeps the thumb smooth).
+  // Captions: on or off (the phone remembers), the file once they're on.
+  const captionsPath = captions && captions.path ? captions.path : null;
+  const [ccOn, setCcOn] = useCaptionsPref();
+  const { track: captionTrackData, failed: captionsFailed } = useCaptionTrack(captionsPath, { enabled: ccOn, getToken });
+  const ccAvailable = Boolean(captionsPath) && !captionsFailed;
+
+  // Times straight from the player, every quarter second. expo-video
+  // sends none until asked (timeUpdateEventInterval is 0 by default), so
+  // the scrubber stood at 0:00 for anyone lib/useWatchProgress.js doesn't
+  // save progress for (signed out, a preview, a trailer).
   useEffect(() => {
     if (!player) return undefined;
+    try { player.timeUpdateEventInterval = TIME_TICK_SECONDS; } catch { /* a released player */ }
     const time = player.addListener('timeUpdate', ({ currentTime: t }) => {
       setCurrentTime(t || 0);
       const d = player.duration || 0;
@@ -270,6 +308,13 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
 
   const shownTime = scrubbing != null ? scrubbing : currentTime;
   const progress = duration ? Math.min(1, shownTime / duration) : 0;
+  // The cue at the video's own time (not the thumb's while it's held: the
+  // picture hasn't moved yet). Seeks set currentTime at once.
+  const captionText = ccOn && captionTrackData ? captionTextAt(captionTrackData, currentTime) : '';
+  function toggleCaptions() {
+    showControls();
+    setCcOn(!ccOn);
+  }
 
   // `F` is the full-screen chrome from fullChrome() (null inline), handed
   // in by the full-screen frame so its insets are the Modal's own.
@@ -287,6 +332,16 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
         {full && fillToast ? (
           <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
             <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
+          </View>
+        ) : null}
+        {/* The caption, under the controls and the advisory in the stack. */}
+        {captionText && !showEnd && !advisoryOn && (full || !controlsShown) ? (
+          <View style={[styles.cc, full ? (controlsShown ? F.ccUp : F.ccDown) : styles.ccInline]} pointerEvents="none">
+            {captionText.split('\n').map((line, i) => (
+              <View key={i} style={[styles.ccLine, full && F.ccLine]}>
+                <Text style={[styles.ccText, full && F.ccText]}>{line}</Text>
+              </View>
+            ))}
           </View>
         ) : null}
         {controlsShown && !showEnd ? (
@@ -337,6 +392,18 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
                   </Pressable>
                 ) : null}
                 <View style={{ flex: 1 }} />
+                {ccAvailable ? (
+                  <Pressable
+                    style={[styles.round, full && F.round, ccOn && styles.ccOn]}
+                    onPress={toggleCaptions}
+                    accessibilityRole="switch"
+                    accessibilityLabel={`Captions${captions.label ? `, ${captions.label}` : ''}`}
+                    accessibilityState={{ checked: ccOn }}
+                    hitSlop={8}
+                  >
+                    <Text style={[styles.ccBtnText, full && F.ccBtnText, ccOn && styles.ccBtnTextOn]}>CC</Text>
+                  </Pressable>
+                ) : null}
                 <Pressable style={[styles.round, full && F.round]} onPress={() => (full ? exitFullscreen(true) : enterFullscreen(true))} accessibilityRole="button" accessibilityLabel={full ? 'Leave full screen' : 'Full screen'} hitSlop={8}>
                   <Svg width={full ? F.fsIcon : 20} height={full ? F.fsIcon : 20} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
                     {full ? <Path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5" /> : <Path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />}
@@ -423,5 +490,17 @@ const styles = StyleSheet.create({
   time: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.ink },
   timeDim: { color: colors.inkDim },
   next: { height: 44, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: 'rgba(251,232,211,0.4)', backgroundColor: bubble, flexDirection: 'row', alignItems: 'center', gap: 8, maxWidth: 220 },
-  nextText: { fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.ink }
+  nextText: { fontFamily: fonts.mono, fontSize: 12, letterSpacing: 1, textTransform: 'uppercase', color: colors.ink },
+
+  // The CC button (the website's .tp-cc: mono letters, the gold ring and a
+  // gold tint while captions are on).
+  ccBtnText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.8, color: colors.ink },
+  ccOn: { borderColor: colors.olive, backgroundColor: oliveTint(0.14) },
+  ccBtnTextOn: { color: colors.olive },
+  // The caption (the website's .tp-video::cue: the system face on a dark
+  // box, one box per line, centred over the picture's foot).
+  cc: { position: 'absolute', left: 0, right: 0, alignItems: 'center', paddingHorizontal: 16 },
+  ccInline: { bottom: 8 },
+  ccLine: { backgroundColor: surfaceTint(0.82), borderRadius: 2, paddingVertical: 1.5, paddingHorizontal: 6, maxWidth: '100%' },
+  ccText: { fontSize: 13, lineHeight: 17.5, color: colors.ink, textAlign: 'center' }
 });

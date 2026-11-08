@@ -88,10 +88,14 @@ function showScreen(path, href) {
 // in the query is left behind, as on every other route.
 const PUBLIC_TITLE = /^\/(episode|series)\/[^/]+$/;
 const PUBLIC_KEEP = { season: /^\d{1,4}$/, preview: /^1$/, autoplay: /^1$/ };
+// A podcast show's screen keeps only ?preview=1 (its owner's preview; the
+// app's podcast screen has no seasons or autoplay).
+const PODCAST_SHOW = /^\/podcasts\/[^/]+$/;
+const PODCAST_KEEP = { preview: /^1$/ };
 
-function keptQuery(href) {
+function keptQuery(href, keep = PUBLIC_KEEP) {
   const q = queryOf(href);
-  const kept = Object.keys(PUBLIC_KEEP).filter((k) => typeof q[k] === 'string' && PUBLIC_KEEP[k].test(q[k]));
+  const kept = Object.keys(keep).filter((k) => typeof q[k] === 'string' && keep[k].test(q[k]));
   return kept.length ? `?${kept.map((k) => `${k}=${enc(q[k])}`).join('&')}` : '';
 }
 
@@ -103,6 +107,7 @@ export function hrefToRoute(href) {
   const target = ALIASES[path] || path;
   if (target === '/') return { route: '/' };
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
+  if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };
   return { url: `${API_BASE_URL}${href}` };
 }
