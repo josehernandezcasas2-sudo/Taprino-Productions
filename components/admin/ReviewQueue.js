@@ -197,7 +197,9 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     const eyebrow = showInfo ? STAGE_EYEBROW[showInfo.stage] || STAGE_EYEBROW.private : null;
     const blocked = item.kind === 'submission' ? meta.blocked || null : null;
     const tierNow = tiers[item.id] || (item.kind === 'submission' ? (meta.tier === 'premium' ? 'premium' : 'free') : 'free');
-    const approveExtra = item.kind === 'submission' || isApplication ? { tierOverride: tierNow } : {};
+    // A submission's Approve says which file it was looking at (meta.seen):
+    // a file replaced since answers 409 and the queue reloads.
+    const approveExtra = item.kind === 'submission' ? { tierOverride: tierNow, ...(meta.seen ? { seen: meta.seen } : {}) } : isApplication ? { tierOverride: tierNow } : {};
     return (
       <div key={key} className={`rq-row ${inGroup ? 'rq-row-in-group' : ''}`}>
         <div className="rq-thumb" style={item.media.poster ? { backgroundImage: `url("${String(item.media.poster).replace(/"/g, '%22')}")` } : undefined}>
@@ -336,7 +338,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
 }
 
 // Meta the card already says in its own words.
-const HIDDEN_META = new Set(['blocked', 'masterReady', 'openOnShowPage', 'tier']);
+const HIDDEN_META = new Set(['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen']);
 
 function FragmentRow({ k, v }) {
   const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());

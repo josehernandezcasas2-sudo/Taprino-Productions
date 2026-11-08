@@ -172,6 +172,36 @@ test('planPayouts: a hold keeps a creator out; a creator who left is paid under 
   assert.deepEqual(later.pay.map((p) => p.creatorId), ['held']);
 });
 
+test('planPayouts: a studio account a member picked is the studio’s own — never paid, never held, never carried', () => {
+  const owed = [
+    { creatorId: 'user_studio', cents: 9000, lineIds: ['s1', 's2'], oldestAt: '2026-09-01' },
+    { creatorId: 'user_admin2', cents: -150, lineIds: ['s3'], oldestAt: '2026-09-02' },
+    { creatorId: 'user_mara', cents: 3000, lineIds: ['m1'], oldestAt: '2026-09-03' },
+    { creatorId: 'user_dev', cents: 4000, lineIds: ['d1'], oldestAt: '2026-09-04' }
+  ];
+  const ready = { stripeAccountId: 'acct', chargesEnabled: true };
+  // Even with a payout account of its own, a studio account is never planned for a transfer.
+  const accounts = { user_studio: ready, user_mara: ready };
+  const plan = planPayouts({ owed, accounts, minimumCents: 2500, studio: new Set(['user_studio', 'user_admin2']) });
+  assert.deepEqual(plan.pay.map((p) => p.creatorId), ['user_mara']);
+  assert.deepEqual(plan.held.map((h) => [h.creatorId, h.reason]), [['user_dev', 'no payout account']]);
+  assert.deepEqual(plan.carry, []);
+  assert.deepEqual(plan.kept.map((k) => [k.creatorId, k.cents, k.studio]), [['user_studio', 9000, true], ['user_admin2', -150, true]]);
+  assert.equal(plan.keptCents, 8850);
+  assert.equal(plan.payCents, 3000);
+  assert.equal(plan.heldCents, 4000);
+  // An array works too, and without `studio` the old behaviour is unchanged
+  // (a studio account without a payout account was held forever).
+  assert.deepEqual(planPayouts({ owed, accounts, minimumCents: 2500, studio: ['user_studio'] }).kept.map((k) => k.creatorId), ['user_studio']);
+  const before = planPayouts({ owed, accounts, minimumCents: 2500 });
+  assert.deepEqual(before.pay.map((p) => p.creatorId), ['user_studio', 'user_mara']);
+  assert.deepEqual(before.kept, []);
+  assert.equal(before.keptCents, 0);
+  // A hold or a departure on a studio account changes nothing: it is kept.
+  const standing = { user_studio: { hold_started_at: '2026-10-20T00:00:00Z', hold_until: '2027-01-18T00:00:00Z' } };
+  assert.deepEqual(planPayouts({ owed, accounts, minimumCents: 2500, standing, studio: ['user_studio'], now: new Date('2026-11-01') }).kept.map((k) => k.creatorId), ['user_studio']);
+});
+
 test('forfeitLines: the balance leaves the creator and is split across the pool, never back to them', () => {
   const lines = forfeitLines({ creatorId: 'gone', cents: 1001, pool: { gone: 50, a: 2, b: 1, c: 0 } });
   assert.deepEqual(lines.map((l) => [l.creator_id, l.kind, l.cents]), [['gone', 'forfeit', -1001], ['a', 'pool_share', 668], ['b', 'pool_share', 333]]);

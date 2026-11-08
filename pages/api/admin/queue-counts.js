@@ -3,6 +3,7 @@ import { hasCapability } from '../../../lib/capabilities';
 import { getSupabase } from '../../../lib/supabase';
 import { listReviewQueue } from '../../../lib/reviewQueue';
 import { getModerationState } from '../../../lib/moderation';
+import { reviewQueueKeys } from '../../../lib/moderationRules';
 import { applyCors } from '../../../lib/cors';
 
 // Badge numbers for the admin nav (components/AdminShell.js) and the
@@ -21,7 +22,10 @@ import { applyCors } from '../../../lib/cors';
 //             title image, its removal and trailer since migration 120 —,
 //             text, a new video waiting) + removal requests, for
 //             manage_episodes or review_submissions.
-//   flags     open flags and titles with counted open reports
+//   flags     what /admin/content's review queue lists (lib/moderationRules.js
+//             reviewQueueKeys): each item with an open flag or counted
+//             reports not ignored, once — tip notes (Admin → Tips) and items
+//             deleted since they were reported left out
 //   pitch     reported Pitch Room comments (full admins)
 //
 // The staged and removal numbers come from two reads (one of episodes,
@@ -132,12 +136,9 @@ export default async function handler(req, res) {
   ]);
 
   const n = (r) => (r && !r.error && typeof r.count === 'number' ? r.count : 0);
-  // Open flags plus titles with uncounted open reports (ignored ones
-  // don't need attention).
-  const openFlags = moderation
-    ? (moderation.flags || []).length
-      + Object.values(moderation.reportsByTarget || {}).filter((t) => t.counted > 0 && !t.ignored).length
-    : 0;
+  // The items the review queue lists: one each, however many flags and
+  // reports it has (ignored reports don't need attention).
+  const openFlags = moderation ? reviewQueueKeys(moderation).length : 0;
   const staged = stagedCounts(stagedEpisodes, stagedSeries);
 
   return res.status(200).json({

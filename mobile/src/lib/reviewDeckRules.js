@@ -20,7 +20,7 @@ export const STAGE_EYEBROW = {
 export const FILE_WORDS = { ready: 'ready', audio: 'audio', external: 'ready (its own address)', processing: 'still processing', uploading: 'still uploading', error: 'failed to process', deleted: 'gone from Cloudflare', none: 'no file yet', unknown: 'not checked yet' };
 
 // Meta the card already says in its own words (the website's HIDDEN_META).
-export const HIDDEN_META = ['blocked', 'masterReady', 'openOnShowPage', 'tier'];
+export const HIDDEN_META = ['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen'];
 
 const LABELS = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' };
 
@@ -78,14 +78,19 @@ export function tierFor(item, tiers = {}) {
 }
 
 // What an Approve or a Reject sends (the website's queue sends the same).
+// A submission's Approve carries `seen` (the queue's fingerprint of the
+// file the card shows): a file replaced since answers 409 'changed' and the
+// deck reloads, as on the website.
 export function decisionBody(item, decision, { reason, tiers } = {}) {
   const withTier = item.kind === 'submission' || item.kind === 'application';
+  const seen = decision === 'approve' && item.kind === 'submission' && item.meta && typeof item.meta.seen === 'string' && item.meta.seen ? item.meta.seen : undefined;
   return {
     kind: item.kind,
     id: item.id,
     decision,
     reason: decision === 'reject' || decision === 'hold' ? reason : undefined,
-    tierOverride: withTier ? tierFor(item, tiers) : undefined
+    tierOverride: withTier ? tierFor(item, tiers) : undefined,
+    seen
   };
 }
 

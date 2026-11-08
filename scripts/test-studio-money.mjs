@@ -2,7 +2,8 @@
 import assert from 'node:assert/strict';
 import {
   assumedFeeCents, reserveCents, canLeaveCents, toleranceCents, nextSweepDate, isSweepDay, sweepGate,
-  classifyTransaction, groupTransactions, expectedByLane, reconcile, studioShare, adsServedCents, taxThresholds, normalizeSettings, dollars
+  classifyTransaction, groupTransactions, expectedByLane, reconcile, studioShare, adsServedCents, taxThresholds, normalizeSettings, dollars,
+  owedToCreators, creditTotals
 } from '../lib/studioMoneyRules.js';
 
 let passed = 0;
@@ -230,6 +231,66 @@ test('tips lane: a destination charge by payment intent; expected = the cut; kep
   assert.equal(ads.together.adShareCents, 3500);
   assert.equal(ads.together.shareCents, 3500);
   assert.equal(ads.membership.marginCents, 0);
+});
+
+
+test('the studio’s own accounts: a member’s pick of one is the studio’s money — not in what has to stay, kept in the share', () => {
+  const studio = new Set(['user_studio']);
+  const owed = [
+    { creatorId: 'user_studio', cents: 6000 },
+    { creatorId: 'user_mara', cents: 2500 },
+    { creatorId: 'user_dev', cents: -300 },
+    { creatorId: 'user_lena', cents: 0 }
+  ];
+  assert.deepEqual(owedToCreators(owed, studio), { owedCents: 2500, owedCreators: 1, studioKeptCents: 6000 });
+  // Without the studio's accounts (an older caller, or a Clerk read that
+  // failed) everything counts as owed: more stays, never less.
+  assert.deepEqual(owedToCreators(owed), { owedCents: 8500, owedCreators: 2, studioKeptCents: 0 });
+  assert.deepEqual(owedToCreators(owed, ['user_studio']), { owedCents: 2500, owedCreators: 1, studioKeptCents: 6000 });
+  // So the studio's credits never hold money back from the bank.
+  const leave = canLeaveCents({ availableCents: 20000, owedCents: owedToCreators(owed, studio).owedCents, adCreditsCents: 0, reserveCents: 3000, earmarkCents: 0 });
+  assert.deepEqual(leave, { cents: 14500, stayCents: 5500, shortfallCents: 0 });
+
+  // A member paid $12.99: $2.00 to Mara (a pick), $1.50 to the studio's own
+  // account (a pick), $1.00 referral bonus to Mara; then a $1.50 pick to the
+  // studio was reversed by a refund of another payment, with Mara's $2.00.
+  const lines = [
+    { creator_id: 'user_mara', kind: 'member_share', cents: 200 },
+    { creator_id: 'user_studio', kind: 'member_share', cents: 150 },
+    { creator_id: 'user_mara', kind: 'referral', cents: 100 },
+    { creator_id: 'user_mara', kind: 'ad_share', cents: 400 },
+    { creator_id: 'user_mara', kind: 'reversal', cents: -200 },
+    { creator_id: 'user_studio', kind: 'reversal', cents: -150 },
+    { creator_id: 'user_mara', kind: 'payout', cents: -5000 },
+    { creator_id: 'user_dev', kind: 'adjustment', cents: -50 }
+  ];
+  const t = creditTotals(lines, studio);
+  assert.deepEqual(t, { creditedCents: 300, adShareCents: 400, reversedCreditCents: 200, studioCreditedCents: 150, studioReversedCents: 150 });
+  // Without the studio's accounts every line is a creator's (the old reading).
+  assert.deepEqual(creditTotals(lines), { creditedCents: 450, adShareCents: 400, reversedCreditCents: 350, studioCreditedCents: 0, studioReversedCents: 0 });
+
+  // The share: the studio's pick stays in the margin (gross − fees − what
+  // creators were credited − the loss), and its reversal never offsets a
+  // refund's loss (that credit was never taken out of the margin).
+  const base = { membershipGrossCents: 2598, membershipFeeCents: 135, refundedCents: 1299, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, adsServedCents: 0, unexplainedCents: 0 };
+  const share = studioShare({ ...base, creditedCents: t.creditedCents, reversedCreditCents: t.reversedCreditCents, studioCreditedCents: t.studioCreditedCents, studioReversedCents: t.studioReversedCents });
+  // loss = 1299 refunded − 200 of Mara's credits reversed = 1099; margin = 2598 − 135 − 300 − 1099
+  assert.equal(share.membership.lossCents, 1099);
+  assert.equal(share.membership.marginCents, 1064);
+  assert.equal(share.membership.creditedCents, 300);
+  assert.equal(share.membership.studioKeptCents, 0);
+  assert.equal(share.together.shareCents, 1064);
+  // Read the old way (the studio's lines as a creator's), the margin was lower
+  // by the studio's own pick and its reversal was counted against the loss.
+  const old = studioShare({ ...base, creditedCents: 450, reversedCreditCents: 350 });
+  assert.equal(old.membership.marginCents, 2598 - 135 - 450 - (1299 - 350));
+  // A pick not reversed is reported as kept, and is already inside the margin.
+  const kept = studioShare({ ...base, refundedCents: 0, creditedCents: 300, reversedCreditCents: 0, studioCreditedCents: 150, studioReversedCents: 0 });
+  assert.equal(kept.membership.studioKeptCents, 150);
+  assert.equal(kept.together.studioKeptCents, 150);
+  assert.equal(kept.membership.marginCents, 2598 - 135 - 300);
+  // Older callers (no studio numbers) are unchanged.
+  assert.equal(studioShare({ ...base, creditedCents: 300, reversedCreditCents: 200 }).membership.studioKeptCents, 0);
 });
 
 

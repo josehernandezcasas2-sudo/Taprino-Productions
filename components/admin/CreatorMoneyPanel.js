@@ -189,6 +189,8 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
         {result && (
           <p className="cm-result">
             {result.forfeited && result.forfeited.filter((f) => f.cents > 0).length > 0 && <>Moved {dollars(result.forfeited.reduce((t, f) => t + f.cents, 0))} of uncollected credits to the pool. </>}
+            {result.forfeitError && <span className="cm-fail">{result.forfeitError}</span>}
+            {result.adShare && result.adShare.error && <span className="cm-fail">Ad share for {result.adShare.period}: {result.adShare.error}</span>}
             Ran: <b>{result.paid.length}</b> paid ({dollars(result.paidCents)}){result.failed.length > 0 && <>, <b className="bad">{result.failed.length} failed</b></>}{result.skippedForBalance.length > 0 && <>, {result.skippedForBalance.length} waiting on balance</>}, {result.held.length} held.
             {result.failed.map((f) => <span key={f.creatorId} className="cm-fail">{f.displayName || f.creatorId}: {f.reason}</span>)}
           </p>
@@ -238,6 +240,11 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
             {plan.carry.length > 0 && (
               <p className="cm-sub" style={{ marginTop: '0.5rem' }}>
                 {plan.carry.length} creator{plan.carry.length === 1 ? '' : 's'} with a zero or negative balance after reversals (carries into the next credits).
+              </p>
+            )}
+            {(plan.kept || []).length > 0 && (
+              <p className="cm-sub" id="cm-studio-kept" style={{ marginTop: '0.5rem' }}>
+                Kept by the studio · {dollars(plan.keptCents || 0)}: members picked the studio’s own account{plan.kept.length === 1 ? '' : 's'} ({plan.kept.map((k) => `${k.displayName} (studio account) ${dollars(k.cents)}`).join(', ')}). It’s the studio’s money — never paid out, not owed to anyone; the ledger lines stay as the record.
               </p>
             )}
           </div>

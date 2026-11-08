@@ -5,6 +5,7 @@ import ReviewQueue from '../components/admin/ReviewQueue';
 import { adminPageProps } from '../lib/adminPage';
 import { siteConfigIncomplete, missingSiteConfigFields } from '../lib/siteConfig';
 import { getSiteSettings } from '../lib/siteSettings';
+import { reviewQueueKeys } from '../lib/moderationRules';
 
 // The admin dashboard (2026-10-08 redesign). The old 2,000-line hub's
 // sections now live on their own pages — see lib/adminNav.js. This page
@@ -124,24 +125,26 @@ export default function AdminDashboard({ account, mainGenres, defaultCpmCents })
   );
 }
 
-// Rows from /api/admin/content that have an open flag or counted reports.
+// What /admin/content's review queue lists (lib/moderationRules.js, the
+// same count as the "Open flags" tile): one row per item with an open
+// flag or counted reports — both on one row —, tip notes and items deleted
+// since left out.
 function flaggedRows(m) {
   const mod = m.moderation || {};
   const byKey = {};
   // Titles, plus the places, calls, productions and profiles with reports.
   for (const r of [...(m.rows || []), ...(m.connect || [])]) byKey[`${r.type}:${r.id}`] = r;
-  const out = [];
-  for (const f of mod.flags || []) {
-    const key = `${f.target_type}:${f.target_id}`;
+  const flagsOf = {};
+  for (const f of mod.flags || []) (flagsOf[`${f.target_type}:${f.target_id}`] = flagsOf[`${f.target_type}:${f.target_id}`] || []).push(f);
+  return reviewQueueKeys(mod).map((key) => {
     const row = byKey[key];
-    out.push({ key, title: row ? (row.title || row.name) : key, detail: `Flagged · ${f.reasonLabel || f.reason}` });
-  }
-  for (const [key, t] of Object.entries(mod.reportsByTarget || {})) {
-    if (!t.counted || t.ignored) continue;
-    const row = byKey[key];
-    out.push({ key, title: row ? (row.title || row.name) : key, detail: `${t.counted} report${t.counted === 1 ? '' : 's'} · ${t.topReason || ''}` });
-  }
-  return out;
+    const flags = flagsOf[key] || [];
+    const t = (mod.reportsByTarget || {})[key];
+    const parts = [];
+    if (flags.length) parts.push(`Flagged · ${flags[0].reasonLabel || flags[0].reason}`);
+    if (t && t.counted > 0 && !t.ignored) parts.push(`${t.counted} report${t.counted === 1 ? '' : 's'}${t.topReason ? ` · ${t.topReason}` : ''}`);
+    return { key, title: row ? (row.title || row.name) : key, detail: parts.join(' · ') };
+  });
 }
 
 function timeAgo(iso) {
