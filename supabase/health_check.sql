@@ -44,6 +44,22 @@ payee_out_of_step as (
 ),
 payee_invites_old as (
   select id from payee_invites where status = 'pending' and created_at < now() - interval '30 days'
+),
+payee_invites_stuck as (
+  -- An acceptance that stopped part-way (lib/payees.js stuckAcceptedInvites):
+  -- the invite reads accepted, but its title doesn't pay the invitee, no
+  -- history row was stamped by it and no audit line says it went through.
+  -- The daily cron finishes each one or withdraws it and tells both sides,
+  -- so two days on there should be none.
+  select i.id from payee_invites i
+    left join episodes e on i.title_type = 'episode' and e.id = i.title_id
+    left join series s on i.title_type = 'series' and s.id = i.title_id
+   where i.status = 'accepted' and i.decided_at < now() - interval '2 days'
+     and (case when i.title_type = 'series' then nullif(s.paid_to, '') else nullif(e.paid_to, '') end) is distinct from i.invitee_id
+     and not exists (select 1 from title_payees tp where tp.set_by = 'invite:' || i.id::text)
+     and not exists (select 1 from audit_log a
+                      where a.action = 'payee_invite_accepted' and a.target_id = i.title_id
+                        and a.details like '%"inviteId":"' || i.id::text || '"%')
 )
 select section, item, how_many, detail, what_to_do from (
 
@@ -138,6 +154,12 @@ select section, item, how_many, detail, what_to_do from (
          (select count(*) from payee_out_of_step),
          (select left(string_agg(id, ', '), 300) from payee_out_of_step),
          'An episode''s "who gets paid" history disagrees with who it pays now. The daily cron (creator reminders) closes the stray row and opens the right one; if the number stays above 0 after a day, look in Vercel → Logs for "payees: repaired".'
+
+  union all
+  select 26, 'Should be 0', 'Payee invites accepted with nothing moved',
+         (select count(*) from payee_invites_stuck),
+         (select left(string_agg(id::text, ', '), 300) from payee_invites_stuck),
+         'Someone pressed Accept to be paid for a title and it stopped part-way. The daily cron (creator reminders) finishes it, or withdraws it and tells both sides; if the number stays above 0, look in Vercel → Logs for "payees: stuck invite".'
 
   union all
   select 24, 'Should be 0', 'Tables open to the public API',

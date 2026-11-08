@@ -77,8 +77,8 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    if (err.status) return res.status(err.status).json({ error: err.message });
-    console.error('admin/creator-money error:', err.message);
+    // A line written for the admin (a standing action's) goes out as it is;
+    // a database or Stripe error marked internal is logged, never echoed.
     return sendError(res, err, 'admin/creator-money');
   }
 }

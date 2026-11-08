@@ -42,7 +42,7 @@ export default async function handler(req, res) {
     const payeeRepair = await repairTitlePayees().catch((err) => { console.error('repairTitlePayees:', err.message); return { repaired: 0, error: true }; });
     // Prices set before 3b by a contributor follow whoever runs the title.
     const priceOwners = await realignPriceOwners().catch((err) => { console.error('realignPriceOwners:', err.message); return { moved: 0, error: true }; });
-    if (payeeCutover.ran || payeeRepair.repaired || payeeRepair.invitesWithdrawn || priceOwners.moved) console.log(`cron/creator-reminders payees: cut-over ${payeeCutover.stamped || 0} stamped, ${payeeCutover.told || 0} told; repair ${payeeRepair.repaired || 0} rows, ${payeeRepair.invitesWithdrawn || 0} invites withdrawn; ${priceOwners.moved || 0} prices now with whoever runs the title`);
+    if (payeeCutover.ran || payeeRepair.repaired || payeeRepair.invitesWithdrawn || payeeRepair.invitesFinished || payeeRepair.stuckWithdrawn || priceOwners.moved) console.log(`cron/creator-reminders payees: cut-over ${payeeCutover.stamped || 0} stamped, ${payeeCutover.told || 0} told; repair ${payeeRepair.repaired || 0} rows, ${payeeRepair.invitesWithdrawn || 0} invites withdrawn; acceptances that stopped part-way: ${payeeRepair.invitesFinished || 0} finished, ${payeeRepair.stuckWithdrawn || 0} withdrawn; ${priceOwners.moved || 0} prices now with whoever runs the title`);
     return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay, payeeCutover, payeeRepair, priceOwners });
   } catch (err) {
     console.error('cron/creator-reminders error:', err.message);

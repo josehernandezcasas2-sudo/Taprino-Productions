@@ -9,7 +9,9 @@ import { sendError } from '../../../lib/apiErrors';
 //      `connect`: places, crew calls, productions and profiles with open
 //      reports or flags, for the review queue (null when that read failed)
 // POST { op: 'flag', targetType, targetId, reason, note, emailOwner }
-//      { op: 'decide', targetType, targetId, action: restore | take_down | ignore_reports | count_reports, note? }
+//      { op: 'decide', targetType, targetId, action: restore | take_down | ignore_reports | count_reports | close_missing, note? }
+//      (close_missing: the item was deleted since it was reported — its
+//      open reports and flags are closed; refused while it still exists)
 //      { op: 'reporter', userId, status: cleared | muted | banned }
 //      (handle_flags)
 export default async function handler(req, res) {
@@ -37,10 +39,11 @@ export default async function handler(req, res) {
     if (!canAct) return res.status(403).json({ error: "You don't have permission to flag or decide on content." });
 
     const b = req.body || {};
+    let decided = null;
     if (b.op === 'flag') {
       await flagContent({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, reason: b.reason, note: b.note, emailOwner: b.emailOwner !== false });
     } else if (b.op === 'decide') {
-      await decide({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, action: b.action, note: b.note });
+      decided = await decide({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, action: b.action, note: b.note });
     } else if (b.op === 'reporter') {
       await setReporterStatus({ userId: b.userId, status: b.status, adminId: rc.userId });
     } else {
@@ -52,7 +55,7 @@ export default async function handler(req, res) {
       action: b.op === 'flag' ? 'flag_content' : b.op === 'decide' ? `content_${b.action}` : `reporter_${b.status}`,
       targetType: b.op === 'reporter' ? 'user' : b.targetType,
       targetId: b.op === 'reporter' ? b.userId : b.targetId,
-      details: b.reason || b.note || null
+      details: b.reason || b.note || (decided && decided.words) || null
     });
     return res.status(200).json({ ok: true });
   } catch (err) {

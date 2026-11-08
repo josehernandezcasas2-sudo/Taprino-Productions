@@ -3,6 +3,7 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import { FLAG_REASONS } from '../../lib/reportReasons';
+import { queueTileCounts, reviewQueueKeys } from '../../lib/moderationRules';
 import { SITE } from '../../lib/siteConfig';
 
 // Every title from every user, plus flags, viewer reports and reporters.
@@ -46,6 +47,9 @@ function connectState(row) {
 }
 
 const shortDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
+
+// What a deleted item was, for the queue's "Gone" rows.
+const GONE_TYPE = { episode: 'Title', series: 'Series', channel_media: 'Channel upload', location: 'Place', call: 'Crew call', production: 'Production', profile: 'Profile' };
 
 export default function AdminContent({ account, mainGenres }) {
   const [data, setData] = useState(null);
@@ -118,10 +122,11 @@ export default function AdminContent({ account, mainGenres }) {
     });
   }, [data, mod, q, owner, status, type, reports]);
 
+  // The same items the nav's badge counts (lib/moderationRules.js): one
+  // per item, tip notes and items deleted since left out.
   const queue = useMemo(() => {
     if (!mod) return [];
-    const keys = new Set([...Object.keys(flagsByKey), ...Object.keys(mod.reportsByTarget).filter((k) => mod.reportsByTarget[k].tier)]);
-    return [...keys].map((key) => {
+    return reviewQueueKeys(mod).map((key) => {
       const rep = mod.reportsByTarget[key];
       const flags = flagsByKey[key] || [];
       const level = rep && rep.tier === 'red' ? 'red' : flags.length ? 'flag' : rep ? rep.tier : 'minor';
@@ -130,17 +135,10 @@ export default function AdminContent({ account, mainGenres }) {
   }, [mod, flagsByKey, rowByKey]);
 
   // Tip notes are decided on /admin/tips, so they're left out of the
-  // tiles and the queue here and only counted for the pointer.
-  const counts = useMemo(() => {
-    const c = { red: 0, yellow: 0, minor: 0, flag: mod ? new Set(mod.flags.filter((f) => f.target_type !== 'tip').map((f) => `${f.target_type}:${f.target_id}`)).size : 0, tipNotes: 0 };
-    if (mod) {
-      for (const [k, e] of Object.entries(mod.reportsByTarget)) {
-        if (k.startsWith('tip:')) { if (e.total > 0) c.tipNotes += 1; continue; }
-        if (e.tier) c[e.tier] += 1;
-      }
-    }
-    return c;
-  }, [mod]);
+  // tiles and the queue here and only counted for the pointer; items
+  // deleted since they were reported count nowhere and are listed apart.
+  const counts = useMemo(() => queueTileCounts(mod), [mod]);
+  const missing = mod && Array.isArray(mod.missing) ? mod.missing : [];
 
   function openFlag(row) {
     setFlagging({ row, reason: 'copyright', note: '', emailOwner: true });
@@ -247,7 +245,7 @@ export default function AdminContent({ account, mainGenres }) {
                 {counts.tipNotes} reported tip {counts.tipNotes === 1 ? 'note' : 'notes'} → {account && account.isAdmin ? <Link href="/admin/tips">Admin → Tips</Link> : 'Admin → Tips (full admins)'}
               </p>
             )}
-            {queue.length === 0 && <div className="ca-empty">Nothing to review.</div>}
+            {queue.length === 0 && missing.length === 0 && <div className="ca-empty">Nothing to review.</div>}
             <div className="ac-queue">
               {queue.map(({ key, row, rep, flags, level }) => {
                 const words = decisionWords(row);
@@ -295,6 +293,19 @@ export default function AdminContent({ account, mainGenres }) {
                   </div>
                 );
               })}
+              {missing.map((m) => (
+                <div key={`gone-${m.key}`} className="ac-qitem l-done" data-target={m.key}>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="ac-qmeta">
+                      {m.reports > 0 ? `${m.reports} open report${m.reports === 1 ? '' : 's'}${m.topReason ? `, mostly "${m.topReason}"` : ''}` : 'No open reports'}
+                      {m.flags > 0 ? ` · ${m.flags} open flag${m.flags === 1 ? '' : 's'}` : ''}
+                    </div>
+                    <h3><span className="sch-chip ac-type">{GONE_TYPE[m.targetType] || m.targetType}</span><span className="ac-mono">{m.targetId}</span> <span className="sch-chip">Gone</span></h3>
+                    <p>It was deleted after it was reported, so there&rsquo;s nothing left to decide. Closing marks its reports upheld and its flags resolved; nobody is told. Not counted anywhere until then.</p>
+                  </div>
+                  {canAct && <div className="ac-acts"><button type="button" className="sch-btn" disabled={busy} onClick={() => act({ op: 'decide', targetType: m.targetType, targetId: m.targetId, action: 'close_missing' })}>The item is gone — close its reports</button></div>}
+                </div>
+              ))}
               {Object.entries(mod.reportsByTarget).filter(([, e]) => e.ignored).map(([key, e]) => {
                 const row = rowByKey[key];
                 if (!row) return null;

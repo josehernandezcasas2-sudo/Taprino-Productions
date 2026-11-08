@@ -3,7 +3,7 @@ import { getStripe, isStripeConfigured, requestOrigin } from '../../lib/stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
 import { isPaidTier, tierLabel } from '../../lib/membershipTiers';
-import { resolveReferrer } from '../../lib/creatorShare';
+import { referrerForCheckout } from '../../lib/creatorShare';
 import { firstInWindow } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
 import { sendError } from '../../lib/apiErrors';
@@ -86,19 +86,25 @@ export default async function handler(req, res) {
     // send you?" on the account page, web and app) — the only way a
     // referral reaches the app, whose sign-ups never carry the cookie.
     // A name they typed that isn't a creator is refused, so they can fix
-    // it; a stale link just doesn't count.
+    // it; a stale link just doesn't count. When the check can't run (a
+    // read failed), the referral is stamped anyway — the creator's id, or
+    // the handle when even that couldn't be looked up — and the first paid
+    // invoice checks it strictly (lib/creatorShare.js
+    // lockReferralFromSubscription): never a referral dropped for good,
+    // never a Checkout refused over a hiccup.
     const { userId } = getAuth(req);
     const typed = body.viaSource === 'typed';
-    let via = null;
+    let ref = {};
     try {
-      via = userId ? await resolveReferrer(body.via || (req.cookies && req.cookies.tapa_via), userId) : null;
+      ref = userId ? await referrerForCheckout(body.via || (req.cookies && req.cookies.tapa_via), userId) : {};
     } catch (err) {
       console.error('create-checkout-session referrer lookup failed:', err.message);
     }
-    if (typed && body.via && !via) {
+    if (typed && body.via && !ref.via && !ref.handle) {
       return res.status(400).json({ error: 'We couldn’t find a creator with released work by that handle. Check it, or leave the box empty.' });
     }
-    const viaStamp = via ? (typed ? { via, via_source: 'code', via_code: String(body.via).trim().replace(/^@+/, '').slice(0, 40) } : { via, via_source: 'link' }) : {};
+    const source = typed ? { via_source: 'code', via_code: String(body.via).trim().replace(/^@+/, '').slice(0, 40) } : { via_source: 'link' };
+    const viaStamp = ref.via ? { via: ref.via, ...source } : ref.handle ? { via_handle: ref.handle, ...source } : {};
     const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...viaStamp };
 
     const session = await stripe.checkout.sessions.create({
