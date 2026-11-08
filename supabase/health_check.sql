@@ -66,7 +66,7 @@ select section, item, how_many, detail, what_to_do from (
   select 1 as ord, 'Needs you' as section, 'Shows ready to go public' as item,
          (select count(*) from ready) as how_many,
          (select left(string_agg(name, ', ' order by name), 300) from ready) as detail,
-         'Admin → Review: each is a "Ready to go public" card — press Make it public (the show''s owner can too, from their show page). Until then the show and its episodes stay private.' as what_to_do
+         'Admin → Shows → the "Ready to go public" chip: the show''s owner presses Make it public on their show page (a full admin can too, on the show''s admin page). Until then the show and its episodes stay private.' as what_to_do
 
   union all
   select 2, 'Needs you', 'Episode numbers 118 had to move',
