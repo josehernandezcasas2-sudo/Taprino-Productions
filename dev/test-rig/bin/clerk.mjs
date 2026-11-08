@@ -15,6 +15,10 @@
 //   POST /__roles?user=&role=[&permissions=a,b]   POST /__twofactor?user=&on=1
 //   POST /__users  { id?, email, firstName, ... }  (a new account)
 //   POST /__expo/push/send                 sink for EXPO_PUSH_URL
+//   POST /__fail?user=<id>&on=1|0          make Clerk "down" for one account:
+//                                          GET /v1/users/<id>, and a users list
+//                                          that asks for it by user_id, answer 500
+//                                          (user=* with on=0 clears every one)
 // Anything else answers Clerk's 404 shape.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -33,6 +37,9 @@ const DAY = 86400000;
 let users = new Map();
 let invitations = new Map();
 const pushes = [];
+// Accounts whose reads answer 500 (POST /__fail), for the money paths that
+// must fail closed when Clerk can't say who is on the team.
+const failing = new Set();
 
 function emailObj(id, address, verified = true) {
   return {
@@ -260,6 +267,17 @@ const server = http.createServer(async (req, res) => {
       users.set(id, u);
       return sendJson(res, 200, u);
     }
+    if (p === '/__fail' && req.method === 'POST') {
+      const who = q.get('user') || '';
+      const on = q.get('on') !== '0' && q.get('on') !== 'false';
+      if (who === '*' && !on) failing.clear();
+      else if (who) {
+        const id = resolveUserId(who) || who;
+        if (on) failing.add(id);
+        else failing.delete(id);
+      }
+      return sendJson(res, 200, { ok: true, failing: [...failing] });
+    }
     if (p === '/__expo/push/send' && req.method === 'POST') {
       const list = Array.isArray(body) ? body : [body];
       pushes.push(...list.map((m) => ({ at: new Date().toISOString(), ...m })));
@@ -275,6 +293,8 @@ const server = http.createServer(async (req, res) => {
     if (seg[1] === 'jwks' && req.method === 'GET') return sendJson(res, 200, { keys: [publicJwk(keys.clerkPublicPem, FAKE_KEYS.clerkKid)] });
 
     if (seg[1] === 'users') {
+      const down = (seg[2] && failing.has(seg[2])) || (seg.length === 2 && req.method === 'GET' && q.getAll('user_id').some((id) => failing.has(id)));
+      if (down) return clerkError(res, 500, 'internal_clerk_error', 'Something went wrong', 'The fake Clerk is failing for this account (POST /__fail).');
       if (seg.length === 2 && req.method === 'GET') {
         const list = filterUsers(q);
         const offset = Number(q.get('offset') || 0);

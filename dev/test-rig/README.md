@@ -206,7 +206,10 @@ publicMetadata, privateMetadata, banned, emailVerified, createdDaysAgo,
 firstName, lastName }`; `POST /__roles?user=mara&role=sub_admin&permissions=a,b`;
 `POST /__twofactor?user=admin&on=0`; `POST /__users` (a new account);
 `GET /__session?user=mara` (a cookie, like `mint-session.mjs`);
-`POST /__expo/push/send` (the push sink; `GET /__state` lists what arrived).
+`POST /__expo/push/send` (the push sink; `GET /__state` lists what arrived);
+`POST /__fail?user=<id>&on=1|0` (that account's reads — `GET /v1/users/<id>`
+and a users list asking for it by `user_id` — answer 500; `user=*&on=0`
+clears them all).
 
 Not covered: Clerk's frontend. The browser loads `clerk-js` from
 `clerk.example.com`, which doesn't exist, so in a browser Clerk's client hooks
@@ -302,6 +305,13 @@ handful of pages, reporting page errors (these fail it), console errors,
 every request to a host other than the rig aborted. The report
 is written to `$RIG_DATA_DIR/state/smoke.json`.
 
+## The checks
+
+`dev/test-rig/checks/` holds re-runnable checks of one area each (films on
+the own-page landing, kinds of extras before and after 121, captions and
+the podcast preview as the app calls them, the moderation cleanup, money
+through the fakes, stuck payee invites); see `checks/README.md`.
+
 ## Things in the app that reach outside the rig
 
 - `lib/stripeStatus.js` calls `https://api.stripe.com/v2/core/event_destinations`
@@ -318,6 +328,7 @@ is written to `$RIG_DATA_DIR/state/smoke.json`.
 dev/test-rig/
   start.sh stop.sh reset.sh status.sh fetch-postgrest.sh
   mint-session.mjs smoke.mjs
+  checks/              re-runnable checks, one area each (checks/README.md)
   bin/rig.mjs          the commands (start/stop/reset/status/env/migrate)
   bin/supabase.mjs     REST proxy + Storage, http :54321 / https :54331
   bin/clerk.mjs bin/stripe.mjs bin/cloudflare.mjs
