@@ -89,6 +89,10 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
   const yearKey = data ? data.year : null;
   const isYearView = data && data.period === data.year;
   const next = data && data.top.nextPayout;
+  // A studio account (a full admin): what members' picks credited it is
+  // the studio's own money, kept and never paid out (the server says so;
+  // /admin/creator-money words it the same way).
+  const studioKept = Boolean(data && data.top.studioKept);
   const linkHost = typeof window !== 'undefined' ? window.location.host : SITE.productionDomain.replace(/^https?:\/\//, '');
   const shownLanes = lanes ? LANE_ORDER.filter((k) => k !== 'payouts' && (k !== 'bookings' || lanes.bookings.shows)) : [];
 
@@ -138,8 +142,8 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
             </span>
           </div>
           <div className="money-kpi accent">
-            <span className="money-kpi-label">Owed to you</span>
-            <span className="money-kpi-amount">{dollars(data.top.owedCents)}</span>
+            <span className="money-kpi-label">{studioKept ? 'Kept by the studio' : 'Owed to you'}</span>
+            <span className="money-kpi-amount">{dollars(studioKept ? data.top.studioKeptCents : data.top.owedCents)}</span>
             <span className="money-kpi-note">
               {next && next.note
                 ? next.note
@@ -183,13 +187,16 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                       <Row label="Member share" value={dollars(lane.shareCents)} />
                       <Row label="Referral bonus" value={dollars(lane.referralCents)} />
                       {lane.carriedCents > 0 && <Row label="Carried from before" value={dollars(lane.carriedCents)} />}
-                      <Row label="Owed to you" value={dollars(lane.owedCents)} />
+                      {studioKept
+                        ? <Row label="Kept by the studio" value={dollars(lane.keptCents)} />
+                        : <Row label="Owed to you" value={dollars(lane.owedCents)} />}
                     </>
                   )}
                   {k === 'ad_share' && (
                     <>
                       {lane.titles.map((t) => <Row key={t.episodeId || t.title} label={`${t.title} · ${Number(t.units || 0).toLocaleString('en-US')} ad${t.units === 1 ? '' : 's'}`} value={dollars(t.cents)} />)}
                       {lane.owedCents > 0 && <Row label="Owed to you" value={dollars(lane.owedCents)} />}
+                      {studioKept && lane.keptCents > 0 && <Row label="Kept by the studio" value={dollars(lane.keptCents)} />}
                       {lane.titles.length === 0 && <Row label="No ads inside your titles this period" value="" />}
                     </>
                   )}
@@ -235,7 +242,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                   )}
                 </div>
                 <span className="money-lane-note">
-                  {k === 'member_support' && `Pays by transfer on the 1st once you are owed ${dollars(data.top.minimumCents)}.`}
+                  {k === 'member_support' && (studioKept ? 'The studio’s own account: never paid out, not owed to anyone; the ledger lines stay as the record.' : `Pays by transfer on the 1st once you are owed ${dollars(data.top.minimumCents)}.`)}
                   {k === 'ad_share' && `${lane.percent == null ? 'Your share' : `${lane.percent}%`} of what advertisers paid for the ads inside your titles, credited on the 1st for the month before and paid with member support.`}
                   {k === 'tips' && (ready ? 'In your Stripe balance the moment the card clears. The fan covers the card fee.' : 'Set up payouts and the Tip button turns on for your fans.')}
                   {k === 'sales' && 'Your share lands in your Stripe balance at the sale.'}
