@@ -1,0 +1,61 @@
+{
+  "_note": "The rig's accounts. The fake Clerk serves these (roles in publicMetadata, verified primary emails); the seed writes the matching user_profiles rows. Addresses are on example.com and reach nobody.",
+  "accounts": [
+    {
+      "id": "user_rigAdmin",
+      "email": "admin@rig.example.com",
+      "firstName": "Ada",
+      "lastName": "Admin",
+      "username": "rigadmin",
+      "role": "admin",
+      "twoFactorEnabled": true,
+      "createdDaysAgo": 400,
+      "profile": { "display_name": "Studio Tapa Admin", "handle": "studioadmin", "bio": "The rig's full admin." }
+    },
+    {
+      "id": "user_rigMara",
+      "email": "mara@rig.example.com",
+      "firstName": "Mara",
+      "lastName": "Reyes",
+      "username": "mara",
+      "role": "creator",
+      "twoFactorEnabled": false,
+      "createdDaysAgo": 200,
+      "profile": { "display_name": "Mara Reyes", "handle": "mara", "bio": "Makes Night Bus. Night shoots, small crews, long takes.", "age": 34 }
+    },
+    {
+      "id": "user_rigDee",
+      "email": "dee@rig.example.com",
+      "firstName": "Dee",
+      "lastName": "Park",
+      "username": "deepark",
+      "role": "creator",
+      "twoFactorEnabled": false,
+      "createdDaysAgo": 150,
+      "profile": { "display_name": "Dee Park", "handle": "dee", "bio": "Documentary shorts about kitchens.", "age": 29 }
+    },
+    {
+      "id": "user_rigViewer",
+      "email": "viewer@rig.example.com",
+      "firstName": "Vic",
+      "lastName": "Viewer",
+      "username": "vicviewer",
+      "role": null,
+      "twoFactorEnabled": false,
+      "createdDaysAgo": 90,
+      "profile": { "display_name": "Vic Viewer", "handle": "vic", "age": 27 }
+    },
+    {
+      "id": "user_rigSub",
+      "email": "sub@rig.example.com",
+      "firstName": "Sam",
+      "lastName": "Subadmin",
+      "username": "samsub",
+      "role": "sub_admin",
+      "permissions": ["review_submissions", "manage_episodes"],
+      "twoFactorEnabled": true,
+      "createdDaysAgo": 300,
+      "profile": { "display_name": "Sam Subadmin", "handle": "samsub" }
+    }
+  ]
+}
