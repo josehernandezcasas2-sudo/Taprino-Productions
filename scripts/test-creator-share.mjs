@@ -5,7 +5,7 @@ import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
   standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
-  fitShareToPayment, countWatched
+  fitShareToPayment, countWatched, invoiceRetryVerdict, INVOICE_RETRY_HOURS
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -298,6 +298,31 @@ test('countWatched: each watch counts for the account the title paid when it was
   assert.equal(countWatched(rows, by, () => true, 'user_member').user_admin, 1);
   assert.deepEqual(countWatched([], by, eligible, 'x'), {});
   assert.deepEqual(countWatched(null, by, eligible, 'x'), {});
+});
+
+test('invoiceRetryVerdict: an invoice handed back to Stripe is retried for a day, then recorded the old way', () => {
+  const now = Date.parse('2026-11-08T12:00:00Z');
+  const at = (iso) => Math.floor(Date.parse(iso) / 1000);
+  assert.equal(INVOICE_RETRY_HOURS, 24);
+  // Just paid (invoice.paid before checkout.session.completed): retry.
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-08T11:59:00Z') }, now), { retry: true, ageHours: 0 });
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-07T12:00:01Z') }, now), { retry: true, ageHours: 23 });
+  // A day old: Stripe's later retries skip it, so a permanent "nobody"
+  // can't fail the webhook for days.
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-07T12:00:00Z') }, now), { retry: false, ageHours: 24 });
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-04T12:00:00Z') }, now), { retry: false, ageHours: 96 });
+  // When it was paid comes first: a renewal created days ago whose card was
+  // retried until today is young. Without paid_at, created. Neither: not
+  // retried (nothing bounds it).
+  assert.equal(invoiceRetryVerdict({ status_transitions: { paid_at: at('2026-11-08T10:00:00Z') } }, now).retry, true);
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-03T10:00:00Z'), status_transitions: { paid_at: at('2026-11-08T10:00:00Z') } }, now), { retry: true, ageHours: 2 });
+  assert.equal(invoiceRetryVerdict({ created: at('2026-11-08T10:00:00Z'), status_transitions: { paid_at: null } }, now).retry, true);
+  assert.deepEqual(invoiceRetryVerdict({}, now), { retry: false, ageHours: null });
+  assert.deepEqual(invoiceRetryVerdict(null, now), { retry: false, ageHours: null });
+  // A clock a little behind Stripe's never reads as negative.
+  assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-08T12:05:00Z') }, now), { retry: true, ageHours: 0 });
+  // The window can be set.
+  assert.equal(invoiceRetryVerdict({ created: at('2026-11-08T09:00:00Z') }, now, 2).retry, false);
 });
 
 console.log(`\n${passed} passed`);

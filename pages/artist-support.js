@@ -6,7 +6,7 @@ import Footer from '../components/Footer';
 import BackButton from '../components/BackButton';
 import ArtistSupportCard from '../components/ArtistSupportCard';
 import { getAccountContext } from '../lib/accountContext';
-import { getArtistSupportPayload } from '../lib/artistSupport';
+import { ArtistSupportError, getArtistSupportPayload } from '../lib/artistSupport';
 import { MAX_PICKS } from '../lib/artistSupportRules';
 import { SITE } from '../lib/siteConfig';
 
@@ -24,7 +24,9 @@ export async function getServerSideProps({ req, res }) {
       payload = await getArtistSupportPayload(account.userId, account.tier);
     } catch (err) {
       console.error('artist-support page error:', err.message);
-      payload = { error: err.message };
+      // Only a line written for the member is shown; a database error's
+      // text stays in the log (security round 2).
+      payload = { error: err instanceof ArtistSupportError ? err.message : 'something went wrong on our side. Try again in a minute.' };
     }
   }
   return {
