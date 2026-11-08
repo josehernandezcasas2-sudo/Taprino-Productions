@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { SITE } from '../lib/siteConfig';
 import { MAIN_GENRES, SUBMIT_TYPES } from '../lib/submitRules';
 import RatingOptions from './RatingOptions';
+import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
+import { savePageNotes } from '../lib/pageNotesSave';
 
 // A standalone title's own types: the ones that sit in no show.
 const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical'].includes(t.value));
@@ -18,6 +20,11 @@ const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical
 // isn't sent as they are). The genres are lib/submitRules.js's (this list
 // had no Drama, the submit page's default, so a Drama title showed as
 // Comedy here).
+//
+// A film's or a short's notes for its own page (2026-11-08) save at once,
+// like the description here, through the show editor's own save
+// (lib/pageNotesSave.js → PATCH /api/show/episode/<id>, which holds the
+// rules for who may change them).
 export default function EditSubmissionModal({ submission, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: submission.title || '',
@@ -31,8 +38,11 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
     mainGenre: submission.mainGenre || MAIN_GENRES[0],
     tier: submission.tier || 'free'
   });
+  const startNotes = submission.pageNotes || '';
+  const [notes, setNotes] = useState(startNotes);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const notesShown = pageNotesBoxShows(submission, { contentType: form.contentType });
   // A title of another type (an older one, or an extra whose show isn't
   // one of this creator's) keeps its type; the list only adds it.
   const types = STANDALONE_TYPES.some((t) => t.value === form.contentType)
@@ -56,6 +66,10 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save your changes.');
+      if (notesShown && notes.trim() !== startNotes.trim()) {
+        const saved = await savePageNotes(submission.id, notes);
+        if (!saved.ok) throw new Error(`The other changes are saved, but not the notes: ${saved.error}`);
+      }
       onSaved();
     } catch (err) {
       setError(err.message);
@@ -80,6 +94,8 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
 
           <label>Description</label>
           <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} style={{ width: '100%', boxSizing: 'border-box' }} />
+
+          {notesShown && <PageNotesField id="edit-submission-notes" value={notes} onChange={setNotes} />}
 
           <label>Your name / artist credit</label>
           <input type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />

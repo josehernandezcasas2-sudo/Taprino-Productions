@@ -15,6 +15,7 @@ import DeleteRequestModal from '../../components/DeleteRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
+import { pageNotesBoxShows } from '../../components/PageNotesField';
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
 import { PayeeModal } from '../../components/show/PayeeCard';
 import Footer from '../../components/Footer';
@@ -440,11 +441,11 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 className="dropdown-item"
                 role="menuitem"
                 onClick={() => {
-                  setEditRequestTarget({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '' } });
+                  setEditRequestTarget({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '', pageNotes: s.pageNotes || '', notesShown: pageNotesBoxShows(s) } });
                   setOpenDropdown(null);
                 }}
               >
-                <PencilIcon size={12} src={iconOverrides.pencil} /> Edit title &amp; description
+                <PencilIcon size={12} src={iconOverrides.pencil} /> {pageNotesBoxShows(s) ? 'Edit title, description & notes' : <>Edit title &amp; description</>}
               </button>
             ))}
             {onSite && (

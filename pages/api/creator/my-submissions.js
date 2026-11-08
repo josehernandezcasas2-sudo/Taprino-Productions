@@ -4,7 +4,7 @@ import { getCloudflareVideoStatus, cloudflareUidFromUrl } from '../../../lib/clo
 import { getViewCounts } from '../../../lib/redis';
 import { captionsHref } from '../../../lib/episodes';
 import { sortEpisodes } from '../../../lib/seriesResume';
-import { kindOf, titleRunnerOf } from '../../../lib/showRules';
+import { episodeHasPage, kindOf, titleRunnerOf } from '../../../lib/showRules';
 import { payeeShowIds } from '../../../lib/payees';
 import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
@@ -234,6 +234,15 @@ export default async function handler(req, res) {
       // Changes waiting for an admin on a live title.
       pendingTitle: ep.pending_title ?? null,
       pendingDescription: ep.pending_description ?? null,
+      // The notes for the title's own page (migration 118's page_notes),
+      // which Your work's edit boxes offer while the title has its own page
+      // (a film or a short by type; lib/showRules.js episodeHasPage).
+      // pageNotesReady is false on a database before 118 (no column): the
+      // box is hidden then.
+      pageNotes: ep.page_notes ?? null,
+      pageNotesReady: Object.prototype.hasOwnProperty.call(ep, 'page_notes'),
+      hasPage: episodeHasPage(ep),
+      hasPageChoice: typeof ep.has_page === 'boolean' ? ep.has_page : null,
       pendingSrc: Boolean(ep.pending_src),
       pendingVideoState: ep.pending_src ? (pendingCf ? pendingCf.state || null : null) : null,
       // Whether this episode is genuinely missing artwork — a series

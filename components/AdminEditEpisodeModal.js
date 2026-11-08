@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { SITE } from '../lib/siteConfig';
 import RatingOptions from './RatingOptions';
 import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
+import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -50,6 +51,8 @@ function formFromEpisode(episode) {
   return {
     title: episode.title || '',
     description: episode.description || '',
+    // The notes for its own page (migration 118; components/PageNotesField.js).
+    pageNotes: episode.pageNotes || '',
     contentType: episode.contentType || 'short',
     rating: episode.rating || '',
     seriesId: episode.seriesId || '',
@@ -76,7 +79,7 @@ function formFromEpisode(episode) {
 
 // Compared as trimmed text: the inputs, the selects, the dates and the
 // numbers as typed (/api/admin/edit-episode reads the numbers).
-const TEXT_FIELDS = ['title', 'description', 'contentType', 'rating', 'artist', 'runtime', 'releaseYear', 'genre', 'mainGenre', 'tier', 'status', 'fundingUrl', 'availableFrom', 'availableUntil'];
+const TEXT_FIELDS = ['title', 'description', 'pageNotes', 'contentType', 'rating', 'artist', 'runtime', 'releaseYear', 'genre', 'mainGenre', 'tier', 'status', 'fundingUrl', 'availableFrom', 'availableUntil'];
 const SWITCH_FIELDS = ['featured', 'discoverCurated', 'isOriginal'];
 const PLACE_FIELDS = ['seriesId', 'season', 'seriesOrder'];
 const NUMBERED_TYPES = ['series', 'podcast'];
@@ -202,12 +205,16 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
   // change meaning between the first and second press — only the actual
   // submit behavior changes, gated separately by `confirmNoVideo`.
   const noVideoAtAll = !existingUid && !videoUid.trim();
+  const notesShown = pageNotesBoxShows(episode, { contentType: form.contentType, seriesId: form.seriesId });
   const dangerous = form.status === 'approved' && noVideoAtAll;
 
   async function handleSave(e) {
     e.preventDefault();
     setError(null);
     const changes = changedFields(start, form);
+    // Notes only while their box is on the form (the title, as typed now,
+    // has its own page and the database has the column).
+    if (!notesShown) delete changes.pageNotes;
     const blank = REQUIRED_TEXT.find(([field]) => changes[field] === '');
     if (blank) {
       setError(`${blank[1]} can’t be blank.`);
@@ -283,6 +290,10 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <label>Description</label>
             <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} />
           </div>
+
+          {notesShown && (
+            <PageNotesField id="admin-page-notes" wrapClassName="admin-field" value={form.pageNotes} onChange={(v) => update('pageNotes', v)} />
+          )}
 
           <div className="admin-field">
             <label>Content type</label>

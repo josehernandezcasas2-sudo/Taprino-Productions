@@ -23,7 +23,7 @@ import { CONTACT_EMAIL } from '../../lib/suspensionRules';
 import PreviewBar, { PreviewFootnote, openSiteHref } from '../../components/PreviewBar';
 import { endCardFor } from '../../lib/endCardRules';
 import TopNav from '../../components/TopNav';
-import HeroSpotlight, { PlayIcon, heroButtonStyles } from '../../components/HeroSpotlight';
+import { PlayIcon } from '../../components/HeroSpotlight';
 import EpisodePlayer from '../../components/EpisodePlayer';
 import { CardRow, EpisodeStrip } from '../../components/LibraryRows';
 import SmartImage from '../../components/SmartImage';
@@ -49,15 +49,6 @@ const enc = (x) => encodeURIComponent(String(x));
 function tint(hex, a) {
   const n = parseInt(String(hex).slice(1), 16);
   return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
-}
-
-// A title that opens on the V2 landing when it has its own page (decision
-// 11, board V2): an episode of a show (or a podcast's), or an extra. Films
-// and shorts keep their hero landing (question 1 of slice 4). The same
-// test as the website's ownPageLayout.
-function opensOnOwnPage(ep) {
-  if (!ep) return false;
-  return ep.contentType === 'bonus' || ((ep.contentType === 'series' || ep.contentType === 'podcast') && Boolean(ep.seriesId));
 }
 
 // The notes' paragraphs: a blank line starts a new one.
@@ -128,11 +119,10 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // full screen sideways), then one title block — the show kicker, the
 // title, the meta line, four round actions (Save, Tip, Own, Trailer) —
 // the Up next card, the description and credits, the season as a strip
-// of landscape cards, and Bonus content. Standalone titles open on the
-// landing view (trailer or artwork, title, Play / Save / Back this
-// project, the full Own-this-title card) unless reached with ?autoplay=1
-// (a Play button) or ?trailer=1; series episodes start playing straight
-// away, as on the site. When a title plays out the end card comes up over
+// of landscape cards, and Bonus content. A title with its own page opens
+// on it (below) unless reached with ?autoplay=1 (a Play button) or
+// ?trailer=1; series episodes start playing straight away, as on the
+// site. When a title plays out the end card comes up over
 // the last frame (components/EndCard.js): the next episode with a
 // ten-second timer, or one pick once the show is over.
 //
@@ -151,6 +141,10 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // creator's notes, the credit lines, the full Own card, the season strip
 // ("Now open") — and Play turns it into the player in place (?autoplay=1).
 // With the page off (the default for a show's episodes) it plays at once.
+// Since 2026-11-08 films and shorts open on the same landing (Jose,
+// question 1 of slice 4: the hero that repeated the title, meta and
+// description under it is gone), with Watch next in the season strip's
+// place.
 // ?preview=1 is the owner's private preview of an episode that isn't live:
 // the preview bar, a signed play with no views, progress, Tip, Own, Buy or
 // end card, and the "Pulled" panel while it's held (the team still plays
@@ -411,10 +405,10 @@ export default function Episode() {
   // The show's page at this episode's season (the kicker, See all).
   const seasonN = Number(episode.season) || 1;
   const seriesHref = episode.seriesId ? `/series/${enc(episode.seriesId)}?${pq}season=${seasonN}` : null;
-  // The V2 landing (decision 11): its own page, not opened to play, and an
-  // episode of a show or an extra (films keep their hero).
-  const landing = !showPlayer && opensOnOwnPage(episode);
-  const filmHero = !showPlayer && !landing;
+  // The V2 landing (decision 11): every title with its own page, not
+  // opened to play — a show's episode or an extra whose page is on, a film,
+  // a short (the website's ownPageLayout).
+  const landing = !showPlayer && episodeHasPage(episode);
   const still = episode.thumbnail || episode.poster || episode.heroImage || null;
   const notes = paragraphs(episode.pageNotes);
   const notesFrom = page.notesFrom || null;
@@ -448,35 +442,7 @@ export default function Episode() {
       <ScrollView contentContainerStyle={styles.scroll}>
         {previewing ? <PreviewBar preview={previewInfo} /> : null}
 
-        {filmHero ? (
-          <HeroSpotlight
-            pool={[episode]}
-            preferTrailer
-            eyebrow={{ movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', series: 'Series' }[episode.contentType] || 'Short'}
-            onPlay={() => {}}
-            onTrailer={() => {}}
-            renderActions={() => (
-              <View style={[heroButtonStyles.actions, { flexWrap: 'wrap' }]}>
-                <Pressable style={heroButtonStyles.playBtn} onPress={() => setShowPlayer(true)}>
-                  <PlayIcon /><Text style={heroButtonStyles.playText}>Play</Text>
-                </Pressable>
-                {!previewing ? (
-                  <Pressable style={heroButtonStyles.infoBtn} onPress={() => toggleWishlist(episode.id)}>
-                    <HeartIcon active={saved} size={16} color={saved ? colors.danger : colors.ink} />
-                    <Text style={heroButtonStyles.infoText}>{saved ? 'Saved' : 'Save for later'}</Text>
-                  </Pressable>
-                ) : null}
-                {/* Back it is a money link: never in a preview (the website's rule). */}
-                {episode.fundingUrl && !previewing ? (
-                  <Pressable style={heroButtonStyles.infoBtn} onPress={() => Linking.openURL(episode.fundingUrl)}>
-                    <DiamondIcon size={14} />
-                    <Text style={heroButtonStyles.infoText}>Back this project</Text>
-                  </Pressable>
-                ) : null}
-              </View>
-            )}
-          />
-        ) : landing ? (
+        {landing ? (
           // The strip (board V2): the still at the player's size, with the
           // trailer behind a round button when there is one.
           <View style={styles.strip}>
@@ -700,8 +666,6 @@ export default function Episode() {
               ) : null}
             </View>
           )}
-
-          {filmHero ? ownCard : null}
 
           {upNext ? (
             <Pressable style={styles.upNext} onPress={() => router.replace(playHref(upNext.id))} accessibilityRole="button" accessibilityLabel={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}>

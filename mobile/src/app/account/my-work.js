@@ -1,7 +1,7 @@
 import { useAuth } from '@clerk/expo';
 import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import {
@@ -10,7 +10,7 @@ import {
 } from '../../components/WorkIcons';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall } from '../../lib/showApi';
-import { needsYou } from '../../lib/showRules';
+import { episodeHasPage, needsYou } from '../../lib/showRules';
 import { episodeCode, sortEpisodes } from '../../lib/seriesResume';
 import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -56,6 +56,16 @@ function publicPathFor(s) {
 }
 function publicUrlFor(s) {
   return `${SITE_ORIGIN}${publicPathFor(s)}`;
+}
+
+// A film's or a short's notes for its own page (2026-11-08; the website's
+// components/PageNotesField.js): the box shows while the database has the
+// column (my-submissions' pageNotesReady, migration 118) and the title has
+// its own page. The show editor's limits and words.
+const PAGE_NOTES_MAX = 4000;
+function notesBoxShows(s) {
+  if (!s || s.pageNotesReady !== true) return false;
+  return episodeHasPage({ contentType: s.contentType ?? null, seriesId: s.seriesId ?? null, hasPage: typeof s.hasPageChoice === 'boolean' ? s.hasPageChoice : null });
 }
 
 function displayTitle(s) {
@@ -231,12 +241,32 @@ export default function MyWork() {
     }
   }
 
-  async function submitEdit(nameValue, description) {
+  // The title and description go to review (request-episode-edit); a
+  // film's notes for its page go up at once through the show editor's own
+  // save (PATCH /api/show/episode/<id>, which decides who may change them;
+  // there is no column for notes waiting on approval), as on the website's
+  // components/RequestEditModal.js.
+  async function submitEdit(nameValue, description, notes) {
+    const cv = editModal.currentValues;
     setEditSaving(true);
     setEditError(null);
     try {
-      await apiPost('/api/creator/request-episode-edit', { episodeId: editModal.currentValues.id, title: nameValue, description }, await freshToken(getToken));
+      const textChanged = String(nameValue || '').trim() !== String(cv.title || '').trim()
+        || String(description || '').trim() !== String(cv.description || '').trim();
+      const notesChanged = cv.notesShown === true && typeof notes === 'string' && notes.trim() !== String(cv.pageNotes || '').trim();
+      // Only the notes changed: nothing goes to review (the request route
+      // would answer "Nothing actually changed").
+      if (textChanged || !notesChanged) {
+        await apiPost('/api/creator/request-episode-edit', { episodeId: cv.id, title: nameValue, description }, await freshToken(getToken));
+      }
+      if (notesChanged) {
+        const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, { pageNotes: notes.trim() }, getToken);
+        const notSaved = r.ok && Array.isArray(r.data.notSaved) ? r.data.notSaved.find((n) => n && n.field === 'pageNotes') : null;
+        const why = !r.ok ? r.error : notSaved ? notSaved.reason || 'Needs a database update (migration 118).' : null;
+        if (why) throw new Error(textChanged ? `The title and description went to us for review, but the notes didn’t save: ${why}` : why);
+      }
       setEditModal(null);
+      if (notesChanged) loadSubmissions();
     } catch (err) {
       setEditError(err.message);
     } finally {
@@ -697,17 +727,22 @@ export default function MyWork() {
 
       {/* Edit a film's title/description (sent for approval) */}
       <Modal visible={!!editModal} transparent animationType="fade" onRequestClose={() => setEditModal(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditModal(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            {editModal ? <EditModalContent
-              editModal={editModal}
-              saving={editSaving}
-              error={editError}
-              onCancel={() => setEditModal(null)}
-              onSubmit={submitEdit}
-            /> : null}
+        {/* The notes box makes the card tall: it scrolls, and on iOS it
+            rides up with the keyboard so the field being typed in stays in
+            view. */}
+        <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <Pressable style={styles.modalBackdrop} onPress={() => setEditModal(null)}>
+            <Pressable style={[styles.modalCard, styles.modalCardTall]} onPress={(e) => e.stopPropagation()}>
+              {editModal ? <EditModalContent
+                editModal={editModal}
+                saving={editSaving}
+                error={editError}
+                onCancel={() => setEditModal(null)}
+                onSubmit={submitEdit}
+              /> : null}
+            </Pressable>
           </Pressable>
-        </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Request deletion */}
@@ -807,8 +842,8 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
         </>
       ) : null}
       {!s.deletionRequested ? (
-        <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '' } })}>
-          <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Edit title &amp; description</Text>
+        <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '', pageNotes: s.pageNotes || '', notesShown: notesBoxShows(s) } })}>
+          <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{notesBoxShows(s) ? 'Edit title, description & notes' : 'Edit title & description'}</Text>
         </Pressable>
       ) : null}
       <Pressable style={styles.sheetRow} onPress={() => onPayee(s)}>
@@ -835,30 +870,51 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit }) {
   const isEpisode = editModal.type === 'episode';
   const [nameValue, setNameValue] = useState(isEpisode ? editModal.currentValues.title : editModal.currentValues.name);
   const [description, setDescription] = useState(editModal.currentValues.description || '');
+  const notesShown = isEpisode && editModal.currentValues.notesShown === true;
+  const [notes, setNotes] = useState(editModal.currentValues.pageNotes || '');
 
   return (
-    <>
+    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.modalHeader}>
         <Text style={styles.modalHeaderText}>Request an edit — {isEpisode ? 'episode' : 'show'}</Text>
         <Pressable onPress={onCancel}><CloseIcon size={16} /></Pressable>
       </View>
       <Text style={styles.modalNote}>
-        This goes to Studio Tapa for approval before it changes anything visitors see — the current {isEpisode ? 'title/description' : 'name/description'} stay live until then.
+        This goes to Studio Tapa for approval before it changes anything visitors see — the current {isEpisode ? 'title/description' : 'name/description'} stay live until then.{notesShown ? ' The notes for its page are the exception: they go up as soon as you send this.' : ''}
       </Text>
       <Text style={styles.label}>{isEpisode ? 'Title' : 'Show name'}</Text>
       <TextInput style={styles.input} value={nameValue} onChangeText={setNameValue} />
       <Text style={styles.label}>Description</Text>
       <TextInput style={styles.textarea} value={description} onChangeText={setDescription} multiline numberOfLines={4} />
+      {notesShown ? (
+        <>
+          <View style={styles.notesLabelRow}>
+            <Text style={[styles.label, styles.notesLabel]}>Notes for the title’s page <Text style={styles.notesHint}>optional · blank lines make paragraphs</Text></Text>
+            <Text style={[styles.notesCount, notes.length > PAGE_NOTES_MAX && styles.notesCountOver]}>{notes.length.toLocaleString('en-US')} / {PAGE_NOTES_MAX.toLocaleString('en-US')}</Text>
+          </View>
+          <TextInput
+            style={[styles.textarea, styles.notesInput]}
+            value={notes}
+            onChangeText={setNotes}
+            multiline
+            maxLength={PAGE_NOTES_MAX}
+            placeholder="How it was made, who’s in it, the story behind a scene."
+            placeholderTextColor={colors.inkFaint}
+            accessibilityLabel="Notes for the title’s page"
+          />
+          <Text style={styles.notesHelp}>Shown on the title’s page in place of the description. Saved at once, no review.</Text>
+        </>
+      ) : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <View style={styles.modalActions}>
-        <Pressable style={[styles.primaryBtn, saving && styles.btnDisabled]} disabled={saving} onPress={() => onSubmit(nameValue, description)}>
-          <Text style={styles.primaryBtnText}>{saving ? 'Sending…' : 'Send for approval'}</Text>
+        <Pressable style={[styles.primaryBtn, saving && styles.btnDisabled]} disabled={saving} onPress={() => onSubmit(nameValue, description, notesShown ? notes : undefined)}>
+          <Text style={styles.primaryBtnText}>{saving ? 'Sending…' : notesShown ? 'Send' : 'Send for approval'}</Text>
         </Pressable>
         <Pressable style={styles.secondaryBtn} onPress={onCancel} disabled={saving}>
           <Text style={styles.secondaryBtnText}>Cancel</Text>
         </Pressable>
       </View>
-    </>
+    </ScrollView>
   );
 }
 
@@ -953,6 +1009,17 @@ const styles = StyleSheet.create({
 
   modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
   modalCard: { backgroundColor: colors.surface1, borderRadius: 14, padding: 18, width: '100%', maxWidth: 420 },
+  // The edit card with a notes box can be taller than the screen: it
+  // scrolls (EditModalContent's ScrollView) inside this height.
+  modalCardTall: { maxHeight: '88%' },
+  keyboardWrap: { flex: 1 },
+  notesLabelRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },
+  notesLabel: { flexShrink: 1 },
+  notesHint: { fontWeight: '400', color: colors.inkFaint },
+  notesCount: { color: colors.inkFaint, fontSize: 11, fontFamily: fonts.mono, marginBottom: 5 },
+  notesCountOver: { color: colors.danger },
+  notesInput: { minHeight: 120 },
+  notesHelp: { color: colors.inkDim, fontSize: 11.5, lineHeight: 16, marginTop: 5 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   modalHeaderText: { color: colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   modalNote: { color: colors.inkDim, fontSize: 12, lineHeight: 17, marginBottom: 12 },

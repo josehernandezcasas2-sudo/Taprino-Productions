@@ -17,7 +17,7 @@ import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadat
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
-import { attachHeroTrailer, fetchTrailerSrc, trailerKeyOf, useHeroTrailer } from '../../components/HeroSpotlight';
+import { fetchTrailerSrc, trailerKeyOf } from '../../components/HeroSpotlight';
 import HeaderNav from '../../components/HeaderNav';
 import WishlistButton from '../../components/WishlistButton';
 import MobileTabBar from '../../components/MobileTabBar';
@@ -299,20 +299,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // return statement further down, which is the safe place for it.
   const episode = episodeProp || {};
   const [showingTrailer, setShowingTrailer] = useState(startOnTrailer);
-  // Series episodes are reached by explicitly picking one from the show's
-  // own page (/series/[id]) — that's already the "choose what to watch"
-  // step, so they play immediately, same as always. Standalone movies/
-  // shorts default to the landing view (trailer/poster, title,
-  // description) UNLESS the hero's own "Play" button sent them here with
-  // ?autoplay=1, which means the choice to watch was already made —
-  // landing on an info page after clicking Play would defeat the point of
-  // having a separate Play button at all.
+  // A title with its own page opens on it (the landing below) UNLESS a
+  // Play button sent it here with ?autoplay=1 (the choice to watch was
+  // already made) or ?trailer=1; anything else plays at once.
   //
-  // Decision 11 (slice 4): what decides it now is whether the title has
-  // its own page (episode.hasPage; a film or a short by type, a show's
+  // Decision 11 (slice 4): what decides it is whether the title has its
+  // own page (episode.hasPage; a film or a short by type, a show's
   // episode only when its owner switched it on). Without one it plays at
   // once, as a series episode always did; an extra, a podcast or a
-  // vertical title opened bare now plays too.
+  // vertical title opened bare plays too.
   const [showPlayer, setShowPlayer] = useState(!episode.hasPage || Boolean(startOnTrailer) || Boolean(startPlaying));
   // A link from this page to another title (the strip, Up next, Extras)
   // keeps the component mounted with the new props: start that title the
@@ -326,9 +321,17 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     setShowingTrailer(Boolean(startOnTrailer));
   }
   const previewing = Boolean(preview);
-  // An episode's own page (board V2) for a show's episode or an extra;
-  // films and shorts keep their hero landing (question 1 for Jose).
-  const ownPageLayout = Boolean(episode.hasPage) && (episode.contentType === 'bonus' || ((episode.contentType === 'series' || episode.contentType === 'podcast') && Boolean(episode.seriesId)));
+  // A title's own page (board V2 of slice 4): a show's episode or an extra
+  // whose page is on, and since 2026-11-08 films and shorts too (Jose,
+  // question 1 of slice 4: the big hero that repeated the title, meta and
+  // description under it is gone; mockup "Film page · RECOMMENDED",
+  // https://claude.ai/artifact/LP2v3RgVUChREGCbiay22H). Every title that
+  // has its own page opens on the same landing.
+  const ownPageLayout = Boolean(episode.hasPage);
+  // A standalone title's landing keeps the Accessibility panel it always
+  // had before Play (captions, a described version, a flashing-lights
+  // warning); a show's episode's landing has none (slice 4's §6.4).
+  const standaloneTitle = !episode.seriesId && episode.contentType !== 'bonus';
   // The player in a preview fetches its fresh link with preview: true.
   const refreshPreviewSrc = useCallback(async () => {
     try {
@@ -376,38 +379,14 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
 
   // The trailer plays through a signed link like the film (decision 12 of
   // the series revamp; lib/episodePage.js signs it for 60 minutes), so a
-  // page left open past the hour holds a link that no longer plays.
+  // page left open past the hour holds a link that no longer plays. The
+  // landing shows a still with a round "Play the trailer" button (the
+  // muted trailer that looped behind a film's old hero is gone with it).
   //
-  // The landing view's hero (no ?autoplay) swaps a link that has run out
-  // for a fresh one from /api/stream-token before playing it, asks once
-  // more when the stream fails, and shows the artwork when the trailer
-  // can't play — the rule the browse heroes follow (useHeroTrailer). It
-  // plays through hls.js where the browser can't play HLS from a plain
-  // src (every browser but Safari, so Chrome used to show a black hero).
-  const landingVideoRef = useRef(null);
-  const landingTrailer = useHeroTrailer({
-    trailerKey: trailerKeyOf(episode.trailerRef) || (episode.trailerSrc ? `e:${episode.id}` : null),
-    src: episode.trailerSrc || null,
-    expiresAt: episode.trailerExpiresAt || null,
-    ref: episode.trailerRef || null,
-    // The own page (V2) shows a still with a Trailer button instead.
-    active: !showPlayer && !ownPageLayout
-  });
-  const landingTrailerSrc = !showPlayer && landingTrailer.hasTrailer ? landingTrailer.src : null;
-  // episode.id too: the <video> is keyed by it, so moving to another title
-  // whose trailer signs to the same link (two podcast episodes sharing the
-  // show's trailer) is a new element that needs the stream attached again.
-  useEffect(() => {
-    if (!landingTrailerSrc) return undefined; // the player is showing, or a fresh link is on its way
-    const v = landingVideoRef.current;
-    if (!v) return undefined;
-    return attachHeroTrailer(v, landingTrailerSrc, { muted: true, paused: false, onFatal: landingTrailer.onFatal });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [landingTrailerSrc, landingTrailer.gen, episode.id]);
-
-  // In the player ("Watch the trailer", ?trailer=1, the early screening's
-  // trailer) the expired token fails the way the film's does, and the
-  // player asks for a fresh link through refreshSrc. One per half minute:
+  // In the player (the landing's trailer button, "Watch the trailer",
+  // ?trailer=1, the early screening's trailer) the expired token fails
+  // the way the film's does, and the player asks for a fresh link through
+  // refreshSrc. One per half minute:
   // a link fetched moments ago that fails again isn't an expired one, and
   // asking again would only spend the visitor's trailer budget at
   // /api/stream-token, which the browse heroes share. Keyed by the trailer
@@ -616,7 +595,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       <PreviewBar preview={preview} />
 
       {landingV2 ? (
-        // An episode's own page (board V2): the still (or the trailer's
+        // A title's own page (board V2): the still (or the trailer's
         // button) in the player's place, the player's box exactly.
         <div className="epl-strip">
           {(episode.thumbnail || episode.poster || episode.heroImage) && (
@@ -634,98 +613,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               <PlayIcon size={20} src={iconOverrides.play} />
             </button>
           )}
-        </div>
-      ) : !showPlayer ? (
-        <div className="hero-carousel full-bleed">
-          {landingTrailer.hasTrailer ? (
-            // The link is attached by the effect above (hls.js where needed);
-            // the artwork shows while it loads.
-            <video
-              key={episode.id}
-              ref={landingVideoRef}
-              className="hero-video"
-              poster={episode.heroImage || episode.poster || episode.thumbnail || undefined}
-              autoPlay
-              muted
-              loop
-              playsInline
-              onContextMenu={(e) => e.preventDefault()}
-            />
-          ) : (
-            (episode.heroImage || episode.poster || episode.thumbnail) && <Image
-              src={episode.heroImage || episode.poster || episode.thumbnail}
-              alt=""
-              fill
-              priority
-              sizes="100vw"
-              className="hero-video hero-image"
-            />
-          )}
-          <div className="hero-scrim" />
-          <div className="hero-inner">
-            <div className="hero-content">
-              <div className="hero-eyebrow">{{ movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', series: 'Series' }[episode.contentType] || 'Short'}</div>
-              <h2>
-                {episode.titleImageUrl ? (
-                  <Image
-                    src={episode.titleImageUrl}
-                    alt={episode.title}
-                    width={400}
-                    height={110}
-                    style={{ width: 'auto', height: 'auto', maxWidth: '100%', maxHeight: '110px' }}
-                    className="hero-title-image"
-                  />
-                ) : episode.title}
-              </h2>
-              <div className="hero-meta">
-                <span className={`hero-badge-tier ${tierBadge(episode.tier, episode.adsEnabled).key}`}>{tierBadge(episode.tier, episode.adsEnabled).label}</span>
-                {(episode.mainGenre || episode.releaseYear || episode.runtime) && (
-                  <>
-                    <span className="hero-meta-dot">&bull;</span>
-                    <span>{[episode.mainGenre, episode.releaseYear, formatRuntimeLong(episode.runtime) || episode.runtime].filter(Boolean).join(' \u00b7 ')}</span>
-                  </>
-                )}
-                {episode.genre && (
-                  <>
-                    <span className="hero-meta-dot hero-sub-genre">&bull;</span>
-                    <span className="hero-sub-genre">{episode.genre}</span>
-                  </>
-                )}
-                {episode.rating && (
-                  <>
-                    <span className="hero-meta-dot">&bull;</span>
-                    <span className="hero-rating-tag">{episode.rating}</span>
-                  </>
-                )}
-                {episode.isOriginal && (
-                  <>
-                    <span className="hero-meta-dot">&bull;</span>
-                    <span className="original-tag">Tapa Original</span>
-                  </>
-                )}
-              </div>
-              <p>{episode.desc}</p>
-              <div className="hero-actions">
-                <button className="hero-play" onClick={() => setShowPlayer(true)}>
-                  <PlayIcon size={16} src={iconOverrides.play} /> Play
-                </button>
-                {!previewing && (
-                <button
-                  className="hero-trailer"
-                  onClick={() => toggleWishlist(episode.id)}
-                  aria-label={isWishlisted(episode.id) ? 'Remove from wishlist' : 'Add to wishlist'}
-                >
-                  <HeartIcon size={16} active={isWishlisted(episode.id)} src={isWishlisted(episode.id) ? iconOverrides.heart_active : iconOverrides.heart_inactive} /> {isWishlisted(episode.id) ? 'Saved' : 'Save for later'}
-                </button>
-                )}
-                {episode.fundingUrl && !previewing && (
-                  <a href={episode.fundingUrl} target="_blank" rel="noopener noreferrer" className="hero-trailer">
-                    &#9670; Back this project
-                  </a>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       ) : (
         <div className="player-full-bleed">
@@ -948,19 +835,6 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 )}
               </div>
             )}
-            {!showPlayer && !landingV2 && !previewing && (
-              <OwnTitleCard
-                offer={purchase}
-                bundle={bundle}
-                episode={episode}
-                creatorName={episode.artist}
-                isSignedIn={isSignedIn}
-                isSubscriber={isSubscriber}
-                refundDays={refundDays}
-                refundWatchPercent={refundWatchPercent}
-                onSeePlans={startCheckout}
-              />
-            )}
           </section>
 
           {upNext && (
@@ -1016,13 +890,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               {!previewing && <ReportButton targetType="episode" targetId={episode.id} title={episode.title} className="ep-report" />}
             </div>
             {previewing && <PreviewFootnote />}
-            {!locked && !landingV2 && (
-              <AccessibilityPanel
-                episode={episode}
-                describedActive={describedActive}
-                onPlayDescribed={() => setDescribedActive((d) => !d)}
-              />
-            )}
+            {/* The full Own card on the landing, after the credits (board
+                V2's order); while playing it is the round Own action. */}
             {landingV2 && !previewing && (
               <OwnTitleCard
                 offer={purchase}
@@ -1034,6 +903,13 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 refundDays={refundDays}
                 refundWatchPercent={refundWatchPercent}
                 onSeePlans={startCheckout}
+              />
+            )}
+            {!locked && (!landingV2 || standaloneTitle) && (
+              <AccessibilityPanel
+                episode={episode}
+                describedActive={describedActive}
+                onPlayDescribed={() => setDescribedActive((d) => !d)}
               />
             )}
           </section>

@@ -65,6 +65,8 @@ const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_fro
 const BOOLEAN_FIELDS = ['featured', 'discoverCurated', 'isOriginal', 'adsEnabled'];
 // What makes the slot check worth asking.
 const PLACE_COLUMNS = ['series_id', 'season', 'series_order', 'status', 'content_type'];
+// lib/showPage.js updateEpisode's limit for an episode's page notes.
+const PAGE_NOTES_MAX = 4000;
 
 function refuse(message, status = 400, extra = null) {
   return Object.assign(new Error(message), { status, ...(extra ? { extra } : {}) });
@@ -244,6 +246,19 @@ async function editEpisode(req, res, roleContext) {
   for (const f of EDITABLE_FIELDS) {
     if (fields[f] === undefined) continue;
     updates[FIELD_TO_COLUMN[f] || f] = columnValue(f, fields[f]);
+  }
+  // The notes for the title's own page (migration 118's page_notes; the
+  // show editor's limits: 4,000 characters, blank lines make paragraphs).
+  // The row is read whole above, so a database before 118 has no such key:
+  // the modal hides the box then, and a save that sends notes anyway is
+  // told why rather than failing on the column.
+  if (fields.pageNotes !== undefined) {
+    if (!Object.prototype.hasOwnProperty.call(existing, 'page_notes')) {
+      return res.status(503).json({ error: 'Notes need a database update (migration 118).', code: 'migration-118' });
+    }
+    const notes = typeof fields.pageNotes === 'string' ? fields.pageNotes.trim() : '';
+    if (notes.length > PAGE_NOTES_MAX) return res.status(400).json({ error: 'The notes are limited to 4,000 characters.' });
+    updates.page_notes = notes || null;
   }
 
   // The row as it would be, and what its type means for its place.
