@@ -2,6 +2,7 @@ import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { listPlanStates } from '../../../lib/adPlans';
 import { isTitleId } from '../../../lib/titleIds';
+import { episodeHasPage } from '../../../lib/showRules';
 
 export default async function handler(req, res) {
   if (req.method !== 'GET') {
@@ -57,9 +58,10 @@ export default async function handler(req, res) {
 
   // Episode Ad Curator state per row (lib/adPlans.js): default / draft / ready,
   // and the names of what the bonus rows hang under (below).
-  const [plans, parentNames] = await Promise.all([
+  const [plans, parentNames, pageNotes] = await Promise.all([
     listPlanStates((data || []).map((e) => e.id)),
-    bonusParentNames(supabase, data || [])
+    bonusParentNames(supabase, data || []),
+    pageNotesFor(supabase, data || [])
   ]);
 
   // `?? null` throughout: a row from a database without a column, or a
@@ -107,9 +109,37 @@ export default async function handler(req, res) {
       adsEnabled: e.ads_enabled !== false,
       adBreakSeconds: Array.isArray(e.ad_break_seconds) && e.ad_break_seconds.length > 0 ? e.ad_break_seconds : [0],
       deletionRequested: Boolean(e.deletion_requested),
-      createdAt: e.created_at ?? null
+      createdAt: e.created_at ?? null,
+      // The notes for the title's own page and its page switch (migration
+      // 118; pageNotesFor below): the modal's Notes box shows while the
+      // title has its own page, and not at all before 118 (pageNotesReady).
+      pageNotes: pageNotes.ready && pageNotes.rows[e.id] ? pageNotes.rows[e.id].page_notes ?? null : null,
+      pageNotesReady: pageNotes.ready,
+      hasPageChoice: pageNotes.ready && pageNotes.rows[e.id] && typeof pageNotes.rows[e.id].has_page === 'boolean' ? pageNotes.rows[e.id].has_page : null,
+      hasPage: episodeHasPage({ ...e, has_page: pageNotes.ready && pageNotes.rows[e.id] ? pageNotes.rows[e.id].has_page : null })
     }))
   });
+}
+
+// The rows' page notes and page switches (migration 118's
+// episodes.page_notes / has_page), in a read of their own so the library
+// still loads on a database before 118: there the columns are missing,
+// `ready` is false and the edit modal hides its Notes box. Any other
+// failure is logged and also reads as not ready (the box hidden, so a save
+// can't send notes it never saw).
+function isMissingColumn(error) {
+  return Boolean(error) && (error.code === '42703' || error.code === 'PGRST204' || /column .* does not exist|could not find the .* column/i.test(error.message || ''));
+}
+
+async function pageNotesFor(supabase, rows) {
+  const ids = rows.map((e) => e.id).filter(Boolean);
+  if (ids.length === 0) return { ready: true, rows: {} };
+  const { data, error } = await supabase.from('episodes').select('id, page_notes, has_page').in('id', ids);
+  if (error) {
+    if (!isMissingColumn(error)) console.error('admin library page notes:', error.message);
+    return { ready: false, rows: {} };
+  }
+  return { ready: true, rows: Object.fromEntries((data || []).filter((r) => r && r.id).map((r) => [r.id, r])) };
 }
 
 // The names of the shows and titles this page's bonus rows hang under,
