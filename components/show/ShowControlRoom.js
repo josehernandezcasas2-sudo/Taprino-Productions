@@ -27,6 +27,7 @@ import StagedChangesCard from './admin/StagedChangesCard';
 import RemovalCard from './admin/RemovalCard';
 import HistoryCard from './admin/HistoryCard';
 import PayeeCard from './PayeeCard';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // The show page — one control room for a series or a podcast (the series
 // revamp, slice 2; spec Screens "Show page (the control room, creator
@@ -1286,7 +1287,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
         <RemoveEpisodeSheet row={sheet.row} live={sheet.row.status === 'approved' && show.isPublic} busy={sheetBusy} error={sheetError} onSubmit={submitRemoval} onClose={() => { setSheet(null); setSheetError(null); }} />
       )}
       {sheet && sheet.kind === 'place' && (
-        <RoomSheet title={`Place ${sheet.extra.displayTitle}`} eyebrow="Extra" onClose={() => { setSheet(null); setSheetError(null); }} foot={sheetError ? <p className="show-ed-error" role="alert">{sheetError}</p> : null}>
+        <RoomSheet title={`Place ${sheet.extra.displayTitle}`} eyebrow={extraKindLabel(sheet.extra.extraKind)} onClose={() => { setSheet(null); setSheetError(null); }} foot={sheetError ? <p className="show-ed-error" role="alert">{sheetError}</p> : null}>
           <div className="show-sheet-block">
             <div className="show-sheet-shows" role="radiogroup" aria-label="Where it sits">
               <button type="button" role="radio" aria-checked={!sheet.extra.anchor ? 'true' : 'false'} className={`show-sheet-show ${!sheet.extra.anchor ? 'on' : ''}`} disabled={sheetBusy} onClick={() => placeExtra('series', showId)}>

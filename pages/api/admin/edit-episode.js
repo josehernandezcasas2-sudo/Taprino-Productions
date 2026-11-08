@@ -15,6 +15,7 @@ import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
 import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
+import { normalizeExtraKind } from '../../../lib/extraKinds';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, payeeShowIds, withPayeeStamps } from '../../../lib/payees';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
@@ -259,6 +260,16 @@ async function editEpisode(req, res, roleContext) {
     const notes = typeof fields.pageNotes === 'string' ? fields.pageNotes.trim() : '';
     if (notes.length > PAGE_NOTES_MAX) return res.status(400).json({ error: 'The notes are limited to 4,000 characters.' });
     updates.page_notes = notes || null;
+  }
+
+  // What kind of extra (migration 121, lib/extraKinds.js), cleaned; only
+  // for a title that is (or becomes) bonus content, and only where the
+  // database has the column (select('*') above carries it), so a save
+  // before 121 simply leaves it out.
+  const typeAfter = fields.contentType !== undefined ? fields.contentType : existing.content_type;
+  if (fields.extraKind !== undefined && typeAfter === 'bonus' && Object.prototype.hasOwnProperty.call(existing, 'extra_kind')) {
+    if (fields.extraKind !== null && typeof fields.extraKind !== 'string') return res.status(400).json({ error: 'What kind of extra is it?' });
+    updates.extra_kind = normalizeExtraKind(fields.extraKind);
   }
 
   // The row as it would be, and what its type means for its place.

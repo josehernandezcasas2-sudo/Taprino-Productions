@@ -17,6 +17,7 @@ import { tierBadge } from '../../lib/tierBadge';
 import { parseRuntimeToSeconds } from '../../lib/videoMetadata';
 import { seriesPlayLabel, freePlayNote, episodeCode } from '../../lib/seriesResume';
 import { rowTierWord, episodeCodeOf } from '../../lib/showRules';
+import { extraMetaLine } from '../../lib/extraKinds';
 import { BundleCard, BuyChip, OwnedChip, BoughtBanner, useBuyTitle } from '../../components/BuyBits';
 
 import Footer from '../../components/Footer';
@@ -358,7 +359,8 @@ export default function SeriesHub({ seriesInfo, isSubscriber, isSignedIn, wishli
                           {x.thumbnail && <Image src={x.thumbnail} alt="" fill sizes="(max-width: 639px) 46vw, (max-width: 899px) 30vw, 220px" className="spg-thumb-img" />}
                         </span>
                         <span className="spg-extra-title">{x.title}</span>
-                        <span className="spg-extra-meta">{x.runtime ? `Extra · ${minutesLabel(x.runtime)}` : 'Extra'}</span>
+                        {/* "Making-of · 6 min" (migration 121), "Extra · 6 min" without a kind. */}
+                        <span className="spg-extra-meta">{extraMetaLine(x.extraKind, x.runtime ? minutesLabel(x.runtime) : null)}</span>
                       </>
                     );
                     // In a preview, someone else's extra isn't a link (as the rows).

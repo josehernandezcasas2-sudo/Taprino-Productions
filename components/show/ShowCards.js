@@ -5,6 +5,7 @@ import { CheckIcon, ClockIcon, ExternalLinkIcon, EyeIcon, LockIcon, PencilIcon, 
 import { BanIcon, ChevronIcon, KebabIcon, NoEyeIcon, bg, minutesOf } from './roomBits';
 import { shortDate } from './EditorBits';
 import { PayeeLine } from './PayeeCard';
+import { extraKindLabel } from '../../lib/extraKinds';
 
 // The show page's cards (series revamp slice 2; spec Screens, "Show page",
 // boards Main, ShowStates, ShowLaptop): the show card, the status card, the
@@ -312,6 +313,8 @@ export function ExtrasShelf({ view, ctx, actions }) {
                 </div>
                 <button type="button" className="show-extra-title" disabled={!mine} onClick={() => actions.open(x)}>{x.displayTitle}</button>
                 <div className="show-extra-meta">
+                  {/* What kind of extra (migration 121), when it has one. */}
+                  {x.extraKind ? <span className="show-extra-kind">{extraKindLabel(x.extraKind)}</span> : null}
                   <span className="show-extra-tag">{tag}</span>
                   {minutesOf(x.runtime) ? <span>{minutesOf(x.runtime)}</span> : null}
                   {x.status === 'pending' ? <span className="tone-wait">in review</span> : x.status === 'rejected' ? <span className="tone-warn">not this time</span> : null}

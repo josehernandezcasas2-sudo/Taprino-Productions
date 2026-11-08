@@ -1875,6 +1875,8 @@ export const FIELD_POLICY = {
     channelOptIn: { live: 'direct', who: 'uploader' },
     captions: { live: 'direct', who: 'uploader' },
     pageNotes: { live: 'direct', who: 'uploader' },
+    // What kind of extra (migration 121): a label, like the other details.
+    extraKind: { live: 'direct', who: 'uploader' },
     hasPage: { live: 'direct', who: 'either' },
     season: { live: 'direct', who: 'runner' },
     seriesOrder: { live: 'direct', who: 'runner' },

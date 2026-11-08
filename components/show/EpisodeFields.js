@@ -18,7 +18,8 @@ export const NOT_SAVED_WORDS = {
   credits: 'the credits',
   defaults: 'the defaults',
   seasons: 'the season names',
-  kind: 'the kind'
+  kind: 'the kind',
+  extraKind: 'what kind of extra it is'
 };
 
 export function askHref(subject) {

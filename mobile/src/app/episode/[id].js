@@ -19,6 +19,7 @@ import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { withQueryFlag } from '../../lib/captions';
 import { episodeCode } from '../../lib/seriesResume';
 import { episodeHasPage } from '../../lib/showRules';
+import { extraKindLabel } from '../../lib/extraKinds';
 import { CONTACT_EMAIL } from '../../lib/suspensionRules';
 import PreviewBar, { PreviewFootnote, openSiteHref } from '../../components/PreviewBar';
 import { endCardFor } from '../../lib/endCardRules';
@@ -383,7 +384,8 @@ export default function Episode() {
   const saved = isWishlisted(episode.id);
   const { nextEpisode, watchNext = [], bonusContent = [], parentSeriesName, isSignedIn, seasonEpisodes = [] } = page;
   const isSeries = episode.contentType === 'series' && Boolean(episode.seriesId);
-  const typeLabel = CONTENT_TYPE_LABEL[episode.contentType] || 'Short';
+  // An extra with a kind says it ("Making-of", migration 121); without one, as before.
+  const typeLabel = episode.contentType === 'bonus' && episode.extraKind ? extraKindLabel(episode.extraKind) : CONTENT_TYPE_LABEL[episode.contentType] || 'Short';
   const code = episodeCode(episode);
   const seriesKicker = isSeries ? [parentSeriesName, code].filter(Boolean).join(' · ') : typeLabel;
   const tipFirstName = tipping && tipping.creatorName ? tipping.creatorName.trim().split(/\s+/)[0] : 'the maker';
@@ -794,7 +796,7 @@ const styles = StyleSheet.create({
   kickerRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 },
   kickerLink: { flexDirection: 'row', alignItems: 'center', gap: 6, flexShrink: 1 },
   kickerLinkText: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.brass, flexShrink: 1 },
-  kickerType: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6 },
+  kickerType: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, flexShrink: 1 },
   kickerNote: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.inkDim },
   title: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 29, letterSpacing: -0.3, color: colors.ink, marginBottom: 6 },
   titleLanding: { fontSize: 30, lineHeight: 33 },

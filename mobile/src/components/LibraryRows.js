@@ -4,6 +4,7 @@ import { colors, fonts, absoluteFill } from '../lib/theme';
 import { formatRuntimeLong, parseRuntimeToSeconds } from '../lib/runtime';
 import SmartImage from './SmartImage';
 import WishlistHeart from './WishlistHeart';
+import { extraKindLabel } from '../lib/extraKinds';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_LINE_COLOR = { series: colors.brass, movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -134,7 +135,8 @@ export function CardRow({ title, cards, onPressCard, onSeeAll, isWishlisted, onT
           const badge = cardBadge(card.tier, card.adsEnabled);
           const isSeries = card.type === 'series';
           const typeKey = isSeries ? 'series' : card.contentType;
-          const typeLabel = isSeries ? '▤ Series' : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
+          // An extra with a kind says it (migration 121): "6m 10s · Making-of".
+          const typeLabel = isSeries ? '▤ Series' : card.contentType === 'bonus' && card.extraKind ? extraKindLabel(card.extraKind) : (CONTENT_TYPE_LABEL[card.contentType] || 'Short');
           const first = isSeries ? `${card.episodeCount} episode${card.episodeCount === 1 ? '' : 's'}` : (formatRuntimeLong(card.runtime) || card.runtime || '');
           return (
             <Pressable key={card.id} style={{ width: m.posterW }} onPress={() => onPressCard(card)}>
