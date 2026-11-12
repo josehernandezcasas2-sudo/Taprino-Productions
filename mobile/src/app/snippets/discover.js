@@ -6,12 +6,15 @@ import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Share, StyleSheet
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import ReelPlayer from '../../components/ReelPlayer';
+import ReelAdCard from '../../components/ReelAdCard';
 import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 import { AiSealChip } from '../../components/AiSeal';
 import { buildVerticalUnits, expandUnitToSlides, pickNextUnit, unitKey } from '../../lib/verticalFeed';
+import { reelAdTick } from '../../lib/adBreakRules';
+import { loadSlot, reelSlot } from '../../lib/adSlots';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -58,8 +61,9 @@ function withTimeout(promise, ms) {
 // mixed in. Simpler than Vertical Discover in every way that feature
 // isn't: no entitlement filtering, no curated/personal lanes (plain
 // pickNextUnit, not the 3-random/1-curated/3-personal picker), no
-// end-cards (a post is always a standalone unit). No house-ad slides,
-// same reasoning as Vertical Discover (mobile ads are paused).
+// end-cards (a post is always a standalone unit). A house-ad card every
+// six snippets, as on the website (components/ReelAdCard.js; the feed's
+// `adsOn` leaves out an ad-free member and the team).
 //
 // Deliberately NOT built: the composer (website's CreatePostModal) —
 // that's explicitly an admin-only test tool on the website itself (see
@@ -88,6 +92,19 @@ export default function SnippetsDiscover() {
 
   const unitsRef = useRef([]);
   const seenKeys = useRef(new Set());
+  // The house-ad cards (lib/adBreakRules.js reelAdTick).
+  const adCountRef = useRef(0);
+  const adsOnRef = useRef(false);
+  function countForAd(slides) {
+    if (!adsOnRef.current) return;
+    const r = reelAdTick(adCountRef.current, slides.filter((x) => x.kind === 'episode').length);
+    adCountRef.current = r.count;
+    if (!r.adDue) return;
+    loadSlot(reelSlot()).then((items) => {
+      const ad = items[0];
+      if (ad) setDeck((d) => [...d, { kind: 'ad', key: `ad-${ad.id}-${Date.now()}`, ad }]);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -97,6 +114,7 @@ export default function SnippetsDiscover() {
         const feed = await apiGet(`/api/snippets-feed${requestedPostId ? `?post=${encodeURIComponent(requestedPostId)}` : ''}`, token);
         if (cancelled) return;
         setFeedState({ loading: false, error: null, feed });
+        adsOnRef.current = feed.adsOn === true;
 
         unitsRef.current = buildVerticalUnits(feed.snippetEpisodes);
         const requested = requestedPostId
@@ -105,7 +123,9 @@ export default function SnippetsDiscover() {
         const first = requested || pickNextUnit(unitsRef.current, seenKeys.current);
         if (!first) return;
         seenKeys.current.add(unitKey(first));
-        setDeck(expandUnitToSlides(first));
+        const firstSlides = expandUnitToSlides(first);
+        setDeck(firstSlides);
+        countForAd(firstSlides);
       } catch (err) {
         if (!cancelled) setFeedState({ loading: false, error: err.message, feed: null });
       }
@@ -119,7 +139,9 @@ export default function SnippetsDiscover() {
     const next = pickNextUnit(unitsRef.current, seenKeys.current);
     if (!next) return;
     seenKeys.current.add(unitKey(next));
-    setDeck((d) => [...d, ...expandUnitToSlides(next)]);
+    const nextSlides = expandUnitToSlides(next);
+    setDeck((d) => [...d, ...nextSlides]);
+    countForAd(nextSlides);
   }
 
   useEffect(() => {
@@ -254,21 +276,25 @@ export default function SnippetsDiscover() {
         keyExtractor={(slide) => slide.key}
         renderItem={({ item: slide, index: i }) => (
           <View style={{ height: windowHeight, width: '100%' }}>
-            <ReelSlide
-              slide={slide}
-              active={i === activeIndex}
-              muted={muted}
-              onToggleMute={() => setMuted((m) => !m)}
-              onEnded={() => {
-                if (i + 1 < deck.length) listRef.current?.scrollToIndex({ index: i + 1, animated: true });
-              }}
-              onClose={goBack}
-              onShare={() => share(slide)}
-              shareCopied={shareCopiedKey === slide.key}
-              onOpenMenu={isSignedIn ? () => openMenu(slide) : null}
-              onOpenAuthor={slide.episode.ownerId ? () => router.push(`/profile/${slide.episode.ownerId}`) : null}
-              insets={insets}
-            />
+            {slide.kind === 'ad' ? (
+              <ReelAdCard ad={slide.ad} active={i === activeIndex} muted={muted} onToggleMute={() => setMuted((m) => !m)} insets={insets} />
+            ) : (
+              <ReelSlide
+                slide={slide}
+                active={i === activeIndex}
+                muted={muted}
+                onToggleMute={() => setMuted((m) => !m)}
+                onEnded={() => {
+                  if (i + 1 < deck.length) listRef.current?.scrollToIndex({ index: i + 1, animated: true });
+                }}
+                onClose={goBack}
+                onShare={() => share(slide)}
+                shareCopied={shareCopiedKey === slide.key}
+                onOpenMenu={isSignedIn ? () => openMenu(slide) : null}
+                onOpenAuthor={slide.episode.ownerId ? () => router.push(`/profile/${slide.episode.ownerId}`) : null}
+                insets={insets}
+              />
+            )}
           </View>
         )}
         pagingEnabled

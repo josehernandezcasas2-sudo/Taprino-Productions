@@ -6,10 +6,13 @@ import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, Text, useWin
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import ReelPlayer from '../../components/ReelPlayer';
+import ReelAdCard from '../../components/ReelAdCard';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import { buildPersonalUnitKeys, buildVerticalUnits, createDiscoverPicker, expandUnitToSlides, unitKey } from '../../lib/verticalFeed';
 import { withTerms } from '../../lib/viewingTerms';
+import { reelAdTick } from '../../lib/adBreakRules';
+import { loadSlot, reelSlot } from '../../lib/adSlots';
 
 function HeartIcon({ active, size = 22 }) {
   return active ? (
@@ -56,9 +59,10 @@ const SITE_ORIGIN = 'https://studiotapatv.site';
 // Mirrors pages/vertical/discover.js: same catalog-entitlement filter,
 // same 3-random/1-curated/3-personal picker (mobile/src/lib/verticalFeed.js,
 // a byte-for-byte port — see its own header comment), same auto-extend-
-// near-the-end and per-series end-card behavior. Scope cuts from the web
-// version, both deliberate: no house-ad slides (mobile ad integration is
-// paused, see project_mobile_app_ads_paused memory) and no user-posted
+// near-the-end and per-series end-card behavior, and the same house-ad
+// card every six episode slides (components/ReelAdCard.js; the feed's
+// `adsOn` says whether this viewer gets them — not an ad-free member or
+// the team). Scope cut from the web version, deliberate: no user-posted
 // video slides (lib/posts.js is an admin test feature with no mobile
 // screen anywhere yet) — this feed is catalog-only.
 export default function VerticalDiscover() {
@@ -82,6 +86,23 @@ export default function VerticalDiscover() {
   const pickerRef = useRef(null);
   const listRef = useRef(null);
   const pendingScrollToEnd = useRef(false);
+  // The house-ad cards (lib/adBreakRules.js reelAdTick): episode slides
+  // since the last card, and whether this viewer gets them.
+  const adCountRef = useRef(0);
+  const adsOnRef = useRef(false);
+
+  // A card is due every six episode slides; it joins the end of the deck
+  // when the pick answers (nothing, if there's no ad to show).
+  function countForAd(slides) {
+    if (!adsOnRef.current) return;
+    const r = reelAdTick(adCountRef.current, slides.filter((x) => x.kind === 'episode').length);
+    adCountRef.current = r.count;
+    if (!r.adDue) return;
+    loadSlot(reelSlot()).then((items) => {
+      const ad = items[0];
+      if (ad) setDeck((d) => [...d, { kind: 'ad', key: `ad-${ad.id}-${Date.now()}`, ad }]);
+    });
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -93,6 +114,7 @@ export default function VerticalDiscover() {
         if (cancelled) return;
         setFeedState({ loading: false, error: null, feed: data });
         setWishlistSet(new Set(data.wishlist || []));
+        adsOnRef.current = data.adsOn === true;
 
         unitsRef.current = buildVerticalUnits(data.verticalEpisodes);
         pickerRef.current = createDiscoverPicker(unitsRef.current, new Set(data.personalUnitKeys));
@@ -102,7 +124,9 @@ export default function VerticalDiscover() {
         const first = requested || pickerRef.current.next(seenSeriesIds.current);
         if (!first) return;
         seenSeriesIds.current.add(unitKey(first));
-        setDeck(expandUnitToSlides(first));
+        const firstSlides = expandUnitToSlides(first);
+        setDeck(firstSlides);
+        countForAd(firstSlides);
       } catch (err) {
         if (!cancelled) setFeedState({ loading: false, error: err.message, feed: null });
       }
@@ -118,7 +142,9 @@ export default function VerticalDiscover() {
     const next = pickerRef.current && pickerRef.current.next(seenSeriesIds.current);
     if (!next) return;
     seenSeriesIds.current.add(unitKey(next));
-    setDeck((d) => [...d, ...expandUnitToSlides(next)]);
+    const nextSlides = expandUnitToSlides(next);
+    setDeck((d) => [...d, ...nextSlides]);
+    countForAd(nextSlides);
   }
 
   useEffect(() => {
@@ -276,6 +302,14 @@ export default function VerticalDiscover() {
                   ) : null}
                 </View>
               </>
+            ) : slide.kind === 'ad' ? (
+              <ReelAdCard
+                ad={slide.ad}
+                active={i === activeIndex}
+                muted={muted}
+                onToggleMute={() => setMuted((m) => !m)}
+                insets={insets}
+              />
             ) : (
               <View style={styles.endCard}>
                 <Pressable style={[styles.closeBtn, { top: insets.top + 10 }]} onPress={goBack}>
