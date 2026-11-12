@@ -11,6 +11,7 @@ import SmartImage from '../../../components/SmartImage';
 import { crew, Chip, Avatar } from '../../../components/CrewBits';
 import { StatusChip, MoneyLine, HostAnswer, ProducerActions, OutcomeForm, EndorseForm, HostedChip, KV, loc } from '../../../components/LocationBits';
 import { dollars, fmtRange, hoursLabel, disputeLine } from '../../../lib/locationRules';
+import { TAX_NOTE } from '../../../lib/salesTaxRules';
 
 // One booking request, both sides (pages/locations/requests/<id> on the
 // web). Once paid, the producer sees the street address here. Paying
@@ -83,7 +84,8 @@ export default function RequestScreen() {
               {r.cleaningCents > 0 ? <KV k="Cleaning" v={dollars(r.cleaningCents)} /> : null}
               {r.status === 'countered' ? <KV k="Host’s counter" v={`${dollars(r.counterCents)}${r.counterNote ? ` · “${r.counterNote}”` : ''}`} /> : null}
               <KV k="Card fee" v={`${dollars(r.feeCoverCents)} (producer)`} />
-              <KV k="Producer pays" v={dollars(r.totalChargedCents)} />
+              {r.taxCents > 0 ? <KV k="Sales tax" v={`${dollars(r.taxCents)} (producer)`} /> : null}
+              <KV k="Producer pays" v={r.taxCents > 0 ? dollars(r.chargedCents) : `${dollars(r.totalChargedCents)}${r.taxNote ? ` ${TAX_NOTE}` : ''}`} />
               <KV k="Host receives" v={`${dollars(r.hostPayoutCents)} after ${r.cutPercent}%`} />
               {r.refundCents != null ? <KV k="Refunded" v={`${dollars(r.refundCents)}${r.refundReason ? ` · ${r.refundReason}` : ''}`} /> : null}
               {r.dispute ? <KV k="Payment dispute" v={disputeLine(r.dispute)} /> : null}
