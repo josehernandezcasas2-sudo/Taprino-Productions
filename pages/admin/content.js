@@ -28,18 +28,22 @@ const CONNECT_WORDS = {
   production: { hidden: 'hidden from Productions', takeDown: 'Remove the production…', confirm: 'Remove it', why: 'Why it’s being removed (the owner sees this)' },
   profile: { hidden: 'the profile stays up', takeDown: 'Uphold the reports…', confirm: 'Uphold the reports', why: 'What they’re told (the profile stays up; nothing else changes)' }
 };
+// A reported account with no public profile yet (row.noProfile: named from
+// Clerk): there is nothing to hide, its reports are upheld or cleared.
+const ACCOUNT_WORDS = { hidden: 'no public profile yet', takeDown: 'Uphold the reports…', confirm: 'Uphold the reports', why: 'What they’re told (their account stays open; nothing else changes)' };
 // Already removed (or a place not approved): Restore wouldn't bring it
 // back, so the reports are upheld or ignored.
 const GONE_WORDS = { takeDown: 'Uphold the reports…', confirm: 'Uphold the reports', why: 'Why (the owner is told; it stays down)' };
 
 function decisionWords(row) {
   if (!row.connect) return { restore: row.held ? 'Restore' : 'Looks fine, clear', takeDown: 'Take down…', confirm: 'Take it down', why: 'Why it’s coming down (the owner sees this)' };
-  const words = row.gone ? GONE_WORDS : CONNECT_WORDS[row.type] || GONE_WORDS;
+  const words = row.gone ? GONE_WORDS : row.noProfile ? ACCOUNT_WORDS : CONNECT_WORDS[row.type] || GONE_WORDS;
   return { ...words, restore: row.gone ? null : row.type === 'profile' ? 'Looks fine, dismiss reports' : row.held ? 'Restore' : 'Looks fine, clear' };
 }
 
 function connectState(row) {
   if (row.gone) return `${row.statusLabel} · not public`;
+  if (row.noProfile) return ACCOUNT_WORDS.hidden;
   if (row.type === 'profile') return CONNECT_WORDS.profile.hidden;
   if (row.held) return CONNECT_WORDS[row.type].hidden;
   // Only a listed place is public: a paused one or one in review isn't up.
@@ -258,6 +262,7 @@ export default function AdminContent({ account, mainGenres }) {
                         {` · ${row.connect ? connectState(row) : row.held ? 'pulled everywhere' : 'still up'}`}
                       </div>
                       <h3>
+                        {row.connect && row.avatar && <img className="ac-qavatar" src={row.avatar} alt="" width={24} height={24} referrerPolicy="no-referrer" />}
                         {row.connect && <span className="sch-chip ac-type">{row.typeLabel}</span>}
                         {row.title} {level === 'flag' ? <span className="sch-chip bad">Admin flag</span> : <span className={`ac-rep ${level}`}>{TIER_LABEL[level]}</span>}
                         {row.connect && row.gone && <span className="sch-chip bad">{row.statusLabel}</span>}

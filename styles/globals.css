@@ -8647,6 +8647,8 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
 .ac-takedown .ac-acts { justify-content: flex-start; }
 /* Places, calls, productions and profiles in the review queue (2026-11-04) */
 .sch-chip.ac-type { background: transparent; border: 1px solid var(--ocean-ink); color: var(--ink); }
+/* A reported account without a public profile: its Clerk photo */
+.ac-qitem img.ac-qavatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; vertical-align: middle; margin-right: 0.4rem; }
 .ac-qitem p.ac-qsub { margin-top: 0.15rem; font-family: var(--font-mono); font-size: 0.66rem; color: var(--ink-faint); overflow-wrap: anywhere; }
 .ac-qitem p.ac-qreasons small { color: var(--ink-faint); }
 .ac-tipline { margin: 0 0 0.6rem; }

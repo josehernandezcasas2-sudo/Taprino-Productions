@@ -2,7 +2,7 @@
 // lists, as the nav's badge, the dashboard and the page count it
 // (lib/moderationRules.js).
 import assert from 'node:assert/strict';
-import { queueTileCounts, reviewQueueKeys, typeOfKey } from '../lib/moderationRules.js';
+import { accountDisplayName, queueTileCounts, reviewQueueKeys, typeOfKey } from '../lib/moderationRules.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -69,6 +69,16 @@ test('keys split at the first colon only', () => {
   assert.equal(typeOfKey('profile:user_mara'), 'profile');
   assert.equal(typeOfKey('channel_media:a:b'), 'channel_media');
   assert.equal(typeOfKey(''), '');
+});
+
+test('a reported account without a profile is named from its Clerk user', () => {
+  assert.equal(accountDisplayName({ firstName: 'Dee', lastName: 'Park', username: 'dee' }), 'Dee Park');
+  assert.equal(accountDisplayName({ firstName: ' Dee ', lastName: null }), 'Dee');
+  assert.equal(accountDisplayName({ firstName: '', lastName: '', username: 'deepark' }), 'deepark', 'the username when there is no name');
+  assert.equal(accountDisplayName({ firstName: null, lastName: null, username: null }), null, 'the caller says "A member"');
+  assert.equal(accountDisplayName(null), null);
+  assert.equal(accountDisplayName({ firstName: '<b>Dee</b>', lastName: 'P\u0000ark' }), 'bDee/b Park', 'angle brackets and control characters go');
+  assert.equal(accountDisplayName({ firstName: 'x'.repeat(200) }).length, 80);
 });
 
 console.log(`\n${passed} passed`);
