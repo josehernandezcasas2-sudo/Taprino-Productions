@@ -209,6 +209,8 @@ export default async function handler(req, res) {
       discoverCurated: !!ep.discover_curated,
       fundingUrl: ep.funding_url || '',
       isOriginal: !!ep.is_original,
+      // The flashing-lights warning (an admin's "Edit full details" shows it).
+      hasFlashingLights: !!ep.has_flashing_lights,
       channelOptIn: !!ep.channel_opt_in,
       // Pulled from everywhere while an admin reviews it (lib/moderation.js),
       // and why.
@@ -244,6 +246,17 @@ export default async function handler(req, res) {
       // box is hidden then.
       pageNotes: ep.page_notes ?? null,
       pageNotesReady: Object.prototype.hasOwnProperty.call(ep, 'page_notes'),
+      // New notes waiting for approval on a live title (migration 122; ''
+      // = clearing them waits), and whether the database can hold them:
+      // before 122 a live title's notes box is greyed (the save would
+      // answer 503 migration-122).
+      pendingPageNotes: typeof ep.pending_page_notes === 'string' ? ep.pending_page_notes : null,
+      pageNotesWaitReady: Object.prototype.hasOwnProperty.call(ep, 'pending_page_notes'),
+      // A new title image (or its removal) waiting on a live title
+      // (migration 120), for the artwork box.
+      pendingTitleImageUrl: ep.pending_title_image_url ?? null,
+      pendingTitleImageRemoval: ep.pending_title_image_removal === true,
+      titleImageWaitReady: Object.prototype.hasOwnProperty.call(ep, 'pending_title_image_url'),
       hasPage: episodeHasPage(ep),
       hasPageChoice: typeof ep.has_page === 'boolean' ? ep.has_page : null,
       pendingSrc: Boolean(ep.pending_src),
@@ -256,6 +269,7 @@ export default async function handler(req, res) {
       deletionRequested: Boolean(ep.deletion_requested),
       deletionReason: ep.deletion_reason ?? null,
       deletionRequestedAt: ep.deletion_requested_at ?? null,
+      withdrawnAt: ep.withdrawn_at ?? null,
       cloudflareState: cf ? cf.state || null : null,
       cloudflareError: cf && cf.state === 'error' ? (cf.errorReasonText || cf.errorReasonCode || null) : null
     };

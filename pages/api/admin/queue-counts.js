@@ -14,7 +14,8 @@ import { applyCors } from '../../../lib/cors';
 //   library   what Library & queues lists, each part for whoever can act
 //             on it: staged artwork (posters, stills, a show's hero image,
 //             title image or its removal, trailer) for manage_artwork,
-//             staged titles / names / descriptions for manage_episodes,
+//             staged titles / names / descriptions / page notes for
+//             manage_episodes,
 //             removal requests not already withdrawn (a title kept for its
 //             buyers is done) for manage_deletions
 //   shows     Admin → Shows (the series revamp, slice 3a): across shows,
@@ -31,9 +32,10 @@ import { applyCors } from '../../../lib/cors';
 // The staged and removal numbers come from two reads (one of episodes,
 // one of shows) that fetch only the rows that need someone and count them
 // here, rather than one count query per kind. `pending_src` (a staged
-// replacement video) is migration 118's and an episode's waiting title
-// image (or its removal) and trailer are 120's: the read tries with all
-// of them, then without 120's, then without either.
+// replacement video) is migration 118's, an episode's waiting title
+// image (or its removal) and trailer are 120's and its waiting page notes
+// 122's ('' = clearing them waits, so it counts): the read tries with all
+// of them, then without 122's, then without 120's, then without either.
 const EPISODE_FLAGS = 'id, series_id, status, pending_poster, pending_thumbnail, pending_title, pending_description, deletion_requested, withdrawn_at';
 const EPISODE_WANTED = [
   'pending_poster.not.is.null',
@@ -66,7 +68,8 @@ const EPISODE_120_FLAGS = 'pending_title_image_url, pending_title_image_removal,
 const EPISODE_120_WANTED = ['pending_title_image_url.not.is.null', 'pending_title_image_removal.eq.true', 'pending_trailer_src.not.is.null'];
 
 async function episodesNeedingSomeone(supabase) {
-  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED].join(','));
+  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}, pending_page_notes`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED, 'pending_page_notes.not.is.null'].join(','));
+  if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src`).or([...EPISODE_WANTED, 'pending_src.not.is.null'].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(EPISODE_FLAGS).or(EPISODE_WANTED.join(','));
   if (res.error) {
@@ -90,7 +93,7 @@ async function seriesNeedingSomeone(supabase) {
 function stagedCounts(episodes, series) {
   const removal = (r) => r.deletion_requested === true && !has(r.withdrawn_at);
   const epArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_title_image_url) || r.pending_title_image_removal === true || has(r.pending_trailer_src);
-  const epText = (r) => has(r.pending_title) || has(r.pending_description);
+  const epText = (r) => has(r.pending_title) || has(r.pending_description) || typeof r.pending_page_notes === 'string';
   const epVideo = (r) => has(r.pending_src);
   const seArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_trailer_src) || has(r.pending_hero_image) || has(r.pending_title_image_url) || r.pending_title_image_removal === true;
   const seText = (r) => has(r.pending_name) || has(r.pending_description);

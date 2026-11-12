@@ -646,6 +646,8 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const stagedFields = [
     ep.staged && ep.staged.title ? { field: 'title', words: `title “${ep.staged.title}”` } : null,
     ep.staged && ep.staged.description ? { field: 'description', words: 'an edited description' } : null,
+    // Migration 122: notes waiting ('' = clearing them).
+    ep.staged && typeof ep.staged.pageNotes === 'string' ? { field: 'pageNotes', words: ep.staged.pageNotes === '' ? 'clearing the notes' : 'new notes' } : null,
     ep.staged && ep.staged.poster ? { field: 'poster', words: 'the poster' } : null,
     ep.staged && ep.staged.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
     // Migration 120: a live episode's title image (or its removal) and
@@ -854,7 +856,17 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const moreInfo = (
     <>
       {live && <StagedLegend />}
-      <AboutField id="ep-about" value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={pol('description')} edited={edited('description')} />
+      <AboutField
+        id="ep-about"
+        value={form.about}
+        onChange={(v) => set('about', v)}
+        max={aboutMax}
+        policy={pol('description')}
+        edited={edited('description')}
+        stagedValue={ep.staged ? ep.staged.description : null}
+        onCancelStaged={canCancel ? () => cancelStaged('description') : null}
+        cancelBusy={busy === 'cancel-description'}
+      />
       <div className="show-ed-art">
         {artSlot('poster', 'poster', 'Poster 2:3')}
         {artSlot('thumbnail', 'still', 'Still 16:9')}
@@ -959,8 +971,15 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         </SwitchRow>
         {form.hasPage && (
           <div className="show-ed-field">
-            <FieldHead htmlFor="ep-notes" label="Notes" hint=" blank lines make paragraphs" count={form.pageNotes.length} max={notesMax} />
+            <FieldHead htmlFor="ep-notes" label="Notes" hint=" blank lines make paragraphs" staged={pol('pageNotes').mode === 'staged'} locked={pol('pageNotes').mode === 'locked'} count={form.pageNotes.length} max={notesMax} />
             <textarea id="ep-notes" className="show-ed-textarea" rows={6} value={form.pageNotes} maxLength={notesMax} disabled={!has118 || !isOpen(pol('pageNotes'))} placeholder="How it was made, who’s in it, the story behind a scene." onChange={(e) => set('pageNotes', e.target.value)} />
+            {/* On a live title the notes wait for approval like the
+                description (migration 122); what waits, with Cancel. */}
+            {ep.staged && typeof ep.staged.pageNotes === 'string' ? (
+              <StagedBox title={ep.staged.pageNotes === '' ? 'Clearing the notes waits for approval' : 'New notes wait for approval:'} onCancel={canCancel ? () => cancelStaged('pageNotes') : null} busy={busy === 'cancel-pageNotes'}>
+                {ep.staged.pageNotes ? <span className="show-ed-staged-live show-ed-staged-text-long">{ep.staged.pageNotes.length > 240 ? `${ep.staged.pageNotes.slice(0, 240)}…` : ep.staged.pageNotes}</span> : <span className="show-ed-staged-live">Visitors see the live notes until we approve it.</span>}
+              </StagedBox>
+            ) : null}
             <FieldNote policy={pol('pageNotes')} edited={edited('pageNotes')} />
             {/* "Open page" once it's live; before that its preview (slice 4) —
                 an episode in review, approved in a private show, or pulled;

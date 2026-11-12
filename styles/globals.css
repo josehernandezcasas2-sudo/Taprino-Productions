@@ -10377,6 +10377,36 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .tp-advisory-kicker { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--olive); margin-bottom: 0.5rem; }
 .tp-advisory-text { font-size: clamp(0.95rem, 2.2vw, 1.15rem); line-height: 1.4; }
 .tp-advisory-sub { margin-top: 0.5rem; font-size: 0.72rem; color: var(--ink-dim); }
+/* The flashing-lights warning on the same card (2026-11-12): a WARNING
+   kicker in the warn token, the photosensitivity line, and Watch now while
+   the video waits at its first frame underneath. */
+.tp-advisory.has-warning { background: color-mix(in srgb, var(--surface-0) 88%, transparent); }
+.tp-advisory-warning { margin-top: 0.9rem; padding-top: 0.85rem; border-top: 1px solid color-mix(in srgb, var(--warn) 45%, transparent); }
+.tp-advisory-box > .tp-advisory-warning:first-child { margin-top: 0; padding-top: 0; border-top: 0; }
+.tp-advisory-warning-kicker { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warn); margin-bottom: 0.5rem; }
+.tp-advisory-go { margin-top: 1rem; min-height: 44px; padding: 0 1.4rem; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink); color: var(--surface-0); font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; cursor: pointer; }
+.tp-advisory-go:hover, .tp-advisory-go:focus-visible { background: var(--olive-bright); border-color: var(--olive-bright); }
+/* The card with the warning is taller: centred while it fits, scrollable
+   (never clipped) when a phone's inline strip is shorter than it. */
+.tp-advisory.has-warning { align-items: flex-start; overflow-y: auto; }
+.tp-advisory.has-warning .tp-advisory-box { margin: auto; padding: 0.6rem 0; }
+@media (max-width: 600px) {
+  .tp-advisory.has-warning .tp-advisory-box { max-width: 92%; }
+  .tp-advisory.has-warning .tp-advisory-rating { font-size: 0.95rem; margin-bottom: 0.35rem; }
+  .tp-advisory.has-warning .tp-advisory-bug { height: 30px; margin-bottom: 0.35rem; }
+  .tp-advisory.has-warning .tp-advisory-kicker,
+  .tp-advisory.has-warning .tp-advisory-sub { display: none; }
+  .tp-advisory.has-warning .tp-advisory-text { font-size: 0.78rem; line-height: 1.35; }
+  .tp-advisory.has-warning .tp-advisory-warning { margin-top: 0.5rem; padding-top: 0.45rem; }
+  .tp-advisory.has-warning .tp-advisory-warning-kicker { font-size: 0.62rem; margin-bottom: 0.3rem; }
+  .tp-advisory.has-warning .tp-advisory-go { margin-top: 0.55rem; min-height: 36px; font-size: 0.85rem; }
+}
+/* In full screen on a phone the card has the whole screen again. */
+@media (max-width: 600px), (pointer: coarse) {
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-text { font-size: clamp(0.9rem, 3.6vmin, 1.15rem); }
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-sub { display: block; }
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-go { min-height: 44px; }
+}
 @media (max-width: 600px) { .tp-advisory-box { max-width: 86%; } }
 
 /* ---- Private beta door (pages/welcome.js) ---- */
@@ -11226,6 +11256,12 @@ a.prod-day:hover { background: var(--surface-3); }
 .tp-player:focus-within .tp-fs-center { opacity: 1; pointer-events: auto; }
 /* Never over the content advisory card (the first seconds of a title). */
 .tp-player.advisory-on .tp-fs-center { opacity: 0; pointer-events: none; }
+/* …nor the bar and the full-screen top row (the card's Watch now holds the
+   focus while the flashing-lights warning holds the video). */
+.tp-player.advisory-on .tp-controls,
+.tp-player.advisory-on:focus-within .tp-controls,
+.tp-player.advisory-on .tp-fs-top,
+.tp-player.advisory-on:focus-within .tp-fs-top { opacity: 0; pointer-events: none; }
 .tp-fs-skip {
   width: 48px;
   height: 48px;
@@ -12257,6 +12293,9 @@ body.show-dragging * { cursor: grabbing !important; }
 .sub-art-right { flex: 1; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
 .sub-art-slot.still { flex: 1; min-height: 90px; }
 .sub-art-right .apl-btn-ghost.on { border-color: var(--signal-amber); color: var(--signal-amber); }
+/* The optional title image (the title set as a picture, 2026-11-12). */
+.sub-title-slot { min-height: 64px; }
+.sub-title-slot img { display: block; max-height: 72px; max-width: 100%; width: auto; height: auto; object-fit: contain; }
 .sub-slot { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 0.5rem 0.75rem; border: 1.5px dashed rgba(251, 232, 211, 0.3); border-radius: 8px; font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-dim); text-align: center; cursor: pointer; }
 .sub-slot.off { opacity: 0.5; cursor: default; }
 .sub-opt { border: 1px solid rgba(251, 232, 211, 0.15); border-radius: 10px; padding: 0.75rem 0.85rem; font-size: 0.86rem; color: var(--ink-dim); }
@@ -12402,6 +12441,21 @@ body.show-dragging * { cursor: grabbing !important; }
 .show-ed-staged-text strong { font-family: var(--font-body); font-size: 1rem; overflow-wrap: anywhere; }
 .show-ed-staged-live { font-size: 0.82rem; color: var(--ink-dim); }
 .show-ed-staged-live strong { color: var(--ink); font-size: 0.86rem; }
+.show-ed-staged-text-long { white-space: pre-line; overflow-wrap: anywhere; }
+/* Your work's title / description / notes box (components/RequestEditModal.js):
+   what waits for approval, with Cancel, and the line under a closed field. */
+.req-edit-waiting { margin: 0 0 1rem; padding: 0.75rem 0.9rem; border-radius: 10px; border: 1px solid rgba(var(--olive-rgb), 0.5); background: rgba(var(--olive-rgb), 0.08); font-size: 0.85rem; }
+.req-edit-waiting strong { display: block; color: var(--olive); margin-bottom: 0.35rem; }
+.req-edit-waiting ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 0.4rem; }
+.req-edit-waiting li { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; }
+.req-edit-waiting p { margin: 0.5rem 0 0; font-size: 0.78rem; color: var(--ink-dim); }
+.req-edit-line { margin: 0.25rem 0 0.6rem; font-size: 0.78rem; line-height: 1.45; color: var(--ink-dim); }
+/* The title image in Your work's artwork box (components/ArtworkModal.js). */
+.art-title-slot { margin: 0.2rem 0 0.8rem; }
+.art-title-now { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.5rem; padding: 0.5rem 0.6rem; border-radius: 8px; background: var(--surface-2); }
+.art-title-now img { display: block; max-height: 44px; max-width: 70%; width: auto; height: auto; object-fit: contain; }
+.art-title-now span { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ok); }
+.art-title-remove { display: flex; align-items: center; gap: 0.45rem; font-size: 0.82rem; color: var(--ink-dim); }
 
 /* cards */
 .show-ed-card { display: flex; flex-direction: column; gap: 0.7rem; padding: 0.95rem; border-radius: 12px; border: 1px solid var(--ocean-ink); background: var(--surface-1); min-width: 0; }
@@ -13435,6 +13489,17 @@ a.spg-extra-card:hover .spg-extra-title { color: var(--brass); }
 .epl-notes p { margin: 0; font-size: 15.5px; line-height: 1.6; color: var(--ink); }
 .ep-landing .ep-title { font-size: 30px; }
 @media (min-width: 1024px) { .ep-landing .ep-title { font-size: clamp(1.9rem, 3.2vw, 2.4rem); } }
+/* A title's own title image (custom title art, a PNG with transparency)
+   drawn as the title on its own page (2026-11-12, back from the film hero
+   of before 2026-11-08): as tall as that hero drew it (110px) on a laptop,
+   never taller than a third of the 16:9 strip on a phone (18.75vw = a
+   third of a full-width strip's height). */
+.ep-title.ep-title-art { line-height: 0; }
+.ep-title-image { display: block; width: auto; height: auto; max-width: 100%; max-height: min(110px, 18.75vw); object-fit: contain; object-position: left center; }
+/* The flashing-lights warning before Play: a chip in the meta line that
+   points at the Accessibility panel's line. */
+.ep-flash-chip { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.2rem 0.55rem; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--warn) 60%, transparent); background: color-mix(in srgb, var(--warn) 12%, transparent); color: var(--warn); font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; text-decoration: none; white-space: nowrap; }
+a.ep-flash-chip:hover, a.ep-flash-chip:focus-visible { background: color-mix(in srgb, var(--warn) 22%, transparent); }
 .ep-credit-name { color: var(--ink); text-decoration: none; }
 a.ep-credit-name:hover { color: var(--brass); }
 .ep-body .own-wrap { margin-top: 0.6rem; }

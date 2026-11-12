@@ -157,6 +157,8 @@ function rowMeta(row, ctx, upload) {
   if (row.captionsStale) parts.push({ warn: 'Captions may be out of sync' });
   const st = row.staged || {};
   if (st.title) parts.push({ wait: 'Title change waiting' });
+  if (st.description) parts.push({ wait: 'Description change waiting' });
+  if (typeof st.pageNotes === 'string') parts.push({ wait: 'Notes change waiting' });
   if (st.poster || st.thumbnail || st.titleImage) parts.push({ wait: 'Art waiting for approval' });
   if (st.trailer) parts.push({ wait: 'New trailer waiting' });
   if (st.newVideo) parts.push({ wait: 'New file waiting' });

@@ -99,6 +99,10 @@ export default function SubmitTitle() {
   const [step, setStep] = useState(1);
   const [poster, setPoster] = useState(null);
   const [still, setStill] = useState(null);
+  // The title set as a picture (2026-11-12): optional, a PNG with a
+  // transparent background, drawn in place of the text title on its page
+  // (never cut from the film).
+  const [titleImage, setTitleImage] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
   const [link, setLink] = useState('');
   const [importing, setImporting] = useState(false);
@@ -471,6 +475,11 @@ export default function SubmitTitle() {
 
   async function pickArt(kind) {
     try {
+      if (kind === 'titleImage') {
+        const img = await pickImageAsDataUrl({ width: 1200, format: 'png' });
+        if (img) setTitleImage(img);
+        return;
+      }
       const img = await pickImageAsDataUrl({ width: kind === 'poster' ? 600 : 1280 });
       if (!img) return;
       if (kind === 'poster') setPoster(img); else setStill(img);
@@ -526,6 +535,7 @@ export default function SubmitTitle() {
     const body = toSubmitBody(form, media, {
       ...(!form.cutArtwork && poster ? { posterBase64: poster.base64, posterFileName: poster.fileName } : {}),
       ...(!form.cutArtwork && still ? { thumbnailBase64: still.base64, thumbnailFileName: still.fileName } : {}),
+      ...(titleImage && form.contentType !== 'podcast' && form.contentType !== 'vertical' ? { titleImageBase64: titleImage.base64, titleImageFileName: titleImage.fileName } : {}),
       ...(draftId ? { draftId } : {})
     });
     const r = await showCall('POST', '/api/creator/submit-episode', body, getToken);
@@ -805,6 +815,14 @@ export default function SubmitTitle() {
                 <GhostButton on={form.cutArtwork} label={form.cutArtwork ? '✓ Cutting both from the film' : 'Cut both from the film for me'} onPress={() => update('cutArtwork', !form.cutArtwork)} style={{ alignSelf: 'stretch' }} />
               </View>
             </View>
+            {form.contentType !== 'podcast' && form.contentType !== 'vertical' ? (
+              <Field label="Title image" note="optional · a PNG with a transparent background">
+                <Pressable style={s.slotTitle} onPress={() => pickArt('titleImage')} accessibilityRole="button" accessibilityLabel={titleImage ? 'Replace the title image' : 'Add a title image'}>
+                  {titleImage ? <Image source={{ uri: titleImage.uri }} style={s.slotTitleImg} resizeMode="contain" /> : <Text style={s.slotText}>THE TITLE SET AS A PICTURE{'\n'}SHOWN IN PLACE OF THE TEXT TITLE</Text>}
+                </Pressable>
+                {titleImage ? <GhostButton label="Remove the title image" onPress={() => setTitleImage(null)} style={{ alignSelf: 'flex-start' }} /> : null}
+              </Field>
+            ) : null}
             <Field label="Trailer" note="optional · 15–30 s">
               {trailer
                 ? <ProgressCard video={{ ...trailer, bytes: null }} upload={trailerUploading ? upload : null} facts={[]} onRemove={() => setTrailer(null)} />
@@ -937,6 +955,8 @@ const s = StyleSheet.create({
   slotPoster: { width: 110, height: 165, borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed', borderColor: inkTint(0.4), alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface0 },
   slotStill: { flex: 1, minHeight: 90, borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed', borderColor: inkTint(0.4), alignItems: 'center', justifyContent: 'center', overflow: 'hidden', backgroundColor: colors.surface0 },
   slotOff: { opacity: 0.45 },
+  slotTitle: { minHeight: 64, borderRadius: 8, borderWidth: 1.5, borderStyle: 'dashed', borderColor: inkTint(0.3), alignItems: 'center', justifyContent: 'center', padding: 8, backgroundColor: colors.surface0 },
+  slotTitleImg: { width: '100%', height: 64 },
   slotImg: { width: '100%', height: '100%' },
   slotText: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 1, color: colors.inkDim, textAlign: 'center', lineHeight: 14 },
   options: { padding: 12, borderRadius: 10, borderWidth: 1, borderColor: inkTint(0.15) },

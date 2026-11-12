@@ -70,6 +70,11 @@ t('adminShowFilterKeys: staged (120 included), pulled, removal, podcasts, proble
   assert.ok(has({ ...live, pending_season_art: '[{"number":2,"image":"https://x/a.jpg"}]' }, [ep('a', 1)], 'staged'), 'as text');
   assert.ok(!has({ ...live, pending_season_art: [] }, [ep('a', 1)], 'staged'));
   assert.ok(!has({ ...live, pending_season_art: null }, [ep('a', 1)], 'staged'));
+  // Page notes waiting (migration 122, 2026-11-12): '' = clearing them waits.
+  assert.ok(has(live, [ep('a', 1, { pending_page_notes: 'New notes.' })], 'staged'));
+  assert.ok(has(live, [ep('a', 1, { pending_page_notes: '' })], 'staged'), 'clearing the notes waits too');
+  assert.ok(!has(live, [ep('a', 1, { pending_page_notes: null })], 'staged'));
+  assert.ok(has(live, [ep('a', 1, { pending_description: 'New words.' })], 'staged'));
   assert.ok(has({ ...live, moderation_hold: true }, [], 'pulled'));
   assert.ok(!has({ ...live, moderation_hold: true }, [], 'live'));
   assert.ok(has({ ...live, deletion_requested: true }, [], 'removal'));

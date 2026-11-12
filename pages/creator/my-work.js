@@ -16,6 +16,27 @@ import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
 import { pageNotesBoxShows } from '../../components/PageNotesField';
+
+// What the edit box needs about a title of its own: its words now, what
+// waits for approval, and where it stands (components/RequestEditModal.js
+// works out what each change does from it).
+function editValuesFor(s) {
+  return {
+    id: s.id,
+    title: s.title,
+    description: s.description || '',
+    pageNotes: s.pageNotes || '',
+    notesShown: pageNotesBoxShows(s),
+    status: s.status,
+    held: Boolean(s.held),
+    deletionRequested: Boolean(s.deletionRequested),
+    withdrawnAt: s.withdrawnAt || null,
+    pendingTitle: s.pendingTitle || null,
+    pendingDescription: s.pendingDescription || null,
+    pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
+    pageNotesWaitReady: s.pageNotesWaitReady !== false
+  };
+}
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
 import { PayeeModal } from '../../components/show/PayeeCard';
 import Footer from '../../components/Footer';
@@ -442,7 +463,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
                 className="dropdown-item"
                 role="menuitem"
                 onClick={() => {
-                  setEditRequestTarget({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '', pageNotes: s.pageNotes || '', notesShown: pageNotesBoxShows(s) } });
+                  setEditRequestTarget({ type: 'episode', currentValues: editValuesFor(s) });
                   setOpenDropdown(null);
                 }}
               >
@@ -501,6 +522,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     if (s.deletionRequested) flags.push({ key: 'removal', tone: 'muted', Icon: TrashIcon, icon: 'trash', text: s.deletionReason ? `Removal requested: ${s.deletionReason}` : 'Removal requested' });
     if (s.pendingTitle) flags.push({ key: 'title', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Title change waiting' });
     if (s.pendingDescription) flags.push({ key: 'desc', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Description change waiting' });
+    if (typeof s.pendingPageNotes === 'string') flags.push({ key: 'notes', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Notes change waiting' });
     if (s.pendingSrc) flags.push({ key: 'video', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: s.pendingVideoState && s.pendingVideoState !== 'ready' ? 'New video waiting · still processing' : 'New video waiting' });
     if (s.artworkPending) flags.push({ key: 'art', tone: 'wait', Icon: ClockIcon, icon: 'clock', text: 'Art waiting for approval' });
     if (s.cloudflareState === 'error') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, icon: 'warning', text: 'The file failed to process — replace it' });
@@ -608,6 +630,9 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ type: 'captions', title: 'No captions', Icon: ChatIcon, iconKey: 'chat' });
     if (s.artworkPending) flags.push({ type: 'pending', title: 'Artwork change awaiting approval', Icon: ClockIcon, iconKey: 'clock' });
     if (s.pendingTitle) flags.push({ type: 'title', title: 'Title change waiting', Icon: ClockIcon, iconKey: 'clock' });
+    if (s.pendingDescription) flags.push({ type: 'desc', title: 'Description change waiting', Icon: ClockIcon, iconKey: 'clock' });
+    if (typeof s.pendingPageNotes === 'string') flags.push({ type: 'notes', title: 'Notes change waiting', Icon: ClockIcon, iconKey: 'clock' });
+    if (s.pendingTitleImageUrl || s.pendingTitleImageRemoval) flags.push({ type: 'titleImage', title: 'Title image change waiting', Icon: ClockIcon, iconKey: 'clock' });
     if (s.pendingSrc) flags.push({ type: 'video', title: 'New video waiting', Icon: ClockIcon, iconKey: 'clock' });
     if (s.deletionRequested) flags.push({ type: 'deletion', title: 'Pending deletion', Icon: TrashIcon, iconKey: 'trash' });
 

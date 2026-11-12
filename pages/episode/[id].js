@@ -3,7 +3,8 @@ import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
-import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, DiamondIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, DiamondIcon, WarningIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { FLASHING_CHIP } from '../../lib/contentAdvisory';
 import { episodeCode } from '../../lib/seriesResume';
 import { endCardFor } from '../../lib/endCardRules';
 import Head from 'next/head';
@@ -53,7 +54,16 @@ function minutesLabel(runtime) {
 // (viewing terms, age) carry the same ones: a link-preview crawler never
 // has the viewing-terms cookie, so for a rated title the gate is the page
 // it reads.
-function headWords({ title, desc, season, seriesOrder, seriesId, showName, thumbnail, poster }) {
+// og:type: a film or a short is a movie, an episode of a series or a
+// podcast an episode, anything else (an extra, a Snippet) a video.other
+// (it read video.episode for every title until 2026-11-12).
+function ogTypeFor({ contentType, seriesId }) {
+  if (contentType === 'movie' || contentType === 'short') return 'video.movie';
+  if ((contentType === 'series' || contentType === 'podcast') && seriesId) return 'video.episode';
+  return 'video.other';
+}
+
+function headWords({ title, desc, season, seriesOrder, seriesId, showName, thumbnail, poster, contentType }) {
   const code = episodeCode({ season, seriesOrder });
   const named = showName && seriesId;
   const ogTitle = named ? (code ? `${code} · ${title} — ${showName}` : `${title} — ${showName}`) : (title || '');
@@ -61,7 +71,8 @@ function headWords({ title, desc, season, seriesOrder, seriesId, showName, thumb
     docTitle: named ? `${ogTitle} · ${SITE.name}` : `${title} — ${SITE.name}`,
     ogTitle,
     desc: desc || '',
-    ogImage: absoluteSiteUrl(thumbnail) || absoluteSiteUrl(poster) || absoluteSiteUrl('/og-image.png')
+    ogImage: absoluteSiteUrl(thumbnail) || absoluteSiteUrl(poster) || absoluteSiteUrl('/og-image.png'),
+    ogType: ogTypeFor({ contentType, seriesId })
   };
 }
 
@@ -77,7 +88,7 @@ function HeadTags({ words, preview = false, docTitle = null }) {
           <meta property="og:title" content={words.ogTitle} />
           <meta property="og:description" content={words.desc.slice(0, 200)} />
           <meta property="og:image" content={words.ogImage} />
-          <meta property="og:type" content="video.episode" />
+          <meta property="og:type" content={words.ogType || 'video.other'} />
           <meta name="twitter:card" content="summary_large_image" />
           <meta name="twitter:title" content={words.ogTitle} />
           <meta name="twitter:image" content={words.ogImage} />
@@ -333,6 +344,15 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // had before Play (captions, a described version, a flashing-lights
   // warning); a show's episode's landing has none (slice 4's §6.4).
   const standaloneTitle = !episode.seriesId && episode.contentType !== 'bonus';
+  // The title's own title image (custom title art, a PNG with
+  // transparency) drawn as the title on its own page (Jose, 2026-11-12:
+  // "lets put the image back, the goal was that if someone wanted to add a
+  // custom title, they could"); a show's name set as a picture is never an
+  // episode's title, so only the title's own (titleImageOwn).
+  const titleArt = episode.titleImageUrl && episode.titleImageOwn !== false ? episode.titleImageUrl : null;
+  // The flashing-lights warning (2026-11-12): a chip in the meta line,
+  // before Play, that points at the Accessibility panel's line.
+  const flashing = episode.hasFlashingLights === true;
   // The player in a preview fetches its fresh link with preview: true.
   const refreshPreviewSrc = useCallback(async () => {
     try {
@@ -344,6 +364,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     }
   }, [episode.id]);
   const [describedActive, setDescribedActive] = useState(false);
+  // A title image that couldn't load gives the text title back.
+  const [titleArtFailed, setTitleArtFailed] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
@@ -528,6 +550,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const metaLine = [minutesLabel(episode.runtime), episode.genre, episode.releaseYear].filter(Boolean).join(' · ');
   // The own page (board V2): nothing plays yet, so no Up next card.
   const landingV2 = !showPlayer && ownPageLayout;
+  // The Accessibility panel: under the player, and on a standalone title's
+  // landing; a show's episode's landing shows it only for the flashing-
+  // lights warning (its chip points there).
+  const showA11yPanel = !locked && (!landingV2 || standaloneTitle || flashing);
   const upNext = isSeries && !showingTrailer && !landingV2 && nextEpisode && nextEpisode.canOpen !== false ? nextEpisode : null;
   const seasonNumber = Number(episode.season) > 0 ? Number(episode.season) : 1;
   const showHref = episode.seriesId ? `/series/${encodeURIComponent(episode.seriesId)}?season=${seasonNumber}${previewing ? '&preview=1' : ''}` : null;
@@ -761,10 +787,25 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             </div>
             <div className="ep-head-row">
               <div className="ep-titlebox">
-                <h1 className="ep-title">{episode.title}</h1>
+                {landingV2 && titleArt && titleArtFailed !== titleArt ? (
+                  // The custom title on the own page: the picture is the
+                  // title; the heading keeps the words for screen readers.
+                  <h1 className="ep-title ep-title-art">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={titleArt} alt="" className="ep-title-image" onError={() => setTitleArtFailed(titleArt)} />
+                    <span className="visually-hidden">{episode.title}</span>
+                  </h1>
+                ) : (
+                  <h1 className="ep-title">{episode.title}</h1>
+                )}
                 <div className="ep-meta">
                   {metaLine && <span>{metaLine}</span>}
                   {episode.rating && <span className="hero-rating-tag">{episode.rating}</span>}
+                  {flashing && (showA11yPanel ? (
+                    <a href="#a11y-heading" className="ep-flash-chip"><WarningIcon size={12} /> {FLASHING_CHIP}</a>
+                  ) : (
+                    <span className="ep-flash-chip"><WarningIcon size={12} /> {FLASHING_CHIP}</span>
+                  ))}
                   <span className={`ep-tier-pill ${tier.key}`}>{owned ? 'Yours · ad-free' : tier.label}</span>
                   {episode.isOriginal && <span className="original-tag">Tapa Original</span>}
                   {describedActive && <span className="ep-meta-note">Audio described</span>}
@@ -909,7 +950,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 onSeePlans={startCheckout}
               />
             )}
-            {!locked && (!landingV2 || standaloneTitle) && (
+            {showA11yPanel && (
               <AccessibilityPanel
                 episode={episode}
                 describedActive={describedActive}

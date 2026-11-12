@@ -33,7 +33,7 @@ export default async function handler(req, res) {
   // again).
   let query = supabase
     .from('episodes')
-    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, rating, poster, thumbnail, title_image_url, src, featured, discover_curated, is_original, funding_url, bonus_parent_type, bonus_parent_id, deletion_requested, created_at, available_from, available_until, ads_enabled, ad_break_seconds, release_year')
+    .select('id, title, description, tier, status, content_type, genre, main_genre, series_id, season, series_order, artist, runtime, rating, poster, thumbnail, title_image_url, src, featured, discover_curated, is_original, has_flashing_lights, funding_url, bonus_parent_type, bonus_parent_id, deletion_requested, created_at, available_from, available_until, ads_enabled, ad_break_seconds, release_year')
     .order('created_at', { ascending: false })
     .limit(200);
 
@@ -89,6 +89,9 @@ export default async function handler(req, res) {
       rating: e.rating ?? null,
       releaseYear: e.release_year || null,
       isOriginal: Boolean(e.is_original),
+      // The flashing-lights warning (migration 010's column; 2026-11-12:
+      // the page's chip and the card before Play read it).
+      hasFlashingLights: Boolean(e.has_flashing_lights),
       fundingUrl: e.funding_url ?? null,
       poster: e.poster ?? null,
       thumbnail: e.thumbnail ?? null,

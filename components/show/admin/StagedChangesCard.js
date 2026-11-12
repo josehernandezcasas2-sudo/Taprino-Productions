@@ -28,7 +28,7 @@ function Pair({ item }) {
     return (
       <div className="show-adm-text-pair">
         <p><span className="show-adm-pair-k">Now:</span> {item.current ? item.current : <em>nothing</em>}</p>
-        <p><span className="show-adm-pair-k is-proposed">Proposed:</span> {item.proposed ? item.proposed : <em>nothing</em>}</p>
+        <p><span className="show-adm-pair-k is-proposed">Proposed:</span> {item.clears ? <em>clear the notes</em> : item.proposed ? item.proposed : <em>nothing</em>}</p>
       </div>
     );
   }

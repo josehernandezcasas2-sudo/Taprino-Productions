@@ -62,9 +62,9 @@ const VALID_STATUSES = ['pending', 'approved', 'rejected'];
 const VALID_CONTENT_TYPES = ['series', 'movie', 'short', 'vertical', 'podcast', 'bonus'];
 const NUMBERED_TYPES = ['series', 'podcast'];
 const BONUS_PARENT_TYPES = ['series', 'episode'];
-const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'discoverCurated', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'fundingUrl', 'audioUrl', 'releaseYear', 'bonusParentType', 'bonusParentId'];
-const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', fundingUrl: 'funding_url', audioUrl: 'audio_url', releaseYear: 'release_year', discoverCurated: 'discover_curated', bonusParentType: 'bonus_parent_type', bonusParentId: 'bonus_parent_id' };
-const BOOLEAN_FIELDS = ['featured', 'discoverCurated', 'isOriginal', 'adsEnabled'];
+const EDITABLE_FIELDS = ['title', 'description', 'artist', 'runtime', 'genre', 'mainGenre', 'tier', 'status', 'featured', 'discoverCurated', 'availableFrom', 'availableUntil', 'adsEnabled', 'adBreakSeconds', 'contentType', 'seriesId', 'season', 'seriesOrder', 'rating', 'isOriginal', 'hasFlashingLights', 'fundingUrl', 'audioUrl', 'releaseYear', 'bonusParentType', 'bonusParentId'];
+const FIELD_TO_COLUMN = { mainGenre: 'main_genre', availableFrom: 'available_from', availableUntil: 'available_until', adsEnabled: 'ads_enabled', adBreakSeconds: 'ad_break_seconds', contentType: 'content_type', seriesId: 'series_id', seriesOrder: 'series_order', isOriginal: 'is_original', hasFlashingLights: 'has_flashing_lights', fundingUrl: 'funding_url', audioUrl: 'audio_url', releaseYear: 'release_year', discoverCurated: 'discover_curated', bonusParentType: 'bonus_parent_type', bonusParentId: 'bonus_parent_id' };
+const BOOLEAN_FIELDS = ['featured', 'discoverCurated', 'isOriginal', 'hasFlashingLights', 'adsEnabled'];
 // What makes the slot check worth asking.
 const PLACE_COLUMNS = ['series_id', 'season', 'series_order', 'status', 'content_type'];
 // lib/showPage.js updateEpisode's limit for an episode's page notes.

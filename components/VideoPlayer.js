@@ -4,7 +4,7 @@ import { useImaSdk } from '../lib/imaSdk';
 import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
 import EndCard from './EndCard';
-import { advisoryFor, ADVISORY_MS } from '../lib/contentAdvisory';
+import { playbackAdvisoryFor, ADVISORY_MS } from '../lib/contentAdvisory';
 import { isHttpUrl } from '../lib/safeUrl';
 import { screenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 
@@ -31,6 +31,10 @@ function getAdTagUrl(placement, episodeId = null) {
 }
 
 const SKIP_SECONDS = 10;
+// The titles whose content advisory has shown in this tab (once per title
+// per session: a reload, not a move between titles or a remount, shows it
+// again).
+const advisoryShown = new Set();
 // One fresh signed link per source per half minute (refreshSignedSrc).
 const REFRESH_GAP_MS = 30 * 1000;
 
@@ -71,7 +75,9 @@ export default function VideoPlayer({
   // passes its own async () => src-or-null.
   refreshSrc = null,
   // The content advisory card over the first seconds of playback
-  // (lib/contentAdvisory.js); the page turns it off for trailers.
+  // (lib/contentAdvisory.js playbackAdvisoryFor: the rating and, for a
+  // title with flashing lights, the photosensitivity warning on one card);
+  // the page turns it off for trailers.
   advisory = true,
   // Full screen gets the site's own chrome (Jose, 2026-10-29, the "After
   // Play" canvas): `heading` ({ kicker, title }) and `rating` top-left and
@@ -822,32 +828,59 @@ export default function VideoPlayer({
   }, [showControlsTemporarily]);
 
   // Content advisory (Jose, 2026-10-20): a network-style card once the
-  // programme itself is playing (after any pre-roll), once per title;
-  // it fades on its own and a tap dismisses it.
+  // programme itself is playing (after any pre-roll), once per title per
+  // session; it fades on its own and a tap dismisses it. A title with
+  // flashing lights (2026-11-12) gets the photosensitivity warning on the
+  // same card, and the video waits at its first frame under it until the
+  // card ends or the viewer dismisses it ("Watch now", a tap, Enter,
+  // Space or Escape).
   const ratingsList = useContentRatings();
   const advisoryInfo = useMemo(
-    () => (advisory ? advisoryFor({ id: episode.id, rating: episode.rating, contentType: episode.contentType }, ratingsList) : null),
-    [advisory, episode.id, episode.rating, episode.contentType, ratingsList]
+    () => (advisory ? playbackAdvisoryFor({ id: episode.id, rating: episode.rating, contentType: episode.contentType, hasFlashingLights: episode.hasFlashingLights === true }, ratingsList) : null),
+    [advisory, episode.id, episode.rating, episode.contentType, episode.hasFlashingLights, ratingsList]
   );
   const [advisoryState, setAdvisoryState] = useState(null); // null | 'on' | 'fading'
-  const advisoryShownFor = useRef(null);
   const advisoryTimers = useRef([]);
+  // True while the warning holds the video at its first frame.
+  const advisoryHeld = useRef(false);
+  const releaseAdvisoryHold = useCallback(() => {
+    if (!advisoryHeld.current) return;
+    advisoryHeld.current = false;
+    const v = videoRef.current;
+    if (v && v.paused) safePlay(v);
+  }, []);
   const dismissAdvisory = useCallback(() => {
     advisoryTimers.current.forEach(clearTimeout);
     advisoryTimers.current = [];
     setAdvisoryState(null);
-  }, []);
+    releaseAdvisoryHold();
+  }, [releaseAdvisoryHold]);
   useEffect(() => {
     if (!advisoryInfo || isYouTube || !started || !playing || adState) return;
-    if (advisoryShownFor.current === episode.id) return;
-    advisoryShownFor.current = episode.id;
+    if (advisoryShown.has(episode.id)) return;
+    advisoryShown.add(episode.id);
+    if (advisoryInfo.holds) {
+      const v = videoRef.current;
+      if (v) {
+        advisoryHeld.current = true;
+        v.pause();
+        // A title starting from the top waits on its very first frame.
+        if (v.currentTime < 2 && !(initialPositionRef.current > 0)) v.currentTime = 0;
+      }
+    }
     setAdvisoryState('on');
     advisoryTimers.current = [
-      setTimeout(() => setAdvisoryState('fading'), ADVISORY_MS),
+      setTimeout(() => { setAdvisoryState('fading'); releaseAdvisoryHold(); }, ADVISORY_MS),
       setTimeout(() => setAdvisoryState(null), ADVISORY_MS + 700)
     ];
-  }, [advisoryInfo, isYouTube, started, playing, adState, episode.id]);
-  useEffect(() => () => { advisoryTimers.current.forEach(clearTimeout); }, [episode.id]);
+  }, [advisoryInfo, isYouTube, started, playing, adState, episode.id, releaseAdvisoryHold]);
+  // Another title: no card carried over (its own shows when it plays).
+  useEffect(() => () => {
+    advisoryTimers.current.forEach(clearTimeout);
+    advisoryTimers.current = [];
+    advisoryHeld.current = false;
+    setAdvisoryState(null);
+  }, [episode.id]);
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
@@ -1037,6 +1070,13 @@ export default function VideoPlayer({
     (e) => {
       if (adState) return; // controls are locked out during an ad
       if (showEndCard) return; // the end card has the keys (components/EndCard.js)
+      // The advisory card: Enter, Space or Escape takes it away (and lets
+      // a held video go); play/pause never starts the video under it.
+      if (advisoryState === 'on' && ['Enter', ' ', 'Escape', 'k'].includes(e.key)) {
+        e.preventDefault();
+        dismissAdvisory();
+        return;
+      }
       const tag = e.target.tagName;
       if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') return;
       switch (e.key) {
@@ -1077,7 +1117,7 @@ export default function VideoPlayer({
       }
       showControlsTemporarily();
     },
-    [adState, showEndCard, togglePlay, skip, changeVolume, volume, toggleMute, toggleFullscreen, showControlsTemporarily, textTracks, activeTrack, selectTextTrack]
+    [adState, showEndCard, advisoryState, dismissAdvisory, togglePlay, skip, changeVolume, volume, toggleMute, toggleFullscreen, showControlsTemporarily, textTracks, activeTrack, selectTextTrack]
   );
 
   function setQuality(levelIndex) {
@@ -1143,7 +1183,7 @@ export default function VideoPlayer({
         playsInline
         controlsList="nodownload noremoteplayback"
         disablePictureInPicture
-        onClick={() => !adState && togglePlay()}
+        onClick={() => { if (adState) return; if (advisoryState === 'on') { dismissAdvisory(); return; } togglePlay(); }}
         onDoubleClick={toggleFill}
         onEnded={(e) => {
           setPlaying(false);

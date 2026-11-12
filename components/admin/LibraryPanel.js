@@ -315,7 +315,7 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
 
       <div id="library-edits" className="account-card">
         <div className="account-eyebrow">Pending edits</div>
-        <h3>Title &amp; description changes awaiting approval</h3>
+        <h3>Title, description &amp; notes changes awaiting approval</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>A creator requested a change to something already live. Denying leaves the current text untouched; approving replaces it.</p>
         {editError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{editError}</p>}
         {!pendingEdits ? <p>Loading…</p> : pendingEdits.episodes.length === 0 && pendingEdits.series.length === 0 ? <p className="adm-empty">Nothing pending right now.</p> : (
@@ -325,6 +325,8 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                 {kindTag('Episode', 'var(--signal-amber)')}
                 {e.pendingTitle && <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}><strong>Title:</strong> {e.currentTitle} <span style={{ color: 'var(--ink-dim)' }}>→</span> {e.pendingTitle}</p>}
                 {e.pendingDescription && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}><strong>Description:</strong> {e.currentDescription} <span>→</span> {e.pendingDescription}</p>}
+                {/* Notes for the title's page (migration 122): '' waiting = clear them. */}
+                {typeof e.pendingPageNotes === 'string' && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)', whiteSpace: 'pre-line' }}><strong>Page notes:</strong> {e.currentPageNotes || <em>none</em>} <span>→</span> {e.pendingPageNotes === '' ? <em>clear the notes</em> : e.pendingPageNotes}</p>}
                 {decideButtons(editActionLoading === `episode-${e.id}`, () => resolveEdit('episode', e.id, 'approve', e.seen), () => resolveEdit('episode', e.id, 'deny', e.seen))}
               </div>
             ))}

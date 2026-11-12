@@ -1,16 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { apiGet, apiPost } from '../../lib/api';
+import { absoluteUrl, apiGet, apiPost } from '../../lib/api';
 import { readViewingTerms, saveViewingTerms, withTerms, TERMS_URL } from '../../lib/viewingTerms';
-import { advisoryFor, useContentRatings } from '../../lib/contentAdvisory';
-import ContentAdvisory from '../../components/ContentAdvisory';
-import { colors, fonts, absoluteFill, inkTint, oliveTint } from '../../lib/theme';
+import { playbackAdvisoryFor, useContentRatings, FLASHING_CHIP } from '../../lib/contentAdvisory';
+import ContentAdvisory, { useAdvisoryCard } from '../../components/ContentAdvisory';
+import AccessibilityPanel from '../../components/AccessibilityPanel';
+import { colors, fonts, absoluteFill, inkTint, oliveTint, warnTint } from '../../lib/theme';
 import { parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
@@ -108,6 +109,44 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
     </Svg>
   );
 }
+// components/PlayerIcons.js WarningIcon (the flashing-lights chip).
+function WarningIcon({ size = 12, color = colors.warn }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M12 3.5l10 17.5H2z" />
+      <Path d="M12 10v4.5" />
+      <Circle cx="12" cy="17.5" r="0.9" fill={color} stroke="none" />
+    </Svg>
+  );
+}
+
+// The title's own title image (custom title art, a PNG with transparency)
+// drawn as the title on its own page (Jose, 2026-11-12: "lets put the
+// image back"): as tall as the website draws it (110pt), never more than a
+// third of the 16:9 strip on a phone, left-aligned at its own shape once
+// its size is known. The words stay for a screen reader; an image that
+// can't be read gives the text title back (`fallback`).
+function TitleArt({ uri, title, maxWidth, maxHeight, fallback = null }) {
+  const [ratio, setRatio] = useState(null);
+  const [failed, setFailed] = useState(false);
+  const src = uri && uri.startsWith('/') ? absoluteUrl(uri) : uri;
+  useEffect(() => {
+    let alive = true;
+    setRatio(null);
+    setFailed(false);
+    if (!src) return undefined;
+    Image.getSize(src, (w, h) => { if (alive && w > 0 && h > 0) setRatio(w / h); }, () => { if (alive) setFailed(true); });
+    return () => { alive = false; };
+  }, [src]);
+  if (failed) return fallback;
+  const height = ratio ? Math.min(maxHeight, maxWidth / ratio) : maxHeight;
+  const width = ratio ? height * ratio : maxWidth;
+  return (
+    <View style={{ height, marginBottom: 8 }} accessible accessibilityRole="header" accessibilityLabel={title}>
+      {ratio ? <Image source={{ uri: src }} style={{ width, height }} resizeMode="contain" /> : null}
+    </View>
+  );
+}
 
 // Mirrors pages/episode/[id].js, fed by GET /api/episode-page (the same
 // lib/episodePage.js the website uses — so opening a title here records
@@ -132,9 +171,16 @@ function DiamondIcon({ size = 16, color = colors.ink }) {
 // the same gated track as the website's (/api/captions/<id>, with
 // ?preview=1 in a preview), drawn by the player with its CC button
 // (components/EpisodePlayer.js); `captionsUrl` is on the episode only for
-// a viewer who may watch it, and never for a trailer. Not on mobile yet:
-// ad breaks (paused), audio description and the website's Accessibility
-// panel under the description (AccessibilityPanel).
+// a viewer who may watch it, and never for a trailer. The website's
+// Accessibility panel sits under the credits (components/
+// AccessibilityPanel.js, 2026-11-12). Not on mobile yet: ad breaks
+// (paused) and playing the described version (its row opens the website).
+//
+// 2026-11-12 (Jose): a title's own title image is drawn as the title on
+// its own page again (TitleArt); a title with flashing lights carries a
+// "Flashing lights" chip in its meta row and, when it starts, the warning
+// on the advisory card with the video held at its first frame
+// (components/ContentAdvisory.js useAdvisoryCard).
 //
 // The series revamp, slice 4 (boards V2 and V3): an episode of a show (or
 // an extra) whose own page is on opens on the V2 landing — the still or
@@ -238,9 +284,24 @@ export default function Episode() {
   // Content advisory over the first seconds (mobile/src/lib/contentAdvisory.js).
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const ratingsList = useContentRatings();
-  const advisoryInfo = episode && !showingTrailer ? advisoryFor(episode, ratingsList) : null;
-  // While the advisory card is up the player keeps its captions off it.
-  const [advisoryOn, setAdvisoryOn] = useState(false);
+  // The rating advisory and, for a title with flashing lights, the
+  // photosensitivity warning on one card (2026-11-12), never on a trailer.
+  // Its state lives here, not in the card, so it shows once per title even
+  // when the player moves between its inline and full-screen views (it
+  // used to show again when the phone turned); with the warning the video
+  // waits at its first frame under it.
+  const advisoryInfo = episode && !showingTrailer ? playbackAdvisoryFor(episode, ratingsList) : null;
+  const advisoryCard = useAdvisoryCard({ info: advisoryInfo, playing: Boolean(isPlaying && playback.src && !showingTrailer), episodeId: episode && episode.id, player });
+  const advisoryHeldRef = advisoryCard.heldRef;
+  // While the advisory card is up the player keeps its captions and its
+  // controls off it.
+  const advisoryOn = advisoryCard.visible;
+  // The chip scrolls to the Accessibility panel (where it stands in the
+  // scroll: the stage's place plus the panel's within it).
+  const scrollRef = useRef(null);
+  const stageY = useRef(0);
+  const panelY = useRef(null);
+  const { width: windowWidth } = useWindowDimensions();
   // A preview starts at the beginning and saves no progress.
   const resumeSeconds = previewing ? 0 : (state.page && state.page.resumeSeconds) || 0;
   useWatchProgress({
@@ -262,7 +323,8 @@ export default function Episode() {
   useEffect(() => {
     if (!player) return undefined;
     const sub = player.addListener('statusChange', ({ status }) => {
-      if (status === 'readyToPlay' && !player.playing && player.currentTime === 0) player.play();
+      // Never while the flashing-lights warning holds it at its first frame.
+      if (status === 'readyToPlay' && !player.playing && player.currentTime === 0 && !advisoryHeldRef.current) player.play();
     });
     return () => sub.remove();
   }, [player]);
@@ -418,6 +480,22 @@ export default function Episode() {
   // Producer in the owner's order; before slice 4's server, Made by alone.
   const credits = Array.isArray(page.credits) && page.credits.length ? page.credits
     : episode.artist ? [{ key: 'maker', label: 'Made by', name: episode.artist, href: null }] : [];
+  // The custom title on the own page: the title's own image only (a show's
+  // name set as a picture is never an episode's title).
+  const titleArt = landing && episode.titleImageUrl && episode.titleImageOwn !== false ? episode.titleImageUrl : null;
+  const titleArtMax = Math.min(110, Math.round(Math.min(windowWidth * 9 / 16, 600) / 3));
+  // The flashing-lights warning before Play (2026-11-12): a chip in the
+  // meta row that scrolls to the Accessibility panel's line.
+  const flashing = episode.hasFlashingLights === true;
+  const standaloneTitle = !episode.seriesId && episode.contentType !== 'bonus';
+  // The Accessibility panel (the website's): under the player, and on a
+  // standalone title's landing; a show's episode's landing shows it only
+  // for the warning its chip points at. Not over a locked title.
+  const showA11yPanel = !playback.locked && (!landing || standaloneTitle || flashing);
+  const toPanel = () => {
+    if (panelY.current === null || !scrollRef.current) return;
+    scrollRef.current.scrollTo({ y: Math.max(0, stageY.current + panelY.current - 12), animated: true });
+  };
   // Play on the landing: the player in place, and ?autoplay=1 in the
   // address (the website's shallow replace).
   const playHere = () => {
@@ -441,7 +519,7 @@ export default function Episode() {
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView ref={scrollRef} contentContainerStyle={styles.scroll}>
         {previewing ? <PreviewBar preview={previewInfo} /> : null}
 
         {landing ? (
@@ -541,7 +619,7 @@ export default function Episode() {
                   </TipButton>
                 ) : null}
               >
-                <ContentAdvisory info={advisoryInfo} playing={isPlaying} episodeId={episode.id} onVisibleChange={setAdvisoryOn} />
+                {({ full }) => <ContentAdvisory info={advisoryInfo} state={advisoryCard.state} onDismiss={advisoryCard.dismiss} full={full} />}
               </EpisodePlayer>
             ) : playback.error ? (
               <View style={[styles.player, styles.center]}><Text style={styles.errorText}>{playback.error}</Text></View>
@@ -551,7 +629,7 @@ export default function Episode() {
           </View>
         )}
 
-        <View style={styles.stage}>
+        <View style={styles.stage} onLayout={(e) => { stageY.current = e.nativeEvent.layout.y; }}>
           <Pressable style={styles.backBtn} onPress={goBack}>
             <BackArrowIcon /><Text style={styles.backText}>Back</Text>
           </Pressable>
@@ -573,10 +651,33 @@ export default function Episode() {
             {showingTrailer ? <Text style={styles.kickerNote}>TRAILER</Text> : null}
             {owned ? <OwnedChip small /> : null}
           </View>
-          <Text style={[styles.title, landing && styles.titleLanding]}>{episode.title}</Text>
+          {titleArt ? (
+            <TitleArt
+              uri={titleArt}
+              title={episode.title}
+              maxWidth={Math.max(120, windowWidth - 38)}
+              maxHeight={titleArtMax}
+              fallback={<Text style={[styles.title, styles.titleLanding]}>{episode.title}</Text>}
+            />
+          ) : (
+            <Text style={[styles.title, landing && styles.titleLanding]}>{episode.title}</Text>
+          )}
           <View style={styles.metaRow}>
             {metaLine ? <Text style={styles.metaText}>{metaLine}</Text> : null}
             {episode.rating ? <View style={styles.ratingTag}><Text style={styles.ratingText}>{episode.rating}</Text></View> : null}
+            {flashing ? (
+              <Pressable
+                style={styles.flashChip}
+                onPress={showA11yPanel ? toPanel : undefined}
+                disabled={!showA11yPanel}
+                hitSlop={6}
+                accessibilityRole={showA11yPanel ? 'button' : 'text'}
+                accessibilityLabel={showA11yPanel ? `${FLASHING_CHIP}. See the accessibility notes.` : FLASHING_CHIP}
+              >
+                <WarningIcon size={11} />
+                <Text style={styles.flashChipText}>{FLASHING_CHIP}</Text>
+              </Pressable>
+            ) : null}
             <View style={[styles.tierPill, { backgroundColor: owned ? oliveTint(0.2) : tier.bg }]}>
               <Text style={[styles.tierPillText, { color: owned ? colors.ink : tier.fg }]}>{owned ? 'Yours · ad-free' : tier.label}</Text>
             </View>
@@ -721,6 +822,16 @@ export default function Episode() {
           {landing ? ownCard : null}
           {landing && ownCard && purchase && purchase.forSale && !owned ? <View style={{ height: 22 }} /> : null}
 
+          {showA11yPanel ? (
+            <AccessibilityPanel
+              episode={episode}
+              hasAudioDescription={episode.hasAudioDescription === true}
+              onOpenWebsite={() => Linking.openURL(absoluteUrl(`/episode/${enc(episode.id)}${previewing ? '?preview=1' : ''}`)).catch(() => {})}
+              contactEmail={CONTACT_EMAIL}
+              onLayout={(e) => { panelY.current = e.nativeEvent.layout.y; }}
+            />
+          ) : null}
+
           {isSeries && seasonEpisodes.length > 1 ? (
             <EpisodeStrip
               title={`Episodes · Season ${seasonN}`}
@@ -839,6 +950,10 @@ const styles = StyleSheet.create({
   upNextKicker: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 1.4, color: colors.brass },
   upNextTitle: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
   upNextSub: { fontFamily: fonts.mono, fontSize: 9.5, letterSpacing: 0.6, color: colors.inkDim },
+
+  // .ep-flash-chip: the flashing-lights warning in the meta row.
+  flashChip: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, borderWidth: 1, borderColor: warnTint(0.6), backgroundColor: warnTint(0.12), paddingHorizontal: 8, paddingVertical: 3 },
+  flashChipText: { fontFamily: fonts.mono, fontSize: 9, letterSpacing: 0.8, textTransform: 'uppercase', color: colors.warn },
 
   // .ep-desc / .ep-credits
   desc: { fontFamily: fonts.body, fontSize: 15, lineHeight: 22.5, color: colors.ink, marginTop: 14 },

@@ -32,10 +32,13 @@ export function TitleField({ value, onChange, policy, placeholder, liveTitle = n
   );
 }
 
+// The description (one line + about) waits for approval on a live title
+// or show (2026-11-12): the clock on the label, and under About the
+// description that waits, with Cancel (the website's EpisodeFields).
 export function OneLineField({ value, onChange, policy, edited = false }) {
   return (
     <View style={{ gap: 6 }}>
-      <FieldHead label="One line about it" count={value.length} max={ONE_LINE_MAX} locked={policy && policy.mode === 'locked'} />
+      <FieldHead label="One line about it" count={value.length} max={ONE_LINE_MAX} staged={Boolean(policy && policy.mode === 'staged')} locked={policy && policy.mode === 'locked'} />
       <EdInput
         multiline
         style={{ minHeight: 60 }}
@@ -51,11 +54,15 @@ export function OneLineField({ value, onChange, policy, edited = false }) {
   );
 }
 
-export function AboutField({ value, onChange, max, policy, edited = false, label = 'About it', placeholder = 'Everything else: what happens, who’s in it, how it was made.' }) {
+export function AboutField({ value, onChange, max, policy, edited = false, label = 'About it', placeholder = 'Everything else: what happens, who’s in it, how it was made.', stagedValue = null, onCancelStaged = null, cancelBusy = false }) {
+  const waiting = typeof stagedValue === 'string' && stagedValue.trim() ? stagedValue.trim() : null;
   return (
     <View style={{ gap: 6 }}>
-      <FieldHead label={label} count={value.length} max={max} locked={policy && policy.mode === 'locked'} />
+      <FieldHead label={label} count={value.length} max={max} staged={Boolean(policy && policy.mode === 'staged')} locked={policy && policy.mode === 'locked'} />
       <EdInput multiline style={{ minHeight: 120 }} value={value} maxLength={Math.max(0, max)} disabled={!isOpen(policy)} placeholder={placeholder} onChangeText={onChange} accessibilityLabel={label} />
+      {waiting ? (
+        <StagedBox title="A new description waits for approval:" value={waiting.length > 240 ? `${waiting.slice(0, 240)}…` : waiting} onCancel={onCancelStaged} busy={cancelBusy} />
+      ) : null}
       <FieldNote policy={policy} edited={edited} />
     </View>
   );

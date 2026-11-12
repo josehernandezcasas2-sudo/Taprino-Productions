@@ -137,6 +137,11 @@ function RestoreGlyph({ size = 11 }) {
 // the bar. Never over the end card, nor while `advisoryOn` (the content
 // advisory card the screen passes as a child is up). A file that can't be
 // fetched or has no cue takes the button away and says nothing.
+//
+// While `advisoryOn` the controls stay hidden too (the card covers the
+// picture; with the flashing-lights warning the video waits under it,
+// 2026-11-12). `children` may be a function of { full }: the card packs
+// itself tighter in the inline strip than in full screen.
 export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
@@ -344,7 +349,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
             ))}
           </View>
         ) : null}
-        {controlsShown && !showEnd ? (
+        {controlsShown && !showEnd && !advisoryOn ? (
           <>
             {full ? (
               <View style={[styles.top, F.top]} pointerEvents="box-none">
@@ -413,7 +418,8 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
             </View>
           </>
         ) : null}
-        {children}
+        {/* The advisory card: never with the end card (a very short title). */}
+        {showEnd ? null : typeof children === 'function' ? children({ full }) : children}
         {showEnd ? <EndCard card={endCard.card} onGo={endCard.onGo} onBack={endCard.onBack} onStay={endCard.onStay} full={full} chrome={F} /> : null}
       </>
     );

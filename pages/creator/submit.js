@@ -146,6 +146,10 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
   const [step, setStep] = useState(draft && draft.form && draft.form.step ? Math.min(3, Math.max(1, Number(draft.form.step))) : 1);
   const [posterFile, setPosterFile] = useState(null);
   const [stillFile, setStillFile] = useState(null);
+  // The title set as a picture (2026-11-12): optional, a PNG with a
+  // transparent background; the title's own page draws it in place of the
+  // text title (never cut from the film).
+  const [titleImageFile, setTitleImageFile] = useState(null);
   const [captionsFile, setCaptionsFile] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
   const [link, setLink] = useState('');
@@ -505,11 +509,12 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
       }
     }
     try {
-      const [posterBase64, thumbnailBase64, captionsBase64] = await Promise.all([readAsDataUrl(form.cutArtwork ? null : posterFile), readAsDataUrl(form.cutArtwork ? null : stillFile), readAsDataUrl(captionsFile)]);
+      const [posterBase64, thumbnailBase64, captionsBase64, titleImageBase64] = await Promise.all([readAsDataUrl(form.cutArtwork ? null : posterFile), readAsDataUrl(form.cutArtwork ? null : stillFile), readAsDataUrl(captionsFile), readAsDataUrl(titleImageFile)]);
       const body = toSubmitBody(form, media, {
         adBreakSeconds: form.adsEnabled !== false ? parseAdBreaksInput(form.adBreaksText) : [0],
         ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
         ...(thumbnailBase64 ? { thumbnailBase64, thumbnailFileName: stillFile.name } : {}),
+        ...(titleImageBase64 ? { titleImageBase64, titleImageFileName: titleImageFile.name } : {}),
         ...(captionsBase64 ? { captionsBase64, captionsFileName: captionsFile.name, captionsLanguage: form.captionsLanguage, captionsLabel: form.captionsLabel } : {}),
         ...(draftId ? { draftId } : {})
       });
@@ -833,6 +838,20 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
               </div>
             </div>
             {form.contentType === 'bonus' && <p className="apl-help">A clip on a show's page: its art is optional either way.</p>}
+
+            {form.contentType !== 'podcast' && form.contentType !== 'vertical' && (
+              <div className="apl-field">
+                <div className="apl-label">Title image <em>optional · a PNG with a transparent background</em></div>
+                <label className="sub-slot sub-title-slot">
+                  {titleImageFile ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={URL.createObjectURL(titleImageFile)} alt="" />
+                  ) : 'The title set as a picture, shown in place of the text title on its page'}
+                  <input type="file" accept="image/png,image/webp" hidden onChange={(e) => setTitleImageFile((e.target.files && e.target.files[0]) || null)} />
+                </label>
+                {titleImageFile && <button type="button" className="apl-btn-ghost" onClick={() => setTitleImageFile(null)}>Remove the title image</button>}
+              </div>
+            )}
 
             <div className="apl-field">
               <div className="apl-label">Trailer <em>optional · 15–30 s</em></div>

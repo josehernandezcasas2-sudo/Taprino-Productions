@@ -75,6 +75,7 @@ function formFromEpisode(episode) {
     featured: !!episode.featured,
     discoverCurated: !!episode.discoverCurated,
     isOriginal: !!episode.isOriginal,
+    hasFlashingLights: !!episode.hasFlashingLights,
     fundingUrl: episode.fundingUrl || '',
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
@@ -88,7 +89,7 @@ function formFromEpisode(episode) {
 // Compared as trimmed text: the inputs, the selects, the dates and the
 // numbers as typed (/api/admin/edit-episode reads the numbers).
 const TEXT_FIELDS = ['title', 'description', 'pageNotes', 'contentType', 'rating', 'artist', 'runtime', 'releaseYear', 'genre', 'mainGenre', 'tier', 'status', 'fundingUrl', 'availableFrom', 'availableUntil'];
-const SWITCH_FIELDS = ['featured', 'discoverCurated', 'isOriginal'];
+const SWITCH_FIELDS = ['featured', 'discoverCurated', 'isOriginal', 'hasFlashingLights'];
 const PLACE_FIELDS = ['seriesId', 'season', 'seriesOrder'];
 const NUMBERED_TYPES = ['series', 'podcast'];
 // The inputs marked required: changed to nothing but spaces, they'd save blank.
@@ -475,6 +476,13 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
           <label className="admin-checkbox">
             <input type="checkbox" checked={form.isOriginal} onChange={(e) => update('isOriginal', e.target.checked)} />
             Tapa Original <span className="admin-optional"> — exclusive to Studio Tapa, independent of free/premium tier</span>
+          </label>
+
+          {/* The flashing-lights warning (2026-11-12): a chip on the title's
+              page and a photosensitivity card before it plays. */}
+          <label className="admin-checkbox">
+            <input type="checkbox" checked={form.hasFlashingLights} onChange={(e) => update('hasFlashingLights', e.target.checked)} />
+            Contains flashing lights <span className="admin-optional"> — shows a warning on its page and holds the video under a photosensitivity card before it plays</span>
           </label>
 
           <div className="admin-field">

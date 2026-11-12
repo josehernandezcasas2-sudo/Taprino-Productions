@@ -43,10 +43,13 @@ export function TitleField({ id, value, onChange, policy, placeholder, liveTitle
   );
 }
 
+// The description (one line + about) waits for approval on a live title
+// or show (2026-11-12): the clock on the label, and under About the
+// description that waits, with Cancel.
 export function OneLineField({ id, value, onChange, policy, edited = false }) {
   return (
     <div className="show-ed-field">
-      <FieldHead htmlFor={id} label="One line about it" count={value.length} max={ONE_LINE_MAX} locked={policy && policy.mode === 'locked'} />
+      <FieldHead htmlFor={id} label="One line about it" count={value.length} max={ONE_LINE_MAX} staged={Boolean(policy && policy.mode === 'staged')} locked={policy && policy.mode === 'locked'} />
       <textarea
         id={id}
         className="show-ed-textarea is-short"
@@ -62,11 +65,17 @@ export function OneLineField({ id, value, onChange, policy, edited = false }) {
   );
 }
 
-export function AboutField({ id, value, onChange, max, policy, edited = false, label = 'About it', placeholder = 'Everything else: what happens, who’s in it, how it was made.' }) {
+export function AboutField({ id, value, onChange, max, policy, edited = false, label = 'About it', placeholder = 'Everything else: what happens, who’s in it, how it was made.', stagedValue = null, onCancelStaged = null, cancelBusy = false }) {
+  const waiting = typeof stagedValue === 'string' && stagedValue.trim() ? stagedValue.trim() : null;
   return (
     <div className="show-ed-field">
-      <FieldHead htmlFor={id} label={label} count={value.length} max={max} locked={policy && policy.mode === 'locked'} />
+      <FieldHead htmlFor={id} label={label} count={value.length} max={max} staged={Boolean(policy && policy.mode === 'staged')} locked={policy && policy.mode === 'locked'} />
       <textarea id={id} className="show-ed-textarea" rows={6} value={value} maxLength={Math.max(0, max)} disabled={!isOpen(policy)} placeholder={placeholder} onChange={(e) => onChange(e.target.value)} />
+      {waiting ? (
+        <StagedBox title="A new description waits for approval:" onCancel={onCancelStaged} busy={cancelBusy}>
+          <span className="show-ed-staged-live show-ed-staged-text-long">{waiting.length > 240 ? `${waiting.slice(0, 240)}…` : waiting}</span>
+        </StagedBox>
+      ) : null}
       <FieldNote policy={policy} edited={edited} />
     </div>
   );
