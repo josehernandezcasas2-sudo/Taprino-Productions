@@ -11,6 +11,7 @@ import PostMenu from '../../components/PostMenu';
 import ReelAuthor from '../../components/ReelAuthor';
 import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { REEL_AD_EVERY } from '../../lib/adBreakRules';
 
 // Snippets-only reel feed — same swipe mechanics as /vertical/discover but
 // scoped to just what people have posted (lib/posts.js, kind:'video'),
@@ -28,10 +29,11 @@ export async function getServerSideProps({ req, res, query }) {
   return { props: data };
 }
 
-// One ad card per this many snippets — same cadence as /vertical/discover,
-// reusing its 'vertical_discover' placement rather than introducing a
-// separate one admins would need to configure before any ad shows here.
-const AD_FREQUENCY = 6;
+// One ad card per this many snippets — same cadence as /vertical/discover
+// (lib/adBreakRules.js REEL_AD_EVERY, the app's feeds too), reusing its
+// 'vertical_discover' placement rather than introducing a separate one
+// admins would need to configure before any ad shows here.
+const AD_FREQUENCY = REEL_AD_EVERY;
 
 async function fetchAdSlide() {
   try {
@@ -44,7 +46,7 @@ async function fetchAdSlide() {
   }
 }
 
-export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId }) {
+export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId, adsOn = true }) {
   const router = useRouter();
   const iconOverrides = usePlayerIconOverrides();
   const [shareCopiedKey, setShareCopiedKey] = useState(null);
@@ -90,7 +92,7 @@ export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId
     const firstSlides = expandUnitToSlides(first);
     setDeck(firstSlides);
     contentSlideCountRef.current += firstSlides.length;
-    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+    if (adsOn && contentSlideCountRef.current >= AD_FREQUENCY) {
       contentSlideCountRef.current = 0;
       fetchAdSlide().then((adSlide) => {
         if (adSlide) setDeck((d) => [...d, adSlide]);
@@ -106,7 +108,7 @@ export default function SnippetsDiscover({ snippetEpisodes, isSignedIn, viewerId
     const nextSlides = expandUnitToSlides(next);
     setDeck((d) => [...d, ...nextSlides]);
     contentSlideCountRef.current += nextSlides.length;
-    if (contentSlideCountRef.current >= AD_FREQUENCY) {
+    if (adsOn && contentSlideCountRef.current >= AD_FREQUENCY) {
       contentSlideCountRef.current = 0;
       fetchAdSlide().then((adSlide) => {
         if (adSlide) setDeck((d) => [...d, adSlide]);

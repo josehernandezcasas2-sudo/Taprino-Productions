@@ -21,6 +21,7 @@ import ReelAuthor from '../../components/ReelAuthor';
 import { HeartIcon, ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { getViewerAgeContext } from '../../lib/viewerAge';
+import { REEL_AD_EVERY, reelAdsOn } from '../../lib/adBreakRules';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -97,15 +98,16 @@ export async function getServerSideProps({ req, res }) {
       personalUnitKeys,
       // Tapa+ members and admins get no ad slides (the feed used to insert
       // them for everyone).
-      adsOn: !(account.adFree || account.isAdmin)
+      adsOn: reelAdsOn(account)
     }
   };
 }
 
 // One ad card per this many real content slides — a rough middle ground
 // between "never" and "so often it stops feeling like a content feed."
-// Easy to retune later; this is the only place the number lives.
-const AD_FREQUENCY = 6;
+// Easy to retune later: the number lives in lib/adBreakRules.js
+// (REEL_AD_EVERY), which /snippets/discover and the app's feeds read too.
+const AD_FREQUENCY = REEL_AD_EVERY;
 
 async function fetchAdSlide() {
   try {

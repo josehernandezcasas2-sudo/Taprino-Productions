@@ -9,16 +9,18 @@ import { getWatchHistory } from '../../lib/watchHistory';
 import { filterEntitledVertical, buildPersonalUnitKeys } from '../../lib/verticalFeed';
 import { limitPublicRead } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { reelAdsOn } from '../../lib/adBreakRules';
 
 // The mobile app's equivalent of pages/vertical/discover.js's
 // getServerSideProps — same entitlement filter, same personalization
 // pass (recommendations scoped to vertical content, turned into unit
 // keys for the 3-random/1-curated/3-personal picker). Deliberately
 // leaves out user-posted videos (lib/posts.js, an admin test feature
-// with no mobile equivalent yet) and house-ad slides (mobile ad
-// integration is paused — see project_mobile_app_ads_paused memory):
-// this feed is catalog-only. The unit-building/picker/slide-expansion
-// logic itself (lib/verticalFeed.js) is pure and has no server-only
+// with no mobile equivalent yet). House-ad cards are inserted by the app
+// itself every six slides (mobile/src/lib/adBreakRules.js), like the
+// website page; `adsOn` says whether this viewer gets them. The
+// unit-building/picker/slide-expansion logic itself
+// (lib/verticalFeed.js) is pure and has no server-only
 // deps, so it's ported as-is into mobile/src/lib/verticalFeed.js and
 // runs client-side there too, same as it does on the website.
 export default async function handler(req, res) {
@@ -75,6 +77,10 @@ export default async function handler(req, res) {
     isSignedIn: account.isSignedIn,
     viewerId: account.userId,
     wishlist: account.wishlist,
-    personalUnitKeys
+    personalUnitKeys,
+    // The house-ad cards the app's feed inserts (lib/adBreakRules.js
+    // reelAdsOn, the website page's rule): not for an ad-free member or
+    // the team.
+    adsOn: reelAdsOn(account)
   });
 }

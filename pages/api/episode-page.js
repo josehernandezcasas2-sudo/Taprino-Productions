@@ -67,7 +67,13 @@ export default async function handler(req, res) {
     episode: stripForViewer(data.episode, entitled),
     isSignedIn: data.account.isSignedIn,
     isSubscriber: data.account.isSubscriber,
+    // Who gets ads on this title (lib/adBreakRules.js adsOnFor, the
+    // website's own rule): never an ad-free member, the team or a buyer
+    // (`purchase.owned`), never in a preview, on a trailer or on a title
+    // with `episode.adsEnabled` off. The breaks are `episode.adBreakSeconds`,
+    // or a ready plan's (`episode.adPlan`).
     adFree: data.account.adFree,
+    isAdmin: Boolean(data.account.isAdmin),
     // Buy to own: the price (or ownership) of this title and its series.
     purchase: data.purchase,
     bundle: data.bundle,
