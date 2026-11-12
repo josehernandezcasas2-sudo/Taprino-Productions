@@ -1,5 +1,6 @@
 import { TIER_INFO, DISPLAY_ORDER, isPaidTier, tierLabel } from '../lib/membershipTiers';
 import { SITE } from '../lib/siteConfig';
+import { TAX_NOTE } from '../lib/salesTaxRules';
 
 // The Membership card's plan picker on /account (mockups/membership-tiers.html,
 // signed off 2026-10-12): Basic plus every plan on sale in Stripe
@@ -57,6 +58,7 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
                 {plan ? formatPlanPrice(plan) : t === 'basic' ? 'Free' : '—'}
                 {plan && <small>/ {plan.interval || 'month'}</small>}
               </div>
+              {plan && plan.taxNote && <div className="mp-taxnote">{TAX_NOTE}</div>}
               <div className="mp-tag">
                 {sub
                   ? `${sub.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} ${formatDate(sub.renewsAt)}`
