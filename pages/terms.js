@@ -68,7 +68,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-06';
+const TEXT_UPDATED = '2026-11-12';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -90,7 +90,7 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
           it</strong> — you&rsquo;re giving us permission to stream it, not signing it over. Don&rsquo;t
           upload things you don&rsquo;t have the rights to, and don&rsquo;t try to rip our video.
           We&rsquo;re in private testing, and these terms may still be revised before we open to the
-          public (section 16).
+          public (section 17).
         </>
       }
     >
@@ -119,7 +119,8 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       <p>
         {SITE.premiumTier} is a recurring monthly subscription. It renews automatically until you cancel,
         and you can cancel any time from your account page — access continues to the end of the
-        period you&rsquo;ve already paid for.
+        period you&rsquo;ve already paid for. Where the law requires it, sales tax is added at checkout
+        and shown before you pay.
       </p>
       <p>
         <strong>Refunds.</strong> Payments are generally non-refundable except where the law requires
@@ -355,7 +356,8 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       </p>
       <p>
         {SITE.name} keeps a platform fee from each contribution; the current fee is shown on the project page
-        before you back it, and the rest goes to the creator. Contributions are final once charged. Until
+        before you back it, and the rest goes to the creator. Where the law requires it, sales tax is added
+        at checkout and shown before you pay. Contributions are final once charged. Until
         card payments are switched on, a contribution is recorded as a pledge and no money is taken.
       </p>
       <p>
@@ -403,6 +405,10 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         member, and a disagreement about the work is settled between them, with us only holding or releasing
         the money as described here. The fee is set on our Settings page and shown before the poster pays;
         a change applies to calls funded after it.
+      </p>
+      <p id="locations">
+        <strong>Booking a place.</strong> When you book a place through Locations, sales tax is added at
+        checkout where the law requires it and shown before you pay.
       </p>
 
       <h2 id="buying">15. Buying a title</h2>
