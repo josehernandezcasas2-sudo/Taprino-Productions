@@ -52,6 +52,8 @@ export function ShowCard({ view, canEdit, onEdit, onCancelStaged, busy }) {
     st.poster ? { field: 'poster', words: 'New poster waiting' } : null,
     st.thumbnail ? { field: 'thumbnail', words: 'New still waiting' } : null,
     st.heroImage ? { field: 'heroImage', words: 'New hero image waiting' } : null,
+    // A season's art (migration 122): taken back by its own field, 'seasonArt:2'.
+    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt:${w.number}`, words: w.image ? `New Season ${w.number} art waiting` : `Season ${w.number} art removal waiting` })),
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'Title image removal waiting' : 'New title image waiting' } : null,
     st.trailer ? { field: 'trailer', words: 'New trailer waiting' } : null,
     st.description ? { field: 'description', words: 'New description waiting' } : null

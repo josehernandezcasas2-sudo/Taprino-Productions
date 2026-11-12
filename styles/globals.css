@@ -12457,6 +12457,12 @@ body.show-dragging * { cursor: grabbing !important; }
 .show-ed-art-waiting-row p { margin: 0; font-size: 0.8rem; line-height: 1.4; color: var(--ink-dim); }
 /* Edit show's Art tab: a poster sits beside its words */
 .show-ed-section > .show-ed-art-slot.kind-poster > .show-ed-art-body { display: grid; grid-template-columns: 96px minmax(0, 1fr); gap: 0.8rem; align-items: center; }
+/* Season art (migration 122): one row per season, the picture beside its
+   words once there is room */
+.show-ed-season-art > .show-ed-art-slot + .show-ed-art-slot { padding-top: 0.8rem; border-top: 1px solid var(--ocean-ink); }
+@media (min-width: 480px) {
+  .show-ed-season-art > .show-ed-art-slot > .show-ed-art-body { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr); gap: 0.8rem; align-items: center; }
+}
 
 /* "Same as the show" */
 .show-ed-same-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }

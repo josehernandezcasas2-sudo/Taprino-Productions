@@ -5,6 +5,7 @@ import { freshToken } from '../../lib/api';
 import { currentUpload, startTusUpload } from '../../lib/tusUpload';
 import { MAIN_GENRES } from '../../lib/submitRules';
 import { fieldPolicy, fieldPolicyLine, joinDescription, saveSummary, splitDescription } from '../../lib/showRules';
+import { SEASON_ART_122_MSG, seasonArtRows } from '../../lib/seasonArt';
 import { useContentRatings } from '../../lib/contentAdvisory';
 import { showPath } from '../../lib/showApi';
 import { assetName } from '../../lib/showUploadQueue';
@@ -32,7 +33,11 @@ import { InfoIcon, LinkText, PREMIUM_WORD, RoomToast, SmallButton, UploadIcon, a
 //            and the kind while the show is still empty;
 //   Art      poster, still, hero image, title image and trailer, each Live,
 //            Waiting for approval (Cancel) or None — a podcast has the
-//            poster and the still only.
+//            poster and the still only — and a series' Season art: one
+//            16:9 picture per season (migration 122), waiting for approval
+//            like the rest once an episode is approved; Details carries
+//            the switch that puts the newest released season's art in the
+//            hero (it applies at once, no review).
 // Reads GET /api/show/<id> and saves with PATCH (lib/showRules.js
 // fieldPolicy decides what applies at once and what waits, the same rule
 // the route runs); a waiting change is taken back with DELETE …/staged.
@@ -76,8 +81,20 @@ function showForm(view) {
     artist: defs.artist || '',
     adsEnabled: defs.adsEnabled !== false,
     seasons: seasonsOfView(view),
-    credits: creditsToForm(s.credits, { inherit: false })
+    credits: creditsToForm(s.credits, { inherit: false }),
+    newestSeasonHero: s.newestSeasonHero !== false
   };
+}
+
+// The Season art rows (lib/seasonArt.js): every season the show has, with
+// its saved words, what is live and what waits.
+function seasonArtOfView(view) {
+  const s = view.show;
+  return seasonArtRows({
+    seasons: seasonsOfView(view).map((x) => ({ number: x.number, label: x.name ? `Season ${x.number} · ${x.name}` : `Season ${x.number}` })),
+    live: (s.art && s.art.seasonArt) || [],
+    pending: (s.staged && s.staged.seasonArt) || []
+  });
 }
 
 // What a change to the show does now: the same fieldPolicy the route runs.
@@ -149,6 +166,8 @@ function ShowEditorReady({ initial, startTab, auth }) {
   // Edit show calls a series and a podcast alike "show" (the boards' words).
   const noun = 'show';
   const has118 = !view.migration || view.migration.shows118 !== false;
+  // Season art and the newest-season switch need migration 122.
+  const has122 = Boolean(view.migration && view.migration.series122 === true);
   const canEdit = Boolean(viewer.canEditShow);
   // Taking back a waiting change is the owner's (the team decides it on
   // the website's admin page, where Deny tells them).
@@ -198,6 +217,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
     const seasonsBefore = init.seasons.map((s) => ({ number: s.number, name: s.name.trim() })).filter((s) => s.name);
     if (JSON.stringify(seasons) !== JSON.stringify(seasonsBefore)) add('seasons', 'seasons', seasons);
     if (creditsFormKey(form.credits) !== creditsFormKey(init.credits)) add('credits', 'credits', creditsFormBody(form.credits));
+    if (form.newestSeasonHero !== init.newestSeasonHero) add('newestSeasonHero', 'newestSeasonHero', form.newestSeasonHero);
     return { body, changes };
   }, [form, init, pol]);
   const summary = saveSummary(computed.changes);
@@ -215,7 +235,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
     setSaving(false);
     if (!r.ok) {
       setError(r.error);
-      if (r.data && r.data.field) setTab(['poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer'].includes(r.data.field) ? 'art' : 'details');
+      if (r.data && r.data.field) setTab(['poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'seasonArt'].includes(r.data.field) ? 'art' : 'details');
       return;
     }
     applyView(r.data.view);
@@ -233,6 +253,20 @@ function ShowEditorReady({ initial, startTab, auth }) {
     setBusy(`cancel-${field}`);
     setError(null);
     const r = await call('DELETE', `${path}/staged?field=${enc(field)}`);
+    setBusy(null);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    say({ tone: 'ok', title: 'Taken back', lines: ['What was live stays live.'] });
+    await reload();
+  }
+
+  // One season's waiting art, taken back.
+  async function cancelSeasonStaged(number) {
+    setBusy(`cancel-season-${number}`);
+    setError(null);
+    const r = await call('DELETE', `${path}/staged?field=seasonArt&season=${enc(number)}`);
     setBusy(null);
     if (!r.ok) {
       setError(r.error);
@@ -279,6 +313,24 @@ function ShowEditorReady({ initial, startTab, auth }) {
     }
     if (!img) return;
     saveArt(a, { [`${a.field}Base64`]: img.base64, [`${a.field}FileName`]: img.fileName });
+  }
+  // A season's art: saved the moment it's picked, like the rest.
+  async function pickSeasonArt(row) {
+    let img = null;
+    try {
+      img = await pickImageAsDataUrl({ width: 1600, format: 'jpeg' });
+    } catch (err) {
+      setError(err.message);
+      return;
+    }
+    if (!img) return;
+    saveArt({ field: `season-${row.number}` }, { seasonArt: [{ number: row.number, imageBase64: img.base64, fileName: img.fileName }] }, `The ${row.label} art`);
+  }
+  function removeSeasonArt(row) {
+    Alert.alert(`Remove the ${row.label} art?`, 'The show’s own hero image stands in for it.', [
+      { text: 'Keep it', style: 'cancel' },
+      { text: 'Remove', style: 'destructive', onPress: () => saveArt({ field: `season-${row.number}` }, { seasonArt: [{ number: row.number, remove: true }] }, `Removing the ${row.label} art`) }
+    ]);
   }
   function removeTitleImage(a) {
     Alert.alert('Remove the title image?', 'The name shows as text again.', [
@@ -338,7 +390,8 @@ function ShowEditorReady({ initial, startTab, auth }) {
     st.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
     st.heroImage ? { field: 'heroImage', words: 'the hero image' } : null,
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'removing the title image' : 'the title image' } : null,
-    st.trailer ? { field: 'trailer', words: 'the trailer' } : null
+    st.trailer ? { field: 'trailer', words: 'the trailer' } : null,
+    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` }))
   ].filter(Boolean);
   const declined = show.status === 'rejected' && !show.held;
   const banners = (
@@ -372,12 +425,15 @@ function ShowEditorReady({ initial, startTab, auth }) {
       ) : null}
       {stagedList.length > 0 ? (
         <Banner level="review" icon={<ClockIcon size={16} color={colors.olive} />} title="Changes awaiting review:">
-          {stagedList.map((s) => (
-            <View key={s.field} style={se.bannerItem}>
-              <Text style={[ss.p, { flex: 1 }]}>{s.words}</Text>
-              {canCancel ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
-            </View>
-          ))}
+          {stagedList.map((s) => {
+            const key = s.season ? `cancel-season-${s.season}` : `cancel-${s.field}`;
+            return (
+              <View key={s.field} style={se.bannerItem}>
+                <Text style={[ss.p, { flex: 1 }]}>{s.words}</Text>
+                {canCancel ? <CancelButton busy={busy === key} onPress={() => (s.season ? cancelSeasonStaged(s.season) : cancelStaged(s.field))} /> : null}
+              </View>
+            );
+          })}
         </Banner>
       ) : null}
       {!has118 ? <Banner level="neutral" title="The defaults, the season names, the credits and the kind wait for a database update (migration 118)." /> : null}
@@ -392,6 +448,8 @@ function ShowEditorReady({ initial, startTab, auth }) {
   const seasonsPolicy = has118 ? lockAll('seasons') : NEEDS_118;
   const creditsPolicy = has118 ? lockAll('credits') : NEEDS_118;
   const kindPolicy = has118 ? lockAll('kind') : NEEDS_118;
+  const heroSwitchPolicy = has122 ? lockAll('newestSeasonHero') : { mode: 'locked', line: SEASON_ART_122_MSG };
+  const seasonArtPolicy = has122 ? lockAll('seasonArt') : { mode: 'locked', line: SEASON_ART_122_MSG };
   const makerLine = (show.creditLines || []).find((l) => l.key === 'maker');
   const ratingOptions = [{ value: '', label: 'Not set' }, ...ratings.map((r) => ({ value: r.code, label: r.code }))];
   if (form.rating && !ratingOptions.some((o) => o.value === form.rating)) ratingOptions.push({ value: form.rating, label: form.rating });
@@ -488,11 +546,20 @@ function ShowEditorReady({ initial, startTab, auth }) {
           TapaTV can schedule every episode live, with ads.
         </SwitchRow>
       </View>
+
+      {!podcast ? (
+        <View style={ss.card}>
+          <SwitchRow title="Use the newest season’s art as the hero" on={form.newestSeasonHero} onChange={(v) => set('newestSeasonHero', v)} disabled={!isOpen(heroSwitchPolicy)} policy={heroSwitchPolicy.mode === 'locked' ? heroSwitchPolicy : null}>
+            When a new season goes public with its own art (Art → Season art), that picture becomes the show’s hero; off, the show’s own hero image stays.
+          </SwitchRow>
+        </View>
+      ) : null}
     </>
   );
 
   // --- Art ---------------------------------------------------------------------
-  const anyArtStaged = Boolean(st.poster || st.thumbnail || st.heroImage || st.titleImageUrl || st.titleImageRemoval || st.trailer);
+  const anyArtStaged = Boolean(st.poster || st.thumbnail || st.heroImage || st.titleImageUrl || st.titleImageRemoval || st.trailer || (Array.isArray(st.seasonArt) && st.seasonArt.length > 0));
+  const seasonRows = seasonArtOfView(view);
   const artPolicyStaged = canEdit && pol('poster').mode === 'staged';
   const art = show.art || {};
   const trailerPolicy = canEdit ? pol('trailer') : namePolicy;
@@ -566,6 +633,49 @@ function ShowEditorReady({ initial, startTab, auth }) {
             <SmallButton label={art.trailer || st.trailer ? 'Replace the trailer' : 'Add a trailer'} icon={<UploadIcon size={15} color={colors.ink} />} disabled={busyUpload} onPress={pickTrailer} />
           ) : null}
           <FieldNote policy={canEdit ? (pol('trailer').mode === 'staged' ? null : pol('trailer')) : namePolicy} />
+        </View>
+      ) : null}
+      {!podcast ? (
+        <View style={ss.card}>
+          <View style={ss.row}>
+            {seasonArtPolicy.mode === 'staged' ? <ClockIcon size={12} color={colors.olive} /> : null}
+            <Text style={ss.cardK}>Season art</Text>
+          </View>
+          <Text style={ss.small}>
+            One 16:9 picture per season. {form.newestSeasonHero ? 'While “Use the newest season’s art as the hero” is on (Details), the newest released season’s picture is the show’s hero.' : 'The newest-season hero is off (Details): these wait for when you turn it on.'}
+          </Text>
+          {!has122 ? (
+            <FieldNote policy={seasonArtPolicy} />
+          ) : seasonRows.length === 0 ? (
+            <Text style={ss.small}>Seasons show up here once the show has episodes.</Text>
+          ) : seasonRows.map((row) => {
+            const p = canEdit ? seasonArtPolicy : namePolicy;
+            return (
+              <ArtSlot
+                key={row.number}
+                kind="still"
+                label={row.label}
+                status={row.staged || row.removal ? 'waiting' : row.live ? 'live' : 'none'}
+                policy={p}
+                live={row.live}
+                staged={row.staged}
+                stagedNote={`Visitors see ${row.live ? 'the live picture' : 'the show’s own art'} until we approve this one.`}
+                onCancelStaged={canCancel ? () => cancelSeasonStaged(row.number) : null}
+                cancelBusy={busy === `cancel-season-${row.number}`}
+                emptyTitle="No art yet"
+                emptyText="A 16:9 picture for this season."
+                caption={row.removal ? 'Removing it waits for approval.' : null}
+                busy={busy === `art-season-${row.number}`}
+                actions={isOpen(p) ? (
+                  <>
+                    <SmallButton label={row.live || row.staged ? 'Replace' : 'Upload'} disabled={Boolean(busy)} onPress={() => pickSeasonArt(row)} />
+                    {row.live && !row.removal ? <SmallButton label="Remove" disabled={Boolean(busy)} onPress={() => removeSeasonArt(row)} /> : null}
+                  </>
+                ) : null}
+              />
+            );
+          })}
+          {has122 && seasonRows.length > 0 ? <Text style={ss.small}>A picture is saved the moment you pick it.</Text> : null}
         </View>
       ) : null}
     </>

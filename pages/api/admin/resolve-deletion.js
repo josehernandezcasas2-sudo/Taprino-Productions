@@ -11,6 +11,7 @@ import { showRouteError } from '../../../lib/showRoute';
 import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
 import { creditAdShareBeforeDelete } from '../../../lib/adShare';
 import { cancelPendingInvites, refileExtrasUnderShow } from '../../../lib/payees';
+import { seasonArtImages } from '../../../lib/seasonArt';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -169,6 +170,14 @@ export default async function handler(req, res) {
       if (path && !seen.has(path)) {
         seen.add(path);
         jobs.push(recordOrphan({ kind: 'storage_image', reference: path, reason: `${reason} (${col})`, context }));
+      }
+    }
+    // A show's art per season, live and waiting (migration 122).
+    for (const url of type === 'series' ? seasonArtImages(row) : []) {
+      const path = storagePathFromUrl(url);
+      if (path && !seen.has(path)) {
+        seen.add(path);
+        jobs.push(recordOrphan({ kind: 'storage_image', reference: path, reason: `${reason} (season art)`, context }));
       }
     }
     await Promise.all(jobs);

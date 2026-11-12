@@ -6,7 +6,8 @@ import { AdmCard, ErrorLine, NeedLine, SignedClip, fileStateWords, onEscape } fr
 // (title, words, art, the title image or its removal, a trailer, a new
 // file) — with what is live now beside what is proposed, Approve or Deny
 // (with a note) each, and Approve all for everything this account may
-// decide. Items come from lib/stagedChanges.js listStaged; a decision is
+// decide. A show's season art (migration 122) comes as one item per
+// season (field 'seasonArt:<n>'). Items come from lib/stagedChanges.js listStaged; a decision is
 // POST /api/admin/show/[id] { action: 'staged', items, decision, note }.
 function groupsOf(items) {
   const groups = [];
@@ -32,7 +33,10 @@ function Pair({ item }) {
     );
   }
   if (item.kind === 'image' || item.kind === 'removal') {
-    const shape = item.field === 'poster' ? 'poster' : item.field === 'titleImage' || item.field === 'titleImageRemoval' ? 'title' : item.field === 'heroImage' ? 'hero' : 'still';
+    // A season's art (migration 122) says its own frame and what its
+    // removal leaves (item.shape, item.removalWords).
+    const shape = item.shape || (item.field === 'poster' ? 'poster' : item.field === 'titleImage' || item.field === 'titleImageRemoval' ? 'title' : item.field === 'heroImage' ? 'hero' : 'still');
+    const removalWords = item.removalWords || 'the name as text';
     return (
       <div className="show-ed-art-pair show-adm-art-pair">
         <figure>
@@ -41,8 +45,8 @@ function Pair({ item }) {
         </figure>
         <span className="show-ed-art-arrow" aria-hidden="true">→</span>
         <figure>
-          <div className={`show-ed-art-img kind-${shape}`}>{item.kind === 'removal' ? <span>the name as text</span> : item.proposed ? <img src={item.proposed} alt="" /> : <span>None</span>}</div>
-          <figcaption className="tone-review">{item.kind === 'removal' ? 'Proposed: the name as text' : 'Proposed'}</figcaption>
+          <div className={`show-ed-art-img kind-${shape}`}>{item.kind === 'removal' ? <span>{removalWords}</span> : item.proposed ? <img src={item.proposed} alt="" /> : <span>None</span>}</div>
+          <figcaption className="tone-review">{item.kind === 'removal' ? `Proposed: ${removalWords}` : 'Proposed'}</figcaption>
         </figure>
       </div>
     );

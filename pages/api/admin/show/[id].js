@@ -3,6 +3,7 @@ import { startShowRoute, showLimit, showRouteError, idFrom } from '../../../../l
 import { isTitleId } from '../../../../lib/titleIds';
 import { SHOW_ADMIN_CAPS } from '../../../../lib/showAdminRules';
 import { decideStaged } from '../../../../lib/stagedChanges';
+import { isSeasonArtField } from '../../../../lib/seasonArt';
 import { tellSaversNow } from '../../../../lib/seriesDrop';
 import {
   approveShowEpisodes, denyShowRemoval, fixNumbering, getAdminShow, grantOwnerCreator, holdShow, rejectShowEpisodes,
@@ -44,7 +45,9 @@ async function decideItems(body, rc) {
       results.push({ key, ok: false, error: 'Which change?' });
       continue;
     }
-    const groupKey = `${target}:${id}`;
+    // A show's season art (migration 122) is decided apart from its other
+    // changes: one list per show, written on its own.
+    const groupKey = `${target}:${id}${isSeasonArtField(field) ? ':seasons' : ''}`;
     if (!groups.has(groupKey)) groups.set(groupKey, { target, id, fields: [], seen: null });
     const g = groups.get(groupKey);
     if (!g.fields.includes(field)) g.fields.push(field);

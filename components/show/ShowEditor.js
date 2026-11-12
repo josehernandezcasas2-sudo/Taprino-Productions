@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useUpload } from '../../contexts/UploadContext';
 import { MAIN_GENRES } from '../../lib/submitRules';
 import { fieldPolicy, fieldPolicyLine, joinDescription, saveSummary, splitDescription } from '../../lib/showRules';
+import { SEASON_ART_122_MSG, SEASON_ART_PER_SAVE, seasonArtRows } from '../../lib/seasonArt';
 import { SITE } from '../../lib/siteConfig';
 import RatingOptions from '../RatingOptions';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
@@ -26,7 +27,11 @@ import { BackArrowIcon, ClockIcon, CloseIcon, ExternalLinkIcon, InfoIcon, Warnin
 //            and the kind while the show is still empty;
 //   Art      poster, still, hero image, title image and trailer, each Live,
 //            Waiting for approval (Cancel) or None — a podcast has the
-//            poster and the still only.
+//            poster and the still only — and a series' Season art: one
+//            16:9 picture per season (migration 122), waiting for approval
+//            like the rest once an episode is approved; Details carries
+//            the switch that puts the newest released season's art in the
+//            hero (it applies at once).
 // Reads GET /api/show/[id] and saves with PATCH (lib/showRules.js
 // fieldPolicy decides what applies at once and what waits, the same rule
 // the route runs); a waiting change is taken back with DELETE …/staged.
@@ -38,6 +43,9 @@ const ABOUT_MAX = 2000;
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 const TITLE_IMAGE_ACCEPT = 'image/png,image/webp';
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.m4v,.mkv,.webm';
+// Edit show's body is capped at 10 MB and every picture rides in it as a
+// data URL (a third bigger than the file).
+const PICTURES_PER_SAVE_BYTES = 7 * 1024 * 1024;
 const ART = [
   { field: 'poster', kind: 'poster', label: 'Poster 2:3', live: 'poster', staged: 'poster', words: 'On cards, rows and the show page.' },
   { field: 'thumbnail', kind: 'still', label: 'Still 16:9', live: 'thumbnail', staged: 'thumbnail', words: 'Behind the show in rows and on the episode strip.' },
@@ -71,8 +79,20 @@ function showForm(view) {
     artist: defs.artist || '',
     adsEnabled: defs.adsEnabled !== false,
     seasons: seasonsOfView(view),
-    credits: creditsToForm(s.credits, { inherit: false })
+    credits: creditsToForm(s.credits, { inherit: false }),
+    newestSeasonHero: s.newestSeasonHero !== false
   };
+}
+
+// The Season art rows (lib/seasonArt.js): every season the show has, with
+// its saved words, what is live and what waits.
+function seasonArtOfView(view) {
+  const s = view.show;
+  return seasonArtRows({
+    seasons: seasonsOfView(view).map((x) => ({ number: x.number, label: x.name ? `Season ${x.number} · ${x.name}` : `Season ${x.number}` })),
+    live: (s.art && s.art.seasonArt) || [],
+    pending: (s.staged && s.staged.seasonArt) || []
+  });
 }
 
 // What a change to the show does now: the same fieldPolicy the route runs.
@@ -140,6 +160,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
   // "Edit show", "Changing a live show's name…").
   const noun = 'show';
   const has118 = !view.migration || view.migration.shows118 !== false;
+  // Season art and the newest-season switch need migration 122.
+  const has122 = Boolean(view.migration && view.migration.series122 === true);
   const canEdit = Boolean(viewer.canEditShow);
   // Taking back a waiting change is the owner's: the team decides it under
   // Waiting for approval on the admin page, where Deny tells the owner.
@@ -149,6 +171,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
   const [init, setInit] = useState(() => showForm(initial));
   const [files, setFiles] = useState({ poster: null, thumbnail: null, heroImage: null, titleImage: null });
   const [removeTitle, setRemoveTitle] = useState(false);
+  // Season art picked here and not saved yet: { [number]: File | 'remove' }.
+  const [seasonPicks, setSeasonPicks] = useState({});
   const [trailerUp, setTrailerUp] = useState(null);
   const [tab, setTab] = useState(startTab === 'art' ? 'art' : 'details');
   const [saving, setSaving] = useState(false);
@@ -164,6 +188,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     setInit(f);
     setFiles({ poster: null, thumbnail: null, heroImage: null, titleImage: null });
     setRemoveTitle(false);
+    setSeasonPicks({});
     setTrailerUp(null);
   }, []);
   const reload = useCallback(async () => {
@@ -194,6 +219,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     const seasonsBefore = init.seasons.map((s) => ({ number: s.number, name: s.name.trim() })).filter((s) => s.name);
     if (JSON.stringify(seasons) !== JSON.stringify(seasonsBefore)) add('seasons', 'seasons', seasons);
     if (creditsFormKey(form.credits) !== creditsFormKey(init.credits)) add('credits', 'credits', creditsFormBody(form.credits));
+    if (form.newestSeasonHero !== init.newestSeasonHero) add('newestSeasonHero', 'newestSeasonHero', form.newestSeasonHero);
+    for (const n of Object.keys(seasonPicks)) changes.push({ field: 'seasonArt', mode: pol('seasonArt').mode, season: Number(n) });
     for (const f of ['poster', 'thumbnail', 'heroImage', 'titleImage']) if (files[f]) changes.push({ field: f, mode: pol(f).mode });
     if (removeTitle) changes.push({ field: 'titleImageRemoval', mode: pol('titleImage').mode });
     if (trailerUp && trailerUp.state === 'uploaded') {
@@ -201,7 +228,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
       changes.push({ field: 'trailer', mode: pol('trailer').mode });
     }
     return { body, changes };
-  }, [form, init, files, removeTitle, trailerUp, pol]);
+  }, [form, init, files, removeTitle, seasonPicks, trailerUp, pol]);
   const summary = saveSummary(computed.changes);
   const dirty = computed.changes.length > 0 || Boolean(trailerUp && trailerUp.state === 'uploading');
   useBeforeUnload(dirty);
@@ -213,11 +240,29 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     setSaving(true);
     setError(null);
     const body = { ...computed.body };
+    const seasonList = Object.entries(seasonPicks).map(([n, pick]) => ({ number: Number(n), pick }));
+    if (seasonList.length > SEASON_ART_PER_SAVE) {
+      setSaving(false);
+      setError(`Up to ${SEASON_ART_PER_SAVE} seasons’ art in one save — save these, then the rest.`);
+      return;
+    }
+    const pictureBytes = [...Object.values(files), ...seasonList.map((x) => x.pick)].reduce((sum, f) => sum + (f && typeof f === 'object' && f.size ? f.size : 0), 0);
+    if (pictureBytes > PICTURES_PER_SAVE_BYTES) {
+      setSaving(false);
+      setError('That’s more pictures than one save can carry (about 7 MB in all) — save a few, then the rest.');
+      return;
+    }
     try {
       for (const f of ['poster', 'thumbnail', 'heroImage', 'titleImage']) {
         if (!files[f]) continue;
         body[`${f}Base64`] = await readAsDataUrl(files[f]);
         body[`${f}FileName`] = files[f].name;
+      }
+      if (seasonList.length) {
+        body.seasonArt = [];
+        for (const { number, pick } of seasonList) {
+          body.seasonArt.push(pick === 'remove' ? { number, remove: true } : { number, imageBase64: await readAsDataUrl(pick), fileName: pick.name });
+        }
       }
     } catch (err) {
       setSaving(false);
@@ -230,7 +275,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     setSaving(false);
     if (!r.ok) {
       setError(r.error);
-      if (r.data && r.data.field && layout !== 'panel') setTab(['poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer'].includes(r.data.field) ? 'art' : 'details');
+      if (r.data && r.data.field && layout !== 'panel') setTab(['poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'seasonArt'].includes(r.data.field) ? 'art' : 'details');
       return;
     }
     applyView(r.data.view);
@@ -249,6 +294,20 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     setBusy(`cancel-${field}`);
     setError(null);
     const r = await callApi('DELETE', `/api/show/${encodeURIComponent(show.id)}/staged?field=${encodeURIComponent(field)}`);
+    setBusy(null);
+    if (!r.ok) {
+      setError(r.error);
+      return;
+    }
+    showToast({ title: 'Taken back', lines: ['What was live stays live.'] });
+    await reload();
+  }
+
+  // One season's waiting art, taken back.
+  async function cancelSeasonStaged(number) {
+    setBusy(`cancel-season-${number}`);
+    setError(null);
+    const r = await callApi('DELETE', `/api/show/${encodeURIComponent(show.id)}/staged?field=seasonArt&season=${encodeURIComponent(number)}`);
     setBusy(null);
     if (!r.ok) {
       setError(r.error);
@@ -312,7 +371,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     st.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
     st.heroImage ? { field: 'heroImage', words: 'the hero image' } : null,
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'removing the title image' : 'the title image' } : null,
-    st.trailer ? { field: 'trailer', words: 'the trailer' } : null
+    st.trailer ? { field: 'trailer', words: 'the trailer' } : null,
+    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` }))
   ].filter(Boolean);
   const declined = show.status === 'rejected' && !show.held;
   const banners = (
@@ -347,12 +407,15 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
       {stagedList.length > 0 && (
         <Banner level="review" icon={<ClockIcon size={16} />} title="Changes awaiting review:">
           <ul className="show-ed-banner-list">
-            {stagedList.map((s) => (
-              <li key={s.field}>
-                <span>{s.words}</span>
-                {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
-              </li>
-            ))}
+            {stagedList.map((s) => {
+              const key = s.season ? `cancel-season-${s.season}` : `cancel-${s.field}`;
+              return (
+                <li key={s.field}>
+                  <span>{s.words}</span>
+                  {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === key} onClick={() => (s.season ? cancelSeasonStaged(s.season) : cancelStaged(s.field))}>{busy === key ? '…' : 'Cancel'}</button>}
+                </li>
+              );
+            })}
           </ul>
           {!canCancel && mode === 'admin' ? <p className="show-ed-banner-sub">Approve or deny these under Waiting for approval on the show page.</p> : null}
         </Banner>
@@ -369,6 +432,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
   const seasonsPolicy = has118 ? lockAll('seasons') : { mode: 'locked', line: 'Needs a database update (migration 118).' };
   const creditsPolicy = has118 ? lockAll('credits') : { mode: 'locked', line: 'Needs a database update (migration 118).' };
   const kindPolicy = has118 ? lockAll('kind') : { mode: 'locked', line: 'Needs a database update (migration 118).' };
+  const heroSwitchPolicy = has122 ? lockAll('newestSeasonHero') : { mode: 'locked', line: SEASON_ART_122_MSG };
+  const seasonArtPolicy = has122 ? lockAll('seasonArt') : { mode: 'locked', line: SEASON_ART_122_MSG };
   const makerLine = (show.creditLines || []).find((l) => l.key === 'maker');
 
   // Who gets paid (slice 3b): the line, and the way to the show page's
@@ -509,11 +574,26 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
           TapaTV can schedule every episode live, with ads.
         </SwitchRow>
       </div>
+
+      {!podcast && (
+        <div className="show-ed-card">
+          <SwitchRow id="sh-season-hero" title="Use the newest season’s art as the hero" on={form.newestSeasonHero} onChange={(v) => set('newestSeasonHero', v)} disabled={!isOpen(heroSwitchPolicy)} policy={heroSwitchPolicy.mode === 'locked' ? heroSwitchPolicy : null}>
+            When a new season goes public with its own art (Art → Season art), that picture becomes the show’s hero; off, the show’s own hero image stays.
+          </SwitchRow>
+        </div>
+      )}
     </>
   );
 
   // --- Art ---------------------------------------------------------------------
-  const anyArtStaged = Boolean(st.poster || st.thumbnail || st.heroImage || st.titleImageUrl || st.titleImageRemoval || st.trailer);
+  const anyArtStaged = Boolean(st.poster || st.thumbnail || st.heroImage || st.titleImageUrl || st.titleImageRemoval || st.trailer || (Array.isArray(st.seasonArt) && st.seasonArt.length > 0));
+  const seasonRows = seasonArtOfView(view);
+  const pickSeason = (number, pick) => setSeasonPicks((x) => ({ ...x, [number]: pick }));
+  const undoSeason = (number) => setSeasonPicks((x) => {
+    const next = { ...x };
+    delete next[number];
+    return next;
+  });
   const artPolicyStaged = canEdit && pol('poster').mode === 'staged';
   const art = show.art || {};
   const artTab = (
@@ -586,6 +666,58 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
           )}
           {isOpen(canEdit ? pol('trailer') : namePolicy) && !trailerUp ? <PickButton label={art.trailer || st.trailer ? 'Replace the trailer' : 'Add a trailer'} accept={VIDEO_ACCEPT} disabled={busyUpload} onPick={pickTrailer} className="show-ed-slot" /> : null}
           <FieldNote policy={canEdit ? (pol('trailer').mode === 'staged' ? null : pol('trailer')) : namePolicy} />
+        </div>
+      )}
+      {!podcast && (
+        <div className="show-ed-card show-ed-season-art">
+          <div className="show-ed-art-head">
+            <span className="show-ed-label">{seasonArtPolicy.mode === 'staged' && <ClockIcon size={12} />}<span>Season art</span></span>
+          </div>
+          <p className="show-ed-hint">
+            One 16:9 picture per season.{' '}
+            {form.newestSeasonHero ? 'While “Use the newest season’s art as the hero” is on (Details), the newest released season’s picture is the show’s hero.' : 'The newest-season hero is off (Details): these wait for when you turn it on.'}
+          </p>
+          {!has122 ? (
+            <FieldNote policy={seasonArtPolicy} />
+          ) : seasonRows.length === 0 ? (
+            <p className="show-ed-hint">Seasons show up here once the show has episodes.</p>
+          ) : seasonRows.map((row) => {
+            const pick = seasonPicks[row.number];
+            const picked = pick && pick !== 'remove' ? pick : null;
+            const removing = pick === 'remove';
+            const p = canEdit ? seasonArtPolicy : namePolicy;
+            const status = picked || removing ? 'new' : row.staged || row.removal ? 'waiting' : row.live ? 'live' : 'none';
+            return (
+              <ArtSlot
+                key={row.number}
+                kind="still"
+                label={row.label}
+                status={status}
+                policy={p}
+                live={row.live}
+                picked={picked}
+                removing={removing}
+                pickedNote={picked || removing ? (p.mode === 'staged' ? 'Goes to review when you save' : 'Applies when you save') : null}
+                staged={picked || removing ? null : row.staged}
+                stagedNote={`Visitors see ${row.live ? 'the live picture' : 'the show’s own art'} until we approve this one.`}
+                onCancelStaged={canCancel ? () => cancelSeasonStaged(row.number) : null}
+                cancelBusy={busy === `cancel-season-${row.number}`}
+                emptyTitle={removing ? 'Removed when you save' : 'No art yet'}
+                emptyText="A 16:9 picture for this season."
+                caption={row.removal && !removing ? 'Removing it waits for approval.' : null}
+                actions={isOpen(p) ? (
+                  <>
+                    <PickButton label={row.live || row.staged || picked ? 'Replace' : 'Upload'} accept={IMAGE_ACCEPT} onPick={(f) => pickSeason(row.number, f)} />
+                    {picked || removing ? (
+                      <button type="button" className="show-ed-mini" onClick={() => undoSeason(row.number)}>Undo</button>
+                    ) : row.live && !row.removal ? (
+                      <button type="button" className="show-ed-mini" onClick={() => pickSeason(row.number, 'remove')}>Remove</button>
+                    ) : null}
+                  </>
+                ) : null}
+              />
+            );
+          })}
         </div>
       )}
     </>

@@ -64,6 +64,12 @@ t('adminShowFilterKeys: staged (120 included), pulled, removal, podcasts, proble
   assert.ok(has(live, [ep('a', 1, { pending_title_image_removal: true })], 'staged'));
   assert.ok(has(live, [ep('a', 1, { pendingTrailerSrc: 't' })], 'staged'), 'camelCase too');
   assert.ok(!has(live, [ep('a', 1, { pending_title_image_removal: false })], 'staged'));
+  // A show's season art waiting (migration 122): a removal counts, an
+  // empty list or none doesn't.
+  assert.ok(has({ ...live, pending_season_art: [{ number: 2, image: null }] }, [ep('a', 1)], 'staged'), 'season art waiting');
+  assert.ok(has({ ...live, pending_season_art: '[{"number":2,"image":"https://x/a.jpg"}]' }, [ep('a', 1)], 'staged'), 'as text');
+  assert.ok(!has({ ...live, pending_season_art: [] }, [ep('a', 1)], 'staged'));
+  assert.ok(!has({ ...live, pending_season_art: null }, [ep('a', 1)], 'staged'));
   assert.ok(has({ ...live, moderation_hold: true }, [], 'pulled'));
   assert.ok(!has({ ...live, moderation_hold: true }, [], 'live'));
   assert.ok(has({ ...live, deletion_requested: true }, [], 'removal'));

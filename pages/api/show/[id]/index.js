@@ -8,7 +8,10 @@ import { getShowPage, updateShow } from '../../../../lib/showPage';
 //   PATCH → Edit show: { name, description, releaseYear, fundingUrl,
 //           channelOptIn, kind, defaults, seasons, credits, posterBase64,
 //           thumbnailBase64, heroImageBase64, titleImageBase64,
-//           removeTitleImage, trailerUid, resubmit } through
+//           removeTitleImage, trailerUid, resubmit, seasonArt: [{ number,
+//           imageBase64, fileName } | { number, remove: true }] and
+//           newestSeasonHero (migration 122; 503 migration-122 before
+//           it) } through
 //           lib/showRules.js fieldPolicy (updateShow) → { ok, applied,
 //           staged, notices, notSaved, unchanged, view }.
 

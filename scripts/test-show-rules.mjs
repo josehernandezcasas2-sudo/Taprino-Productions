@@ -1317,6 +1317,16 @@ function suite(R, who) {
     assert.deepEqual(R.showProblems({ status: 'pending' }, [], { trailerState: 'error' }).map((p) => p.words), ['The trailer failed — replace it']);
   });
 
+  tt('showProblems: a show\'s season art waiting (migration 122)', () => {
+    const words = (show) => R.showProblems(show, []).filter((p) => p.code === 'staged').map((p) => p.words);
+    assert.deepEqual(words({ status: 'pending', pending_season_art: [{ number: 2, image: null }] }), ['Waiting for approval: the new season art']);
+    assert.deepEqual(words({ status: 'pending', pendingSeasonArt: [{ number: 2, image: 'https://x/s2.jpg' }], pending_poster: 'https://x/p.jpg' }), ['Waiting for approval: the new poster and season art']);
+    assert.deepEqual(words({ status: 'pending', pending_season_art: '[{"number":1,"image":"https://x/s1.jpg"}]' }), ['Waiting for approval: the new season art'], 'as text');
+    assert.deepEqual(words({ status: 'pending', pending_season_art: [] }), []);
+    assert.deepEqual(words({ status: 'pending', pending_season_art: null }), []);
+    assert.deepEqual(words({ status: 'pending' }), [], 'before 122');
+  });
+
   tt('showProblems: a live episode\'s waiting title image, removal and trailer (migration 120)', () => {
     const staged = (extra) => R.showProblems({ status: 'pending' }, [ep('z', 1, 1, { captionsUrl: '/c', ...extra })]).filter((p) => p.code === 'staged-episodes').map((p) => p.episodeIds);
     assert.deepEqual(staged({ pending_title_image_url: 'https://x/t.png' }), [['z']]);
