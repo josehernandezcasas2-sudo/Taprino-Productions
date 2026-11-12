@@ -67,6 +67,7 @@ export default function SiteSettingsPanel() {
           tipPlatformCutPercent: siteSettings.tipPlatformCutPercent,
           tipCutMaxCents: siteSettings.tipCutMaxCents,
           tipMaxCents: siteSettings.tipMaxCents,
+          crewPayCutPercent: siteSettings.crewPayCutPercent,
           connectLabel: siteSettings.connectLabel,
           streamLabel: siteSettings.streamLabel,
           ...overrides
