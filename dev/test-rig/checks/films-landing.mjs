@@ -198,6 +198,8 @@ async function notesEditing(b) {
   const { ctx, page: pg, errors } = await b.open(MARA, 1280);
   await goto(pg, '/creator/my-work');
   const menu = pg.locator(`button[aria-label="Options for Check film to edit"]`);
+  // Your work loads its list in the browser: wait for it.
+  await menu.first().waitFor({ timeout: 30000 }).catch(() => {});
   ok('Your work lists the film with its options', (await menu.count()) === 1);
   await menu.click();
   const item = pg.locator('[role="menuitem"]', { hasText: 'Edit title, description & notes' });

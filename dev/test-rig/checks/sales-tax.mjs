@@ -328,7 +328,7 @@ await runCheck('sales-tax', async () => {
   const has122 = hasColumn('site_settings', 'tax_memberships');
   console.log(`database ${has122 ? 'with' : 'without'} migration 122`);
   if (has122) savedSettings = rows(`select ${SETTINGS.join(', ')} from public.site_settings where id = 1`)[0];
-  const savedTax = (await stripeHook('/__tax')).json;
+  const savedTax = ((await stripeHook('/__tax')).json || {}).tax || null;
   cleanup();
   seed();
   try {
@@ -336,7 +336,7 @@ await runCheck('sales-tax', async () => {
     else await before122();
   } finally {
     // The fake's Stripe Tax and the switches as they were.
-    if (savedTax) await stripeHook('/__tax', { method: 'POST', body: { rate: savedTax.rate ?? 0, codeRates: savedTax.codeRates || {}, refuse: savedTax.refuse ?? null, registrations: savedTax.registrations || [] } });
+    if (savedTax) await stripeHook('/__tax', { method: 'POST', body: { rate: savedTax.rate ?? 0, codeRates: savedTax.codeRates || {}, replaceCodeRates: true, refuse: savedTax.refuse ?? null, registrations: savedTax.registrations || [] } });
     if (savedSettings) sql(`update public.site_settings set ${SETTINGS.map((c) => `${c} = ${q(savedSettings[c])}`).join(', ')} where id = 1`);
     const ids = people.map(q).join(', ') || "''";
     await forgetInvoiceEvents({ members: people });

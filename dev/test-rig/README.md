@@ -316,10 +316,12 @@ set. `POST /v1/products/<id>` takes `tax_code` (txcd_ + 8 digits);
 with `reverse_transfer` reverses it in proportion to the refund over the
 whole charge, tax included.
 
-`GET /__tax` answers the state; `POST /__tax` merges `{ rate?, codeRates?,
+`GET /__tax` answers the state (`{ tax: {…} }`); `POST /__tax` merges `{ rate?, codeRates?,
 refuse?, active?, defaultBehavior?, defaultCode?, registrations?,
-invoiceShape? }`: `rate` in percent (`8.25`), `codeRates` per code
-(`{ "txcd_20030000": 8.25 }`), `refuse` a message every automatic-tax
+invoiceShape?, replaceCodeRates? }`: `rate` in percent (`8.25`), `codeRates` per code
+(`{ "txcd_20030000": 8.25 }`, merged code by code, or replacing the list
+whole with `replaceCodeRates: true` — how `checks/sales-tax.mjs` puts back
+what it found), `refuse` a message every automatic-tax
 Checkout is refused with (`null` to stop), `registrations` like `["CA"]`.
 Defaults (and after `/__reset`): rate 0 — no registration, every tax $0,
 the studio today — `codeRates { txcd_90000001: 0, txcd_00000000: 0 }` (a

@@ -54,8 +54,9 @@
 //   POST /__events/forget { ids? | invoices? | all? } → events leave the
 //        events list (a check's cleanup).
 //   GET /__tax → the tax state; POST /__tax { rate?, codeRates?, refuse?,
-//        active?, defaultBehavior?, defaultCode?, registrations? } merges
-//        into it (rate in percent, e.g. 8.25; refuse: a message every
+//        active?, defaultBehavior?, defaultCode?, registrations?,
+//        replaceCodeRates? } merges into it (codeRates per code, or whole
+//        with replaceCodeRates: true; rate in percent, e.g. 8.25; refuse: a message every
 //        automatic-tax Checkout is refused with, null to stop; active:
 //        false = Stripe Tax not set up; registrations: ['CA', …] for
 //        GET /v1/tax/registrations). /__reset puts the defaults back:
@@ -885,7 +886,9 @@ async function hooks(req, res, url, parts, body) {
         if (body[k] === undefined) continue;
         if (k === 'rate') taxState.rate = Number(body.rate) || 0;
         else if (k === 'active') taxState.active = bool(body.active) || body.active === true;
-        else if (k === 'codeRates') taxState.codeRates = { ...taxState.codeRates, ...Object.fromEntries(Object.entries(body.codeRates || {}).map(([c, r]) => [c, Number(r) || 0])) };
+        // Merged per code; with `replaceCodeRates: true` the list replaces
+        // the old one whole (how a check puts the state it found back).
+        else if (k === 'codeRates') taxState.codeRates = { ...(body.replaceCodeRates === true ? {} : taxState.codeRates), ...Object.fromEntries(Object.entries(body.codeRates || {}).map(([c, r]) => [c, Number(r) || 0])) };
         else if (k === 'registrations') taxState.registrations = Array.isArray(body.registrations) ? body.registrations.map(String) : [];
         else taxState[k] = body[k] === '' ? null : body[k];
       }
