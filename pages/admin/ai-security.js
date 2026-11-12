@@ -3,7 +3,7 @@ import { adminPageProps } from '../../lib/adminPage';
 import { AI_POLICY_PATH } from '../../lib/aiPolicyRules';
 import {
   Card, Chip, Tile, SwitchRow, ProtectionRun, useSwitches, shortDay,
-  VideosResult, CaptionsResult, UniversityResult, PostsResult
+  VideosResult, CaptionsResult, UniversityResult, PostsResult, PodcastsResult
 } from '../../components/admin/SecurityBits';
 import { AiSealChip } from '../../components/AiSeal';
 
@@ -29,7 +29,8 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
   const capture = switches.screenCaptureBlock;
   const answer = switches.blockAiSearch;
   const runs = data.runs || {};
-  const ranCount = ['videos', 'captions', 'university', 'posts'].filter((k) => runs[k]).length;
+  const runKeys = ['videos', 'captions', 'university', 'posts', 'podcasts'];
+  const ranCount = runKeys.filter((k) => runs[k]).length;
   const crawlersBlocked = data.crawlers.training + (answer.on ? data.crawlers.answer : 0);
   const changed = data.captureChanged;
 
@@ -39,7 +40,7 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
       <div className="sec-tiles">
         <Tile label="Screenshots in the app" value={capture.on ? 'Blocked' : 'Allowed'} tone={capture.on ? 'ok' : 'warn'} />
         <Tile label="AI crawlers blocked" value={`${crawlersBlocked} of ${data.crawlers.training + data.crawlers.answer}`} tone={answer.on ? 'ok' : 'plain'} />
-        <Tile label="Older uploads locked" value={`${ranCount} of 4 run`} tone={ranCount === 4 ? 'ok' : 'warn'} />
+        <Tile label="Older uploads locked" value={`${ranCount} of ${runKeys.length} run`} tone={ranCount === runKeys.length ? 'ok' : 'warn'} />
         <Tile label="The seal" value={data.seal ? `${data.seal.creators - data.seal.off} of ${data.seal.creators} creators` : '—'} tone="plain" />
       </div>
 
@@ -59,15 +60,16 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
           <div className="sec-kv first">
             <div>
               <p className="sec-row-title"><span>Training crawlers</span></p>
-              <p className="sec-p small">{data.crawlers.trainingSample.join(', ')} and {data.crawlers.training - data.crawlers.trainingSample.length} more are always told no. It&rsquo;s the promise on the AI policy page, so it has no switch.</p>
+              <p className="sec-p small">{data.crawlers.trainingSample.join(', ')} and {data.crawlers.training - data.crawlers.trainingSample.length} more are always told no in robots.txt, and the site refuses them too: a request that names one in its user agent gets a 403 (robots.txt, /.well-known/, the AI policy and the Terms excepted). It&rsquo;s the promise on the AI policy page, so it has no switch.</p>
             </div>
             <Chip tone="ok">Always blocked</Chip>
           </div>
           <SwitchRow
             field="blockAiSearch" title="Block AI answer engines" state={answer} busy={busy} error={errors.blockAiSearch} onFlip={flip}
           >
-            <p className="sec-p">On: robots.txt tells {data.crawlers.answerSample.join(', ')} and {data.crawlers.answer - data.crawlers.answerSample.length} more not to read pages to answer questions about the site. Off: robots.txt stops naming them and the AI policy page says so, but every page&rsquo;s headers still ask AI not to use it and the Terms still forbid it, so check with the lawyer before turning it off. The training crawlers stay blocked either way.</p>
+            <p className="sec-p">On: robots.txt tells {data.crawlers.answerSample.join(', ')} and {data.crawlers.answer - data.crawlers.answerSample.length} more not to read pages to answer questions about the site, and the site answers them 403 as it does the training crawlers. Off: robots.txt stops naming them, the site lets them in and the AI policy page says so, but every page&rsquo;s headers still ask AI not to use it and the Terms still forbid it, so check with the lawyer before turning it off. The training crawlers stay blocked either way.</p>
           </SwitchRow>
+          <p className="sec-p small">The refusal goes by the name a crawler gives. It stops the ones that say who they are, including those that ignore robots.txt; one dressed up as a browser gets through, and files served straight from the build (scripts, images) never reach this check. Vercel&rsquo;s firewall covers the rest (Admin → Security, &ldquo;Done in other dashboards&rdquo;).</p>
           <p className="sec-p"><a href="/robots.txt" target="_blank" rel="noreferrer">See robots.txt ↗</a> · <a href={AI_POLICY_PATH} target="_blank" rel="noreferrer">AI policy ↗</a></p>
         </Card>
 
@@ -90,6 +92,12 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
             blurb="Makes the course-file bucket private. Readings and files keep working through one-hour links."
             lastRun={runs.university} label="Lock the files" busyLabel="Locking…" url="/api/admin/protect-media" body={{ what: 'university' }}
             render={(result) => <UniversityResult result={result} />}
+          />
+          <ProtectionRun
+            title="Podcast audio locked"
+            blurb="Makes the podcast audio bucket private. Nothing is copied: every play, every podcast-app download from a show's feed and the review queue's player already go through links that last a few hours, and the free episodes a public feed lists still open for anyone."
+            lastRun={runs.podcasts} label="Lock podcast audio" busyLabel="Locking…" url="/api/admin/protect-media" body={{ what: 'podcasts' }}
+            render={(result) => <PodcastsResult result={result} />}
           />
           <ProtectionRun
             title="Snippet photos and covers in private storage"

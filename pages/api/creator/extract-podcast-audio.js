@@ -2,6 +2,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { cloudflareUidFromUrl, ensureCloudflareAudioDownloadUrl } from '../../../lib/cloudflareUpload';
 import { importAudioFromUrl } from '../../../lib/audioUpload';
+import { audioRoutePath } from '../../../lib/podcastAudio';
 
 // Polled by the creator's browser after they ask to extract audio from a
 // podcast episode's existing video — same two-stage wait pattern as
@@ -41,8 +42,11 @@ export default async function handler(req, res) {
   if (!episode.src) {
     return res.status(400).json({ error: 'This episode has no video to extract audio from.' });
   }
+  // The answer names the audio route, never the stored file (the bucket
+  // is private since 2026-11-12; lib/podcastAudio.js). My Work only reads
+  // `status`.
   if (episode.audio_url) {
-    return res.status(200).json({ status: 'ready', audioUrl: episode.audio_url });
+    return res.status(200).json({ status: 'ready', audioUrl: audioRoutePath(episodeId, episode.audio_url) });
   }
 
   const uid = cloudflareUidFromUrl(episode.src);
@@ -71,7 +75,7 @@ export default async function handler(req, res) {
       console.error('extract-podcast-audio save error:', updateError.message);
       return res.status(500).json({ error: 'Audio was extracted but could not be saved — try again.' });
     }
-    return res.status(200).json({ status: 'ready', audioUrl: rehosted.url });
+    return res.status(200).json({ status: 'ready', audioUrl: audioRoutePath(episodeId, rehosted.url) });
   }
 
   return res.status(200).json({ status: result.status, percentComplete: result.percentComplete });

@@ -170,6 +170,10 @@ export function UniversityResult({ result }) {
   return <p>{result.wasPublic ? 'The bucket was public and is now private.' : result.existed ? 'The bucket was already private.' : 'Created the bucket private.'}</p>;
 }
 
+export function PodcastsResult({ result }) {
+  return <p>{result.wasPublic ? 'The podcast audio bucket was public and is now private.' : result.existed ? 'The podcast audio bucket was already private.' : 'Created the podcast audio bucket private.'}</p>;
+}
+
 export function PostsResult({ result }) {
   return (
     <>

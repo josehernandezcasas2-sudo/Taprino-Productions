@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../lib/api';
+import { absoluteUrl, apiGet } from '../../lib/api';
 import { colors, fonts, oliveTint } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
@@ -13,6 +13,8 @@ import { withTerms } from '../../lib/viewingTerms';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 
 const enc = (x) => encodeURIComponent(String(x));
+// Ten of the twelve hours an audio key lasts (lib/podcastAudioRules.js).
+const KEY_FRESH_MS = 10 * 60 * 60 * 1000;
 
 // Why a row of the owner's preview won't play here (pages/podcasts/[id].js's
 // lock titles, the same words).
@@ -124,6 +126,11 @@ export default function PodcastShow() {
   const [isPlaying, setIsPlaying] = useState(false);
   const player = useVideoPlayer(audioSrc, () => {});
   const tokenWithTimeout = () => Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
+  // When the show was last read: the audio addresses carry a key that
+  // lasts 12 hours (lib/podcastAudio.js), so a screen left open longer
+  // asks again before it plays.
+  const loadedAtRef = useRef(0);
+  const showPath = () => `/api/podcast-show?id=${encodeURIComponent(id)}${previewAsked ? '&preview=1' : ''}`;
 
   // Same progress as the episode screen (mobile/src/lib/useWatchProgress.js):
   // picks up where this listener left the episode (`resume` from
@@ -154,8 +161,11 @@ export default function PodcastShow() {
         ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))])
         : null;
       try {
-        const data = await apiGet(await withTerms(`/api/podcast-show?id=${encodeURIComponent(id)}${previewAsked ? '&preview=1' : ''}`), token);
-        if (!cancelled) setState({ loading: false, error: null, data });
+        const data = await apiGet(await withTerms(showPath()), token);
+        if (!cancelled) {
+          loadedAtRef.current = Date.now();
+          setState({ loading: false, error: null, data });
+        }
       } catch (err) {
         if (!cancelled) setState({ loading: false, error: err.message, data: null });
       }
@@ -175,13 +185,31 @@ export default function PodcastShow() {
     return () => sub.remove();
   }, [player]);
 
-  function playAudio(ep) {
+  async function playAudio(ep) {
     if (playingId === ep.id) {
       setIsPlaying((p) => !p);
       return;
     }
+    // The website's audio route with a key the server minted for this
+    // listener (lib/podcastAudio.js, 2026-11-12): it answers with a link
+    // that lasts a few hours, so the player needs no sign-in header. A
+    // key near its 12 hours is replaced by reading the show again.
+    let url = ep.audioUrl;
+    if (Date.now() - loadedAtRef.current > KEY_FRESH_MS) {
+      try {
+        const token = isSignedIn ? await tokenWithTimeout() : null;
+        const data = await apiGet(await withTerms(showPath()), token);
+        loadedAtRef.current = Date.now();
+        setState({ loading: false, error: null, data });
+        const fresh = (data.episodes || []).find((e) => e.id === ep.id);
+        url = fresh && !fresh.locked ? fresh.audioUrl : null;
+      } catch (err) {
+        // Keep the address we have; the route says no if it has to.
+      }
+    }
+    if (!url) return;
     setPlayingId(ep.id);
-    setAudioSrc(ep.audioUrl);
+    setAudioSrc(absoluteUrl(url));
     setIsPlaying(true);
   }
 

@@ -37,6 +37,17 @@ export function ensureBucket(id, { public: isPublic = false, fileSizeLimit = nul
   return b[id];
 }
 
+// A check's way to put a bucket back the way production has it (the
+// podcast audio check starts from a public `episode-audio`, as it was
+// before 2026-11-12).
+export function setBucketPublic(id, isPublic) {
+  const b = readBuckets();
+  if (!b[id]) return ensureBucket(id, { public: Boolean(isPublic) });
+  b[id] = { ...b[id], public: Boolean(isPublic), updated_at: new Date().toISOString() };
+  writeBuckets(b);
+  return b[id];
+}
+
 // Object keys never climb out of the bucket's directory.
 function safeKey(key) {
   const parts = String(key || '').split('/').filter((p) => p && p !== '.' && p !== '..');

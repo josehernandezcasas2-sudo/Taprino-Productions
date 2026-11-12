@@ -6,6 +6,7 @@ import { UploadProvider, uploadStatusRef } from '../contexts/UploadContext';
 import { PodcastPlayerProvider } from '../contexts/PodcastPlayerContext';
 import UploadStatusWidget from '../components/UploadStatusWidget';
 import PodcastMiniPlayer from '../components/PodcastMiniPlayer';
+import { refreshPushQuietly, dropPushWhenSignedOut, forgetPushRefresh } from '../lib/webPushClient';
 import '../styles/globals.css';
 import '@uppy/core/css/style.css';
 import '@uppy/dashboard/css/style.css';
@@ -14,12 +15,23 @@ import '@uppy/dashboard/css/style.css';
 // signed-in person saw is left for the next one on this browser
 // (security round, 2026-10-26). The worker stores only shareable pages
 // since then; this is the second lock.
+// Web push (2026-11-12, lib/webPushClient.js): sign-out also stops this
+// browser's notifications — the server is told by endpoint, then the
+// subscription is dropped — so the next person here gets none of them. A
+// signed-in visit tells the server once a day that a browser that already
+// sends notifications is still here (it never asks for permission); a
+// signed-out one drops a subscription a session left behind.
 function ClearCacheOnSignOut() {
   const { isLoaded, isSignedIn } = useAuth();
   const wasSignedIn = useRef(false);
   useEffect(() => {
     if (!isLoaded) return;
+    if (typeof window !== 'undefined') {
+      if (isSignedIn) refreshPushQuietly();
+      else dropPushWhenSignedOut();
+    }
     if (wasSignedIn.current && !isSignedIn && typeof window !== 'undefined') {
+      forgetPushRefresh();
       try {
         if (navigator.serviceWorker && navigator.serviceWorker.controller) navigator.serviceWorker.controller.postMessage({ type: 'clear-cache' });
         if (window.caches) window.caches.keys().then((keys) => keys.forEach((k) => window.caches.delete(k))).catch(() => {});

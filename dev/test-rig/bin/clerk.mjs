@@ -15,6 +15,11 @@
 //   POST /__roles?user=&role=[&permissions=a,b]   POST /__twofactor?user=&on=1
 //   POST /__users  { id?, email, firstName, ... }  (a new account)
 //   POST /__expo/push/send                 sink for EXPO_PUSH_URL
+//   POST /__webpush/<token>                web push sink (WEB_PUSH_TEST_ORIGIN):
+//                                          201; a token starting "gone" 410,
+//                                          "missing" 404, "fail" 500
+//   POST /__webpush-keys { token, privateKey, auth }  decrypt what arrives
+//                                          for that token (lib/webpush.mjs)
 //   POST /__fail?user=<id>&on=1|0          make Clerk "down" for one account:
 //                                          GET /v1/users/<id>, and a users list
 //                                          that asks for it by user_id, answer 500
@@ -29,6 +34,7 @@ import { loadKeys } from '../lib/keys.mjs';
 import { publicJwk, signRS256 } from '../lib/jwt.mjs';
 import { readBody, sendJson, jsonOrNull, logLine, listen, corsHeaders } from '../lib/http.mjs';
 import { resolveUserId } from '../lib/accounts.mjs';
+import { decryptPush, readVapid } from '../lib/webpush.mjs';
 
 const keys = loadKeys();
 const SEED = path.join(RIG_DIR, 'seed', 'accounts.json');
@@ -37,6 +43,10 @@ const DAY = 86400000;
 let users = new Map();
 let invitations = new Map();
 const pushes = [];
+// Web push: what arrived at /__webpush/<token>, and the stand-in browsers'
+// private keys a check registered, so the sink can read the message.
+const webPushes = [];
+const webPushKeys = new Map();
 // Accounts whose reads answer 500 (POST /__fail), for the money paths that
 // must fail closed when Clerk can't say who is on the team.
 const failing = new Set();
@@ -109,6 +119,8 @@ function loadSeed() {
   users = new Map(seed.accounts.map((a) => [a.id, makeUser(a)]));
   invitations = new Map();
   pushes.length = 0;
+  webPushes.length = 0;
+  webPushKeys.clear();
 }
 loadSeed();
 
@@ -218,7 +230,8 @@ const server = http.createServer(async (req, res) => {
     const q = url.searchParams;
     const p = url.pathname.replace(/\/+$/, '') || '/';
     const seg = p.split('/').filter(Boolean).map(decodeURIComponent);
-    const body = req.method === 'GET' || req.method === 'HEAD' ? null : jsonOrNull(await readBody(req)) || {};
+    const raw = req.method === 'GET' || req.method === 'HEAD' ? null : await readBody(req);
+    const body = raw === null ? null : jsonOrNull(raw) || {};
 
     if (req.method === 'OPTIONS') {
       res.writeHead(204, corsHeaders(req));
@@ -234,7 +247,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': 'image/svg+xml', 'Content-Length': Buffer.byteLength(svg) });
       return res.end(svg);
     }
-    if (p === '/__state') return sendJson(res, 200, { users: [...users.values()], invitations: [...invitations.values()], pushes });
+    if (p === '/__state') return sendJson(res, 200, { users: [...users.values()], invitations: [...invitations.values()], pushes, webPushes });
     if (p === '/__reset' && req.method === 'POST') {
       loadSeed();
       return sendJson(res, 200, { ok: true, users: users.size });
@@ -277,6 +290,41 @@ const server = http.createServer(async (req, res) => {
         else failing.delete(id);
       }
       return sendJson(res, 200, { ok: true, failing: [...failing] });
+    }
+    if (p === '/__webpush-keys' && req.method === 'POST') {
+      if (!body.token || !body.privateKey || !body.auth) return sendJson(res, 400, { error: 'send { token, privateKey, auth }' });
+      webPushKeys.set(String(body.token), { privateKey: String(body.privateKey), auth: String(body.auth) });
+      return sendJson(res, 200, { ok: true });
+    }
+    if (seg[0] === '__webpush' && seg[1] && req.method === 'POST') {
+      const token = seg[1];
+      const status = token.startsWith('gone') ? 410 : token.startsWith('missing') ? 404 : token.startsWith('fail') ? 500 : 201;
+      const vapid = readVapid(req.headers.authorization);
+      const entry = {
+        at: new Date().toISOString(),
+        token,
+        status,
+        ttl: req.headers.ttl || null,
+        urgency: req.headers.urgency || null,
+        contentEncoding: req.headers['content-encoding'] || null,
+        bytes: raw ? raw.length : 0,
+        vapid: vapid ? { aud: vapid.claims && vapid.claims.aud, sub: vapid.claims && vapid.claims.sub, exp: vapid.claims && vapid.claims.exp, k: vapid.k, signatureValid: vapid.signatureValid } : null,
+        payload: null,
+        decryptError: null
+      };
+      const k = webPushKeys.get(token);
+      if (k && raw) {
+        try {
+          const text = decryptPush(raw, k);
+          try { entry.payload = JSON.parse(text); } catch (err) { entry.payload = text; }
+        } catch (err) {
+          entry.decryptError = err.message;
+        }
+      }
+      webPushes.push(entry);
+      if (webPushes.length > 500) webPushes.splice(0, webPushes.length - 500);
+      res.writeHead(status, { 'Content-Length': '0' });
+      return res.end();
     }
     if (p === '/__expo/push/send' && req.method === 'POST') {
       const list = Array.isArray(body) ? body : [body];

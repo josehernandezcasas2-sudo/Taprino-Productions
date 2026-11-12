@@ -1,14 +1,16 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
-import { moveCaptionsToPrivate, lockUniversityBucket, movePostMediaToPrivate } from '../../../lib/protectMedia';
+import { moveCaptionsToPrivate, lockUniversityBucket, movePostMediaToPrivate, lockPodcastAudioBucket } from '../../../lib/protectMedia';
 import { sendError } from '../../../lib/apiErrors';
 
 // The Protection card's other buttons (components/admin/SiteSettingsPanel.js):
 // `what: 'captions'` moves every caption track still at a public URL into
 // the private bucket; `what: 'university'` makes the Film University
 // bucket private; `what: 'posts'` moves every Snippet photo and cover
-// into the private bucket as a capped copy (2026-10-29). All are safe to
-// press again (lib/protectMedia.js).
+// into the private bucket as a capped copy (2026-10-29); `what:
+// 'podcasts'` makes the podcast audio bucket private (2026-11-12: every
+// play already goes through /api/podcasts/audio/<id>, which signs a link,
+// so nothing is copied). All are safe to press again (lib/protectMedia.js).
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
@@ -56,7 +58,19 @@ export default async function handler(req, res) {
       });
       return res.status(200).json({ what, ...result });
     }
-    return res.status(400).json({ error: 'what must be captions, university or posts.' });
+    if (what === 'podcasts') {
+      const result = await lockPodcastAudioBucket();
+      await recordAudit({
+        adminId: userId,
+        adminEmail: email,
+        action: 'protect_podcast_audio',
+        targetType: 'storage',
+        targetId: 'episode-audio',
+        details: result.wasPublic ? 'The podcast audio bucket was public and is now private.' : result.existed ? 'The podcast audio bucket was already private.' : 'Created the podcast audio bucket private.'
+      });
+      return res.status(200).json({ what, ...result });
+    }
+    return res.status(400).json({ error: 'what must be captions, university, posts or podcasts.' });
   } catch (err) {
     console.error('protect-media error:', err.message);
     return sendError(res, err, 'admin/protect-media', 'Could not finish.');

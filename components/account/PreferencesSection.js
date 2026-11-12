@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { SITE } from '../../lib/siteConfig';
+import WebPushRow from './WebPushRow';
 
 // /account/preferences (option B, 2026-10-29): the newsletter and
-// "Start in Stream" as switches, and a note that push lives in the app.
+// "Start in Stream" as switches, and notifications: on this browser (web
+// push, 2026-11-12, components/account/WebPushRow.js) and in the app.
 // The same two handlers the old one-page /account had.
 export function Switch({ on, onToggle, label, busy = false }) {
   return (
@@ -89,10 +91,11 @@ export default function PreferencesSection({ newsletterStatus = 'undecided', pro
       </div>
 
       <div className="account-card">
-        <div className="account-subheading">The app</div>
+        <div className="account-subheading">Notifications</div>
+        <WebPushRow Switch={Switch} />
         <div className="account-row">
           <div>
-            <div className="account-row-label">Push notifications</div>
+            <div className="account-row-label">In the app</div>
             <div className="account-row-detail">Messages, calls and payouts on your phone. Switched on and off in the {SITE.name} app, under Account.</div>
           </div>
         </div>

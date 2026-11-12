@@ -43,7 +43,7 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-const UPDATED = 'October 25, 2026';
+const UPDATED = 'November 12, 2026';
 
 export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) {
   return (
@@ -95,15 +95,15 @@ export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) 
               <h3>We tell them no.</h3>
               <p>
                 {answerEnginesBlocked
-                  ? 'Our robots file names every known AI training crawler and AI answer engine and turns them away.'
-                  : 'Our robots file names every known AI training crawler and turns it away. It does not name the AI answer engines (the search features of chatbots), though every page still asks not to be used by AI.'}
+                  ? 'Our robots file names every known AI training crawler and AI answer engine and turns them away, and the site refuses a request from any of them that gives its name, robots file or not.'
+                  : 'Our robots file names every known AI training crawler and turns it away, and the site refuses a request from one that gives its name. It does not name or refuse the AI answer engines (the search features of chatbots), though every page still asks not to be used by AI.'}
                 {' '}Every page carries a no-AI header, the European text-and-data-mining reservation, and a signal that says search yes, AI no.
               </p>
             </div>
             <div className="aip-card">
               <div className="aip-kicker">02 · Video</div>
               <h3>No permanent address.</h3>
-              <p>Every title plays through a short-lived signed link, free titles included. A copied link stops working within hours. A Snippet&rsquo;s photo and cover are served by us from private storage, capped in size with the camera data stripped, never from a public address.</p>
+              <p>Every title plays through a short-lived signed link, free titles included. A copied link stops working within hours. Podcast audio plays the same way, through a link that lasts a few hours; only the free episodes a show&rsquo;s public feed lists open for anyone. A Snippet&rsquo;s photo and cover are served by us from private storage, capped in size with the camera data stripped, never from a public address.</p>
             </div>
             <div className="aip-card">
               <div className="aip-kicker">03 · The words</div>
@@ -131,7 +131,7 @@ export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) 
         <section className="aip-section aip-honest">
           <h2>What we can&rsquo;t promise</h2>
           <p>
-            These signals are requests. The large AI companies document honouring them; not everyone does, and a crawler that lies about its name gets past a robots file. Nothing stops a person with a camera pointed at a screen, or a signed-in human copying what they see. A model that was trained on something cannot be made to forget it.
+            These signals are requests. The large AI companies document honouring them; not everyone does, and a crawler that lies about its name gets past a robots file and past our refusal. Nothing stops a person with a camera pointed at a screen, or a signed-in human copying what they see. A model that was trained on something cannot be made to forget it.
           </p>
           <p>
             We are a small studio. We would rather say that plainly than pretend otherwise, and keep closing the doors we can close.

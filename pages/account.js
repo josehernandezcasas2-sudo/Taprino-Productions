@@ -197,7 +197,7 @@ export default function Account(props) {
           lines={[
             `Newsletter ${newsletterStatus === 'subscribed' ? 'on' : newsletterStatus === 'opted_out' ? 'off' : 'not chosen'}`,
             profile ? `Start in Stream ${profile.stayInStream ? 'on' : 'off'}` : 'Start in Stream',
-            'Push, in the app'
+            'Notifications here and in the app'
           ]}
           cta="Change"
         />

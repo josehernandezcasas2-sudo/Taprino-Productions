@@ -84,6 +84,13 @@ export function appEnv(appDir, keys) {
     CRON_SECRET: 'rig-cron-secret',
     ADMIN_NOTIFY_SECRET: 'rig-admin-notify-secret',
     EXPO_PUSH_URL: `${u.clerk}/__expo/push/send`,
+    // Web push (lib/webPush.js): the rig's own key pair, and the fake
+    // Clerk's sink (POST /__webpush/<token>) as the one extra push service
+    // the app accepts outside production.
+    WEB_PUSH_PUBLIC_KEY: keys.vapidPublicKey,
+    WEB_PUSH_PRIVATE_KEY: keys.vapidPrivateKey,
+    WEB_PUSH_SUBJECT: 'mailto:rig@rig.example.com',
+    WEB_PUSH_TEST_ORIGIN: u.clerk,
     PAYEE_RULE_FROM: '2026-10-15T00:00:00.000Z'
   };
   const env = {};
