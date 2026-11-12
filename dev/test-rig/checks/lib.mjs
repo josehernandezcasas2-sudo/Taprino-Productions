@@ -110,7 +110,8 @@ export function insert(table, row) {
   const vals = cols.map((c) => {
     const v = row[c];
     if (v && typeof v === 'object' && !Array.isArray(v)) return qj(v);
-    if (Array.isArray(v)) return table === 'episodes' && c === 'ad_break_seconds' ? `array[${v.map(Number).join(',')}]::int[]` : qj(v);
+    // An array is jsonb (episodes.ad_break_seconds is jsonb, not int[]).
+    if (Array.isArray(v)) return qj(v);
     return q(v);
   });
   sql(`insert into public.${table} (${cols.join(', ')}) values (${vals.join(', ')})`);
