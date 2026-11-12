@@ -20,6 +20,7 @@ dev/test-rig/status.sh
 dev/test-rig/reset.sh                    # back to the seed (truncate + reseed, fakes reset)
 dev/test-rig/reset.sh --rebuild          # drop the database, run the chain again, reseed
 dev/test-rig/stop.sh                     # everything down; the data stays
+node dev/test-rig/bin/rig.mjs restart-next   # only `next dev` again (with this shell's RIG_APP_ENV_*)
 node dev/test-rig/smoke.mjs              # the smoke check (rig must be up)
 ```
 
@@ -42,7 +43,7 @@ The checkout needs its `node_modules` (a worktree can symlink them:
 | `RIG_DATA_DIR`, `RIG_CACHE_DIR` | Where the run-time data and the PostgREST download live. |
 | `RIG_PG_BIN`, `RIG_PSQL`, `RIG_POSTGREST_BIN` | Other Postgres / PostgREST binaries. |
 | `RIG_NEXT_PORT`, `RIG_PG_PORT` | Other ports for Next (3100) and Postgres (54329). |
-| `RIG_APP_ENV_<NAME>=value` | Give the app one variable a different value (e.g. `RIG_APP_ENV_PRIVATE_BETA=on`). |
+| `RIG_APP_ENV_<NAME>=value` | Give the app one variable a different value (e.g. `RIG_APP_ENV_PRIVATE_BETA=on`, or `RIG_APP_ENV_GOOGLE_VIDEO_AD_TAG=https://pubads.g.doubleclick.net/gampad/ads?…` for `checks/google-fill.mjs`). To switch one while the rest keeps running: `RIG_APP_ENV_<NAME>=value node dev/test-rig/bin/rig.mjs restart-next` (and the same without it to blank it again). |
 | `RIG_CF_AUTOREADY_SECONDS=5` | Uploaded videos become ready by themselves after N seconds (default: only through `/__ready`). |
 | `RIG_STRIPE_API_EVENTS=0` | The fake Stripe stops sending the webhooks Stripe sends after API calls (refund → `charge.refunded`, …). |
 | `RIG_SUPABASE_TLS=0` | Give the app the plain-http Supabase address (images through next/image then fail; see below). |

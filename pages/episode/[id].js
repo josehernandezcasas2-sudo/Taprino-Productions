@@ -14,6 +14,8 @@ import { MIN_AGE_BY_RATING } from '../../lib/ageGate';
 import { episodeHref } from '../../lib/episodeLinks';
 import { getEpisodePageData } from '../../lib/episodePage';
 import { signedSrcForStoredUrl, unsignedFallback } from '../../lib/videoSigning';
+import { adsOnFor } from '../../lib/adBreakRules';
+import { googleAdTagFor } from '../../lib/googleAds';
 import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadata';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
@@ -207,6 +209,14 @@ export async function getServerSideProps({ req, params, query, res }) {
     ? previewInfo.canPlay === true
     : (episode.tier === 'free' || account.isSubscriber || owned) && !earlyAccess.locked;
   const purchaseSettings = data.purchase && data.purchase.forSale && !owned ? await getPurchaseSettings() : null;
+  // Google's Ad Manager tag (lib/googleAds.js), asked for only when our own
+  // ads leave a break empty — and in these props only for a viewer who
+  // gets ads on this title and can play it (lib/adBreakRules.js adsOnFor:
+  // never an ad-free member, the team, a buyer or a preview). The player
+  // leaves it out on the trailer too.
+  const googleAdTag = entitled
+    ? googleAdTagFor(adsOnFor({ previewing: Boolean(previewInfo), adFree: account.adFree, isAdmin: account.isAdmin, owned, adsEnabled: episode.adsEnabled }))
+    : null;
 
   // Every video is served through a short-lived Cloudflare signed URL
   // rather than its permanent one, free titles included (Jose,
@@ -257,6 +267,7 @@ export async function getServerSideProps({ req, params, query, res }) {
       isAdmin: account.isAdmin,
       isCreator: account.isCreator,
       isSignedIn: account.isSignedIn,
+      googleAdTag,
       wishlist: account.wishlist,
       email: account.email,
       watchProgress: account.watchProgress,
@@ -300,7 +311,7 @@ export async function getServerSideProps({ req, params, query, res }) {
   };
 }
 
-export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, afterShow = null, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10, credits = [], notesFrom = null, preview = null, head = null, showEpisodeCount = 0 }) {
+export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree = false, isSignedIn, wishlist, email, watchProgress, mainGenres = [], bonusContent = [], crew = [], shotAt = [], parentSeriesName, nextEpisode, previousEpisode, previousEpisodeWatched, seasonEpisodes = [], watchNext, afterShow = null, startOnTrailer, startPlaying, isAdmin, isCreator, signedPlayback, ageRestricted, termsRequired = false, requiredRating, requiredAge: requiredAgeProp = null, purchase = null, bundle = null, withdrawn = false, earlyAccess = null, tipping = null, aiSeal = true, bought = null, refundDays = 14, refundWatchPercent = 10, credits = [], notesFrom = null, preview = null, head = null, showEpisodeCount = 0, googleAdTag = null }) {
   const router = useRouter();
   // Falls back to an empty object rather than leaving `episode` undefined
   // when age-restricted — every hook below (and there are several) has to
@@ -532,6 +543,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   // pulled one plays for the team only (preview.canPlay).
   const previewPulled = previewing && preview.canPlay === false && !showingTrailer;
   const locked = previewing ? previewPulled : (episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer) || earlyLocked;
+  // Who gets ads here (lib/adBreakRules.js adsOnFor, the rule the app reads too).
+  const titleAdsOn = adsOnFor({ previewing, trailer: showingTrailer, adFree, isAdmin, owned, adsEnabled: episode.adsEnabled });
   const playingEpisode = showingTrailer
     ? { ...episode, src: episode.trailerSrc }
     : describedActive && episode.audioDescriptionSrc
@@ -720,7 +733,14 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 // ad-free (lib/membershipTiers.js adFree). A buyer paid for this
                 // title, so it plays ad-free for them (Buy to own).
                 // A preview never shows ads (nothing about it counts).
-                adsEnabled={!previewing && !showingTrailer && !adFree && !isAdmin && !owned && episode.adsEnabled !== false}
+                adsEnabled={titleAdsOn}
+                // Google's Ad Manager fills a plain break our own ads leave
+                // empty (only ever handed to a viewer who gets ads).
+                googleAdTag={titleAdsOn ? googleAdTag : null}
+                // The trailer and the full episode share the episode's id: a
+                // switch between them starts the player afresh (the title's
+                // pre-roll isn't skipped because the trailer played first).
+                programKey={showingTrailer ? 'trailer' : 'title'}
                 onEnded={handleEnded}
                 advisory={!showingTrailer}
                 // The film refreshes its own token through /api/stream-token;

@@ -6,6 +6,9 @@
 //   node dev/test-rig/bin/rig.mjs status
 //   node dev/test-rig/bin/rig.mjs env          the app's environment, as shell exports
 //   node dev/test-rig/bin/rig.mjs migrate      apply migrations the database lacks
+//   node dev/test-rig/bin/rig.mjs restart-next [app-checkout]
+//                                              only `next dev` again, with this shell's
+//                                              RIG_APP_ENV_* (e.g. a GOOGLE_VIDEO_AD_TAG)
 import fs from 'node:fs';
 import path from 'node:path';
 import { RIG_DIR, REPO_DIR, DATA_DIR, PATHS, PORTS, HOST, urls, PG_BIN, POSTGREST_BIN, ensureDirs, IS_ROOT } from '../lib/config.mjs';
@@ -221,6 +224,18 @@ async function status() {
   console.log(`\ndata: ${DATA_DIR}${IS_ROOT ? ' (Postgres runs as the postgres user)' : ''}\nlogs: ${PATHS.logs}`);
 }
 
+// Only the app again (the database and the fakes keep running): how a
+// check switches one of the app's variables, RIG_APP_ENV_<NAME>=value
+// (unset to blank it again). Without a checkout, the one Next ran last.
+async function restartNext(argApp) {
+  const keys = ensureKeys();
+  const appDir = argApp ? appDirFrom(argApp) : fs.existsSync(PATHS.appFile) ? fs.readFileSync(PATHS.appFile, 'utf8').trim() : appDirFrom(null);
+  if (await stopProcess('next')) say('stopped next');
+  await waitFor(async () => !(await portOpen(PORTS.next)), { timeoutMs: 20000, what: `port ${PORTS.next} to free` });
+  await startNext(appDir, keys);
+  say(`up: the app on ${urls().next} (${appDir})`);
+}
+
 async function printEnv() {
   const keys = ensureKeys();
   const appDir = fs.existsSync(PATHS.appFile) ? fs.readFileSync(PATHS.appFile, 'utf8').trim() : REPO_DIR;
@@ -235,9 +250,9 @@ async function migrate() {
 }
 
 const [cmd, arg] = process.argv.slice(2);
-const commands = { start: () => start(arg), stop, reset: () => reset({ rebuild: arg === '--rebuild' || process.argv.includes('--rebuild') }), status, env: printEnv, migrate };
+const commands = { start: () => start(arg), stop, reset: () => reset({ rebuild: arg === '--rebuild' || process.argv.includes('--rebuild') }), status, env: printEnv, migrate, 'restart-next': () => restartNext(arg) };
 if (!commands[cmd]) {
-  console.error('usage: rig.mjs start [app-checkout] | stop | reset [--rebuild] | status | env | migrate');
+  console.error('usage: rig.mjs start [app-checkout] | stop | reset [--rebuild] | status | env | migrate | restart-next [app-checkout]');
   process.exit(2);
 }
 commands[cmd]().catch((err) => {

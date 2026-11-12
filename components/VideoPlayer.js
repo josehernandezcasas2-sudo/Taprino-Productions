@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
+import { runImaBreak, googleRequestTag } from '../lib/imaAdBreak';
+import { titleBreaks, preRollOf, AD_START_NOTE } from '../lib/adBreakRules';
 import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
 import EndCard from './EndCard';
@@ -15,13 +17,18 @@ import { screenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 //
 // Priority order:
 //   1. NEXT_PUBLIC_AD_TAG_URL, if set — point this at a real ad network's
-//      VAST tag once you have one.
+//      VAST tag once you have one. It replaces the house tag *and* Google's
+//      fill below: the player asks only that tag, exactly as it always did.
 //   2. This site's own house-ads system (/api/house-ads/vast) — a working
 //      ad system with no network, no approval process, and no minimum
 //      traffic, populated from the admin's house-ads dashboard. This is
 //      the default specifically so a fresh checkout of this app has a
 //      functioning ad path on day one, not a hardcoded pointer to Google's
 //      public IMA sample forever.
+//      When it yields no ad and the page handed the player Google's Ad
+//      Manager tag (`googleAdTag`, GOOGLE_VIDEO_AD_TAG, only in the props of
+//      a viewer who gets ads), IMA asks Google once for that break
+//      (lib/imaAdBreak.js): our own ads first, Google's in the gaps.
 // `episodeId` rides along so the impression credits the title's creator
 // (ad share, migration 103); an outside network's tag ignores it.
 function getAdTagUrl(placement, episodeId = null) {
@@ -93,17 +100,28 @@ export default function VideoPlayer({
   // card from lib/endCardRules.js, null for no card) and where its
   // timer / PLAY NOW / Back link go: `onEndCardGo(href, target)`.
   endCard = null,
-  onEndCardGo = null
+  onEndCardGo = null,
+  // Google's Ad Manager tag (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js): asked
+  // for a plain break only when our own ads yield none. The page passes it
+  // only to a viewer who gets ads (null otherwise).
+  googleAdTag = null,
+  // What is playing, when the page swaps programmes under the same title
+  // (the trailer and the full episode share the episode's id): a change
+  // starts the player afresh, so the title's pre-roll isn't skipped
+  // because the trailer already "started" it.
+  programKey = null
 }) {
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const iconOverrides = usePlayerIconOverrides();
   // Google's IMA SDK, fetched only when this viewer can get ads (it used
-  // to load on every page of the site).
-  useImaSdk(Boolean(adsEnabled));
+  // to load on every page of the site). `imaReady`: it's on the page.
+  const imaReady = useImaSdk(Boolean(adsEnabled));
   const adContainerRef = useRef(null);
   const adsManagerRef = useRef(null);
   const adsLoaderRef = useRef(null);
+  // The IMA break in progress (lib/imaAdBreak.js runImaBreak), if any.
+  const adRunRef = useRef(null);
   // Tracks which ad-break second-offsets have already fired this playback
   // session, so a timeupdate event near the threshold (or scrubbing back
   // and forward across it) doesn't retrigger the same break repeatedly.
@@ -157,6 +175,11 @@ export default function VideoPlayer({
   const [currentLevel, setCurrentLevel] = useState(-1);
   const [rate, setRate] = useState(1);
   const [adState, setAdState] = useState(null);
+  // True while the pre-roll is being asked for (our own ads, then
+  // Google's): the title starts when the break is over, and play waits.
+  const [adWaiting, setAdWaiting] = useState(false);
+  // The title whose pre-roll has been asked for (it plays once per title).
+  const [preRollDoneFor, setPreRollDoneFor] = useState(null);
   const [cuePoints, setCuePoints] = useState([]);
   const [srcError, setSrcError] = useState(false);
   // The src that played out, for the end card: a trailer's end never
@@ -189,6 +212,13 @@ export default function VideoPlayer({
   useEffect(() => {
     if (plan) setCuePoints(plan.breaks.map((b) => b.at).filter((a) => a > 0));
   }, [plan, episode.id]);
+  // The break before the title, if this viewer gets one (lib/adBreakRules.js:
+  // a ready plan's break at 0:00, else 0 among the plain breaks — none set
+  // means a pre-roll only). `index` is the plan's break, null for a plain one.
+  const preRoll = useMemo(
+    () => (isYouTube ? null : preRollOf(titleBreaks({ adsOn: Boolean(adsEnabled), adPlan: episode.adPlan, adBreakSeconds: episode.adBreakSeconds }))),
+    [isYouTube, adsEnabled, episode.adPlan, episode.adBreakSeconds]
+  );
 
   /* ------------------------------------------------------------------ *
    * Watch progress — unchanged behaviour, still throttled to ~15s.
@@ -209,6 +239,15 @@ export default function VideoPlayer({
     if (isYouTube || !onProgress) return;
     const videoElement = videoRef.current;
     if (!videoElement) return;
+    // The saver this run was set up with: when the page swaps the title for
+    // its trailer (no saver), the cleanup below still saves the title's
+    // place through it — reading the ref alone there found nothing to call
+    // and the page went blank ("onProgressRef.current is not a function").
+    const setupSave = onProgressRef.current;
+    const save = (position, duration) => {
+      const fn = typeof onProgressRef.current === 'function' ? onProgressRef.current : setupSave;
+      if (typeof fn === 'function') fn(position, duration);
+    };
 
     function handleLoadedMetadata() {
       if (seekedForRef.current === episode.id) return;
@@ -223,7 +262,7 @@ export default function VideoPlayer({
       if (now - lastSavedRef.current >= 15) {
         lastSavedRef.current = now;
         lastSaveTimeRef.current = Date.now();
-        onProgressRef.current(now, videoElement.duration);
+        save(now, videoElement.duration);
       }
     }
     // The 15s throttle above is exactly right for normal playback — it's
@@ -240,7 +279,7 @@ export default function VideoPlayer({
       const now = Date.now();
       if (now - lastSaveTimeRef.current < 3000) return;
       lastSaveTimeRef.current = now;
-      onProgressRef.current(position, duration);
+      save(position, duration);
     }
     function handlePause() {
       // `pause` fires just before `ended`; onEnded records the finish.
@@ -467,12 +506,16 @@ export default function VideoPlayer({
   /* ------------------------------------------------------------------ *
    * Reset per-episode state when the episode changes.
    * ------------------------------------------------------------------ */
+  // Also when the page swaps the trailer for the full episode
+  // (`programKey`): the same title, but a new start, so its pre-roll plays
+  // (once per title: a title that already had it doesn't get it again).
   useEffect(() => {
     setStarted(false);
     setPlaying(false);
     setEndedSrc(null);
     setCurrentTime(0);
     setAdState(null);
+    setAdWaiting(false);
     setCuePoints([]);
     setSettingsOpen(false);
     lastSavedRef.current = 0;
@@ -481,14 +524,19 @@ export default function VideoPlayer({
       v.pause();
       v.currentTime = 0;
     }
+    // A break still being asked for belongs to what was playing.
+    if (adRunRef.current) {
+      adRunRef.current.cancel();
+      adRunRef.current = null;
+    }
     if (adsManagerRef.current) {
-      adsManagerRef.current.destroy();
+      try { adsManagerRef.current.destroy(); } catch (err) { /* already gone */ }
       adsManagerRef.current = null;
     }
     // stopPod is declared further down (a const); reach it through the ref
     // so this effect's deps don't hit the temporal dead zone at render.
     stopPodRef.current();
-  }, [episode.id, isYouTube]);
+  }, [episode.id, isYouTube, programKey]);
 
   /* ------------------------------------------------------------------ *
    * Ads.
@@ -500,23 +548,40 @@ export default function VideoPlayer({
    * asked to watch. IMA also requires AdDisplayContainer.initialize() to
    * run inside a real user gesture on mobile, which is only true here.
    * ------------------------------------------------------------------ */
-  const startAds = useCallback(() => {
+  // `kind`: 'preroll' (the viewer's click started it: the title waits for
+  // the break) or 'midroll' (playback crossed a break: the title plays on
+  // until an ad actually starts). One break through lib/imaAdBreak.js: the
+  // house tag first, Google's tag only when that yields no ad.
+  const startAds = useCallback((kind = 'preroll') => {
     const v = videoRef.current;
     if (!v) return false;
     if (typeof window === 'undefined' || !window.google || !window.google.ima) return false;
+    const houseTag = getAdTagUrl('main_player', episode && episode.id);
+    if (!houseTag) return false;
 
     const google = window.google;
+    const preroll = kind === 'preroll';
+    // One break at a time: one still being asked for is dropped.
+    if (adRunRef.current) {
+      adRunRef.current.cancel();
+      adRunRef.current = null;
+    }
     try {
       const adDisplayContainer = new google.ima.AdDisplayContainer(adContainerRef.current, v);
       adDisplayContainer.initialize(); // must happen inside the click handler
+      const pageUrl = `${window.location.origin}/episode/${encodeURIComponent(episode.id)}`;
 
-      const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-      adsLoaderRef.current = adsLoader;
-
-      adsLoader.addEventListener(
-        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-        (evt) => {
-          const adsManager = evt.getAdsManager(v);
+      const run = runImaBreak({
+        ima: google.ima,
+        container: adDisplayContainer,
+        video: v,
+        houseTag,
+        // Asked for only if our own ads yield nothing, with the mute state
+        // and the player's size at that moment — and never for a pre-roll
+        // whose title is already playing (a media key started it while the
+        // house answer was on its way): the viewer is watching by then.
+        googleTag: () => (preroll && !v.paused ? null : googleRequestTag(googleAdTag, { video: v, vpos: preroll ? 'preroll' : 'midroll', clickToPlay: preroll, descriptionUrl: pageUrl })),
+        onLoaded: (adsManager, brk) => {
           adsManagerRef.current = adsManager;
 
           // Mid-roll positions, when the VAST/VMAP response defines any.
@@ -529,16 +594,19 @@ export default function VideoPlayer({
           }
 
           const AdEvent = google.ima.AdEvent.Type;
-
+          // While the break runs it decides when the title carries on
+          // (onEnd below); a VMAP tag's later breaks (NEXT_PUBLIC_AD_TAG_URL,
+          // the manager kept) resume it here, as they always did.
           adsManager.addEventListener(AdEvent.CONTENT_PAUSE_REQUESTED, () => {
             v.pause();
             setAdState((s) => s || { index: 1, total: 1, remaining: 0 });
           });
           adsManager.addEventListener(AdEvent.CONTENT_RESUME_REQUESTED, () => {
             setAdState(null);
-            safePlay(v);
+            if (brk.ended) safePlay(v);
           });
           adsManager.addEventListener(AdEvent.STARTED, (e) => {
+            setAdWaiting(false);
             const ad = e.getAd ? e.getAd() : null;
             const pod = ad && ad.getAdPodInfo ? ad.getAdPodInfo() : null;
             setAdState({
@@ -556,49 +624,33 @@ export default function VideoPlayer({
           adsManager.addEventListener(AdEvent.COMPLETE, () => setAdState(null));
           adsManager.addEventListener(AdEvent.ALL_ADS_COMPLETED, () => {
             setAdState(null);
-            safePlay(v);
+            if (brk.ended) safePlay(v);
           });
           adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => {
             setAdState(null);
-            adsManager.destroy();
+            if (!brk.ended) return; // the break decides: Google's turn, or the title
+            try { adsManager.destroy(); } catch (err) { /* gone */ }
             safePlay(v);
           });
-
-          try {
-            adsManager.init(v.clientWidth, v.clientHeight, google.ima.ViewMode.NORMAL);
-            adsManager.start();
-          } catch (adError) {
-            setAdState(null);
-            safePlay(v);
-          }
         },
-        false
-      );
-
-      adsLoader.addEventListener(
-        google.ima.AdErrorEvent.Type.AD_ERROR,
-        () => {
-          // Fail open — an ad problem must never stop someone watching.
+        // The break is over (an ad played, nothing filled it, or IMA went
+        // quiet): the title carries on. A mid-roll whose title never paused
+        // (nothing filled the break) leaves it as the viewer has it.
+        onEnd: ({ contentPaused }) => {
           setAdState(null);
-          safePlay(v);
-        },
-        false
-      );
-
-      const adsRequest = new google.ima.AdsRequest();
-      const adTagUrl = getAdTagUrl('main_player', episode && episode.id);
-      if (!adTagUrl) return false;
-      adsRequest.adTagUrl = adTagUrl;
-      adsRequest.linearAdSlotWidth = v.clientWidth || 640;
-      adsRequest.linearAdSlotHeight = v.clientHeight || 360;
-      adsRequest.nonLinearAdSlotWidth = v.clientWidth || 640;
-      adsRequest.nonLinearAdSlotHeight = 150;
-      adsLoader.requestAds(adsRequest);
+          setAdWaiting(false);
+          if (preroll || contentPaused) safePlay(v);
+        }
+      });
+      if (!run) return false;
+      adRunRef.current = run;
+      adsLoaderRef.current = run.loader;
+      if (preroll && !run.ended) setAdWaiting(true);
       return true;
     } catch (err) {
       return false;
     }
-  }, []);
+  }, [episode.id, googleAdTag]);
 
   /* ------------------------------------------------------------------ *
    * Ad plan pods. One break of a ready plan: /api/ad-plan/fill says what
@@ -767,7 +819,7 @@ export default function VideoPlayer({
         if (now >= breakSeconds && !consumedBreaksRef.current.has(breakSeconds)) {
           consumedBreaksRef.current.add(breakSeconds);
           if (planBreaks) runPod(planBreaks.find((b) => b.at === breakSeconds).index);
-          else startAds();
+          else startAds('midroll');
           break; // one break at a time - the pod/startAds() pauses content itself
         }
       }
@@ -783,8 +835,12 @@ export default function VideoPlayer({
 
   useEffect(() => {
     return () => {
+      if (adRunRef.current) {
+        adRunRef.current.cancel();
+        adRunRef.current = null;
+      }
       if (adsManagerRef.current) {
-        adsManagerRef.current.destroy();
+        try { adsManagerRef.current.destroy(); } catch (err) { /* already gone */ }
         adsManagerRef.current = null;
       }
       if (adsLoaderRef.current && adsLoaderRef.current.contentComplete) {
@@ -885,29 +941,22 @@ export default function VideoPlayer({
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
+    // The pre-roll is being asked for: the title starts when that's over
+    // (a second press would start it under the ad, or skip the ad).
+    if (adWaiting) return;
 
     if (!started) {
       setStarted(true);
-      // Free tier: try the ad first. If IMA isn't available (blocked, still
-      // loading, or misconfigured) fall straight through to the content.
-      // Pre-roll only fires if 0 is actually in the configured ad breaks —
-      // this used to be unconditional on adsEnabled alone, which meant a
-      // mid-roll-only configuration (say, just "10:00") would still get an
-      // uninvited pre-roll on top of it.
-      if (plan) {
-        const pre = plan.breaks.find((b) => b.at === 0);
-        if (pre) {
-          consumedBreaksRef.current.add(0);
-          if (runPod(pre.index)) return;
-        }
-        safePlay(v);
-        return;
-      }
-      const breaks = Array.isArray(episode.adBreakSeconds) && episode.adBreakSeconds.length > 0 ? episode.adBreakSeconds : [0];
-      if (adsEnabled && breaks.includes(0)) {
+      // The break before the title (`preRoll`): once per title — a ready
+      // plan's pod, else IMA (our own ads, Google's in the gaps). It plays
+      // only when 0 is among the breaks: a mid-roll-only title ("10:00")
+      // never gets an uninvited pre-roll. If it can't be asked for (IMA
+      // blocked or still loading, a pod that won't start), the title plays.
+      if (preRoll && !consumedBreaksRef.current.has(0)) {
         consumedBreaksRef.current.add(0);
-        const requested = startAds();
-        if (requested) return;
+        setPreRollDoneFor(episode.id);
+        const asked = preRoll.index !== null ? runPod(preRoll.index) : startAds('preroll');
+        if (asked) return;
       }
       safePlay(v);
       return;
@@ -915,7 +964,7 @@ export default function VideoPlayer({
     if (v.paused) safePlay(v);
     else v.pause();
     showControlsTemporarily();
-  }, [adsEnabled, started, startAds, showControlsTemporarily, episode.adBreakSeconds, plan, runPod]);
+  }, [adWaiting, started, preRoll, episode.id, startAds, showControlsTemporarily, runPod]);
 
   const seekTo = useCallback((t) => {
     const v = videoRef.current;
@@ -1232,7 +1281,7 @@ export default function VideoPlayer({
         </a>
       )}
 
-      {buffering && !adState && (
+      {(buffering || adWaiting) && !adState && (
         <div className="tp-spinner" aria-live="polite" aria-label="Buffering">
           <span />
         </div>
@@ -1248,7 +1297,10 @@ export default function VideoPlayer({
       {!started && !adState && (
         <button className="tp-bigplay" onClick={togglePlay} aria-label="Play">
           <span className="tp-bigplay-glyph"><PlayIcon size={32} src={iconOverrides.play} /></span>
-          {adsEnabled && <span className="tp-bigplay-note">Starts with a short ad</span>}
+          {/* Only when a pre-roll will really be asked for: a mid-roll-only
+              title or a plan with no break at 0:00 starts straight away,
+              and a plain pre-roll needs IMA on the page. */}
+          {preRoll && preRollDoneFor !== episode.id && (preRoll.index !== null || imaReady) && <span className="tp-bigplay-note">{AD_START_NOTE}</span>}
         </button>
       )}
 

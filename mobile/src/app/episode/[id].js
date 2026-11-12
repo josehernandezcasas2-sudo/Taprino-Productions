@@ -315,6 +315,9 @@ export default function Episode() {
     adPlan: episode ? episode.adPlan || null : null,
     adBreakSeconds: episode ? episode.adBreakSeconds || null : null,
     titleSrc: showingTrailer ? null : playback.src,
+    // Google's fill for a break our own ads leave empty (house ads only
+    // until a real build can play it: mobile/src/lib/googleAdPlayer.js).
+    googleAdTag: state.page ? state.page.googleAdTag || null : null,
     getToken
   });
   armPreRollRef.current = titleAds.armPreRoll;

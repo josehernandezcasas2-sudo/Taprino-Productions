@@ -1,6 +1,7 @@
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL, absoluteUrl, freshToken } from './api';
 import { AD_SLOT_TIMEOUT_MS, titleSlot, liveSlot, reelSlot } from './adBreakRules';
+import { googleAdsAvailable } from './googleAdPlayer';
 
 // The one place the app decides what plays in an ad slot and fetches it.
 // A slot comes from mobile/src/lib/adBreakRules.js (titleSlot, liveSlot,
@@ -22,6 +23,15 @@ import { AD_SLOT_TIMEOUT_MS, titleSlot, liveSlot, reelSlot } from './adBreakRule
 // that type's player added beside the others (ITEM_RUNNERS in
 // mobile/src/lib/useAdBreak.js, ITEM_VIEWS in
 // mobile/src/components/AdBreakLayer.js). Nothing else changes.
+//
+// Google's fill is that source: a plain break's slot may carry
+// `googleAdTag` (withGoogleFill below; /api/episode-page's tag, null
+// unless this viewer gets ads), and when the house pick answers with no ad
+// the slot yields one `{ type: 'google', adTagUrl }` item — our own ads
+// first, Google's in the gaps, as on the website (lib/imaAdBreak.js). Only
+// when googleAdsAvailable() says this build can play it
+// (mobile/src/lib/googleAdPlayer.js), which it can't yet: today the app
+// plays house ads only, as before.
 //
 // An ad never holds up what the viewer came for: an answer slower than
 // AD_SLOT_TIMEOUT_MS, an error or anything unusable is "nothing to play".
@@ -98,6 +108,20 @@ export function cleanItem(raw) {
   return null;
 }
 
+// A plain break's slot with Google's tag on it (a plan's fill stays house
+// only, as on the website). No tag: the slot as it was.
+export function withGoogleFill(slot, googleAdTag) {
+  if (!slot || slot.source !== 'pick' || typeof googleAdTag !== 'string' || !/^https:\/\//i.test(googleAdTag)) return slot;
+  return { ...slot, googleAdTag };
+}
+
+// Google's item for a slot our own ads left empty: once, and only when this
+// build has a player for it.
+function googleFill(slot) {
+  if (!slot || !slot.googleAdTag || !googleAdsAvailable()) return [];
+  return [{ type: 'google', adTagUrl: slot.googleAdTag }];
+}
+
 // What plays in a slot → a list of items, [] for nothing.
 export async function loadSlot(slot, { timeoutMs = AD_SLOT_TIMEOUT_MS } = {}) {
   if (!slot || !slot.path) return [];
@@ -105,7 +129,8 @@ export async function loadSlot(slot, { timeoutMs = AD_SLOT_TIMEOUT_MS } = {}) {
   if (!data) return [];
   if (slot.source === 'pick') {
     const ad = data.ad;
-    if (!ad) return [];
+    // The house answered with nothing to play: Google's turn, if any.
+    if (!ad) return googleFill(slot);
     const item = adItem({ id: ad.id, src: ad.videoUrl, seconds: ad.seconds, title: ad.title, brand: ad.brand, clickUrl: ad.clickUrl, clickTrackUrl: ad.clickTrackUrl || (ad.id ? `/api/house-ads/click?ad=${encodeURIComponent(ad.id)}` : null), impressionUrl: ad.impressionUrl });
     return item ? [item] : [];
   }
