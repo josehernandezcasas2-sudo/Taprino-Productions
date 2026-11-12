@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { dollars } from '../../lib/artistSupportRules';
 import { applyBalance, earliestEffective, normalizeShareNumbers, shareChanges } from '../../lib/creatorShareRules';
 import { STRIPE_FEE_FIXED_CENTS, STRIPE_FEE_PERCENT } from '../../lib/donationMath';
+import { adShareAuditWords } from '../../lib/adShareRules';
+import { catchupNotice } from '../../lib/stripeCatchupRules';
 
 // /admin/creator-money: what Creator Share's ledger holds this month, who
 // the next payout batch would pay and hold, the platform's Stripe balance
@@ -40,6 +42,8 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
   const [notice, setNotice] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [nums, setNums] = useState(null);
+  const [catchup, setCatchup] = useState(null);
+  const [catchupRun, setCatchupRun] = useState(null);
 
   const load = useCallback(async () => {
     setError(null);
@@ -54,6 +58,37 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
     }
   }, [apiPath]);
   useEffect(() => { load(); }, [load]);
+
+  // The Stripe catch-up's line (lib/stripeCatchup.js): paid membership
+  // invoices never recorded and webhook events that never finished. Asked
+  // apart, so the page never waits on Stripe's event listing.
+  const loadCatchup = useCallback(async () => {
+    try {
+      const res = await fetch(`${apiPath}${apiPath.includes('?') ? '&' : '?'}part=catchup`);
+      const d = await res.json();
+      if (res.ok) setCatchup(d);
+    } catch (err) {
+      setCatchup({ invoicesError: 'Couldn’t check Stripe just now.' });
+    }
+  }, [apiPath]);
+  useEffect(() => { loadCatchup(); }, [loadCatchup]);
+
+  async function retryCatchup() {
+    setBusy('catchup');
+    setError(null);
+    try {
+      const res = await fetch(apiPath, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'catchup' }) });
+      const d = await res.json();
+      if (!res.ok) throw new Error(d.error || 'The catch-up didn’t run.');
+      setCatchupRun(d.line || 'Done.');
+      if (d.check) setCatchup(d.check);
+      await load();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy(null);
+    }
+  }
 
   // Same rule as the batch (lib/creatorShareRules.js applyBalance): pay in
   // order while the platform's available balance covers it; the rest
@@ -160,6 +195,26 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
         <div className="adm-stat"><b>{balance ? dollars(balance.availableCents) : '—'}</b><span>{balance ? 'platform balance available' : 'platform balance (Stripe off)'}</span></div>
       </div>
 
+      {catchup && (catchupNotice(catchup) || catchup.invoicesError || catchup.eventsError || catchupRun) && (
+        <div className="account-card" id="cm-catchup" style={{ marginBottom: '1rem' }}>
+          <div className="adm-card-head">
+            <div>
+              <div className="account-eyebrow" style={{ marginBottom: 2 }}>Stripe catch-up</div>
+              <div className="cm-sub">
+                {catchupNotice(catchup) || 'Every paid membership invoice of the last 30 days is recorded.'}
+                {catchup.capped ? ' (only the newest 1,000 payments were checked)' : ''}
+              </div>
+              {(catchup.invoicesError || catchup.eventsError) && <div className="cm-sub" style={{ color: 'var(--warn, var(--olive))' }}>{[catchup.invoicesError, catchup.eventsError].filter(Boolean).join(' ')}</div>}
+              <div className="cm-sub">Runs every day at 9:30 UTC: webhook events whose work didn’t finish run again, and paid invoices Stripe never got through to us are recorded (nothing is recorded twice).</div>
+              {catchupRun && <p className="cm-result">Ran: {catchupRun}</p>}
+            </div>
+            <button type="button" className="account-btn-primary" style={{ width: 'auto', marginBottom: 0 }} disabled={busy === 'catchup'} onClick={retryCatchup}>
+              {busy === 'catchup' ? 'Catching up…' : 'Retry now'}
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="account-card" style={{ marginBottom: '1rem' }}>
         <div className="adm-card-head">
           <div>
@@ -190,7 +245,8 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
           <p className="cm-result">
             {result.forfeited && result.forfeited.filter((f) => f.cents > 0).length > 0 && <>Moved {dollars(result.forfeited.reduce((t, f) => t + f.cents, 0))} of uncollected credits to the pool. </>}
             {result.forfeitError && <span className="cm-fail">{result.forfeitError}</span>}
-            {result.adShare && result.adShare.error && <span className="cm-fail">Ad share for {result.adShare.period}: {result.adShare.error}</span>}
+            {result.adShare && result.adShare.error && <span className="cm-fail">Ad share for {result.adShare.error}</span>}
+            {result.adShare && <span className="cm-sub" style={{ display: 'block' }}>{adShareAuditWords(result.adShare)}</span>}
             Ran: <b>{result.paid.length}</b> paid ({dollars(result.paidCents)}){result.failed.length > 0 && <>, <b className="bad">{result.failed.length} failed</b></>}{result.skippedForBalance.length > 0 && <>, {result.skippedForBalance.length} waiting on balance</>}, {result.held.length} held.
             {result.failed.map((f) => <span key={f.creatorId} className="cm-fail">{f.displayName || f.creatorId}: {f.reason}</span>)}
           </p>
@@ -244,7 +300,7 @@ export default function CreatorMoneyPanel({ apiPath = '/api/admin/creator-money'
             )}
             {(plan.kept || []).length > 0 && (
               <p className="cm-sub" id="cm-studio-kept" style={{ marginTop: '0.5rem' }}>
-                Kept by the studio · {dollars(plan.keptCents || 0)}: members picked the studio’s own account{plan.kept.length === 1 ? '' : 's'} ({plan.kept.map((k) => `${k.displayName} (studio account) ${dollars(k.cents)}`).join(', ')}). It’s the studio’s money — never paid out, not owed to anyone; the ledger lines stay as the record.
+                Kept by the studio · {dollars(plan.keptCents || 0)}: what members’ picks credited the studio’s own account{plan.kept.length === 1 ? '' : 's'} while {plan.kept.length === 1 ? 'it was' : 'they were'} the studio’s ({plan.kept.map((k) => `${k.displayName} ${dollars(k.cents)}`).join(', ')}). It’s the studio’s money — never paid out, not owed to anyone; the ledger lines stay as the record.
               </p>
             )}
           </div>

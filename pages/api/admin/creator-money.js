@@ -5,7 +5,11 @@ import { resolveProfileUserId } from '../../../lib/userProfiles';
 import { cancelScheduledNumbers, saveShareNumbers } from '../../../lib/creatorShareSettings';
 import { recordAudit } from '../../../lib/auditLog';
 import { dollars } from '../../../lib/artistSupportRules';
+import { adShareAuditWords } from '../../../lib/adShareRules';
+import { checkStripeCatchup, runStripeCatchup } from '../../../lib/stripeCatchup';
+import { catchupAuditLine } from '../../../lib/stripeCatchupRules';
 import { sendError } from '../../../lib/apiErrors';
+import { handleStripeEvent } from '../webhook';
 
 // /admin/creator-money: Creator Share's ledger summary, the next payout
 // batch's plan and the button that runs it. Full admins only — this moves
@@ -17,6 +21,10 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // The Stripe catch-up's line ("2 paid membership invoices not
+      // recorded yet"), asked apart so the summary never waits on Stripe's
+      // event listing.
+      if (req.query.part === 'catchup') return res.status(200).json(await checkStripeCatchup());
       return res.status(200).json(await getAdminSummary());
     }
     if (req.method === 'POST') {
@@ -62,6 +70,13 @@ export default async function handler(req, res) {
         }).catch(() => {});
         return res.status(200).json({ ok: true, creatorId, result });
       }
+      if (action === 'catchup') {
+        // "Retry now": the daily Stripe catch-up, run by hand
+        // (lib/stripeCatchup.js; the cron runs it every day at 9:30 UTC).
+        const result = await runStripeCatchup({ handleEvent: handleStripeEvent });
+        await recordAudit({ adminId: userId, adminEmail: email || null, action: 'stripe_catchup', targetType: 'creator_share', targetId: 'manual', details: `manual · ${catchupAuditLine(result)}` });
+        return res.status(200).json({ ok: true, ...result, line: catchupAuditLine(result), check: await checkStripeCatchup() });
+      }
       if (action !== 'run') return res.status(400).json({ error: 'Unknown action.' });
       const result = await runPayoutBatch({ createdBy: userId });
       recordAudit({
@@ -70,7 +85,7 @@ export default async function handler(req, res) {
         action: 'creator_payouts_run',
         targetType: 'creator_share',
         targetId: result.period,
-        details: `${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held${result.adShare ? ` · ad share ${result.adShare.error ? `failed: ${result.adShare.error}` : result.adShare.skipped ? `skipped (${result.adShare.skipped}, ${result.adShare.period})` : `${dollars(result.adShare.totalCents)} to ${result.adShare.creators || 0} creators for ${result.adShare.period}`}` : ''}`
+        details: `${result.paid.length} paid (${dollars(result.paidCents)}) · ${result.failed.length} failed · ${result.skippedForBalance.length} waiting on balance · ${result.held.length} held${result.adShare ? ` · ${adShareAuditWords(result.adShare)}` : ''}`
       }).catch(() => {});
       return res.status(200).json(result);
     }

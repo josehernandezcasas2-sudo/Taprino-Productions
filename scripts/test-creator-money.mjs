@@ -1,7 +1,7 @@
 // node scripts/test-creator-money.mjs — the creator's Money page maths
 // (lib/creatorMoneyRules.js).
 import assert from 'node:assert/strict';
-import { buildHistory, laneTotals, owedCents, paidInYearCents, monthRange, yearRange, rangeFor, periodOf, periodsBetween, periodLabel, toCsv, signed, dollars } from '../lib/creatorMoneyRules.js';
+import { buildHistory, laneTotals, owedCents, owedSplitCents, paidInYearCents, monthRange, yearRange, rangeFor, periodOf, periodsBetween, periodLabel, toCsv, signed, dollars } from '../lib/creatorMoneyRules.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
@@ -141,6 +141,26 @@ t('lane totals for October: refunds net out, payouts never count', () => {
 
 t('owed: unpaid earnings lines, whatever the month', () => {
   assert.equal(owedCents(rows.ledger), 350 + 200 + 150 + 960);
+});
+
+t('owed, split by who was the studio when each line was written (migration 122)', () => {
+  const ledger = [
+    { kind: 'member_share', cents: 400, payout_id: null, studio: false },
+    { kind: 'referral', cents: 100, payout_id: null, studio: true },
+    { kind: 'ad_share', cents: 250, payout_id: null, studio: false },
+    { kind: 'member_share', cents: 70, payout_id: null },
+    { kind: 'member_share', cents: 999, payout_id: 'po_1', studio: false },
+    { kind: 'payout', cents: -999, payout_id: 'po_1', studio: false }
+  ];
+  // The account isn't the studio's now: only the stamped-true line is kept.
+  assert.deepEqual(owedSplitCents(ledger, false), { owedCents: 720, keptCents: 100 });
+  // It is now: the unstamped (pre-122) line goes with the role now.
+  assert.deepEqual(owedSplitCents(ledger, true), { owedCents: 650, keptCents: 170 });
+  assert.deepEqual(owedSplitCents(ledger, false, 'member_support'), { owedCents: 470, keptCents: 100 });
+  assert.deepEqual(owedSplitCents(ledger, true, 'ad_share'), { owedCents: 250, keptCents: 0 });
+  // The two always add up to the old figure.
+  const split = owedSplitCents(ledger, true);
+  assert.equal(split.owedCents + split.keptCents, owedCents(ledger));
 });
 
 t('paid this year: transfers that went through less what came back, plus the card lanes net', () => {

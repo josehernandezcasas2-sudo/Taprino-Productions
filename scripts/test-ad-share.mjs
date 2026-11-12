@@ -1,6 +1,6 @@
 // node scripts/test-ad-share.mjs — ad share (lib/adShareRules.js).
 import assert from 'node:assert/strict';
-import { adShareLines, normalizeAdSharePercent, periodDays, periodLabel, normalizeSurface } from '../lib/adShareRules.js';
+import { adShareLines, normalizeAdSharePercent, periodDays, periodLabel, normalizeSurface, AD_SHARE_LOOKBACK_MONTHS, lookbackPeriods, adShareMonthWords, adShareAuditWords } from '../lib/adShareRules.js';
 import { isTitleId } from '../lib/titleIds.js';
 
 let n = 0;
@@ -169,6 +169,32 @@ t('title ids are text slugs, not uuids (migration 117)', () => {
   for (const id of ['', 'has space', 'semi;colon', 'slash/path', 'has/slash', '..', '../up', 'dot.ted', '%2e%2e', "o'brien", 'a"b', 'a,b', 'f(x)', 'café', 'x'.repeat(201), null, undefined, 42, ['night-bus']]) {
     assert.equal(isTitleId(id), false, String(id));
   }
+});
+
+t('lookback: the last finished month and the five before it, oldest first, across a year', () => {
+  assert.equal(AD_SHARE_LOOKBACK_MONTHS, 6);
+  assert.deepEqual(lookbackPeriods('2026-10'), ['2026-05', '2026-06', '2026-07', '2026-08', '2026-09', '2026-10']);
+  assert.deepEqual(lookbackPeriods('2026-02'), ['2025-09', '2025-10', '2025-11', '2025-12', '2026-01', '2026-02']);
+  assert.deepEqual(lookbackPeriods('2026-01', 1), ['2026-01']);
+  assert.deepEqual(lookbackPeriods('2026-01', 0), ['2026-01']);
+  assert.deepEqual(lookbackPeriods('2026-13'), []);
+  assert.deepEqual(lookbackPeriods(null), []);
+  assert.equal(lookbackPeriods('2026-10', 100).length, 24);
+});
+
+t('the audit line: each month’s result', () => {
+  assert.equal(adShareMonthWords({ period: '2026-05', available: true, inserted: 3, totalCents: 1234, creators: 2 }), '2026-05 $12.34 to 2 creators');
+  assert.equal(adShareMonthWords({ period: '2026-06', available: true, inserted: 1, totalCents: 5, creators: 1 }), '2026-06 $0.05 to 1 creator');
+  assert.equal(adShareMonthWords({ period: '2026-07', available: true, inserted: 0, alreadyCredited: 4 }), '2026-07 nothing new');
+  assert.equal(adShareMonthWords({ period: '2026-08', available: true, inserted: 0, alreadyCredited: 0 }), '2026-08 no ad plays');
+  assert.equal(adShareMonthWords({ period: '2026-09', error: 'it couldn’t finish' }), '2026-09 failed');
+  assert.equal(adShareMonthWords({ period: '2026-11', skipped: 'period not over' }), '2026-11 not over');
+  assert.equal(adShareMonthWords({ period: '2026-04', available: false }), '2026-04 no ad plays table');
+  assert.equal(adShareAuditWords({ months: [{ period: '2026-09', error: 'x' }, { period: '2026-10', available: true, inserted: 2, totalCents: 200, creators: 2 }] }), 'ad share 2026-09 failed · 2026-10 $2.00 to 2 creators');
+  // One month's answer (an older caller) reads the same way.
+  assert.equal(adShareAuditWords({ period: '2026-10', available: true, inserted: 0, alreadyCredited: 1 }), 'ad share 2026-10 nothing new');
+  assert.equal(adShareAuditWords(null), '');
+  assert.equal(adShareAuditWords({ months: [] }), '');
 });
 
 console.log(`${n} passed`);

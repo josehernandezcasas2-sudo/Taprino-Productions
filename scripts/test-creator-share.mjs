@@ -5,7 +5,8 @@ import {
   chooseBasis, invoiceProductId, invoiceSubscriptionId, invoiceChargeId, invoicePaymentIntentId, tierForInvoice,
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
   standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
-  fitShareToPayment, countWatched, invoiceRetryVerdict, INVOICE_RETRY_HOURS
+  fitShareToPayment, countWatched, invoiceRetryVerdict, INVOICE_RETRY_HOURS,
+  isStudioLine, inheritStudio, stampLines, unstampedCreators, owedByStudio, splitStudioCents, restoreLinesFor
 } from '../lib/creatorShareRules.js';
 
 let passed = 0;
@@ -323,6 +324,138 @@ test('invoiceRetryVerdict: an invoice handed back to Stripe is retried for a day
   assert.deepEqual(invoiceRetryVerdict({ created: at('2026-11-08T12:05:00Z') }, now), { retry: true, ageHours: 0 });
   // The window can be set.
   assert.equal(invoiceRetryVerdict({ created: at('2026-11-08T09:00:00Z') }, now, 2).retry, false);
+});
+
+// Who was the studio (migration 122, creator_ledger.studio).
+test('isStudioLine: the stamp decides; a line without one goes by the role now', () => {
+  const studioNow = new Set(['user_admin']);
+  assert.equal(isStudioLine({ creator_id: 'user_mara', studio: true }, studioNow), true);
+  assert.equal(isStudioLine({ creator_id: 'user_admin', studio: false }, studioNow), false);
+  assert.equal(isStudioLine({ creator_id: 'user_admin', studio: null }, studioNow), true);
+  assert.equal(isStudioLine({ creator_id: 'user_admin' }, studioNow), true);
+  assert.equal(isStudioLine({ creator_id: 'user_mara', studio: null }, studioNow), false);
+  // An owed entry (creatorId), an array, a boolean for the line's own account.
+  assert.equal(isStudioLine({ creatorId: 'user_admin' }, ['user_admin']), true);
+  assert.equal(isStudioLine({ creator_id: 'user_mara' }, true), true);
+  assert.equal(isStudioLine({ creator_id: 'user_mara', studio: false }, true), false);
+  assert.equal(isStudioLine({ creator_id: 'user_mara' }), false);
+  assert.equal(isStudioLine(null, studioNow), false);
+  // Anything but a real boolean is "no stamp".
+  assert.equal(isStudioLine({ creator_id: 'user_mara', studio: 'true' }, studioNow), false);
+});
+
+test('stampLines / inheritStudio / unstampedCreators: new lines stamped, derived lines keep their source’s', () => {
+  const out = stampLines([
+    { creator_id: 'user_admin', cents: 100 },
+    { creator_id: 'user_mara', cents: 200 },
+    { creator_id: 'user_admin', cents: -50, studio: false },
+    { creator_id: 'user_mara', cents: -10, studio: null }
+  ], new Set(['user_admin']));
+  assert.deepEqual(out.map((l) => l.studio), [true, false, false, null]);
+  assert.deepEqual(inheritStudio({ studio: true }), { studio: true });
+  assert.deepEqual(inheritStudio({ studio: false }), { studio: false });
+  assert.deepEqual(inheritStudio({ studio: null }), { studio: null });
+  // Read from a database without the column: nothing, so the insert leaves it out too.
+  assert.deepEqual(inheritStudio({ creator_id: 'user_mara' }), {});
+  assert.deepEqual(inheritStudio(null), {});
+  assert.deepEqual(unstampedCreators([{ creator_id: 'a', studio: true }, { creator_id: 'b', studio: null }, { creator_id: 'c' }, { creator_id: 'b' }, { creatorId: 'd' }]), ['b', 'c', 'd']);
+});
+
+test('reversals and restores sit where the credit they follow sits', () => {
+  const lines = [
+    { id: 'l1', creator_id: 'user_admin', lane: 'earnings', kind: 'member_share', cents: 300, moves_money: true, member_id: 'm', payment_id: 'p', payout_id: null, studio: true },
+    { id: 'l2', creator_id: 'user_mara', lane: 'earnings', kind: 'member_share', cents: 200, moves_money: true, member_id: 'm', payment_id: 'p', payout_id: null, studio: false },
+    { id: 'l3', creator_id: 'user_dev', lane: 'earnings', kind: 'member_share', cents: 100, moves_money: true, member_id: 'm', payment_id: 'p', payout_id: null, studio: null }
+  ];
+  const rev = reversalLinesFor(lines, 'disputed');
+  assert.deepEqual(rev.map((l) => [l.creator_id, l.cents, l.studio]), [['user_admin', -300, true], ['user_mara', -200, false], ['user_dev', -100, null]]);
+  // Before 122 (no column read): no key, as before.
+  assert.equal('studio' in reversalLinesFor([{ id: 'x', creator_id: 'a', lane: 'earnings', kind: 'member_share', cents: 5, payout_id: null }])[0], false);
+  const back = restoreLinesFor(rev.map((l, i) => ({ ...l, id: `r${i}` })));
+  assert.deepEqual(back.map((l) => [l.creator_id, l.kind, l.cents, l.studio, l.created_by]), [['user_admin', 'adjustment', 300, true, 'stripe'], ['user_mara', 'adjustment', 200, false, 'stripe'], ['user_dev', 'adjustment', 100, null, 'stripe']]);
+  // Only reversal lines that took something back are restored.
+  assert.deepEqual(restoreLinesFor([{ kind: 'member_share', cents: 5 }, { kind: 'reversal', cents: 0 }]), []);
+  assert.equal(back[0].note, 'membership payment dispute won; credited again');
+});
+
+test('forfeitLines: the leaver’s own balance — the forfeit line says studio false, the pool lines are stamped by the server', () => {
+  const lines = forfeitLines({ creatorId: 'gone', cents: 1001, pool: { a: 2, b: 1 } });
+  assert.equal(lines[0].studio, false);
+  assert.equal('studio' in lines[1], false);
+  assert.deepEqual(stampLines(lines, new Set()).map((l) => l.studio), [false, false, false]);
+});
+
+test('owedByStudio: one entry per account and place, oldest credit first', () => {
+  const rows = [
+    { id: 'a1', creator_id: 'user_admin', cents: 500, created_at: '2026-09-01T00:00:00Z', studio: false },
+    { id: 'a2', creator_id: 'user_admin', cents: 700, created_at: '2026-10-05T00:00:00Z', studio: true },
+    { id: 'm1', creator_id: 'user_mara', cents: 300, created_at: '2026-09-02T00:00:00Z', studio: null },
+    { id: 'a3', creator_id: 'user_admin', cents: 100, created_at: '2026-10-06T00:00:00Z' },
+    { id: 'm2', creator_id: 'user_mara', cents: -50, created_at: '2026-10-09T00:00:00Z', studio: false }
+  ];
+  const owed = owedByStudio(rows, new Set(['user_admin']));
+  assert.deepEqual(owed.map((o) => [o.creatorId, o.studio, o.cents, o.lineIds, o.oldestAt]), [
+    ['user_admin', false, 500, ['a1'], '2026-09-01T00:00:00Z'],
+    ['user_admin', true, 800, ['a2', 'a3'], '2026-10-05T00:00:00Z'],
+    ['user_mara', false, 250, ['m1', 'm2'], '2026-09-02T00:00:00Z']
+  ]);
+  // Before 122 (no stamps anywhere): exactly the old one-entry-per-account answer.
+  const old = owedByStudio(rows.map(({ studio, ...r }) => r), new Set(['user_admin']));
+  assert.deepEqual(old.map((o) => [o.creatorId, o.studio, o.cents]), [['user_admin', true, 1300], ['user_mara', false, 250]]);
+  assert.deepEqual(owedByStudio([], new Set()), []);
+});
+
+test('splitStudioCents: the account’s own part and the studio’s part', () => {
+  assert.deepEqual(splitStudioCents([{ cents: 100, studio: true }, { cents: 40, studio: false }, { cents: 10 }], false), { ownCents: 50, studioCents: 100 });
+  assert.deepEqual(splitStudioCents([{ cents: 100, studio: true }, { cents: 40, studio: false }, { cents: 10 }], true), { ownCents: 40, studioCents: 110 });
+});
+
+test('a creator promoted to admin after earning is still paid what they earned before', () => {
+  // Mara earned $40 as a creator (stamped false), then joined the team; a
+  // member's pick since credited her $9 (stamped true). She is the studio now.
+  const rows = [
+    { id: 'm1', creator_id: 'user_mara', cents: 4000, created_at: '2026-09-01T00:00:00Z', studio: false },
+    { id: 'm2', creator_id: 'user_mara', cents: 900, created_at: '2026-10-20T00:00:00Z', studio: true }
+  ];
+  const studioNow = new Set(['user_mara']);
+  const owed = owedByStudio(rows, studioNow);
+  const ready = { stripeAccountId: 'acct_mara', chargesEnabled: true };
+  // `studio` (the role now) no longer decides a stamped entry.
+  const plan = planPayouts({ owed, accounts: { user_mara: ready }, minimumCents: 2500, studio: studioNow });
+  assert.deepEqual(plan.pay.map((p) => [p.creatorId, p.cents, p.lineIds]), [['user_mara', 4000, ['m1']]]);
+  assert.deepEqual(plan.kept.map((k) => [k.creatorId, k.cents, k.lineIds]), [['user_mara', 900, ['m2']]]);
+  assert.equal(plan.keptCents, 900);
+  // Without a payout account her own credits wait (held), the kept part never does.
+  const noAccount = planPayouts({ owed, accounts: {}, minimumCents: 2500 });
+  assert.deepEqual(noAccount.held.map((h) => [h.creatorId, h.cents, h.reason]), [['user_mara', 4000, 'no payout account']]);
+  assert.equal(noAccount.keptCents, 900);
+  // Before 122 the same history would have been kept whole (the old rule).
+  const before = planPayouts({ owed: owedByStudio(rows.map(({ studio, ...r }) => r), studioNow), accounts: { user_mara: ready }, minimumCents: 2500 });
+  assert.deepEqual(before.pay, []);
+  assert.equal(before.keptCents, 4900);
+});
+
+test('an admin demoted later is never paid what the studio kept', () => {
+  // Dee was on the team: members' picks credited her account $60 (stamped
+  // true). She left the team and has earned $30 since (stamped false).
+  const rows = [
+    { id: 'd1', creator_id: 'user_dee', cents: 6000, created_at: '2026-08-01T00:00:00Z', studio: true },
+    { id: 'd2', creator_id: 'user_dee', cents: 3000, created_at: '2026-10-15T00:00:00Z', studio: false }
+  ];
+  const owed = owedByStudio(rows, new Set());
+  const ready = { stripeAccountId: 'acct_dee', chargesEnabled: true };
+  const plan = planPayouts({ owed, accounts: { user_dee: ready }, minimumCents: 2500 });
+  assert.deepEqual(plan.pay.map((p) => [p.creatorId, p.cents, p.lineIds]), [['user_dee', 3000, ['d2']]]);
+  assert.deepEqual(plan.kept.map((k) => [k.creatorId, k.cents]), [['user_dee', 6000]]);
+  // Under the minimum, her own part carries as under-the-minimum; the
+  // studio's part still never reaches the plan.
+  const small = planPayouts({ owed: owedByStudio([rows[0], { ...rows[1], cents: 1000 }], new Set()), accounts: { user_dee: ready }, minimumCents: 2500 });
+  assert.deepEqual(small.held.map((h) => [h.cents, h.reason]), [[1000, 'under the minimum']]);
+  assert.deepEqual(small.pay, []);
+  assert.equal(small.keptCents, 6000);
+  // A reversal of a kept credit comes off the kept part, not hers.
+  const withReversal = owedByStudio([...rows, { id: 'd3', creator_id: 'user_dee', cents: -6000, created_at: '2026-10-20T00:00:00Z', ...inheritStudio(rows[0]) }], new Set());
+  assert.deepEqual(withReversal.map((o) => [o.studio, o.cents]), [[true, 0], [false, 3000]]);
 });
 
 console.log(`\n${passed} passed`);
