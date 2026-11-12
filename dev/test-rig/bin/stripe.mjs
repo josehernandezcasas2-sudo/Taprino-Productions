@@ -11,7 +11,9 @@
 //   balance, payouts (list/retrieve/create), transfers (create/retrieve/
 //   list, reversals), refunds (create/retrieve/list), payment_intents,
 //   charges, balance_transactions (list/retrieve), webhook_endpoints (list),
-//   events (retrieve). Anything else: Stripe's 404 JSON error.
+//   events (list by type / types[] / created, retrieve; a connected
+//   account's only with its Stripe-Account header). Anything else: Stripe's
+//   404 JSON error.
 // Pages a browser opens:
 //   /checkout/:id (Pay / Cancel), /portal/:id, /connect/onboard/:acct,
 //   /connect/dashboard/:acct
@@ -21,9 +23,16 @@
 //   POST /__accounts/:id/ready
 //   POST /__payouts/:id/paid | /__payouts/:id/failed
 //   POST /__dispute { charge, phase: created | won | lost }
-//   POST /__event { type, object | objectId, account?, previous? } → signs
-//        with STRIPE_WEBHOOK_SECRET (or the Connect secret with an account)
-//        and POSTs it to the app's /api/webhook; answers the delivery.
+//   POST /__event { type, object | objectId, account?, previous?,
+//        ageMinutes?, deliver? } → signs with STRIPE_WEBHOOK_SECRET (or the
+//        Connect secret with an account) and POSTs it to the app's
+//        /api/webhook; answers the delivery. deliver: false only records it
+//        (in the events list, never sent); ageMinutes dates it back.
+//   POST /__subscriptions/:id/renew { deliver?, ageMinutes? } → a paid
+//        renewal invoice (subscription_cycle) with its charge and
+//        invoice.paid, sent unless deliver: false.
+//   POST /__events/forget { ids? | invoices? | all? } → events leave the
+//        events list (a check's cleanup).
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { PORTS, HOST, FAKE_KEYS, urls } from '../lib/config.mjs';
@@ -684,7 +693,25 @@ async function api(method, parts, params, ctx) {
     return out(get(r1, 'charge'), ex);
   }
   if (r0 === 'invoices' && r1) return out(get(r1, 'invoice'), ex);
-  if (r0 === 'events' && r1) return out(get(r1, 'event'), ex);
+  // Events list, as the real one: newest first, `type` (exact, or a
+  // wildcard like `invoice.*`), `types[]`, `created` ranges. The platform's
+  // own events only, unless the Stripe-Account header names an account.
+  if (r0 === 'events' && !r1 && method === 'GET') {
+    const wanted = (t) => {
+      if (params.type) return params.type.endsWith('.*') ? t.startsWith(params.type.slice(0, -1)) : t === params.type;
+      if (Array.isArray(params.types)) return params.types.includes(t);
+      return true;
+    };
+    const list = all('event').filter((e) => wanted(e.type) && rangeOk(e.created, params.created) && (ctx.account ? e.account === ctx.account : !e.account));
+    const pg = page(list, params, '/v1/events');
+    return { ...pg, data: pg.data.map((e) => out(e)) };
+  }
+  if (r0 === 'events' && r1) {
+    const ev = get(r1, 'event');
+    // A connected account's event is found with its Stripe-Account header only.
+    if (ev.account && ev.account !== ctx.account) throw missing(r1);
+    return out(ev, ex);
+  }
   if (r0 === 'webhook_endpoints' && !r1 && method === 'GET') {
     return { object: 'list', has_more: false, url: '/v1/webhook_endpoints', data: [{ id: 'we_rig', object: 'webhook_endpoint', url: WEBHOOK_URL, enabled_events: ['*'], status: 'enabled', livemode: false, api_version: '2024-06-20', created: now() - 86400, description: 'The rig: every event, signed with whsec_rig' }] };
   }
@@ -737,7 +764,56 @@ async function hooks(req, res, url, parts, body) {
     if (!body.type) return sendJson(res, 400, { error: 'type is required' });
     const obj = body.objectId ? out(get(body.objectId)) : body.object || (body.data && body.data.object) || {};
     const ev = makeEvent(body.type, obj, { account: body.account || null, previous: body.previous || null });
+    // `ageMinutes` dates the event back (Stripe's `created`); `deliver: false`
+    // keeps it in the events list without sending it — a delivery Stripe
+    // never got through (the app's daily catch-up finds it there).
+    if (Number(body.ageMinutes) > 0) ev.created = now() - Math.round(Number(body.ageMinutes) * 60);
+    if (body.deliver === false || body.deliver === 'false') return sendJson(res, 200, { event: out(ev), delivery: null });
     return sendJson(res, 200, { event: out(ev), delivery: await deliver(ev) });
+  }
+  // A check's cleanup: its events leave the events list (the app's daily
+  // catch-up would otherwise find, an hour later, invoices whose rows the
+  // check deleted, and record them again). { ids: [...] } or { invoices:
+  // [...] } (every event about those invoices) or { all: true }.
+  if (a === 'events' && b === 'forget' && req.method === 'POST') {
+    const ids = new Set(Array.isArray(body.ids) ? body.ids : []);
+    const invs = new Set(Array.isArray(body.invoices) ? body.invoices : []);
+    let forgotten = 0;
+    for (const e of all('event')) {
+      const about = e.data && e.data.object ? e.data.object.id : null;
+      if (body.all === true || body.all === 'true' || ids.has(e.id) || (about && invs.has(about))) {
+        objects.delete(e.id);
+        forgotten += 1;
+      }
+    }
+    return sendJson(res, 200, { ok: true, forgotten });
+  }
+  // A subscription renews: a paid invoice (billing_reason subscription_cycle)
+  // with its charge, and invoice.paid. `deliver: false` leaves the event
+  // undelivered; `ageMinutes` dates the invoice, its payment and the event
+  // back.
+  if (a === 'subscriptions' && c === 'renew' && req.method === 'POST') {
+    const s = get(b, 'subscription');
+    const ageSecs = Number(body.ageMinutes) > 0 ? Math.round(Number(body.ageMinutes) * 60) : 0;
+    const at = now() - ageSecs;
+    const item = s.items.data[0];
+    const amount = item ? item.price.unit_amount * (item.quantity || 1) : 0;
+    const cust = objects.get(s.customer);
+    const pi = charge({ amount, customer: s.customer, email: cust ? cust.email : null, description: 'Subscription update' });
+    const invId = newId('in');
+    const inv = put({
+      id: invId, object: 'invoice', customer: s.customer, customer_email: cust ? cust.email : null, subscription: s.id, status: 'paid', paid: true, amount_due: amount, amount_paid: amount, amount_remaining: 0, currency: 'usd',
+      billing_reason: 'subscription_cycle', charge: pi.latest_charge, payment_intent: pi.id, created: at, period_start: at, period_end: at, livemode: false,
+      status_transitions: { paid_at: at, finalized_at: at },
+      subscription_details: { metadata: s.metadata },
+      parent: { type: 'subscription_details', subscription_details: { subscription: s.id, metadata: s.metadata } },
+      lines: { object: 'list', data: s.items.data.map((it) => ({ id: newId('il'), object: 'line_item', amount: it.price.unit_amount * (it.quantity || 1), currency: 'usd', price: clone(it.price), quantity: it.quantity, period: { start: at, end: at + 30 * 86400 }, subscription: s.id, type: 'subscription' })), has_more: false }
+    });
+    s.latest_invoice = invId;
+    const ev = makeEvent('invoice.paid', out(inv));
+    ev.created = at;
+    const send = !(body.deliver === false || body.deliver === 'false');
+    return sendJson(res, 200, { invoice: out(inv), event: out(ev), delivery: send ? await deliver(ev) : null });
   }
   return sendJson(res, 404, { error: `no hook ${url.pathname}` });
 }

@@ -239,8 +239,11 @@ subscriptions (list/retrieve/update/cancel), balance, balance transactions
 (list with `created`, `type`, `source`, `payout`), payouts (list/create/
 retrieve/cancel), transfers (create — refuses more than the available balance
 without `source_transaction` — retrieve, list, reversals), refunds (with
-`reverse_transfer`), payment intents, charges, invoices and events (retrieve),
-disputes (retrieve), webhook endpoints (one, every event).
+`reverse_transfer`), payment intents, charges, invoices (retrieve), events
+(list — newest first, `type` exact or `invoice.*`, `types[]`, `created` —
+and retrieve; a connected account's events only with its `Stripe-Account`
+header, as Stripe does), disputes (retrieve), webhook endpoints (one, every
+event).
 
 Pages: `/checkout/<id>` (Pay / Cancel — Pay completes the session, sends the
 webhooks and lands on the `success_url`), `/portal/<id>` (cancel at period end),
@@ -260,7 +263,18 @@ Hooks: `POST /__checkout/<id>/complete` and `/__checkout/<id>/expire` (answer
 the session and each delivery's status and body), `POST /__accounts/<id>/ready`,
 `POST /__payouts/<id>/paid|failed`, `POST /__dispute` `{ charge, phase:
 created|won|lost }`, `POST /__event` `{ type, object | objectId, account?,
-previous? }` (any event, signed and delivered), `GET /__state` (objects,
+previous?, ageMinutes?, deliver? }` (any event, signed and delivered;
+`deliver: false` only records it in the events list — a delivery Stripe
+never got through — and `ageMinutes` dates it back),
+`POST /__subscriptions/<id>/renew` `{ deliver?, ageMinutes? }` (a paid
+renewal invoice, `billing_reason: subscription_cycle`, with its charge and
+`invoice.paid`; the same two options — this is how the app's daily Stripe
+catch-up is exercised: a renewal never delivered, an hour or more old, is
+found in the events list and recorded), `POST /__events/forget` `{ ids? |
+invoices? | all? }` (events leave the events list: a check that deletes the
+rows an invoice made should forget its events too, or the daily catch-up —
+`/api/cron/creator-reminders`, which `payee-invites.mjs` runs — records that
+invoice again once its event is an hour old), `GET /__state` (objects,
 balances, deliveries).
 
 Not covered: Stripe Tax (tax is always 0), coupons and promotion codes,
