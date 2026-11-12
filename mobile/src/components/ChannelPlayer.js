@@ -15,6 +15,9 @@ import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 import { useCaptureBlock } from '../lib/captureBlock';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 import { FullscreenChrome } from '../lib/fullscreenChrome';
+import { betweenProgramsBreak, liveSlot } from '../lib/adBreakRules';
+import { useAdBreak } from '../lib/useAdBreak';
+import AdBreakLayer from './AdBreakLayer';
 
 // The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
 // Jose, 2026-10-30: the controls run to the screen's edges and grow with
@@ -38,7 +41,13 @@ function fullChrome(c) {
     menu: { right: c.padRight, bottom: s(72) + c.padBottom },
     fillToastWrap: { top: s(78) + c.padTop },
     fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
-    fillToastText: { fontSize: s(11.5) }
+    fillToastText: { fontSize: s(11.5) },
+    // An ad break (components/AdBreakLayer.js), clear of the screen's edges.
+    adBar: { paddingLeft: c.padLeft, paddingRight: c.padRight, paddingBottom: s(10) + c.padBottom, paddingTop: s(22), gap: s(12) },
+    adBarText: { fontSize: s(12), letterSpacing: s(1) },
+    adTag: { paddingVertical: s(3), paddingHorizontal: s(8) },
+    adCardKicker: { fontSize: s(12.5), letterSpacing: s(1.5) },
+    adCardBrand: { fontSize: s(30) }
   };
 }
 
@@ -65,9 +74,17 @@ const CAN_ROTATE = Platform.OS === 'ios' || Platform.OS === 'android';
 // the next program starts. The snapshot (/api/channel/now) says what's on;
 // /api/channel/play hands this viewer a playable URL for that program only.
 //
-// No seeking (it's TV). Scheduled ad breaks show a countdown card: ads
-// aren't on mobile yet, and nothing plays in the gap. The short break the
-// website runs between programs is skipped here for the same reason.
+// No seeking (it's TV). Ads run for every viewer here, members included,
+// as on the website (2026-11-12, mobile/src/lib/adBreakRules.js): a
+// scheduled ad break plays house ads one after another until it ends; a
+// program with a ready ad plan stops at each break and plays the plan's
+// fill (/api/ad-plan/fill, surface live) — ads, bumpers, the "Presented
+// by" card, the hold card — then catches up to the air clock; and when
+// one program follows another (not next to a scheduled break, not within
+// ten minutes of the last one) one house ad plays before the next program
+// picks up where the channel is. The ad plays in its own player
+// (mobile/src/lib/useAdBreak.js, drawn by components/AdBreakLayer.js);
+// when there is nothing to play, the break is the countdown card.
 //
 // Controls sit on the video as separate bubbles and fade out while it
 // plays (tap to bring them back); in fullscreen the ✕ goes with them. Fullscreen is this component's own sideways view with an exit
@@ -109,9 +126,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const pausedRef = useRef(false);
   const pausedKey = useRef(null); // the program that was on when they paused
   // A ready ad plan for the program on air (lib/adPlanTime.js): the
-  // channel counts air seconds, the video its own. Ads don't play on
-  // mobile yet, so a planned break is the countdown card for its booked
-  // seconds, then we catch up to wherever the channel is.
+  // channel counts air seconds, the video its own. A planned break plays
+  // the plan's fill for its booked seconds (the countdown card when the
+  // fill has nothing), then we catch up to wherever the channel is.
   const planRef = useRef(null);
   const breakTimer = useRef(null);
   const screenRef = useRef('loading');
@@ -121,6 +138,18 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const player = useVideoPlayer(null, (p) => {
     p.timeUpdateEventInterval = 1;
   });
+  // The ad breaks' own player (mobile/src/lib/useAdBreak.js), and when the
+  // last break ran (no break between programs within ten minutes of it, or
+  // of tuning in).
+  const ads = useAdBreak({ getToken });
+  const adsRef = useRef(ads);
+  adsRef.current = ads;
+  const lastBreakAt = useRef(Date.now());
+  // The between-programs break a tune is waiting on (resolved false when
+  // another tune, or leaving the screen, ends it first).
+  const breakDone = useRef(null);
+  const mutedRef = useRef(false);
+  const volumeRef = useRef(1);
 
   // Filling the screen in full screen (mobile/src/lib/screenFill.js, the
   // same rule as EpisodePlayer): the picture's size decides, a second tap
@@ -162,10 +191,21 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     }
   }, [channelSlug]);
 
-  async function tune(state) {
+  // Whatever break is running ends here, without its follow-up.
+  function endBreaks() {
+    if (breakDone.current) {
+      const resolve = breakDone.current;
+      breakDone.current = null;
+      resolve(false);
+    }
+    adsRef.current.stop();
+  }
+
+  async function tune(state, { withBreak = false } = {}) {
     const seq = ++tuneSeq.current;
     if (breakTimer.current) clearTimeout(breakTimer.current);
     setBreakUntil(null);
+    endBreaks();
     const program = state && state.program;
     if (!state || (!state.onAir && !state.live)) {
       player.pause();
@@ -175,6 +215,12 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     if (program && program.kind === 'ad_break') {
       player.pause();
       setScreen('ad');
+      // House ads one after another until the break ends (the loop's
+      // break: no title, nothing earned); the countdown card when there
+      // are none. The next check retunes when it ends.
+      lastBreakAt.current = Date.now();
+      const until = program.endsAt ? Date.parse(program.endsAt) : null;
+      if (until && until > Date.now()) adsRef.current.start(liveSlot({ kind: 'scheduled' }), { untilMs: until, repeat: true, muted: mutedRef.current, volume: volumeRef.current });
       return;
     }
     setScreen('loading');
@@ -203,14 +249,32 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     }
     const plan = play.kind !== 'live' && play.adPlan && play.adPlan.breaks && play.adPlan.breaks.length ? play.adPlan : null;
     planRef.current = plan ? { breaks: plan.breaks, consumed: new Set(plan.breaks.filter((b) => b.airEnd <= (play.offsetSeconds || 0)).map((b) => b.index)) } : null;
+    if (plan) planRef.current.episodeId = play.episodeId || null;
     if (plan && play.inBreak) {
       planRef.current.consumed.add(play.inBreak.index);
       pendingSeek.current = null;
       player.pause();
-      startPlanBreak(play.inBreak.remaining);
+      startPlanBreak(play.inBreak.index, play.inBreak.remaining, play.inBreak.elapsed);
       return;
     }
-    pendingSeek.current = play.kind === 'live' ? null : { offset: plan ? play.episodeOffsetSeconds || 0 : play.offsetSeconds || 0, at: Date.now() };
+    const answeredAt = Date.now();
+    // The short break between two programs (the website's runAds(null,
+    // go, episodeId)): one house ad for the program that follows, then the
+    // program from wherever the channel has got to. A planned program
+    // plays its own breaks instead.
+    if (withBreak && !plan && play.kind !== 'live') {
+      lastBreakAt.current = Date.now();
+      player.pause();
+      setScreen('ad');
+      const done = await new Promise((resolve) => {
+        adsRef.current.start(liveSlot({ kind: 'between', episodeId: play.episodeId || null }), { onDone: () => resolve(true), muted: mutedRef.current, volume: volumeRef.current });
+        breakDone.current = resolve;
+      });
+      breakDone.current = null;
+      if (!done || seq !== tuneSeq.current || !focused.current) return;
+      setScreen('loading');
+    }
+    pendingSeek.current = play.kind === 'live' ? null : { offset: plan ? play.episodeOffsetSeconds || 0 : play.offsetSeconds || 0, at: answeredAt };
     try {
       await player.replaceAsync(play.src);
     } catch (err) {
@@ -222,13 +286,23 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     player.play();
   }
 
-  // The countdown card for a planned break; when it ends, catch up to the
-  // channel (a fresh /play lands on the right second of the video).
-  function startPlanBreak(seconds) {
+  // A planned break: the plan's fill for exactly its booked seconds (the
+  // countdown card when the fill has nothing), joined `elapsed` seconds in
+  // when tuning in mid-break; when it ends, catch up to the channel (a
+  // fresh /play lands on the right second of the video).
+  function startPlanBreak(index, seconds, elapsed = 0) {
     if (breakTimer.current) clearTimeout(breakTimer.current);
+    const plan = planRef.current;
+    const until = Date.now() + Math.max(0, seconds) * 1000;
     setScreen('ad');
-    setBreakUntil(Date.now() + Math.max(0, seconds) * 1000);
-    breakTimer.current = setTimeout(() => { setBreakUntil(null); catchUp(true); }, Math.max(0, seconds) * 1000 + 300);
+    setBreakUntil(until);
+    adsRef.current.start(liveSlot({ kind: 'plan', episodeId: plan && plan.episodeId, breakIndex: index }), {
+      untilMs: until,
+      elapsed,
+      muted: mutedRef.current,
+      volume: volumeRef.current,
+      onDone: () => { setBreakUntil(null); catchUp(true); }
+    });
   }
   startBreakRef.current = startPlanBreak;
   useEffect(() => { screenRef.current = screen; }, [screen]);
@@ -271,7 +345,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         if (due) {
           plan.consumed.add(due.index);
           player.pause();
-          if (startBreakRef.current) startBreakRef.current(due.booked);
+          if (startBreakRef.current) startBreakRef.current(due.index, due.booked, 0);
         }
       }
     });
@@ -290,8 +364,16 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       const prev = nowRef.current || {};
       const changed = !!fresh.live !== !!prev.live || (fresh.program && prev.program ? fresh.program.key !== prev.program.key : !!fresh.program !== !!prev.program);
       updateNow(fresh);
+      // A short ad break between two programs, like TV — but not next to a
+      // scheduled ad break and not within ten minutes of the last break
+      // (lib/adBreakRules.js betweenProgramsBreak, the website's rule).
+      const withBreak = !fresh.live && betweenProgramsBreak({
+        prevKind: prev.program ? prev.program.kind || 'episode' : null,
+        nextKind: fresh.program ? fresh.program.kind || 'episode' : null,
+        sinceLastBreakMs: Date.now() - lastBreakAt.current
+      });
       // Paused by the viewer: the channel moves on, the player doesn't.
-      if (changed && !pausedRef.current) tune(fresh);
+      if (changed && !pausedRef.current) tune(fresh, { withBreak });
       scheduleNextCheck(fresh);
     }, ms);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -307,6 +389,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       tuneSeq.current += 1;
       if (endTimer.current) clearTimeout(endTimer.current);
       if (breakTimer.current) clearTimeout(breakTimer.current);
+      endBreaks();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelSlug, initialNow]);
@@ -375,6 +458,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         focused.current = false;
         sub.remove();
         player.pause();
+        // Leaving the screen ends a break (coming back catches up).
+        endBreaks();
         if (fullscreenRef.current) {
           fullscreenRef.current = false;
           setFullscreen(false);
@@ -399,7 +484,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // Safety net: notices a live broadcast starting/ending and corrects drift.
   useEffect(() => {
     const id = setInterval(async () => {
-      if (!appActive.current || !focused.current || screen === 'loading') return;
+      if (!appActive.current || !focused.current || screen === 'loading' || screen === 'ad') return;
       if (!playing && screen === null && !(nowRef.current && nowRef.current.live)) return; // paused on purpose
       const fresh = await fetchNow();
       if (!fresh) return;
@@ -460,6 +545,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   function toggleMute() {
     showControls();
     player.muted = !muted;
+    mutedRef.current = !muted;
+    ads.setMuted(!muted);
     setMuted(!muted);
   }
   async function acceptLiveTerms() {
@@ -470,8 +557,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     showControls();
     const next = Math.max(0, Math.min(1, Math.round((volume + delta) * 10) / 10));
     player.volume = next;
+    volumeRef.current = next;
     setVolume(next);
-    if (next > 0 && muted) { player.muted = false; setMuted(false); }
+    if (next > 0 && muted) { player.muted = false; mutedRef.current = false; ads.setMuted(false); setMuted(false); }
   }
 
   const channelName = now && now.channel ? now.channel.name : '';
@@ -479,6 +567,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   const program = now && now.program;
   const isLive = !!(now && now.live);
   const movedOn = userPaused && program && pausedKey.current && program.key !== pausedKey.current;
+  // The break's own layer, unless it has nothing to show (the countdown card).
+  const adShowing = screen === 'ad' && Boolean(ads.state) && ads.state.item && ads.state.item.type !== 'countdown';
 
   // One overlay for both the inline player and fullscreen (a render
   // function, not a component, so it isn't remounted on every render).
@@ -488,6 +578,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     return (
       <>
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
+        {/* An ad break with something to show (components/AdBreakLayer.js);
+            with nothing, the countdown card below. */}
+        {adShowing ? <AdBreakLayer ad={ads} live full={full} F={F} channelName={channelName} /> : null}
         {full && fillToast ? (
           <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
             <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
@@ -511,7 +604,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
           </Pressable>
         )}
 
-        {screen && (
+        {screen && !(screen === 'ad' && adShowing) && (
           <View style={styles.card}>
             {screen === 'loading' && <><ActivityIndicator color={colors.brass} /><Text style={styles.cardSub}>Tuning in…</Text></>}
             {screen === 'off_air' && <><Text style={styles.cardTitle}>{channelName || 'This channel'} is off the air</Text><Text style={styles.cardSub}>Check the guide for what&rsquo;s coming up.</Text></>}
