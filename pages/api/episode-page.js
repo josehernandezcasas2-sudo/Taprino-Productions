@@ -1,6 +1,8 @@
 import { getEpisodePageData } from '../../lib/episodePage';
 import { limitPublicRead } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
+import { adsOnFor } from '../../lib/adBreakRules';
+import { googleAdTagFor } from '../../lib/googleAds';
 
 // Trim an episode record down to what a card/sidebar needs — and never a
 // playable URL. The app gets the real src from POST /api/stream-token,
@@ -74,6 +76,14 @@ export default async function handler(req, res) {
     // or a ready plan's (`episode.adPlan`).
     adFree: data.account.adFree,
     isAdmin: Boolean(data.account.isAdmin),
+    // Google's Ad Manager tag (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js) for a
+    // plain break our own ads leave empty: null unless it's set and this
+    // viewer gets ads on this title and may play it. The app plays house
+    // ads only until a real build carries a native IMA player
+    // (mobile/src/lib/googleAdPlayer.js); a ready plan's breaks never use it.
+    googleAdTag: entitled
+      ? googleAdTagFor(adsOnFor({ previewing: Boolean(data.preview), adFree: data.account.adFree, isAdmin: data.account.isAdmin, owned: Boolean(data.purchase && data.purchase.owned), adsEnabled: data.episode.adsEnabled }))
+      : null,
     // Buy to own: the price (or ownership) of this title and its series.
     purchase: data.purchase,
     bundle: data.bundle,

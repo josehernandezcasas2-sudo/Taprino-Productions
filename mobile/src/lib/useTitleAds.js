@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useFocusEffect } from 'expo-router';
 import { breakTick, preRollOf, titleBreaks, titleSlot } from './adBreakRules';
 import { useAdBreak } from './useAdBreak';
+import { withGoogleFill } from './adSlots';
 
 // A title's ads on the episode screen, decided the way the website's
 // player decides them (components/VideoPlayer.js; the rules are
@@ -12,7 +13,9 @@ import { useAdBreak } from './useAdBreak';
 // demand" on) in place of the plain ones. `adsOn` is adsOnFor(...) — never
 // a preview, a trailer, an ad-free member, the team or a buyer.
 //
-//   const ads = useTitleAds({ player, episodeId, adsOn, adPlan, adBreakSeconds, titleSrc, getToken });
+//   const ads = useTitleAds({ player, episodeId, adsOn, adPlan, adBreakSeconds, titleSrc, googleAdTag, getToken });
+// (`googleAdTag`: /api/episode-page's Google tag, null unless this viewer
+// gets ads; a plain break's slot carries it — mobile/src/lib/adSlots.js.)
 //   ads.armPreRoll()   right before the title's src goes to the player: when
 //                      the pre-roll is due it starts now (the player is
 //                      paused and held, so the title never starts under it,
@@ -25,14 +28,14 @@ import { useAdBreak } from './useAdBreak';
 // The title is paused under the break and plays again when it ends (or
 // fails, or comes back with nothing). Leaving the screen stops a break and
 // leaves the title paused.
-export function useTitleAds({ player, episodeId, adsOn, adPlan = null, adBreakSeconds = null, titleSrc = null, getToken }) {
+export function useTitleAds({ player, episodeId, adsOn, adPlan = null, adBreakSeconds = null, titleSrc = null, googleAdTag = null, getToken }) {
   const ads = useAdBreak({ getToken });
   const breaks = useMemo(() => titleBreaks({ adsOn, adPlan, adBreakSeconds }), [adsOn, adPlan, adBreakSeconds]);
   const holdRef = useRef(false);
   // Per title: the breaks played or passed, the last tick, the pre-roll.
   const track = useRef({ episodeId: null, consumed: new Set(), last: null, preRollDone: false });
-  const live = useRef({ player, episodeId, breaks, enabled: false });
-  live.current = { player, episodeId, breaks, enabled: Boolean(adsOn && titleSrc) };
+  const live = useRef({ player, episodeId, breaks, enabled: false, googleAdTag: null });
+  live.current = { player, episodeId, breaks, enabled: Boolean(adsOn && titleSrc), googleAdTag: adsOn ? googleAdTag : null };
   const startRef = useRef(ads.start);
   startRef.current = ads.start;
 
@@ -50,7 +53,7 @@ export function useTitleAds({ player, episodeId, adsOn, adPlan = null, adBreakSe
     if (!p || !id) return;
     holdRef.current = true;
     try { p.pause(); } catch { /* a released player */ }
-    startRef.current(titleSlot(brk, id), {
+    startRef.current(withGoogleFill(titleSlot(brk, id), live.current.googleAdTag), {
       onDone: () => {
         holdRef.current = false;
         const cur = live.current.player;
