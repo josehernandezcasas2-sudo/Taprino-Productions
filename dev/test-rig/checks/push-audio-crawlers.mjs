@@ -167,6 +167,13 @@ async function audio() {
     ok('…and doesn’t open a held one', r.status === 404, r.status);
     r = await call(`${prem.audioUrl.slice(0, -3)}AAA`, { who: SIGNED_OUT_NO_TERMS });
     ok('a tampered key falls back to the gate (refused signed out)', r.status === 403, r.status);
+    sql(`update public.series set moderation_hold = true where id = ${q(ID.show)}`);
+    try {
+      r = await call(prem.audioUrl, { who: SIGNED_OUT_NO_TERMS });
+      ok('the show taken down → its keys stop at once', r.status >= 400 && !r.headers.get('location'), r.status);
+    } finally {
+      sql(`update public.series set moderation_hold = false where id = ${q(ID.show)}`);
+    }
   }
   r = await call(`/api/podcast-show?id=${encodeURIComponent(ID.show)}&terms=1`, app(VIEWER));
   ok('a viewer without a plan: the premium row has no audio at all', r.json && audioRow(r.json, ID.premium) && !audioRow(r.json, ID.premium).audioUrl, r.json && audioRow(r.json, ID.premium));

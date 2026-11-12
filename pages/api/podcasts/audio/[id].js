@@ -5,10 +5,11 @@ import { getRatings } from '../../../../lib/ratings';
 import { termsWouldClear } from '../../../../lib/ageGate';
 import { playbackGate } from '../../../../lib/playbackGate';
 import { getSecuritySwitches } from '../../../../lib/securitySwitches';
+import { getSuspensionFor } from '../../../../lib/suspensions';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../../lib/rateLimit';
 import { applyCors } from '../../../../lib/cors';
 import { sendError } from '../../../../lib/apiErrors';
-import { parseAudioRouteId, rssListsEpisode, keyStillAllows } from '../../../../lib/podcastAudioRules';
+import { parseAudioRouteId, rssListsEpisode, keyStillAllows, showStillAllows } from '../../../../lib/podcastAudioRules';
 import { verifyAudioKey, audioLinkFor } from '../../../../lib/podcastAudio';
 
 // GET|HEAD /api/podcasts/audio/<id>[.mp3|.m4a|…][?k=<key>][&preview=1] →
@@ -19,23 +20,39 @@ import { verifyAudioKey, audioLinkFor } from '../../../../lib/podcastAudio';
 // payload carries the bucket address any more.
 //
 // Who gets the link, in order:
+//   0. never a signed-in account under a whole-account suspension (the
+//      rule lib/playbackGate.js keeps for video and captions; the app's
+//      keys are refused at the source, lib/podcastShowHub.js);
 //   1. a key the server minted (the show page, /api/podcast-show, the
 //      review queue) that is for this episode, unexpired, and still fits
-//      the episode as it is now (held, removed, declined → no);
+//      the episode and its show as they are now (held, removed, declined,
+//      taken down → no);
+//   while the private beta door is shut, a request without a key needs a
+//   signed-in account from here on, as the rest of the site does (the
+//   route is on the door's open list only for the app's keyed plays);
 //   2. anyone, for an episode a show's public RSS feed lists (a podcast
-//      app has no account); while the private beta door is shut, a keyless
-//      request needs a signed-in account, as the rest of the site does;
+//      app has no account);
 //   3. otherwise the playback gate (lib/playbackGate.js), from the session:
 //      membership, purchases, age, a preview (?preview=1), a hold.
 // Audio hosted somewhere else is a 302 to its own address after the same
-// checks. Generous limits: a podcast app may fetch the same file in pieces.
-const PER_IP_PER_HOUR = 600;
+// checks. Generous limits: many listeners can share one address (a
+// carrier's or an office's), and a podcast app may ask more than once.
+const PER_IP_PER_HOUR = 2400;
 const PER_ACCOUNT_PER_HOUR = 600;
 
 const EPISODE_COLUMNS = 'id, content_type, status, tier, rating, series_id, audio_url, moderation_hold, deletion_requested, withdrawn_at, available_until';
 
 async function readEpisode(id) {
   const { data, error } = await getSupabase().from('episodes').select(EPISODE_COLUMNS).eq('id', id).maybeSingle();
+  if (error) throw error;
+  return data || null;
+}
+
+// The show's own state, for a key (null when the episode has no show or
+// the show is gone).
+async function readShow(seriesId) {
+  if (!seriesId) return null;
+  const { data, error } = await getSupabase().from('series').select('id, status, moderation_hold, deletion_requested, withdrawn_at').eq('id', seriesId).maybeSingle();
   if (error) throw error;
   return data || null;
 }
@@ -87,18 +104,28 @@ export default async function handler(req, res) {
     // Same answer for "no such episode" and "no audio": nothing to learn.
     if (!row || !row.audio_url) return res.status(404).json({ error: 'Not found' });
 
+    // 0. A suspended account's own session gets nothing.
+    if (userId) {
+      const suspended = await getSuspensionFor(userId);
+      if (suspended && suspended.scope === 'all') return res.status(403).json({ error: 'Your account is suspended.', suspended: true });
+    }
+
     // 1. A key minted for this episode.
     const mode = typeof req.query.k === 'string' ? verifyAudioKey(id, req.query.k) : null;
-    if (mode && keyStillAllows(mode, row)) return sendLink(res, row);
+    if (mode && keyStillAllows(mode, row)) {
+      const hasShow = Boolean(row.series_id);
+      const show = hasShow ? await readShow(row.series_id) : null;
+      if (showStillAllows(mode, show, { hasShow })) return sendLink(res, row);
+    }
+
+    // The door: past this point a request needs an account while it's shut.
+    if (!userId) {
+      const sw = await getSecuritySwitches();
+      if (sw.doorShut) return res.status(401).json({ error: 'Studio Tapa TV is in private beta. Sign in with an invited account.', privateBeta: true });
+    }
 
     // 2. An episode the public feed lists.
-    if (await feedListsIt(row)) {
-      if (!userId) {
-        const sw = await getSecuritySwitches();
-        if (sw.doorShut) return res.status(401).json({ error: 'Studio Tapa TV is in private beta. Sign in with an invited account.', privateBeta: true });
-      }
-      return sendLink(res, row);
-    }
+    if (await feedListsIt(row)) return sendLink(res, row);
 
     // 3. The playback gate, from the session.
     const gate = await playbackGate(req, id, { preview: req.query.preview === '1' });

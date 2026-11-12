@@ -44,8 +44,12 @@ export function PodcastPlayerProvider({ children }) {
   const currentRef = useRef(null);
   currentRef.current = currentEpisode;
   const saveRef = useRef(null);
-  // When the last reload after an error happened (see onError below).
+  // When the last reload after an error happened, and whether the reload
+  // should carry on playing (see onError below).
   const reloadAtRef = useRef(0);
+  const playAfterLoadRef = useRef(true);
+  const playingRef = useRef(false);
+  playingRef.current = isPlaying;
 
   function saveNow({ finished = false } = {}) {
     const el = audioRef.current;
@@ -150,7 +154,10 @@ export function PodcastPlayerProvider({ children }) {
             }
             // load() resets the element's rate to 1; keep the chosen speed.
             e.target.playbackRate = playbackRate;
-            e.target.play();
+            // A reload after an error while paused stays paused.
+            const play = playAfterLoadRef.current;
+            playAfterLoadRef.current = true;
+            if (play) e.target.play();
           }}
           onTimeUpdate={(e) => {
             setPosition(e.target.currentTime);
@@ -173,10 +180,17 @@ export function PodcastPlayerProvider({ children }) {
           // again, once per half minute, and carry on from the same spot.
           onError={(e) => {
             const el = e.target;
-            if (!currentRef.current || Date.now() - reloadAtRef.current < 30000) return;
+            if (!currentRef.current) return;
+            // A second failure within half a minute: the route itself is
+            // refusing (not signed in, the plan, gone). Stop showing "playing".
+            if (Date.now() - reloadAtRef.current < 30000) {
+              setIsPlaying(false);
+              return;
+            }
             reloadAtRef.current = Date.now();
             const at = el.currentTime || 0;
             if (at > 0) startAtRef.current = at;
+            playAfterLoadRef.current = playingRef.current;
             el.load();
           }}
           style={{ display: 'none' }}

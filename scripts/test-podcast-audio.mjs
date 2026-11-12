@@ -5,7 +5,7 @@
 import assert from 'node:assert/strict';
 import {
   PODCAST_AUDIO_ROUTE, AUDIO_KEY_SECONDS, audioExtensionOf, audioMimeType, podcastAudioPath, parseAudioRouteId,
-  audioStoragePath, isExternalAudio, rssListsEpisode, parseAudioKey, keyStillAllows
+  audioStoragePath, isExternalAudio, rssListsEpisode, parseAudioKey, keyStillAllows, showStillAllows
 } from '../lib/podcastAudioRules.js';
 
 let n = 0;
@@ -60,7 +60,7 @@ await t('a stored address in our bucket → its path; anything else → null', (
   assert.equal(audioStoragePath(stored('a.mp3'), ''), null, 'no Supabase configured');
   assert.equal(audioStoragePath(null, BASE), null);
   assert.equal(isExternalAudio('https://cdn.example.com/a.mp3'), true);
-  assert.equal(isExternalAudio('http://cdn.example.com/a.mp3'), false, 'https only');
+  assert.equal(isExternalAudio('http://cdn.example.com/a.mp3'), true, 'an http address an admin typed keeps playing');
   assert.equal(isExternalAudio('javascript:alert(1)'), false);
   assert.equal(isExternalAudio('https://cdn.example.com/a b.mp3'), false);
 });
@@ -103,6 +103,22 @@ await t('what still plays for a key once the episode changes', () => {
   assert.equal(keyStillAllows('t', { ...pending, withdrawn_at: '2026-11-11T00:00:00Z' }, NOW), false);
   assert.equal(keyStillAllows('x', free, NOW), false);
   assert.equal(keyStillAllows('v', null, NOW), false);
+});
+
+await t('…and once its show changes', () => {
+  const live = { status: 'approved', moderation_hold: false, deletion_requested: false, withdrawn_at: null };
+  assert.equal(showStillAllows('v', live), true);
+  assert.equal(showStillAllows('v', { ...live, status: null }), true, 'an older show with no status');
+  for (const change of [{ moderation_hold: true }, { deletion_requested: true }, { withdrawn_at: '2026-11-11T00:00:00Z' }, { status: 'pending' }, { status: 'rejected' }]) {
+    assert.equal(showStillAllows('v', { ...live, ...change }), false, JSON.stringify(change));
+  }
+  assert.equal(showStillAllows('v', null, { hasShow: true }), false, 'a show that is gone');
+  assert.equal(showStillAllows('v', null, { hasShow: false }), true, 'an episode with no show');
+  assert.equal(showStillAllows('p', { ...live, status: 'pending' }), true, 'the owner previews a private show');
+  assert.equal(showStillAllows('p', { ...live, status: 'pending', moderation_hold: true }), false, 'held: the team only');
+  assert.equal(showStillAllows('t', { ...live, moderation_hold: true, deletion_requested: true }), true);
+  assert.equal(showStillAllows('t', null, { hasShow: true }), true);
+  assert.equal(showStillAllows('x', live), false);
 });
 
 // The keys need a secret; the tests bring their own.
