@@ -187,6 +187,7 @@ t('the audit line: each month’s result', () => {
   assert.equal(adShareMonthWords({ period: '2026-06', available: true, inserted: 1, totalCents: 5, creators: 1 }), '2026-06 $0.05 to 1 creator');
   assert.equal(adShareMonthWords({ period: '2026-07', available: true, inserted: 0, alreadyCredited: 4 }), '2026-07 nothing new');
   assert.equal(adShareMonthWords({ period: '2026-08', available: true, inserted: 0, alreadyCredited: 0 }), '2026-08 no ad plays');
+  assert.equal(adShareMonthWords({ period: '2026-09', available: true, skipped: 'credited already', inserted: 0 }), '2026-09 done');
   assert.equal(adShareMonthWords({ period: '2026-09', error: 'it couldn’t finish' }), '2026-09 failed');
   assert.equal(adShareMonthWords({ period: '2026-11', skipped: 'period not over' }), '2026-11 not over');
   assert.equal(adShareMonthWords({ period: '2026-04', available: false }), '2026-04 no ad plays table');

@@ -14,7 +14,7 @@
 //     month (the run's payout minimum is raised for the check so nobody is
 //     paid)
 //   node dev/test-rig/checks/money-edges.mjs
-import { IDS, USERS, RUN, ok, section, runCheck, call, sql, rows, q, insert, session, newUser, removeUser, stripeHook, stripeApi, hasColumn, ago, uidFor } from './lib.mjs';
+import { IDS, USERS, RUN, ok, section, runCheck, call, sql, rows, q, insert, session, newUser, removeUser, stripeHook, stripeApi, clerk, hasColumn, ago, uidFor } from './lib.mjs';
 
 const ADMIN = session(USERS.admin);
 // The studio's account needs released work to be pickable (as in money.mjs).
@@ -24,6 +24,7 @@ const studioFilm = () => ({
   runtime: '1:10:00', rating: 'TV-PG', release_year: 2026, src: `https://customer-test.cloudflarestream.com/${uidFor(IDS.film)}/manifest/video.m3u8`, video_type: 'html5', video_provider: 'cloudflare', ads_enabled: true, deletion_requested: false,
   moderation_hold: false, submitted_by: USERS.admin, status: 'approved', reviewed_at: ago(6), released_at: ago(6), created_at: ago(7)
 });
+const EX_FILM = `ck-edges-leaver-${RUN}`;
 const CRON = { Authorization: 'Bearer rig-cron-secret' };
 const people = [];
 const invoices = [];
@@ -35,7 +36,8 @@ async function member(tag, opts) {
   people.push(m.id);
   return m;
 }
-const ledger = (where) => rows(`select creator_id, kind, cents, studio, payment_id from public.creator_ledger where ${where} order by created_at, creator_id`);
+// `studio` only once the database has it (migration 122).
+const ledger = (where) => rows(`select creator_id, kind, cents${hasColumn('creator_ledger', 'studio') ? ', studio' : ''}, payment_id from public.creator_ledger where ${where} order by created_at, creator_id`);
 const monthsAgo = (n) => {
   const d = new Date();
   const x = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - n, 1));
@@ -158,7 +160,7 @@ async function adShareLookback() {
     ok('Run now → 200, paying nobody', run.status === 200 && run.json && run.json.paid.length === 0, `${run.status} ${run.text.slice(0, 300)}`);
     const months = (run.json && run.json.adShare && run.json.adShare.months) || [];
     ok('ad share looked at six finished months, oldest first', months.length === 6 && months[5].period === monthsAgo(1) && months[0].period === monthsAgo(6), months.map((x) => x.period));
-    const lines = rows(`select period, cents, studio from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(IDS.nbS1E3)} and created_at >= ${q(t0)} order by period`);
+    const lines = rows(`select period, cents${hasColumn('creator_ledger', 'studio') ? ', studio' : ''} from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(IDS.nbS1E3)} and created_at >= ${q(t0)} order by period`);
     ok('the two finished months are credited, $2.50 each, to Mara', lines.length === 2 && lines[0].period === periods[0] && lines[1].period === periods[1] && lines.every((l) => l.cents === 250), lines);
     if (hasColumn('creator_ledger', 'studio')) ok('…stamped studio = false', lines.every((l) => l.studio === false), lines);
     ok('the current month is never credited', !lines.some((l) => l.period === periods[2]));
@@ -167,7 +169,35 @@ async function adShareLookback() {
     const again = await call('/api/admin/creator-money', { who: ADMIN, method: 'POST', body: { action: 'run' } });
     const twice = rows(`select count(*)::int as n from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(IDS.nbS1E3)} and created_at >= ${q(t0)}`)[0].n;
     ok('a second run credits nothing twice (“nothing new”)', again.status === 200 && twice === 2 && (again.json.adShare.months || []).some((x) => x.period === periods[0] && x.inserted === 0), again.json && again.json.adShare);
+
+    // A month is decided once, as it was when it was credited: a title whose
+    // account was leaving that month (or the studio's: a full admin's) earns
+    // nothing for it, and the account coming back in good standing (or
+    // leaving the team) later doesn't pay it that month on a later run's
+    // look-back — the rule creator_ledger.studio keeps for every other line.
+    // (The leaver is the one a check can flip: the studio's role is read
+    // through a ten-minute memo.)
+    const leaver = await member('leaver', { role: 'creator', displayName: 'Check Leaver' });
+    insert('episodes', { ...studioFilm(), id: EX_FILM, title: `Check edges leaver film ${RUN}`, submitted_by: leaver.id });
+    insert('creator_standing', { creator_id: leaver.id, leaving_reason: 'withdrew', left_at: ago(70), collect_until: new Date(Date.now() + 20 * 86400000).toISOString(), left_by: 'check' });
+    const ad = rows('select gen_random_uuid() as id')[0].id;
+    adIds.push(ad);
+    const p3 = monthsAgo(3);
+    insert('ad_impression_days', { ad_id: ad, episode_id: EX_FILM, surface: 'vod', day: `${p3}-12`, impressions: 40, credit_cents: 800 });
+    // The months above were decided by the runs above; this one wasn't yet.
+    sql(`delete from public.audit_log where action = 'ad_share_month' and target_id = ${q(p3)} and created_at >= ${q(t0)}`);
+    let r = await call('/api/admin/creator-money', { who: ADMIN, method: 'POST', body: { action: 'run' } });
+    ok('a leaver’s title that month → no line', r.status === 200 && rows(`select id from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(EX_FILM)}`).length === 0, r.status);
+    sql(`delete from public.creator_standing where creator_id = ${q(leaver.id)}`);
+    r = await call('/api/admin/creator-money', { who: ADMIN, method: 'POST', body: { action: 'run' } });
+    const late = rows(`select period, cents from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(EX_FILM)}`);
+    ok('…and back in good standing, a later run doesn’t pay them that month', r.status === 200 && late.length === 0, late);
+    ok('…the month reads “done” in the run’s answer', r.json && r.json.adShare && (r.json.adShare.months || []).some((x) => x.period === p3 && x.skipped === 'credited already'), r.json && r.json.adShare && r.json.adShare.months);
   } finally {
+    sql(`delete from public.audit_log where action = 'ad_share_month' and created_at >= ${q(t0)}`);
+    sql(`delete from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(EX_FILM)}`);
+    sql(`delete from public.creator_standing where creator_id in (${people.map(q).join(', ') || "''"})`);
+    sql(`delete from public.episodes where id = ${q(EX_FILM)}`);
     sql(`update public.site_settings set creator_payout_minimum_cents = ${Number(before && before.m) || 2500} where id = 1`);
     sql(`delete from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(IDS.nbS1E3)} and created_at >= ${q(t0)}`);
     sql(`delete from public.ad_impression_days where ad_id in (${adIds.map(q).join(', ') || "'00000000-0000-0000-0000-000000000000'"})`);
