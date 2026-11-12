@@ -84,6 +84,9 @@ export default function AdBreakLayer({ ad, full = false, F = null, live = false,
       <View style={styles.black} pointerEvents="none" />
       <View style={absoluteFill} pointerEvents="none"><VideoItemView ad={ad} /></View>
       {ItemView ? <View style={absoluteFill} pointerEvents="none"><ItemView item={item} F={F} channelName={channelName} /></View> : null}
+      {/* A tap on the ad plays it again if it stopped (the phone locked, a
+          call, a page the browser never reported closing); it never pauses. */}
+      <Pressable style={absoluteFill} onPress={() => { if (ad.resume) ad.resume(); }} accessibilityRole="button" accessibilityLabel="Play the ad" />
       {/* The bar: not while a title's single ad is still being asked for
           (the website shows nothing until its ad is up), never over the
           live player's own countdown card. */}
