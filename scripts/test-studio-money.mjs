@@ -3,8 +3,9 @@ import assert from 'node:assert/strict';
 import {
   assumedFeeCents, reserveCents, canLeaveCents, toleranceCents, nextSweepDate, isSweepDay, sweepGate,
   classifyTransaction, groupTransactions, expectedByLane, reconcile, studioShare, adsServedCents, taxThresholds, normalizeSettings, dollars,
-  owedToCreators, creditTotals
+  owedToCreators, creditTotals, taxFeeCents, taxInRefundCents, salesTaxPeriod, SALES_TAX_LANES
 } from '../lib/studioMoneyRules.js';
+import { splitDonation } from '../lib/donationMath.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -291,6 +292,74 @@ test('the studio’s own accounts: a member’s pick of one is the studio’s mo
   assert.equal(kept.membership.marginCents, 2598 - 135 - 300);
   // Older callers (no studio numbers) are unchanged.
   assert.equal(studioShare({ ...base, creditedCents: 300, reversedCreditCents: 200 }).membership.studioKeptCents, 0);
+});
+
+// Sales tax on memberships, backings and bookings (migration 122).
+test('sales tax: the extra card fee on a tax, and the lanes expect the tax in the balance', () => {
+  assert.equal(taxFeeCents(5327, 0), 0);
+  assert.equal(taxFeeCents(5327, 439), assumedFeeCents(5327 + 439) - assumedFeeCents(5327));
+  assert.ok(taxFeeCents(5327, 439) >= 12 && taxFeeCents(5327, 439) <= 14);
+  // a 'fee' backing or booking (no tax fields) expects exactly what it did
+  assert.equal(expectedByLane({ backing: { count: 1, pledgeCents: 4000, cutCents: 200, coverCents: 160 } }).backing, 200);
+  assert.equal(expectedByLane({ bookings: { count: 1, cutCents: 850, coverCents: 301 } }).bookings, 850);
+  // a 'transfer' one also leaves its tax, less Stripe's fee on it
+  assert.equal(expectedByLane({ backing: { count: 1, cutCents: 200, taxCents: 330, taxFeeCents: 10 } }).backing, 520);
+  assert.equal(expectedByLane({ bookings: { count: 1, cutCents: 6500, taxCents: 5640, taxFeeCents: 164 } }).bookings, 6500 + 5640 - 164);
+  // memberships: tax is inside the gross, the lane expects the whole charge less its fee
+  assert.equal(expectedByLane({ memberships: { count: 1, grossCents: 865, amounts: [865], taxCents: 66 } }).memberships, 865 - assumedFeeCents(865));
+});
+
+test('sales tax: a transfer backing reconciles to its cut once the tax is taken out', () => {
+  // $50 backing, 5% cut, the backer covers the card fee; taxed at 8% (a
+  // backing is coded as a donation, so usually 0 — this one isn't).
+  const d = splitDonation(5000, 5);
+  const total = d.totalChargedCents;
+  const tax = Math.round(total * 0.08);
+  const fee = assumedFeeCents(total + tax);
+  // the platform's balance: the charge (total + tax − fee) and the fixed transfer of the creator's share
+  const ids = { backingCharges: new Set(['pi_tb']) };
+  const txns = [
+    { id: 'txn_c', reporting_category: 'charge', amount: total + tax, fee, net: total + tax - fee, source: { id: 'ch_tb', payment_intent: 'pi_tb' } },
+    { id: 'txn_t', reporting_category: 'transfer', amount: -d.creatorPayoutCents, fee: 0, net: -d.creatorPayoutCents, source: { id: 'tr_tb', source_transaction: 'ch_tb' } }
+  ];
+  const g = groupTransactions(txns, ids);
+  const records = { backing: { count: 1, pledgeCents: 5000, cutCents: d.platformCutCents, coverCents: d.feeCoverCents, taxCents: tax, taxFeeCents: taxFeeCents(total, tax) } };
+  const r = reconcile({ lanes: g.lanes, records, explainedCents: 0, toleranceCents: 0 });
+  const row = r.rows.find((x) => x.key === 'backing');
+  // what's left over is exactly the cover's own rounding gap, as before 122
+  assert.equal(row.differenceCents, d.feeCoverCents - assumedFeeCents(total));
+  // kept = the lane net less the tax = the cut + that gap, less Stripe's fee on the tax
+  assert.equal(g.lanes.backing.netCents - tax, d.platformCutCents + (d.feeCoverCents - assumedFeeCents(total)) - taxFeeCents(total, tax));
+});
+
+test("sales tax: never the studio's share — out of membership revenue and its refunds", () => {
+  const base = { membershipFeeCents: 100, creditedCents: 200, reversedCreditCents: 0, disputeCents: 0, backingKeptCents: 0, bookingsKeptCents: 0, adsServedCents: 0, unexplainedCents: 0 };
+  const untaxed = studioShare({ ...base, membershipGrossCents: 1598, refundedCents: 0 });
+  const taxed = studioShare({ ...base, membershipGrossCents: 1598 + 132, membershipTaxCents: 132, refundedCents: 0 });
+  assert.equal(taxed.membership.grossCents, 1598);
+  assert.equal(taxed.membership.taxCents, 132);
+  assert.equal(taxed.membership.marginCents, untaxed.membership.marginCents);
+  assert.equal(taxed.together.shareCents, untaxed.together.shareCents);
+  // a refunded taxed membership: the loss is the price, not the tax that went back
+  const refunded = studioShare({ ...base, membershipGrossCents: 1730, membershipTaxCents: 132, refundedCents: 865, membershipRefundedTaxCents: 66 });
+  assert.equal(refunded.membership.lossCents, 799);
+  // older callers are unchanged
+  assert.equal(studioShare({ ...base, membershipGrossCents: 1598, refundedCents: 0 }).membership.grossCents, 1598);
+});
+
+test('sales tax: the tax inside a refund, and the period line', () => {
+  assert.equal(taxInRefundCents({ refundCents: 7480, chargeCents: 7480, taxCents: 565 }), 565, 'a full refund gives it all back');
+  assert.equal(taxInRefundCents({ refundCents: 3740, chargeCents: 7480, taxCents: 565 }), 283);
+  assert.equal(taxInRefundCents({ refundCents: 9999, chargeCents: 7480, taxCents: 565 }), 565);
+  assert.equal(taxInRefundCents({ refundCents: 3740, chargeCents: 7480, taxCents: 0 }), 0);
+  assert.equal(taxInRefundCents({ refundCents: 3740, chargeCents: 0, taxCents: 565 }), 0);
+  assert.deepEqual(SALES_TAX_LANES, ['memberships', 'backing', 'bookings', 'purchases']);
+  const p = salesTaxPeriod({ collected: { memberships: 132, backing: 0, bookings: 5640, purchases: 41 }, refunded: { bookings: 2820, memberships: 66 } });
+  assert.equal(p.collectedCents, 132 + 5640 + 41);
+  assert.equal(p.refundedCents, 2820 + 66);
+  assert.equal(p.owedCents, 132 + 5640 + 41 - 2820 - 66);
+  assert.deepEqual(p.lanes.bookings, { collectedCents: 5640, refundedCents: 2820, owedCents: 2820 });
+  assert.deepEqual(salesTaxPeriod(), { collectedCents: 0, refundedCents: 0, owedCents: 0, lanes: { memberships: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, backing: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, bookings: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, purchases: { collectedCents: 0, refundedCents: 0, owedCents: 0 } } });
 });
 
 

@@ -94,6 +94,15 @@ t('history: one line per thing that happened, newest first, names only where all
   assert.equal(booking.cents, 61025);
   const bRefund = lines.find((l) => l.id === 'booking-refund:b2');
   assert.equal(bRefund.cents, -Math.round(34900 * 61025 / 69800));
+  // A booking paid with sales tax (migration 122, split 'transfer'):
+  // Stripe reverses the host's transfer over the whole charge, tax
+  // included; the tax itself is never the host's line.
+  const taxed = buildHistory({ ...rows, bookings: [{ ...rows.bookings[1], id: 'b3', split: 'transfer', tax_cents: 5758, refund_cents: 37779 }] });
+  assert.equal(taxed.find((l) => l.id === 'booking:b3').cents, 61025);
+  assert.equal(taxed.find((l) => l.id === 'booking-refund:b3').cents, -Math.round(37779 * 61025 / (69800 + 5758)));
+  // a fee row with a stray tax number reads as before
+  const stray = buildHistory({ ...rows, bookings: [{ ...rows.bookings[1], id: 'b4', split: 'fee', tax_cents: 5758 }] });
+  assert.equal(stray.find((l) => l.id === 'booking-refund:b4').cents, bRefund.cents);
   const payout = lines.find((l) => l.id === 'payout:p1');
   assert.equal(payout.lane, 'payouts');
   assert.equal(payout.where, 'Moved to your Stripe balance');
