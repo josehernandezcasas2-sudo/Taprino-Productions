@@ -25,9 +25,11 @@ export async function getServerSideProps({ req, res, params, query }) {
   const data = await getPodcastShowHubData(params.id, req, { preview });
   if (!data) return { notFound: true };
   // Google's Ad Manager tag for the inline video's empty breaks (lib/googleAds.js):
-  // only for a viewer who gets ads here (each episode's own switch is read
-  // where the player is drawn).
-  const googleAdTag = googleAdTagFor(!preview && !data.preview && !data.adFree && !data.isAdmin);
+  // only for a viewer who gets ads here, and only when an episode they can
+  // watch inline has ads on (each episode's own switch is read again where
+  // the player is drawn).
+  const inlineWithAds = (data.episodes || []).some((ep) => ep && ep.src && !ep.locked && ep.adsEnabled !== false);
+  const googleAdTag = googleAdTagFor(inlineWithAds && !preview && !data.preview && !data.adFree && !data.isAdmin);
   return { props: { ...data, googleAdTag } };
 }
 

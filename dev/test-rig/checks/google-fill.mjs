@@ -74,6 +74,11 @@ const SLOT = crypto.randomUUID(); // a scheduled ad break on the main channel, n
 const people = [];
 const invoices = [];
 let parked = []; // other checks' active house ads, switched off while this runs
+// The seed podcast's first episode is unrated (17+ until rated), so nobody
+// without an age on file can watch it inline; the check rates it TV-G
+// while it runs (and puts its rating back) so the podcast page has an
+// inline video with ads to hand the tag for.
+let podRating;
 
 let haveVideo = false;
 function makeVideo() {
@@ -106,6 +111,8 @@ function seed() {
   // The house VAST must be empty unless a scenario turns this check's ad on.
   parked = rows(`select id from public.house_ads where active = true and review_status = 'approved'`).map((r) => r.id);
   if (parked.length) sql(`update public.house_ads set active = false where id in (${parked.map(q).join(', ')})`);
+  podRating = rows(`select rating from public.episodes where id = ${q(IDS.podE1)}`)[0];
+  if (podRating) sql(`update public.episodes set rating = 'TV-G' where id = ${q(IDS.podE1)}`);
   sql(`insert into public.house_ads (id, title, advertiser, video_url, duration_seconds, click_url, weight, active, review_status, created_by) values (${q(HOUSE_AD)}, 'Check fill house ad ${RUN}', 'Kettle Coffee', 'https://ads.rig.example.com/kettle-${RUN}.mp4', 15, 'https://kettle.example.com/', 1, false, 'approved', ${q(USERS.admin)})`);
 }
 async function cleanup() {
@@ -120,6 +127,7 @@ async function cleanup() {
   sql(`delete from public.ad_impression_days where ad_id = ${q(HOUSE_AD)}`);
   sql(`delete from public.house_ads where id = ${q(HOUSE_AD)}`);
   if (parked.length) sql(`update public.house_ads set active = true where id in (${parked.map(q).join(', ')})`);
+  if (podRating) sql(`update public.episodes set rating = ${q(podRating.rating || null)} where id = ${q(IDS.podE1)}`);
   for (const t of ['creator_ledger', 'member_referrals', 'member_payments', 'member_customers', 'member_lineups']) {
     sql(`delete from public.${t} where ${t === 'creator_ledger' ? 'member_id' : 'user_id'} in (${ids})`);
   }
@@ -201,10 +209,20 @@ async function httpPart(members) {
   ok('/live for the team: null, nowhere in the HTML', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
   p = await page(`/podcasts/${IDS.podcast}`, SIGNED_OUT);
   props = nextData(p.text);
-  ok(`/podcasts/<show> signed out: ${MODE === 'on' ? 'the tag' : 'null'}`, p.status === 200 && props && (props.googleAdTag || null) === expect, `${p.status} ${props && props.googleAdTag}`);
+  const inline = props && (props.episodes || []).some((e) => e.src && !e.locked && e.adsEnabled !== false);
+  ok('/podcasts/<show> signed out: an episode to watch inline, ads on', inline, props && (props.episodes || []).map((e) => [e.id, Boolean(e.src), e.locked]));
+  ok(`…googleAdTag ${MODE === 'on' ? 'is the tag' : 'is null'}`, p.status === 200 && props && (props.googleAdTag || null) === expect, `${p.status} ${props && props.googleAdTag}`);
   p = await page(`/podcasts/${IDS.podcast}`, members.premium);
   props = nextData(p.text);
   ok('…for a Premium member: null', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
+  sql(`update public.episodes set ads_enabled = false where id in (${q(IDS.podE1)}, ${q(IDS.podE2)})`);
+  try {
+    p = await page(`/podcasts/${IDS.podcast}`, SIGNED_OUT);
+    props = nextData(p.text);
+    ok('…a show whose episodes all have ads off: null, nowhere in the HTML', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
+  } finally {
+    sql(`update public.episodes set ads_enabled = true where id in (${q(IDS.podE1)}, ${q(IDS.podE2)})`);
+  }
 
   section('What the admin is told');
   p = await page('/admin/house-ads', ADMIN);
