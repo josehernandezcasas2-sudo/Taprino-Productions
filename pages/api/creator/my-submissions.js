@@ -209,6 +209,8 @@ export default async function handler(req, res) {
       discoverCurated: !!ep.discover_curated,
       fundingUrl: ep.funding_url || '',
       isOriginal: !!ep.is_original,
+      // The flashing-lights warning (an admin's "Edit full details" shows it).
+      hasFlashingLights: !!ep.has_flashing_lights,
       channelOptIn: !!ep.channel_opt_in,
       // Pulled from everywhere while an admin reviews it (lib/moderation.js),
       // and why.
