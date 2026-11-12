@@ -51,7 +51,7 @@ function suite(name, L) {
     assert.equal(L.flashingLightsFor({ hasFlashingLights: 'yes' }), null, 'only a real true');
     assert.deepEqual(L.flashingLightsFor({ hasFlashingLights: true }), {
       kicker: 'WARNING',
-      headline: 'This programme contains flashing lights that may affect viewers with photosensitive epilepsy.',
+      headline: 'This program contains flashing lights that may affect viewers with photosensitive epilepsy.',
       line: 'Viewer discretion is advised.'
     });
     assert.equal(L.FLASHING_CHIP, 'Flashing lights');
@@ -77,7 +77,7 @@ function suite(name, L) {
     assert.equal(card.rating, null);
     assert.equal(card.holds, true);
     assert.equal(card.flashing.kicker, 'WARNING');
-    assert.equal(card.label, 'Warning. This programme contains flashing lights that may affect viewers with photosensitive epilepsy. Viewer discretion is advised.');
+    assert.equal(card.label, 'Warning. This program contains flashing lights that may affect viewers with photosensitive epilepsy. Viewer discretion is advised.');
   });
 
   t('playbackAdvisoryFor: both on ONE card, the discretion line said once', () => {

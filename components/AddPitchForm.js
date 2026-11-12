@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useDraftAutosave } from '../lib/useDraftAutosave';
-import { PITCH_TAGS } from '../lib/pitches';
+import { PITCH_TAGS } from '../lib/pitchRules';
 
 function readAsDataUrl(file) {
   return new Promise((resolve, reject) => {

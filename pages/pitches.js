@@ -4,7 +4,7 @@ import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { HeartIcon, SwipeDeckIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
-import { PITCH_TAGS } from '../lib/pitches';
+import { PITCH_TAGS } from '../lib/pitchRules';
 import { getPitchRoomData } from '../lib/pitchRoom';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import HeaderNav from '../components/HeaderNav';

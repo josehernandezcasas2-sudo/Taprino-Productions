@@ -230,8 +230,9 @@ export async function getServerSideProps({ req, params, query, res }) {
     }
   }
 
-  // audioUrl (podcast audio, in a public bucket) used to pass through
-  // untouched, so anyone could lift a premium episode's audio link.
+  // audioUrl (podcast audio) is never the stored bucket address: since
+  // 2026-11-12 the bucket is private and every play goes through
+  // /api/podcasts/audio/<id>, which checks the listener first.
   // Captions and transcripts are the title's dialogue in text: they go to
   // the browser only with the video (the lock screen used to carry them),
   // and never the stored reference, only the gated route.

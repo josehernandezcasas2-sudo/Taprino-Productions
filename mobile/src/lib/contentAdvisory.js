@@ -75,7 +75,7 @@ export function advisoryFor(episode, ratings) {
 // until the card ends or the viewer dismisses it. Never for a trailer (the
 // player passes no advisory for one).
 export const FLASHING_KICKER = 'WARNING';
-export const FLASHING_HEADLINE = 'This programme contains flashing lights that may affect viewers with photosensitive epilepsy.';
+export const FLASHING_HEADLINE = 'This program contains flashing lights that may affect viewers with photosensitive epilepsy.';
 export const DISCRETION_LINE = 'Viewer discretion is advised.';
 export const FLASHING_CHIP = 'Flashing lights';
 
