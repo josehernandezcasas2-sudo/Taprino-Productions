@@ -48,7 +48,11 @@ export default async function handler(req, res) {
     adminEmail = email || null;
   }
   try {
-    const result = await sendCollectReminders();
+    // Each step runs whatever the one before it did: a failed reminder run
+    // must not keep the crew-pay releases, the payee steps or the Stripe
+    // catch-up from running. The answer is still 500 when it failed.
+    let remindersError = null;
+    const result = await sendCollectReminders().catch((err) => { remindersError = err; console.error('sendCollectReminders:', err.message); return { checked: 0, sent: [] }; });
     const crewPay = await releaseDueCrewPay().catch((err) => { console.error('releaseDueCrewPay:', err.message); return { released: 0, error: true }; });
     const payeeCutover = await payeeCutoverStep().catch((err) => { console.error('payeeCutoverStep:', err.message); return { ran: false, error: true }; });
     const payeeRepair = await repairTitlePayees().catch((err) => { console.error('repairTitlePayees:', err.message); return { repaired: 0, error: true }; });
@@ -58,6 +62,7 @@ export default async function handler(req, res) {
     // Last, with its own clock: the Stripe catch-up. Never throws past here.
     const stripeCatchup = await runStripeCatchup({ handleEvent: handleStripeEvent }).catch((err) => { console.error('runStripeCatchup:', err.message); return { error: 'it couldn’t run (see the logs)' }; });
     await recordAudit({ adminId, adminEmail, action: 'stripe_catchup', targetType: 'creator_share', targetId: 'daily', details: `${isCronRequest ? 'cron' : 'manual'} · ${catchupAuditLine(stripeCatchup)}` });
+    if (remindersError) return sendError(res, remindersError, 'cron/creator-reminders');
     return res.status(200).json({ ok: true, checked: result.checked, reminded: result.sent.filter((s) => !s.skipped).length, skipped: result.sent.filter((s) => s.skipped).length, crewPay, payeeCutover, payeeRepair, priceOwners, stripeCatchup });
   } catch (err) {
     console.error('cron/creator-reminders error:', err.message);
