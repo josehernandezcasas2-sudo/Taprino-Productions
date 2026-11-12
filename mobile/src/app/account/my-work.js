@@ -125,6 +125,7 @@ function showRowFlags(s) {
   if (s.deletionRequested) flags.push({ key: 'removal', tone: 'muted', Icon: TrashIcon, text: s.deletionReason ? `Removal requested: ${s.deletionReason}` : 'Removal requested' });
   if (s.pendingTitle) flags.push({ key: 'title', tone: 'wait', Icon: ClockIcon, text: 'Title change waiting' });
   if (s.pendingDescription) flags.push({ key: 'desc', tone: 'wait', Icon: ClockIcon, text: 'Description change waiting' });
+  if (typeof s.pendingPageNotes === 'string') flags.push({ key: 'notes', tone: 'wait', Icon: ClockIcon, text: 'Notes change waiting' });
   if (s.pendingSrc) flags.push({ key: 'video', tone: 'wait', Icon: ClockIcon, text: s.pendingVideoState && s.pendingVideoState !== 'ready' ? 'New video waiting · still processing' : 'New video waiting' });
   if (s.artworkPending) flags.push({ key: 'art', tone: 'wait', Icon: ClockIcon, text: 'Art waiting for approval' });
   if (s.cloudflareState === 'error') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, text: 'The file failed to process — replace it' });
@@ -557,6 +558,9 @@ export default function MyWork() {
           if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ key: 'captions', Icon: ChatIcon });
           if (s.artworkPending) flags.push({ key: 'pending', Icon: ClockIcon });
           if (s.pendingTitle) flags.push({ key: 'title', Icon: ClockIcon });
+          if (s.pendingDescription) flags.push({ key: 'desc', Icon: ClockIcon });
+          if (typeof s.pendingPageNotes === 'string') flags.push({ key: 'notes', Icon: ClockIcon });
+          if (s.pendingTitleImageUrl || s.pendingTitleImageRemoval) flags.push({ key: 'titleImage', Icon: ClockIcon });
           if (s.pendingSrc) flags.push({ key: 'video', Icon: ClockIcon });
           if (s.deletionRequested) flags.push({ key: 'deletion', Icon: TrashIcon });
           return (

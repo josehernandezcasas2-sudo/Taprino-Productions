@@ -670,6 +670,7 @@ function suite(R, who) {
     assert.equal(mixed.count, 4);
     assert.equal(R.saveSummary([{ field: 'thumbnail', mode: 'staged' }, { field: 'name', mode: 'staged' }, { field: 'heroImage', mode: 'staged' }]).note, 'Goes to review: the still, the new name and the hero image');
     assert.equal(R.saveSummary([{ field: 'somethingNew', mode: 'staged' }]).note, 'Goes to review: somethingNew');
+    assert.deepEqual(R.saveSummary([{ field: 'description', mode: 'staged' }, { field: 'pageNotes', mode: 'staged' }, { field: 'genre', mode: 'direct' }]), { label: 'Save · 2 changes go to review', note: 'Goes to review: the description and the notes; the rest applies at once', staged: ['description', 'pageNotes'], direct: 1, count: 3 });
   });
 
   tt('season labels, kinds, nouns, public shows', () => {
@@ -965,10 +966,13 @@ function suite(R, who) {
       for (const field of ['title', 'poster', 'video', 'trailer', 'tier', 'rating', 'description']) assert.equal(R.fieldPolicy(field, { ...owner, status }), 'direct', `${status} ${field}`);
     }
     const live = { ...owner, status: 'approved' };
-    for (const field of ['description', 'genre', 'mainGenre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'channelOptIn', 'captions', 'hasPage', 'pageNotes', 'season', 'seriesOrder', 'seriesId', 'bonusParent', 'credits']) {
+    for (const field of ['genre', 'mainGenre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'channelOptIn', 'captions', 'hasPage', 'season', 'seriesOrder', 'seriesId', 'bonusParent', 'credits']) {
       assert.equal(R.fieldPolicy(field, live), 'direct', field);
     }
-    for (const field of ['title', 'poster', 'thumbnail', 'titleImage', 'trailer', 'video']) assert.equal(R.fieldPolicy(field, live), 'staged', field);
+    // Jose, 2026-11-12: descriptions and notes wait for review on a live title.
+    for (const field of ['title', 'description', 'pageNotes', 'poster', 'thumbnail', 'titleImage', 'trailer', 'video']) assert.equal(R.fieldPolicy(field, live), 'staged', field);
+    // Never live yet: they apply at once.
+    for (const status of ['draft', 'pending', 'rejected']) for (const field of ['description', 'pageNotes']) assert.equal(R.fieldPolicy(field, { ...owner, status }), 'direct', `${status} ${field}`);
     for (const field of ['tier', 'rating', 'isOriginal', 'featured']) assert.equal(R.fieldPolicy(field, live), 'locked', field);
     assert.equal(R.fieldPolicy('paidTo', live), 'invite');
     assert.equal(R.fieldPolicy('paidTo', { ...owner, status: 'pending' }), 'invite');
@@ -981,7 +985,8 @@ function suite(R, who) {
   tt('fieldPolicy: who may change what — the uploader\'s details, the runner\'s place, credits and payee', () => {
     const contributor = { isUploader: true, isRunner: false, status: 'approved' };
     const runner = { isUploader: false, isRunner: true, status: 'approved' };
-    assert.equal(R.fieldPolicy('description', contributor), 'direct');
+    assert.equal(R.fieldPolicy('description', contributor), 'staged');
+    assert.equal(R.fieldPolicy('description', { ...contributor, status: 'pending' }), 'direct');
     assert.equal(R.fieldPolicy('seriesOrder', contributor), 'locked');
     assert.equal(R.fieldPolicy('credits', contributor), 'locked');
     assert.equal(R.fieldPolicy('paidTo', contributor), 'locked');
@@ -1016,8 +1021,8 @@ function suite(R, who) {
 
   tt('fieldPolicy: a show — at once until its first episode is approved, then its name and art wait', () => {
     const runner = { target: 'show', isRunner: true };
-    const art = ['name', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer'];
-    const rest = ['description', 'releaseYear', 'fundingUrl', 'channelOptIn', 'seasons', 'defaults', 'credits'];
+    const art = ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer'];
+    const rest = ['releaseYear', 'fundingUrl', 'channelOptIn', 'seasons', 'defaults', 'credits'];
     for (const f of [...art, ...rest]) assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 0 }), 'direct', `new show ${f}`);
     for (const f of art) {
       assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 1 }), 'staged', `ready show ${f}`);
@@ -1037,7 +1042,10 @@ function suite(R, who) {
 
   tt('fieldPolicyLine: the words under a field', () => {
     const live = { isUploader: true, isRunner: true, status: 'approved' };
-    assert.equal(R.fieldPolicyLine('description', live), null);
+    assert.equal(R.fieldPolicyLine('genre', live), null);
+    assert.equal(R.fieldPolicyLine('description', live), 'Waits for approval; what’s there now stays until then');
+    assert.equal(R.fieldPolicyLine('pageNotes', live), 'Waits for approval; what’s there now stays until then');
+    assert.equal(R.fieldPolicyLine('pageNotes', { ...live, held: true }), null, 'a pulled title keeps its notes open');
     assert.equal(R.fieldPolicyLine('video', live), 'The new file goes to an admin; the current one keeps playing until then');
     assert.equal(R.fieldPolicyLine('poster', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('tier', live), 'Ask us to change who can watch');
@@ -1315,6 +1323,19 @@ function suite(R, who) {
     const pod = R.showProblems({ status: 'pending', kind: 'podcast' }, [ep('p', 1, 1, { contentType: 'podcast', audioUrl: 'https://x/a.mp3' })]);
     assert.deepEqual(pod, []);
     assert.deepEqual(R.showProblems({ status: 'pending' }, [], { trailerState: 'error' }).map((p) => p.words), ['The trailer failed — replace it']);
+  });
+
+  tt('showProblems: a waiting description and page notes (2026-11-12, migration 122)', () => {
+    const staged = (extra) => R.showProblems({ status: 'pending' }, [ep('z', 1, 1, { captionsUrl: '/c', ...extra })]).filter((p) => p.code === 'staged-episodes').map((p) => p.episodeIds);
+    assert.deepEqual(staged({ pending_description: 'New words.' }), [['z']]);
+    assert.deepEqual(staged({ pendingDescription: 'New words.' }), [['z']]);
+    assert.deepEqual(staged({ pending_page_notes: 'New notes.' }), [['z']]);
+    assert.deepEqual(staged({ pending_page_notes: '' }), [['z']], 'clearing the notes waits too');
+    assert.deepEqual(staged({ pendingPageNotes: '' }), [['z']]);
+    assert.deepEqual(staged({ pending_page_notes: null }), []);
+    assert.deepEqual(staged({}), []);
+    const show = R.showProblems({ status: 'approved', pending_description: 'A new line.' }, []).filter((p) => p.code === 'staged').map((p) => p.words);
+    assert.deepEqual(show, ['Waiting for approval: the new description']);
   });
 
   tt('showProblems: a live episode\'s waiting title image, removal and trailer (migration 120)', () => {

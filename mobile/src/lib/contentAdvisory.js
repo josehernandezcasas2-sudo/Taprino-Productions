@@ -66,3 +66,43 @@ export function advisoryFor(episode, ratings) {
     line: level === 'all' ? null : 'Viewer discretion is advised.'
   };
 }
+
+// The flashing-lights warning (Jose, 2026-11-12: "add the flashing light
+// warning on the film page and before the video plays, similar to how the
+// tv rating is on some tvs"): a title marked has_flashing_lights
+// (episode.hasFlashingLights) gets a photosensitivity card when the
+// programme itself starts, and the video waits at its first frame under it
+// until the card ends or the viewer dismisses it. Never for a trailer (the
+// player passes no advisory for one).
+export const FLASHING_KICKER = 'WARNING';
+export const FLASHING_HEADLINE = 'This programme contains flashing lights that may affect viewers with photosensitive epilepsy.';
+export const DISCRETION_LINE = 'Viewer discretion is advised.';
+export const FLASHING_CHIP = 'Flashing lights';
+
+export function flashingLightsFor(episode) {
+  if (!episode || episode.hasFlashingLights !== true) return null;
+  return { kicker: FLASHING_KICKER, headline: FLASHING_HEADLINE, line: DISCRETION_LINE };
+}
+
+// The one card shown when the programme starts: the rating advisory
+// (advisoryFor) and the flashing-lights warning on one card when a title
+// has both, never two in a row. Null when there is nothing to say.
+//   → { rating: advisoryFor's answer (its discretion line left to the
+//       warning when both are there) | null, flashing: { kicker, headline,
+//       line } | null, holds (the video waits at its first frame under the
+//       card: the warning's), label (the card in one line, for a screen
+//       reader) }
+export function playbackAdvisoryFor(episode, ratings) {
+  const rating = advisoryFor(episode, ratings);
+  const flashing = flashingLightsFor(episode);
+  if (!rating && !flashing) return null;
+  const ratingPart = rating && flashing ? { ...rating, line: null } : rating;
+  const words = [
+    ratingPart ? `Rated ${ratingPart.code}.` : null,
+    ratingPart ? ratingPart.headline : null,
+    ratingPart && ratingPart.line ? ratingPart.line : null,
+    flashing ? `Warning. ${flashing.headline}` : null,
+    flashing ? flashing.line : null
+  ].filter(Boolean);
+  return { rating: ratingPart, flashing, holds: Boolean(flashing), label: words.join(' ') };
+}

@@ -1,7 +1,8 @@
 import { startShowRoute, showViewer, showLimit, showRouteError, idFrom } from '../../../../../lib/showRoute';
 import { cancelEpisodeStaged } from '../../../../../lib/showPage';
 
-// DELETE ?field=title|description|poster|thumbnail|video → { ok, cancelled }:
+// DELETE ?field=title|description|pageNotes|poster|thumbnail|titleImage|trailer|video
+// → { ok, cancelled }:
 // the uploader (or the team) takes back a change that waits for approval;
 // its file is orphaned (lib/showPage.js cancelEpisodeStaged).
 export default async function handler(req, res) {

@@ -62,7 +62,9 @@ export function rowMeta(row, ctx, upload) {
   if (row.captionsStale) add('Captions may be out of sync', 'warn');
   const st = row.staged || {};
   if (st.title) add('Title change waiting', 'wait');
-  if (st.poster || st.thumbnail) add('Art waiting for approval', 'wait');
+  if (st.description) add('Description change waiting', 'wait');
+  if (typeof st.pageNotes === 'string') add('Notes change waiting', 'wait');
+  if (st.poster || st.thumbnail || st.titleImage) add('Art waiting for approval', 'wait');
   if (st.newVideo) add('New file waiting', 'wait');
   if (row.hasPageChoice === true) add('its own page');
   if (row.tier && ctx.defaultTier && row.tier !== ctx.defaultTier) add(row.tier === 'free' ? 'free' : ctx.premiumWord);

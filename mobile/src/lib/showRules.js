@@ -1446,6 +1446,7 @@ const STAGED_WORDS = {
   title: 'the new title',
   name: 'the new name',
   description: 'the description',
+  pageNotes: 'the notes',
   poster: 'the poster',
   thumbnail: 'the still',
   heroImage: 'the hero image',
@@ -1858,7 +1859,11 @@ export function creditLines(episode, series, names) {
 export const FIELD_POLICY = {
   episode: {
     title: { live: 'staged', who: 'uploader' },
-    description: { live: 'direct', who: 'uploader' },
+    // Jose, 2026-11-12: "make sure descriptions and notes wait for
+    // review" — on a live title the description (pending_description,
+    // migration 030) and the page notes (pending_page_notes, migration 122)
+    // wait like the title.
+    description: { live: 'staged', who: 'uploader' },
     poster: { live: 'staged', who: 'uploader' },
     thumbnail: { live: 'staged', who: 'uploader' },
     titleImage: { live: 'staged', who: 'uploader' },
@@ -1874,7 +1879,7 @@ export const FIELD_POLICY = {
     adsEnabled: { live: 'direct', who: 'uploader' },
     channelOptIn: { live: 'direct', who: 'uploader' },
     captions: { live: 'direct', who: 'uploader' },
-    pageNotes: { live: 'direct', who: 'uploader' },
+    pageNotes: { live: 'staged', who: 'uploader' },
     // What kind of extra (migration 121): a label, like the other details.
     extraKind: { live: 'direct', who: 'uploader' },
     hasPage: { live: 'direct', who: 'either' },
@@ -1896,7 +1901,8 @@ export const FIELD_POLICY = {
     heroImage: { live: 'staged', who: 'runner' },
     titleImage: { live: 'staged', who: 'runner' },
     trailer: { live: 'staged', who: 'runner' },
-    description: { live: 'direct', who: 'runner' },
+    // Waits like the name once an episode is approved (2026-11-12).
+    description: { live: 'staged', who: 'runner' },
     releaseYear: { live: 'direct', who: 'runner' },
     fundingUrl: { live: 'direct', who: 'runner' },
     channelOptIn: { live: 'direct', who: 'runner' },
@@ -1909,7 +1915,9 @@ export const FIELD_POLICY = {
 };
 
 // Amendment 22: while pulled, the file can still be replaced (it goes to
-// review) and the captions and page notes stay open; the rest waits.
+// review) and the captions and page notes stay open; the rest waits. (A
+// pulled title isn't on the site, so its notes go up as they are typed;
+// on a live one they wait for review, FIELD_POLICY above.)
 const OPEN_WHILE_PULLED = { video: 'staged', captions: 'direct', pageNotes: 'direct' };
 
 const TEAM_ONLY_WORDS = {
@@ -2230,12 +2238,15 @@ export function showProblems(show, rows, opts = {}) {
     const which = isPublicShow(show) ? 'live' : 'approved';
     if (bare.length) out.push({ code: 'captions', level: 'review', episodeIds: bare.map((r) => r.id), words: `${pl(bare.length, `${which} episode has`, `${which} episodes have`)} no captions` });
   }
-  const showStaged = [['pendingName', 'pending_name', 'name'], ['pendingPoster', 'pending_poster', 'poster'], ['pendingThumbnail', 'pending_thumbnail', 'still'], ['pendingHeroImage', 'pending_hero_image', 'hero image'], ['pendingTitleImageUrl', 'pending_title_image_url', 'title image'], ['pendingTrailerSrc', 'pending_trailer_src', 'trailer']]
+  const showStaged = [['pendingName', 'pending_name', 'name'], ['pendingPoster', 'pending_poster', 'poster'], ['pendingThumbnail', 'pending_thumbnail', 'still'], ['pendingHeroImage', 'pending_hero_image', 'hero image'], ['pendingTitleImageUrl', 'pending_title_image_url', 'title image'], ['pendingTrailerSrc', 'pending_trailer_src', 'trailer'], ['pendingDescription', 'pending_description', 'description']]
     .filter(([camel, snake]) => !blank(pick(show, camel, snake)))
     .map(([, , word]) => word);
   if (showStaged.length) out.push({ code: 'staged', level: 'review', episodeIds: [], words: `Waiting for approval: the new ${listWords(showStaged)}` });
-  const stagedEpisodes = inPlay.filter((r) => ['pendingTitle', 'pendingPoster', 'pendingThumbnail', 'pendingSrc', 'pendingTitleImageUrl', 'pendingTrailerSrc'].some((k) => !blank(r[k]))
-    || ['pending_title', 'pending_poster', 'pending_thumbnail', 'pending_src', 'pending_title_image_url', 'pending_trailer_src'].some((k) => !blank(r[k]))
+  // A description and page notes wait too (2026-11-12); notes waiting as
+  // an empty string are "clear the notes" (migration 122).
+  const stagedEpisodes = inPlay.filter((r) => ['pendingTitle', 'pendingDescription', 'pendingPoster', 'pendingThumbnail', 'pendingSrc', 'pendingTitleImageUrl', 'pendingTrailerSrc'].some((k) => !blank(r[k]))
+    || ['pending_title', 'pending_description', 'pending_poster', 'pending_thumbnail', 'pending_src', 'pending_title_image_url', 'pending_trailer_src'].some((k) => !blank(r[k]))
+    || typeof r.pendingPageNotes === 'string' || typeof r.pending_page_notes === 'string'
     || r.pendingTitleImageRemoval === true || r.pending_title_image_removal === true);
   if (stagedEpisodes.length) out.push({ code: 'staged-episodes', level: 'review', episodeIds: stagedEpisodes.map((r) => r.id), words: `${pl(stagedEpisodes.length, 'episode has', 'episodes have')} changes waiting for approval` });
   const trailer = videoStateOf(opts.trailerState);
