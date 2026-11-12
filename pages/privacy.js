@@ -142,7 +142,9 @@ export default function Privacy({ account }) {
       <p>
         <strong>Google&rsquo;s ads.</strong> We use <strong>Google AdSense</strong> for display
         advertising on our public pages. Its script isn&rsquo;t loaded on account, creator, admin or
-        message pages.
+        message pages. When we have no ad of our own for a break, the website&rsquo;s player may ask
+        Google&rsquo;s Ad Manager for one; those ads come from Google, under the same cookies and
+        opt-outs described below.
       </p>
       <ul>
         <li>
