@@ -21,8 +21,9 @@ import { applyCors } from '../../../lib/cors';
 //   shows     Admin → Shows (the series revamp, slice 3a): across shows,
 //             episodes in review + staged changes (art — an episode's
 //             title image, its removal and trailer since migration 120 —,
-//             text, a new video waiting) + removal requests, for
-//             manage_episodes or review_submissions.
+//             text, a new video waiting, a show's season art since
+//             migration 122) + removal requests, for manage_episodes or
+//             review_submissions.
 //   flags     what /admin/content's review queue lists (lib/moderationRules.js
 //             reviewQueueKeys): each item with an open flag or counted
 //             reports not ignored, once — tip notes (Admin → Tips) and items
@@ -79,8 +80,13 @@ async function episodesNeedingSomeone(supabase) {
   return res.data || [];
 }
 
+// A show's season art waiting for approval (migration 122's
+// pending_season_art, decided on its admin show page) counts toward Shows;
+// the Library's queues don't list it, so it is never in `artwork`. Read
+// without the column before 122.
 async function seriesNeedingSomeone(supabase) {
-  const res = await supabase.from('series').select(SERIES_FLAGS).or(SERIES_WANTED.join(','));
+  let res = await supabase.from('series').select(`${SERIES_FLAGS}, pending_season_art`).or([...SERIES_WANTED, 'pending_season_art.not.is.null'].join(','));
+  if (res.error && isMissingColumn(res.error)) res = await supabase.from('series').select(SERIES_FLAGS).or(SERIES_WANTED.join(','));
   if (res.error) {
     console.error('queue-counts series:', res.error.message);
     return [];
@@ -97,6 +103,8 @@ function stagedCounts(episodes, series) {
   const epVideo = (r) => has(r.pending_src);
   const seArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_trailer_src) || has(r.pending_hero_image) || has(r.pending_title_image_url) || r.pending_title_image_removal === true;
   const seText = (r) => has(r.pending_name) || has(r.pending_description);
+  // Season art waiting (migration 122): a non-empty list.
+  const seSeasons = (r) => Array.isArray(r.pending_season_art) && r.pending_season_art.length > 0;
   const inShow = (r) => has(r.series_id);
   const count = (rows, test) => rows.filter(test).length;
   return {
@@ -105,7 +113,7 @@ function stagedCounts(episodes, series) {
     deletions: count(episodes, removal) + count(series, removal),
     shows: count(episodes, (r) => inShow(r) && r.status === 'pending')
       + count(episodes, (r) => inShow(r) && (epArt(r) || epText(r) || epVideo(r)))
-      + count(series, (r) => seArt(r) || seText(r))
+      + count(series, (r) => seArt(r) || seText(r) || seSeasons(r))
       + count(episodes, (r) => inShow(r) && removal(r))
       + count(series, removal)
   };
