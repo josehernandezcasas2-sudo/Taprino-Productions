@@ -107,6 +107,10 @@ async function surrogates() {
   ok('edit-submission: title → 200', r.status === 200 && (rows(`select title from public.episodes where id = ${q(ID.fresh)}`)[0] || {}).title === `Check fixes film ${RUN} �`, `${r.status} ${r.text.slice(0, 160)}`);
   r = await call('/api/admin/edit-episode', { who: ADMIN, method: 'POST', body: { episodeId: ID.live, artist: 'Mara \uDBFF Reyes' } });
   ok('the Library’s edit-episode: → 200', r.status === 200 && (rows(`select artist from public.episodes where id = ${q(ID.live)}`)[0] || {}).artist === 'Mara � Reyes', `${r.status} ${r.text.slice(0, 160)}`);
+  r = await call('/api/creator/drafts', { who: MARA, method: 'POST', body: { form: { ...EMPTY_SUBMIT_FORM, contentType: 'movie', title: `Check fixes draft ${RUN} \uD83D` } } });
+  const draftId = r.json && r.json.draft && r.json.draft.id;
+  ok('the drafts route (the form as jsonb): → 200, well formed', r.status === 200 && draftId && (rows(`select form->>'title' as t from public.creator_drafts where id = ${q(draftId)}`)[0] || {}).t === `Check fixes draft ${RUN} \uFFFD`, `${r.status} ${r.text.slice(0, 160)}`);
+  if (draftId) sql(`delete from public.creator_drafts where id = ${q(draftId)}`);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.fresh)}`, { who: MARA, method: 'PATCH', body: { pageNotes: 'A real pair 🎬 stays.' } });
   ok('a real pair is left alone', r.status === 200 && notesOf(ID.fresh) === 'A real pair 🎬 stays.', JSON.stringify(notesOf(ID.fresh)));
 }

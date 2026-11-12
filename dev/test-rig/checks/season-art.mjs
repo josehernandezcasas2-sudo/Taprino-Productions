@@ -20,7 +20,7 @@
 //   node dev/test-rig/checks/season-art.mjs
 import { spawn } from 'node:child_process';
 import { jpegCard } from '../lib/images.mjs';
-import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, hasColumn, session, browser, goto, ago, uidFor } from './lib.mjs';
+import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, hasColumn, session, browser, goto, overflowPx, ago, uidFor } from './lib.mjs';
 
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
@@ -163,6 +163,30 @@ async function after122() {
   ok('a season the show doesn’t have → 400', r.status === 400 && /no Season 7/.test(r.text), `${r.status} ${r.text.slice(0, 160)}`);
   r = await patch(MARA, ID.live, { seasonArt: [{ number: 2, remove: true, imageBase64: s1 }] });
   ok('a picture and a removal at once → 400', r.status === 400, r.status);
+
+  section('In the browser: the admin show page and the owner’s editor');
+  {
+    const b = await browser();
+    try {
+      const a = await b.open(ADMIN, 1280);
+      await goto(a.page, `/admin/shows/${ID.live}`);
+      const card = a.page.locator('text=Season 2 · The Second art').first();
+      await card.waitFor({ timeout: 30000 }).catch(() => {});
+      ok('Waiting for approval shows “Season 2 · The Second art”', await card.isVisible().catch(() => false));
+      ok('…and Season 1’s', await a.page.locator('text=Season 1 · The First art').first().isVisible().catch(() => false));
+      ok('…no page errors', a.errors.length === 0, a.errors);
+      await a.ctx.close();
+      const m = await b.open(MARA, 390);
+      await goto(m.page, `/creator/show/${ID.live}/edit?tab=art`);
+      const rowWords = m.page.locator('text=Season art').first();
+      await rowWords.waitFor({ timeout: 30000 }).catch(() => {});
+      ok('the owner’s editor (390) has the Season art block', await rowWords.isVisible().catch(() => false));
+      ok('…no overflow, no page errors', (await overflowPx(m.page)) <= 0 && m.errors.length === 0, m.errors);
+      await m.ctx.close();
+    } finally {
+      await b.close();
+    }
+  }
 
   section('The team decides each season');
   let items = await stagedItems();
