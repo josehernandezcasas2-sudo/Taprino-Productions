@@ -51,14 +51,15 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="October 18, 2026"
+      updated="November 12, 2026"
       account={account}
       summary={
         <>
           <strong>The short version.</strong> You can watch most of {SITE.name} without an
           account. If you make one, we store your email and what you&rsquo;ve watched so the site can
-          remember where you left off. We show ads on free content, and those ads come from Google.
-          We don&rsquo;t sell your personal information. You can ask us to delete your account and
+          remember where you left off. We show ads on free content: our own and our advertisers&rsquo;
+          ads in the player, and Google&rsquo;s display ads on some public pages. We don&rsquo;t sell
+          your personal information. You can ask us to delete your account and
           everything attached to it at any time by emailing {SITE.contactEmail}.
         </>
       }
@@ -87,11 +88,35 @@ export default function Privacy({ account }) {
         <li><strong>Email preferences</strong> — whether you want to hear about new drops.</li>
       </ul>
 
-      <h3>If you subscribe to {SITE.premiumTier}</h3>
+      <h3>If you pay for something</h3>
       <p>
-        Payments are processed by Stripe. <strong>We never receive or store your card number.</strong>{' '}
-        We keep a Stripe customer reference and your subscription status so we know what you have
+        Memberships, titles, tips, backings and bookings are paid through Stripe.{' '}
+        <strong>We never receive or store your card number.</strong> We keep a Stripe customer
+        reference, your subscription status and a record of each payment so we know what you have
         access to. Stripe&rsquo;s own privacy policy governs the payment data they hold.
+      </p>
+      <p>
+        <strong>Sales tax.</strong> Where sales tax applies, Stripe works it out from the address you
+        give at checkout, and we keep the amount of tax charged with the payment record, as tax law
+        requires.
+      </p>
+
+      <h3>If you turn on notifications</h3>
+      <p>
+        <strong>In your browser:</strong> if you switch notifications on under Account → Preferences
+        and your browser agrees, we store the push address your browser gives us (a link to its push
+        service, run by the browser&rsquo;s maker, such as Google, Mozilla, Apple or Microsoft) and the
+        keys that encrypt each message. The words of a notification and its link pass through that push
+        service, encrypted. Switch it off there, in your browser&rsquo;s settings, or by signing out of
+        that browser.
+      </p>
+      <p>
+        <strong>In the app:</strong> if you allow notifications, the app sends us a device token, and
+        notifications go to your phone through Expo&rsquo;s push service and Apple or Google. Turn them
+        off in the app&rsquo;s preferences or your phone&rsquo;s settings.
+      </p>
+      <p>
+        We keep a switched-off address or token marked as switched off, with no message content.
       </p>
 
       <h3>If you submit work as a creator</h3>
@@ -103,9 +128,21 @@ export default function Privacy({ account }) {
 
       <h2>Advertising and Google AdSense</h2>
       <p>
-        Free content on {SITE.name} is supported by advertising. We use{' '}
-        <strong>Google AdSense</strong> to serve display advertising, and the Google IMA SDK to
-        serve video advertising in the player.
+        Free content on {SITE.name} is supported by advertising, of two kinds.
+      </p>
+      <p>
+        <strong>Our own ads.</strong> Most ads in the player are {SITE.studio}&rsquo;s own or come from
+        advertisers who buy them through our ad system, and we choose them ourselves. They set no
+        cookies and use no advertising ID. We count how many times each ad plays, per title and per
+        day, so we can charge the advertiser and pay the title&rsquo;s creator their share; that count
+        isn&rsquo;t tied to you. On the website these ads play through Google&rsquo;s IMA player
+        software, which loads from Google&rsquo;s servers like any Google resource. In the app they
+        play in our own player, and the app doesn&rsquo;t load Google&rsquo;s advertising software.
+      </p>
+      <p>
+        <strong>Google&rsquo;s ads.</strong> We use <strong>Google AdSense</strong> for display
+        advertising on our public pages. Its script isn&rsquo;t loaded on account, creator, admin or
+        message pages.
       </p>
       <ul>
         <li>
@@ -139,8 +176,10 @@ export default function Privacy({ account }) {
       </ul>
       <p>
         This is Google&rsquo;s processing, not ours — we receive aggregate performance figures, not
-        profiles of individual viewers. <strong>{SITE.premiumTier} members are shown no ads</strong>, and
-        no ad request is made on their behalf, so no advertising cookies are set for them.
+        profiles of individual viewers. <strong>Premium and Sponsor members see no ads in the
+        player</strong>, and no ad is requested for them there. Google&rsquo;s display-ads script still
+        loads on our public pages for everyone, members included, and Live TV carries ads for every
+        viewer.
       </p>
       <p>
         If you are in the EEA or UK, Google serves ads in accordance with its obligations under the
@@ -152,13 +191,17 @@ export default function Privacy({ account }) {
       <p>We use these services, and only for the purposes listed:</p>
       <ul>
         <li><strong>Clerk</strong> — accounts and sign-in</li>
-        <li><strong>Stripe</strong> — payments and subscriptions</li>
-        <li><strong>Supabase</strong> — our content and account database</li>
+        <li><strong>Stripe</strong> — payments, subscriptions and sales tax</li>
+        <li><strong>Supabase</strong> — our content and account database, and file storage</li>
         <li><strong>Cloudflare Stream</strong> — video hosting and delivery</li>
         <li><strong>Vercel</strong> — website hosting</li>
-        <li><strong>Upstash</strong> — view counters</li>
-        <li><strong>Google</strong> — advertising on free content</li>
+        <li><strong>Upstash</strong> — view counters and short-lived counters that limit how often a request can be repeated</li>
+        <li><strong>Google</strong> — display advertising on public pages, and the IMA player software on the website</li>
         <li><strong>Resend</strong> — email notifications, if you opt in</li>
+        <li><strong>Brevo</strong> — our newsletter, if you sign up for it</li>
+        <li><strong>Expo</strong> — notifications to the app, if you allow them</li>
+        <li><strong>Your browser&rsquo;s push service</strong> — notifications in your browser, if you switch them on</li>
+        <li><strong>OpenStreetMap (Nominatim)</strong> — turning a place you type on a working card or a location listing into a point on the map</li>
       </ul>
       <p>
         <strong>We do not sell your personal information</strong>, and we don&rsquo;t share it with
