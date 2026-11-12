@@ -28,6 +28,15 @@ t('screeners stay open while the door is shut (the link is the key)', () => {
   assert.equal(isOpenPath('/screeners'), false);
 });
 
+t('podcast audio stays open (2026-11-12)', () => {
+  // The audio route keeps the door itself for a request without a key.
+  assert.equal(isOpenPath('/api/podcasts/audio/ep1.mp3'), true);
+  assert.equal(isOpenPath('/api/podcasts/audio/ep1'), true);
+  // The feed itself was never open while the door is shut.
+  assert.equal(isOpenPath('/api/podcasts/show-1/rss.xml'), false);
+  assert.equal(isOpenPath('/api/podcasts/audio'), false, 'no bare index');
+});
+
 t('the door keeps the page wanted, never an outside one', () => {
   assert.equal(doorPath('/', ''), '/welcome');
   assert.equal(doorPath('/welcome', '?x=1'), '/welcome');

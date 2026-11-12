@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useAuth } from '@clerk/expo';
-import { apiGet } from '../../lib/api';
+import { absoluteUrl, apiGet } from '../../lib/api';
 import { colors, fonts, oliveTint } from '../../lib/theme';
 import SmartImage from '../../components/SmartImage';
 import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
@@ -181,7 +181,10 @@ export default function PodcastShow() {
       return;
     }
     setPlayingId(ep.id);
-    setAudioSrc(ep.audioUrl);
+    // The website's audio route with a key the server minted for this
+    // listener (lib/podcastAudio.js, 2026-11-12): it answers with a link
+    // that lasts a few hours, so the player needs no sign-in header.
+    setAudioSrc(absoluteUrl(ep.audioUrl));
     setIsPlaying(true);
   }
 

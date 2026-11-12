@@ -25,6 +25,8 @@ const PAUSE_GUARD_MS = 3000;
 // where continuing to listen while doing something else is the whole
 // point.
 export function PodcastPlayerProvider({ children }) {
+  // audioUrl: the audio route with the key the show page was given
+  // (lib/podcastAudio.js), never the stored file.
   const [currentEpisode, setCurrentEpisode] = useState(null); // { id, title, showTitle, showArt, audioUrl, startAt, noProgress }
   const [isPlaying, setIsPlaying] = useState(false);
   const [position, setPosition] = useState(0);
@@ -42,6 +44,8 @@ export function PodcastPlayerProvider({ children }) {
   const currentRef = useRef(null);
   currentRef.current = currentEpisode;
   const saveRef = useRef(null);
+  // When the last reload after an error happened (see onError below).
+  const reloadAtRef = useRef(0);
 
   function saveNow({ finished = false } = {}) {
     const el = audioRef.current;
@@ -162,6 +166,18 @@ export function PodcastPlayerProvider({ children }) {
           onEnded={() => {
             setIsPlaying(false);
             saveNow({ finished: true });
+          }}
+          // The src is our audio route (/api/podcasts/audio/<id>, since
+          // 2026-11-12), which answers with a link that lasts a few hours.
+          // After a long pause that link may have run out: ask the route
+          // again, once per half minute, and carry on from the same spot.
+          onError={(e) => {
+            const el = e.target;
+            if (!currentRef.current || Date.now() - reloadAtRef.current < 30000) return;
+            reloadAtRef.current = Date.now();
+            const at = el.currentTime || 0;
+            if (at > 0) startAtRef.current = at;
+            el.load();
           }}
           style={{ display: 'none' }}
         />

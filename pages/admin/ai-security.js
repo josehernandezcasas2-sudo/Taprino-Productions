@@ -3,7 +3,7 @@ import { adminPageProps } from '../../lib/adminPage';
 import { AI_POLICY_PATH } from '../../lib/aiPolicyRules';
 import {
   Card, Chip, Tile, SwitchRow, ProtectionRun, useSwitches, shortDay,
-  VideosResult, CaptionsResult, UniversityResult, PostsResult
+  VideosResult, CaptionsResult, UniversityResult, PostsResult, PodcastsResult
 } from '../../components/admin/SecurityBits';
 import { AiSealChip } from '../../components/AiSeal';
 
@@ -29,7 +29,8 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
   const capture = switches.screenCaptureBlock;
   const answer = switches.blockAiSearch;
   const runs = data.runs || {};
-  const ranCount = ['videos', 'captions', 'university', 'posts'].filter((k) => runs[k]).length;
+  const runKeys = ['videos', 'captions', 'university', 'posts', 'podcasts'];
+  const ranCount = runKeys.filter((k) => runs[k]).length;
   const crawlersBlocked = data.crawlers.training + (answer.on ? data.crawlers.answer : 0);
   const changed = data.captureChanged;
 
@@ -39,7 +40,7 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
       <div className="sec-tiles">
         <Tile label="Screenshots in the app" value={capture.on ? 'Blocked' : 'Allowed'} tone={capture.on ? 'ok' : 'warn'} />
         <Tile label="AI crawlers blocked" value={`${crawlersBlocked} of ${data.crawlers.training + data.crawlers.answer}`} tone={answer.on ? 'ok' : 'plain'} />
-        <Tile label="Older uploads locked" value={`${ranCount} of 4 run`} tone={ranCount === 4 ? 'ok' : 'warn'} />
+        <Tile label="Older uploads locked" value={`${ranCount} of ${runKeys.length} run`} tone={ranCount === runKeys.length ? 'ok' : 'warn'} />
         <Tile label="The seal" value={data.seal ? `${data.seal.creators - data.seal.off} of ${data.seal.creators} creators` : '—'} tone="plain" />
       </div>
 
@@ -91,6 +92,12 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
             blurb="Makes the course-file bucket private. Readings and files keep working through one-hour links."
             lastRun={runs.university} label="Lock the files" busyLabel="Locking…" url="/api/admin/protect-media" body={{ what: 'university' }}
             render={(result) => <UniversityResult result={result} />}
+          />
+          <ProtectionRun
+            title="Podcast audio locked"
+            blurb="Makes the podcast audio bucket private. Nothing is copied: every play, every podcast-app download from a show's feed and the review queue's player already go through links that last a few hours, and the free episodes a public feed lists still open for anyone."
+            lastRun={runs.podcasts} label="Lock podcast audio" busyLabel="Locking…" url="/api/admin/protect-media" body={{ what: 'podcasts' }}
+            render={(result) => <PodcastsResult result={result} />}
           />
           <ProtectionRun
             title="Snippet photos and covers in private storage"
