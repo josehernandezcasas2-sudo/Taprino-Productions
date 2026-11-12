@@ -35,7 +35,7 @@ import { firePixel, loadSlot, openAdLink } from './adSlots';
 // Each item type has its runner here (ITEM_RUNNERS) and its view in
 // AdBreakLayer (ITEM_VIEWS); an item of a type neither knows is skipped.
 
-const VIDEO_TICK_SECONDS = 0.5;
+const VIDEO_TICK_SECONDS = 1;
 
 export function useAdBreak({ getToken } = {}) {
   const player = useVideoPlayer(null, (p) => {
@@ -133,7 +133,10 @@ export function useAdBreak({ getToken } = {}) {
           p.addListener('timeUpdate', ({ currentTime }) => {
             if (run.current !== it || !started) return;
             const d = Number(p.duration) || it.seconds;
-            put(run, (s) => (s ? { ...s, remaining: Math.max(0, d - (Number(currentTime) || 0)) } : s));
+            const left = Math.max(0, d - (Number(currentTime) || 0));
+            // Only when the second shown changes: the screen holding the
+            // break re-renders with it.
+            put(run, (s) => (s && Math.floor(s.remaining) !== Math.floor(left) ? { ...s, remaining: left } : s));
           })
         ];
       } catch {
@@ -247,7 +250,10 @@ export function useAdBreak({ getToken } = {}) {
       if (run.until) {
         if (run.until <= Date.now()) { end(run, true); return; }
         run.untilTimer = setTimeout(() => end(run, true), run.until - Date.now());
-        run.countdown = setInterval(() => put(run, (s) => (s ? { ...s, left: left() } : s)), 500);
+        run.countdown = setInterval(() => {
+          const l = left();
+          put(run, (s) => (s && Math.floor(s.left) !== Math.floor(l) ? { ...s, left: l } : s));
+        }, 500);
       }
       ask(run);
     };
