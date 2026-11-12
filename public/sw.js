@@ -8,7 +8,14 @@
 // they fetched, private ones included (an account page, a conversation, a
 // screener), and could hand them to the next person on the same browser
 // when offline. Bumping the name deletes those caches on activation.
-const CACHE_NAME = 'taprino-shell-v4';
+// v5 (2026-11-12): web push. The worker shows the site's notifications
+// (`push`) and opens the right page when one is tapped
+// (`notificationclick`); lib/webPush.js sends them, lib/webPushRules.js
+// shapes them. Registered as /sw.js?nofetch=1 in development (only when
+// someone turns notifications on there, lib/webPushClient.js), it caches
+// nothing, so a dev server's code is never served stale.
+const CACHE_NAME = 'taprino-shell-v5';
+const NO_FETCH = new URL(self.location.href).searchParams.has('nofetch');
 
 // Only a response meant to be shared may be kept: a successful one whose
 // Cache-Control doesn't say private or no-store. Next marks every
@@ -29,9 +36,11 @@ self.addEventListener('message', (event) => {
 const SHELL_ASSETS = ['/icon.svg'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
-  );
+  if (!NO_FETCH) {
+    event.waitUntil(
+      caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS))
+    );
+  }
   self.skipWaiting();
 });
 
@@ -44,7 +53,67 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
+// ---- Web push (2026-11-12) ----
+// What a notification may open: a path on this site, nothing else (the
+// same rule as lib/webPushRules.js safePushHref).
+function safeHref(href) {
+  if (typeof href !== 'string') return null;
+  const h = href.trim();
+  if (!h.startsWith('/') || h.startsWith('//') || h.length > 500) return null;
+  if (/[\\\u0000-\u001f\u007f]/.test(h)) return null;
+  return h;
+}
+
+self.addEventListener('push', (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch (err) {
+    data = { body: event.data ? event.data.text() : '' };
+  }
+  const title = typeof data.title === 'string' && data.title ? data.title.slice(0, 80) : 'Studio Tapa TV';
+  const body = typeof data.body === 'string' ? data.body.slice(0, 180) : '';
+  const tag = typeof data.tag === 'string' && data.tag ? data.tag.slice(0, 120) : undefined;
+  event.waitUntil(self.registration.showNotification(title, {
+    body,
+    icon: '/push-icon.png',
+    badge: '/push-badge.png',
+    // Repeats with the same tag (one conversation, one title) replace the
+    // last one instead of stacking, and still make a sound.
+    tag,
+    renotify: Boolean(tag),
+    data: { href: safeHref(data.href) || '/' }
+  }));
+});
+
+// A tap: a tab already on that page comes to the front; else a tab of
+// this site the worker controls goes there; else a new one opens. Only
+// ever this site's own pages.
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  const href = safeHref(event.notification.data && event.notification.data.href) || '/';
+  const target = new URL(href, self.location.origin);
+  if (target.origin !== self.location.origin) return;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    const same = windows.find((c) => c.url === target.href);
+    if (same && 'focus' in same) return same.focus();
+    const ours = windows.find((c) => new URL(c.url).origin === self.location.origin && 'navigate' in c);
+    if (ours) {
+      try {
+        const moved = await ours.navigate(target.href);
+        if (moved) return moved.focus();
+      } catch (err) {
+        // A tab this worker doesn't control can't be moved; open a new one.
+      }
+    }
+    return self.clients.openWindow ? self.clients.openWindow(target.href) : undefined;
+  })());
+});
+
 self.addEventListener('fetch', (event) => {
+  // Development registration: notifications only, no caching at all.
+  if (NO_FETCH) return;
   const url = new URL(event.request.url);
 
   // This service worker exists to cache THIS APP's own pages and static

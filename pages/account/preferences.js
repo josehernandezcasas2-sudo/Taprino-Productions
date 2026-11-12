@@ -4,7 +4,8 @@ import { useOwnProfile } from '../../components/account/useOwnProfile';
 import { accountPageProps } from '../../lib/accountPage';
 
 // /account/preferences (option B, 2026-10-29): newsletter, Start in
-// Stream, and where push lives.
+// Stream, and notifications (this browser's switch since 2026-11-12, and
+// where the app's live).
 export async function getServerSideProps({ req, res }) {
   return accountPageProps(req, res, { requireSignedIn: true });
 }
