@@ -7,9 +7,13 @@
 // How long the app waits for a slot's answer (the pick or the plan's fill)
 // before it gives up and plays the title: an ad never holds a title up.
 export const AD_SLOT_TIMEOUT_MS = 4000;
-// How long an ad or a bumper may take to start once it is loading before
-// the break moves on without it.
-export const AD_START_TIMEOUT_MS = 5000;
+// How long an ad's or a bumper's file may take to load onto the player,
+// and then to start playing once it is on, before the break moves on
+// without it: Google's IMA gives a creative 8 s (loadVideoTimeout) on the
+// website's plain breaks, so a slow file on a phone's network gets the
+// same chance in the app.
+export const AD_LOAD_TIMEOUT_MS = 8000;
+export const AD_START_TIMEOUT_MS = 8000;
 // An item never runs past its booked seconds by much (VideoPlayer's runPod).
 export const AD_ITEM_GRACE_SECONDS = 6;
 // Playback moving by more than this between two time ticks is a seek, a

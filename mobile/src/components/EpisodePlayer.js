@@ -180,6 +180,13 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const adOn = Boolean(ad && ad.state);
   const adOnRef = useRef(adOn);
   adOnRef.current = adOn;
+  const adRef = useRef(ad);
+  adRef.current = ad;
+  // The advertiser's page is open over the app: turning the phone neither
+  // opens nor closes full screen under it (closing the Modal would take
+  // the browser sheet with it, and nothing would say the visit was over).
+  const visitingRef = useRef(false);
+  visitingRef.current = Boolean(ad && ad.state && ad.state.visiting);
 
   // Captions: on or off (the phone remembers), the file once they're on.
   const captionsPath = captions && captions.path ? captions.path : null;
@@ -258,6 +265,8 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     const next = Math.max(0, Math.min(d ? d - 0.5 : Infinity, (player.currentTime || 0) + delta));
     player.currentTime = next;
     setCurrentTime(next);
+    // A seek passes the breaks before where it lands (the website's 'seeked').
+    if (adRef.current && adRef.current.seekedTo) adRef.current.seekedTo(next);
   }
 
   // The scrubber: a tap seeks there, a drag follows the finger from where
@@ -285,7 +294,11 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     onPanResponderRelease: () => {
       const s = scrubRef.current;
       const p = playerRef.current;
-      if (s != null && p) { p.currentTime = s; setCurrentTime(s); }
+      if (s != null && p) {
+        p.currentTime = s;
+        setCurrentTime(s);
+        if (adRef.current && adRef.current.seekedTo) adRef.current.seekedTo(s);
+      }
       scrubRef.current = null;
       setScrubbing(null);
     },
@@ -322,8 +335,15 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   useEffect(() => { wasPlaying.current = playing; }, [playing]);
   useEffect(() => {
     if (!player) return undefined;
-    // Never under an ad break: the break plays the title again when it ends.
-    const t = setTimeout(() => { if (wasPlaying.current && !player.playing && !adOnRef.current) player.play(); }, 150);
+    // Never under an ad break: the break plays the title again when it ends;
+    // the break's own ad gets the same nudge on the move.
+    const t = setTimeout(() => {
+      if (adOnRef.current) {
+        if (adRef.current && adRef.current.nudge) adRef.current.nudge();
+        return;
+      }
+      if (wasPlaying.current && !player.playing) player.play();
+    }, 150);
     return () => clearTimeout(t);
   }, [fullscreen, player]);
   useFocusEffect(
@@ -332,6 +352,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
       if (CAN_ROTATE) ScreenOrientation.unlockAsync().catch(() => {});
       const sub = ScreenOrientation.addOrientationChangeListener(({ orientationInfo }) => {
         const o = orientationInfo && orientationInfo.orientation;
+        if (visitingRef.current) return;
         if (isLandscape(o) && autoRotate.current) enterFullscreen(false);
         else if (o === Orientation.PORTRAIT_UP && fullscreenRef.current && autoRotate.current) exitFullscreen(false);
       });
@@ -361,7 +382,9 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
       return (
         <>
           <View style={absoluteFill} />
-          <AdBreakLayer ad={ad} full={full} F={F} />
+          {/* The Modal keeps drawing while it fades out on iOS: only the
+              view that's showing holds the ad's player. */}
+          {!full || fullscreen ? <AdBreakLayer ad={ad} full={full} F={F} /> : null}
           {full ? (
             <View style={[styles.top, F.top]} pointerEvents="box-none">
               <Pressable style={[styles.round, F.round]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>

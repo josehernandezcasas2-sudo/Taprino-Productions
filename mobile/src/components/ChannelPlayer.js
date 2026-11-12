@@ -52,6 +52,9 @@ function fullChrome(c) {
 }
 
 const SAFETY_POLL_MS = 45000;
+// Asking what's on failed (a dropped connection): ask again this soon, so
+// the player never sits on a finished break's "0:00".
+const RETRY_MS = 5000;
 // Viewers without an age on file take the viewing terms once; the device
 // remembers it and sends it with every play request. One acceptance covers
 // the live channels and library titles under 17+ (mobile/src/lib/viewingTerms.js).
@@ -148,6 +151,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // The between-programs break a tune is waiting on (resolved false when
   // another tune, or leaving the screen, ends it first).
   const breakDone = useRef(null);
+  const retryTimer = useRef(null);
   const mutedRef = useRef(false);
   const volumeRef = useRef(1);
 
@@ -206,6 +210,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     if (breakTimer.current) clearTimeout(breakTimer.current);
     setBreakUntil(null);
     endBreaks();
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
     const program = state && state.program;
     if (!state || (!state.onAir && !state.live)) {
       player.pause();
@@ -308,11 +313,16 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   useEffect(() => { screenRef.current = screen; }, [screen]);
 
   async function catchUp(force = false) {
+    if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
     const fresh = await fetchNow();
     if (fresh) {
       updateNow(fresh);
       if (force || !pausedRef.current) tune(fresh);
       scheduleNextCheck(fresh);
+    } else if (focused.current) {
+      // Nothing came back (the end of a planned break lands here): try
+      // again rather than stay on the break's card.
+      retryTimer.current = setTimeout(() => { retryTimer.current = null; catchUp(force); }, RETRY_MS);
     }
     return fresh;
   }
@@ -357,10 +367,15 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     const p = state && state.program;
     if (!p || !p.endsAt) return;
     const ms = Math.max(2000, Date.parse(p.endsAt) - Date.now() + 1500);
-    endTimer.current = setTimeout(async () => {
+    const check = async () => {
       if (!focused.current) return;
       const fresh = await fetchNow();
-      if (!fresh) return;
+      if (!fresh) {
+        // Couldn't ask (a dropped connection): ask again soon, or a
+        // scheduled break that just ended stays on "0:00".
+        if (focused.current) endTimer.current = setTimeout(check, RETRY_MS);
+        return;
+      }
       const prev = nowRef.current || {};
       const changed = !!fresh.live !== !!prev.live || (fresh.program && prev.program ? fresh.program.key !== prev.program.key : !!fresh.program !== !!prev.program);
       updateNow(fresh);
@@ -375,7 +390,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       // Paused by the viewer: the channel moves on, the player doesn't.
       if (changed && !pausedRef.current) tune(fresh, { withBreak });
       scheduleNextCheck(fresh);
-    }, ms);
+    };
+    endTimer.current = setTimeout(check, ms);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fetchNow, updateNow]);
 
@@ -389,6 +405,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       tuneSeq.current += 1;
       if (endTimer.current) clearTimeout(endTimer.current);
       if (breakTimer.current) clearTimeout(breakTimer.current);
+      if (retryTimer.current) clearTimeout(retryTimer.current);
       endBreaks();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -437,6 +454,12 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   useEffect(() => {
     wasPlaying.current = playing;
   }, [playing]);
+  // An ad moving between the views gets the same nudge.
+  useEffect(() => {
+    if (!adsRef.current.activeRef.current) return undefined;
+    const t = setTimeout(() => adsRef.current.nudge(), 150);
+    return () => clearTimeout(t);
+  }, [fullscreen]);
 
   // While the Live screen is showing: rotation allowed (sideways =
   // fullscreen). Leaving it: back to portrait, out of fullscreen, and the
@@ -460,6 +483,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         player.pause();
         // Leaving the screen ends a break (coming back catches up).
         endBreaks();
+        if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
         if (fullscreenRef.current) {
           fullscreenRef.current = false;
           setFullscreen(false);
@@ -484,7 +508,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // Safety net: notices a live broadcast starting/ending and corrects drift.
   useEffect(() => {
     const id = setInterval(async () => {
-      if (!appActive.current || !focused.current || screen === 'loading' || screen === 'ad') return;
+      // It runs during ad breaks too: a program change it sees is the way
+      // out of a break whose own end check couldn't reach the server.
+      if (!appActive.current || !focused.current || screen === 'loading') return;
       if (!playing && screen === null && !(nowRef.current && nowRef.current.live)) return; // paused on purpose
       const fresh = await fetchNow();
       if (!fresh) return;
@@ -580,7 +606,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
         {/* An ad break with something to show (components/AdBreakLayer.js);
             with nothing, the countdown card below. */}
-        {adShowing ? <AdBreakLayer ad={ads} live full={full} F={F} channelName={channelName} /> : null}
+        {adShowing && (!full || fullscreen) ? <AdBreakLayer ad={ads} live full={full} F={F} channelName={channelName} /> : null}
         {full && fillToast ? (
           <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
             <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>

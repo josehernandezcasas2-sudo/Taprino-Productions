@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAuth } from '@clerk/expo';
 import { colors, absoluteFill } from '../lib/theme';
 import { REEL_AD_CTA } from '../lib/adBreakRules';
-import { firePixel, openAdLink } from '../lib/adSlots';
+import { firePixel } from '../lib/adSlots';
+import { visitAdvertiser } from '../lib/adVisit';
 
 // The swipe feeds' house-ad card (Vertical Discover, Snippets), the
 // website's components/ReelAdCard.js: a sibling of ReelPlayer, not a
@@ -13,7 +14,9 @@ import { firePixel, openAdLink } from '../lib/adSlots';
 // link, "Learn more →". The impression fires each time the card becomes
 // the one on screen (scrolling back to it counts again, as on the
 // website); "Learn more →" fires the click tracker and opens the
-// advertiser's page in the in-app browser. `ad` is one slot's item from
+// advertiser's page in the in-app browser, the card paused until the
+// viewer is back (mobile/src/lib/adVisit.js, which knows when on Android
+// too). `ad` is one slot's item from
 // mobile/src/lib/adSlots.js. `insets` keeps the label clear of the notch.
 export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = null }) {
   const { getToken } = useAuth();
@@ -21,6 +24,18 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = n
     p.loop = true;
   });
   const firedRef = useRef(false);
+  const activeRef = useRef(active);
+  activeRef.current = active;
+  const visitingRef = useRef(false);
+
+  async function learnMore() {
+    if (visitingRef.current || !ad) return;
+    visitingRef.current = true;
+    try { player.pause(); } catch { /* released */ }
+    await visitAdvertiser(ad, getToken);
+    visitingRef.current = false;
+    try { if (activeRef.current) player.play(); } catch { /* released */ }
+  }
 
   useEffect(() => {
     if (!player) return;
@@ -44,6 +59,17 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = n
     try { if (player) player.muted = muted; } catch { /* released */ }
   }, [muted, player]);
 
+  // Back in the app (expo-video pauses every player when it goes to the
+  // background): the card on screen plays again.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active' && activeRef.current && !visitingRef.current) {
+        try { player.play(); } catch { /* released */ }
+      }
+    });
+    return () => { try { sub.remove(); } catch { /* gone */ } };
+  }, [player]);
+
   const top = (insets ? insets.top : 0) + 16;
   const bottom = (insets ? insets.bottom : 0) + 30;
   return (
@@ -53,7 +79,7 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = n
       <View style={[styles.caption, { paddingBottom: bottom }]} pointerEvents="box-none">
         {ad && ad.title ? <Text style={styles.title}>{ad.title}</Text> : null}
         {ad && ad.clickUrl ? (
-          <Pressable onPress={() => openAdLink(ad, getToken)} accessibilityRole="link" hitSlop={8}>
+          <Pressable onPress={learnMore} accessibilityRole="link" hitSlop={8}>
             <Text style={styles.cta}>{REEL_AD_CTA}</Text>
           </Pressable>
         ) : null}

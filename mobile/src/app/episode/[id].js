@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '@clerk/expo';
 import { useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
@@ -319,6 +319,14 @@ export default function Episode() {
   });
   armPreRollRef.current = titleAds.armPreRoll;
   const adHoldRef = titleAds.holdRef;
+  // Another screen on top (an extra, the series page, another title): the
+  // title pauses instead of playing on out of sight (and a break never
+  // starts there, mobile/src/lib/useTitleAds.js); play picks it up here.
+  useFocusEffect(
+    useCallback(() => () => {
+      try { player.pause(); } catch { /* a released player */ }
+    }, [player])
+  );
   // Content advisory over the first seconds (mobile/src/lib/contentAdvisory.js).
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const ratingsList = useContentRatings();

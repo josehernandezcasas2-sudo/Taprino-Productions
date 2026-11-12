@@ -172,6 +172,9 @@ for (const [label, m] of [['web', web], ['app', app]]) {
     assert.equal(m.AD_START_NOTE, 'Starts with a short ad');
     assert.equal(m.LIVE_AD_BADGE, 'Ad break');
     assert.equal(m.REEL_AD_CTA, 'Learn more →');
+    assert.equal(m.AD_SLOT_TIMEOUT_MS, 4000);
+    assert.equal(m.AD_LOAD_TIMEOUT_MS, 8000, 'IMA’s loadVideoTimeout');
+    assert.equal(m.AD_START_TIMEOUT_MS, 8000);
   });
 }
 
