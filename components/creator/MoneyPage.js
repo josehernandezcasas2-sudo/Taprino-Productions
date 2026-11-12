@@ -154,6 +154,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                     : data.top.owedCents > 0
                       ? `Carries over until you reach ${dollars(data.top.minimumCents)}.`
                       : 'Nothing waiting. Member support adds up here through the month.'}
+              {!studioKept && (data.top.studioKeptCents || 0) > 0 && ` ${dollars(data.top.studioKeptCents)} more is kept by the studio: credited while this was the studio’s own account.`}
             </span>
           </div>
           <div className="money-kpi">
@@ -187,16 +188,15 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
                       <Row label="Member share" value={dollars(lane.shareCents)} />
                       <Row label="Referral bonus" value={dollars(lane.referralCents)} />
                       {lane.carriedCents > 0 && <Row label="Carried from before" value={dollars(lane.carriedCents)} />}
-                      {studioKept
-                        ? <Row label="Kept by the studio" value={dollars(lane.keptCents)} />
-                        : <Row label="Owed to you" value={dollars(lane.owedCents)} />}
+                      {!studioKept && <Row label="Owed to you" value={dollars(lane.owedCents)} />}
+                      {(studioKept || lane.keptCents > 0) && <Row label="Kept by the studio" value={dollars(lane.keptCents)} />}
                     </>
                   )}
                   {k === 'ad_share' && (
                     <>
                       {lane.titles.map((t) => <Row key={t.episodeId || t.title} label={`${t.title} · ${Number(t.units || 0).toLocaleString('en-US')} ad${t.units === 1 ? '' : 's'}`} value={dollars(t.cents)} />)}
                       {lane.owedCents > 0 && <Row label="Owed to you" value={dollars(lane.owedCents)} />}
-                      {studioKept && lane.keptCents > 0 && <Row label="Kept by the studio" value={dollars(lane.keptCents)} />}
+                      {lane.keptCents > 0 && <Row label="Kept by the studio" value={dollars(lane.keptCents)} />}
                       {lane.titles.length === 0 && <Row label="No ads inside your titles this period" value="" />}
                     </>
                   )}

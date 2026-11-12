@@ -293,5 +293,36 @@ test('the studio’s own accounts: a member’s pick of one is the studio’s mo
   assert.equal(studioShare({ ...base, creditedCents: 300, reversedCreditCents: 200 }).membership.studioKeptCents, 0);
 });
 
+test('who was the studio (migration 122): a stamped line or owed entry says itself; the role now only places the older ones', () => {
+  // Mara was promoted after earning: her $25.00 from before is owed to her,
+  // the $9.00 a pick credited her since is kept. Dee was demoted: the $60.00
+  // the studio kept on her account stays kept, the $30.00 since is owed.
+  // Lena's line is from before 122: she is the studio now, so it is kept.
+  const studioNow = new Set(['user_mara', 'user_lena']);
+  const owed = [
+    { creatorId: 'user_mara', studio: false, cents: 2500 },
+    { creatorId: 'user_mara', studio: true, cents: 900 },
+    { creatorId: 'user_dee', studio: true, cents: 6000 },
+    { creatorId: 'user_dee', studio: false, cents: 3000 },
+    { creatorId: 'user_lena', cents: 400 }
+  ];
+  assert.deepEqual(owedToCreators(owed, studioNow), { owedCents: 5500, owedCreators: 2, studioKeptCents: 7300 });
+  // A failed role read (no studio set) only moves the unstamped line: more stays.
+  assert.deepEqual(owedToCreators(owed), { owedCents: 5900, owedCreators: 3, studioKeptCents: 6900 });
+
+  const lines = [
+    { creator_id: 'user_mara', kind: 'member_share', cents: 200, studio: false },
+    { creator_id: 'user_mara', kind: 'member_share', cents: 150, studio: true },
+    { creator_id: 'user_dee', kind: 'member_share', cents: 300, studio: true },
+    { creator_id: 'user_dee', kind: 'reversal', cents: -300, studio: true },
+    { creator_id: 'user_dee', kind: 'referral', cents: 100, studio: false },
+    { creator_id: 'user_lena', kind: 'member_share', cents: 50, studio: null },
+    { creator_id: 'user_lena', kind: 'ad_share', cents: 70 }
+  ];
+  assert.deepEqual(creditTotals(lines, studioNow), { creditedCents: 300, adShareCents: 0, reversedCreditCents: 0, studioCreditedCents: 570, studioReversedCents: 300 });
+  // Read without the studio's accounts, only the unstamped lines change place.
+  assert.deepEqual(creditTotals(lines), { creditedCents: 350, adShareCents: 70, reversedCreditCents: 0, studioCreditedCents: 450, studioReversedCents: 300 });
+});
+
 
 console.log(`\n${passed} passed`);

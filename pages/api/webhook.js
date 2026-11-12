@@ -13,43 +13,14 @@ import { openDispute, closeDispute } from '../../lib/paymentDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 import { securityAlert } from '../../lib/securityAlerts';
+import { firstDelivery, markProcessed, releaseEvent } from '../../lib/stripeEvents';
 
 // Stripe retries any delivery it didn't get a 2xx for, and a creator's
-// payout or a donation must never be applied twice. Each event id is
-// written once (stripe_events, migration 083); a repeat is acknowledged
-// and skipped. Before the migration is run the table is missing and
-// every event is treated as new, which is what happened before anyway.
-//
-// Since migration 112 a finished event also gets processed_at. A row
-// without it that is older than STALE_MS belongs to a delivery that died
-// half-way (a function timeout, not a caught error, which would have
-// removed the row), so the next delivery claims it and does the work
-// again; every step is safe to run twice, ad credits included
-// (apply_ad_credit_purchase). Before 112 the column is missing and a
-// repeat is a duplicate, as it always was.
-const STALE_MS = 2 * 60 * 1000;
-
-async function firstDelivery(event) {
-  const supabase = getSupabase();
-  const { error } = await supabase.from('stripe_events').insert({ id: event.id, type: event.type });
-  if (!error) return true;
-  if (error.code === 'PGRST205' || error.code === '42P01') return true;
-  if (error.code !== '23505') {
-    console.error('stripe_events insert failed:', error.message);
-    return true;
-  }
-  const { data: row, error: readError } = await supabase.from('stripe_events').select('received_at, processed_at').eq('id', event.id).maybeSingle();
-  if (readError || !row || row.processed_at) return false;
-  if (Date.now() - Date.parse(row.received_at) < STALE_MS) return false;
-  // Claim it: only the delivery whose update still finds the old time goes on.
-  const { data: claimed } = await supabase.from('stripe_events').update({ received_at: new Date().toISOString() }).eq('id', event.id).eq('received_at', row.received_at).is('processed_at', null).select('id');
-  return Boolean(claimed && claimed.length);
-}
-
-async function markProcessed(event) {
-  const { error } = await getSupabase().from('stripe_events').update({ processed_at: new Date().toISOString() }).eq('id', event.id);
-  if (error && !/processed_at|schema cache|does not exist/i.test(error.message || '')) console.error('stripe_events processed_at:', error.message);
-}
+// payout or a donation must never be applied twice: each event id is
+// claimed once (lib/stripeEvents.js, stripe_events) and its work runs in
+// handleStripeEvent below — the same function the daily catch-up runs for
+// an event whose delivery died half-way (lib/stripeCatchup.js, from
+// /api/cron/creator-reminders and Admin → Creator Share payouts).
 
 // Ad credits once per Checkout session: the purchase row and the balance
 // move in one transaction (migration 112). Before 112 the function is
@@ -124,15 +95,29 @@ export default async function handler(req, res) {
     return res.json({ received: true, duplicate: true });
   }
 
-  // Subscription status is read live from Stripe on every page load (see
-  // pages/index.js), so those cases only log. Ad credits and creator
-  // payout accounts do get written here.
-  //
   // The event row above is written before any work is done, so a step
-  // that fails must hand the event back to Stripe: run() collects the
-  // failures and the end of the handler removes the row and answers 500,
-  // and Stripe retries the whole event. Every step run() wraps is safe
-  // to run twice (each checks the state it's moving from).
+  // that fails must hand the event back to Stripe: the row is removed and
+  // the answer is 500, and Stripe retries the whole event.
+  const outcome = await handleStripeEvent(event);
+  if (outcome.failed.length) {
+    await releaseEvent(event);
+    return res.status(500).json({ error: outcome.error || `not applied: ${outcome.failed.join(', ')}` });
+  }
+  await markProcessed(event);
+  res.json({ received: true });
+}
+
+// An event's work, once it has been claimed. Subscription status is read
+// live from Stripe on every page load (see pages/index.js), so those cases
+// only log. Ad credits and creator payout accounts do get written here.
+// run() collects the steps that failed; every step it wraps is safe to run
+// twice (each checks the state it's moving from).
+//   → { failed: [step names], error: the answer's line when one failed }
+export async function handleStripeEvent(event) {
+  // An event from a creator's connected account is only ever acted on as
+  // an onboarding update (the webhook acknowledges anything else before
+  // claiming it; the catch-up only replays the platform's own events).
+  if (event.account && event.type !== 'account.updated') return { failed: [], error: null, ignored: 'connected-account event' };
   const failed = [];
   const run = async (name, fn) => {
     try {
@@ -184,8 +169,7 @@ export default async function handler(req, res) {
           console.error('ad credits from webhook failed:', err.message);
           // Same as the donation branch: let Stripe retry, and let the
           // retry through firstDelivery.
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'credits not applied' });
+          return { failed: ['applyAdCredits'], error: 'credits not applied' };
         }
       } else if (session.metadata?.type === 'pitch_donation') {
         // A Pitch Room backing was paid: the pending row becomes the
@@ -196,8 +180,7 @@ export default async function handler(req, res) {
           console.error('completeDonationFromSession from webhook failed:', err.message);
           // A 500 makes Stripe retry — the event row is already written,
           // so remove it to let the retry through firstDelivery.
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'donation not recorded' });
+          return { failed: ['completeDonationFromSession'], error: 'donation not recorded' };
         }
       } else if (session.metadata?.type === 'title_purchase') {
         // Buy to own: the pending row becomes the purchase that grants
@@ -206,8 +189,7 @@ export default async function handler(req, res) {
           await completePurchaseFromSession(session);
         } catch (err) {
           console.error('completePurchaseFromSession from webhook failed:', err.message);
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'purchase not recorded' });
+          return { failed: ['completePurchaseFromSession'], error: 'purchase not recorded' };
         }
       } else if (session.metadata?.type === 'location_booking') {
         // A location booking was paid: the accepted request becomes a
@@ -216,8 +198,7 @@ export default async function handler(req, res) {
           await completeBookingFromSession(session);
         } catch (err) {
           console.error('completeBookingFromSession from webhook failed:', err.message);
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'booking not recorded' });
+          return { failed: ['completeBookingFromSession'], error: 'booking not recorded' };
         }
       } else if (session.metadata?.type === 'tip') {
         // A tip was paid (lib/tips.js): the pending row becomes the tip
@@ -226,8 +207,7 @@ export default async function handler(req, res) {
           await completeTipFromSession(session);
         } catch (err) {
           console.error('completeTipFromSession from webhook failed:', err.message);
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'tip not recorded' });
+          return { failed: ['completeTipFromSession'], error: 'tip not recorded' };
         }
       } else if (session.metadata?.type === 'crew_pay') {
         // Pay secured on a crew call (lib/crewPay.js): the poster's money
@@ -236,8 +216,7 @@ export default async function handler(req, res) {
           await completeCrewPayFromSession(session);
         } catch (err) {
           console.error('completeCrewPayFromSession from webhook failed:', err.message);
-          await getSupabase().from('stripe_events').delete().eq('id', event.id);
-          return res.status(500).json({ error: 'crew pay not recorded' });
+          return { failed: ['completeCrewPayFromSession'], error: 'crew pay not recorded' };
         }
       } else {
         console.log(`New ${SITE.premiumTier} member (event ${event.id}).`);
@@ -257,8 +236,7 @@ export default async function handler(req, res) {
         if (result && result.skipped) console.log(`invoice.paid ${event.data.object.id}: skipped (${result.skipped})`);
       } catch (err) {
         console.error('recordMembershipInvoice from webhook failed:', err.message);
-        await getSupabase().from('stripe_events').delete().eq('id', event.id);
-        return res.status(500).json({ error: 'membership payment not recorded' });
+        return { failed: ['recordMembershipInvoice'], error: 'membership payment not recorded' };
       }
       break;
     }
@@ -366,10 +344,5 @@ export default async function handler(req, res) {
       break;
   }
 
-  if (failed.length) {
-    await getSupabase().from('stripe_events').delete().eq('id', event.id);
-    return res.status(500).json({ error: `not applied: ${failed.join(', ')}` });
-  }
-  await markProcessed(event);
-  res.json({ received: true });
+  return { failed, error: failed.length ? `not applied: ${failed.join(', ')}` : null };
 }

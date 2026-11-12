@@ -165,7 +165,7 @@ export default function CreatorMoneyScreen() {
           <View style={[styles.kpi, styles.kpiAccent]}>
             <Text style={[styles.kpiLabel, { color: colors.brass }]}>{studioKept ? 'Kept by the studio' : 'Owed to you'}</Text>
             <Text style={styles.kpiAmount}>{dollars(studioKept ? data.top.studioKeptCents : data.top.owedCents)}</Text>
-            <Text style={styles.kpiNote}>{studioKept ? 'the studio’s money, never paid out' : next && next.willPay ? `transfers ${fmtDay(next.on)}` : next && next.reason === 'set up payouts' ? 'set up payouts first' : data.top.owedCents > 0 ? `carries over until ${dollars(data.top.minimumCents)}` : 'nothing waiting'}</Text>
+            <Text style={styles.kpiNote}>{studioKept ? 'the studio’s money, never paid out' : next && next.willPay ? `transfers ${fmtDay(next.on)}` : next && next.reason === 'set up payouts' ? 'set up payouts first' : data.top.owedCents > 0 ? `carries over until ${dollars(data.top.minimumCents)}` : 'nothing waiting'}{!studioKept && (data.top.studioKeptCents || 0) > 0 ? ` · ${dollars(data.top.studioKeptCents)} more kept by the studio` : ''}</Text>
           </View>
           <View style={styles.kpi}>
             <Text style={styles.kpiLabel}>Stripe balance</Text>
@@ -183,7 +183,7 @@ export default function CreatorMoneyScreen() {
           const lane = lanes[k];
           const route = LANE_ROUTES[k];
           const sub = k === 'member_support'
-            ? `share ${dollars(lane.shareCents)} · referrals ${dollars(lane.referralCents)} · ${studioKept ? `kept by the studio ${dollars(lane.keptCents)}` : `owed ${dollars(lane.owedCents)}`}`
+            ? `share ${dollars(lane.shareCents)} · referrals ${dollars(lane.referralCents)} · ${studioKept ? `kept by the studio ${dollars(lane.keptCents)}` : `owed ${dollars(lane.owedCents)}${lane.keptCents > 0 ? ` · kept by the studio ${dollars(lane.keptCents)}` : ''}`}`
             : k === 'ad_share'
               ? (lane.titles && lane.titles.length ? `${Number(lane.units || 0).toLocaleString('en-US')} ads inside ${lane.titles.length} title${lane.titles.length === 1 ? '' : 's'}${lane.owedCents ? ` · owed ${dollars(lane.owedCents)}` : ''}` : `no ads inside your titles this period${lane.owedCents ? ` · owed ${dollars(lane.owedCents)}` : ''}`)
             : k === 'tips'
