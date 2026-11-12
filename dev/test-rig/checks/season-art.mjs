@@ -20,7 +20,7 @@
 //   node dev/test-rig/checks/season-art.mjs
 import { spawn } from 'node:child_process';
 import { jpegCard } from '../lib/images.mjs';
-import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, hasColumn, session, ago, uidFor } from './lib.mjs';
+import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, hasColumn, session, browser, goto, ago, uidFor } from './lib.mjs';
 
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
@@ -263,8 +263,19 @@ async function before122() {
     const h = await page(p, MARA);
     ok(`${p} → 200`, h.status === 200, h.status);
   }
-  const editor = await page(`/creator/show/${ID.live}/edit?tab=art`, MARA);
-  ok('the editor says season art needs migration 122', /Season art needs a database update \(migration 122\)/.test(editor.text.replace(/&#x27;|’/g, "'")), editor.status);
+  // The editor draws in the browser (its data comes from /api/show/<id>).
+  const b = await browser();
+  try {
+    const { ctx, page: pg, errors } = await b.open(MARA, 1280);
+    await goto(pg, `/creator/show/${ID.live}/edit?tab=art`);
+    const line = pg.locator('text=Season art needs a database update (migration 122).').first();
+    await line.waitFor({ timeout: 30000 }).catch(() => {});
+    ok('the editor says season art needs migration 122', await line.isVisible().catch(() => false));
+    ok('…no page errors', errors.length === 0, errors);
+    await ctx.close();
+  } finally {
+    await b.close();
+  }
   r = await page(`/admin/shows/${ID.live}`, ADMIN);
   ok('the admin show page answers 200', r.status === 200, r.status);
   const hero = await streamHero(ID.live);
