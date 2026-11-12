@@ -3,6 +3,7 @@ import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 import { sendError } from '../../../lib/apiErrors';
 import { applyCors } from '../../../lib/cors';
 import { submitDraft, ShowError } from '../../../lib/showPage';
+import { wellFormedBody } from '../../../lib/wellFormed';
 
 // Sends a title in for review (Creator Studio's three-step submit, the
 // app's submit screen). Everything about the title — the checks, its place
@@ -22,6 +23,9 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  // A lone surrogate in any text would make Postgres refuse the save
+  // (a 500): every string in the body is made well formed first.
+  wellFormedBody(req);
   // The app's submit screen calls this with a Bearer token.
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');

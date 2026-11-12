@@ -5,6 +5,7 @@ import { checkRateLimit } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
+import { wellFormedBody } from '../../../lib/wellFormed';
 
 // Creator Studio's drafts (the three-step submit page, web + app).
 //   GET            → { drafts }         GET ?id= → { draft }
@@ -23,6 +24,9 @@ import { isTitleId } from '../../../lib/titleIds';
 // before it answers a PATCH with 405 instead of reading the change as a
 // whole draft and emptying the rest.
 export default async function handler(req, res) {
+  // A lone surrogate in any text would make Postgres refuse the save
+  // (a 500): every string in the body is made well formed first.
+  wellFormedBody(req);
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, DELETE, OPTIONS');

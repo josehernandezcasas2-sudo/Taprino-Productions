@@ -99,6 +99,18 @@ for (const [label, m] of [['web', web], ['app', app]]) {
     assert.equal(m.normalizeExtraKind(`${ch(0x1f3ac)} Table read`), `${ch(0x1f3ac)} Table read`);
   });
 
+  t(`${label}: a lone surrogate is dropped (Postgres can't store one; it answered 500)`, () => {
+    const hi = String.fromCharCode(0xd800);
+    const lo = String.fromCharCode(0xdc00);
+    assert.equal(m.normalizeExtraKind(`ab${hi}cd`), 'abcd');
+    assert.equal(m.normalizeExtraKind(`ab${lo}cd`), 'abcd');
+    assert.equal(m.normalizeExtraKind(`${lo}${hi}`), null, 'nothing left');
+    assert.equal(m.normalizeExtraKind(`Table read${hi}`), 'Table read', 'at the end');
+    assert.equal(m.normalizeExtraKind(`${ch(0x1f3ac)} Take ${hi}2`), `${ch(0x1f3ac)} Take 2`, 'a real pair stays');
+    assert.equal(m.dropLoneSurrogates(`a${hi}${hi}${ch(0x1f3ac)}${lo}b`), `a${ch(0x1f3ac)}b`);
+    assert.ok(m.normalizeExtraKind(`x${hi}`.repeat(30)).isWellFormed(), 'what comes out is well formed');
+  });
+
   t(`${label}: 40 characters at most, counted as Postgres counts them`, () => {
     assert.equal(m.normalizeExtraKind('x'.repeat(40)), 'x'.repeat(40));
     assert.equal(m.normalizeExtraKind('x'.repeat(41)), 'x'.repeat(40));

@@ -1,8 +1,12 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { applyCors } from '../../../lib/cors';
+import { wellFormedBody } from '../../../lib/wellFormed';
 
 export default async function handler(req, res) {
+  // A lone surrogate in any text would make Postgres refuse the save
+  // (a 500): every string in the body is made well formed first.
+  wellFormedBody(req);
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');

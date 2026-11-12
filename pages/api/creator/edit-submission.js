@@ -6,6 +6,7 @@ import { isTitleId } from '../../../lib/titleIds';
 import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, withPayeeStamps } from '../../../lib/payees';
+import { wellFormedBody } from '../../../lib/wellFormed';
 
 // Mirrors the fields REQUIRED_FIELDS enforces in submit-episode.js, minus
 // videoUid (the video itself isn't editable here — re-uploading a new cut
@@ -51,6 +52,9 @@ async function showRows(supabase, seriesId) {
 }
 
 export default async function handler(req, res) {
+  // A lone surrogate in any text would make Postgres refuse the save
+  // (a 500): every string in the body is made well formed first.
+  wellFormedBody(req);
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });

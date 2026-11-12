@@ -17,6 +17,7 @@ import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf,
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, payeeShowIds, withPayeeStamps } from '../../../lib/payees';
+import { wellFormedBody } from '../../../lib/wellFormed';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -192,6 +193,9 @@ async function slotRefusal(supabase, next, episodeId) {
 }
 
 export default async function handler(req, res) {
+  // A lone surrogate in any text would make Postgres refuse the save
+  // (a 500): every string in the body is made well formed first.
+  wellFormedBody(req);
   res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
