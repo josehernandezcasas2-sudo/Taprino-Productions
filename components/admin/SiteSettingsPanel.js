@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import SalesTaxCard from './SalesTaxCard';
 
 // Site configuration: header labels and links, feature toggles, recs
 // closeness, default ad CPM, the tip numbers, logo, placeholder content,
@@ -273,6 +274,9 @@ export default function SiteSettingsPanel() {
         </button>
         {siteSettingsSaved && <span style={{ marginLeft: '0.8rem', color: 'var(--brass)' }}>Saved.</span>}
       </div>
+
+      {/* The saved settings, not the card above's edits in progress. */}
+      <SalesTaxCard settings={confirmedSiteSettings || siteSettings} onSaved={loadSiteSettings} />
 
       <div className="account-card">
         <div className="account-eyebrow">Site logo</div>
