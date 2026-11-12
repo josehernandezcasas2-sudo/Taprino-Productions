@@ -10384,6 +10384,27 @@ textarea.sm-input { resize: vertical; font-family: var(--font-body); }
 .tp-advisory-warning-kicker { display: inline-flex; align-items: center; gap: 0.4rem; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 700; letter-spacing: 0.18em; text-transform: uppercase; color: var(--warn); margin-bottom: 0.5rem; }
 .tp-advisory-go { margin-top: 1rem; min-height: 44px; padding: 0 1.4rem; border-radius: 999px; border: 1px solid var(--ink); background: var(--ink); color: var(--surface-0); font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; cursor: pointer; }
 .tp-advisory-go:hover, .tp-advisory-go:focus-visible { background: var(--olive-bright); border-color: var(--olive-bright); }
+/* The card with the warning is taller: centred while it fits, scrollable
+   (never clipped) when a phone's inline strip is shorter than it. */
+.tp-advisory.has-warning { align-items: flex-start; overflow-y: auto; }
+.tp-advisory.has-warning .tp-advisory-box { margin: auto; padding: 0.6rem 0; }
+@media (max-width: 600px) {
+  .tp-advisory.has-warning .tp-advisory-box { max-width: 92%; }
+  .tp-advisory.has-warning .tp-advisory-rating { font-size: 0.95rem; margin-bottom: 0.35rem; }
+  .tp-advisory.has-warning .tp-advisory-bug { height: 30px; margin-bottom: 0.35rem; }
+  .tp-advisory.has-warning .tp-advisory-kicker,
+  .tp-advisory.has-warning .tp-advisory-sub { display: none; }
+  .tp-advisory.has-warning .tp-advisory-text { font-size: 0.78rem; line-height: 1.35; }
+  .tp-advisory.has-warning .tp-advisory-warning { margin-top: 0.5rem; padding-top: 0.45rem; }
+  .tp-advisory.has-warning .tp-advisory-warning-kicker { font-size: 0.62rem; margin-bottom: 0.3rem; }
+  .tp-advisory.has-warning .tp-advisory-go { margin-top: 0.55rem; min-height: 36px; font-size: 0.85rem; }
+}
+/* In full screen on a phone the card has the whole screen again. */
+@media (max-width: 600px), (pointer: coarse) {
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-text { font-size: clamp(0.9rem, 3.6vmin, 1.15rem); }
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-sub { display: block; }
+  .tp-player.is-fullscreen .tp-advisory.has-warning .tp-advisory-go { min-height: 44px; }
+}
 @media (max-width: 600px) { .tp-advisory-box { max-width: 86%; } }
 
 /* ---- Private beta door (pages/welcome.js) ---- */

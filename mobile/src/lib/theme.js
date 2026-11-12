@@ -64,6 +64,9 @@ export const oliveTint = (a) => `rgba(242,193,78,${a})`;
 export const dangerTint = (a) => `rgba(239,91,91,${a})`;
 // colors.ok's tint (the show page's Live pills and "ready" lines).
 export const okTint = (a) => `rgba(132,205,152,${a})`;
+// colors.warn's tint (the flashing-lights chip and the warning card; the
+// website's color-mix(in srgb, var(--warn) N%, transparent)).
+export const warnTint = (a) => `rgba(237,181,63,${a})`;
 // surface0 (the page background, #0c131f) at an alpha: scrims over a
 // picture (the review deck's chips and notes).
 export const surfaceTint = (a) => `rgba(12,19,31,${a})`;

@@ -10,7 +10,8 @@ import {
 } from '../../components/WorkIcons';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall } from '../../lib/showApi';
-import { episodeHasPage, needsYou } from '../../lib/showRules';
+import { episodeHasPage, fieldPolicy, fieldPolicyLine, needsYou, saveSummary } from '../../lib/showRules';
+import { pickImageAsDataUrl } from '../../components/CreatorBits';
 import { episodeCode, sortEpisodes } from '../../lib/seriesResume';
 import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -67,6 +68,26 @@ const PAGE_NOTES_MAX = 4000;
 function notesBoxShows(s) {
   if (!s || s.pageNotesReady !== true) return false;
   return episodeHasPage({ contentType: s.contentType ?? null, seriesId: s.seriesId ?? null, hasPage: typeof s.hasPageChoice === 'boolean' ? s.hasPageChoice : null });
+}
+
+// What the edit box needs about a title of its own: its words now, what
+// waits for approval, and where it stands (the website's editValuesFor).
+function editValuesFor(s) {
+  return {
+    id: s.id,
+    title: s.title,
+    description: s.description || '',
+    pageNotes: s.pageNotes || '',
+    notesShown: notesBoxShows(s),
+    status: s.status,
+    held: Boolean(s.held),
+    deletionRequested: Boolean(s.deletionRequested),
+    withdrawnAt: s.withdrawnAt || null,
+    pendingTitle: s.pendingTitle || null,
+    pendingDescription: s.pendingDescription || null,
+    pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
+    pageNotesWaitReady: s.pageNotesWaitReady !== false
+  };
 }
 
 function displayTitle(s) {
@@ -186,6 +207,8 @@ export default function MyWork() {
   const [deleteError, setDeleteError] = useState(null);
   const [copiedId, setCopiedId] = useState(null);
   const [actionError, setActionError] = useState(null);
+  // What a title image save did, under the list's head.
+  const [titleImageWords, setTitleImageWords] = useState(null);
   // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>"
   // (/api/creator/pricing) and the title the Sell sheet is open for.
   const [pricing, setPricing] = useState({ prices: {}, settings: {} });
@@ -243,37 +266,71 @@ export default function MyWork() {
     }
   }
 
-  // The title and description go to review (request-episode-edit); a
-  // film's notes for its page go up at once through the show editor's own
-  // save (PATCH /api/show/episode/<id>, which decides who may change them;
-  // there is no column for notes waiting on approval), as on the website's
-  // components/RequestEditModal.js.
-  async function submitEdit(nameValue, description, notes) {
+  // The title, description and (a film's) notes: the show editor's own
+  // save, PATCH /api/show/episode/<id> (the website's
+  // components/RequestEditModal.js, 2026-11-12). Only what changed is sent;
+  // the server's field policy decides: on a live title they wait for
+  // approval (the notes in migration 122's column), on one that has never
+  // been live they apply at once. → the words for the done line.
+  async function submitEdit(body) {
     const cv = editModal.currentValues;
     setEditSaving(true);
     setEditError(null);
     try {
-      const textChanged = String(nameValue || '').trim() !== String(cv.title || '').trim()
-        || String(description || '').trim() !== String(cv.description || '').trim();
-      const notesChanged = cv.notesShown === true && typeof notes === 'string' && notes.trim() !== String(cv.pageNotes || '').trim();
-      // Only the notes changed: nothing goes to review (the request route
-      // would answer "Nothing actually changed").
-      if (textChanged || !notesChanged) {
-        await apiPost('/api/creator/request-episode-edit', { episodeId: cv.id, title: nameValue, description }, await freshToken(getToken));
-      }
-      if (notesChanged) {
-        const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, { pageNotes: notes.trim() }, getToken);
-        const notSaved = r.ok && Array.isArray(r.data.notSaved) ? r.data.notSaved.find((n) => n && n.field === 'pageNotes') : null;
-        const why = !r.ok ? r.error : notSaved ? notSaved.reason || 'Needs a database update (migration 118).' : null;
-        if (why) throw new Error(textChanged ? `The title and description went to us for review, but the notes didn’t save: ${why}` : why);
-      }
-      setEditModal(null);
-      if (notesChanged) loadSubmissions();
+      const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, body, getToken);
+      if (!r.ok) throw new Error(r.error);
+      const notSaved = Array.isArray(r.data.notSaved) ? r.data.notSaved : [];
+      if (notSaved.length) throw new Error(notSaved.map((n) => n && n.reason).filter(Boolean).join(' ') || 'Some of it didn’t save.');
+      loadSubmissions();
+      return { staged: r.data.staged || [], applied: r.data.applied || [], notices: r.data.notices || [] };
     } catch (err) {
       setEditError(err.message);
+      return null;
     } finally {
       setEditSaving(false);
     }
+  }
+
+  // A change waiting for approval taken back (DELETE …/staged?field=).
+  async function cancelWaiting(field) {
+    const cv = editModal.currentValues;
+    setEditError(null);
+    const r = await showCall('DELETE', `/api/show/episode/${encodeURIComponent(String(cv.id))}/staged?field=${encodeURIComponent(field)}`, undefined, getToken);
+    if (!r.ok) {
+      setEditError(r.error);
+      return false;
+    }
+    loadSubmissions();
+    return true;
+  }
+
+  // The title image (2026-11-12: "the goal was that if someone wanted to add
+  // a custom title, they could"): the title set as a picture, a PNG with a
+  // transparent background, picked from the library and saved through the
+  // show editor's own route (on a live title it waits for approval).
+  async function pickTitleImage(s, { remove = false } = {}) {
+    setActionError(null);
+    let img = null;
+    if (!remove) {
+      try {
+        img = await pickImageAsDataUrl({ width: 1200, format: 'png' });
+      } catch (err) {
+        setActionError(err.message);
+        return;
+      }
+      if (!img) return;
+    }
+    const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(s.id))}`, remove ? { removeTitleImage: true } : { titleImageBase64: img.base64, titleImageFileName: img.fileName }, getToken);
+    if (!r.ok) {
+      setActionError(r.error);
+      return;
+    }
+    const waits = Array.isArray(r.data.staged) && r.data.staged.some((f) => f === 'titleImage' || f === 'titleImageRemoval');
+    setActionError(null);
+    setTitleImageWords(remove
+      ? (waits ? 'Removing the title image waits for approval.' : 'The title image is removed: the title shows as text.')
+      : (waits ? 'The new title image waits for approval; visitors see the live one until then.' : 'The title image is saved.'));
+    loadSubmissions();
   }
 
   async function requestDeletion() {
@@ -622,6 +679,7 @@ export default function MyWork() {
         </Pressable>
 
         {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
+        {titleImageWords ? <Text style={styles.okLine} accessibilityLiveRegion="polite">{titleImageWords}</Text> : null}
 
         {submissions.length === 0 ? (
           <Text style={styles.note}>
@@ -681,6 +739,7 @@ export default function MyWork() {
               actionSheet={actionSheet}
               onClose={() => setActionSheet(null)}
               onEdit={(target) => { setActionSheet(null); setEditError(null); setTimeout(() => setEditModal(target), SHEET_HANDOFF_MS); }}
+              onTitleImage={(item, opts) => { setActionSheet(null); setTimeout(() => pickTitleImage(item, opts), SHEET_HANDOFF_MS); }}
               onDelete={(item) => { setActionSheet(null); setDeleteReason(''); setDeleteError(null); setTimeout(() => setDeleteModal(item), SHEET_HANDOFF_MS); }}
               onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
               onCopyLink={copyPublicLink}
@@ -746,6 +805,7 @@ export default function MyWork() {
                 error={editError}
                 onCancel={() => setEditModal(null)}
                 onSubmit={submitEdit}
+                onCancelWaiting={cancelWaiting}
               /> : null}
             </Pressable>
           </Pressable>
@@ -789,7 +849,7 @@ export default function MyWork() {
   );
 }
 
-function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, onOpenEditor, onOpenShow, copiedId, pricing, onSell, onPayee }) {
+function ActionSheetContent({ actionSheet, onClose, onEdit, onTitleImage, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, onOpenEditor, onOpenShow, copiedId, pricing, onSell, onPayee }) {
   const { type, item: s } = actionSheet;
 
   // A show's episode or extra: the editor and the show screen do the rest
@@ -849,9 +909,27 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
         </>
       ) : null}
       {!s.deletionRequested ? (
-        <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'episode', currentValues: { id: s.id, title: s.title, description: s.description || '', pageNotes: s.pageNotes || '', notesShown: notesBoxShows(s) } })}>
+        <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'episode', currentValues: editValuesFor(s) })}>
           <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{notesBoxShows(s) ? 'Edit title, description & notes' : 'Edit title & description'}</Text>
         </Pressable>
+      ) : null}
+      {/* The title set as a picture (a PNG with a transparent background),
+          drawn in place of the text title on the title's own page. */}
+      {!s.deletionRequested && !s.withdrawnAt && !['podcast', 'vertical'].includes(s.contentType) && !(s.status === 'approved' && s.titleImageWaitReady === false) ? (
+        <>
+          <Pressable style={styles.sheetRow} onPress={() => onTitleImage(s)}>
+            <ImageIcon size={16} color={colors.ink} />
+            <Text style={styles.sheetRowText}>
+              {s.titleImageUrl || s.pendingTitleImageUrl ? 'Replace the title image' : 'Add a title image'}
+              {s.pendingTitleImageUrl || s.pendingTitleImageRemoval ? ' · one waits for approval' : ''}
+            </Text>
+          </Pressable>
+          {s.titleImageUrl && !s.pendingTitleImageRemoval ? (
+            <Pressable style={styles.sheetRow} onPress={() => onTitleImage(s, { remove: true })}>
+              <TrashIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Remove the title image</Text>
+            </Pressable>
+          ) : null}
+        </>
       ) : null}
       <Pressable style={styles.sheetRow} onPress={() => onPayee(s)}>
         <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>Who gets paid</Text>
@@ -873,26 +951,122 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onDelete, onCancelDe
   );
 }
 
-function EditModalContent({ editModal, saving, error, onCancel, onSubmit }) {
+// The title, description and notes box (the website's
+// components/RequestEditModal.js): each field does what the field policy
+// says for a title of the creator's own — on a live title it waits for
+// approval, on one that has never been live it applies at once — the
+// changes already waiting are listed with Cancel and the boxes start from
+// them, only what changed is sent, and the Save label says what goes to
+// review. Before migration 122 a live title's notes have nowhere to wait:
+// the box is greyed with the reason.
+const NOTES_122_LINE = 'Notes need a database update (migration 122).';
+const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes' };
+function listOf(fields) {
+  const named = fields.map((f) => DONE_WORDS[f]).filter(Boolean);
+  return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
+}
+
+function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCancelWaiting }) {
+  const cv = editModal.currentValues || {};
   const isEpisode = editModal.type === 'episode';
-  const [nameValue, setNameValue] = useState(isEpisode ? editModal.currentValues.title : editModal.currentValues.name);
-  const [description, setDescription] = useState(editModal.currentValues.description || '');
-  const notesShown = isEpisode && editModal.currentValues.notesShown === true;
-  const [notes, setNotes] = useState(editModal.currentValues.pageNotes || '');
+  const waitingStart = {
+    title: typeof cv.pendingTitle === 'string' && cv.pendingTitle.trim() ? cv.pendingTitle : null,
+    description: typeof cv.pendingDescription === 'string' && cv.pendingDescription.trim() ? cv.pendingDescription : null,
+    pageNotes: typeof cv.pendingPageNotes === 'string' ? cv.pendingPageNotes : null
+  };
+  const start = {
+    title: waitingStart.title !== null ? waitingStart.title : cv.title || '',
+    description: waitingStart.description !== null ? waitingStart.description : cv.description || '',
+    pageNotes: waitingStart.pageNotes !== null ? waitingStart.pageNotes : cv.pageNotes || ''
+  };
+  const [nameValue, setNameValue] = useState(start.title);
+  const [description, setDescription] = useState(start.description);
+  const notesShown = isEpisode && cv.notesShown === true;
+  const [notes, setNotes] = useState(start.pageNotes);
+  const [waiting, setWaiting] = useState(waitingStart);
+  const [cancelling, setCancelling] = useState(null);
+  const [done, setDone] = useState(null);
+
+  const ctx = { isUploader: true, isRunner: true, status: cv.status || 'approved', held: cv.held === true, deletionRequested: cv.deletionRequested === true, withdrawn: Boolean(cv.withdrawnAt) };
+  const notes122 = (f) => f === 'pageNotes' && fieldPolicy(f, ctx) === 'staged' && cv.pageNotesWaitReady === false;
+  const modeOf = (f) => (notes122(f) ? 'locked' : fieldPolicy(f, ctx));
+  const lineOf = (f) => (notes122(f) ? NOTES_122_LINE : fieldPolicyLine(f, ctx));
+  const open = (f) => ['direct', 'staged'].includes(modeOf(f));
+  const changes = [];
+  if (nameValue.trim() !== start.title.trim()) changes.push({ field: 'title', mode: modeOf('title') });
+  if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
+  if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
+  const summary = saveSummary(changes);
+  const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
+  const anyWaiting = Object.values(waiting).some((v) => v !== null);
+
+  async function send() {
+    const body = {};
+    for (const c of changes) {
+      if (c.field === 'title') body.title = nameValue.trim();
+      if (c.field === 'description') body.description = description.trim();
+      if (c.field === 'pageNotes') body.pageNotes = notes.trim();
+    }
+    const result = await onSubmit(body);
+    if (result) setDone(result);
+  }
+  async function takeBack(field) {
+    setCancelling(field);
+    const okNow = await onCancelWaiting(field);
+    setCancelling(null);
+    if (okNow) setWaiting((w) => ({ ...w, [field]: null }));
+  }
+
+  if (done) {
+    return (
+      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+        <View style={styles.modalHeader}>
+          <Text style={styles.modalHeaderText}>{notesShown ? 'Title, description & notes' : 'Title & description'}</Text>
+          <Pressable onPress={onCancel}><CloseIcon size={16} /></Pressable>
+        </View>
+        <Text style={styles.doneText}>
+          {[
+            done.staged.length ? `Sent for review: ${listOf(done.staged)}. Visitors see what’s live until we approve it.` : null,
+            done.applied.length ? `Saved: ${listOf(done.applied)}.` : null,
+            !done.staged.length && !done.applied.length ? done.notices[0] || 'Saved.' : null
+          ].filter(Boolean).join(' ')}
+        </Text>
+        <Pressable style={styles.primaryBtn} onPress={onCancel}><Text style={styles.primaryBtnText}>Close</Text></Pressable>
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalHeaderText}>Request an edit — {isEpisode ? 'episode' : 'show'}</Text>
+        <Text style={styles.modalHeaderText}>{notesShown ? 'Title, description & notes' : 'Title & description'}</Text>
         <Pressable onPress={onCancel}><CloseIcon size={16} /></Pressable>
       </View>
       <Text style={styles.modalNote}>
-        This goes to Studio Tapa for approval before it changes anything visitors see — the current {isEpisode ? 'title/description' : 'name/description'} stay live until then.{notesShown ? ' The notes for its page are the exception: they go up as soon as you send this.' : ''}
+        {liveRules
+          ? 'It’s live, so these go to Studio Tapa for approval before visitors see them — what’s there now stays until then.'
+          : 'It isn’t live yet, so these apply as soon as you save.'}
       </Text>
+      {anyWaiting ? (
+        <View style={styles.waitingBox}>
+          <Text style={styles.waitingHead}>Waiting for approval</Text>
+          {['title', 'description', 'pageNotes'].filter((f) => waiting[f] !== null).map((f) => (
+            <View key={f} style={styles.waitingRow}>
+              <Text style={styles.waitingText}>{f === 'pageNotes' && waiting.pageNotes === '' ? 'clearing the notes' : `the new ${f === 'pageNotes' ? 'notes' : f}`}</Text>
+              <Pressable style={[styles.waitingCancel, (cancelling === f || saving) && styles.btnDisabled]} disabled={cancelling === f || saving} onPress={() => takeBack(f)} accessibilityRole="button" accessibilityLabel={`Cancel the waiting ${f === 'pageNotes' ? 'notes' : f}`}>
+                <Text style={styles.waitingCancelText}>{cancelling === f ? '…' : 'Cancel'}</Text>
+              </Pressable>
+            </View>
+          ))}
+          <Text style={styles.waitingFoot}>Visitors see what’s live until we approve it. The boxes below start from what waits.</Text>
+        </View>
+      ) : null}
       <Text style={styles.label}>{isEpisode ? 'Title' : 'Show name'}</Text>
-      <TextInput style={styles.input} value={nameValue} onChangeText={setNameValue} />
+      <TextInput style={[styles.input, !open('title') && styles.inputOff]} value={nameValue} onChangeText={setNameValue} editable={open('title')} maxLength={200} />
+      {!open('title') ? <Text style={styles.notesHelp}>{lineOf('title')}</Text> : null}
       <Text style={styles.label}>Description</Text>
-      <TextInput style={styles.textarea} value={description} onChangeText={setDescription} multiline numberOfLines={4} />
+      <TextInput style={[styles.textarea, !open('description') && styles.inputOff]} value={description} onChangeText={setDescription} multiline numberOfLines={4} maxLength={4000} editable={open('description')} />
+      {!open('description') ? <Text style={styles.notesHelp}>{lineOf('description')}</Text> : null}
       {notesShown ? (
         <>
           <View style={styles.notesLabelRow}>
@@ -900,22 +1074,27 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit }) {
             <Text style={[styles.notesCount, notes.length > PAGE_NOTES_MAX && styles.notesCountOver]}>{notes.length.toLocaleString('en-US')} / {PAGE_NOTES_MAX.toLocaleString('en-US')}</Text>
           </View>
           <TextInput
-            style={[styles.textarea, styles.notesInput]}
+            style={[styles.textarea, styles.notesInput, !open('pageNotes') && styles.inputOff]}
             value={notes}
             onChangeText={setNotes}
             multiline
             maxLength={PAGE_NOTES_MAX}
+            editable={open('pageNotes')}
             placeholder="How it was made, who’s in it, the story behind a scene."
             placeholderTextColor={colors.inkFaint}
             accessibilityLabel="Notes for the title’s page"
           />
-          <Text style={styles.notesHelp}>Shown on the title’s page in place of the description. Saved at once, no review.</Text>
+          <Text style={styles.notesHelp}>
+            Shown on the title’s page in place of the description.{' '}
+            {!open('pageNotes') ? lineOf('pageNotes') : modeOf('pageNotes') === 'staged' ? 'Waits for approval like the description.' : 'Saved at once: it isn’t live yet.'}
+          </Text>
         </>
       ) : null}
+      {summary.note ? <Text style={styles.notesHelp}>{summary.note}.</Text> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       <View style={styles.modalActions}>
-        <Pressable style={[styles.primaryBtn, saving && styles.btnDisabled]} disabled={saving} onPress={() => onSubmit(nameValue, description, notesShown ? notes : undefined)}>
-          <Text style={styles.primaryBtnText}>{saving ? 'Sending…' : notesShown ? 'Send' : 'Send for approval'}</Text>
+        <Pressable style={[styles.primaryBtn, (saving || changes.length === 0) && styles.btnDisabled]} disabled={saving || changes.length === 0} onPress={send}>
+          <Text style={styles.primaryBtnText}>{saving ? 'Sending…' : summary.label}</Text>
         </Pressable>
         <Pressable style={styles.secondaryBtn} onPress={onCancel} disabled={saving}>
           <Text style={styles.secondaryBtnText}>Cancel</Text>
@@ -1027,6 +1206,17 @@ const styles = StyleSheet.create({
   notesCountOver: { color: colors.danger },
   notesInput: { minHeight: 120 },
   notesHelp: { color: colors.inkDim, fontSize: 11.5, lineHeight: 16, marginTop: 5 },
+  // The changes already waiting for approval (the website's .req-edit-waiting).
+  waitingBox: { padding: 10, borderRadius: 10, borderWidth: 1, borderColor: oliveTint(0.5), backgroundColor: oliveTint(0.08), marginBottom: 6, gap: 6 },
+  waitingHead: { color: colors.olive, fontSize: 12.5, fontWeight: '600' },
+  waitingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  waitingText: { color: colors.ink, fontSize: 13, flex: 1 },
+  waitingCancel: { borderWidth: 1, borderColor: oliveTint(0.65), borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
+  waitingCancelText: { color: colors.olive, fontSize: 12.5 },
+  waitingFoot: { color: colors.inkDim, fontSize: 11.5, lineHeight: 16 },
+  inputOff: { opacity: 0.5 },
+  doneText: { color: colors.ok, fontSize: 14, lineHeight: 20, marginBottom: 14 },
+  okLine: { color: colors.ok, fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 6 },
   modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   modalHeaderText: { color: colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
   modalNote: { color: colors.inkDim, fontSize: 12, lineHeight: 17, marginBottom: 12 },

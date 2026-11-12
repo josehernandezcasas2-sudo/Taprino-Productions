@@ -364,6 +364,8 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     }
   }, [episode.id]);
   const [describedActive, setDescribedActive] = useState(false);
+  // A title image that couldn't load gives the text title back.
+  const [titleArtFailed, setTitleArtFailed] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const { isWishlisted, toggle: toggleWishlist } = useWishlist(isSignedIn, wishlist);
   const { getPosition, savePosition } = useWatchProgress(isSignedIn, watchProgress);
@@ -785,12 +787,12 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
             </div>
             <div className="ep-head-row">
               <div className="ep-titlebox">
-                {landingV2 && titleArt ? (
+                {landingV2 && titleArt && titleArtFailed !== titleArt ? (
                   // The custom title on the own page: the picture is the
                   // title; the heading keeps the words for screen readers.
                   <h1 className="ep-title ep-title-art">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={titleArt} alt="" className="ep-title-image" />
+                    <img src={titleArt} alt="" className="ep-title-image" onError={() => setTitleArtFailed(titleArt)} />
                     <span className="visually-hidden">{episode.title}</span>
                   </h1>
                 ) : (

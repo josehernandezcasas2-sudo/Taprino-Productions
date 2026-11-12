@@ -20,6 +20,9 @@ function stripPlayable(e) {
 function stripForViewer(e, entitled) {
   if (!e) return e;
   const out = stripPlayable(e);
+  // Whether a described version exists (the app's Accessibility panel
+  // says so; its file stays on the server like every other).
+  out.hasAudioDescription = Boolean(e.audioDescriptionSrc);
   if (entitled && e.audioUrl) out.audioUrl = e.audioUrl;
   if (entitled && e.captionsUrl) out.captionsUrl = e.captionsUrl;
   if (entitled && e.transcriptUrl) out.transcriptUrl = e.transcriptUrl;

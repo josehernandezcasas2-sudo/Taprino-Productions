@@ -185,7 +185,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   // isn't): the server's own line, and the controls that need it grey.
   const [behind, setBehind] = useState({});
   const noteBehind = useCallback((r) => {
-    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && r.data.code === 'migration-120' ? { code: 'migration-120', line: r.error } : null);
+    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && ['migration-120', 'migration-122'].includes(r.data.code) ? { code: r.data.code, line: r.error } : null);
     if (m) setBehind((b) => ({ ...b, [m.code]: m.line }));
     return Boolean(m);
   }, []);
@@ -195,6 +195,12 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     const p = policy[f] || LOCKED_FALLBACK;
     return behind['migration-120'] && p.mode === 'staged' ? { mode: 'locked', line: behind['migration-120'] } : p;
   }, [policy, behind]);
+  // The notes wait in 122's column on a live title; the payload's policy
+  // already greys them before 122, and a 503 seen at run time does too.
+  const notesPol = (() => {
+    const p = policy.pageNotes || LOCKED_FALLBACK;
+    return behind['migration-122'] && p.mode === 'staged' ? { mode: 'locked', line: behind['migration-122'] } : p;
+  })();
   const has118 = (!data.migration || data.migration.shows118 !== false) && !behind['migration-118'];
   const inShow = Boolean(show) && (ep.contentType === 'series' || ep.contentType === 'podcast');
   const isExtra = ep.contentType === 'bonus';
@@ -650,6 +656,8 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   const stagedFields = [
     st.title ? { field: 'title', words: `title “${st.title}”` } : null,
     st.description ? { field: 'description', words: 'an edited description' } : null,
+    // Migration 122: notes waiting ('' = clearing them).
+    typeof st.pageNotes === 'string' ? { field: 'pageNotes', words: st.pageNotes === '' ? 'clearing the notes' : 'new notes' } : null,
     st.poster ? { field: 'poster', words: 'the poster' } : null,
     st.thumbnail ? { field: 'thumbnail', words: 'the still' } : null,
     // Migration 120: a waiting image replaces a waiting removal and the
@@ -875,7 +883,16 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           <SectionHead label="More info" />
           {live ? <StagedLegend /> : null}
           <View style={ss.card}>
-            <AboutField value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={pol('description')} edited={edited('description')} />
+            <AboutField
+              value={form.about}
+              onChange={(v) => set('about', v)}
+              max={aboutMax}
+              policy={pol('description')}
+              edited={edited('description')}
+              stagedValue={ep.staged ? ep.staged.description : null}
+              onCancelStaged={canCancel ? () => cancelStaged('description') : null}
+              cancelBusy={busy === 'cancel-description'}
+            />
           </View>
           <View style={ss.card}>
             <Text style={ss.cardK}>Art</Text>
@@ -968,9 +985,19 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             </SwitchRow>
             {form.hasPage ? (
               <View style={{ gap: 6 }}>
-                <FieldHead label="Notes" hint="blank lines make paragraphs" count={form.pageNotes.length} max={NOTES_MAX} />
-                <EdInput multiline style={{ minHeight: 120 }} value={form.pageNotes} maxLength={NOTES_MAX} disabled={!has118 || !isOpen(pol('pageNotes'))} placeholder="How it was made, who’s in it, the story behind a scene." onChangeText={(t) => set('pageNotes', t)} accessibilityLabel="Notes" />
-                <FieldNote policy={pol('pageNotes')} edited={edited('pageNotes')} />
+                <FieldHead label="Notes" hint="blank lines make paragraphs" staged={notesPol.mode === 'staged'} locked={notesPol.mode === 'locked'} count={form.pageNotes.length} max={NOTES_MAX} />
+                <EdInput multiline style={{ minHeight: 120 }} value={form.pageNotes} maxLength={NOTES_MAX} disabled={!has118 || !isOpen(notesPol)} placeholder="How it was made, who’s in it, the story behind a scene." onChangeText={(t) => set('pageNotes', t)} accessibilityLabel="Notes" />
+                {/* On a live title the notes wait for approval like the
+                    description (migration 122); what waits, with Cancel. */}
+                {typeof st.pageNotes === 'string' ? (
+                  <StagedBox
+                    title={st.pageNotes === '' ? 'Clearing the notes waits for approval' : 'New notes wait for approval:'}
+                    value={st.pageNotes ? (st.pageNotes.length > 240 ? `${st.pageNotes.slice(0, 240)}…` : st.pageNotes) : null}
+                    onCancel={canCancel ? () => cancelStaged('pageNotes') : null}
+                    busy={busy === 'cancel-pageNotes'}
+                  />
+                ) : null}
+                <FieldNote policy={notesPol} edited={edited('pageNotes')} />
                 {/* Open page when it's live; else the owner's preview (?preview=1, slice 4) unless it was declined. */}
                 {viewable ? <LinkText onPress={() => router.push(episodePublicRoute(ep.id))}>Open page</LinkText>
                   : PREVIEW_BUILT && ep.status !== 'rejected' && !ep.withdrawnAt ? <LinkText onPress={() => router.push(episodePublicRoute(ep.id, { preview: true }))}>Preview page</LinkText> : null}
