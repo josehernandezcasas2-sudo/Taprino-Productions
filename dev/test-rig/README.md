@@ -163,6 +163,10 @@ PostgREST's secret), `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `STRIPE_SECRET_KEY=sk_test
 `_API_TOKEN` / `_STREAM_CUSTOMER_CODE=test` / `_API_BASE` / `_STREAM_ORIGIN`,
 `CRON_SECRET=rig-cron-secret`, `ADMIN_NOTIFY_SECRET=rig-admin-notify-secret`,
 `EXPO_PUSH_URL` (the fake Clerk's sink), `PAYEE_RULE_FROM=2026-10-15T00:00:00.000Z`,
+`WEB_PUSH_PUBLIC_KEY` / `WEB_PUSH_PRIVATE_KEY` (a VAPID pair the rig makes on
+first start, `$RIG_DATA_DIR/keys/vapid.json`), `WEB_PUSH_SUBJECT=mailto:rig@rig.example.com`,
+`WEB_PUSH_TEST_ORIGIN` (the fake Clerk, the one extra push service the app
+accepts outside production; `lib/webPush.js` ignores it in production),
 `NEXT_TELEMETRY_DISABLED=1`. Blank: Upstash (rate limits fall back to the
 per-process counter, caches to direct reads), Resend (no email is sent), Brevo,
 Notion, Bunny, `PRIVATE_BETA`, `CLOUDFLARE_STREAM_KEY_ID/_PEM`, the rest.
@@ -207,6 +211,13 @@ firstName, lastName }`; `POST /__roles?user=mara&role=sub_admin&permissions=a,b`
 `POST /__twofactor?user=admin&on=0`; `POST /__users` (a new account);
 `GET /__session?user=mara` (a cookie, like `mint-session.mjs`);
 `POST /__expo/push/send` (the push sink; `GET /__state` lists what arrived);
+`POST /__webpush/<token>` (the web push sink, 2026-11-12: answers 201, or 410
+for a token starting `gone`, 404 for `missing`, 500 for `fail`; records the
+TTL, Urgency, Content-Encoding, the VAPID token's claims and whether its
+signature checks out against the key it names, and — once a check has sent
+`POST /__webpush-keys { token, privateKey, auth }` for a stand-in browser
+made by `lib/webpush.mjs` `makeBrowser` — the message decrypted, as
+`webPushes` in `GET /__state`);
 `POST /__fail?user=<id>&on=1|0` (that account's reads — `GET /v1/users/<id>`
 and a users list asking for it by `user_id` — answer 500; `user=*&on=0`
 clears them all).
@@ -332,7 +343,8 @@ dev/test-rig/
   bin/rig.mjs          the commands (start/stop/reset/status/env/migrate)
   bin/supabase.mjs     REST proxy + Storage, http :54321 / https :54331
   bin/clerk.mjs bin/stripe.mjs bin/cloudflare.mjs
-  lib/                 config, keys/TLS, Postgres + the chain, seed, storage, env
+  lib/                 config, keys/TLS, Postgres + the chain, seed, storage, env,
+                       web push (a stand-in browser, the sink's decryption)
   seed/accounts.json seed/catalogue.mjs
 $RIG_DATA_DIR/ (outside the repo)
   pgdata/ keys/ storage/ logs/ run/ state/ (migrations.json, baseline.sql, smoke.json) postgrest.conf

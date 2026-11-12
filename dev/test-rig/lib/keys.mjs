@@ -1,13 +1,15 @@
 // The rig's keys, made on first start and kept under RIG_DATA_DIR/keys
 // (never in the repo): the RSA pair the fake Clerk signs sessions with
 // and serves as its JWKS, PostgREST's JWT secret, the service-role and
-// anon keys minted from it, and the authenticator role's password.
+// anon keys minted from it, the authenticator role's password, and the
+// app's web push (VAPID) pair.
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { PATHS, ensureDirs } from './config.mjs';
 import { signHS256 } from './jwt.mjs';
+import { makeVapidKeys } from './webpush.mjs';
 
 const file = (name) => path.join(PATHS.keys, name);
 
@@ -36,6 +38,8 @@ export function ensureKeys() {
   const anonKey = readOr('anon.jwt', () => signHS256({ role: 'anon', iss: 'supabase-rig', iat: now, exp: now + 10 * 365 * 86400 }, jwtSecret));
   // The storage stand-in signs its object links with its own secret.
   const storageSecret = readOr('storage-secret', () => crypto.randomBytes(32).toString('base64url'));
+  // The app's web push keys (WEB_PUSH_PUBLIC_KEY / _PRIVATE_KEY, lib/webPush.js).
+  const vapid = JSON.parse(readOr('vapid.json', () => JSON.stringify(makeVapidKeys())));
   const tls = ensureTls();
   return {
     tls,
@@ -45,7 +49,9 @@ export function ensureKeys() {
     authenticatorPassword,
     serviceRoleKey,
     anonKey,
-    storageSecret
+    storageSecret,
+    vapidPublicKey: vapid.publicKey,
+    vapidPrivateKey: vapid.privateKey
   };
 }
 
