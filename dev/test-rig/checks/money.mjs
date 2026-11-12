@@ -10,7 +10,7 @@
 //     503 "This title can't be sold right now", and a normal Checkout after
 //   a referral (?via=) through Checkout: the bonus line on the first invoice
 //   node dev/test-rig/checks/money.mjs
-import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, session, newUser, removeUser, browser, goto, stripeHook, stripeApi, clerk, ago, uidFor } from './lib.mjs';
+import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, session, newUser, removeUser, browser, goto, stripeHook, stripeApi, forgetInvoiceEvents, clerk, ago, uidFor } from './lib.mjs';
 
 const ADMIN = session(USERS.admin);
 const MARA = session(USERS.mara);
@@ -239,6 +239,8 @@ await runCheck('money', async () => {
     await clerk('/__fail?user=*&on=0', { method: 'POST' });
     // Undo every row a member of this run caused, then the people.
     const ids = people.map(q).join(', ') || "''";
+    // The catch-up must not record these invoices again once the rows go.
+    await forgetInvoiceEvents({ members: people, invoices });
     const subs = (await stripeHook('/__state')).json.objects.filter((o) => o.object === 'subscription' && o.metadata && people.includes(o.metadata.member));
     for (const s of subs) await stripeApi(`/subscriptions/${s.id}`, { method: 'DELETE' });
     sql(`delete from public.creator_ledger where member_id in (${ids})`);

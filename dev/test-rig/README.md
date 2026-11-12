@@ -378,7 +378,10 @@ is written to `$RIG_DATA_DIR/state/smoke.json`.
 `dev/test-rig/checks/` holds re-runnable checks of one area each (films on
 the own-page landing, kinds of extras before and after 121, captions and
 the podcast preview as the app calls them, the moderation cleanup, money
-through the fakes, stuck payee invites); see `checks/README.md`.
+through the fakes, stuck payee invites, the money edge cases, web push,
+podcast audio and the crawler refusal, notes and descriptions waiting for
+review, season art, sales tax, the flashing-lights card, the round's
+small fixes); see `checks/README.md`.
 
 ## Things in the app that reach outside the rig
 

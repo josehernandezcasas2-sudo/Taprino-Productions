@@ -139,6 +139,35 @@ export async function stripeApi(p, { method = 'GET', params = null } = {}) {
   return { status: res.status, json: await res.json().catch(() => null) };
 }
 
+// The daily Stripe catch-up (lib/stripeCatchup.js, run by
+// /api/cron/creator-reminders and Admin → Creator Share payouts' "Retry
+// now") records every paid membership invoice in the fake's events list
+// that member_payments lacks, once its event is an hour old. A check that
+// deletes the rows its members' invoices made must make the fake forget
+// those invoices' events too, or a later check's cron run records them
+// again (for accounts that no longer exist, with pool lines for the seed's
+// creators). `members`: account ids whose subscriptions' or customers'
+// invoices go; `invoices`: invoice ids to add. → how many events went.
+export async function forgetInvoiceEvents({ members = [], invoices = [] } = {}) {
+  const who = new Set((members || []).filter(Boolean));
+  const inv = new Set((invoices || []).filter(Boolean));
+  const state = await stripeHook('/__state');
+  const objs = (state.json && state.json.objects) || [];
+  const subs = new Set(objs.filter((o) => o.object === 'subscription' && o.metadata && who.has(o.metadata.member)).map((o) => o.id));
+  const custs = new Set(objs.filter((o) => o.object === 'customer' && o.metadata && who.has(o.metadata.clerkUserId)).map((o) => o.id));
+  for (const o of objs) {
+    if (o.object === 'invoice' && (subs.has(o.subscription) || custs.has(o.customer))) inv.add(o.id);
+    // An event whose invoice lives only inside it (a check's /__event).
+    if (o.object === 'event' && o.type === 'invoice.paid' && o.data && o.data.object) {
+      const x = o.data.object;
+      if (subs.has(x.subscription) || custs.has(x.customer) || (x.subscription_details && x.subscription_details.metadata && who.has(x.subscription_details.metadata.member))) inv.add(x.id);
+    }
+  }
+  if (!inv.size) return 0;
+  const r = await stripeHook('/__events/forget', { method: 'POST', body: { invoices: [...inv] } });
+  return (r.json && r.json.forgotten) || 0;
+}
+
 // A fresh account of this run (the fake Clerk + its profile row), so a
 // check's money, limits and lineups never meet another run's.
 export async function newUser(tag, { role = null, firstName = null, createdDaysAgo = 60, displayName = null, handle = null } = {}) {

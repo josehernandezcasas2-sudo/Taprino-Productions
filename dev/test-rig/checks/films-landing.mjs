@@ -3,7 +3,7 @@
 // and the notes for a title's page (Your work's edit box, the Library's
 // admin modal). Rig up, any migration from 118 on.
 //   node dev/test-rig/checks/films-landing.mjs
-import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, session, SIGNED_OUT, SIGNED_OUT_NO_TERMS, newUser, removeUser, browser, goto, overflowPx, stripeHook, uidFor, ago } from './lib.mjs';
+import { IDS, USERS, RUN, ok, section, runCheck, call, page, sql, rows, q, insert, hasColumn, session, SIGNED_OUT, SIGNED_OUT_NO_TERMS, newUser, removeUser, browser, goto, overflowPx, stripeHook, forgetInvoiceEvents, uidFor, ago } from './lib.mjs';
 
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
@@ -205,19 +205,38 @@ async function notesEditing(b) {
   await item.click();
   await pg.locator('#request-edit-notes').waitFor({ timeout: 10000 });
   ok('the box has "Notes for the title’s page"', await pg.locator('#request-edit-notes').isVisible());
+  // Since migration 122 (2026-11-12, "make sure descriptions and notes wait
+  // for review"): on a live film the title, the description and the notes
+  // all wait for approval (pending_title / pending_description /
+  // pending_page_notes) and visitors keep the live ones; before 122 the
+  // notes have nowhere to wait, so the box is greyed with the reason.
+  const notesWait = hasColumn('episodes', 'pending_page_notes');
   await pg.locator('.modal-card input[type="text"]').first().fill('Check film renamed');
-  await pg.locator('#request-edit-notes').fill('Notes typed in Your work.\n\nA second paragraph.');
-  await pg.locator('.modal-card button[type="submit"]', { hasText: 'Send' }).click();
-  await pg.waitForTimeout(1500);
-  const said = await pg.locator('text=Your notes are saved.').count();
-  ok('it says the notes are saved and the title is with us for review', said > 0);
-  const db = rows(`select title, pending_title, page_notes from public.episodes where id = ${q(ID.edit)}`)[0] || {};
-  ok('the notes applied at once', db.page_notes === 'Notes typed in Your work.\n\nA second paragraph.', db);
+  if (notesWait) {
+    ok('the notes box is open on a live film', await pg.locator('#request-edit-notes').isEnabled());
+    await pg.locator('#request-edit-notes').fill('Notes typed in Your work.\n\nA second paragraph.');
+  } else {
+    ok('before 122 the notes box is greyed on a live film', !(await pg.locator('#request-edit-notes').isEnabled()));
+    ok('before 122 it says notes need migration 122', (await pg.locator('.modal-card').textContent()).includes('migration 122'));
+  }
+  const send = pg.locator('.modal-card button[type="submit"]');
+  const label = ((await send.textContent()) || '').trim();
+  ok('the button says what goes to review', notesWait ? label === 'Save · 2 changes go to review' : label === 'Save · 1 change goes to review', label);
+  await send.click();
+  await pg.locator('text=Sent for review').first().waitFor({ timeout: 15000 }).catch(() => {});
+  const said = ((await pg.locator('.modal-card').textContent().catch(() => '')) || '');
+  ok('it says what was sent for review', notesWait ? said.includes('Sent for review: the title and the notes.') : said.includes('Sent for review: the title.'), said.slice(0, 200));
+  const db = rows(`select title, pending_title, page_notes${notesWait ? ', pending_page_notes' : ''} from public.episodes where id = ${q(ID.edit)}`)[0] || {};
   ok('the title waits for review (pending_title), the live one unchanged', db.pending_title === 'Check film renamed' && db.title === 'Check film to edit', db);
+  if (notesWait) {
+    ok('the notes wait for review (pending_page_notes), none live yet', db.pending_page_notes === 'Notes typed in Your work.\n\nA second paragraph.' && db.page_notes === null, db);
+  }
   ok('no page errors on Your work', errors.length === 0, errors);
   await ctx.close();
   const live = await page(`/episode/${ID.edit}`);
-  ok('the film’s page shows the new notes at once', /Notes typed in Your work\./.test(live.text));
+  ok('the film’s page doesn’t show the waiting notes', live.status === 200 && !/Notes typed in Your work\./.test(live.text), live.status);
+  const api = await call(`/api/episode-page?id=${encodeURIComponent(ID.edit)}`);
+  ok('/api/episode-page carries neither waiting value', api.status === 200 && !api.text.includes('Notes typed in Your work') && !api.text.includes('Check film renamed'), api.status);
 
   // The admin's Library modal.
   const a = await b.open(ADMIN, 1280);
@@ -241,8 +260,17 @@ async function notesEditing(b) {
   r = await call(`/api/show/episode/${encodeURIComponent(ID.edit)}`, { who: DEE, method: 'PATCH', body: { pageNotes: 'Not Dee’s film.' } });
   ok('another creator can’t change a film’s notes', r.status === 403 || r.status === 404, `${r.status} ${r.text.slice(0, 160)}`);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.edit)}`, { who: MARA, method: 'PATCH', body: { pageNotes: '' } });
-  const cleared = rows(`select page_notes from public.episodes where id = ${q(ID.edit)}`)[0] || {};
-  ok('the uploader clears the notes (empty = none)', r.status === 200 && cleared.page_notes === null, `${r.status} ${JSON.stringify(cleared)}`);
+  if (hasColumn('episodes', 'pending_page_notes')) {
+    const cleared = rows(`select page_notes, pending_page_notes from public.episodes where id = ${q(ID.edit)}`)[0] || {};
+    ok('the uploader clearing a live film’s notes waits (pending_page_notes = \'\'), the live ones stay', r.status === 200 && cleared.pending_page_notes === '' && cleared.page_notes === 'Notes from the Library modal.', `${r.status} ${JSON.stringify(cleared)}`);
+  } else {
+    ok('before 122 a live film’s notes answer 503 migration-122', r.status === 503 && /122/.test(r.text), `${r.status} ${r.text.slice(0, 160)}`);
+  }
+  // A film that was never live: the notes apply at once (and clearing them is none).
+  sql(`update public.episodes set status = 'pending', released_at = null, reviewed_at = null where id = ${q(ID.edit)}`);
+  r = await call(`/api/show/episode/${encodeURIComponent(ID.edit)}`, { who: MARA, method: 'PATCH', body: { pageNotes: '' } });
+  const direct = rows(`select page_notes from public.episodes where id = ${q(ID.edit)}`)[0] || {};
+  ok('on a film still in review the uploader clears the notes at once (empty = none)', r.status === 200 && direct.page_notes === null, `${r.status} ${JSON.stringify(direct)}`);
 }
 
 await runCheck('films-landing', async () => {
@@ -259,6 +287,8 @@ await runCheck('films-landing', async () => {
   } finally {
     await b.close();
     if (member) {
+      // The catch-up must not record this member's invoice again.
+      await forgetInvoiceEvents({ members: [member.id] });
       sql(`delete from public.member_payments where user_id = ${q(member.id)}`);
       sql(`delete from public.creator_ledger where member_id = ${q(member.id)}`);
       sql(`delete from public.member_customers where user_id = ${q(member.id)}`);

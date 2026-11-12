@@ -221,7 +221,11 @@ async function audio() {
   ok('again → already private', r.status === 200 && r.json && r.json.wasPublic === false && r.json.existed === true, r.json);
   ok('…both runs in the audit log', rows(`select count(*) as c from public.audit_log where action = 'protect_podcast_audio' and created_at > now() - interval '10 minutes'`)[0].c >= 2);
   r = await page('/admin/ai-security', ADMIN);
-  ok('Admin → AI security shows the run', r.status === 200 && r.text.includes('Lock podcast audio') && r.text.includes('of 5 run'), r.status);
+  // Once it has run, the card reads "Ran <day>" with a "Run again" button
+  // (the "Lock podcast audio" label is only on a card that never ran), and
+  // the tile counts it among five.
+  const card = /Podcast audio locked[\s\S]{0,1200}?<button[^>]*>([^<]*)<\/button>/.exec(r.text);
+  ok('Admin → AI security shows the run', r.status === 200 && card && /Ran /.test(card[0]) && card[1] === 'Run again' && /\d of 5 run/.test(r.text), `${r.status} ${card ? card[1] : 'no card'}`);
 }
 
 async function webPush() {
