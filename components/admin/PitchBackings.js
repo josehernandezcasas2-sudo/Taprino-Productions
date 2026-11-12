@@ -24,7 +24,7 @@ export default function PitchBackings({ pitchId, onChanged }) {
   async function refund(b) {
     const who = b.backerName || b.donorEmail || 'this backer';
     const reason = window.prompt(
-      `Refund ${dollars(b.totalChargedCents || b.amountCents)} to ${who}?\n\n` +
+      `Refund ${dollars(b.chargedCents || b.totalChargedCents || b.amountCents)}${b.taxCents ? ` (incl. ${dollars(b.taxCents)} sales tax)` : ''} to ${who}?\n\n` +
       'The backer gets the whole amount back, the creator’s share is pulled back out of their Stripe balance, and Studio Tapa returns its cut. Stripe keeps its processing fee, so Studio Tapa absorbs it. This can’t be undone.\n\n' +
       'Reason (optional):'
     );
@@ -90,7 +90,7 @@ export default function PitchBackings({ pitchId, onChanged }) {
                   {b.donorEmail && <span className="bk-email">{b.donorEmail}</span>}
                 </td>
                 <td>{dollars(b.amountCents)}</td>
-                <td>{dollars(b.totalChargedCents || b.amountCents)}</td>
+                <td>{dollars(b.chargedCents || b.totalChargedCents || b.amountCents)}{b.taxCents ? <span className="bk-email">incl. {dollars(b.taxCents)} tax</span> : null}</td>
                 <td>{dollars(b.creatorPayoutCents)}</td>
                 <td>{dollars(b.platformCutCents)}</td>
                 <td>{statusText(b)}</td>

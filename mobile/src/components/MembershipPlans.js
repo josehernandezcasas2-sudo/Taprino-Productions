@@ -1,5 +1,6 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { colors, fonts } from '../lib/theme';
+import { TAX_NOTE } from '../lib/salesTaxRules';
 
 // The Account screen's plan picker — the app's twin of
 // components/MembershipPlans.js (mockups/membership-tiers.html, section 3):
@@ -42,6 +43,7 @@ export default function MembershipPlans({ plans = [], tier = 'basic', subscripti
               {flag ? <View style={[styles.flag, { borderColor: flagColor }]}><Text style={[styles.flagText, { color: flagColor }]}>{flag}</Text></View> : null}
               <Text style={[styles.name, flag && { marginTop: 8 }]}>{plan && !plan.legacy ? plan.name : info.label}</Text>
               <Text style={styles.price}>{plan ? money(plan) : t === 'basic' ? 'Free' : '—'}{plan ? <Text style={styles.per}>  / {plan.interval || 'month'}</Text> : null}</Text>
+              {plan && plan.taxNote ? <Text style={styles.taxNote}>{TAX_NOTE}</Text> : null}
               <Text style={styles.tag}>{sub ? `${sub.cancelsAtPeriodEnd ? 'Ends' : 'Renews'} ${fmtDate(sub.renewsAt)}` : info.tagline}</Text>
               <View style={styles.perks}>
                 {info.perks.map((p) => <Text key={p} style={styles.perk}><Text style={styles.tick}>✓  </Text>{p}</Text>)}
@@ -91,6 +93,7 @@ const styles = StyleSheet.create({
   price: { fontFamily: fonts.displayBold, fontSize: 25, color: colors.ink, marginTop: 5, fontVariant: ['tabular-nums'] },
   per: { fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint },
   tag: { fontFamily: fonts.mono, fontSize: 12, color: colors.inkFaint, marginTop: 2, marginBottom: 12 },
+  taxNote: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkFaint, marginTop: 2 },
   perks: { gap: 6, marginBottom: 14 },
   perk: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.inkDim },
   perkNo: { color: colors.inkFaint },

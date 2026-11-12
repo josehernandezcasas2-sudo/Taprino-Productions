@@ -229,7 +229,7 @@ Sponsor $6.99 (metadata `tier`), the platform account `acct_rigPlatform`
 (payout schedule `manual`, $500 available) and Mara's ready Express account
 `acct_rigMara`.
 
-Covered: products, prices, customers (create/retrieve/update/delete/list by
+Covered: products, prices (with `tax_code` / `tax_behavior` updates), customers (create/retrieve/update/delete/list by
 email/search on `metadata['k']:'v'` and `email:'v'`), checkout sessions
 (create — payment, subscription, setup; destination charges with
 `application_fee_amount` or `transfer_data.amount`; retrieve; list; expire;
@@ -275,9 +275,52 @@ invoices? | all? }` (events leave the events list: a check that deletes the
 rows an invoice made should forget its events too, or the daily catch-up —
 `/api/cron/creator-reminders`, which `payee-invites.mjs` runs — records that
 invoice again once its event is an hour old), `GET /__state` (objects,
-balances, deliveries).
+balances, deliveries), `GET|POST /__tax` (Stripe Tax, below).
 
-Not covered: Stripe Tax (tax is always 0), coupons and promotion codes,
+**Stripe Tax** (sales tax on memberships, backings and bookings, migration
+122). A Checkout session with `automatic_tax[enabled]=true` works the tax
+out per line: the line's tax code (`price_data.product_data.tax_code`, else
+the catalog product's `tax_code`, else the account default) picks a rate
+(the hook's `codeRates`, else `rate`), and its tax behaviour (`price_data`'s
+or the catalog price's `tax_behavior`, else the account default) says on top
+(`exclusive`: `amount_total` = subtotal + tax) or inside (`inclusive`). The
+session has `total_details.amount_tax` and `automatic_tax.status: complete`,
+each line `amount_tax`; a subscription session's first invoice has `tax` +
+`total_tax_amounts` (the events' API version, 2024-06-20) or, with
+`invoiceShape: 'basil'`, `total_taxes`, and `amount_paid` includes the tax;
+the subscription carries `automatic_tax.enabled`; `customer_update[address]
+=auto` saves a California address on the customer. Refused with a 400 like
+the real API when Stripe Tax isn't active (`active: false`), when a line has
+no tax behaviour and there's no default (the seeded membership prices are
+`unspecified`, as Jose's are until the settings card's button runs — so a
+membership Checkout with tax is refused and the site makes it again without),
+when a customer has no address and `customer_update[address]` isn't `auto`,
+when `customer_update` comes without `customer`, and whenever `refuse` is
+set. `POST /v1/products/<id>` takes `tax_code` (txcd_ + 8 digits);
+`POST /v1/prices/<id>` takes `tax_behavior` once, from `unspecified`
+(changing it after is refused, as Stripe does), plus `active`, `metadata`,
+`nickname`, `lookup_key`. `GET /v1/tax/settings` (`status` active/pending,
+`defaults`) and `GET /v1/tax/registrations` (from the hook's list).
+`transfer_data.amount` fixes the connected account's transfer, and a refund
+with `reverse_transfer` reverses it in proportion to the refund over the
+whole charge, tax included.
+
+`GET /__tax` answers the state; `POST /__tax` merges `{ rate?, codeRates?,
+refuse?, active?, defaultBehavior?, defaultCode?, registrations?,
+invoiceShape? }`: `rate` in percent (`8.25`), `codeRates` per code
+(`{ "txcd_20030000": 8.25 }`), `refuse` a message every automatic-tax
+Checkout is refused with (`null` to stop), `registrations` like `["CA"]`.
+Defaults (and after `/__reset`): rate 0 — no registration, every tax $0,
+the studio today — `codeRates { txcd_90000001: 0, txcd_00000000: 0 }` (a
+backing is a cash donation; Nontaxable), active, no default behaviour or
+code, no registrations.
+
+```bash
+curl -s -XPOST localhost:54322/__tax -H 'content-type: application/json' -d '{"rate":8.25,"registrations":["CA"]}'
+curl -s -XPOST localhost:54322/__tax -H 'content-type: application/json' -d '{"refuse":"Stripe Tax is not set up."}'
+```
+
+Not covered: coupons and promotion codes,
 invoices beyond the first, renewals, payment methods, setup intents, 3-D
 Secure, the v2 API, real fee maths beyond 2.9% + 30¢, application fees as
 objects, test clocks.

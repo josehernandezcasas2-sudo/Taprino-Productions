@@ -7,6 +7,7 @@ import { colors, fonts } from '../lib/theme';
 import { crew, Avatar, Chip } from './CrewBits';
 import SmartImage from './SmartImage';
 import { dollars, fmtRange, fmtDay, hoursLabel, STATUS_LABEL } from '../lib/locationRules';
+import { TAX_NOTE } from '../lib/salesTaxRules';
 
 // Pieces shared by the Locations screens (locations/*): mirrors
 // components/locations/LocationBits.js + RequestBits.js on the website.
@@ -151,7 +152,8 @@ export async function requestAction(id, body, token) {
 
 export function MoneyLine({ r, side }) {
   if (side === 'host') return <Text style={crew.mono}>You receive <Text style={{ color: colors.ink }}>{dollars(r.hostPayoutCents)}</Text> of {dollars(r.bookingCents)} after the {r.cutPercent}% cut{r.cleaningCents ? ` (incl. ${dollars(r.cleaningCents)} cleaning)` : ''}</Text>;
-  return <Text style={crew.mono}>{dollars(r.bookingCents)} for the place{r.cleaningCents ? ` incl. ${dollars(r.cleaningCents)} cleaning` : ''}, <Text style={{ color: colors.ink }}>{dollars(r.totalChargedCents)}</Text> with the card fee</Text>;
+  // Sales tax (migration 122): the website's MoneyLine words.
+  return <Text style={crew.mono}>{dollars(r.bookingCents)} for the place{r.cleaningCents ? ` incl. ${dollars(r.cleaningCents)} cleaning` : ''}, <Text style={{ color: colors.ink }}>{dollars(r.taxCents ? r.chargedCents : r.totalChargedCents)}</Text> with the card fee{r.taxCents ? ' and sales tax' : r.taxNote ? ` ${TAX_NOTE}` : ''}</Text>;
 }
 
 // Host's answer: accept / counter / decline.
@@ -225,7 +227,7 @@ export function ProducerActions({ r, token, onChange, onPay }) {
     <View style={{ gap: 6 }}>
       <View style={[crew.row, { flexWrap: 'wrap' }]}>
         {r.status === 'countered' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'accept_counter' })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Accept {dollars(r.counterCents)}{r.cleaningCents ? ` + ${dollars(r.cleaningCents)} cleaning` : ''}</Text></Pressable> : null}
-        {r.status === 'accepted' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'pay' })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)} to confirm`}</Text></Pressable> : null}
+        {r.status === 'accepted' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'pay' })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)}${r.taxNote ? ' + tax' : ''} to confirm`}</Text></Pressable> : null}
         {['requested', 'countered', 'accepted', 'paid'].includes(r.status) ? <Pressable style={crew.btnSm} disabled={busy} onPress={cancel}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>{r.status === 'paid' ? 'Cancel booking' : 'Withdraw'}</Text></Pressable> : null}
       </View>
       {error ? <Text style={crew.error}>{error}</Text> : null}

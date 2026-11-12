@@ -8,6 +8,7 @@ import { getAccountContext } from '../../../lib/accountContext';
 import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getRequest } from '../../../lib/locationRequests';
 import { CANCELLATION, dollars, disputeLine } from '../../../lib/locationRules';
+import { TAX_NOTE } from '../../../lib/salesTaxRules';
 
 // One booking request, both sides (mockups/locations-v1.html §3): what
 // was asked, the money, where it stands, and the next action for
@@ -127,7 +128,8 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
               {r.cleaningCents > 0 && <div><span>Cleaning</span><span>{dollars(r.cleaningCents)}</span></div>}
               {r.status === 'countered' && <div><span>Host’s counter</span><span>{dollars(r.counterCents)}{r.counterNote ? ` · “${r.counterNote}”` : ''}</span></div>}
               <div><span>Card fee</span><span>{dollars(r.feeCoverCents)} (paid by the producer)</span></div>
-              <div><span>Producer pays</span><span><b>{dollars(r.totalChargedCents)}</b></span></div>
+              {r.taxCents > 0 && <div><span>Sales tax</span><span>{dollars(r.taxCents)} (added at checkout, paid by the producer)</span></div>}
+              <div><span>Producer pays</span><span><b>{dollars(r.taxCents > 0 ? r.chargedCents : r.totalChargedCents)}</b>{r.taxCents > 0 ? '' : r.taxNote ? ` ${TAX_NOTE}` : ''}</span></div>
               <div><span>Host receives</span><span><b>{dollars(r.hostPayoutCents)}</b> after the {r.cutPercent}% cut</span></div>
               {r.refundCents != null && <div><span>Refunded</span><span>{dollars(r.refundCents)}{r.refundReason ? ` · ${r.refundReason}` : ''}</span></div>}
               {r.dispute && <div><span>Payment dispute</span><span>{disputeLine(r.dispute)}</span></div>}

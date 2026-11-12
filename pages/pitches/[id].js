@@ -13,6 +13,7 @@ import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import { SITE } from '../../lib/siteConfig';
+import { TAX_NOTE } from '../../lib/salesTaxRules';
 // The person's account-page photo over the letter circle at their saved
 // focal point and zoom, same as the header and profile page.
 import { AvatarImg } from '../../components/AvatarPhoto';
@@ -61,7 +62,7 @@ const PAYOUT_STATE_LABELS = {
   unavailable: 'Payouts aren’t set up on this site yet (migration 083)'
 };
 
-export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false, creatorPayoutState = null }) {
+export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, isCreator, userId, mainGenres, pitch, similar, updates, comments, initialSaved, bypassingDisabled, totalRaisedCents, backerCount, recentBackers, crewCalls = [], isPitchOwner = false, creatorPayoutState = null, backingTaxed = false }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
   const [saved, setSaved] = useState(initialSaved);
@@ -539,7 +540,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                     </div>
                     {preview && (
                       <div className="fund-math">
-                        You pay <b>{dollars(preview.totalChargedCents)}</b> — {dollars(preview.amountCents)} to the project + {dollars(preview.feeCoverCents)} card processing. The creator receives {dollars(preview.creatorPayoutCents)} after {SITE.studio}’s {Number(pitch.platform_cut_percent || 0)}% cut.
+                        You pay <b>{dollars(preview.totalChargedCents)}</b>{backingTaxed ? ` ${TAX_NOTE}` : ''} — {dollars(preview.amountCents)} to the project + {dollars(preview.feeCoverCents)} card processing. The creator receives {dollars(preview.creatorPayoutCents)} after {SITE.studio}’s {Number(pitch.platform_cut_percent || 0)}% cut.
                       </div>
                     )}
                   </form>

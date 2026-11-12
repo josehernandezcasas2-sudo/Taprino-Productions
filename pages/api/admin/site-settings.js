@@ -4,6 +4,13 @@ import { uploadArtworkImage } from '../../../lib/artworkUpload';
 import { recordAudit } from '../../../lib/auditLog';
 import { getSiteSettings } from '../../../lib/siteSettings';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
+import { saveTaxSettings } from '../../../lib/salesTax';
+import { sendError } from '../../../lib/apiErrors';
+
+// Sales tax (migration 122): the settings card's Sales tax block sends
+// these on their own; lib/salesTax.js checks them (bookings need a tax
+// code) and answers 503 with the migration's name before 122.
+const TAX_KEYS = ['taxMemberships', 'taxBackings', 'taxBookings', 'taxBookingCode'];
 
 // Default Next.js API body limit is 1MB — a base64-encoded image (roughly
 // 33% larger than the original file) plus the rest of the JSON payload
@@ -38,6 +45,16 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  const taxBody = req.body || {};
+  if (TAX_KEYS.some((k) => taxBody[k] !== undefined)) {
+    try {
+      const tax = await saveTaxSettings(Object.fromEntries(TAX_KEYS.filter((k) => taxBody[k] !== undefined).map((k) => [k, taxBody[k]])), { userId, email });
+      if (Object.keys(taxBody).every((k) => TAX_KEYS.includes(k))) return res.status(200).json({ ok: true, tax });
+    } catch (err) {
+      return sendError(res, err, 'admin/site-settings (sales tax)');
+    }
   }
 
   const { shopEnabled, shopUrl, liveTvEnabled, verticalEnabled, podcastsEnabled, searchIconBase64, searchIconFileName, clearSearchIcon, recommendationCloseness, elevatorPitchEnabled, curatedRowsRandomOrder, logoBase64, logoFileName, clearLogo, adCpmCents, connectLabel, streamLabel } = req.body || {};

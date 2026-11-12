@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Avatar } from '../crew/CrewBits';
 import { HostedChip, fmtRange, hoursLabel } from './LocationBits';
 import { dollars, MAX_ENDORSEMENT_CHARS } from '../../lib/locationRules';
+import { TAX_NOTE } from '../../lib/salesTaxRules';
 
 // Request cards and the action rows both sides use (Your places, Your
 // requests, and the request page itself). `onChange(request)` gets the
@@ -27,10 +28,13 @@ export function StatusChip({ r }) {
   return <span className={`crew-chip ${cls}`}>{r.statusLabel}{left != null ? ` · ${left} h left` : ''}{r.outcome && r.outcome !== 'as_agreed' ? ` · ${r.outcome.replace('_', ' ')}` : ''}</span>;
 }
 
-// The money line for whoever is looking.
+// The money line for whoever is looking. Sales tax (migration 122): a
+// booking paid with tax shows what the card paid in all; one not paid yet
+// while booking tax is on says "+ tax where it applies". The host's
+// payout never includes tax.
 export function MoneyLine({ r, side }) {
   if (side === 'host') return <>You receive <b>{dollars(r.hostPayoutCents)}</b> of {dollars(r.bookingCents)} after the {r.cutPercent}% cut{r.cleaningCents ? ` (incl. ${dollars(r.cleaningCents)} cleaning)` : ''}</>;
-  return <>{dollars(r.bookingCents)} for the place{r.cleaningCents ? ` incl. ${dollars(r.cleaningCents)} cleaning` : ''}, <b>{dollars(r.totalChargedCents)}</b> with the card fee</>;
+  return <>{dollars(r.bookingCents)} for the place{r.cleaningCents ? ` incl. ${dollars(r.cleaningCents)} cleaning` : ''}, <b>{dollars(r.taxCents ? r.chargedCents : r.totalChargedCents)}</b> with the card fee{r.taxCents ? ' and sales tax' : r.taxNote ? ` ${TAX_NOTE}` : ''}</>;
 }
 
 // Host's answer buttons: accept / counter / decline.
@@ -104,7 +108,7 @@ export function ProducerActions({ r, onChange }) {
     <div className="loc-answer">
       <div className="crew-actions">
         {r.status === 'countered' && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => run({ action: 'accept_counter' })}>Accept {dollars(r.counterCents)}{r.cleaningCents ? ` + ${dollars(r.cleaningCents)} cleaning` : ''}</button>}
-        {r.status === 'accepted' && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => run({ action: 'pay' })}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)} to confirm`}</button>}
+        {r.status === 'accepted' && <button type="button" className="crew-btn sm primary" disabled={busy} onClick={() => run({ action: 'pay' })}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)}${r.taxNote ? ' + tax' : ''} to confirm`}</button>}
         {['requested', 'countered', 'accepted', 'paid'].includes(r.status) && <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={cancel}>{r.status === 'paid' ? 'Cancel booking' : 'Withdraw'}</button>}
         {r.threadId && <Link href={`/messages/${r.threadId}`} className="crew-btn sm ghost">Message</Link>}
       </div>

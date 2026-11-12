@@ -41,7 +41,7 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
     try { await call(apiPath, 'POST', body); await load(); } catch (err) { setError(err.message); } finally { setBusy(null); }
   }
   const refund = (r) => {
-    const reason = window.prompt(`Refund ${dollars(r.totalChargedCents)} to ${r.producer.displayName} in full? This is final; Stripe keeps its processing fee. Reason (shown to both):`);
+    const reason = window.prompt(`Refund ${dollars(r.chargedCents || r.totalChargedCents)}${r.taxCents ? ` (incl. ${dollars(r.taxCents)} sales tax)` : ''} to ${r.producer.displayName} in full? This is final; Stripe keeps its processing fee. Reason (shown to both):`);
     if (reason === null) return;
     act(r.id, { op: 'refund', requestId: r.id, reason });
   };
@@ -166,7 +166,7 @@ function BookingRow({ r, busy, onRefund, showNote, children }) {
         <span><Link href={`/locations/requests/${r.id}`}>{r.projectTitle || r.shooting}</Link> · {fmtRange(r.startsOn, r.endsOn)} <span className="crew-mono">· {r.listing ? <Link href={`/locations/${r.listing.id}`}>{r.listing.title}</Link> : 'a place'} · <Link href={r.producer.profilePath}>{r.producer.displayName}</Link> → <Link href={r.host.profilePath}>{r.host.displayName}</Link></span></span>
         <StatusChip r={r} />
       </div>
-      <span className="crew-mono">Producer paid {dollars(r.totalChargedCents)} · host receives {dollars(r.hostPayoutCents)} · cut {dollars(r.platformCutCents)}{r.refundCents != null ? ` · refunded ${dollars(r.refundCents)}${r.refundReason ? ` (${r.refundReason})` : ''}` : ''}{r.paidAt ? ` · paid ${new Date(r.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
+      <span className="crew-mono">Producer paid {dollars(r.chargedCents || r.totalChargedCents)}{r.taxCents ? ` (incl. ${dollars(r.taxCents)} sales tax)` : ''} · host receives {dollars(r.hostPayoutCents)} · cut {dollars(r.platformCutCents)}{r.refundCents != null ? ` · refunded ${dollars(r.refundCents)}${r.refundReason ? ` (${r.refundReason})` : ''}` : ''}{r.paidAt ? ` · paid ${new Date(r.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
       {showNote && r.outcomeNote && <p className="loc-reqcard-msg" style={{ margin: 0 }}><b style={{ color: 'var(--danger)' }}>{r.outcome.replace('_', ' ')}:</b> “{r.outcomeNote}”</p>}
       <span className="crew-actions">
         {children}

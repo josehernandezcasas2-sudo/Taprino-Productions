@@ -3,17 +3,37 @@
 // Stripe-shaped objects, lists, search, expansion and errors.
 //
 // API (all under /v1, form-encoded like the real one):
-//   products, prices (list/retrieve/create), customers (create/retrieve/
+//   products (list/retrieve/create/update, tax_code), prices (list/
+//   retrieve/create/update; tax_behavior can be set once, from
+//   'unspecified'), customers (create/retrieve/
 //   update/del/list/search), checkout/sessions (create/retrieve/list/
-//   expire), billing_portal/sessions, accounts (create/retrieve/update/
+//   expire; automatic_tax, customer_update, billing_address_collection),
+//   billing_portal/sessions, accounts (create/retrieve/update/
 //   list, GET /v1/account = the platform), account_links,
 //   accounts/:id/login_links, subscriptions (list/retrieve/update/cancel),
 //   balance, payouts (list/retrieve/create), transfers (create/retrieve/
 //   list, reversals), refunds (create/retrieve/list), payment_intents,
 //   charges, balance_transactions (list/retrieve), webhook_endpoints (list),
+//   tax/settings (retrieve), tax/registrations (list),
 //   events (list by type / types[] / created, retrieve; a connected
 //   account's only with its Stripe-Account header). Anything else: Stripe's
 //   404 JSON error.
+// Stripe Tax (sales tax, migration 122): a Checkout with
+//   automatic_tax[enabled]=true works out the tax per line from the rig's
+//   tax state (below): the line's tax code (price_data.product_data.tax_code,
+//   else the catalog product's, else the account default) picks a rate
+//   (codeRates, else `rate`), and the line's tax behaviour (price_data's or
+//   the catalog price's, else the account default) says whether the tax is
+//   on top (exclusive: amount_total grows) or inside (inclusive). The
+//   session carries total_details.amount_tax, the lines amount_tax, and a
+//   subscription's first invoice tax / total_taxes / total_tax_amounts with
+//   amount_paid including the tax. Refused like the real one with a 400
+//   when Stripe Tax isn't active, when a line has no tax behaviour and
+//   there is no default, when a customer has no address and
+//   customer_update[address] isn't 'auto', when customer_update comes
+//   without a customer, or whenever `refuse` is set. The rate stands for
+//   "the buyer is somewhere the studio is registered": 0 by default (no
+//   registration, every tax $0, like the studio today).
 // Pages a browser opens:
 //   /checkout/:id (Pay / Cancel), /portal/:id, /connect/onboard/:acct,
 //   /connect/dashboard/:acct
@@ -33,6 +53,14 @@
 //        invoice.paid, sent unless deliver: false.
 //   POST /__events/forget { ids? | invoices? | all? } → events leave the
 //        events list (a check's cleanup).
+//   GET /__tax → the tax state; POST /__tax { rate?, codeRates?, refuse?,
+//        active?, defaultBehavior?, defaultCode?, registrations? } merges
+//        into it (rate in percent, e.g. 8.25; refuse: a message every
+//        automatic-tax Checkout is refused with, null to stop; active:
+//        false = Stripe Tax not set up; registrations: ['CA', …] for
+//        GET /v1/tax/registrations). /__reset puts the defaults back:
+//        rate 0, codeRates { txcd_90000001: 0, txcd_00000000: 0 }, active,
+//        no default behaviour or code, no registrations.
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { PORTS, HOST, FAKE_KEYS, urls } from '../lib/config.mjs';
@@ -54,6 +82,9 @@ let objects = new Map();
 let balances = new Map();
 let idempotency = new Map();
 let deliveries = [];
+// Stripe Tax as the rig plays it (see the header; GET/POST /__tax).
+const TAX_DEFAULTS = () => ({ rate: 0, codeRates: { txcd_90000001: 0, txcd_00000000: 0 }, refuse: null, active: true, defaultBehavior: null, defaultCode: null, registrations: [], invoiceShape: '2024-06-20' });
+let taxState = TAX_DEFAULTS();
 
 const NOUN = {
   cus: 'customer', prod: 'product', price: 'price', cs: 'checkout.session', sub: 'subscription', acct: 'account', pi: 'payment_intent', ch: 'charge',
@@ -102,6 +133,7 @@ function seed() {
   balances = new Map();
   idempotency = new Map();
   deliveries = [];
+  taxState = TAX_DEFAULTS();
   const created = now() - 90 * 86400;
   const plans = [
     ['standard', 'Studio Tapa + Standard', 799],
@@ -235,7 +267,8 @@ function lineAmount(li) {
   const qty = int(li.quantity, 1);
   if (li.price) {
     const p = get(li.price, 'price');
-    return { amount: p.unit_amount * qty, price: p, qty, recurring: Boolean(p.recurring) };
+    const prod = objects.get(p.product);
+    return { amount: p.unit_amount * qty, price: p, qty, recurring: Boolean(p.recurring), taxCode: (prod && prod.tax_code) || null };
   }
   const pd = li.price_data || {};
   const unit = int(pd.unit_amount, 0);
@@ -244,7 +277,32 @@ function lineAmount(li) {
     recurring: pd.recurring ? { interval: pd.recurring.interval || 'month', interval_count: 1 } : null, type: pd.recurring ? 'recurring' : 'one_time',
     metadata: {}, created: now(), livemode: false, tax_behavior: pd.tax_behavior || 'unspecified', _name: pd.product_data && pd.product_data.name
   };
-  return { amount: unit * qty, price, qty, recurring: Boolean(pd.recurring) };
+  return { amount: unit * qty, price, qty, recurring: Boolean(pd.recurring), taxCode: (pd.product_data && pd.product_data.tax_code) || null };
+}
+
+// Stripe Tax on one Checkout's lines (automatic_tax[enabled]=true): the
+// refusals the real API gives, then each line's tax from its code's rate,
+// on top (exclusive) or inside (inclusive).
+function taxLines(p, items) {
+  if (taxState.refuse) throw new StripeError(400, String(taxState.refuse), { param: 'automatic_tax[enabled]' });
+  if (!taxState.active) throw new StripeError(400, 'Stripe Tax has not been activated on your account. Please visit https://dashboard.stripe.com/settings/tax/activate to get started.', { param: 'automatic_tax[enabled]' });
+  if (p.customer) {
+    const c = get(p.customer, 'customer');
+    const cu = p.customer_update || {};
+    if (!c.address && cu.address !== 'auto' && cu.shipping !== 'auto') {
+      throw new StripeError(400, "Automatic tax calculation in Checkout requires a valid address on the Customer. Add a valid address to the Customer or set either `customer_update[address]` to 'auto' or `customer_update[shipping]` to 'auto' to save the address entered in Checkout to the Customer.", { param: 'customer_update[address]' });
+    }
+  }
+  return items.map((i, n) => {
+    const behavior = i.price.tax_behavior && i.price.tax_behavior !== 'unspecified' ? i.price.tax_behavior : taxState.defaultBehavior;
+    if (!behavior) {
+      throw new StripeError(400, `The price ${i.price.id} has \`tax_behavior\` set to 'unspecified'. To use automatic tax, set the price's tax_behavior to 'inclusive' or 'exclusive', or set a default tax behavior in your Stripe Tax settings.`, { param: `line_items[${n}][price]` });
+    }
+    const code = i.taxCode || taxState.defaultCode || null;
+    const rate = code && Object.prototype.hasOwnProperty.call(taxState.codeRates || {}, code) ? Number(taxState.codeRates[code]) : Number(taxState.rate) || 0;
+    const tax = behavior === 'inclusive' ? i.amount - Math.round(i.amount / (1 + rate / 100)) : Math.round((i.amount * rate) / 100);
+    return { behavior, code, rate, tax, total: behavior === 'inclusive' ? i.amount : i.amount + tax };
+  });
 }
 
 function createSession(p) {
@@ -258,18 +316,24 @@ function createSession(p) {
     }
   }
   if (p.customer) get(p.customer, 'customer');
+  if (p.customer_update && !p.customer) throw new StripeError(400, '`customer_update` can only be used with `customer`.', { param: 'customer_update' });
+  const automaticTax = bool(p.automatic_tax && p.automatic_tax.enabled);
+  const taxed = automaticTax ? taxLines(p, items) : null;
   const amount = items.reduce((s, i) => s + i.amount, 0);
+  const tax = taxed ? taxed.reduce((s, t) => s + t.tax, 0) : 0;
+  const total = taxed ? taxed.reduce((s, t) => s + t.total, 0) : amount;
   const id = `cs_test_${rand(40)}`;
   return put({
     id, object: 'checkout.session', mode, status: 'open', payment_status: mode === 'setup' ? 'no_payment_required' : 'unpaid', livemode: false, created: now(), expires_at: now() + 24 * 3600,
     url: `${SELF}/checkout/${id}`, success_url: p.success_url || null, cancel_url: p.cancel_url || null, return_url: p.return_url || null,
     customer: p.customer || null, customer_email: p.customer_email || null, customer_details: null, client_reference_id: p.client_reference_id || null,
-    metadata: p.metadata || {}, currency: 'usd', amount_subtotal: amount, amount_total: amount,
-    total_details: { amount_discount: 0, amount_shipping: 0, amount_tax: 0 }, automatic_tax: { enabled: bool(p.automatic_tax && p.automatic_tax.enabled), status: null },
+    metadata: p.metadata || {}, currency: 'usd', amount_subtotal: amount, amount_total: total,
+    total_details: { amount_discount: 0, amount_shipping: 0, amount_tax: tax }, automatic_tax: { enabled: automaticTax, status: automaticTax ? 'complete' : null, liability: automaticTax ? { type: 'self' } : null },
+    customer_update: p.customer_update || null, billing_address_collection: p.billing_address_collection || null,
     payment_intent: null, subscription: null, invoice: null, setup_intent: null,
     payment_intent_data: undefined,
     _payment_intent_data: p.payment_intent_data || {}, _subscription_data: p.subscription_data || {},
-    _line_items: items.map((i) => ({ id: newId('li'), object: 'item', amount_total: i.amount, amount_subtotal: i.amount, currency: 'usd', quantity: i.qty, price: i.price, description: i.price._name || null })),
+    _line_items: items.map((i, n) => ({ id: newId('li'), object: 'item', amount_total: taxed ? taxed[n].total : i.amount, amount_subtotal: i.amount, amount_tax: taxed ? taxed[n].tax : 0, amount_discount: 0, currency: 'usd', quantity: i.qty, price: i.price, description: i.price._name || null, _tax: taxed ? taxed[n] : null })),
     allow_promotion_codes: bool(p.allow_promotion_codes)
   });
 }
@@ -327,17 +391,33 @@ async function completeSession(id) {
     const sub = put({
       id: subId, object: 'subscription', customer, status: 'active', metadata: sd.metadata || {}, cancel_at_period_end: false, cancel_at: null, canceled_at: null, ended_at: null,
       current_period_start: start, current_period_end: start + 30 * 86400, start_date: start, created: start, latest_invoice: invId, livemode: false, collection_method: 'charge_automatically',
+      automatic_tax: { enabled: Boolean(s.automatic_tax && s.automatic_tax.enabled), liability: s.automatic_tax && s.automatic_tax.enabled ? { type: 'self' } : null },
       items: { object: 'list', data: s._line_items.map((li) => ({ id: newId('si'), object: 'subscription_item', price: clone(li.price), quantity: li.quantity, created: start, subscription: subId, current_period_start: start, current_period_end: start + 30 * 86400 })), has_more: false, url: `/v1/subscription_items?subscription=${subId}` },
       plan: first ? { id: first.price.id, object: 'plan', amount: first.price.unit_amount, interval: 'month', product: first.price.product, active: true } : null
     });
+    // Stripe Tax on the first invoice, in the shape of the event's API
+    // version (2024-06-20: tax + total_tax_amounts; with the tax state's
+    // invoiceShape 'basil', the 2025-03-31 total_taxes instead).
+    const taxed = Boolean(s.automatic_tax && s.automatic_tax.enabled);
+    const invTax = taxed ? Number(s.total_details.amount_tax) || 0 : null;
+    const taxRows = taxed ? s._line_items.filter((li) => li._tax).map((li) => ({ amount: li._tax.tax, inclusive: li._tax.behavior === 'inclusive', taxable_amount: li.amount_subtotal, rate: li._tax.rate })) : [];
+    const taxShape = !taxed ? {} : taxState.invoiceShape === 'basil'
+      ? { total_taxes: taxRows.map((t) => ({ amount: t.amount, tax_behavior: t.inclusive ? 'inclusive' : 'exclusive', taxability_reason: t.amount ? 'standard_rated' : 'not_collecting', taxable_amount: t.taxable_amount, type: 'tax_rate_details', tax_rate_details: { tax_rate: 'txr_rig' } })) }
+      : { tax: invTax, total_tax_amounts: taxRows.map((t) => ({ amount: t.amount, inclusive: t.inclusive, tax_rate: 'txr_rig', taxability_reason: t.amount ? 'standard_rated' : 'not_collecting', taxable_amount: t.taxable_amount })) };
     const inv = put({
       id: invId, object: 'invoice', customer, customer_email: email, subscription: subId, status: 'paid', paid: true, amount_due: s.amount_total, amount_paid: s.amount_total, amount_remaining: 0, currency: 'usd',
+      subtotal: s.amount_subtotal, total: s.amount_total, automatic_tax: { enabled: taxed, status: taxed ? 'complete' : null }, ...(taxed ? taxShape : { tax: null, total_tax_amounts: [] }),
       billing_reason: 'subscription_create', charge: ch.id, payment_intent: pi.id, created: start, period_start: start, period_end: start, livemode: false,
       status_transitions: { paid_at: start, finalized_at: start },
       subscription_details: { metadata: sub.metadata },
       parent: { type: 'subscription_details', subscription_details: { subscription: subId, metadata: sub.metadata } },
-      lines: { object: 'list', data: s._line_items.map((li) => ({ id: newId('il'), object: 'line_item', amount: li.amount_total, currency: 'usd', price: clone(li.price), quantity: li.quantity, period: { start, end: start + 30 * 86400 }, subscription: subId, type: 'subscription' })), has_more: false }
+      lines: { object: 'list', data: s._line_items.map((li) => ({ id: newId('il'), object: 'line_item', amount: li.amount_subtotal, currency: 'usd', price: clone(li.price), quantity: li.quantity, period: { start, end: start + 30 * 86400 }, subscription: subId, type: 'subscription' })), has_more: false }
     });
+    // customer_update[address]=auto saves the address typed in Checkout.
+    if (taxed && s.customer_update && s.customer_update.address === 'auto') {
+      const c = objects.get(customer);
+      if (c && !c.address) c.address = { line1: '1 Rig Street', line2: null, city: 'Los Angeles', state: 'CA', postal_code: '90012', country: 'US' };
+    }
     s.subscription = subId;
     s.invoice = invId;
     events.push(['customer.subscription.created', sub], ['invoice.paid', inv]);
@@ -468,7 +548,12 @@ async function api(method, parts, params, ctx) {
     if (!r1 && method === 'GET') return page(all('product').filter((p) => params.active === undefined || p.active === bool(params.active)), params, '/v1/products');
     if (!r1 && method === 'POST') return put({ id: newId('prod'), object: 'product', active: params.active === undefined ? true : bool(params.active), name: params.name, description: params.description || null, metadata: params.metadata || {}, created: now(), updated: now(), default_price: null, images: [], livemode: false, type: 'service', tax_code: params.tax_code || null });
     const p = get(r1, 'product');
-    if (method === 'POST') Object.assign(p, { ...(params.name ? { name: params.name } : {}), ...(params.active !== undefined ? { active: bool(params.active) } : {}), metadata: { ...p.metadata, ...(params.metadata || {}) }, updated: now() });
+    if (method === 'POST') {
+      if (params.tax_code !== undefined && params.tax_code !== '' && !/^txcd_[0-9]{8}$/.test(String(params.tax_code))) {
+        throw new StripeError(400, `Invalid tax code: ${params.tax_code}. See https://stripe.com/docs/tax/tax-categories for the list of supported tax codes.`, { param: 'tax_code' });
+      }
+      Object.assign(p, { ...(params.name ? { name: params.name } : {}), ...(params.active !== undefined ? { active: bool(params.active) } : {}), ...(params.tax_code !== undefined ? { tax_code: params.tax_code || null } : {}), metadata: { ...p.metadata, ...(params.metadata || {}) }, updated: now() });
+    }
     return out(p, ex);
   }
   if (r0 === 'prices') {
@@ -484,9 +569,42 @@ async function api(method, parts, params, ctx) {
     }
     if (!r1 && method === 'POST') {
       const prod = params.product ? get(params.product, 'product') : null;
-      return put({ id: newId('price'), object: 'price', active: true, currency: params.currency || 'usd', unit_amount: int(params.unit_amount, 0), product: prod ? prod.id : newId('prod'), recurring: params.recurring ? { interval: params.recurring.interval || 'month', interval_count: 1 } : null, type: params.recurring ? 'recurring' : 'one_time', metadata: params.metadata || {}, created: now(), livemode: false, lookup_key: params.lookup_key || null, billing_scheme: 'per_unit', tax_behavior: 'unspecified' });
+      return put({ id: newId('price'), object: 'price', active: true, currency: params.currency || 'usd', unit_amount: int(params.unit_amount, 0), product: prod ? prod.id : newId('prod'), recurring: params.recurring ? { interval: params.recurring.interval || 'month', interval_count: 1 } : null, type: params.recurring ? 'recurring' : 'one_time', metadata: params.metadata || {}, created: now(), livemode: false, lookup_key: params.lookup_key || null, billing_scheme: 'per_unit', tax_behavior: ['inclusive', 'exclusive'].includes(params.tax_behavior) ? params.tax_behavior : 'unspecified' });
     }
-    return out(get(r1, 'price'), ex);
+    const price = get(r1, 'price');
+    if (method === 'POST') {
+      // Like the real API: tax_behavior can be set once, from
+      // 'unspecified'; after that it can't change.
+      if (params.tax_behavior !== undefined) {
+        if (!['inclusive', 'exclusive', 'unspecified'].includes(params.tax_behavior)) throw new StripeError(400, `Invalid tax_behavior: must be one of inclusive, exclusive, or unspecified`, { param: 'tax_behavior' });
+        if (price.tax_behavior !== 'unspecified' && params.tax_behavior !== price.tax_behavior) {
+          throw new StripeError(400, `You cannot change \`tax_behavior\` on a price once it has been set to '${price.tax_behavior}'. Create a new price instead.`, { param: 'tax_behavior' });
+        }
+        price.tax_behavior = params.tax_behavior;
+      }
+      if (params.active !== undefined) price.active = bool(params.active);
+      if (params.metadata) price.metadata = { ...price.metadata, ...params.metadata };
+      if (params.nickname !== undefined) price.nickname = params.nickname || null;
+      if (params.lookup_key !== undefined) price.lookup_key = params.lookup_key || null;
+    }
+    return out(price, ex);
+  }
+  if (r0 === 'tax' && r1 === 'settings' && !r2) {
+    return {
+      object: 'tax.settings', livemode: false,
+      defaults: { tax_behavior: taxState.defaultBehavior || null, tax_code: taxState.defaultCode || null },
+      head_office: taxState.active ? { address: { line1: '1 Rig Street', line2: null, city: 'Los Angeles', state: 'CA', postal_code: '90012', country: 'US' } } : null,
+      status: taxState.active ? 'active' : 'pending',
+      status_details: taxState.active ? { active: {} } : { pending: { missing_fields: ['head_office'] } }
+    };
+  }
+  if (r0 === 'tax' && r1 === 'registrations' && !r2 && method === 'GET') {
+    const regs = (taxState.registrations || []).map((place, i) => {
+      const state = String(place).toUpperCase();
+      const us = state.length === 2;
+      return { id: `taxreg_rig${i}`, object: 'tax.registration', active_from: now() - 86400, country: us ? 'US' : state, country_options: us ? { us: { state, type: 'state_sales_tax' } } : {}, created: now() - 86400, expires_at: null, livemode: false, status: 'active' };
+    }).filter((r) => !params.status || params.status === 'all' || r.status === params.status);
+    return { object: 'list', data: regs, has_more: false, url: '/v1/tax/registrations' };
   }
 
   // customers
@@ -540,7 +658,7 @@ async function api(method, parts, params, ctx) {
       return { ...pg, data: pg.data.map((s) => out(s)) };
     }
     if (r3 === 'expire' && method === 'POST') return out(await expireSession(r2), ex);
-    if (r3 === 'line_items' && method === 'GET') return virtual(get(r2, 'checkout.session'), 'line_items');
+    if (r3 === 'line_items' && method === 'GET') return out(virtual(get(r2, 'checkout.session'), 'line_items'));
     return out(get(r2, 'checkout.session'), ex);
   }
   if (r0 === 'billing_portal' && r1 === 'sessions' && method === 'POST') {
@@ -759,6 +877,20 @@ async function hooks(req, res, url, parts, body) {
     dp.status = phase === 'won' ? 'won' : 'lost';
     if (phase === 'won') txn({ amount: dp.amount, type: 'adjustment', source: dp.id, description: 'Chargeback reversal' });
     return sendJson(res, 200, { dispute: out(dp), delivery: await deliver(makeEvent('charge.dispute.closed', out(dp))) });
+  }
+  if (a === 'tax') {
+    if (req.method === 'POST') {
+      const allowed = ['rate', 'codeRates', 'refuse', 'active', 'defaultBehavior', 'defaultCode', 'registrations', 'invoiceShape'];
+      for (const k of allowed) {
+        if (body[k] === undefined) continue;
+        if (k === 'rate') taxState.rate = Number(body.rate) || 0;
+        else if (k === 'active') taxState.active = bool(body.active) || body.active === true;
+        else if (k === 'codeRates') taxState.codeRates = { ...taxState.codeRates, ...Object.fromEntries(Object.entries(body.codeRates || {}).map(([c, r]) => [c, Number(r) || 0])) };
+        else if (k === 'registrations') taxState.registrations = Array.isArray(body.registrations) ? body.registrations.map(String) : [];
+        else taxState[k] = body[k] === '' ? null : body[k];
+      }
+    }
+    return sendJson(res, 200, { tax: taxState });
   }
   if (a === 'event' && req.method === 'POST') {
     if (!body.type) return sendJson(res, 400, { error: 'type is required' });

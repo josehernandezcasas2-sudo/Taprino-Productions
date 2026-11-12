@@ -8,6 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
+import { TAX_NOTE } from '../../lib/salesTaxRules';
 import SmartImage from '../../components/SmartImage';
 import PositionedImage from '../../components/PositionedImage';
 
@@ -267,7 +268,7 @@ export default function PitchDetail() {
     );
   }
 
-  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorAvatarPosition = null, creatorAvatarZoom = null, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null } = state.data;
+  const { pitch, similar, updates, recentBackers, backerCount, isSignedIn, userId, bypassingDisabled, creatorAvatarUrl, creatorAvatarPosition = null, creatorAvatarZoom = null, creatorDisplayName, isPitchOwner = false, creatorPayoutState = null, backingTaxed = false } = state.data;
   const creatorName = pitch.creator_name || creatorDisplayName;
 
   const raisedForPct = pitch.funding_enabled ? (currentTotalRaisedCents || 0) / 100 : (pitch.funding_raised || 0);
@@ -532,7 +533,7 @@ export default function PitchDetail() {
                     </Pressable>
                   )}
                   {donationError ? <Text style={styles.errorTextSm}>{donationError}</Text> : null}
-                  <Text style={styles.finePrint}>You pay the pledge plus Stripe’s card fee (2.9% + 30¢); the creator receives the pledge minus Studio Tapa’s cut. Payments go through Stripe. Backing isn’t a purchase or an investment.</Text>
+                  <Text style={styles.finePrint}>You pay the pledge plus Stripe’s card fee (2.9% + 30¢){backingTaxed ? `, ${TAX_NOTE}` : ''}; the creator receives the pledge minus Studio Tapa’s cut. Payments go through Stripe. Backing isn’t a purchase or an investment.</Text>
                 </View>
               ) : (
                 <View style={styles.fundClosed}>

@@ -7,6 +7,8 @@ import { referrerForCheckout } from '../../lib/creatorShare';
 import { firstInWindow } from '../../lib/rateLimit';
 import { applyCors } from '../../lib/cors';
 import { sendError } from '../../lib/apiErrors';
+import { getTaxSettings, recordSkippedTax } from '../../lib/salesTax';
+import { membershipTaxParams, refusedOverRequest, stripeReason } from '../../lib/salesTaxRules';
 
 // Starts Stripe Checkout for one membership tier (lib/membershipTiers.js):
 //   POST { tier: 'standard' | 'premium' | 'sponsor', returnTo?: '/account' }
@@ -107,7 +109,7 @@ export default async function handler(req, res) {
     const viaStamp = ref.via ? { via: ref.via, ...source } : ref.handle ? { via_handle: ref.handle, ...source } : {};
     const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...viaStamp };
 
-    const session = await stripe.checkout.sessions.create({
+    const params = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
@@ -120,7 +122,28 @@ export default async function handler(req, res) {
       ...(userId ? { client_reference_id: userId } : {}),
       subscription_data: { metadata: stamp },
       metadata: stamp
-    });
+    };
+    // Sales tax (migration 122; Admin → Settings → Sales tax): while the
+    // switch is on, Stripe Tax adds the tax on top where the studio is
+    // registered and saves the address the member types on their customer.
+    // A session Stripe refuses as asked (a price without a tax behaviour,
+    // Stripe Tax not set up) is made again exactly as before, so a signup
+    // never fails over tax; the card on the settings page counts those.
+    // The switch read never fails a signup either (a failed read is off).
+    const tax = await getTaxSettings();
+    let session;
+    if (tax.memberships) {
+      try {
+        session = await stripe.checkout.sessions.create({ ...params, ...membershipTaxParams(true) });
+      } catch (err) {
+        if (!refusedOverRequest(err)) throw err;
+        console.error('create-checkout-session: Stripe refused the session with tax, made again without:', stripeReason(err));
+        session = await stripe.checkout.sessions.create(params);
+        await recordSkippedTax({ lane: 'membership', sessionId: session.id, reason: stripeReason(err) });
+      }
+    } else {
+      session = await stripe.checkout.sessions.create(params);
+    }
     res.status(200).json({ url: session.url });
   } catch (err) {
     sendError(res, err, 'create-checkout-session');
