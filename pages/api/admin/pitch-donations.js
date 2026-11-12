@@ -38,7 +38,7 @@ export default async function handler(req, res) {
           action: 'pitch_donation_refunded',
           targetType: 'pitch_donation',
           targetId: donationId,
-          details: `${dollars(d.totalChargedCents || d.amountCents)} on pitch ${d.pitchId}${reason ? ` · ${String(reason).slice(0, 200)}` : ''}`
+          details: `${dollars(d.chargedCents || d.totalChargedCents || d.amountCents)} on pitch ${d.pitchId}${reason ? ` · ${String(reason).slice(0, 200)}` : ''}`
         });
       }
       return res.status(200).json(result);
