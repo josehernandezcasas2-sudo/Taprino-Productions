@@ -11,6 +11,7 @@ import { FullscreenChrome } from '../lib/fullscreenChrome';
 import { useCaptionTrack, useCaptionsPref } from '../lib/captions';
 import { captionTextAt } from '../lib/vtt';
 import EndCard from './EndCard';
+import AdBreakLayer from './AdBreakLayer';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -65,7 +66,16 @@ function fullChrome(c) {
     ccText: { fontSize: s(17), lineHeight: s(22.5) },
     fillToastWrap: { top: s(78) + c.padTop },
     fillToast: { paddingVertical: s(7), paddingHorizontal: s(12) },
-    fillToastText: { fontSize: s(11.5) }
+    fillToastText: { fontSize: s(11.5) },
+    // An ad break (components/AdBreakLayer.js): the bar along the foot
+    // clear of the home indicator, "Visit … ↗" above it, the cards.
+    adBar: { paddingLeft: c.padLeft, paddingRight: c.padRight, paddingBottom: s(10) + c.padBottom, paddingTop: s(22), gap: s(12) },
+    adBarText: { fontSize: s(12), letterSpacing: s(1) },
+    adTag: { paddingVertical: s(3), paddingHorizontal: s(8) },
+    adVisit: { right: c.padRight, bottom: s(50) + c.padBottom, paddingVertical: s(8), paddingHorizontal: s(14) },
+    adVisitText: { fontSize: s(11.5), letterSpacing: s(1) },
+    adCardKicker: { fontSize: s(12.5), letterSpacing: s(1.5) },
+    adCardBrand: { fontSize: s(30) }
   };
 }
 const { OrientationLock, Orientation } = ScreenOrientation;
@@ -142,7 +152,14 @@ function RestoreGlyph({ size = 11 }) {
 // picture; with the flashing-lights warning the video waits under it,
 // 2026-11-12). `children` may be a function of { full }: the card packs
 // itself tighter in the inline strip than in full screen.
-export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, children }) {
+//
+// House ads (2026-11-12, the website's own ad chrome): `ad` is the
+// screen's ad break (mobile/src/lib/useTitleAds.js). While a break runs
+// its layer (components/AdBreakLayer.js) covers the picture in whichever
+// view is showing — the ad's own player, "Ad · 1 of 2 · 0:12 left", "Visit
+// … ↗" — and the title's controls, captions, toasts, the advisory and the
+// end card wait; taps do nothing, except the close × in full screen.
+export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, ad = null, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -159,6 +176,10 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const autoRotate = useRef(true);
   const trackWidth = useRef(1);
   const durationRef = useRef(0);
+  // An ad break running (the title is paused under it).
+  const adOn = Boolean(ad && ad.state);
+  const adOnRef = useRef(adOn);
+  adOnRef.current = adOn;
 
   // Captions: on or off (the phone remembers), the file once they're on.
   const captionsPath = captions && captions.path ? captions.path : null;
@@ -185,13 +206,16 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     return () => { time.remove(); status.remove(); };
   }, [player]);
 
-  // The resume toast, once per source.
+  // The resume toast, once per source — once the title itself plays (after
+  // a pre-roll, not under it).
+  const toastShown = useRef(false);
   useEffect(() => {
-    if (!(resumeSeconds > 0)) return undefined;
+    if (!(resumeSeconds > 0) || adOn || toastShown.current) return undefined;
+    toastShown.current = true;
     setToast(resumeSeconds);
     const t = setTimeout(() => setToast(0), 4500);
     return () => clearTimeout(t);
-  }, [resumeSeconds]);
+  }, [resumeSeconds, adOn]);
   useEffect(() => {
     if (!fillToast) return undefined;
     const t = setTimeout(() => setFillToast(null), 1600);
@@ -268,6 +292,14 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
     onPanResponderTerminate: () => { scrubRef.current = null; setScrubbing(null); }
   })).current;
 
+  // A break that starts while the scrubber is held takes the scrubber away
+  // with the controls: nothing stays half-dragged under it.
+  useEffect(() => {
+    if (!adOn) return;
+    scrubRef.current = null;
+    setScrubbing(null);
+  }, [adOn]);
+
   /* ---------------- full screen and rotation (ChannelPlayer.js) ---------------- */
   function enterFullscreen(fromButton) {
     if (fullscreenRef.current) return;
@@ -290,7 +322,8 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   useEffect(() => { wasPlaying.current = playing; }, [playing]);
   useEffect(() => {
     if (!player) return undefined;
-    const t = setTimeout(() => { if (wasPlaying.current && !player.playing) player.play(); }, 150);
+    // Never under an ad break: the break plays the title again when it ends.
+    const t = setTimeout(() => { if (wasPlaying.current && !player.playing && !adOnRef.current) player.play(); }, 150);
     return () => clearTimeout(t);
   }, [fullscreen, player]);
   useFocusEffect(
@@ -324,6 +357,21 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   // `F` is the full-screen chrome from fullChrome() (null inline), handed
   // in by the full-screen frame so its insets are the Modal's own.
   function renderOverlay(full, F) {
+    if (adOn) {
+      return (
+        <>
+          <View style={absoluteFill} />
+          <AdBreakLayer ad={ad} full={full} F={F} />
+          {full ? (
+            <View style={[styles.top, F.top]} pointerEvents="box-none">
+              <Pressable style={[styles.round, F.round]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
+                <Svg width={F.closeIcon} height={F.closeIcon} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2.4} strokeLinecap="round"><Path d="M6 6l12 12M18 6L6 18" /></Svg>
+              </Pressable>
+            </View>
+          ) : null}
+        </>
+      );
+    }
     const showEnd = Boolean(endCard && endCard.card);
     return (
       <>

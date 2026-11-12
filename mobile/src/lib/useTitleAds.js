@@ -1,0 +1,120 @@
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useFocusEffect } from 'expo-router';
+import { breakTick, preRollOf, titleBreaks, titleSlot } from './adBreakRules';
+import { useAdBreak } from './useAdBreak';
+
+// A title's ads on the episode screen, decided the way the website's
+// player decides them (components/VideoPlayer.js; the rules are
+// mobile/src/lib/adBreakRules.js): the pre-roll once, when the title first
+// plays, whatever point it resumes from; then each break as playback
+// crosses it, while a resume, a seek or −10 / +10 passes the breaks it
+// jumps over instead of playing them; a ready plan's breaks (with "on
+// demand" on) in place of the plain ones. `adsOn` is adsOnFor(...) — never
+// a preview, a trailer, an ad-free member, the team or a buyer.
+//
+//   const ads = useTitleAds({ player, episodeId, adsOn, adPlan, adBreakSeconds, titleSrc, getToken });
+//   ads.armPreRoll()   right before the title's src goes to the player: when
+//                      the pre-roll is due it starts now (the player is
+//                      paused and held, so the title never starts under it,
+//                      and the break is on screen the moment the player is)
+//                      → true
+//   ads.holdRef        true while the title waits for a break (a screen
+//                      that restarts its player when it's ready leaves it be)
+//   ads.state, ads.player, ads.visit   for components/AdBreakLayer.js
+//
+// The title is paused under the break and plays again when it ends (or
+// fails, or comes back with nothing). Leaving the screen stops a break and
+// leaves the title paused.
+export function useTitleAds({ player, episodeId, adsOn, adPlan = null, adBreakSeconds = null, titleSrc = null, getToken }) {
+  const ads = useAdBreak({ getToken });
+  const breaks = useMemo(() => titleBreaks({ adsOn, adPlan, adBreakSeconds }), [adsOn, adPlan, adBreakSeconds]);
+  const holdRef = useRef(false);
+  // Per title: the breaks played or passed, the last tick, the pre-roll.
+  const track = useRef({ episodeId: null, consumed: new Set(), last: null, preRollDone: false });
+  const live = useRef({ player, episodeId, breaks, enabled: false });
+  live.current = { player, episodeId, breaks, enabled: Boolean(adsOn && titleSrc) };
+  const startRef = useRef(ads.start);
+  startRef.current = ads.start;
+
+  // Another title: nothing carried over.
+  if (track.current.episodeId !== episodeId) {
+    track.current = { episodeId, consumed: new Set(), last: null, preRollDone: false };
+  }
+  useEffect(() => () => {
+    ads.stop();
+    holdRef.current = false;
+  }, [episodeId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const startBreak = useCallback((brk) => {
+    const { player: p, episodeId: id } = live.current;
+    if (!p || !id) return;
+    holdRef.current = true;
+    try { p.pause(); } catch { /* a released player */ }
+    startRef.current(titleSlot(brk, id), {
+      onDone: () => {
+        holdRef.current = false;
+        const cur = live.current.player;
+        if (cur && live.current.episodeId === id) {
+          try { cur.play(); } catch { /* released */ }
+        }
+      }
+    });
+  }, []);
+
+  const armPreRoll = useCallback(() => {
+    const t = track.current;
+    const pre = preRollOf(live.current.breaks);
+    if (t.preRollDone || !pre) return false;
+    t.preRollDone = true;
+    startBreak(pre);
+    return true;
+  }, [startBreak]);
+
+  // Breaks as playback crosses them (the title's own time, never the
+  // trailer's: `enabled` is off while the trailer plays).
+  const wasEnabled = useRef(false);
+  useEffect(() => {
+    if (!player) return undefined;
+    const sub = player.addListener('timeUpdate', ({ currentTime }) => {
+      const { enabled, breaks: b } = live.current;
+      const t = track.current;
+      if (!enabled) { wasEnabled.current = false; return; }
+      // Back from the trailer (or ads switched on): the next tick is a fresh start.
+      if (!wasEnabled.current) { wasEnabled.current = true; t.last = null; }
+      if (holdRef.current) return;
+      const r = breakTick({ breaks: b, consumed: t.consumed, now: Number(currentTime) || 0, last: t.last });
+      t.consumed = r.consumed;
+      t.last = Number(currentTime) || 0;
+      if (r.due) startBreak(r.due);
+    });
+    return () => sub.remove();
+  }, [player, startBreak]);
+
+  // The title leaves the player under a break (the trailer instead, the
+  // page reloading after a purchase): the break stops with it, so the two
+  // never play at once.
+  const prevSrc = useRef(titleSrc);
+  useEffect(() => {
+    if (prevSrc.current && !titleSrc && holdRef.current) {
+      ads.stop();
+      holdRef.current = false;
+    }
+    prevSrc.current = titleSrc;
+  }, [titleSrc]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Leaving the screen: the break stops, the title stays paused.
+  const stopRef = useRef(ads.stop);
+  stopRef.current = ads.stop;
+  useFocusEffect(
+    useCallback(() => () => {
+      if (holdRef.current) {
+        stopRef.current();
+        holdRef.current = false;
+      }
+    }, [])
+  );
+
+  return useMemo(() => ({ ...ads, holdRef, armPreRoll }), [ads, armPreRoll]);
+}
+
+export default useTitleAds;

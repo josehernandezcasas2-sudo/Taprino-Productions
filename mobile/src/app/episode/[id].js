@@ -34,6 +34,8 @@ import { TipButton, TipGlyph } from '../../components/TipSheet';
 import { AiSealChip } from '../../components/AiSeal';
 import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
+import { adsOnFor } from '../../lib/adBreakRules';
+import { useTitleAds } from '../../lib/useTitleAds';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_COLOR = { movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -173,8 +175,18 @@ function TitleArt({ uri, title, maxWidth, maxHeight, fallback = null }) {
 // (components/EpisodePlayer.js); `captionsUrl` is on the episode only for
 // a viewer who may watch it, and never for a trailer. The website's
 // Accessibility panel sits under the credits (components/
-// AccessibilityPanel.js, 2026-11-12). Not on mobile yet: ad breaks
-// (paused) and playing the described version (its row opens the website).
+// AccessibilityPanel.js, 2026-11-12). Not on mobile yet: playing the
+// described version (its row opens the website).
+//
+// House ads (2026-11-12, the website's own rules, mobile/src/lib/
+// adBreakRules.js): the pre-roll once when the title first plays, the
+// title's breaks as playback crosses them (a resume or a seek passes the
+// ones it jumps over), a ready plan's pods in their place — for the
+// viewers the website shows ads to (never a preview, a trailer, an
+// ad-free member, the team or a buyer, nor a title with ads off). The ad
+// plays in its own player over the paused title (mobile/src/lib/
+// useTitleAds.js, components/AdBreakLayer.js); an ad that doesn't answer
+// within four seconds or won't play never holds the title up.
 //
 // 2026-11-12 (Jose): a title's own title image is drawn as the title on
 // its own page again (TitleArt); a title with flashing lights carries a
@@ -209,6 +221,9 @@ export default function Episode() {
   // Bumping this reloads the page: after Buy to own's Checkout closes, or
   // after the viewing terms are taken.
   const [reloadKey, setReloadKey] = useState(0);
+  // The pre-roll's hold (useTitleAds below), armed right before the
+  // title's src reaches the player so it never starts under the ad.
+  const armPreRollRef = useRef(null);
 
   useEffect(() => {
     if (!id) return undefined;
@@ -264,7 +279,9 @@ export default function Episode() {
         const body = { episodeId: episode.id, terms: await readViewingTerms() };
         if (previewing) body.preview = true;
         const res = await apiPost('/api/stream-token', body, token);
-        if (!cancelled) setPlayback({ loading: false, src: res.src, locked: false, error: null });
+        if (cancelled) return;
+        if (res && res.src && armPreRollRef.current) armPreRollRef.current();
+        setPlayback({ loading: false, src: res.src, locked: false, error: null });
       } catch (err) {
         if (cancelled) return;
         // A preview of a title pulled while the team looks at it (403 held).
@@ -281,6 +298,27 @@ export default function Episode() {
 
   const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
+  // The title's ads (the website's adsEnabled: never a preview, a trailer,
+  // an ad-free member, the team or a buyer, nor a title with ads off).
+  const adsOn = Boolean(episode) && adsOnFor({
+    previewing,
+    trailer: showingTrailer,
+    adFree: Boolean(state.page && state.page.adFree),
+    isAdmin: Boolean(state.page && state.page.isAdmin),
+    owned,
+    adsEnabled: episode ? episode.adsEnabled : false
+  });
+  const titleAds = useTitleAds({
+    player,
+    episodeId: episode ? episode.id : null,
+    adsOn,
+    adPlan: episode ? episode.adPlan || null : null,
+    adBreakSeconds: episode ? episode.adBreakSeconds || null : null,
+    titleSrc: showingTrailer ? null : playback.src,
+    getToken
+  });
+  armPreRollRef.current = titleAds.armPreRoll;
+  const adHoldRef = titleAds.holdRef;
   // Content advisory over the first seconds (mobile/src/lib/contentAdvisory.js).
   const { isPlaying } = useEvent(player, 'playingChange', { isPlaying: player.playing });
   const ratingsList = useContentRatings();
@@ -291,7 +329,8 @@ export default function Episode() {
   // used to show again when the phone turned); with the warning the video
   // waits at its first frame under it.
   const advisoryInfo = episode && !showingTrailer ? playbackAdvisoryFor(episode, ratingsList) : null;
-  const advisoryCard = useAdvisoryCard({ info: advisoryInfo, playing: Boolean(isPlaying && playback.src && !showingTrailer), episodeId: episode && episode.id, player });
+  // Never under an ad: it comes up once the programme itself plays.
+  const advisoryCard = useAdvisoryCard({ info: advisoryInfo, playing: Boolean(isPlaying && playback.src && !showingTrailer && !titleAds.active), episodeId: episode && episode.id, player });
   const advisoryHeldRef = advisoryCard.heldRef;
   // While the advisory card is up the player keeps its captions and its
   // controls off it.
@@ -323,8 +362,9 @@ export default function Episode() {
   useEffect(() => {
     if (!player) return undefined;
     const sub = player.addListener('statusChange', ({ status }) => {
-      // Never while the flashing-lights warning holds it at its first frame.
-      if (status === 'readyToPlay' && !player.playing && player.currentTime === 0 && !advisoryHeldRef.current) player.play();
+      // Never while the flashing-lights warning holds it at its first frame,
+      // nor while an ad break holds it (the break plays it when it ends).
+      if (status === 'readyToPlay' && !player.playing && player.currentTime === 0 && !advisoryHeldRef.current && !adHoldRef.current) player.play();
     });
     return () => sub.remove();
   }, [player]);
@@ -613,6 +653,7 @@ export default function Episode() {
                 captions={captions}
                 getToken={tokenFn}
                 advisoryOn={advisoryOn}
+                ad={showingTrailer ? null : titleAds}
                 topRight={!showingTrailer ? (
                   <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
                     Tip {tipFirstName}
