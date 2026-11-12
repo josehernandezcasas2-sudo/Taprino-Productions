@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server';
 import { isOpenPath, doorPath } from './lib/privateBetaRules';
 import { getSecuritySwitches } from './lib/securitySwitches';
 import { suspensionFor, isSuspensionOpenPath, isSuspensionOpenApiWrite } from './lib/suspensionGate';
-import { robotsTag } from './lib/robotsRules';
+import { robotsTag, refuseAiCrawler, crawlerRefusalText } from './lib/robotsRules';
 import { crossSiteWriteRefused } from './lib/cors';
 
 // Normally this deliberately does NOT protect any routes — free browsing
@@ -54,6 +54,15 @@ import { crossSiteWriteRefused } from './lib/cors';
 //    SameSite=Lax cookie was the only thing standing between a hostile
 //    page's auto-submitting form and a signed-in member's account.
 //
+// 6. A request whose User-Agent names an AI training crawler is refused
+//    with 403, always, and an AI answer engine too while Admin → AI
+//    security's "Block AI answer engines" is on (lib/robotsRules.js
+//    refuseAiCrawler; Jose, 2026-11-12). robots.txt, /.well-known/, the
+//    AI policy and the Terms always answer. A User-Agent can be faked:
+//    this stops the crawlers that say who they are, including the ones
+//    that ignore robots.txt. Static files the matcher below skips aren't
+//    reached; Vercel's firewall is what covers those.
+//
 // A page's props fetched for a client-side navigation
 // (/_next/data/<build>/<page>.json) reach this middleware as the page
 // they stand for: Next normalises the data path to the page path before
@@ -75,6 +84,13 @@ export default clerkMiddleware(async (auth, req, event) => {
   const beta = sw.doorShut;
   const tag = robotsTag({ privateBeta: beta, hidden: sw.hidden });
   const isApi = pathname.startsWith('/api/');
+
+  if (refuseAiCrawler({ userAgent: req.headers.get('user-agent'), pathname, blockAiSearch: sw.aiSearchBlocked })) {
+    const refused = new NextResponse(crawlerRefusalText(req.nextUrl.origin), { status: 403, headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'private, no-store' } });
+    refused.headers.set('X-Robots-Tag', tag);
+    return refused;
+  }
+
   let userId;
   const who = async () => {
     if (userId === undefined) ({ userId } = await auth());

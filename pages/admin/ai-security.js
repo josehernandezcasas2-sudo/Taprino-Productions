@@ -59,15 +59,16 @@ export default function AdminAiSecurity({ account, mainGenres, data }) {
           <div className="sec-kv first">
             <div>
               <p className="sec-row-title"><span>Training crawlers</span></p>
-              <p className="sec-p small">{data.crawlers.trainingSample.join(', ')} and {data.crawlers.training - data.crawlers.trainingSample.length} more are always told no. It&rsquo;s the promise on the AI policy page, so it has no switch.</p>
+              <p className="sec-p small">{data.crawlers.trainingSample.join(', ')} and {data.crawlers.training - data.crawlers.trainingSample.length} more are always told no in robots.txt, and the site refuses them too: a request that names one in its user agent gets a 403 (robots.txt, /.well-known/, the AI policy and the Terms excepted). It&rsquo;s the promise on the AI policy page, so it has no switch.</p>
             </div>
             <Chip tone="ok">Always blocked</Chip>
           </div>
           <SwitchRow
             field="blockAiSearch" title="Block AI answer engines" state={answer} busy={busy} error={errors.blockAiSearch} onFlip={flip}
           >
-            <p className="sec-p">On: robots.txt tells {data.crawlers.answerSample.join(', ')} and {data.crawlers.answer - data.crawlers.answerSample.length} more not to read pages to answer questions about the site. Off: robots.txt stops naming them and the AI policy page says so, but every page&rsquo;s headers still ask AI not to use it and the Terms still forbid it, so check with the lawyer before turning it off. The training crawlers stay blocked either way.</p>
+            <p className="sec-p">On: robots.txt tells {data.crawlers.answerSample.join(', ')} and {data.crawlers.answer - data.crawlers.answerSample.length} more not to read pages to answer questions about the site, and the site answers them 403 as it does the training crawlers. Off: robots.txt stops naming them, the site lets them in and the AI policy page says so, but every page&rsquo;s headers still ask AI not to use it and the Terms still forbid it, so check with the lawyer before turning it off. The training crawlers stay blocked either way.</p>
           </SwitchRow>
+          <p className="sec-p small">The refusal goes by the name a crawler gives. It stops the ones that say who they are, including those that ignore robots.txt; one dressed up as a browser gets through, and files served straight from the build (scripts, images) never reach this check. Vercel&rsquo;s firewall covers the rest (Admin → Security, &ldquo;Done in other dashboards&rdquo;).</p>
           <p className="sec-p"><a href="/robots.txt" target="_blank" rel="noreferrer">See robots.txt ↗</a> · <a href={AI_POLICY_PATH} target="_blank" rel="noreferrer">AI policy ↗</a></p>
         </Card>
 
