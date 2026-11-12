@@ -4,6 +4,12 @@ import { SITE } from '../lib/siteConfig';
 import RatingOptions from './RatingOptions';
 import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
 import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
+import ExtraKindField from './ExtraKindField';
+import { extraKindChoice, extraKindFromChoice } from '../lib/extraKinds';
+
+// The kind of extra's line before migration 121 (lib/showPage.js
+// EXTRA_KIND_121_MSG says the same).
+const EXTRA_KIND_121_LINE = 'What kind of extra it is needs a database update (migration 121).';
 
 const MAIN_GENRES = ['Comedy', 'Action', 'Horror', 'Science Fiction', 'Fantasy', 'Romance', 'Documentary', 'Mystery', 'Animation', 'Anime'];
 
@@ -73,7 +79,9 @@ function formFromEpisode(episode) {
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
     adsEnabled: episode.adsEnabled !== false,
-    adBreaksText: formatAdBreaksForInput(episode.adBreakSeconds)
+    adBreaksText: formatAdBreaksForInput(episode.adBreakSeconds),
+    // What kind of extra (migration 121): { choice, other } for the field.
+    extraKind: extraKindChoice(episode.extraKind)
   };
 }
 
@@ -207,11 +215,22 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
   const noVideoAtAll = !existingUid && !videoUid.trim();
   const notesShown = pageNotesBoxShows(episode, { contentType: form.contentType, seriesId: form.seriesId });
   const dangerous = form.status === 'approved' && noVideoAtAll;
+  // The Library row says whether the database has migration 121's column
+  // (an older answer without the flag reads as not ready).
+  const kindReady = episode.extraKindReady === true;
+  const kindOpen = form.contentType === 'bonus' && kindReady;
 
   async function handleSave(e) {
     e.preventDefault();
     setError(null);
     const changes = changedFields(start, form);
+    // What kind of extra (migration 121), for bonus content once the
+    // database has the column, and only when it changed.
+    if (kindOpen) {
+      const kindBefore = extraKindFromChoice(start.extraKind.choice, start.extraKind.other);
+      const kindAfter = extraKindFromChoice(form.extraKind.choice, form.extraKind.other);
+      if (kindAfter !== kindBefore) changes.extraKind = kindAfter;
+    }
     // Notes only while their box is on the form (the title, as typed now,
     // has its own page and the database has the column).
     if (!notesShown) delete changes.pageNotes;
@@ -334,6 +353,14 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
                   </optgroup>
                 )}
               </select>
+            </div>
+          )}
+
+          {form.contentType === 'bonus' && (
+            <div className="admin-field admin-extra-kind">
+              <ExtraKindField idPrefix={`admin-xk-${episode.id}`} choice={form.extraKind.choice} other={form.extraKind.other} onChange={(v) => update('extraKind', v)} disabled={!kindReady} variant="apply">
+                {!kindReady && <p className="apl-help">{EXTRA_KIND_121_LINE}</p>}
+              </ExtraKindField>
             </div>
           )}
 

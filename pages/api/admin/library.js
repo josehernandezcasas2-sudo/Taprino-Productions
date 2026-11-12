@@ -64,6 +64,10 @@ export default async function handler(req, res) {
     pageNotesFor(supabase, data || [])
   ]);
 
+  // What kind of extra each bonus row is (migration 121; extraKindsFor
+  // below), for the modal's "What kind of extra?" field.
+  const extraKinds = await extraKindsFor(supabase, data || []);
+
   // `?? null` throughout: a row from a database without a column, or a
   // stand-in, mustn't hand the modal an undefined.
   return res.status(200).json({
@@ -104,6 +108,10 @@ export default async function handler(req, res) {
       bonusParentType: e.bonus_parent_type ?? null,
       bonusParentId: e.bonus_parent_id ?? null,
       bonusParentTitle: e.bonus_parent_type && e.bonus_parent_id ? parentNames[`${e.bonus_parent_type}:${e.bonus_parent_id}`] ?? null : null,
+      // Migration 121: a bonus row's kind (lib/extraKinds.js), and whether
+      // the database has the column (the modal greys the field before it).
+      extraKind: extraKinds.ready && extraKinds.rows[e.id] ? extraKinds.rows[e.id].extra_kind ?? null : null,
+      extraKindReady: extraKinds.ready,
       availableFrom: e.available_from ?? null,
       availableUntil: e.available_until ?? null,
       adsEnabled: e.ads_enabled !== false,
@@ -137,6 +145,21 @@ async function pageNotesFor(supabase, rows) {
   const { data, error } = await supabase.from('episodes').select('id, page_notes, has_page').in('id', ids);
   if (error) {
     if (!isMissingColumn(error)) console.error('admin library page notes:', error.message);
+    return { ready: false, rows: {} };
+  }
+  return { ready: true, rows: Object.fromEntries((data || []).filter((r) => r && r.id).map((r) => [r.id, r])) };
+}
+
+// The bonus rows' kinds (migration 121's episodes.extra_kind), in a read of
+// their own like the notes above: before 121 the column is missing and
+// `ready` is false (the modal greys its field); any other failure is
+// logged and reads the same.
+async function extraKindsFor(supabase, rows) {
+  const ids = rows.filter((e) => e.content_type === 'bonus').map((e) => e.id).filter(Boolean);
+  if (ids.length === 0) return { ready: true, rows: {} };
+  const { data, error } = await supabase.from('episodes').select('id, extra_kind').in('id', ids);
+  if (error) {
+    if (!isMissingColumn(error)) console.error('admin library extra kinds:', error.message);
     return { ready: false, rows: {} };
   }
   return { ready: true, rows: Object.fromEntries((data || []).filter((r) => r && r.id).map((r) => [r.id, r])) };
