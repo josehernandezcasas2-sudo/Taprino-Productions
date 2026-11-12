@@ -108,7 +108,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
   if (error && !data) return <p className="rq-error">{error}</p>;
   if (!data) return <p className="adm-empty">Reading Stripe and the ledger…</p>;
 
-  const { stripe, obligations, canLeave, sweep: sw, reconciliation: rec, studioShare: share, tax } = data;
+  const { stripe, obligations, canLeave, sweep: sw, reconciliation: rec, studioShare: share, tax, salesTax } = data;
   const scheduleOk = stripe.scheduleInterval === 'manual';
   const sinceLabel = `${fmtDay(rec.since)} → ${fmtDay(rec.until)}`;
   const m = share.membership;
@@ -337,6 +337,7 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr className="total"><td className="op">=</td><td>Membership margin</td><td>{dollars(m.marginCents)}</td></tr>
               </tbody>
             </table>
+            {(m.taxCents || 0) > 0 && <p className="cm-sub" style={{ marginTop: '0.4rem' }}>Revenue leaves out the {dollars(m.taxCents)} of sales tax members paid on top; it’s in the line below the studio’s share.</p>}
           </div>
           <div>
             <table className="sm-ledger">
@@ -353,6 +354,22 @@ export default function StudioMoneyPanel({ apiPath = '/api/admin/money' }) {
                 <tr className="total"><td className="op">=</td><td>Studio share this period<span className="sm-sub">for maintenance and other projects · before the reserve and earmarks you keep in Stripe</span></td><td>{dollars(share.together.shareCents)}</td></tr>
               </tbody>
             </table>
+            {salesTax && (
+              <table className="sm-ledger" style={{ marginTop: '0.6rem' }} data-testid="sales-tax-line">
+                <tbody>
+                  <tr>
+                    <td className="op" />
+                    <td>
+                      Sales tax collected (owed to the states)
+                      <span className="sm-sub">
+                        Stripe Tax added on top of memberships, title sales, backings and bookings · {dollars(salesTax.collectedCents)} collected{salesTax.refundedCents ? `, ${dollars(salesTax.refundedCents)} given back with refunds` : ''} · not the studio’s: it leaves with the sweep and is paid to the states from the bank (Stripe Tax → Filing). $0 until the studio registers in a state (Dashboard → Tax → Registrations).
+                      </span>
+                    </td>
+                    <td>{dollars(salesTax.owedCents)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
             <p className="cm-sub" style={{ marginTop: '0.6rem' }}>An operating number, not a tax number: it ignores hosting and the other bills, and counts ad credits when served, not when bought. The accountant’s books start from Stripe’s balance-transaction export.</p>
           </div>
         </div>
