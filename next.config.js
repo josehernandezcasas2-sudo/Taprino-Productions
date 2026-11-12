@@ -43,14 +43,19 @@ function reportOnlyCsp() {
   // adtrafficquality.google is the display-ads script's own traffic-quality
   // check (a script, a frame and a config fetch on every page that loads it).
   const ads = 'https://imasdk.googleapis.com https://*.doubleclick.net https://*.googlesyndication.com https://*.googleadservices.com https://*.google.com https://*.gstatic.com https://*.adtrafficquality.google';
+  // Google's video ads (GOOGLE_VIDEO_AD_TAG, 2026-11-12): Ad Manager's VAST
+  // comes from *.doubleclick.net (above); the video files IMA plays are
+  // served from *.2mdn.net, often by way of redirector.gvt1.com. Media and
+  // fetches only — still report-only, so the reports name anything else.
+  const videoAds = 'https://*.2mdn.net https://*.gvt1.com';
   return [
     "default-src 'self'",
     `script-src 'self' ${clerkSrc} ${ads}`,
     `style-src 'self' 'unsafe-inline' https://fonts.googleapis.com`,
     "font-src 'self' https://fonts.gstatic.com data:",
     "img-src 'self' data: blob: https:",
-    `media-src 'self' blob: ${stream} ${supabase} ${ads}`,
-    `connect-src 'self' ${clerkSrc} ${stream} ${supabase} ${ads}`,
+    `media-src 'self' blob: ${stream} ${supabase} ${ads} ${videoAds}`,
+    `connect-src 'self' ${clerkSrc} ${stream} ${supabase} ${ads} ${videoAds}`,
     // University readings open in a frame from Storage (a signed PDF link).
     `frame-src 'self' ${clerkSrc} ${ads} ${supabase} https://www.youtube-nocookie.com`,
     "worker-src 'self' blob:",

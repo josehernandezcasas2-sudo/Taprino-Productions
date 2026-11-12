@@ -3,9 +3,16 @@ import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
 import HouseAdForm from '../../components/HouseAdForm';
+import { googleFillOn } from '../../lib/googleAds';
+import { GOOGLE_FILL_ON_LINE, GOOGLE_FILL_OFF_LINE } from '../../lib/googleAdTagRules';
 
 export async function getServerSideProps(ctx) {
-  return adminPageProps(ctx, { caps: ['manage_house_ads'] });
+  const result = await adminPageProps(ctx, { caps: ['manage_house_ads'] });
+  // Whether Google's Ad Manager fills breaks no house ad is running in
+  // (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js): only whether it's set, never
+  // the tag.
+  if (result && result.props) result.props.googleFill = googleFillOn();
+  return result;
 }
 
 function ctr(ad) {
@@ -13,7 +20,7 @@ function ctr(ad) {
   return ((ad.clicks / ad.impressions) * 100).toFixed(1);
 }
 
-export default function HouseAdsAdmin({ account, mainGenres }) {
+export default function HouseAdsAdmin({ account, mainGenres, googleFill = false }) {
   const [ads, setAds] = useState(null);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
@@ -93,7 +100,10 @@ export default function HouseAdsAdmin({ account, mainGenres }) {
         <div className="house-ad-notice">
           Point at this system by leaving <code>NEXT_PUBLIC_AD_TAG_URL</code> unset — the player
           defaults to <code>/api/house-ads/vast</code> automatically. Set that variable only once you
-          want to switch to a real ad network instead.
+          want to switch to a real ad network instead (it then replaces house ads and Google&rsquo;s fill).
+          <p className="house-ad-google" data-google-fill={googleFill ? 'on' : 'off'}>
+            <b>Google fill.</b> {googleFill ? GOOGLE_FILL_ON_LINE : GOOGLE_FILL_OFF_LINE}
+          </p>
         </div>
 
         {ads && (

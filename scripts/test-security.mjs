@@ -107,6 +107,18 @@ await t('keys: set only when every name is set, half set noticed, values never r
   assert.equal(JSON.stringify(rows).includes('"x"'), false, 'no value leaks');
 });
 
+await t('keys: Google’s video ad tag is listed, optional, and never echoed', () => {
+  const tag = 'https://pubads.g.doubleclick.net/gampad/ads?iu=/1/x&correlator=';
+  const off = Object.fromEntries(keyStatus({}).map((r) => [r.id, r]));
+  assert.equal(off.googleVideoAds.label, 'GOOGLE_VIDEO_AD_TAG');
+  assert.equal(off.googleVideoAds.optional, true);
+  assert.equal(off.googleVideoAds.set, false);
+  assert.equal(off.cron.optional, false, 'the others stay required');
+  const on = keyStatus({ GOOGLE_VIDEO_AD_TAG: tag });
+  assert.equal(on.find((r) => r.id === 'googleVideoAds').set, true);
+  assert.equal(JSON.stringify(on).includes('doubleclick'), false, 'the tag never leaves');
+});
+
 await t('security event lines read plainly', () => {
   assert.equal(securityEventLine({ action: 'grant_admin_access', admin_email: 'jose@x', target_id: 'user_a' }), 'jose@x made user_a an admin');
   assert.equal(securityEventLine({ action: 'security_switch', admin_email: 'jose@x', details: 'privateBeta: off → on' }), 'jose@x switched privateBeta: off → on');

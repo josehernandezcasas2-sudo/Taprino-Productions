@@ -3954,6 +3954,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 3px;
   font-size: 0.82em;
 }
+.house-ad-notice .house-ad-google { margin: 0.6rem 0 0; }
 
 .house-ad-form-wrap {
   border: 1px solid rgba(251, 232, 211, 0.14);

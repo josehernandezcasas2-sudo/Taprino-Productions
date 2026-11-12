@@ -24,6 +24,8 @@ export default function AdminSecurity({ account, mainGenres, data }) {
   const team = data.team;
   const withTwoStep = team ? team.filter((t) => t.twoFactor).length : 0;
   const keysSet = data.keys.filter((k) => k.set).length;
+  // Every key the site needs is set (an optional one may be left out).
+  const keysOk = data.keys.every((k) => k.set || (k.optional && !k.invalid));
   const youHaveTwoStep = data.you.twoFactorEnabled;
   const missingTwoStep = team ? team.filter((t) => !t.twoFactor) : [];
 
@@ -41,7 +43,7 @@ export default function AdminSecurity({ account, mainGenres, data }) {
         <Tile label="The site" value={door.on ? 'Invited only' : 'Open to everyone'} tone={door.on ? 'ok' : 'warn'} />
         <Tile label="Search engines" value={search.inForce ? 'Kept out' : 'Allowed'} tone={search.inForce ? 'ok' : 'plain'} />
         <Tile label="Team two-step" value={team ? `${withTwoStep} of ${team.length} on` : '—'} tone={team && withTwoStep === team.length ? 'ok' : 'warn'} />
-        <Tile label="Keys in Vercel" value={`${keysSet} of ${data.keys.length} set`} tone={keysSet === data.keys.length ? 'ok' : 'plain'} />
+        <Tile label="Keys in Vercel" value={`${keysSet} of ${data.keys.length} set`} tone={keysOk ? 'ok' : 'plain'} />
       </div>
 
       <div className="sec-grid">
@@ -124,7 +126,7 @@ export default function AdminSecurity({ account, mainGenres, data }) {
                 <p className="sec-mono">{k.label}</p>
                 <p className="sec-p small">{k.what}</p>
               </div>
-              <Chip tone={k.set ? 'ok' : 'warn'}>{k.set ? 'Set' : k.partly ? 'Half set' : 'Not set'}</Chip>
+              <Chip tone={k.set ? 'ok' : k.optional && !k.partly && !k.invalid ? 'muted' : 'warn'}>{k.set ? 'Set' : k.invalid ? 'Not a valid tag' : k.partly ? 'Half set' : 'Not set'}</Chip>
             </div>
           ))}
         </Card>
