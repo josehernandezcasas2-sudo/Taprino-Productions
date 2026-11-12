@@ -7,7 +7,7 @@ import { getAllSeriesForCreator } from '../../lib/series';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getDraft } from '../../lib/creatorDrafts';
 import {
-  SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody
+  SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody, submitHasOwnPage
 } from '../../lib/submitRules';
 import { readVideoMetadata, formatRuntime } from '../../lib/videoMetadata';
 import { parseAdBreaksInput } from '../../lib/adBreaks';
@@ -20,6 +20,7 @@ import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
 import ExtraKindField from '../../components/ExtraKindField';
+import PageNotesField from '../../components/PageNotesField';
 import { WarningIcon } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 
@@ -771,6 +772,11 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
               <label className="apl-label" htmlFor="sub-desc">About it</label>
               <textarea id="sub-desc" rows={4} value={form.description} onChange={(e) => update('description', e.target.value)} maxLength={4000} />
             </div>
+            {/* A film or a short has its own page from the start: its notes
+                go on it (saved with the draft, written on Send). */}
+            {submitHasOwnPage(form.contentType) && (
+              <PageNotesField id="sub-notes" wrapClassName="apl-field sub-notes" value={form.pageNotes || ''} onChange={(v) => update('pageNotes', v)} />
+            )}
             <div className="apl-field">
               <label className="apl-label" htmlFor="sub-artist">Your name, as credited</label>
               <input id="sub-artist" type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} maxLength={200} />

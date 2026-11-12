@@ -46,6 +46,9 @@ export const EMPTY_SUBMIT_FORM = {
   // is on ('', a preset's id or 'other') and the words under Other.
   extraKindChoice: '',
   extraKindOther: '',
+  // The notes for the title's own page (a film or a short;
+  // submitHasOwnPage below).
+  pageNotes: '',
   cutArtwork: true,
   step: 1
 };
@@ -60,6 +63,17 @@ export function typeIsNumbered(contentType) {
 
 export function showNoun(contentType) {
   return contentType === 'podcast' ? 'show' : 'series';
+}
+
+// The notes for the title's own page (migration 118's page_notes; Jose,
+// 2026-11-12): only a title that has its own page from the start gets the
+// box — a film or a short (lib/showRules.js episodeHasPage, by type). A
+// show's episode, an extra or a Snippet plays from its show; its page
+// switch is on the show page's editor. 4,000 characters, as everywhere.
+export const SUBMIT_NOTES_MAX = 4000;
+
+export function submitHasOwnPage(contentType) {
+  return contentType === 'movie' || contentType === 'short';
 }
 
 export function stepBlocker(step, form, media = {}) {
@@ -117,6 +131,7 @@ export function toSubmitBody(form, media, extras = {}) {
     isOriginal: f.isOriginal === true,
     fundingUrl: String(f.fundingUrl || '').trim(),
     ...(f.contentType === 'bonus' ? { extraKind: extraKindFromChoice(f.extraKindChoice, f.extraKindOther) } : {}),
+    ...(submitHasOwnPage(f.contentType) && String(f.pageNotes || '').trim() ? { pageNotes: String(f.pageNotes).trim() } : {}),
     ...(media && media.video ? { videoUid: media.video.uid, runtimeSeconds: media.video.runtimeSeconds || undefined } : {}),
     ...(media && media.trailer ? { trailerUid: media.trailer.uid } : {}),
     ...(media && media.audioUrl ? { audioUrl: media.audioUrl, audioBytes: media.audioBytes || null } : {}),

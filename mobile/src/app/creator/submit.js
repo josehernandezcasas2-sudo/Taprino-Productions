@@ -7,7 +7,8 @@ import { apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall, showPath } from '../../lib/showApi';
 import { startTusUpload } from '../../lib/tusUpload';
 import {
-  SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody, formatRuntime, bytesLabel
+  SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody, formatRuntime, bytesLabel,
+  SUBMIT_NOTES_MAX, submitHasOwnPage
 } from '../../lib/submitRules';
 import { MAX_EPISODE_NUMBER, nextFreeExcept, showPickerTag } from '../../lib/showRules';
 import { changedFields, mediaChanged } from '../../lib/draftPatch';
@@ -762,6 +763,22 @@ export default function SubmitTitle() {
 
             <Field label="Title"><Input value={form.title} onChangeText={(v) => update('title', v)} maxLength={300} /></Field>
             <Field label="About it"><Input multiline value={form.description} onChangeText={(v) => update('description', v)} maxLength={4000} /></Field>
+            {/* A film or a short has its own page from the start: its notes
+                go on it (saved with the draft, written on Send) — the
+                website's components/PageNotesField.js, the same words. */}
+            {submitHasOwnPage(form.contentType) ? (
+              <Field label="Notes for the title’s page" note="optional · blank lines make paragraphs">
+                <Input
+                  multiline
+                  value={form.pageNotes || ''}
+                  onChangeText={(v) => update('pageNotes', v)}
+                  maxLength={SUBMIT_NOTES_MAX}
+                  placeholder="How it was made, who’s in it, the story behind a scene."
+                  accessibilityLabel="Notes for the title’s page"
+                />
+                <Text style={cp.help}>{String(form.pageNotes || '').length.toLocaleString('en-US')} / {SUBMIT_NOTES_MAX.toLocaleString('en-US')} · shown on the title’s page in place of the description.</Text>
+              </Field>
+            ) : null}
             <Field label="Your name, as credited"><Input value={form.artist} onChangeText={(v) => update('artist', v)} maxLength={200} /></Field>
             <Field label="Genre"><Chips small options={MAIN_GENRES.map((g) => ({ value: g, label: g }))} value={form.mainGenre} onChange={(v) => update('mainGenre', v)} /></Field>
             <Field label="Rating" note="not set = treated as 17+"><Chips small options={[{ value: '', label: 'Not set' }, ...ratings.map((r) => ({ value: r.code, label: r.code }))]} value={form.rating} onChange={(v) => update('rating', v)} /></Field>

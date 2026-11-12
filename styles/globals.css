@@ -12246,6 +12246,9 @@ body.show-dragging * { cursor: grabbing !important; }
 .sub-newshow { display: flex; flex-direction: column; gap: 0.6rem; padding: 0.75rem; border-radius: 8px; border: 1px dashed rgba(251, 232, 211, 0.25); margin-top: 0.4rem; }
 .sub-step textarea { width: 100%; box-sizing: border-box; padding: 0.6rem 0.75rem; border-radius: 8px; border: 1px solid rgba(251, 232, 211, 0.2); background: var(--void); color: var(--ink); font-family: var(--font-body); font-size: 0.95rem; line-height: 1.45; }
 .sub-step textarea:focus { outline: none; border-color: var(--brass); }
+/* The notes box (components/PageNotesField.js) in the submit page's look */
+.sub-notes > label { font-family: var(--font-mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-dim); }
+.sub-notes > label .admin-optional { text-transform: none; letter-spacing: 0; opacity: 0.7; }
 .sub-art { display: flex; gap: 0.75rem; }
 .sub-art-slot { display: flex; align-items: center; justify-content: center; text-align: center; border: 1.5px dashed rgba(251, 232, 211, 0.4); border-radius: 8px; font-family: var(--font-mono); font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); cursor: pointer; overflow: hidden; background: var(--void); }
 .sub-art-slot.off { opacity: 0.45; }
