@@ -1,4 +1,5 @@
 import { useImaSdk } from '../lib/imaSdk';
+import { runImaBreak, googleRequestTag } from '../lib/imaAdBreak';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -31,7 +32,10 @@ function formatClock(seconds) {
 // it comes from /api/channel/play, which only ever signs the program that's
 // airing at that moment. A live broadcast on the channel takes over the
 // whole player.
-export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) {
+// `googleAdTag` (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js; null unless this
+// viewer gets ads on demand): Google's Ad Manager fills a break, once,
+// when our own ads leave it empty (lib/imaAdBreak.js).
+export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, googleAdTag = null }) {
   // Ad breaks between programs run on Google's IMA SDK; fetch it with the player.
   useImaSdk(true);
   const iconOverrides = usePlayerIconOverrides();
@@ -236,14 +240,20 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // "ad break" card with a countdown if no ad can be shown.
   // `episodeId` (ad share, migration 103): the program the break sits in,
   // so the pre-roll's impression credits its creator; null for the loop.
+  // Each ad is asked of our own ads first; when they leave the break
+  // empty, Google's Ad Manager is asked once for the whole break
+  // (`googleAdTag`, lib/imaAdBreak.js), never again in the same break.
   function runAds(untilMs, onDone, episodeId = null) {
     const v = videoRef.current;
     detachVideo();
     setScreen('ad');
     let finished = false;
+    let current = null; // the IMA break being asked for or playing
+    let googleAsked = false;
     const finish = () => {
       if (finished) return;
       finished = true;
+      if (current) current.cancel();
       setScreen(null);
       setAdCountdown(null);
       onDone();
@@ -267,24 +277,26 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
       try {
         const container = new google.ima.AdDisplayContainer(adContainerRef.current, v);
         container.initialize();
-        const loader = new google.ima.AdsLoader(container);
-        loader.addEventListener(google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED, (evt) => {
-          const mgr = evt.getAdsManager(v);
-          mgr.addEventListener(google.ima.AdEvent.Type.ALL_ADS_COMPLETED, afterAd);
-          mgr.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => { mgr.destroy(); if (!untilMs) { clearInterval(tick); finish(); } });
-          try {
-            mgr.init(v.clientWidth, v.clientHeight, google.ima.ViewMode.NORMAL);
-            mgr.start();
-          } catch (err) {
-            if (!untilMs) { clearInterval(tick); finish(); }
+        current = runImaBreak({
+          ima: google.ima,
+          container,
+          video: v,
+          houseTag: process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}${episodeId ? `&episode=${encodeURIComponent(episodeId)}` : ''}`,
+          googleTag: () => {
+            if (googleAsked) return null;
+            const tag = googleRequestTag(googleAdTag, { video: v, vpos: 'midroll', clickToPlay: false, descriptionUrl: `${window.location.origin}${window.location.pathname}` });
+            if (tag) googleAsked = true;
+            return tag;
+          },
+          onEnd: ({ played }) => {
+            if (finished) return;
+            if (played) afterAd();
+            // Nothing to show: the short break ends, a scheduled one keeps
+            // its countdown card until its time is up.
+            else if (!untilMs) { clearInterval(tick); finish(); }
           }
-        }, false);
-        loader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => { if (!untilMs) { clearInterval(tick); finish(); } }, false);
-        const req = new google.ima.AdsRequest();
-        req.adTagUrl = process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}${episodeId ? `&episode=${encodeURIComponent(episodeId)}` : ''}`;
-        req.linearAdSlotWidth = v.clientWidth || 640;
-        req.linearAdSlotHeight = v.clientHeight || 360;
-        loader.requestAds(req);
+        });
+        if (!current && !untilMs) { clearInterval(tick); finish(); }
       } catch (err) {
         if (!untilMs) { clearInterval(tick); finish(); }
       }
@@ -534,7 +546,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
 
   if (now && now.live) {
     // Everyone gets the broadcast's ad breaks on a channel.
-    return <LiveVideoPlayer key={now.live.id} stream={now.live} isSubscriber={false} isAdmin={false} />;
+    return <LiveVideoPlayer key={now.live.id} stream={now.live} isSubscriber={false} isAdmin={false} googleAdTag={googleAdTag} />;
   }
 
   const program = now && now.program;

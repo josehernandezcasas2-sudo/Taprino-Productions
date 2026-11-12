@@ -1,4 +1,5 @@
 import { useImaSdk } from '../lib/imaSdk';
+import { runImaBreak, googleRequestTag } from '../lib/imaAdBreak';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
 
@@ -11,7 +12,10 @@ const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 // of that through the VOD player's already-substantial state machine would
 // risk destabilizing something that works today, for a feature that's
 // genuinely a different shape.
-export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
+// `googleAdTag` (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js; null unless this
+// viewer gets ads on demand): Google's Ad Manager fills a break, once,
+// when our own ads leave it empty (lib/imaAdBreak.js).
+export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin, googleAdTag = null }) {
   useImaSdk(Boolean(stream.adsEnabled) && !isSubscriber && !isAdmin);
   const iconOverrides = usePlayerIconOverrides();
   const videoRef = useRef(null);
@@ -19,6 +23,8 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
   const adContainerRef = useRef(null);
   const hlsRef = useRef(null);
   const adsManagerRef = useRef(null);
+  // The IMA break being asked for or playing (lib/imaAdBreak.js).
+  const adRunRef = useRef(null);
   const breakCheckTimer = useRef(null);
   const nextBreakIndexRef = useRef(0);
   const hideTimerRef = useRef(null);
@@ -176,51 +182,43 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin }) {
     v.pause();
 
     const google = window.google;
+    let ended = false;
+    const endBreak = () => {
+      if (ended) return;
+      ended = true;
+      adRunRef.current = null;
+      setOnAdBreak(false);
+      attachLive(); // rejoin at the current live edge, not where we paused
+    };
     try {
       const adDisplayContainer = new google.ima.AdDisplayContainer(adContainerRef.current, v);
       adDisplayContainer.initialize();
-      const adsLoader = new google.ima.AdsLoader(adDisplayContainer);
-
-      const endBreak = () => {
-        setOnAdBreak(false);
-        attachLive(); // rejoin at the current live edge, not where we paused
-      };
-
-      adsLoader.addEventListener(
-        google.ima.AdsManagerLoadedEvent.Type.ADS_MANAGER_LOADED,
-        (evt) => {
-          const adsManager = evt.getAdsManager(v);
-          adsManagerRef.current = adsManager;
-          const AdEvent = google.ima.AdEvent.Type;
-          adsManager.addEventListener(AdEvent.ALL_ADS_COMPLETED, endBreak);
-          adsManager.addEventListener(AdEvent.COMPLETE, endBreak);
-          adsManager.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, () => {
-            adsManager.destroy();
-            endBreak();
-          });
-          try {
-            adsManager.init(v.clientWidth, v.clientHeight, google.ima.ViewMode.NORMAL);
-            adsManager.start();
-          } catch (err) {
-            endBreak();
-          }
-        },
-        false
-      );
-      adsLoader.addEventListener(google.ima.AdErrorEvent.Type.AD_ERROR, endBreak, false);
-
-      const adsRequest = new google.ima.AdsRequest();
-      adsRequest.adTagUrl =
-        process.env.NEXT_PUBLIC_AD_TAG_URL ||
-        (typeof window !== 'undefined' ? `${window.location.origin}${DEFAULT_AD_TAG_PATH}` : '');
-      adsRequest.linearAdSlotWidth = v.clientWidth || 640;
-      adsRequest.linearAdSlotHeight = v.clientHeight || 360;
-      adsLoader.requestAds(adsRequest);
+      // Our own ads first; Google's Ad Manager once when they leave the
+      // break empty. The break ends (and the stream comes back) when the
+      // ads are over, nothing filled it, or IMA went quiet.
+      const run = runImaBreak({
+        ima: google.ima,
+        container: adDisplayContainer,
+        video: v,
+        houseTag: process.env.NEXT_PUBLIC_AD_TAG_URL || `${window.location.origin}${DEFAULT_AD_TAG_PATH}`,
+        googleTag: () => googleRequestTag(googleAdTag, { video: v, vpos: 'midroll', clickToPlay: false, descriptionUrl: `${window.location.origin}${window.location.pathname}` }),
+        onLoaded: (adsManager) => { adsManagerRef.current = adsManager; },
+        onEnd: endBreak
+      });
+      if (!run) endBreak();
+      else adRunRef.current = run;
     } catch (err) {
-      setOnAdBreak(false);
-      attachLive();
+      endBreak();
     }
   }
+
+  // Leaving the page (or the broadcast ending) drops a break in progress.
+  useEffect(() => () => {
+    if (adRunRef.current) {
+      adRunRef.current.cancel();
+      adRunRef.current = null;
+    }
+  }, []);
 
   const showControlsTemporarily = useCallback(() => {
     setControlsVisible(true);

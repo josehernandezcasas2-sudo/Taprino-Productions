@@ -50,7 +50,7 @@ function programHeading(p) {
 }
 
 export default function LiveChannelsPage(props) {
-  const { channels, channel, initialNow, initialGuide, nowSec, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, unavailable } = props;
+  const { channels, channel, initialNow, initialGuide, nowSec, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, unavailable, googleAdTag = null } = props;
   const router = useRouter();
   const [now, setNow] = useState(initialNow);
   const [guide, setGuide] = useState(initialGuide);
@@ -217,7 +217,7 @@ export default function LiveChannelsPage(props) {
           <div className="tv-main">
             <div className="tv-stage">
               <div className="player-card tv-player">
-                <ChannelPlayer key={channel.slug} channelSlug={channel.slug} initialNow={initialNow} onNowChange={setNow} />
+                <ChannelPlayer key={channel.slug} channelSlug={channel.slug} initialNow={initialNow} onNowChange={setNow} googleAdTag={googleAdTag} />
               </div>
 
               <aside className="tv-info" aria-live="polite">
