@@ -14,7 +14,7 @@ import { captionTextAt } from '../lib/vtt';
 import EndCard from './EndCard';
 import AdBreakLayer from './AdBreakLayer';
 import MuteGlyph from './MuteGlyph';
-import { isSilent, muteLabel, muteToggle } from '../lib/adBreakRules';
+import { muteLabel, muteToggle } from '../lib/adBreakRules';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -205,8 +205,10 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   visitingRef.current = Boolean(ad && ad.state && ad.state.visiting);
 
   // The one mute: the title player's own, followed live.
+  // (Its volume is never turned down in the app — the phone's buttons do
+  // that — so silent is muted; muteToggle still mends a zero volume.)
   const { muted } = useEvent(player, 'mutedChange', { muted: Boolean(player && player.muted) });
-  const silent = isSilent({ muted, volume: player ? player.volume : 1 });
+  const silent = Boolean(muted);
   function toggleMute() {
     showControls();
     if (!player) return;
