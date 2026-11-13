@@ -1037,7 +1037,10 @@ export default function VideoPlayer({
         setPodForcedMute(false);
         pv.volume = v.volume;
         pv.muted = false;
-        safePlay(pv);
+        // Still playing (muted) is the usual case: unmuting is enough. A
+        // file the browser stopped outright plays again; an ad that has
+        // ended (a card is up) is never started over.
+        if (pv.paused && !pv.ended && pv.currentSrc) safePlay(pv);
       }
       return;
     }
