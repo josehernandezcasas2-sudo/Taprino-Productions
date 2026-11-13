@@ -3,9 +3,10 @@ import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useAuth } from '../lib/stableAuth';
 import { colors, absoluteFill } from '../lib/theme';
-import { REEL_AD_CTA } from '../lib/adBreakRules';
+import { REEL_AD_CTA, muteLabel } from '../lib/adBreakRules';
 import { firePixel } from '../lib/adSlots';
 import { visitAdvertiser } from '../lib/adVisit';
+import { VolumeIcon } from './ReelPlayer';
 
 // The swipe feeds' house-ad card (Vertical Discover, Snippets), the
 // website's components/ReelAdCard.js: a sibling of ReelPlayer, not a
@@ -18,6 +19,10 @@ import { visitAdvertiser } from '../lib/adVisit';
 // viewer is back (mobile/src/lib/adVisit.js, which knows when on Android
 // too). `ad` is one slot's item from
 // mobile/src/lib/adSlots.js. `insets` keeps the label clear of the notch.
+// Its mute (Jose, 2026-11-13: "Allow tv ads to be muted"): a tap anywhere
+// still toggles it, and the reel's own speaker (ReelPlayer's) sits
+// top-right, where the website's card has it — the feed's one mute, so the
+// clips after the ad stay as the viewer set them.
 export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = null }) {
   const { getToken } = useAuth();
   const player = useVideoPlayer(ad && ad.src ? ad.src : null, (p) => {
@@ -76,6 +81,9 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute, insets = n
     <Pressable style={styles.wrap} onPress={onToggleMute} accessibilityLabel={muted ? 'Unmute the ad' : 'Mute the ad'}>
       <VideoView player={player} style={absoluteFill} contentFit="cover" nativeControls={false} />
       <View style={[styles.badge, { top }]} pointerEvents="none"><Text style={styles.badgeText}>Ad</Text></View>
+      <Pressable style={[styles.mute, { top: top - 4 }]} onPress={onToggleMute} accessibilityRole="button" accessibilityLabel={muteLabel(muted)} hitSlop={8}>
+        <VolumeIcon muted={muted} size={16} />
+      </Pressable>
       <View style={[styles.caption, { paddingBottom: bottom }]} pointerEvents="box-none">
         {ad && ad.title ? <Text style={styles.title}>{ad.title}</Text> : null}
         {ad && ad.clickUrl ? (
@@ -93,6 +101,8 @@ const styles = StyleSheet.create({
   wrap: { ...absoluteFill, backgroundColor: '#000' },
   badge: { position: 'absolute', left: 16, zIndex: 5, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 999, paddingVertical: 4, paddingHorizontal: 10 },
   badgeText: { color: colors.ink, fontSize: 11, fontWeight: '700', letterSpacing: 0.45, textTransform: 'uppercase' },
+  // ReelPlayer's muteToggle, top-right.
+  mute: { position: 'absolute', right: 16, zIndex: 5, width: 32, height: 32, borderRadius: 16, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' },
   caption: { position: 'absolute', left: 0, right: 0, bottom: 0, zIndex: 3, paddingHorizontal: 18, paddingTop: 60 },
   title: { color: colors.ink, fontSize: 16, fontWeight: '700', marginBottom: 4 },
   cta: { marginTop: 8, color: colors.sky, fontWeight: '700', fontSize: 14.5 }

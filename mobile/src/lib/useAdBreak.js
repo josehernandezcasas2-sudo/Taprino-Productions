@@ -18,6 +18,8 @@ import { visitAdvertiser } from './adVisit';
 //   ad.resume();          // a tap on the ad: play it again if it stopped
 //                         // (and end a visit the browser never reported)
 //   ad.nudge();           // after the ad moved between views
+//   ad.setMuted(m); ad.setVolume(v);  // the screen's mute and volume (one
+//                         // mute for the ad and the programme)
 //
 // `state` (null when no break runs) is what components/AdBreakLayer.js
 // draws in both of a player's views — the same `player` is handed to
@@ -408,10 +410,20 @@ export function useAdBreak({ getToken } = {}) {
       if (live(run) && run.itemStarted) playIfDue(run);
     };
 
+    // The player's mute and volume (one mute: the screen's own player and
+    // the ad's follow the same button, mobile/src/lib/adBreakRules.js "the
+    // sound"): the item playing now, and each one after it.
     const setMuted = (muted) => {
       const run = runRef.current;
       if (run) run.muted = Boolean(muted);
       try { playerRef.current.muted = Boolean(muted); } catch { /* released */ }
+    };
+    const setVolume = (volume) => {
+      const v = Math.max(0, Math.min(1, Number(volume)));
+      if (!Number.isFinite(v)) return;
+      const run = runRef.current;
+      if (run) run.volume = v;
+      try { playerRef.current.volume = v; } catch { /* released */ }
     };
 
     // The app going to the background and coming back: expo-video pauses
@@ -434,7 +446,7 @@ export function useAdBreak({ getToken } = {}) {
       }
     };
 
-    api.current = { start, stop, visit, resume, nudge, setMuted, onAppState };
+    api.current = { start, stop, visit, resume, nudge, setMuted, setVolume, onAppState };
   }
 
   useEffect(() => {
@@ -456,8 +468,8 @@ export function useAdBreak({ getToken } = {}) {
     }
   }, []);
 
-  const { start, stop, visit, resume, nudge, setMuted } = api.current;
-  return useMemo(() => ({ player, state, active: Boolean(state), activeRef, start, stop, visit, resume, nudge, setMuted }), [player, state, start, stop, visit, resume, nudge, setMuted]);
+  const { start, stop, visit, resume, nudge, setMuted, setVolume } = api.current;
+  return useMemo(() => ({ player, state, active: Boolean(state), activeRef, start, stop, visit, resume, nudge, setMuted, setVolume }), [player, state, start, stop, visit, resume, nudge, setMuted, setVolume]);
 }
 
 export default useAdBreak;

@@ -71,18 +71,18 @@ export default async function handler(req, res) {
     isSubscriber: data.account.isSubscriber,
     // Who gets ads on this title (lib/adBreakRules.js adsOnFor, the
     // website's own rule): never an ad-free member, the team or a buyer
-    // (`purchase.owned`), never in a preview, on a trailer or on a title
-    // with `episode.adsEnabled` off. The breaks are `episode.adBreakSeconds`,
+    // (`purchase.owned`), never in a preview, on a trailer, on a title
+    // with `episode.adsEnabled` off or on a podcast (`episode.contentType`). The breaks are `episode.adBreakSeconds`,
     // or a ready plan's (`episode.adPlan`).
     adFree: data.account.adFree,
     isAdmin: Boolean(data.account.isAdmin),
     // Google's Ad Manager tag (GOOGLE_VIDEO_AD_TAG, lib/googleAds.js) for a
     // plain break our own ads leave empty: null unless it's set and this
-    // viewer gets ads on this title and may play it. The app plays house
+    // viewer gets ads on this title and may play it (never a podcast). The app plays house
     // ads only until a real build carries a native IMA player
     // (mobile/src/lib/googleAdPlayer.js); a ready plan's breaks never use it.
     googleAdTag: entitled
-      ? googleAdTagFor(adsOnFor({ previewing: Boolean(data.preview), adFree: data.account.adFree, isAdmin: data.account.isAdmin, owned: Boolean(data.purchase && data.purchase.owned), adsEnabled: data.episode.adsEnabled }))
+      ? googleAdTagFor(adsOnFor({ previewing: Boolean(data.preview), adFree: data.account.adFree, isAdmin: data.account.isAdmin, owned: Boolean(data.purchase && data.purchase.owned), adsEnabled: data.episode.adsEnabled, contentType: data.episode.contentType }))
       : null,
     // Buy to own: the price (or ownership) of this title and its series.
     purchase: data.purchase,

@@ -3152,6 +3152,18 @@ button { font-family: inherit; cursor: pointer; }
 }
 .tp-adbar-time { color: var(--ink); }
 .tp-adbar-note { margin-left: auto; opacity: 0.7; text-transform: none; letter-spacing: 0.04em; }
+/* The ad's mute (components/AdMuteButton.js; Jose, 2026-11-13: "Allow tv
+   ads to be muted"): the player's own speaker at the start of the bar. The
+   bar lets taps through to the ad; its button takes them. */
+.tp-adbar .tp-ad-mute {
+  pointer-events: auto;
+  min-width: 32px;
+  height: 32px;
+  margin: -0.45rem 0 -0.45rem -0.5rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.tp-adbar .tp-ad-mute:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 1px; }
 
 /* Control bar */
 .tp-controls {
@@ -7982,6 +7994,24 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border-radius: 999px;
   backdrop-filter: blur(4px);
 }
+/* The ad card's mute (components/ReelAdCard.js; Jose, 2026-11-13): the
+   look of a content slide's .reel-mute-toggle, top-right where a slide's
+   menu sits (an ad card has no menu and no close). */
+.reel-ad-mute {
+  position: absolute;
+  top: calc(0.85rem + env(safe-area-inset-top, 0px));
+  right: 1rem;
+  z-index: 5;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.reel-ad-mute:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 2px; }
+
 /* ---------------------------------------------------------------------
    About page — a designed page rather than another LegalLayout doc, so
    it gets its own section. Reuses the site's real tokens (--brass,
@@ -13507,3 +13537,25 @@ a.ep-flash-chip:hover, a.ep-flash-chip:focus-visible { background: color-mix(in 
 a.ep-credit-name:hover { color: var(--brass); }
 .ep-body .own-wrap { margin-top: 0.6rem; }
 /* --- end series revamp: the public pages (slice 4) --- */
+
+/* The Ad Curator on a podcast (pages/ad-plan/[episodeId].js; Jose,
+   2026-11-13: "Podcasts should be ad free"): what it says instead of a
+   plan to compose. */
+.adc-adfree { max-width: 640px; margin: 2rem auto; padding: 0 16px; display: flex; flex-direction: column; gap: 0.8rem; align-items: flex-start; }
+.adc-adfree h1 { font-family: var(--font-display); font-size: 1.7rem; margin: 0; }
+.adc-adfree-note { color: var(--ink-dim); line-height: 1.55; margin: 0; }
+.adc-adfree-note strong { color: var(--ink); }
+
+/* "Contains flashing lights" (components/FlashingLightsField.js; Jose,
+   2026-11-13): the uploader's checkbox, with the hint under the label and,
+   on a live title whose warning only the team can take off, the line why
+   it is greyed. */
+.flash-field { margin: 0.2rem 0 0.9rem; }
+.flash-check { display: flex; gap: 0.65rem; align-items: flex-start; cursor: pointer; }
+.flash-check input { width: 18px; height: 18px; margin: 0.15rem 0 0; flex: none; accent-color: var(--brass); color-scheme: dark; cursor: pointer; }
+.flash-check-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.flash-check-label { font-weight: 600; color: var(--ink); }
+.flash-check-hint { font-size: 0.82rem; color: var(--ink-dim); line-height: 1.4; }
+.flash-check-lock { color: var(--warn); }
+.flash-field.locked .flash-check, .flash-field.locked .flash-check input { cursor: not-allowed; }
+.flash-field.locked .flash-check-label { color: var(--ink-dim); }

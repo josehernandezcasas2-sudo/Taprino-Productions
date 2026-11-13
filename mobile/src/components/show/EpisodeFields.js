@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Pressable, Text, TextInput, View, StyleSheet } from 'react-native';
 import { MAIN_GENRES } from '../../lib/submitRules';
 import { ONE_LINE_MAX } from '../../lib/showRules';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 import { useContentRatings } from '../../lib/contentAdvisory';
 import { brassTint, colors, fonts, inkTint, oliveTint } from '../../lib/theme';
 import { ClockIcon } from '../WorkIcons';
@@ -68,8 +69,10 @@ export function AboutField({ value, onChange, max, policy, edited = false, label
   );
 }
 
-function tierWord(t) {
-  return t === 'premium' ? PREMIUM_WORD : 'Free with ads';
+// A podcast carries no ads of ours (mobile/src/lib/adBreakRules.js): its
+// free tier is just "Free".
+function tierWord(t, adFree = false) {
+  return t === 'premium' ? PREMIUM_WORD : adFree ? 'Free' : 'Free with ads';
 }
 
 // "Same as the show": one row per inherited field. Tap a row to open its
@@ -81,7 +84,7 @@ function tierWord(t) {
 export function SameAsShow({ ctx, inShow = true }) {
   const [open, setOpen] = useState(null);
   const ratings = useContentRatings() || [];
-  const { form, set, defaults = {}, showYear = null, resets, reset, pol } = ctx;
+  const { form, set, defaults = {}, showYear = null, resets, reset, pol, adFree = false } = ctx;
   const d = defaults || {};
   // Genre label, Made by and the year borrow the show's when blank (on
   // every page); the main genre, the rating and Who can watch were copied
@@ -157,11 +160,11 @@ export function SameAsShow({ ctx, inShow = true }) {
       key: 'tier',
       label: 'Who can watch',
       policy: pol('tier'),
-      value: tierWord(form.tier),
+      value: tierWord(form.tier, adFree),
       tier: form.tier,
       state: stateOf('tier', form.tier, d.tier),
       resetKeys: ['tier'],
-      editor: <ChoiceChips options={[{ value: 'free', label: tierWord('free') }, { value: 'premium', label: tierWord('premium') }]} value={form.tier} disabled={!isOpen(pol('tier'))} onChange={(t) => set('tier', t)} />,
+      editor: <ChoiceChips options={[{ value: 'free', label: tierWord('free', adFree) }, { value: 'premium', label: tierWord('premium', adFree) }]} value={form.tier} disabled={!isOpen(pol('tier'))} onChange={(t) => set('tier', t)} />,
       ask: 'Ask us to change who can watch'
     }
   ];
@@ -311,14 +314,16 @@ export function PlaceBlock({ place }) {
 
 // The folded options: runtime, ad breaks, ads, channels, the hero spot,
 // Tapa Original (the last two are the studio's on a live title).
-export function MoreOptions({ form, set, pol, live = false }) {
+// A podcast (`adFree`, mobile/src/lib/adBreakRules.js) has no ad breaks and
+// no ads switch: it says it is ad-free instead.
+export function MoreOptions({ form, set, pol, live = false, adFree = false }) {
   const [open, setOpen] = useState(false);
   return (
     <View style={ss.card}>
       <Pressable style={ef.moreHead} onPress={() => setOpen((o) => !o)} accessibilityRole="button" accessibilityState={{ expanded: open }}>
         <View style={{ flex: 1, gap: 2 }}>
           <Text style={ef.moreTitle}>More options</Text>
-          <Text style={ss.small}>Runtime, ad breaks, let channels air it{live ? ', the hero spot and Tapa Original (the last two are set by the studio)' : ', the hero spot, Tapa Original'}</Text>
+          <Text style={ss.small}>Runtime, {adFree ? '' : 'ad breaks, '}let channels air it{live ? ', the hero spot and Tapa Original (the last two are set by the studio)' : ', the hero spot, Tapa Original'}</Text>
         </View>
         <View style={{ transform: [{ rotate: open ? '90deg' : '0deg' }] }}><ChevronIcon size={16} color={colors.inkDim} /></View>
       </Pressable>
@@ -329,14 +334,20 @@ export function MoreOptions({ form, set, pol, live = false }) {
               <FieldHead label="Runtime" hint="MM:SS" locked={pol('runtime').mode === 'locked'} />
               <EdInput value={form.runtime} placeholder="22:04" maxLength={9} disabled={!isOpen(pol('runtime'))} onChangeText={(t) => set('runtime', t)} accessibilityLabel="Runtime" />
             </View>
-            <View style={{ flex: 1, gap: 6, minWidth: 130 }}>
-              <FieldHead label="Ad breaks" hint="MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
-              <EdInput value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChangeText={(t) => set('adBreaksText', t)} accessibilityLabel="Ad breaks" />
-            </View>
+            {adFree ? null : (
+              <View style={{ flex: 1, gap: 6, minWidth: 130 }}>
+                <FieldHead label="Ad breaks" hint="MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
+                <EdInput value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChangeText={(t) => set('adBreaksText', t)} accessibilityLabel="Ad breaks" />
+              </View>
+            )}
           </View>
-          <SwitchRow title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
-            Off plays it without ad breaks for everyone.
-          </SwitchRow>
+          {adFree ? (
+            <Text style={ss.small}>{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</Text>
+          ) : (
+            <SwitchRow title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
+              Off plays it without ad breaks for everyone.
+            </SwitchRow>
+          )}
           <SwitchRow title="Let channels air it" on={form.channelOptIn} onChange={(v) => set('channelOptIn', v)} disabled={!isOpen(pol('channelOptIn'))} policy={pol('channelOptIn').mode === 'locked' ? pol('channelOptIn') : null}>
             TapaTV can schedule it live, with ads.
           </SwitchRow>

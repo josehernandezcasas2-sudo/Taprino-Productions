@@ -42,6 +42,47 @@ for (const [label, m] of [['web', web], ['app', app]]) {
     assert.equal(m.reelAdsOn({ isAdmin: true }), false);
   });
 
+  t(`${label}: podcasts are ad-free (Jose, 2026-11-13)`, () => {
+    assert.equal(m.adsOnFor({ contentType: 'podcast' }), false, 'a podcast, signed out');
+    assert.equal(m.adsOnFor({ contentType: 'podcast', adsEnabled: true }), false, 'its own switch on changes nothing');
+    for (const type of ['series', 'movie', 'short', 'vertical', 'bonus', null, undefined]) {
+      assert.equal(m.adsOnFor({ contentType: type }), true, `${type} keeps its ads`);
+    }
+    assert.equal(m.adFreeContent('podcast'), true);
+    assert.equal(m.adFreeContent('series'), false);
+    assert.equal(m.adFreeContent(undefined), false);
+    assert.deepEqual(m.AD_FREE_CONTENT_TYPES, ['podcast']);
+    assert.equal(m.PODCASTS_AD_FREE, 'Podcasts are ad-free.');
+    // No ads → no breaks, no plan, no pre-roll, whatever the title carries.
+    const adsOn = m.adsOnFor({ contentType: 'podcast' });
+    assert.deepEqual(m.titleBreaks({ adsOn, adPlan: PLAN, adBreakSeconds: [0, 600] }), []);
+    assert.equal(m.planFor(adsOn, PLAN), null);
+    assert.equal(m.preRollOf(m.titleBreaks({ adsOn, adBreakSeconds: [0] })), null);
+  });
+
+  t(`${label}: one mute for the ad and the programme`, () => {
+    assert.equal(m.isSilent({}), false);
+    assert.equal(m.isSilent({ muted: true }), true);
+    assert.equal(m.isSilent({ volume: 0 }), true, 'turned all the way down');
+    assert.equal(m.isSilent({ volume: 0.4 }), false);
+    assert.equal(m.adVolume({}), 1, 'a player as it starts');
+    assert.equal(m.adVolume({ muted: true, volume: 0.8 }), 0, 'muted: the ad is silent too');
+    assert.equal(m.adVolume({ volume: 0.4 }), 0.4, 'the player’s own level');
+    assert.equal(m.adVolume({ volume: 0 }), 0);
+    assert.equal(m.adVolume({ volume: 3 }), 1, 'never past full');
+    assert.equal(m.adVolume({ volume: NaN }), 0);
+    assert.deepEqual(m.muteToggle({ muted: false, volume: 0.6 }), { muted: true, volume: 0.6 }, 'sound → muted at its level');
+    assert.deepEqual(m.muteToggle({ muted: true, volume: 0.6 }), { muted: false, volume: 0.6 }, 'muted → its level again');
+    assert.deepEqual(m.muteToggle({ muted: false, volume: 0 }), { muted: false, volume: 1 }, 'turned down: "Unmute" brings the sound back');
+    assert.deepEqual(m.muteToggle({ muted: true, volume: 0 }), { muted: false, volume: 1 });
+    assert.deepEqual(m.muteToggle({}), { muted: true, volume: 1 });
+    // Pressing twice comes back to where it was (unless it was turned all the way down).
+    const once = m.muteToggle({ muted: false, volume: 0.3 });
+    assert.deepEqual(m.muteToggle(once), { muted: false, volume: 0.3 });
+    assert.equal(m.muteLabel(true), 'Unmute');
+    assert.equal(m.muteLabel(false), 'Mute');
+  });
+
   t(`${label}: a title's breaks — plain, a ready plan, none`, () => {
     assert.deepEqual(m.breakTimes(null), [0]);
     assert.deepEqual(m.breakTimes([]), [0]);

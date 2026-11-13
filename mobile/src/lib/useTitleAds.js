@@ -28,6 +28,9 @@ import { withGoogleFill } from './adSlots';
 //                      website's player passes them on 'seeked'
 //   ads.state, ads.player, ads.visit, ads.resume, ads.nudge
 //                      for components/AdBreakLayer.js and the player
+//   ads.setMuted(m), ads.setVolume(v)
+//                      the player's mute button while a break runs (the
+//                      ad starts at the title's own sound)
 //
 // The title is paused under the break and plays again when it ends (or
 // fails, or comes back with nothing). Leaving the screen stops a break and
@@ -66,7 +69,18 @@ export function useTitleAds({ player, episodeId, adsOn, adPlan = null, adBreakSe
     // this one is back, so nothing plays or counts out of sight.
     if (!focusedRef.current) { track.current.deferred = brk; return; }
     track.current.deferred = null;
+    // The ad starts at the title's own sound (one mute,
+    // mobile/src/lib/adBreakRules.js "the sound"): a muted title gets a
+    // muted ad, and the player's mute button reaches both while it plays.
+    let muted = false;
+    let volume = null;
+    try {
+      muted = Boolean(p.muted);
+      volume = typeof p.volume === 'number' ? p.volume : null;
+    } catch { /* a released player */ }
     startRef.current(withGoogleFill(titleSlot(brk, id), live.current.googleAdTag), {
+      muted,
+      volume,
       onDone: () => {
         holdRef.current = false;
         const cur = live.current.player;

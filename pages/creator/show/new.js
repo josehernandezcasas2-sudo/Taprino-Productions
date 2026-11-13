@@ -7,6 +7,7 @@ import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getPublicIdentities } from '../../../lib/userProfiles';
 import { MAIN_GENRES } from '../../../lib/submitRules';
 import { SITE } from '../../../lib/siteConfig';
+import { PODCASTS_AD_FREE } from '../../../lib/adBreakRules';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
 import RatingOptions from '../../../components/RatingOptions';
@@ -191,20 +192,25 @@ export default function NewShowPage({ displayName, mainGenres, isSignedIn, isSub
               <div className="apl-field">
                 <span className="apl-label" id="ns-tier">Who can watch</span>
                 <div className="apl-pills" role="radiogroup" aria-labelledby="ns-tier">
-                  {[['free', 'Free with ads'], ['premium', SITE.premiumTier]].map(([v, l]) => (
+                  {[['free', podcast ? 'Free' : 'Free with ads'], ['premium', SITE.premiumTier]].map(([v, l]) => (
                     <button key={v} type="button" role="radio" aria-checked={tier === v ? 'true' : 'false'} className={`apl-pill ${tier === v ? 'on' : ''}`} onClick={() => setTier(v)}>{l}</button>
                   ))}
                 </div>
-                <p className="apl-help">Free with ads, or {SITE.premiumTier} members only. The studio has the final say.</p>
+                <p className="apl-help">{podcast ? 'Free' : 'Free with ads'}, or {SITE.premiumTier} members only. The studio has the final say.</p>
               </div>
               <div className="apl-field">
                 <label className="apl-label" htmlFor="ns-artist">{podcast ? 'Hosted by' : 'Made by'}</label>
                 <input id="ns-artist" type="text" maxLength={120} value={artist} placeholder="Your name, as credited" onChange={(e) => setArtist(e.target.value)} />
               </div>
-              <div className="new-show-switch-row">
-                <span id="ns-ads">Ads between scenes</span>
-                <button type="button" role="switch" aria-checked={adsEnabled ? 'true' : 'false'} aria-labelledby="ns-ads" className={`seal-switch show-ed-switch ${adsEnabled ? 'on' : ''}`} onClick={() => setAdsEnabled((v) => !v)} />
-              </div>
+              {/* A podcast carries no ads of ours (lib/adBreakRules.js). */}
+              {podcast ? (
+                <p className="apl-help">{PODCASTS_AD_FREE} No ad of ours plays in an episode; a sponsor read in your own audio is yours.</p>
+              ) : (
+                <div className="new-show-switch-row">
+                  <span id="ns-ads">Ads between scenes</span>
+                  <button type="button" role="switch" aria-checked={adsEnabled ? 'true' : 'false'} aria-labelledby="ns-ads" className={`seal-switch show-ed-switch ${adsEnabled ? 'on' : ''}`} onClick={() => setAdsEnabled((v) => !v)} />
+                </div>
+              )}
               </div>
             </details>
 

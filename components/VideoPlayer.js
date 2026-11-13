@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
 import { useImaSdk } from '../lib/imaSdk';
 import { runImaBreak, googleRequestTag } from '../lib/imaAdBreak';
-import { titleBreaks, preRollOf, AD_START_NOTE } from '../lib/adBreakRules';
+import { titleBreaks, preRollOf, AD_START_NOTE, adFreeContent, adVolume, isSilent, muteToggle } from '../lib/adBreakRules';
+import AdMuteButton from './AdMuteButton';
 import { useContentRatings } from './RatingOptions';
 import ContentAdvisory from './ContentAdvisory';
 import EndCard from './EndCard';
@@ -69,7 +70,11 @@ function formatTime(seconds) {
 
 export default function VideoPlayer({
   episode,
-  adsEnabled,
+  // Whether this viewer gets ads on this title (lib/adBreakRules.js
+  // adsOnFor). A podcast never does, whatever it is handed (Jose,
+  // 2026-11-13: "Podcasts should be ad free"): no pre-roll, no break, no
+  // plan pod, no IMA, no Google.
+  adsEnabled: adsEnabledProp,
   onEnded,
   initialPosition,
   onProgress,
@@ -111,6 +116,7 @@ export default function VideoPlayer({
   // because the trailer already "started" it.
   programKey = null
 }) {
+  const adsEnabled = Boolean(adsEnabledProp) && !adFreeContent(episode && episode.contentType);
   const videoRef = useRef(null);
   const shellRef = useRef(null);
   const iconOverrides = usePlayerIconOverrides();
@@ -196,6 +202,12 @@ export default function VideoPlayer({
   const podRunRef = useRef(null);
   const stopPodRef = useRef(() => {});
   const [podCard, setPodCard] = useState(null);
+  // The browser refused a pod's ad with sound (autoplay rules: Safari asks
+  // for a tap on each new <video>), so it plays muted although the player
+  // isn't: the ad's mute button reads "Unmute" and a press gives it its
+  // sound — the programme's own mute is never changed by the browser's.
+  const podForcedMuteRef = useRef(false);
+  const [podForcedMute, setPodForcedMute] = useState(false);
   // Caption tracks can arrive two ways: advertised inside the HLS manifest
   // (captions uploaded to Cloudflare Stream) or as a <track> element built
   // from episode.captionsUrl. Both end up in this one list so the CC menu
@@ -334,6 +346,18 @@ export default function VideoPlayer({
     const onVol = () => {
       setVolume(v.volume);
       setMuted(v.muted);
+      // One mute (lib/adBreakRules.js "the sound"): an ad on screen plays
+      // at the player's sound — IMA's (a break being asked for or playing,
+      // else the manager a VMAP tag keeps) and a ready plan's pod.
+      if (adRunRef.current && adRunRef.current.syncVolume) adRunRef.current.syncVolume();
+      else if (adsManagerRef.current) {
+        try { adsManagerRef.current.setVolume(adVolume({ muted: v.muted, volume: v.volume })); } catch (err) { /* no ad on it */ }
+      }
+      const pv = podRef.current;
+      if (pv && podRunRef.current) {
+        pv.volume = v.volume;
+        pv.muted = v.muted || podForcedMuteRef.current;
+      }
     };
     const onRate = () => setRate(v.playbackRate);
 
@@ -743,6 +767,8 @@ export default function VideoPlayer({
       pv.load();
     }
     setPodCard(null);
+    podForcedMuteRef.current = false;
+    setPodForcedMute(false);
   }, []);
   stopPodRef.current = stopPod;
 
@@ -780,6 +806,8 @@ export default function VideoPlayer({
       pv.load();
       setPodCard(null);
       setAdState(null);
+      podForcedMuteRef.current = false;
+      setPodForcedMute(false);
       v.play().catch(() => {});
     };
     function next() {
@@ -794,9 +822,18 @@ export default function VideoPlayer({
       if (it.type === 'ad' || it.type === 'bumper') {
         setPodCard(null);
         if (it.type === 'ad' && it.impressionUrl) { try { new Image().src = it.impressionUrl; } catch (err) { /* counting is best effort */ } }
+        // The player's sound (one mute: lib/adBreakRules.js). A browser
+        // that refuses it with sound gets it muted, and only the ad is.
         pv.volume = v.volume;
-        pv.muted = v.muted;
-        const start = () => pv.play().catch(() => { pv.muted = true; pv.play().catch(() => {}); });
+        pv.muted = v.muted || podForcedMuteRef.current;
+        const start = () => pv.play().catch(() => {
+          if (!pv.muted) {
+            podForcedMuteRef.current = true;
+            setPodForcedMute(true);
+          }
+          pv.muted = true;
+          pv.play().catch(() => {});
+        });
         onT = () => setAdState((s) => (s ? { ...s, remaining: Math.max(0, (pv.duration || it.seconds) - pv.currentTime) } : s));
         pv.addEventListener('ended', next);
         pv.addEventListener('error', next);
@@ -1053,10 +1090,33 @@ export default function VideoPlayer({
     [seekTo]
   );
 
+  // The player's mute, the same button on the ad (lib/adBreakRules.js
+  // muteToggle: a silent player gets its sound back, at full volume when it
+  // had been turned all the way down; anything else is muted). On a pod the
+  // browser forced silent, a press gives the ad its sound — the press is
+  // the tap the browser wanted.
   const toggleMute = useCallback(() => {
     const v = videoRef.current;
     if (!v) return;
-    v.muted = !v.muted;
+    const pv = podRef.current;
+    const forced = Boolean(podRunRef.current) && podForcedMuteRef.current;
+    if (forced || isSilent({ muted: v.muted, volume: v.volume })) {
+      const next = muteToggle({ muted: true, volume: v.volume });
+      v.volume = next.volume;
+      v.muted = false;
+      if (forced && pv) {
+        podForcedMuteRef.current = false;
+        setPodForcedMute(false);
+        pv.volume = v.volume;
+        pv.muted = false;
+        // Still playing (muted) is the usual case: unmuting is enough. A
+        // file the browser stopped outright plays again; an ad that has
+        // ended (a card is up) is never started over.
+        if (pv.paused && !pv.ended && pv.currentSrc) safePlay(pv);
+      }
+      return;
+    }
+    v.muted = true;
   }, []);
 
   const changeVolume = useCallback((val) => {
@@ -1189,7 +1249,11 @@ export default function VideoPlayer({
 
   const onKeyDown = useCallback(
     (e) => {
-      if (adState) return; // controls are locked out during an ad
+      // Controls are locked out during an ad, except its mute (M).
+      if (adState) {
+        if (e.key === 'm') toggleMute();
+        return;
+      }
       if (showEndCard) return; // the end card has the keys (components/EndCard.js)
       // The advisory card: Enter, Space or Escape takes it away (and lets
       // a held video go); play/pause never starts the video under it.
@@ -1378,6 +1442,7 @@ export default function VideoPlayer({
 
       {adState && (
         <div className="tp-adbar">
+          <AdMuteButton silent={muted || volume === 0 || (Boolean(adState.pod) && podForcedMute)} onToggle={toggleMute} icons={iconOverrides} />
           <span className="tp-adbar-tag">Ad</span>
           <span>
             {adState.index} of {adState.total}

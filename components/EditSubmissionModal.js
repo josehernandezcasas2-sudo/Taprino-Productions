@@ -3,6 +3,7 @@ import { SITE } from '../lib/siteConfig';
 import { MAIN_GENRES, SUBMIT_TYPES } from '../lib/submitRules';
 import RatingOptions from './RatingOptions';
 import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
+import FlashingLightsField from './FlashingLightsField';
 import { savePageNotes } from '../lib/pageNotesSave';
 
 // A standalone title's own types: the ones that sit in no show.
@@ -36,7 +37,10 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
     rating: submission.rating || '',
     genre: submission.genre || '',
     mainGenre: submission.mainGenre || MAIN_GENRES[0],
-    tier: submission.tier || 'free'
+    tier: submission.tier || 'free',
+    // "Contains flashing lights" (Jose, 2026-11-13): still in review, so
+    // the uploader ticks and unticks it freely (edit-submission checks).
+    hasFlashingLights: submission.hasFlashingLights === true
   });
   const startNotes = submission.pageNotes || '';
   const [notes, setNotes] = useState(startNotes);
@@ -123,6 +127,8 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
             <option value="">Not set</option>
             <RatingOptions />
           </select>
+
+          <FlashingLightsField id="edit-submission-flashing" checked={form.hasFlashingLights} onChange={(v) => update('hasFlashingLights', v)} />
 
           <label>Main genre</label>
           <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>

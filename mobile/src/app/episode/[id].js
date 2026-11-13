@@ -310,14 +310,16 @@ export default function Episode() {
   const activeSrc = showingTrailer ? trailerLink.src : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
   // The title's ads (the website's adsEnabled: never a preview, a trailer,
-  // an ad-free member, the team or a buyer, nor a title with ads off).
+  // an ad-free member, the team or a buyer, nor a title with ads off, nor
+  // a podcast — podcasts are ad-free, mobile/src/lib/adBreakRules.js).
   const adsOn = Boolean(episode) && adsOnFor({
     previewing,
     trailer: showingTrailer,
     adFree: Boolean(state.page && state.page.adFree),
     isAdmin: Boolean(state.page && state.page.isAdmin),
     owned,
-    adsEnabled: episode ? episode.adsEnabled : false
+    adsEnabled: episode ? episode.adsEnabled : false,
+    contentType: episode ? episode.contentType : null
   });
   const titleAds = useTitleAds({
     player,

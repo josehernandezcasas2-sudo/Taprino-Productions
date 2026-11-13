@@ -39,7 +39,7 @@ export default function AdminAdPlans({ account, mainGenres, apiPath = '/api/admi
 
   return (
     <AdminShell account={account} mainGenres={mainGenres} title="Episode ad plans" crumbs={['Ads']}
-      intro="Every approved episode and the state of its ad plan. Open the curator to compose the breaks; only a plan saved “ready for air” changes what the channel and the player do.">
+      intro="Every approved episode and the state of its ad plan. Open the curator to compose the breaks; only a plan saved “ready for air” changes what the channel and the player do. Podcasts are ad-free, so they aren’t listed.">
       {error && <div className="crew-status error" style={{ marginBottom: '0.8rem' }}>{error}</div>}
       {!episodes && !error && <div className="crew-mono">Loading…</div>}
       {episodes && (

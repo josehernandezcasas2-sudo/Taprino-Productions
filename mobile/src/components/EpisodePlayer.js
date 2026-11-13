@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Modal, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { VideoView } from 'expo-video';
+import { useEvent } from 'expo';
 import { StatusBar } from 'expo-status-bar';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import Svg, { Path, Rect } from 'react-native-svg';
@@ -12,6 +13,8 @@ import { useCaptionTrack, useCaptionsPref } from '../lib/captions';
 import { captionTextAt } from '../lib/vtt';
 import EndCard from './EndCard';
 import AdBreakLayer from './AdBreakLayer';
+import MuteGlyph from './MuteGlyph';
+import { muteLabel, muteToggle } from '../lib/adBreakRules';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -75,7 +78,11 @@ function fullChrome(c) {
     adVisit: { right: c.padRight, bottom: s(50) + c.padBottom, paddingVertical: s(8), paddingHorizontal: s(14) },
     adVisitText: { fontSize: s(11.5), letterSpacing: s(1) },
     adCardKicker: { fontSize: s(12.5), letterSpacing: s(1.5) },
-    adCardBrand: { fontSize: s(30) }
+    adCardBrand: { fontSize: s(30) },
+    // The ad's mute at the start of its bar (the player's own speaker).
+    adMute: { width: s(40), height: s(40), borderRadius: s(20), marginVertical: -s(6) },
+    adMuteIcon: s(20),
+    adWords: { gap: s(12) }
   };
 }
 const { OrientationLock, Orientation } = ScreenOrientation;
@@ -158,7 +165,16 @@ function RestoreGlyph({ size = 11 }) {
 // its layer (components/AdBreakLayer.js) covers the picture in whichever
 // view is showing — the ad's own player, "Ad · 1 of 2 · 0:12 left", "Visit
 // … ↗" — and the title's controls, captions, toasts, the advisory and the
-// end card wait; taps do nothing, except the close × in full screen.
+// end card wait; taps do nothing, except the close × in full screen and
+// the ad's mute.
+//
+// The mute (Jose, 2026-11-13: "Allow tv ads to be muted"): a speaker in
+// the bar mutes the title, and the same button sits at the start of an
+// ad's bar — one mute (mobile/src/lib/adBreakRules.js "the sound"): it is
+// the title player's `muted`, handed to the ad's player as a break starts
+// (mobile/src/lib/useTitleAds.js) and on every press during one, so
+// muting during the ad keeps the programme muted after it and a muted
+// title starts its ad muted. Mute only — an ad has no skip or seek.
 export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, ad = null, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
@@ -187,6 +203,25 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   // the browser sheet with it, and nothing would say the visit was over).
   const visitingRef = useRef(false);
   visitingRef.current = Boolean(ad && ad.state && ad.state.visiting);
+
+  // The one mute: the title player's own, followed live.
+  // (Its volume is never turned down in the app — the phone's buttons do
+  // that — so silent is muted; muteToggle still mends a zero volume.)
+  const { muted } = useEvent(player, 'mutedChange', { muted: Boolean(player && player.muted) });
+  const silent = Boolean(muted);
+  function toggleMute() {
+    showControls();
+    if (!player) return;
+    let next;
+    try {
+      next = muteToggle({ muted: player.muted, volume: player.volume });
+      player.volume = next.volume;
+      player.muted = next.muted;
+    } catch { return; /* a released player */ }
+    const a = adRef.current;
+    if (a && a.setVolume) a.setVolume(next.volume);
+    if (a && a.setMuted) a.setMuted(next.muted);
+  }
 
   // Captions: on or off (the phone remembers), the file once they're on.
   const captionsPath = captions && captions.path ? captions.path : null;
@@ -384,7 +419,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
           <View style={absoluteFill} />
           {/* The Modal keeps drawing while it fades out on iOS: only the
               view that's showing holds the ad's player. */}
-          {!full || fullscreen ? <AdBreakLayer ad={ad} full={full} F={F} /> : null}
+          {!full || fullscreen ? <AdBreakLayer ad={ad} full={full} F={F} mute={{ silent, onToggle: toggleMute }} /> : null}
           {full ? (
             <View style={[styles.top, F.top]} pointerEvents="box-none">
               <Pressable style={[styles.round, F.round]} onPress={() => exitFullscreen(true)} accessibilityRole="button" accessibilityLabel="Leave full screen" hitSlop={10}>
@@ -468,6 +503,9 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
                   </Pressable>
                 ) : null}
                 <View style={{ flex: 1 }} />
+                <Pressable style={[styles.round, full && F.round]} onPress={toggleMute} accessibilityRole="button" accessibilityLabel={muteLabel(silent)} hitSlop={8}>
+                  <MuteGlyph muted={silent} size={full ? F.fsIcon : 20} />
+                </Pressable>
                 {ccAvailable ? (
                   <Pressable
                     style={[styles.round, full && F.round, ccOn && styles.ccOn]}

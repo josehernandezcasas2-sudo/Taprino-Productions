@@ -10,6 +10,7 @@ import { AccountFrame } from '../../../components/account/AccountBits';
 import { Check, Chips, Field, PrimaryButton, Switch, cp, pickImageAsDataUrl } from '../../../components/CreatorBits';
 import SmartImage from '../../../components/SmartImage';
 import { PREMIUM_WORD, UploadIcon, LinkText, ss } from '../../../components/show/ShowBits';
+import { PODCASTS_AD_FREE } from '../../../lib/adBreakRules';
 
 // New show in the app (the series revamp, slice 5; the website's
 // pages/creator/show/new.js, spec "New show"): name it, say what it is (a
@@ -163,13 +164,16 @@ export default function NewShowScreen() {
           <Chips small options={[{ value: '', label: 'Not set' }, ...ratings.map((r) => ({ value: r.code, label: r.code }))]} value={rating} onChange={setRating} />
         </Field>
         <Field label="Who can watch">
-          <Chips options={[{ value: 'free', label: 'Free with ads' }, { value: 'premium', label: PREMIUM_WORD }]} value={tier} onChange={setTier} />
-          <Text style={cp.help}>Free with ads, or {PREMIUM_WORD} members only. The studio has the final say.</Text>
+          <Chips options={[{ value: 'free', label: podcast ? 'Free' : 'Free with ads' }, { value: 'premium', label: PREMIUM_WORD }]} value={tier} onChange={setTier} />
+          <Text style={cp.help}>{podcast ? 'Free' : 'Free with ads'}, or {PREMIUM_WORD} members only. The studio has the final say.</Text>
         </Field>
         <Field label={podcast ? 'Hosted by' : 'Made by'}>
           <TextInput style={cp.input} value={artist} maxLength={120} onChangeText={(t) => { setArtistTouched(true); setArtist(t); }} placeholder="Your name, as credited" placeholderTextColor={colors.inkFaint} />
         </Field>
-        <Switch on={adsEnabled} label="Ads between scenes" onPress={() => setAdsEnabled((v) => !v)} />
+        {/* A podcast carries no ads of ours (mobile/src/lib/adBreakRules.js). */}
+        {podcast
+          ? <Text style={cp.help}>{PODCASTS_AD_FREE} No ad of ours plays in an episode; a sponsor read in your own audio is yours.</Text>
+          : <Switch on={adsEnabled} label="Ads between scenes" onPress={() => setAdsEnabled((v) => !v)} />}
       </View>
 
       <View style={cp.card}>

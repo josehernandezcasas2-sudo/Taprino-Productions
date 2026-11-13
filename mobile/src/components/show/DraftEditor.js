@@ -18,6 +18,7 @@ import {
 import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, TitleField } from './EpisodeFields';
 import { RoomToast, SmallButton, UploadIcon, episodeEditorRoute, shortDate, showRoute, ss, useRoomToast } from './ShowBits';
 import ExtraKindField from '../ExtraKindField';
+import FlashingLightsField from '../FlashingLightsField';
 import { extraKindChoice } from '../../lib/extraKinds';
 
 // The editor for a draft in the app (the series revamp, slice 5; the
@@ -59,6 +60,7 @@ function draftFormOf(d) {
     channelOptIn: f.channelOptIn === true,
     featured: f.featured === true,
     isOriginal: f.isOriginal === true,
+    hasFlashingLights: f.hasFlashingLights === true,
     season: Number(f.season) || 1,
     number: f.seriesOrder ? String(f.seriesOrder) : '',
     // An extra's kind (migration 121), kept in the draft as the field holds
@@ -86,6 +88,7 @@ function draftValues(form) {
     channelOptIn: form.channelOptIn,
     featured: form.featured,
     isOriginal: form.isOriginal,
+    hasFlashingLights: form.hasFlashingLights === true,
     season: String(Number(form.season) || 1),
     seriesOrder: String(form.number || '').trim(),
     extraKindChoice: form.extraKindChoice || '',
@@ -111,7 +114,7 @@ function formChange(init, form) {
   return change;
 }
 
-const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', season: 'place', seriesOrder: 'place', extraKindChoice: 'extraKind', extraKindOther: 'extraKind' };
+const FIELD_OF = { title: 'title', description: 'description', mainGenre: 'mainGenre', genre: 'genre', artist: 'artist', releaseYear: 'releaseYear', rating: 'rating', tier: 'tier', runtime: 'runtime', fundingUrl: 'fundingUrl', adsEnabled: 'adsEnabled', adBreaksText: 'adBreakSeconds', channelOptIn: 'channelOptIn', featured: 'featured', isOriginal: 'isOriginal', hasFlashingLights: 'hasFlashingLights', season: 'place', seriesOrder: 'place', extraKindChoice: 'extraKind', extraKindOther: 'extraKind' };
 
 function findRow(view, id) {
   for (const s of (view && view.seasons) || []) for (const r of s.rows || []) if (r.kind === 'draft' && r.id === id) return r;
@@ -481,7 +484,11 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
           <View style={ss.card}>
             <AboutField value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={DIRECT} edited={edited('description')} />
           </View>
-          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: title }} />
+          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: title, adFree: kind === 'podcast' }} />
+          {/* A draft is never live: the uploader ticks and unticks it freely. */}
+          <View style={ss.card}>
+            <FlashingLightsField checked={form.hasFlashingLights} onChange={(v) => set('hasFlashingLights', v)} />
+          </View>
           <View style={ss.card}>
             <FieldHead label="Funding link" hint="optional" />
             <EdInput value={form.fundingUrl} placeholder="https://" maxLength={500} keyboardType="url" autoCapitalize="none" autoCorrect={false} onChangeText={(t) => set('fundingUrl', t)} accessibilityLabel="Funding link" />
@@ -490,7 +497,7 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
             <Text style={ss.cardK}>Once it’s sent</Text>
             <Text style={ss.small}>Its own poster and still (it uses {show ? `${show.name}’s` : 'the show’s'} art until then), captions, a trailer, its own page and the credits are added in this editor once the draft is sent for review.</Text>
           </View>
-          <MoreOptions form={form} set={set} pol={pol} />
+          <MoreOptions form={form} set={set} pol={pol} adFree={kind === 'podcast'} />
 
           <SectionHead label="Place" />
           <View style={ss.card}>

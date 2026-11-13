@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { isHttpUrl } from '../lib/safeUrl';
+import { VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { muteLabel } from '../lib/adBreakRules';
 
 // Sibling to ReelPlayer.js, not a variant of it — an ad card has no HLS
 // source (ad creatives are uploaded as direct MP4 files, never
@@ -7,7 +9,13 @@ import { isHttpUrl } from '../lib/safeUrl';
 // own tracking and disclosure label that a regular content slide has no
 // use for. Keeping these separate means a future change to how content
 // clips play can never accidentally alter ad behavior, or vice versa.
+//
+// Its mute (Jose, 2026-11-13: "Allow tv ads to be muted"): a tap anywhere
+// still toggles it, and a speaker button top-right (where a content
+// slide's menu sits; an ad card has none) says which it is — the feed's
+// own mute, so the clips after the ad stay as the viewer set them.
 export default function ReelAdCard({ ad, active, muted, onToggleMute }) {
+  const icons = usePlayerIconOverrides();
   const videoRef = useRef(null);
   const impressionFiredRef = useRef(false);
 
@@ -57,6 +65,14 @@ export default function ReelAdCard({ ad, active, muted, onToggleMute }) {
         loop
       />
       <div className="reel-ad-badge">Ad</div>
+      <button
+        type="button"
+        className="reel-ad-mute"
+        onClick={(e) => { e.stopPropagation(); if (onToggleMute) onToggleMute(); }}
+        aria-label={muteLabel(muted)}
+      >
+        <VolumeIcon muted={muted} size={17} src={muted ? icons.volume_muted : icons.volume_on} />
+      </button>
       <div className="reel-caption">
         <div className="reel-caption-title">{ad.title}</div>
         {isHttpUrl(ad.clickUrl) && (

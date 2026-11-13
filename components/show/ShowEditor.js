@@ -7,6 +7,7 @@ import { fieldPolicy, fieldPolicyLine, joinDescription, saveSummary, splitDescri
 import { SEASON_ART_122_MSG, SEASON_ART_PER_SAVE, seasonArtRows } from '../../lib/seasonArt';
 import { SITE } from '../../lib/siteConfig';
 import { shrinkArtwork } from '../../lib/shrinkImage';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 import RatingOptions from '../RatingOptions';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
 import {
@@ -533,7 +534,8 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
         <div className="show-ed-field">
           <span className="show-ed-label" id="sh-tier-k">Who can watch</span>
           <div className="apl-pills" role="radiogroup" aria-labelledby="sh-tier-k">
-            {[['free', 'Free with ads'], ['premium', SITE.premiumTier]].map(([v, l]) => (
+            {/* A podcast carries no ads of ours (lib/adBreakRules.js). */}
+            {[['free', podcast ? 'Free' : 'Free with ads'], ['premium', SITE.premiumTier]].map(([v, l]) => (
               <button key={v} type="button" role="radio" aria-checked={form.tier === v ? 'true' : 'false'} className={`apl-pill ${form.tier === v ? 'on' : ''}`} disabled={!isOpen(defaultsPolicy)} onClick={() => set('tier', v)}>{l}</button>
             ))}
           </div>
@@ -542,7 +544,9 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
           <FieldHead htmlFor="sh-artist" label={podcast ? 'Hosted by' : 'Made by'} />
           <input id="sh-artist" className="show-ed-input" type="text" maxLength={120} value={form.artist} placeholder={show.ownerName || 'Your name, as credited'} disabled={!isOpen(defaultsPolicy)} onChange={(e) => set('artist', e.target.value)} />
         </div>
-        <SwitchRow id="sh-ads" title="Ads between scenes" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(defaultsPolicy)} />
+        {podcast
+          ? <p className="show-ed-hint">{PODCASTS_AD_FREE} No ad of ours plays in an episode; a sponsor read in your own audio is yours.</p>
+          : <SwitchRow id="sh-ads" title="Ads between scenes" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(defaultsPolicy)} />}
         <p className="show-ed-hint show-ed-defaults-note"><InfoIcon size={13} /> Episodes already added keep their own rating and who can watch.</p>
         <FieldNote policy={defaultsPolicy} edited={edited('defaults')} />
       </div>

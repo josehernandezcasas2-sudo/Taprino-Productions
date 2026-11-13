@@ -217,10 +217,10 @@ export async function getServerSideProps({ req, params, query, res }) {
   // Google's Ad Manager tag (lib/googleAds.js), asked for only when our own
   // ads leave a break empty — and in these props only for a viewer who
   // gets ads on this title and can play it (lib/adBreakRules.js adsOnFor:
-  // never an ad-free member, the team, a buyer or a preview). The player
-  // leaves it out on the trailer too.
+  // never an ad-free member, the team, a buyer, a preview or a podcast).
+  // The player leaves it out on the trailer too.
   const googleAdTag = entitled
-    ? googleAdTagFor(adsOnFor({ previewing: Boolean(previewInfo), adFree: account.adFree, isAdmin: account.isAdmin, owned, adsEnabled: episode.adsEnabled }))
+    ? googleAdTagFor(adsOnFor({ previewing: Boolean(previewInfo), adFree: account.adFree, isAdmin: account.isAdmin, owned, adsEnabled: episode.adsEnabled, contentType: episode.contentType }))
     : null;
 
   // Every video is served through a short-lived Cloudflare signed URL
@@ -568,7 +568,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
   const previewPulled = previewing && preview.canPlay === false && !showingTrailer;
   const locked = previewing ? previewPulled : (episode.tier === 'premium' && !isSubscriber && !owned && !showingTrailer) || earlyLocked;
   // Who gets ads here (lib/adBreakRules.js adsOnFor, the rule the app reads too).
-  const titleAdsOn = adsOnFor({ previewing, trailer: showingTrailer, adFree, isAdmin, owned, adsEnabled: episode.adsEnabled });
+  const titleAdsOn = adsOnFor({ previewing, trailer: showingTrailer, adFree, isAdmin, owned, adsEnabled: episode.adsEnabled, contentType: episode.contentType });
   const playingEpisode = showingTrailer
     ? { ...episode, src: episode.trailerSrc }
     : describedActive && episode.audioDescriptionSrc

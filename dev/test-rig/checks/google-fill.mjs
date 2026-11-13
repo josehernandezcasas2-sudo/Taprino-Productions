@@ -77,7 +77,8 @@ let parked = []; // other checks' active house ads, switched off while this runs
 // The seed podcast's first episode is unrated (17+ until rated), so nobody
 // without an age on file can watch it inline; the check rates it TV-G
 // while it runs (and puts its rating back) so the podcast page has an
-// inline video with ads to hand the tag for.
+// inline video — which, podcasts being ad-free (2026-11-13), must come
+// with no tag.
 let podRating;
 
 let haveVideo = false;
@@ -207,22 +208,18 @@ async function httpPart(members) {
   p = await page('/live', ADMIN);
   props = nextData(p.text);
   ok('/live for the team: null, nowhere in the HTML', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
+  // Podcasts are ad-free (2026-11-13; checks/round-nov13.mjs plays one):
+  // the show page carries no tag at all, whoever watches its inline video.
   p = await page(`/podcasts/${IDS.podcast}`, SIGNED_OUT);
   props = nextData(p.text);
-  const inline = props && (props.episodes || []).some((e) => e.src && !e.locked && e.adsEnabled !== false);
-  ok('/podcasts/<show> signed out: an episode to watch inline, ads on', inline, props && (props.episodes || []).map((e) => [e.id, Boolean(e.src), e.locked]));
-  ok(`…googleAdTag ${MODE === 'on' ? 'is the tag' : 'is null'}`, p.status === 200 && props && (props.googleAdTag || null) === expect, `${p.status} ${props && props.googleAdTag}`);
+  const inline = props && (props.episodes || []).some((e) => e.src && !e.locked);
+  ok('/podcasts/<show> signed out: an episode to watch inline, ads off on every episode', inline && (props.episodes || []).every((e) => e.adsEnabled === false), props && (props.episodes || []).map((e) => [e.id, Boolean(e.src), e.locked, e.adsEnabled]));
+  ok('…no googleAdTag prop, nowhere in the HTML (podcasts are ad-free)', p.status === 200 && props && !('googleAdTag' in props) && !leaks(p.text), `${p.status} ${props && props.googleAdTag}`);
   p = await page(`/podcasts/${IDS.podcast}`, members.premium);
   props = nextData(p.text);
-  ok('…for a Premium member: null', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
-  sql(`update public.episodes set ads_enabled = false where id in (${q(IDS.podE1)}, ${q(IDS.podE2)})`);
-  try {
-    p = await page(`/podcasts/${IDS.podcast}`, SIGNED_OUT);
-    props = nextData(p.text);
-    ok('…a show whose episodes all have ads off: null, nowhere in the HTML', p.status === 200 && props && (props.googleAdTag || null) === null && !leaks(p.text), props && props.googleAdTag);
-  } finally {
-    sql(`update public.episodes set ads_enabled = true where id in (${q(IDS.podE1)}, ${q(IDS.podE2)})`);
-  }
+  ok('…for a Premium member: none either', p.status === 200 && props && !('googleAdTag' in props) && !leaks(p.text), props && props.googleAdTag);
+  r = await call(`/api/episode-page?id=${encodeURIComponent(IDS.podE1)}&terms=1`, { who: SIGNED_OUT });
+  ok('/api/episode-page for a podcast episode: googleAdTag null, adsEnabled false', r.status === 200 && r.json.googleAdTag === null && r.json.episode && r.json.episode.adsEnabled === false && !leaks(r.text), r.json && { tag: r.json.googleAdTag, ads: r.json.episode && r.json.episode.adsEnabled });
 
   section('What the admin is told');
   p = await page('/admin/house-ads', ADMIN);

@@ -20,6 +20,8 @@ import { PICTURES_TOO_LARGE, bodyBytes, shrinkArtwork } from '../../lib/shrinkIm
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
+import FlashingLightsField from '../../components/FlashingLightsField';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 import ExtraKindField from '../../components/ExtraKindField';
 import PageNotesField from '../../components/PageNotesField';
 import { WarningIcon } from '../../components/PlayerIcons';
@@ -821,6 +823,8 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
                 </select>
               </div>
             </div>
+            {/* The uploader's own mark (Jose, 2026-11-13); saved with the draft. */}
+            <FlashingLightsField id="sub-flashing" checked={form.hasFlashingLights === true} onChange={(v) => update('hasFlashingLights', v)} />
             <div className="apl-grid2">
               <div className="apl-field">
                 <label className="apl-label" htmlFor="sub-runtime">Runtime <em>{video && video.runtimeSeconds ? 'read from the file' : 'MM:SS'}</em></label>
@@ -902,16 +906,23 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
               <summary>More options <span>· the defaults are fine for most titles</span></summary>
               <div className="sub-opt-body">
                 <div className="sub-opt-row">
-                  <span className="sub-opt-text"><span>Who can watch</span><span>Free with ads, or {SITE.premiumTier} members only. {SITE.studio ? 'The studio' : 'We'} has the final say.</span></span>
+                  <span className="sub-opt-text"><span>Who can watch</span><span>{form.contentType === 'podcast' ? 'Free' : 'Free with ads'}, or {SITE.premiumTier} members only. {SITE.studio ? 'The studio' : 'We'} has the final say.</span></span>
                   <span className="apl-pills">
                     <button type="button" className={`apl-pill ${form.tier !== 'premium' ? 'on' : ''}`} onClick={() => update('tier', 'free')}>Free</button>
                     <button type="button" className={`apl-pill ${form.tier === 'premium' ? 'on' : ''}`} onClick={() => update('tier', 'premium')}>{SITE.premiumTier}</button>
                   </span>
                 </div>
-                <div className="sub-opt-row">
-                  <span className="sub-opt-text"><span>Ad breaks</span><span>One before the title. Add break points as MM:SS, comma-separated.</span></span>
-                  <input type="text" className="sub-opt-input" value={form.adBreaksText} onChange={(e) => update('adBreaksText', e.target.value)} aria-label="Ad breaks" />
-                </div>
+                {/* Podcasts are ad-free (lib/adBreakRules.js): no breaks to set. */}
+                {form.contentType === 'podcast' ? (
+                  <div className="sub-opt-row">
+                    <span className="sub-opt-text"><span>Ad breaks</span><span>{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</span></span>
+                  </div>
+                ) : (
+                  <div className="sub-opt-row">
+                    <span className="sub-opt-text"><span>Ad breaks</span><span>One before the title. Add break points as MM:SS, comma-separated.</span></span>
+                    <input type="text" className="sub-opt-input" value={form.adBreaksText} onChange={(e) => update('adBreaksText', e.target.value)} aria-label="Ad breaks" />
+                  </div>
+                )}
                 <label className="sub-opt-row">
                   <span className="sub-opt-text"><span>Let channels air it</span><span>TapaTV can schedule it live, with ads.</span></span>
                   <input type="checkbox" checked={form.channelOptIn} onChange={(e) => update('channelOptIn', e.target.checked)} />

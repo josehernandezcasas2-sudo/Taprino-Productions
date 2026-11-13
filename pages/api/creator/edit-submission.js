@@ -3,7 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { creatorOwnsSeries } from '../../../lib/series';
 import { internalError, sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
-import { MAX_EPISODE_NUMBER, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, flashingLightsChange, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, withPayeeStamps } from '../../../lib/payees';
 import { wellFormedBody } from '../../../lib/wellFormed';
@@ -90,7 +90,7 @@ async function editSubmission(req, res) {
   // whether the creator owns it).
   const { data: existing, error: fetchError } = await supabase
     .from('episodes')
-    .select('id, submitted_by, status, content_type, series_id, season, series_order, withdrawn_at')
+    .select('id, submitted_by, status, content_type, series_id, season, series_order, withdrawn_at, has_flashing_lights, moderation_hold, deletion_requested')
     .eq('id', String(episodeId))
     .maybeSingle();
 
@@ -135,6 +135,20 @@ async function editSubmission(req, res) {
   }
 
   const dbUpdates = {};
+  // "Contains flashing lights" (Jose, 2026-11-13): this route only edits a
+  // title still in review, where the uploader may tick or untick it; the
+  // rule is lib/showRules.js flashingLightsChange all the same, so this
+  // route can never take a live title's warning off.
+  if (fields.hasFlashingLights !== undefined) {
+    if (typeof fields.hasFlashingLights !== 'boolean') return res.status(400).json({ error: 'Say whether it contains flashing lights.' });
+    const verdict = flashingLightsChange(
+      { target: 'episode', isUploader: true, isAdmin: false, status: existing.status, held: Boolean(existing.moderation_hold), deletionRequested: Boolean(existing.deletion_requested), withdrawn: Boolean(existing.withdrawn_at) },
+      Boolean(existing.has_flashing_lights),
+      fields.hasFlashingLights
+    );
+    if (!verdict.ok) return res.status(verdict.status).json({ error: verdict.line, code: verdict.code, field: 'hasFlashingLights' });
+    if (verdict.change !== null) dbUpdates.has_flashing_lights = verdict.change;
+  }
   if (updates.title !== undefined) dbUpdates.title = updates.title;
   if (updates.description !== undefined) dbUpdates.description = updates.description;
   if (updates.artist !== undefined) dbUpdates.artist = updates.artist;

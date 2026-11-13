@@ -22,6 +22,7 @@ import { BackArrowIcon, CheckIcon, ClockIcon, CloseIcon, ExternalLinkIcon, PlusI
 import { PREVIEW_BUILT } from './ShowCards';
 import PayeeCard, { PayeeLine } from './PayeeCard';
 import ExtraKindField from '../ExtraKindField';
+import FlashingLightsField from '../FlashingLightsField';
 import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
 
 // The episode editor (series revamp slice 2; spec Screens, "Episode
@@ -95,6 +96,7 @@ function episodeForm(ep, hasShow) {
     channelOptIn: Boolean(ep.channelOptIn),
     featured: Boolean(ep.featured),
     isOriginal: Boolean(ep.isOriginal),
+    hasFlashingLights: Boolean(ep.hasFlashingLights),
     hasPage: Boolean(ep.hasPage),
     pageNotes: ep.pageNotes || '',
     credits: creditsToForm(ep.credits, { inherit: hasShow }),
@@ -305,6 +307,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     if (form.runtime.trim() !== init.runtime.trim()) add('runtime', 'runtime', form.runtime.trim());
     if (form.fundingUrl.trim() !== init.fundingUrl.trim()) add('fundingUrl', 'fundingUrl', form.fundingUrl.trim());
     for (const key of ['adsEnabled', 'channelOptIn', 'featured', 'isOriginal']) if (form[key] !== init[key]) add(key, key, form[key]);
+    if (form.hasFlashingLights !== init.hasFlashingLights) add('hasFlashingLights', 'hasFlashingLights', form.hasFlashingLights);
     const breaks = parseAdBreaksInput(form.adBreaksText);
     if (JSON.stringify(breaks) !== JSON.stringify(parseAdBreaksInput(init.adBreaksText))) add('adBreakSeconds', 'adBreakSeconds', breaks);
     if (form.hasPage !== init.hasPage) add('hasPage', 'hasPage', form.hasPage);
@@ -911,7 +914,17 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
           <span className="show-ed-staged-live">Visitors see the live title image until we approve it; then the name shows as text.</span>
         </StagedBox>
       ) : null}
-      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'ep', titleForAsk: `${show ? `${show.name} · ` : ''}${title}` }} />
+      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'ep', titleForAsk: `${show ? `${show.name} · ` : ''}${title}`, adFree: ep.contentType === 'podcast' }} />
+      {/* The uploader's mark (Jose, 2026-11-13): on at once in every state;
+          ticked on a live title it is the team's to take off
+          (lib/showRules.js flashingLightsPolicy, the server's policy). */}
+      <FlashingLightsField
+        id="ep-flashing"
+        className="show-ed-field"
+        checked={form.hasFlashingLights}
+        onChange={(v) => set('hasFlashingLights', v)}
+        locked={pol('hasFlashingLights').mode === 'locked' ? pol('hasFlashingLights').line || 'This can’t be changed here' : null}
+      />
 
       <div className="show-ed-card show-ed-captions">
         <span className="show-ed-card-k">Captions</span>
@@ -1015,7 +1028,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         </div>
       )}
 
-      <MoreOptions idPrefix="ep" form={form} set={set} pol={pol} live={live} />
+      <MoreOptions idPrefix="ep" form={form} set={set} pol={pol} live={live} adFree={ep.contentType === 'podcast'} />
 
       {data.payee ? <PayeeCard payee={data.payee} mode="section" onChanged={onPayeeChanged} titleWord={`“${title}”`} /> : null}
     </>

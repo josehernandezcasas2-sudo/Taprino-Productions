@@ -2,7 +2,8 @@ import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-nati
 import { VideoView } from 'expo-video';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, fonts, absoluteFill, inkTint } from '../lib/theme';
-import { adBarWords, liveAdNote, liveCardWords, podCardWords, visitLabel } from '../lib/adBreakRules';
+import { adBarWords, liveAdNote, liveCardWords, muteLabel, podCardWords, visitLabel } from '../lib/adBreakRules';
+import MuteGlyph from './MuteGlyph';
 
 // An ad break on screen, drawn by the episode player and the live player
 // in whichever of their views is showing (the inline 16:9 strip or the
@@ -22,6 +23,12 @@ import { adBarWords, liveAdNote, liveCardWords, podCardWords, visitLabel } from 
 //                                           no Visit link there
 // `F` is the full-screen chrome (the player's fullChrome(), null inline):
 // the bar and the link keep clear of the screen's edges and grow with it.
+//
+// Its mute (Jose, 2026-11-13: "Allow tv ads to be muted"): `mute` =
+// { silent, onToggle } draws the player's speaker at the start of the bar,
+// the website's .tp-ad-mute. It is the player's own mute
+// (mobile/src/lib/adBreakRules.js "the sound"): muting during the ad keeps
+// the programme muted after it. Mute only — an ad has no skip or seek.
 //
 // Each item type has its view (ITEM_VIEWS); a new source's type adds one.
 
@@ -71,7 +78,7 @@ const ITEM_VIEWS = {
   countdown: null
 };
 
-export default function AdBreakLayer({ ad, full = false, F = null, live = false, channelName = '' }) {
+export default function AdBreakLayer({ ad, full = false, F = null, live = false, channelName = '', mute = null }) {
   const s = ad && ad.state;
   if (!s) return null;
   const item = s.item || { type: 'load' };
@@ -91,17 +98,30 @@ export default function AdBreakLayer({ ad, full = false, F = null, live = false,
           (the website shows nothing until its ad is up), never over the
           live player's own countdown card. */}
       {item.type !== 'countdown' && (live || item.type !== 'load') ? (
-        <LinearGradient colors={['rgba(10,11,15,0)', 'rgba(10,11,15,0.92)']} style={[styles.bar, F && F.adBar]} pointerEvents="none">
-          <View style={[styles.tag, F && F.adTag]}><Text style={[styles.tagText, F && F.adBarText]}>{bar.tag}</Text></View>
-          {live ? (
-            <Text style={[styles.barText, styles.note, F && F.adBarText]} numberOfLines={1}>{liveAdNote(channelName, s.left)}</Text>
-          ) : (
-            <>
-              <Text style={[styles.barText, F && F.adBarText]}>{bar.count}</Text>
-              {bar.time ? <Text style={[styles.barText, styles.time, F && F.adBarText]}>{bar.time}</Text> : null}
-              {full ? <Text style={[styles.barText, styles.note, F && F.adBarText]} numberOfLines={1}>{bar.note}</Text> : null}
-            </>
-          )}
+        <LinearGradient colors={['rgba(10,11,15,0)', 'rgba(10,11,15,0.92)']} style={[styles.bar, F && F.adBar]} pointerEvents="box-none">
+          {mute ? (
+            <Pressable
+              style={[styles.mute, F && F.adMute]}
+              onPress={() => { if (mute.onToggle) mute.onToggle(); }}
+              accessibilityRole="button"
+              accessibilityLabel={muteLabel(mute.silent)}
+              hitSlop={10}
+            >
+              <MuteGlyph muted={Boolean(mute.silent)} size={F && F.adMuteIcon ? F.adMuteIcon : 18} />
+            </Pressable>
+          ) : null}
+          <View style={[styles.words, F && F.adWords]} pointerEvents="none">
+            <View style={[styles.tag, F && F.adTag]}><Text style={[styles.tagText, F && F.adBarText]}>{bar.tag}</Text></View>
+            {live ? (
+              <Text style={[styles.barText, styles.note, F && F.adBarText]} numberOfLines={1}>{liveAdNote(channelName, s.left)}</Text>
+            ) : (
+              <>
+                <Text style={[styles.barText, F && F.adBarText]}>{bar.count}</Text>
+                {bar.time ? <Text style={[styles.barText, styles.time, F && F.adBarText]}>{bar.time}</Text> : null}
+                {full ? <Text style={[styles.barText, styles.note, F && F.adBarText]} numberOfLines={1}>{bar.note}</Text> : null}
+              </>
+            )}
+          </View>
         </LinearGradient>
       ) : null}
       {showVisit ? (
@@ -123,7 +143,10 @@ const styles = StyleSheet.create({
   cardKicker: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.3, textTransform: 'uppercase', color: colors.inkFaint, textAlign: 'center' },
   cardBrand: { fontFamily: fonts.displayBold, fontSize: 22, color: colors.ink, textAlign: 'center' },
   liveLine: { fontFamily: fonts.body, fontSize: 14, color: colors.inkDim, textAlign: 'center' },
-  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 11, paddingTop: 18, paddingBottom: 10, paddingHorizontal: 14 },
+  bar: { position: 'absolute', left: 0, right: 0, bottom: 0, flexDirection: 'row', alignItems: 'center', gap: 11, paddingTop: 18, paddingBottom: 10, paddingHorizontal: 14 },
+  words: { flex: 1, minWidth: 0, flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 11 },
+  // The player's round button (EpisodePlayer's .round, a little smaller in the bar).
+  mute: { width: 32, height: 32, borderRadius: 16, marginVertical: -6, borderWidth: 1, borderColor: 'rgba(251,232,211,0.45)', backgroundColor: 'rgba(12,19,31,0.55)', alignItems: 'center', justifyContent: 'center' },
   barText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.85, textTransform: 'uppercase', color: colors.inkDim },
   tag: { backgroundColor: colors.olive, borderRadius: 2, paddingVertical: 2, paddingHorizontal: 7 },
   tagText: { fontFamily: fonts.monoBold, fontSize: 10.5, letterSpacing: 0.85, textTransform: 'uppercase', color: colors.surface0 },
