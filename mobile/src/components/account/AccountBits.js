@@ -154,6 +154,10 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
     clearTimeout(fallback);
     if (!isSignedIn) {
       setDashboard({ isSignedIn: false });
+      // Signed out: nothing of the last account stays (a failed read for
+      // the next one keeps what showed, which must not be theirs).
+      setProfile(null);
+      setProfileFailed(false);
       return undefined;
     }
     if (!refreshOnFocus) loadAll();

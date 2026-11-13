@@ -42,6 +42,7 @@ export function PushPrompt({ getToken }) {
     refresh();
   }
   async function notNow() {
+    setNote(null);
     await dismissPushPrompt();
     refresh();
   }
