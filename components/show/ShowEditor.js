@@ -6,11 +6,12 @@ import { MAIN_GENRES } from '../../lib/submitRules';
 import { fieldPolicy, fieldPolicyLine, joinDescription, saveSummary, splitDescription } from '../../lib/showRules';
 import { SEASON_ART_122_MSG, SEASON_ART_PER_SAVE, seasonArtRows } from '../../lib/seasonArt';
 import { SITE } from '../../lib/siteConfig';
+import { shrinkArtwork } from '../../lib/shrinkImage';
 import RatingOptions from '../RatingOptions';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
 import {
   ArtSlot, Banner, EditorFrame, FieldHead, FieldNote, PickButton, SwitchRow, Toast,
-  callApi, isOpen, readAsDataUrl, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast
+  callApi, isOpen, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast
 } from './EditorBits';
 import { AboutField, NOT_SAVED_WORDS, OneLineField, askHref } from './EpisodeFields';
 import { PayeeLine } from './PayeeCard';
@@ -43,9 +44,10 @@ const ABOUT_MAX = 2000;
 const IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,image/gif';
 const TITLE_IMAGE_ACCEPT = 'image/png,image/webp';
 const VIDEO_ACCEPT = 'video/*,.mp4,.mov,.m4v,.mkv,.webm';
-// Edit show's body is capped at 10 MB and every picture rides in it as a
-// data URL (a third bigger than the file).
-const PICTURES_PER_SAVE_BYTES = 7 * 1024 * 1024;
+// Every picture rides in Edit show's body as a data URL: they are shrunk
+// to what the site draws and kept under the host's 4.5 MB body limit
+// together (lib/shrinkImage.js shrinkArtwork; the old 7 MB of files here
+// was over that limit, which answered a bare 413).
 const ART = [
   { field: 'poster', kind: 'poster', label: 'Poster 2:3', live: 'poster', staged: 'poster', words: 'On cards, rows and the show page.' },
   { field: 'thumbnail', kind: 'still', label: 'Still 16:9', live: 'thumbnail', staged: 'thumbnail', words: 'Behind the show in rows and on the episode strip.' },
@@ -246,22 +248,20 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
       setError(`Up to ${SEASON_ART_PER_SAVE} seasons’ art in one save — save these, then the rest.`);
       return;
     }
-    const pictureBytes = [...Object.values(files), ...seasonList.map((x) => x.pick)].reduce((sum, f) => sum + (f && typeof f === 'object' && f.size ? f.size : 0), 0);
-    if (pictureBytes > PICTURES_PER_SAVE_BYTES) {
-      setSaving(false);
-      setError('That’s more pictures than one save can carry (about 7 MB in all) — save a few, then the rest.');
-      return;
-    }
     try {
+      const art = await shrinkArtwork([
+        ...['poster', 'thumbnail', 'heroImage', 'titleImage'].map((f) => ({ key: f, file: files[f] || null, keepAlpha: f === 'titleImage', max: f === 'heroImage' ? 2400 : 2000 })),
+        ...seasonList.filter((x) => x.pick && x.pick !== 'remove').map(({ number, pick }) => ({ key: `season-${number}`, file: pick, max: 2400 }))
+      ]);
       for (const f of ['poster', 'thumbnail', 'heroImage', 'titleImage']) {
         if (!files[f]) continue;
-        body[`${f}Base64`] = await readAsDataUrl(files[f]);
+        body[`${f}Base64`] = art[f];
         body[`${f}FileName`] = files[f].name;
       }
       if (seasonList.length) {
         body.seasonArt = [];
         for (const { number, pick } of seasonList) {
-          body.seasonArt.push(pick === 'remove' ? { number, remove: true } : { number, imageBase64: await readAsDataUrl(pick), fileName: pick.name });
+          body.seasonArt.push(pick === 'remove' ? { number, remove: true } : { number, imageBase64: art[`season-${number}`], fileName: pick.name });
         }
       }
     } catch (err) {
@@ -398,7 +398,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
           level="warn"
           icon={<WarningIcon size={16} />}
           title={`An admin declined this ${noun}`}
-          action={canEdit ? <button type="button" className="apl-btn-secondary show-ed-banner-btn" disabled={saving} onClick={() => save({ resubmit: true })}>{saving ? 'Sending…' : 'Resubmit'}</button> : null}
+          action={canEdit ? <button type="button" className="apl-btn-secondary show-ed-banner-btn" disabled={saving || Boolean(trailerUp && trailerUp.state === 'uploading')} title={trailerUp && trailerUp.state === 'uploading' ? 'The trailer is still uploading — resubmit once it’s up.' : undefined} onClick={() => save({ resubmit: true })}>{saving ? 'Sending…' : 'Resubmit'}</button> : null}
         >
           {show.decisionNote ? <p>{show.decisionNote}</p> : null}
           <p className="show-ed-banner-sub">Fix what it needs and press Resubmit; it comes back as not public yet.</p>

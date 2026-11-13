@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BackArrowIcon, ClockIcon, CloseIcon, LockIcon } from '../PlayerIcons';
 import { pickerKeys } from './roomBits';
+import { PICTURES_TOO_LARGE } from '../../lib/shrinkImage';
 
 // The pieces the series revamp's editors share (slice 2, mockups/
 // series-slice2-components.md): the episode editor, the draft editor and
@@ -29,6 +30,9 @@ export async function callApi(method, url, body) {
       data = null;
     }
     const out = data && typeof data === 'object' ? data : {};
+    // A body over the host's limit (Vercel's 4.5 MB) is refused before the
+    // route runs, with a page of its own: only pictures get that big.
+    if (res.status === 413) return { ok: false, status: 413, data: out, error: PICTURES_TOO_LARGE };
     return { ok: res.ok, status: res.status, data: out, error: res.ok ? null : out.error || `Something went wrong (${res.status}). Try again.` };
   } catch {
     return { ok: false, status: 0, data: {}, error: 'Couldn’t reach the site — check the connection and try again.' };

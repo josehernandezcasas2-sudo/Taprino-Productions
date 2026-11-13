@@ -35,6 +35,9 @@ export function UploadProvider({ children }) {
   // the last one is in, before React has re-rendered with the new state, so
   // "is something uploading?" can't be read from `activeUpload` there.
   const runningRef = useRef(false);
+  // The file-only upload running now ({ uid, stop }), so the page that
+  // started it can call it off (cancelVideoUpload).
+  const videoRunRef = useRef(null);
 
   useEffect(() => {
     uploadStatusRef.current = activeUpload;
@@ -355,6 +358,7 @@ export function UploadProvider({ children }) {
 
     setActiveUpload((u) => (u ? { ...u, status: 'uploading', uid } : u));
 
+    let stopped = false;
     const done = new Promise((resolve, reject) => {
       let reportedUrl = Boolean(resumeUrl);
       const upload = new tus.Upload(file, {
@@ -382,13 +386,30 @@ export function UploadProvider({ children }) {
         }
       });
       tusInstanceRef.current = upload;
+      videoRunRef.current = {
+        uid,
+        stop: () => {
+          if (stopped) return;
+          stopped = true;
+          try {
+            const aborting = upload.abort();
+            if (aborting && typeof aborting.catch === 'function') aborting.catch(() => {});
+          } catch { /* already stopped */ }
+          reject(Object.assign(new Error('The upload was called off.'), { cancelled: true }));
+        }
+      };
       upload.start();
     }).then(() => {
+      if (videoRunRef.current && videoRunRef.current.uid === uid) videoRunRef.current = null;
       runningRef.current = false;
       setActiveUpload((u) => (u ? { ...u, status: 'uploaded', bytesUploaded: u.fileSize } : u));
       lastAttemptRef.current = null;
       return { uid };
     }).catch((err) => {
+      if (videoRunRef.current && videoRunRef.current.uid === uid) videoRunRef.current = null;
+      // Called off by its page (cancelVideoUpload): that already cleared
+      // the widget; nothing failed.
+      if (err && err.cancelled) throw err;
       runningRef.current = false;
       const described = describeUploadError(err);
       setActiveUpload((u) => (u ? { ...u, status: 'error', errorTitle: described.title, errorMessage: described.message, errorRaw: described.raw, likelyBlocked: described.likelyBlocked } : u));
@@ -398,6 +419,28 @@ export function UploadProvider({ children }) {
     done.catch(() => {});
 
     return { uid, uploadUrl, done };
+  }
+
+  // Calls off the file-only upload of this video (the submit page's "Not
+  // this file" while it is still going): the transfer stops, the widget
+  // clears and the next pick isn't refused as "an upload is already in
+  // progress". Its `done` rejects with `cancelled: true`. An upload of it
+  // that already finished or stopped only leaves the widget; another
+  // upload is left alone.
+  //   → true when it was running
+  function cancelVideoUpload(uid) {
+    if (!uid) return false;
+    const run = videoRunRef.current;
+    const running = Boolean(run && run.uid === uid);
+    if (running) {
+      videoRunRef.current = null;
+      run.stop();
+      runningRef.current = false;
+      lastAttemptRef.current = null;
+      tusInstanceRef.current = null;
+    }
+    setActiveUpload((u) => (u && u.videoOnly && u.uid === uid ? null : u));
+    return running;
   }
 
   // --- the show page's queue (the series revamp, slice 2) ---------------------
@@ -617,10 +660,11 @@ export function UploadProvider({ children }) {
       if (item) retryQueueItems({ draftIds: [item.draftId] });
       return;
     }
-    if (attempt.isVideoOnly) {
-      startVideoUpload(attempt.file, { urlEndpoint: attempt.urlEndpoint, resumeUrl: attempt.resumeUrl, kind: attempt.kind, onUrl: attempt.onUrl, authHeaders: attempt.authHeaders }).catch(() => {});
-      return;
-    }
+    // A file-only upload (not the queue's) is its page's: starting another
+    // here would hand the page's draft or row a second upload it never
+    // learns of (and its kept address to the first). The page resumes it
+    // when the same file is picked again; the widget says so.
+    if (attempt.isVideoOnly) return;
     if (attempt.isUrlImport) {
       startUrlImport(attempt.videoUrl, attempt.fileName, attempt.formData, attempt.submitEndpoint, attempt.doneMessages);
       return;
@@ -635,7 +679,7 @@ export function UploadProvider({ children }) {
   }
 
   return (
-    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, startVideoUpload, retryUpload, dismissUpload, queue, queuePaused, queueHost, setQueueHost, enqueueUploads, cancelQueueItem, retryQueueItems }}>
+    <UploadContext.Provider value={{ activeUpload, startUpload, startUrlImport, startVideoUpload, cancelVideoUpload, retryUpload, dismissUpload, queue, queuePaused, queueHost, setQueueHost, enqueueUploads, cancelQueueItem, retryQueueItems }}>
       {children}
     </UploadContext.Provider>
   );

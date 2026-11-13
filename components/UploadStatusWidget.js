@@ -109,12 +109,21 @@ export default function UploadStatusWidget() {
         <>
           <div className="upload-widget-error-title">{activeUpload.errorTitle}</div>
           <div className="upload-widget-meta upload-widget-error">{activeUpload.errorMessage}</div>
-          <div className="upload-widget-actions">
-            <button onClick={() => retryUpload()}>↻ Retry</button>
-            {activeUpload.likelyBlocked && activeUpload.uploadMethod !== 'basic' && (
-              <button onClick={() => retryUpload('basic')}>Try fallback upload method</button>
-            )}
-          </div>
+          {/* An upload that only sends the file (the submit page, Apply,
+              the editors' Replace the file) belongs to the page it was
+              dropped on: a retry from here would start a second upload
+              that page never hears of. It resumes where it stopped when
+              the same file is picked there again. */}
+          {activeUpload.videoOnly && !(activeUpload.queue && activeUpload.queue.key) ? (
+            <div className="upload-widget-meta">{activeUpload.phase === 'trailer' ? 'Drop the trailer again where you dropped it.' : 'Pick the same file again where you dropped it — it carries on from where it stopped.'}</div>
+          ) : (
+            <div className="upload-widget-actions">
+              <button onClick={() => retryUpload()}>↻ Retry</button>
+              {activeUpload.likelyBlocked && activeUpload.uploadMethod !== 'basic' && !activeUpload.videoOnly && (
+                <button onClick={() => retryUpload('basic')}>Try fallback upload method</button>
+              )}
+            </div>
+          )}
           <details className="upload-widget-details">
             <summary>Technical details (for reporting a persistent problem)</summary>
             <code>{activeUpload.errorRaw}</code>
