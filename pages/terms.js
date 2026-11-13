@@ -68,7 +68,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-12';
+const TEXT_UPDATED = '2026-11-13';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -210,8 +210,9 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         a break, or during a live channel broadcast of it), we credit you {adPct(n)}% of what that advertiser
         paid us for that play. Plays are counted by the title they ran in, the month they ran, and credited on
         the 1st of the next month alongside your member share, under the same payout rules. Our own house ads,
-        station bumpers, plays by ad-free members, and ads inside podcasts (podcast ads are your own until we
-        add our audio ads) earn nothing, and a title we own ourselves keeps everything. The percentage is
+        station bumpers and plays by ad-free members earn nothing, and a title we own ourselves keeps
+        everything. Podcasts carry no ads of ours, so they earn no ad share; a sponsor read you put in your own
+        audio stays yours. The percentage is
         published here; a decrease takes effect no sooner than 30 days after we publish it and email creators,
         as with the member share.
       </p>

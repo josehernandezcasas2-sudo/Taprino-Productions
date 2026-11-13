@@ -813,7 +813,8 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
                         <button type="button" className={`sch-ep ${isPicked('title', e.id) ? 'picked' : ''}`} onClick={() => setPicked(isPicked('title', e.id) ? null : epItem)} {...drag(epItem)}>
                           <span>{e.label ? `${e.label} · ` : ''}{e.title}</span><small>{dur(e.durationSeconds)}{e.adBreaks ? ` air · ${e.adBreaks.length} break${e.adBreaks.length === 1 ? '' : 's'}` : ''}</small>
                         </button>
-                        <a className="sch-ep-link" href={`/ad-plan/${e.id}`} title="Open the ad plan">plan</a>
+                        {/* Podcasts are ad-free: no plan to open. */}
+                        {s.contentType !== 'podcast' && <a className="sch-ep-link" href={`/ad-plan/${e.id}`} title="Open the ad plan">plan</a>}
                       </div>
                     );
                   })}
@@ -836,7 +837,7 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
                   {t.tier === 'premium' && <span className="sch-chips"><span className="sch-chip prem">Premium · ads</span></span>}
                 </span>
               </button>
-              <a className="sch-expand" href={`/ad-plan/${t.id}`}>Ad plan{t.adBreaks ? ' · ready' : ' · default'} ↗</a>
+              {t.contentType !== 'podcast' && <a className="sch-expand" href={`/ad-plan/${t.id}`}>Ad plan{t.adBreaks ? ' · ready' : ' · default'} ↗</a>}
             </div>
           );
         })}

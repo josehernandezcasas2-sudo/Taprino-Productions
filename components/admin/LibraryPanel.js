@@ -237,7 +237,8 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                 </div>
               </div>
               <span style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-                {e.status === 'approved' && <a className="account-btn-secondary" style={{ width: 'auto', textDecoration: 'none' }} href={`/ad-plan/${e.id}`}>Ad plan</a>}
+                {/* Podcasts are ad-free (lib/adBreakRules.js): no plan to open. */}
+                {e.status === 'approved' && e.contentType !== 'podcast' && <a className="account-btn-secondary" style={{ width: 'auto', textDecoration: 'none' }} href={`/ad-plan/${e.id}`}>Ad plan</a>}
                 <button className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setEditingEpisode(e)}>Edit</button>
               </span>
             </div>

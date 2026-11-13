@@ -15,7 +15,6 @@ import { useRouter } from 'next/router';
 import { takeViewingTerms } from '../../lib/viewingTerms';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
-import { googleAdTagFor } from '../../lib/googleAds';
 
 export async function getServerSideProps({ req, res, params, query }) {
   // ?preview=1: the owner's private preview of a show that isn't public
@@ -24,13 +23,10 @@ export async function getServerSideProps({ req, res, params, query }) {
   res.setHeader('Cache-Control', preview ? 'private, no-store' : 'private, no-cache, no-store, must-revalidate');
   const data = await getPodcastShowHubData(params.id, req, { preview });
   if (!data) return { notFound: true };
-  // Google's Ad Manager tag for the inline video's empty breaks (lib/googleAds.js):
-  // only for a viewer who gets ads here, and only when an episode they can
-  // watch inline has ads on (each episode's own switch is read again where
-  // the player is drawn).
-  const inlineWithAds = (data.episodes || []).some((ep) => ep && ep.src && !ep.locked && ep.adsEnabled !== false);
-  const googleAdTag = googleAdTagFor(inlineWithAds && !preview && !data.preview && !data.adFree && !data.isAdmin);
-  return { props: { ...data, googleAdTag } };
+  // Podcasts are ad-free (Jose, 2026-11-13; lib/adBreakRules.js
+  // adFreeContent): the inline video plays with no ad of ours and no
+  // Google request, so the page carries no ad tag at all.
+  return { props: data };
 }
 
 function formatDate(iso) {
@@ -38,7 +34,7 @@ function formatDate(iso) {
   return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', timeZone: 'America/Los_Angeles' });
 }
 
-export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, email, isAdmin, isCreator, mainGenres, show, episodes, resume = {}, preview = null, googleAdTag = null }) {
+export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, isCreator, mainGenres, show, episodes, resume = {}, preview = null }) {
   const previewing = Boolean(preview);
   const player = usePodcastPlayer();
   const router = useRouter();
@@ -183,10 +179,11 @@ export default function PodcastShow({ isSignedIn, isSubscriber, adFree = false, 
             {expandedVideoId === ep.id && (
               <div className="podcast-inline-video">
                 <VideoPlayer
-                  episode={ep}
+                  // A podcast's own episode, and podcasts are ad-free
+                  // (lib/adBreakRules.js): no pre-roll, no break, no Google.
+                  episode={{ ...ep, contentType: 'podcast' }}
                   signedPlayback={Boolean(ep.signedPlayback)}
-                  adsEnabled={!previewing && !adFree && !isAdmin && ep.adsEnabled !== false}
-                  googleAdTag={!previewing && !adFree && !isAdmin && ep.adsEnabled !== false ? googleAdTag : null}
+                  adsEnabled={false}
                   onEnded={() => setExpandedVideoId(null)}
                   initialPosition={0}
                 />

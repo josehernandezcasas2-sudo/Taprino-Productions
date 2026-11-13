@@ -13538,3 +13538,11 @@ a.ep-credit-name:hover { color: var(--brass); }
 .ep-body .own-wrap { margin-top: 0.6rem; }
 /* --- end series revamp: the public pages (slice 4) --- */
 
+/* The Ad Curator on a podcast (pages/ad-plan/[episodeId].js; Jose,
+   2026-11-13: "Podcasts should be ad free"): what it says instead of a
+   plan to compose. */
+.adc-adfree { max-width: 640px; margin: 2rem auto; padding: 0 16px; display: flex; flex-direction: column; gap: 0.8rem; align-items: flex-start; }
+.adc-adfree h1 { font-family: var(--font-display); font-size: 1.7rem; margin: 0; }
+.adc-adfree-note { color: var(--ink-dim); line-height: 1.55; margin: 0; }
+.adc-adfree-note strong { color: var(--ink); }
+

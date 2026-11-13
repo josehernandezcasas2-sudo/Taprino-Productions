@@ -73,8 +73,9 @@ export default function AdPlanPage({ episodeId, isSignedIn, isSubscriber, email,
     try {
       const d = await api('GET', null, `episode=${encodeURIComponent(episodeId)}`, apiPath);
       setData(d);
-      setPlan(clone(d.plan));
-      setSavedStatus(d.plan.status || 'none');
+      // A podcast comes back with no plan (podcasts are ad-free).
+      setPlan(d.plan ? clone(d.plan) : null);
+      setSavedStatus(d.plan ? d.plan.status || 'none' : 'none');
       setDirty(false);
       setSel(0);
     } catch (err) {
@@ -98,8 +99,8 @@ export default function AdPlanPage({ episodeId, isSignedIn, isSubscriber, email,
 
   const episode = data ? data.episode : null;
   const settings = data ? data.settings : null;
-  const ads = data ? data.ads : [];
-  const bumpers = data ? data.bumpers : [];
+  const ads = (data && data.ads) || [];
+  const bumpers = (data && data.bumpers) || [];
   const runtime = episode ? episode.runtimeSeconds : 0;
 
   const derived = useMemo(() => {
@@ -233,6 +234,26 @@ export default function AdPlanPage({ episodeId, isSignedIn, isSubscriber, email,
   const title = episode ? `${episode.seriesName ? `${episode.seriesName} · ` : ''}${episode.label ? `${episode.label} ` : ''}${episode.title}` : 'Ad plan';
   const backHref = adminArea ? '/admin/library' : '/schedule';
   const backLabel = adminArea ? 'Library' : 'Scheduler';
+
+  // A podcast (lib/adPlans.js getCuratorData `adFree`): podcasts are
+  // ad-free (Jose, 2026-11-13), so there is nothing here to compose — the
+  // page says so instead of offering a plan to save.
+  if (data && data.adFree) {
+    return (
+      <>
+        <Head><title>{`Ad plan — ${episode ? episode.title : 'Episode'} — ${SITE.name}`}</title></Head>
+        <HeaderNav activeType="All" isSignedIn={isSignedIn} email={email} isAdmin={isAdmin} isCreator={isCreator} isSubscriber={isSubscriber} />
+        <main className="stage stage-single stage-wide adc-page">
+          <div className="adc-adfree" role="status">
+            <div className="eyebrow"><Link href={backHref} className="adc-back">‹ {backLabel}</Link> · Ad plan{episode && episode.seriesName ? ` · ${episode.seriesName}` : ''}</div>
+            <h1>{episode ? `${episode.label ? `${episode.label} ` : ''}${episode.title}` : 'Episode'}</h1>
+            <p className="adc-adfree-note"><strong>{data.adFreeNote}</strong> No ad of ours plays on a podcast episode — no house ad, no Google ad, no break — so it has no ad plan. A sponsor read the podcaster puts in their own audio is theirs. On a live channel, the channel&rsquo;s own breaks still run around it.</p>
+            <Link href={backHref} className="sch-btn">‹ {backLabel}</Link>
+          </div>
+        </main>
+      </>
+    );
+  }
 
   return (
     <>
