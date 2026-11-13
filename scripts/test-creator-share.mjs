@@ -6,8 +6,11 @@ import {
   buildLedgerLines, reversalLinesFor, referralIsActive, referralEarnsBonus, cleanViaSlug, planPayouts, applyBalance,
   standingState, forfeitLines, normalizeShareNumbers, shareChanges, earliestEffective, scheduledDue, reminderDue,
   fitShareToPayment, countWatched, invoiceRetryVerdict, INVOICE_RETRY_HOURS,
-  isStudioLine, inheritStudio, stampLines, unstampedCreators, owedByStudio, splitStudioCents, restoreLinesFor
+  isStudioLine, inheritStudio, stampLines, unstampedCreators, owedByStudio, splitStudioCents, restoreLinesFor,
+  chargeReversalReason, membershipLineKey, membershipPaidCents, paymentPromisesLines
 } from '../lib/creatorShareRules.js';
+import { stableLineId, withMembershipLineIds } from '../lib/ledgerIds.js';
+import { claimLines, CLAIM_CHUNK } from '../lib/payoutClaims.js';
 
 let passed = 0;
 function test(name, fn) {
@@ -457,5 +460,142 @@ test('an admin demoted later is never paid what the studio kept', () => {
   const withReversal = owedByStudio([...rows, { id: 'd3', creator_id: 'user_dee', cents: -6000, created_at: '2026-10-20T00:00:00Z', ...inheritStudio(rows[0]) }], new Set());
   assert.deepEqual(withReversal.map((o) => [o.studio, o.cents]), [[true, 0], [false, 3000]]);
 });
+
+test('a membership charge refunded in full or disputed before its invoice is recorded', () => {
+  assert.equal(chargeReversalReason(null), null);
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 0, refunded: false, disputed: false }), null);
+  // A partial refund leaves the credits alone, as the webhook does.
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 300, refunded: false, disputed: false }), null);
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 799, refunded: true, disputed: false }), 'refunded');
+  // A charge Stripe sends without `refunded` but refunded to the cent.
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 799 }), 'refunded');
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 0, refunded: false, disputed: true }), 'disputed');
+  // Refunded wins: nothing about it can be won back.
+  assert.equal(chargeReversalReason({ amount: 799, amount_refunded: 799, refunded: true, disputed: true }), 'refunded');
+});
+
+test('which recorded payments should have creator lines', () => {
+  assert.equal(paymentPromisesLines({ status: 'split', share_cents: 200, bonus_cents: 0, basis: 'picks' }), true);
+  assert.equal(paymentPromisesLines({ status: 'split', share_cents: 200, bonus_cents: 0, basis: 'pool' }), true);
+  // Nobody could be credited: nothing was written, nothing is missing.
+  assert.equal(paymentPromisesLines({ status: 'split', share_cents: 200, bonus_cents: 0, basis: 'none' }), false);
+  assert.equal(paymentPromisesLines({ status: 'split', share_cents: 200, bonus_cents: 100, basis: 'none' }), true, 'the referral bonus still has its line');
+  assert.equal(paymentPromisesLines({ status: 'split', share_cents: 0, bonus_cents: 0, basis: 'none' }), false);
+  // A reversed payment is the refund's or the dispute's to settle.
+  assert.equal(paymentPromisesLines({ status: 'reversed', share_cents: 200, bonus_cents: 0, basis: 'picks' }), false);
+  assert.equal(paymentPromisesLines(null), false);
+});
+
+test('a payment’s lines and their reversals get stable ids', () => {
+  const pay = '7d0d6c1e-1111-4aaa-8bbb-000000000001';
+  const lines = buildLedgerLines({ memberId: 'user_m', paymentId: pay, shareCents: 200, basis: 'picks', entries: [{ id: 'user_mara', weight: 1 }, { id: 'user_dee', weight: 1 }], referral: { id: 'ref1', creator_id: 'user_mara', locked_at: '2026-10-01T00:00:00Z' }, bonusCents: 100, paidAt: '2026-11-01T00:00:00Z', bonusMonths: 12 });
+  assert.deepEqual(lines.map(membershipLineKey), [`membership:${pay}:member_share:user_mara`, `membership:${pay}:member_share:user_dee`, `membership:${pay}:referral:user_mara`]);
+  const a = withMembershipLineIds(lines);
+  const b = withMembershipLineIds(lines);
+  assert.deepEqual(a.map((l) => l.id), b.map((l) => l.id), 'the same payment always gives the same ids');
+  assert.equal(new Set(a.map((l) => l.id)).size, 3, 'one id per line');
+  for (const l of a) assert.match(l.id, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+  // Another payment: other ids.
+  const other = withMembershipLineIds(lines.map((l) => ({ ...l, payment_id: '7d0d6c1e-1111-4aaa-8bbb-000000000002' })));
+  assert.ok(other.every((l, i) => l.id !== a[i].id));
+  // Reversals written with them point at their credits and have ids of their own.
+  const rev = withMembershipLineIds(reversalLinesFor(a, 'membership payment refunded'));
+  assert.deepEqual(rev.map((r) => [r.reverses_id, r.cents]), a.map((l) => [l.id, -l.cents]));
+  assert.deepEqual(rev.map((r) => r.id), rev.map((r) => stableLineId(`membership:reversal:${r.reverses_id}`)));
+  assert.ok(rev.every((r) => !a.some((l) => l.id === r.id)));
+  // A line without what its key needs keeps the database's own id.
+  assert.equal(membershipLineKey({ kind: 'adjustment', creator_id: 'user_x' }), null);
+  assert.equal(withMembershipLineIds([{ kind: 'adjustment', creator_id: 'user_x', cents: 5 }])[0].id, undefined);
+});
+
+test('the share is measured against what the membership cost, never its sales tax', () => {
+  assert.equal(membershipPaidCents(865, 66), 799);
+  assert.equal(membershipPaidCents(799, 0), 799);
+  assert.equal(membershipPaidCents(50, 80), 0);
+  assert.equal(membershipPaidCents(null, undefined), 0);
+  // A discounted Standard month: $1.50 for the membership + $1.00 tax.
+  // Before: capped at the $2.50 paid, so the $2.00 share went through whole.
+  assert.deepEqual(fitShareToPayment({ amountCents: 250, billingReason: 'subscription_cycle', shareCents: 200, bonusCents: 0 }), { shareCents: 200, bonusCents: 0 });
+  // Now: capped at the $1.50 the membership cost.
+  assert.deepEqual(fitShareToPayment({ amountCents: membershipPaidCents(250, 100), billingReason: 'subscription_cycle', shareCents: 200, bonusCents: 0 }), { shareCents: 150, bonusCents: 0 });
+  // With a bonus, both shrink to fit.
+  assert.deepEqual(fitShareToPayment({ amountCents: membershipPaidCents(250, 100), billingReason: 'subscription_cycle', shareCents: 200, bonusCents: 100 }), { shareCents: 100, bonusCents: 50 });
+  // A month whose whole charge is tax: no share.
+  assert.deepEqual(fitShareToPayment({ amountCents: membershipPaidCents(66, 66), billingReason: 'subscription_cycle', shareCents: 200, bonusCents: 100 }), { shareCents: 0, bonusCents: 0 });
+});
+
+// A stand-in for the claim's update: rows by id, `payout_id` null = free.
+// Each call records how many ids it named; `failOn` makes one call fail.
+function claimClient(rows, { failOn = -1, stealBefore = null } = {}) {
+  const calls = [];
+  return {
+    calls,
+    from() {
+      const q = { patch: null, ids: [], nullCol: null };
+      const api = {
+        update(patch) { q.patch = patch; return api; },
+        in(col, ids) { q.ids = ids; return api; },
+        is(col) { q.nullCol = col; return api; },
+        async select() {
+          calls.push(q.ids.length);
+          if (calls.length - 1 === failOn) return { data: null, error: { message: 'URI too long' } };
+          if (stealBefore !== null && calls.length - 1 === stealBefore) rows.get(q.ids[0]).payout_id = 'other-run';
+          const data = [];
+          for (const id of q.ids) {
+            const r = rows.get(id);
+            if (r && r.payout_id === null) {
+              r.payout_id = q.patch.payout_id;
+              data.push({ id });
+            }
+          }
+          return { data, error: null };
+        }
+      };
+      return api;
+    }
+  };
+}
+const ledgerRows = (n) => new Map(Array.from({ length: n }, (_, i) => [`l${i}`, { id: `l${i}`, payout_id: null }]));
+
+{
+  const rows = ledgerRows(400);
+  const ids = [...rows.keys()];
+  const client = claimClient(rows);
+  const out = await claimLines(client, 'po1', ids);
+  assert.equal(CLAIM_CHUNK, 150);
+  assert.deepEqual(client.calls, [150, 150, 100], 'at most 150 ids per update');
+  assert.deepEqual(out, { count: 400, error: null });
+  assert.ok([...rows.values()].every((r) => r.payout_id === 'po1'));
+  passed += 1;
+  console.log('ok — the claim: 400 lines in parts of 150, every one taken');
+}
+{
+  // Another run took one line of the second part first: the claim stops
+  // short (count < lines) and names no more parts.
+  const rows = ledgerRows(400);
+  const client = claimClient(rows, { stealBefore: 1 });
+  const out = await claimLines(client, 'po2', [...rows.keys()]);
+  assert.deepEqual(client.calls, [150, 150]);
+  assert.equal(out.count, 299);
+  assert.equal(out.error, null);
+  passed += 1;
+  console.log('ok — the claim: a line taken by another run stops it short, so the caller gives the rest back');
+}
+{
+  const rows = ledgerRows(400);
+  const client = claimClient(rows, { failOn: 1 });
+  const out = await claimLines(client, 'po3', [...rows.keys()]);
+  assert.deepEqual(client.calls, [150, 150]);
+  assert.equal(out.count, 150);
+  assert.equal(out.error.message, 'URI too long');
+  passed += 1;
+  console.log('ok — the claim: a part that fails stops it, with what the earlier parts took');
+}
+{
+  const out = await claimLines(claimClient(new Map()), 'po4', []);
+  assert.deepEqual(out, { count: 0, error: null });
+  passed += 1;
+  console.log('ok — the claim: no lines, nothing asked');
+}
 
 console.log(`\n${passed} passed`);

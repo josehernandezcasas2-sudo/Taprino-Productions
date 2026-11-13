@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   assumedFeeCents, reserveCents, canLeaveCents, toleranceCents, nextSweepDate, isSweepDay, sweepGate,
   classifyTransaction, groupTransactions, expectedByLane, reconcile, studioShare, adsServedCents, taxThresholds, normalizeSettings, dollars,
-  owedToCreators, creditTotals, taxFeeCents, taxInRefundCents, salesTaxPeriod, SALES_TAX_LANES
+  owedToCreators, creditTotals, taxFeeCents, taxInRefundCents, salesTaxPeriod, SALES_TAX_LANES,
+  adCreditReversalTarget, adCreditDisputeOpen, adCreditDisputeGiveBack
 } from '../lib/studioMoneyRules.js';
 import { splitDonation } from '../lib/donationMath.js';
 
@@ -393,5 +394,61 @@ test('sales tax: the tax inside a refund, and the period line', () => {
   assert.deepEqual(salesTaxPeriod(), { collectedCents: 0, refundedCents: 0, owedCents: 0, lanes: { memberships: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, backing: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, bookings: { collectedCents: 0, refundedCents: 0, owedCents: 0 }, purchases: { collectedCents: 0, refundedCents: 0, owedCents: 0 } } });
 });
 
+
+test('ad credits: a dispute after a partial refund, then won — the refund stays taken', () => {
+  // $100 of credits bought; $30 refunded; the bank disputes the other $70.
+  const amountCents = 10000;
+  let reversed = 0;
+  let reason = null;
+  let balance = 10000;
+  const apply = (target, why) => {
+    const delta = target - reversed;
+    if (delta <= 0) return 0;
+    reversed = target;
+    reason = adCreditDisputeOpen(reason) ? reason : why;
+    balance -= delta;
+    return delta;
+  };
+  // The refund: what Stripe has refunded so far.
+  assert.equal(apply(adCreditReversalTarget({ amountCents, refundedCents: 3000 }), 'refunded'), 3000);
+  assert.equal(adCreditDisputeOpen(reason), false);
+  // The dispute: its $70 on top of the $30 refunds took — all of it gone.
+  assert.equal(apply(adCreditReversalTarget({ amountCents, refundedCents: 3000, disputedCents: 7000 }), 'disputed'), 7000);
+  assert.equal(reversed, 10000);
+  assert.equal(balance, 0);
+  assert.equal(adCreditDisputeOpen(reason), true);
+  // (Before: the dispute's target was its own $70, so it took only $40 more.)
+  assert.equal(Math.min(amountCents, 7000) - 3000, 4000);
+  // A replay of the refund changes nothing while the dispute is open.
+  assert.equal(apply(adCreditReversalTarget({ amountCents, refundedCents: 3000 }), 'refunded'), 0);
+  assert.equal(reason, 'disputed');
+  // Won: the dispute's $70 comes back, the refund's $30 stays taken.
+  const give = adCreditDisputeGiveBack({ reversedCents: reversed, disputedCents: 7000 });
+  assert.equal(give, 7000);
+  reversed -= give;
+  balance += give;
+  reason = 'dispute won';
+  assert.equal(reversed, 3000);
+  assert.equal(balance, 7000);
+  // (Before: everything reversed came back — $100, the refunded $30 too.)
+  assert.equal(adCreditDisputeOpen(reason), false, 'a replayed win gives nothing back');
+  // A later refund of $20 more takes only that.
+  assert.equal(apply(adCreditReversalTarget({ amountCents, refundedCents: 5000 }), 'refunded'), 2000);
+  assert.equal(balance, 5000);
+});
+
+test('ad credits: the rules at their edges', () => {
+  assert.equal(adCreditReversalTarget({ amountCents: 10000, refundedCents: 8000, disputedCents: 7000 }), 10000, 'never more than was bought');
+  assert.equal(adCreditReversalTarget({ amountCents: 10000 }), 0);
+  assert.equal(adCreditReversalTarget({ amountCents: 10000, disputedCents: 10000 }), 10000);
+  assert.equal(adCreditDisputeOpen('disputed'), true);
+  assert.equal(adCreditDisputeOpen('dispute won'), false);
+  assert.equal(adCreditDisputeOpen('refunded'), false);
+  assert.equal(adCreditDisputeOpen(null), false);
+  assert.equal(adCreditDisputeGiveBack({ reversedCents: 10000, disputedCents: 10000 }), 10000);
+  assert.equal(adCreditDisputeGiveBack({ reversedCents: 4000, disputedCents: 7000 }), 4000, 'never more than is reversed');
+  assert.equal(adCreditDisputeGiveBack({ reversedCents: 6000, disputedCents: null }), 6000, 'no amount on the event: what is reversed, as before');
+  assert.equal(adCreditDisputeGiveBack({ reversedCents: 0, disputedCents: 7000 }), 0);
+});
 
 console.log(`\n${passed} passed`);
