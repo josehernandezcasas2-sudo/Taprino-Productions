@@ -338,7 +338,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
 }
 
 // Meta the card already says in its own words.
-const HIDDEN_META = new Set(['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen']);
+const HIDDEN_META = new Set(['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen', 'canAccept', 'acceptBlocker']);
 
 function FragmentRow({ k, v }) {
   const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());

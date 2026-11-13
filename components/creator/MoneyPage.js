@@ -135,7 +135,7 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
       <>
         <div className="money-kpis">
           <div className="money-kpi">
-            <span className="money-kpi-label">{isYearView ? `${data.year} · all lanes` : 'This month · all lanes'}</span>
+            <span className="money-kpi-label">{isYearView ? `${data.year} · all lanes` : `${data.period === (data.periods && data.periods[0]) ? 'This month' : periodLabel(data.period)} · all lanes`}</span>
             <span className="money-kpi-amount">{dollars(data.top.monthCents)}</span>
             <span className="money-kpi-note">
               {shownLanes.map((k, i) => `${i ? ' · ' : ''}${LANES[k].short.toLowerCase()} ${dollars(lanes[k].monthCents)}`).join('')}
