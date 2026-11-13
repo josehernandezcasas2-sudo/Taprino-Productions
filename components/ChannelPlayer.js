@@ -71,6 +71,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
   // where the channel is after a break, whatever the ad files did.
   const planRef = useRef(null);
   const breakRef = useRef(null); // the plan break running right now: { stop }
+  const adsRunRef = useRef(null); // the house/IMA break running right now: () => cancel
   const [breakCard, setBreakCard] = useState(null); // { type: 'card', variant, brand } | { type: 'hold' } | { type: 'wait' }
   const ratings = useContentRatings();
 
@@ -245,6 +246,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
   // (`googleAdTag`, lib/imaAdBreak.js), never again in the same break.
   function runAds(untilMs, onDone, episodeId = null) {
     const v = videoRef.current;
+    cancelAds();
     detachVideo();
     setScreen('ad');
     let finished = false;
@@ -302,13 +304,30 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
       }
     };
     playOne();
-    return () => { clearInterval(tick); if (stopAt) clearTimeout(stopAt); };
+    // A retune (another program, another channel) or leaving the player
+    // drops the break: nothing more is asked for or played, and its onDone
+    // (which attaches the program it was in front of) never runs.
+    const cancel = () => {
+      if (finished) return;
+      finished = true;
+      clearInterval(tick);
+      if (stopAt) clearTimeout(stopAt);
+      if (current) current.cancel();
+    };
+    adsRunRef.current = cancel;
+    return cancel;
+  }
+  function cancelAds() {
+    const cancel = adsRunRef.current;
+    adsRunRef.current = null;
+    if (cancel) cancel();
   }
 
   // Tunes the player to whatever `state` says is on.
   async function tune(state, { withBreak = false } = {}) {
     const program = state && state.program;
     stopPlanBreak();
+    cancelAds();
     if (!state || !state.onAir || state.live || !program) {
       detachVideo();
       tunedKey.current = state && state.live ? 'live' : null;
@@ -412,6 +431,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
     return () => {
       if (endTimer.current) clearTimeout(endTimer.current);
       stopPlanBreak();
+      cancelAds();
       detachVideo();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -30,11 +30,20 @@ function minutesLabel(runtime) {
 const RING_R = 32;
 const RING_C = 2 * Math.PI * RING_R;
 
+// A dialog over the page (the Tip sheet, from the page's round action or
+// the full-screen row) has the keys while it is open, and the clock waits
+// for it: Enter on one of its buttons used to start the next episode, and
+// Escape never reached it.
+function dialogOpen() {
+  return typeof document !== 'undefined' && Boolean(document.querySelector('[aria-modal="true"]'));
+}
+
 export default function EndCard({ card, onGo, onStay, layout = 'compact' }) {
   const iconOverrides = usePlayerIconOverrides();
   const { target, back, headline, seconds } = card;
   const timed = Boolean(target && seconds > 0);
   const [left, setLeft] = useState(seconds);
+  const rootRef = useRef(null);
   const goRef = useRef(onGo);
   const stayRef = useRef(onStay);
   goRef.current = onGo;
@@ -48,6 +57,7 @@ export default function EndCard({ card, onGo, onStay, layout = 'compact' }) {
     setLeft(seconds);
     const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
     const tick = () => {
+      if (dialogOpen()) return;
       remaining -= 1;
       setLeft(remaining);
       if (remaining <= 0) { stop(); goRef.current(target.href, target); }
@@ -61,12 +71,19 @@ export default function EndCard({ card, onGo, onStay, layout = 'compact' }) {
 
   // Keys, ahead of the player's own handler (capture): the card's own
   // buttons keep their meaning, a field elsewhere on the page is left alone.
+  // Only while the focus is in the player (or nowhere in particular): a
+  // link or button elsewhere on the page keeps its own Enter, and an open
+  // dialog keeps all of them.
   useEffect(() => {
     const onKey = (e) => {
       const el = e.target;
       const tag = el && el.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (el && el.isContentEditable)) return;
       if (el && el.closest && el.closest('.tp-endcard')) return;
+      if (dialogOpen()) return;
+      const player = rootRef.current && rootRef.current.closest ? rootRef.current.closest('.tp-player') : null;
+      const nowhere = !el || el === document.body || el === document.documentElement;
+      if (!nowhere && !(player && player.contains(el))) return;
       if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); stayRef.current(); }
       else if ((e.key === 'Enter' || e.key === ' ') && target) { e.preventDefault(); e.stopPropagation(); goRef.current(target.href, target); }
     };
@@ -82,7 +99,7 @@ export default function EndCard({ card, onGo, onStay, layout = 'compact' }) {
   const go = (e, href, t) => { e.preventDefault(); onGo(href, t); };
 
   return (
-    <div className={`tp-endcard ${layout} kind-${card.kind}`} role="dialog" aria-label={target ? `${target.kicker}: ${target.title}` : headline.kicker}>
+    <div ref={rootRef} className={`tp-endcard ${layout} kind-${card.kind}`} role="dialog" aria-label={target ? `${target.kicker}: ${target.title}` : headline.kicker}>
       <div className="tp-endcard-headline">
         <span className="tp-endcard-hk">{headline.kicker}</span>
         {headline.title && <span className="tp-endcard-ht">{headline.title}</span>}

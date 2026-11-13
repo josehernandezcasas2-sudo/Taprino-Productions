@@ -188,6 +188,11 @@ export async function getServerSideProps({ req, params, query, res }) {
     };
   }
   const { episode, account } = data;
+  // An audio-only podcast episode has nothing for this page's video player
+  // to play: its show's page has the audio player (lib/episodeLinks.js).
+  if (episode.contentType === 'podcast' && !episode.src && episode.seriesId) {
+    return { redirect: { destination: `/podcasts/${encodeURIComponent(episode.seriesId)}${preview ? '?preview=1' : ''}`, permanent: false } };
+  }
 
   // SECURITY: never send the real video file to the client unless they're
   // actually entitled to it. Next.js embeds page props directly in the HTML
@@ -231,6 +236,10 @@ export async function getServerSideProps({ req, params, query, res }) {
     const signed = await signedSrcForStoredUrl(episode.src);
     if (signed) {
       playbackSrc = signed.src;
+      signedPlayback = true;
+    } else if (!playbackSrc) {
+      // A Cloudflare video whose link couldn't be signed just now: the
+      // player asks /api/stream-token for one once, then says it won't play.
       signedPlayback = true;
     }
     // The described version is a separate file and needs its own token.
@@ -375,7 +384,22 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
       return null;
     }
   }, [episode.id]);
-  const [describedActive, setDescribedActive] = useState(false);
+  // The described version, for the title it was switched on for: a move to
+  // another title starts it with the standard version again.
+  const [describedFor, setDescribedFor] = useState(null);
+  const describedActive = Boolean(episode.id) && describedFor === episode.id;
+  const toggleDescribed = () => setDescribedFor((cur) => (cur === episode.id ? null : episode.id));
+  // Its own fresh link when the signed one runs out (the film's would load
+  // the standard version over it).
+  const refreshDescribedSrc = useCallback(async () => {
+    try {
+      const res = await fetch('/api/stream-token', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ episodeId: episode.id, part: 'described', ...(preview ? { preview: true } : {}) }) });
+      const data = await res.json().catch(() => ({}));
+      return data && data.src ? data.src : null;
+    } catch (err) {
+      return null;
+    }
+  }, [episode.id, Boolean(preview)]);
   // A title image that couldn't load gives the text title back.
   const [titleArtFailed, setTitleArtFailed] = useState(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -747,9 +771,12 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 // the trailer's link is signed too, and refreshes through its
                 // own (refreshTrailerSrc above).
                 signedPlayback={showingTrailer ? Boolean(episode.trailerRef) : signedPlayback}
-                refreshSrc={showingTrailer ? refreshTrailerSrc : previewing ? refreshPreviewSrc : null}
+                refreshSrc={showingTrailer ? refreshTrailerSrc : describedActive && episode.audioDescriptionSrc ? refreshDescribedSrc : previewing ? refreshPreviewSrc : null}
                 initialPosition={showingTrailer || previewing ? 0 : getPosition(episode.id)}
-                onProgress={showingTrailer || previewing ? undefined : (pos, dur) => savePosition(episode.id, pos, dur)}
+                // The player names the title a save is for (the one it was
+                // playing): a move to another title saves the last one's
+                // place under its own id.
+                onProgress={showingTrailer || previewing ? undefined : (pos, dur, id) => savePosition(id || episode.id, pos, dur)}
                 // Full screen: the site's own chrome (the "After Play" canvas).
                 heading={{ kicker: showingTrailer ? 'Trailer' : seriesKicker, title: episode.title }}
                 rating={episode.rating || null}
@@ -975,7 +1002,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               <AccessibilityPanel
                 episode={episode}
                 describedActive={describedActive}
-                onPlayDescribed={() => setDescribedActive((d) => !d)}
+                onPlayDescribed={toggleDescribed}
               />
             )}
           </section>

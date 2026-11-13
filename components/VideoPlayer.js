@@ -209,9 +209,12 @@ export default function VideoPlayer({
     () => (adsEnabled && episode.adPlan && Array.isArray(episode.adPlan.breaks) && episode.adPlan.breaks.length ? episode.adPlan : null),
     [adsEnabled, episode.adPlan]
   );
+  // Set (and cleared) here for every title and programme: the reset below
+  // runs after this effect, and its clearing them used to wipe a plan's
+  // ticks the moment they were drawn.
   useEffect(() => {
-    if (plan) setCuePoints(plan.breaks.map((b) => b.at).filter((a) => a > 0));
-  }, [plan, episode.id]);
+    setCuePoints(plan ? plan.breaks.map((b) => b.at).filter((a) => a > 0) : []);
+  }, [plan, episode.id, programKey]);
   // The break before the title, if this viewer gets one (lib/adBreakRules.js:
   // a ready plan's break at 0:00, else 0 among the plain breaks — none set
   // means a pre-roll only). `index` is the plan's break, null for a plain one.
@@ -244,9 +247,15 @@ export default function VideoPlayer({
     // place through it — reading the ref alone there found nothing to call
     // and the page went blank ("onProgressRef.current is not a function").
     const setupSave = onProgressRef.current;
+    // The title this run was set up for, handed to the saver: a move to
+    // another title keeps the player mounted, and by the time this run's
+    // cleanup saves, the ref already holds the new title's saver — the
+    // place (or, after the end card, the finish) of the title just left
+    // used to be saved under the one being opened.
+    const setupId = episode.id;
     const save = (position, duration) => {
       const fn = typeof onProgressRef.current === 'function' ? onProgressRef.current : setupSave;
-      if (typeof fn === 'function') fn(position, duration);
+      if (typeof fn === 'function') fn(position, duration, setupId);
     };
 
     function handleLoadedMetadata() {
@@ -294,7 +303,8 @@ export default function VideoPlayer({
       videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
       videoElement.removeEventListener('timeupdate', handleTimeUpdate);
       videoElement.removeEventListener('pause', handlePause);
-      if (videoElement.currentTime > 0) {
+      // A title that played out has its finish saved already (onEnded).
+      if (videoElement.currentTime > 0 && !videoElement.ended) {
         guardedImmediateSave(videoElement.currentTime, videoElement.duration);
       }
     };
@@ -369,7 +379,7 @@ export default function VideoPlayer({
    * ------------------------------------------------------------------ */
   const refreshSignedSrc = useCallback(async () => {
     if (!signedPlayback || refreshingRef.current) return null;
-    const key = `${episode.id}|${episode.src || ''}`;
+    const key = `${episode.id}|${programKey || ''}|${episode.src || ''}`;
     if (Date.now() - (refreshedAtRef.current[key] || 0) < REFRESH_GAP_MS) return null;
     refreshedAtRef.current[key] = Date.now();
     refreshingRef.current = true;
@@ -387,7 +397,33 @@ export default function VideoPlayer({
     } finally {
       refreshingRef.current = false;
     }
-  }, [episode.id, episode.src, signedPlayback, refreshSrc]);
+  }, [episode.id, episode.src, signedPlayback, refreshSrc, programKey]);
+
+  // A page that couldn't sign the link hands over no src at all (the
+  // stored address is never the fallback). With signed playback the player
+  // asks for a fresh link once; without one, or when that fails, it says
+  // the video won't play instead of standing there with a play button that
+  // does nothing (after a pre-roll, too).
+  const sourceKey = `${episode.id}|${programKey || ''}`;
+  const [lateSrc, setLateSrc] = useState(null); // { key, src } | { key, failed: true }
+  const lateForThis = lateSrc && lateSrc.key === sourceKey ? lateSrc : null;
+  const mediaSrc = episode.src || (lateForThis && lateForThis.src) || null;
+  const noSource = !isYouTube && !mediaSrc && (!signedPlayback || Boolean(lateForThis && lateForThis.failed));
+  const sourcePending = !isYouTube && !mediaSrc && !noSource;
+  useEffect(() => {
+    if (isYouTube || episode.src || !signedPlayback) return undefined;
+    let live = true;
+    const key = sourceKey;
+    refreshSignedSrc().then((fresh) => {
+      if (live) setLateSrc(fresh ? { key, src: fresh } : { key, failed: true });
+    });
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceKey, episode.src, signedPlayback, isYouTube]);
+  // What was playing when the source last changed, so a swap of the same
+  // programme's file (the described version and back) carries on from the
+  // same moment instead of 0:00.
+  const carryRef = useRef(null);
 
   /* ------------------------------------------------------------------ *
    * Source attachment. Cloudflare Stream serves HLS, which only Safari
@@ -396,17 +432,36 @@ export default function VideoPlayer({
   useEffect(() => {
     if (isYouTube) return;
     const v = videoRef.current;
-    if (!v || !episode.src) return;
+    if (!v || !mediaSrc) return;
 
     let cancelled = false;
     setSrcError(false);
+    // The last source's own menus (its quality levels and the manifest's
+    // caption tracks) go with it; a <track> element's stays.
+    setLevels([]);
+    setCurrentLevel(-1);
+    setTextTracks((prev) => prev.filter((t) => t.source === 'element'));
+    setActiveTrack((a) => (a >= 0 ? -1 : a));
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
     }
 
-    const isHls = episode.src.includes('.m3u8');
+    const setupProgram = programKey;
+    const carried = carryRef.current;
+    carryRef.current = null;
+    if (carried && carried.id === episode.id && carried.programKey === setupProgram && carried.at > 0) {
+      const restoreCarried = () => {
+        v.removeEventListener('loadedmetadata', restoreCarried);
+        if (cancelled) return;
+        v.currentTime = carried.at;
+        if (carried.playing) safePlay(v);
+      };
+      v.addEventListener('loadedmetadata', restoreCarried);
+    }
+
+    const isHls = mediaSrc.includes('.m3u8');
 
     // Native HLS (Safari) and plain files have no hls.js error hook, so an
     // expired signed URL used to just stop. Try one fresh URL, then say so.
@@ -434,7 +489,7 @@ export default function VideoPlayer({
         if (cancelled) return;
         if (Hls.isSupported()) {
           const hls = new Hls({ capLevelToPlayerSize: true });
-          hls.loadSource(episode.src);
+          hls.loadSource(mediaSrc);
           hls.attachMedia(v);
           hlsRef.current = hls;
 
@@ -486,22 +541,25 @@ export default function VideoPlayer({
           });
         } else {
           // Safari plays HLS natively and doesn't need hls.js at all.
-          v.src = episode.src;
+          v.src = mediaSrc;
         }
       });
     } else {
-      v.src = episode.src;
+      v.src = mediaSrc;
     }
 
     return () => {
       cancelled = true;
+      // Read before the stream is taken down (that resets the clock).
+      carryRef.current = { id: episode.id, programKey: setupProgram, src: mediaSrc, at: v.currentTime, playing: !v.paused && !v.ended };
       v.removeEventListener('error', onNativeError);
       if (hlsRef.current) {
         hlsRef.current.destroy();
         hlsRef.current = null;
       }
     };
-  }, [episode.id, episode.src, isYouTube, refreshSignedSrc]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [episode.id, mediaSrc, isYouTube, refreshSignedSrc]);
 
   /* ------------------------------------------------------------------ *
    * Reset per-episode state when the episode changes.
@@ -516,9 +574,11 @@ export default function VideoPlayer({
     setCurrentTime(0);
     setAdState(null);
     setAdWaiting(false);
-    setCuePoints([]);
     setSettingsOpen(false);
     lastSavedRef.current = 0;
+    // A new start reads its resume point again (the trailer, then the full
+    // episode: the title picks up where it was, not at 0:00).
+    seekedForRef.current = null;
     const v = videoRef.current;
     if (v && !isYouTube) {
       v.pause();
@@ -537,6 +597,18 @@ export default function VideoPlayer({
     // so this effect's deps don't hit the temporal dead zone at render.
     stopPodRef.current();
   }, [episode.id, isYouTube, programKey]);
+
+  // Another title: none of the last one's captions, quality levels or
+  // error carry over (before the <track> below registers the new one).
+  useEffect(() => {
+    setTextTracks([]);
+    setActiveTrack(-1);
+    setLevels([]);
+    setCurrentLevel(-1);
+    setSrcError(false);
+    const v = videoRef.current;
+    if (v && v.textTracks) for (let i = 0; i < v.textTracks.length; i++) v.textTracks[i].mode = 'disabled';
+  }, [episode.id]);
 
   /* ------------------------------------------------------------------ *
    * Ads.
@@ -940,7 +1012,7 @@ export default function VideoPlayer({
 
   const togglePlay = useCallback(() => {
     const v = videoRef.current;
-    if (!v) return;
+    if (!v || !mediaSrc) return;
     // The pre-roll is being asked for: the title starts when that's over
     // (a second press would start it under the ad, or skip the ad).
     if (adWaiting) return;
@@ -964,7 +1036,7 @@ export default function VideoPlayer({
     if (v.paused) safePlay(v);
     else v.pause();
     showControlsTemporarily();
-  }, [adWaiting, started, preRoll, episode.id, startAds, showControlsTemporarily, runPod]);
+  }, [adWaiting, started, preRoll, episode.id, startAds, showControlsTemporarily, runPod, mediaSrc]);
 
   const seekTo = useCallback((t) => {
     const v = videoRef.current;
@@ -1112,7 +1184,7 @@ export default function VideoPlayer({
     ro.observe(el);
     return () => ro.disconnect();
   }, [isYouTube]);
-  const showEndCard = Boolean(endCard && endedSrc && endedSrc === episode.src && !adState);
+  const showEndCard = Boolean(endCard && endedSrc && endedSrc === mediaSrc && !adState);
   const endCardLayout = shellWidth >= 1000 ? 'xl' : shellWidth >= 640 ? 'wide' : 'compact';
 
   const onKeyDown = useCallback(
@@ -1236,8 +1308,8 @@ export default function VideoPlayer({
         onDoubleClick={toggleFill}
         onEnded={(e) => {
           setPlaying(false);
-          setEndedSrc(episode.src || null);
-          if (onProgress) onProgress(e.target.duration, e.target.duration);
+          setEndedSrc(mediaSrc || null);
+          if (onProgress) onProgress(e.target.duration, e.target.duration, episode.id);
           if (onEnded) onEnded(e);
         }}
         onContextMenu={(e) => e.preventDefault()}
@@ -1281,20 +1353,20 @@ export default function VideoPlayer({
         </a>
       )}
 
-      {(buffering || adWaiting) && !adState && (
+      {(buffering || adWaiting || sourcePending) && !adState && (
         <div className="tp-spinner" aria-live="polite" aria-label="Buffering">
           <span />
         </div>
       )}
 
-      {srcError && (
+      {(srcError || noSource) && (
         <div className="tp-error" role="alert">
           <strong>This video won&rsquo;t play right now.</strong>
           <span>Try refreshing the page. If it keeps happening, the file may still be processing.</span>
         </div>
       )}
 
-      {!started && !adState && (
+      {!started && !adState && mediaSrc && (
         <button className="tp-bigplay" onClick={togglePlay} aria-label="Play">
           <span className="tp-bigplay-glyph"><PlayIcon size={32} src={iconOverrides.play} /></span>
           {/* Only when a pre-roll will really be asked for: a mid-roll-only
