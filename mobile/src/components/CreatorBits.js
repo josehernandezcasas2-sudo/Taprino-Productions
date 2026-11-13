@@ -80,7 +80,7 @@ export function ProgressCard({ video, upload, facts = [], onRemove, onResume }) 
   const left = live && speed > 0 && live.status === 'uploading' ? Math.round((live.total - live.sent) / speed) : null;
   const leftLabel = left == null ? '' : left < 60 ? 'under a minute left' : `${Math.round(left / 60)} min left`;
   const state = live && live.status === 'uploading' ? 'uploading' : live && live.status === 'requesting-url' ? 'starting' : live && live.status === 'error' ? 'error' : video.state;
-  const right = state === 'uploading' ? `${pct}%${leftLabel ? ` · ${leftLabel}` : ''}` : state === 'starting' ? 'starting…' : state === 'error' ? 'stopped' : state === 'processing' ? 'uploaded · processing' : state === 'ready' ? 'ready ✓' : state === 'uploaded' ? 'uploaded ✓' : state === 'uploading' ? 'upload stopped' : state || '';
+  const right = state === 'uploading' ? `${pct}%${leftLabel ? ` · ${leftLabel}` : ''}` : state === 'starting' ? 'starting…' : state === 'error' ? 'stopped' : state === 'processing' ? 'uploaded · processing' : state === 'ready' ? 'ready ✓' : state === 'uploaded' ? 'uploaded ✓' : state === 'uploading' || state === 'stopped' ? 'upload stopped' : state || '';
   const lines = facts.filter(Boolean);
   return (
     <View style={[cp.progress, state === 'error' && cp.progressError]}>
@@ -92,6 +92,8 @@ export function ProgressCard({ video, upload, facts = [], onRemove, onResume }) 
       <View style={cp.progressMeta}>
         {state === 'error' ? (
           <Text style={cp.metaText}>{(live && live.error) || 'The upload stopped.'} {onResume ? <Text style={cp.link} onPress={onResume}>Pick the same file again</Text> : null}</Text>
+        ) : video.state === 'stopped' && !live ? (
+          <Text style={cp.metaText}>The upload stopped, so it isn’t sent. Take it out and pick it again.</Text>
         ) : video.state === 'uploading' && !live ? (
           <Text style={cp.metaText}>The upload stopped. {onResume ? <Text style={cp.link} onPress={onResume}>Pick the same file again to resume</Text> : null}</Text>
         ) : lines.length ? (

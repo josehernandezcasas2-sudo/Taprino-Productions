@@ -133,7 +133,10 @@ export function toSubmitBody(form, media, extras = {}) {
     ...(f.contentType === 'bonus' ? { extraKind: extraKindFromChoice(f.extraKindChoice, f.extraKindOther) } : {}),
     ...(submitHasOwnPage(f.contentType) && String(f.pageNotes || '').trim() ? { pageNotes: String(f.pageNotes).trim() } : {}),
     ...(media && media.video ? { videoUid: media.video.uid, runtimeSeconds: media.video.runtimeSeconds || undefined } : {}),
-    ...(media && media.trailer ? { trailerUid: media.trailer.uid } : {}),
+    // A trailer goes once Cloudflare has the whole file (processing or
+    // ready, as lib/showPage.js sends a draft's); one still uploading or
+    // stopped would attach a file that never arrives.
+    ...(media && media.trailer && media.trailer.uid && ['processing', 'ready'].includes(media.trailer.state) ? { trailerUid: media.trailer.uid } : {}),
     ...(media && media.audioUrl ? { audioUrl: media.audioUrl, audioBytes: media.audioBytes || null } : {}),
     ...extras
   };

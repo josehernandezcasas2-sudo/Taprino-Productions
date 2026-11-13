@@ -19,8 +19,9 @@ export const STAGE_EYEBROW = {
 
 export const FILE_WORDS = { ready: 'ready', audio: 'audio', external: 'ready (its own address)', processing: 'still processing', uploading: 'still uploading', error: 'failed to process', deleted: 'gone from Cloudflare', none: 'no file yet', unknown: 'not checked yet' };
 
-// Meta the card already says in its own words (the website's HIDDEN_META).
-export const HIDDEN_META = ['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen'];
+// Meta the card already says in its own words (the website's HIDDEN_META,
+// and an application's acceptBlocker, which is the line under Accept).
+export const HIDDEN_META = ['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen', 'canAccept', 'acceptBlocker'];
 
 const LABELS = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' };
 
@@ -58,9 +59,16 @@ export function eyebrowFor(item) {
   return { text: KIND_LABEL[item && item.kind] || 'Review', tone: 'plain' };
 }
 
-// Why Approve is off (the approval blocker's line), or null.
+// Why Approve is off (the approval blocker's line), or null. An
+// application's Accept grants Creator Studio, which only a full admin may:
+// the queue says so with meta.canAccept false (and the line in
+// meta.acceptBlocker) for a sub-admin, who can still hold or decline it.
 export function blockedLine(item) {
-  return item && item.kind === 'submission' && item.meta && item.meta.blocked ? String(item.meta.blocked) : null;
+  const meta = item && item.meta;
+  if (!meta) return null;
+  if (item.kind === 'submission') return meta.blocked ? String(meta.blocked) : null;
+  if (item.kind === 'application' && meta.canAccept === false) return meta.acceptBlocker ? String(meta.acceptBlocker) : 'A full admin accepts an application.';
+  return null;
 }
 
 // The place line under the title: { free, words } or null.

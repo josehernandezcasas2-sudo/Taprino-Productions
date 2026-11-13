@@ -450,7 +450,11 @@ export default function SubmitTitle() {
       if (!asset) return;
       const started = await startTusUpload({ asset, urlPath: '/api/creator/get-upload-url', token: await freshToken(getToken), kind: 'trailer' });
       setTrailer({ uid: started.uid, state: 'uploading', name: asset.fileName || 'trailer' });
-      started.done.then(() => setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'processing' } : t))).catch(() => {});
+      // A trailer that stops isn't sent (lib/submitRules.js toSubmitBody):
+      // its card says so, and it can be picked again.
+      started.done
+        .then(() => setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'processing' } : t)))
+        .catch(() => setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'stopped' } : t)));
     } catch (err) {
       setError(err.message);
     }
@@ -522,6 +526,8 @@ export default function SubmitTitle() {
       const why = stepBlocker(n, form, media) || (n === 2 ? placeBlocker : null);
       if (why) { setError(why); setStep(n); return; }
     }
+    // A trailer still on its way would be left out of what is sent.
+    if (trailerUploading) { setError('The trailer is still uploading — send it once it’s up, or take it out.'); return; }
     setSubmitting(true);
     setError(null);
     // Swap first: the episode on the number moves out of the way.
