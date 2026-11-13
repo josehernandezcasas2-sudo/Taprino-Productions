@@ -247,7 +247,9 @@ export async function handleStripeEvent(event) {
       await run('reverseMembershipCharge (dispute)', () => reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed'));
       // A disputed ad-credit purchase: the credits come off the balance.
       const disputedPi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent && dispute.payment_intent.id;
-      await run('reverseAdCreditPurchase (dispute)', () => reverseAdCreditPurchase({ paymentIntentId: disputedPi, totalReversedCents: dispute.amount, reason: 'disputed' }));
+      // The disputed amount comes on top of what refunds already took
+      // (lib/studioMoney.js reverseAdCreditPurchase).
+      await run('reverseAdCreditPurchase (dispute)', () => reverseAdCreditPurchase({ paymentIntentId: disputedPi, chargeId: dispute.charge, disputedCents: dispute.amount, reason: 'disputed' }));
       // A disputed Pitch backing or location booking (lib/paymentDisputes.js):
       // the backing stops counting and the creator's share is taken back;
       // a booking waits for an admin on /admin/locations.
@@ -264,7 +266,8 @@ export async function handleStripeEvent(event) {
       if (closed.status === 'won' || closed.status === 'warning_closed') {
         const wonPi = typeof closed.payment_intent === 'string' ? closed.payment_intent : closed.payment_intent && closed.payment_intent.id;
         await run('restoreMembershipCharge', () => restoreMembershipCharge({ id: closed.charge, payment_intent: wonPi }));
-        await run('restoreAdCreditPurchase', () => restoreAdCreditPurchase({ paymentIntentId: wonPi }));
+        // The dispute's part only, never what a refund took before it.
+        await run('restoreAdCreditPurchase', () => restoreAdCreditPurchase({ paymentIntentId: wonPi, disputedCents: closed.amount }));
       }
       break;
     }
@@ -275,11 +278,7 @@ export async function handleStripeEvent(event) {
       }
       // Buy to own: a Checkout the buyer walked away from.
       if (session.metadata?.type === 'title_purchase') {
-        try {
-          await failPurchaseFromSession(session, 'checkout expired');
-        } catch (err) {
-          console.error('failPurchaseFromSession from webhook failed:', err.message);
-        }
+        await run('failPurchaseFromSession', () => failPurchaseFromSession(session, 'checkout expired'));
       }
       if (session.metadata?.type === 'tip') {
         await run('failTipFromSession', () => failTipFromSession(session, 'checkout expired'));
@@ -304,11 +303,10 @@ export async function handleStripeEvent(event) {
         const pi = typeof charge.payment_intent === 'string' ? charge.payment_intent : charge.payment_intent && charge.payment_intent.id;
         await run('reverseAdCreditPurchase', () => reverseAdCreditPurchase({ paymentIntentId: pi, totalReversedCents: charge.amount_refunded, reason: 'refunded' }));
       }
-      try {
-        await refundPurchaseFromCharge(event.data.object);
-      } catch (err) {
-        console.error('refundPurchaseFromCharge from webhook failed:', err.message);
-      }
+      // A title sale refunded in the Dashboard: a failure hands the event
+      // back to Stripe like its neighbours (it used to be logged and the
+      // event marked done, so the buyer kept the title).
+      await run('refundPurchaseFromCharge', () => refundPurchaseFromCharge(event.data.object));
       // A fully refunded membership payment: its unpaid creator credits
       // are reversed (a partial refund leaves them alone).
       if (event.data.object.refunded) {
