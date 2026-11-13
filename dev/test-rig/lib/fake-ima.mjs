@@ -16,7 +16,12 @@
 //     does what window.__imaGoogleMode says at the time of the request:
 //     'fill' (default) plays an ad, 'error' answers error 1009, 'hang'
 //     never answers; window.__imaHouseMode = 'hang' makes the house
-//     request never answer either.
+//     request never answer either;
+//   - window.__imaAdMs (read as each ad starts) makes an ad last longer than
+//     FAKE_AD_MS, for a check that presses something during it;
+//   - every AdsManager.setVolume(n) is kept in window.__ima.volumes
+//     ({ label, n, at }) and its getVolume() answers the last one (the
+//     players set the ad's sound to theirs, 2026-11-13).
 // Nothing is drawn: the ad is events only. The content <video> is the
 // player's own; the check looks at it to see the title play.
 export const IMA_SDK_URL = 'https://imasdk.googleapis.com/js/sdkloader/ima3.js';
@@ -24,7 +29,8 @@ export const FAKE_AD_MS = 1200;
 
 export const FAKE_IMA_JS = `(function () {
   var AD_MS = ${FAKE_AD_MS};
-  var log = window.__ima = window.__ima || { requests: [], events: [] };
+  var log = window.__ima = window.__ima || { requests: [], events: [], volumes: [] };
+  log.volumes = log.volumes || [];
   function Emitter() { this._l = {}; }
   Emitter.prototype.addEventListener = function (t, f) { (this._l[t] = this._l[t] || []).push(f); };
   Emitter.prototype.removeEventListener = function (t, f) { this._l[t] = (this._l[t] || []).filter(function (x) { return x !== f; }); };
@@ -60,8 +66,11 @@ export const FAKE_IMA_JS = `(function () {
   AdsManager.prototype.resize = function () {};
   AdsManager.prototype.getCuePoints = function () { return []; };
   AdsManager.prototype.destroy = function () { if (!this.destroyed) log.events.push('destroyed ' + this.label); this.destroyed = true; };
+  AdsManager.prototype.setVolume = function (n) { this.volume = n; log.volumes.push({ label: this.label, n: n, at: Date.now() }); };
+  AdsManager.prototype.getVolume = function () { return this.volume === undefined ? 1 : this.volume; };
   AdsManager.prototype.start = function () {
     var self = this;
+    var AD_MS = Number(window.__imaAdMs) > 0 ? Number(window.__imaAdMs) : ${FAKE_AD_MS};
     setTimeout(function () {
       if (self.destroyed) return;
       self._emit(AdEvent.Type.CONTENT_PAUSE_REQUESTED, adEvent());
