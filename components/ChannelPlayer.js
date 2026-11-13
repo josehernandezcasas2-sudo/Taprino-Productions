@@ -313,6 +313,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
       clearInterval(tick);
       if (stopAt) clearTimeout(stopAt);
       if (current) current.cancel();
+      setAdCountdown(null);
     };
     adsRunRef.current = cancel;
     return cancel;
