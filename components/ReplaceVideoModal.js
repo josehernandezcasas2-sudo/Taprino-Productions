@@ -17,7 +17,7 @@ export default function ReplaceVideoModal({ submission, onClose }) {
       setError('Choose a video file first.');
       return;
     }
-    if (activeUpload && activeUpload.status !== 'done' && activeUpload.status !== 'error') {
+    if (activeUpload && !['done', 'uploaded', 'error'].includes(activeUpload.status)) {
       setError('An upload is already in progress — wait for it to finish (or fail) before starting another.');
       return;
     }
