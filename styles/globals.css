@@ -3152,6 +3152,18 @@ button { font-family: inherit; cursor: pointer; }
 }
 .tp-adbar-time { color: var(--ink); }
 .tp-adbar-note { margin-left: auto; opacity: 0.7; text-transform: none; letter-spacing: 0.04em; }
+/* The ad's mute (components/AdMuteButton.js; Jose, 2026-11-13: "Allow tv
+   ads to be muted"): the player's own speaker at the start of the bar. The
+   bar lets taps through to the ad; its button takes them. */
+.tp-adbar .tp-ad-mute {
+  pointer-events: auto;
+  min-width: 32px;
+  height: 32px;
+  margin: -0.45rem 0 -0.45rem -0.5rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+.tp-adbar .tp-ad-mute:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 1px; }
 
 /* Control bar */
 .tp-controls {
@@ -7982,6 +7994,24 @@ body:has(.mini-player) { padding-bottom: 72px; }
   border-radius: 999px;
   backdrop-filter: blur(4px);
 }
+/* The ad card's mute (components/ReelAdCard.js; Jose, 2026-11-13): the
+   look of a content slide's .reel-mute-toggle, top-right where a slide's
+   menu sits (an ad card has no menu and no close). */
+.reel-ad-mute {
+  position: absolute;
+  top: calc(0.85rem + env(safe-area-inset-top, 0px));
+  right: 1rem;
+  z-index: 5;
+  width: 34px; height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.45);
+  color: var(--ink);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.reel-ad-mute:focus-visible { outline: 2px solid var(--signal-amber); outline-offset: 2px; }
+
 /* ---------------------------------------------------------------------
    About page — a designed page rather than another LegalLayout doc, so
    it gets its own section. Reuses the site's real tokens (--brass,
@@ -13507,3 +13537,4 @@ a.ep-flash-chip:hover, a.ep-flash-chip:focus-visible { background: color-mix(in 
 a.ep-credit-name:hover { color: var(--brass); }
 .ep-body .own-wrap { margin-top: 0.6rem; }
 /* --- end series revamp: the public pages (slice 4) --- */
+

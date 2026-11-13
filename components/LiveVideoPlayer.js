@@ -2,6 +2,8 @@ import { useImaSdk } from '../lib/imaSdk';
 import { runImaBreak, googleRequestTag } from '../lib/imaAdBreak';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PlayIcon, PauseIcon, VolumeIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { isSilent, muteToggle } from '../lib/adBreakRules';
+import AdMuteButton from './AdMuteButton';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 
@@ -107,6 +109,9 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin, googleA
     const onVol = () => {
       setVolume(v.volume);
       setMuted(v.muted);
+      // An ad on screen plays at the player's sound (one mute:
+      // lib/adBreakRules.js).
+      if (adRunRef.current && adRunRef.current.syncVolume) adRunRef.current.syncVolume();
     };
     v.addEventListener('play', onPlay);
     v.addEventListener('pause', onPause);
@@ -235,9 +240,13 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin, googleA
     if (v.paused) v.play();
     else v.pause();
   }
+  // The player's mute, and the ad's (lib/adBreakRules.js muteToggle).
   function toggleMute() {
     const v = videoRef.current;
-    if (v) v.muted = !v.muted;
+    if (!v) return;
+    const next = muteToggle({ muted: v.muted, volume: v.volume });
+    v.volume = next.volume;
+    v.muted = next.muted;
   }
   function changeVolume(val) {
     const v = videoRef.current;
@@ -295,6 +304,7 @@ export default function LiveVideoPlayer({ stream, isSubscriber, isAdmin, googleA
 
       {onAdBreak && (
         <div className="tp-adbar">
+          <AdMuteButton silent={isSilent({ muted, volume })} onToggle={toggleMute} icons={iconOverrides} />
           <span className="tp-adbar-tag">Ad</span>
           <span className="tp-adbar-note">Back to the live stream right after this</span>
         </div>

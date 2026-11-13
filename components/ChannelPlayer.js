@@ -7,6 +7,8 @@ import LiveVideoPlayer from './LiveVideoPlayer';
 import { useContentRatings } from './RatingOptions';
 import { airToEpisode, episodeToAir } from '../lib/adPlanRules';
 import { viewingTermsTaken, takeViewingTerms } from '../lib/viewingTerms';
+import { isSilent, muteToggle } from '../lib/adBreakRules';
+import AdMuteButton from './AdMuteButton';
 
 const DEFAULT_AD_TAG_PATH = '/api/house-ads/vast?placement=live_tv';
 const ptTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/Los_Angeles', hour: 'numeric', minute: '2-digit' });
@@ -71,6 +73,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
   // where the channel is after a break, whatever the ad files did.
   const planRef = useRef(null);
   const breakRef = useRef(null); // the plan break running right now: { stop }
+  // The IMA break being asked for or playing (lib/imaAdBreak.js), so the
+  // ad's mute button reaches it (one mute: lib/adBreakRules.js).
+  const imaRunRef = useRef(null);
   const [breakCard, setBreakCard] = useState(null); // { type: 'card', variant, brand } | { type: 'hold' } | { type: 'wait' }
   const ratings = useContentRatings();
 
@@ -254,6 +259,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
       if (finished) return;
       finished = true;
       if (current) current.cancel();
+      if (imaRunRef.current === current) imaRunRef.current = null;
       setScreen(null);
       setAdCountdown(null);
       onDone();
@@ -296,6 +302,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
             else if (!untilMs) { clearInterval(tick); finish(); }
           }
         });
+        imaRunRef.current = current;
         if (!current && !untilMs) { clearInterval(tick); finish(); }
       } catch (err) {
         if (!untilMs) { clearInterval(tick); finish(); }
@@ -446,7 +453,13 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
     if (!v) return;
     const onPlay = () => { setPlaying(true); setUserPaused(false); pausedRef.current = false; };
     const onPause = () => setPlaying(false);
-    const onVol = () => { setVolume(v.volume); setMuted(v.muted); };
+    const onVol = () => {
+      setVolume(v.volume);
+      setMuted(v.muted);
+      // An IMA ad on screen plays at the player's sound (a plan break's ads
+      // play in this same <video>, so its mute is theirs already).
+      if (imaRunRef.current && imaRunRef.current.syncVolume) imaRunRef.current.syncVolume();
+    };
     const onTime = () => {
       const p = nowRef.current && nowRef.current.program;
       const plan = planRef.current;
@@ -522,9 +535,14 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
       setUserPaused(true);
     }
   }
+  // The player's mute, and the ad's (lib/adBreakRules.js muteToggle: a
+  // silent player gets its sound back, anything else is muted).
   function toggleMute() {
     const v = videoRef.current;
-    if (v) v.muted = !v.muted;
+    if (!v) return;
+    const next = muteToggle({ muted: v.muted, volume: v.volume });
+    v.volume = next.volume;
+    v.muted = next.muted;
   }
   function acceptLiveTerms() {
     takeViewingTerms();
@@ -607,6 +625,9 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange, go
       )}
       {screen === 'ad' && (
         <div className="tp-adbar">
+          {/* Every live ad can be muted (Jose, 2026-11-13): the player's own
+              mute, so the programme after it stays as the viewer left it. */}
+          <AdMuteButton silent={isSilent({ muted, volume })} onToggle={toggleMute} icons={iconOverrides} />
           <span className="tp-adbar-tag">Ad</span>
           <span className="tp-adbar-note">
             {adCountdown != null ? `Back to ${channelName} in ${formatClock(adCountdown)}` : `Back to ${channelName} right after this`}

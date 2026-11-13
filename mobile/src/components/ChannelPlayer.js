@@ -15,9 +15,10 @@ import { airToEpisode, episodeToAir } from '../lib/adPlanTime';
 import { useCaptureBlock } from '../lib/captureBlock';
 import { useScreenFill, FILL_LABEL, FIT_LABEL } from '../lib/screenFill';
 import { FullscreenChrome } from '../lib/fullscreenChrome';
-import { betweenProgramsBreak, liveSlot } from '../lib/adBreakRules';
+import { betweenProgramsBreak, isSilent, liveSlot, muteLabel, muteToggle } from '../lib/adBreakRules';
 import { useAdBreak } from '../lib/useAdBreak';
 import AdBreakLayer from './AdBreakLayer';
+import MuteGlyph from './MuteGlyph';
 
 // The full-screen chrome, sized for the device (mobile/src/lib/fullscreenChrome.js;
 // Jose, 2026-10-30: the controls run to the screen's edges and grow with
@@ -47,7 +48,11 @@ function fullChrome(c) {
     adBarText: { fontSize: s(12), letterSpacing: s(1) },
     adTag: { paddingVertical: s(3), paddingHorizontal: s(8) },
     adCardKicker: { fontSize: s(12.5), letterSpacing: s(1.5) },
-    adCardBrand: { fontSize: s(30) }
+    adCardBrand: { fontSize: s(30) },
+    // The ad's mute at the start of its bar (the player's own speaker).
+    adMute: { width: s(40), height: s(40), borderRadius: s(20), marginVertical: -s(6) },
+    adMuteIcon: s(20),
+    adWords: { gap: s(12) }
   };
 }
 
@@ -87,7 +92,11 @@ const CAN_ROTATE = Platform.OS === 'ios' || Platform.OS === 'android';
 // ten minutes of the last one) one house ad plays before the next program
 // picks up where the channel is. The ad plays in its own player
 // (mobile/src/lib/useAdBreak.js, drawn by components/AdBreakLayer.js);
-// when there is nothing to play, the break is the countdown card.
+// when there is nothing to play, the break is the countdown card. Every
+// ad can be muted (Jose, 2026-11-13: "Allow tv ads to be muted"): the
+// player's own mute sits at the start of the ad's bar, so the programme
+// after it stays as the viewer left it (one mute: toggleMute below sets
+// both players).
 //
 // Controls sit on the video as separate bubbles and fade out while it
 // plays (tap to bring them back); in fullscreen the ✕ goes with them. Fullscreen is this component's own sideways view with an exit
@@ -568,12 +577,22 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     const fresh = await catchUp(true);
     if (!fresh) player.play();
   }
+  // The player's mute and the ad's, one state (mobile/src/lib/adBreakRules.js
+  // muteToggle: a silent player — muted, or turned all the way down — gets
+  // its sound back, anything else is muted).
   function toggleMute() {
     showControls();
-    player.muted = !muted;
-    mutedRef.current = !muted;
-    ads.setMuted(!muted);
-    setMuted(!muted);
+    const next = muteToggle({ muted, volume });
+    if (next.volume !== volume) {
+      player.volume = next.volume;
+      volumeRef.current = next.volume;
+      ads.setVolume(next.volume);
+      setVolume(next.volume);
+    }
+    player.muted = next.muted;
+    mutedRef.current = next.muted;
+    ads.setMuted(next.muted);
+    setMuted(next.muted);
   }
   async function acceptLiveTerms() {
     await saveLiveTerms();
@@ -606,7 +625,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         <Pressable style={absoluteFill} onPress={() => onTap(full)} accessibilityLabel={menuOpen ? 'Close menu' : controlsShown ? 'Hide controls' : 'Show controls'} />
         {/* An ad break with something to show (components/AdBreakLayer.js);
             with nothing, the countdown card below. */}
-        {adShowing && (!full || fullscreen) ? <AdBreakLayer ad={ads} live full={full} F={F} channelName={channelName} /> : null}
+        {adShowing && (!full || fullscreen) ? <AdBreakLayer ad={ads} live full={full} F={F} channelName={channelName} mute={{ silent: isSilent({ muted, volume }), onToggle: toggleMute }} /> : null}
         {full && fillToast ? (
           <View style={[styles.fillToastWrap, F.fillToastWrap]} pointerEvents="none">
             <View style={[styles.fillToast, F.fillToast]}><Text style={[styles.fillToastText, F.fillToastText]}>{fillToast}</Text></View>
@@ -675,11 +694,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
                     : <Path d="M8 5v14l11-7z" fill={colors.ink} />}
                 </Svg>
               </Pressable>
-              <Pressable onPress={toggleMute} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={muted ? 'Unmute' : 'Mute'} hitSlop={10}>
-                <Svg width={full ? F.icon : 22} height={full ? F.icon : 22} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                  <Path d="M11 5L6 9H3v6h3l5 4z" />
-                  {muted ? <Path d="M22 9l-6 6M16 9l6 6" /> : <Path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" />}
-                </Svg>
+              <Pressable onPress={toggleMute} style={[styles.btn, full && F.btn]} accessibilityRole="button" accessibilityLabel={muteLabel(isSilent({ muted, volume }))} hitSlop={10}>
+                <MuteGlyph muted={isSilent({ muted, volume })} size={full ? F.icon : 22} />
               </Pressable>
               <View style={styles.pillWrap}>
                 <View style={[styles.pill, full && F.pill]}>
@@ -714,7 +730,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
               </View>
             </View>
             <Pressable style={styles.menuRow} onPress={toggleMute} accessibilityRole="button">
-              <Text style={styles.menuText}>{muted ? 'Unmute' : 'Mute'}</Text>
+              <Text style={styles.menuText}>{muteLabel(isSilent({ muted, volume }))}</Text>
             </Pressable>
             <Pressable style={styles.menuRow} onPress={() => { setMenuOpen(false); if (full) exitFullscreen(true); else enterFullscreen(true); }} accessibilityRole="button">
               <Text style={styles.menuText}>{full ? 'Exit fullscreen' : 'Fullscreen'}</Text>

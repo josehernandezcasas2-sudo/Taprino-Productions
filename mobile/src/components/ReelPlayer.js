@@ -11,7 +11,7 @@ import SmartImage from './SmartImage';
 // tracking here). expo-video plays HLS natively on both platforms, so
 // unlike the website's ReelPlayer this needs no hls.js-equivalent
 // attach/detach dance — just point the player at `src` and let it decode.
-function VolumeIcon({ muted, size = 17 }) {
+export function VolumeIcon({ muted, size = 17 }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={colors.ink} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Polygon points="3 9 3 15 8 15 13 20 13 4 8 9 3 9" fill={colors.ink} stroke="none" />

@@ -15,8 +15,11 @@ import {
 // extension); load them from their source with the import pointed at the
 // file, as test-ad-breaks.mjs loads the app's copy.
 const RULES_URL = new URL('../lib/googleAdTagRules.js', import.meta.url).href;
+const BREAK_RULES_URL = new URL('../lib/adBreakRules.js', import.meta.url).href;
 async function load(rel) {
-  const src = readFileSync(new URL(rel, import.meta.url), 'utf8').replace(/from '\.\/googleAdTagRules'/g, `from '${RULES_URL}'`);
+  const src = readFileSync(new URL(rel, import.meta.url), 'utf8')
+    .replace(/from '\.\/googleAdTagRules'/g, `from '${RULES_URL}'`)
+    .replace(/from '\.\/adBreakRules'/g, `from '${BREAK_RULES_URL}'`);
   return import(`data:text/javascript;base64,${Buffer.from(src).toString('base64')}`);
 }
 const ads = await load('../lib/googleAds.js');
@@ -203,7 +206,7 @@ function advance(ms) {
 // (error 1009 on the loader), 'hang', 'nothing' (the manager ends without
 // an ad), 'late-error' (an ad plays, then the manager errors), 'never-start'.
 function fakeIma(script) {
-  const log = { requests: [], destroyed: [] };
+  const log = { requests: [], destroyed: [], volumes: [] };
   class Emitter {
     constructor() { this.l = {}; }
     addEventListener(t, f) { (this.l[t] = this.l[t] || []).push(f); }
@@ -213,6 +216,7 @@ function fakeIma(script) {
   class Manager extends Emitter {
     constructor(label, how) { super(); this.label = label; this.how = how; this.dead = false; }
     init() {}
+    setVolume(n) { log.volumes.push({ label: this.label, n, at: now }); }
     destroy() { this.dead = true; log.destroyed.push(this.label); }
     start() {
       const go = (fn, ms) => setTimeout(() => { if (!this.dead) fn(); }, ms);
@@ -246,18 +250,45 @@ function fakeIma(script) {
   return { ima, log };
 }
 const VIDEO = { clientWidth: 640, clientHeight: 360, muted: false, volume: 1 };
-function run(script, { googleTag = BARE } = {}) {
+function run(script, { googleTag = BARE, video = VIDEO } = {}) {
   const startedAt = now;
   const { ima, log } = fakeIma(script);
   const ends = [];
   let asked = 0;
   const handle = brk.runImaBreak({
-    ima, container: {}, video: VIDEO, houseTag: 'https://www.studiotapatv.site/api/house-ads/vast?placement=main_player',
+    ima, container: {}, video, houseTag: 'https://www.studiotapatv.site/api/house-ads/vast?placement=main_player',
     googleTag: googleTag ? () => { asked += 1; return googleTag; } : null,
     onEnd: (r) => ends.push({ ...r, at: now - startedAt })
   });
   return { handle, log, ends, asked: () => asked };
 }
+
+await t('the ad plays at the player\'s sound, and its mute reaches it (Jose, 2026-11-13)', () => {
+  const video = { ...VIDEO, muted: true, volume: 0.7 };
+  const r = run(() => 'fill', { video });
+  advance(55);
+  assert.deepEqual(r.log.volumes.map((x) => x.n), [0], 'a muted player: the ad starts silent, set as the manager starts');
+  advance(10);
+  assert.deepEqual(r.log.volumes.map((x) => x.n), [0, 0], 'and again as the ad starts (a new creative may begin loud)');
+  video.muted = false;
+  r.handle.syncVolume();
+  assert.equal(r.log.volumes.at(-1).n, 0.7, 'unmuted during the ad: the player\'s own level');
+  const before = r.log.volumes.length;
+  r.handle.syncVolume();
+  assert.equal(r.log.volumes.length, before, 'nothing changed: nothing passed on (no loop with a shared element)');
+  video.muted = true;
+  r.handle.syncVolume();
+  assert.equal(r.log.volumes.at(-1).n, 0, 'muted again');
+  advance(5000);
+  assert.equal(r.ends.length, 1);
+});
+
+await t('Google\'s ad after an empty house VAST starts at the player\'s sound too', () => {
+  const video = { ...VIDEO, muted: false, volume: 0 };
+  const r = run((label) => (label === 'house' ? 'empty' : 'fill'), { video });
+  advance(5000);
+  assert.ok(r.log.volumes.length >= 2 && r.log.volumes.every((x) => x.label === 'google' && x.n === 0), JSON.stringify(r.log.volumes));
+});
 
 await t('a house ad plays: that is the break, Google is never asked', () => {
   const r = run(() => 'fill');
