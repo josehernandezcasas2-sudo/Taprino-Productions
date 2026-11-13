@@ -925,7 +925,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             />
             <Text style={ss.small}>A picture is saved the moment you pick it.</Text>
           </View>
-          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: `${show ? `${show.name} · ` : ''}${title}` }} />
+          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: `${show ? `${show.name} · ` : ''}${title}`, adFree: ep.contentType === 'podcast' }} />
           {/* The uploader's mark (Jose, 2026-11-13): on at once in every
               state; ticked on a live title it is the team's to take off
               (the server's policy, mobile/src/lib/showRules.js). */}
@@ -1039,7 +1039,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             </View>
           ) : null}
 
-          <MoreOptions form={form} set={set} pol={pol} live={live} />
+          <MoreOptions form={form} set={set} pol={pol} live={live} adFree={ep.contentType === 'podcast'} />
 
           {/* Slice 3b: who its earnings go to, at the end of More info
               (null for a viewer who may not see who is paid). */}

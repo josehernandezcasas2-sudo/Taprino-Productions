@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MAIN_GENRES } from '../../lib/submitRules';
 import { ONE_LINE_MAX } from '../../lib/showRules';
 import { SITE } from '../../lib/siteConfig';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 import RatingOptions from '../RatingOptions';
 import { FieldHead, FieldNote, StagedBox, SwitchRow, isOpen, lineFor } from './EditorBits';
 import { ClockIcon, LockIcon, PlusIcon } from '../PlayerIcons';
@@ -81,8 +82,10 @@ export function AboutField({ id, value, onChange, max, policy, edited = false, l
   );
 }
 
-function tierWord(t) {
-  return t === 'premium' ? SITE.premiumTier : 'Free with ads';
+// A podcast carries no ads of ours (lib/adBreakRules.js): its free tier is
+// just "Free".
+function tierWord(t, adFree = false) {
+  return t === 'premium' ? SITE.premiumTier : adFree ? 'Free' : 'Free with ads';
 }
 
 // "Same as the show": one row per inherited field. Tap a row to open its
@@ -93,7 +96,7 @@ function tierWord(t) {
 //           resets (a Set), reset(key), pol(field), idPrefix }
 export function SameAsShow({ ctx, inShow = true }) {
   const [open, setOpen] = useState(null);
-  const { form, set, defaults = {}, showYear = null, resets, reset, pol, idPrefix } = ctx;
+  const { form, set, defaults = {}, showYear = null, resets, reset, pol, idPrefix, adFree = false } = ctx;
   const d = defaults || {};
   // Genre label, Made by and the year borrow the show's when blank (on
   // every page); the main genre, the rating and Who can watch were copied
@@ -173,14 +176,14 @@ export function SameAsShow({ ctx, inShow = true }) {
       key: 'tier',
       label: 'Who can watch',
       policy: pol('tier'),
-      value: tierWord(form.tier),
+      value: tierWord(form.tier, adFree),
       tier: form.tier,
       state: stateOf('tier', form.tier, d.tier),
       resetKeys: ['tier'],
       editor: (
         <div className="apl-pills" role="radiogroup" aria-label="Who can watch">
           {['free', 'premium'].map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={form.tier === t ? 'true' : 'false'} className={`apl-pill ${form.tier === t ? 'on' : ''}`} disabled={!isOpen(pol('tier'))} onClick={() => set('tier', t)}>{tierWord(t)}</button>
+            <button key={t} type="button" role="radio" aria-checked={form.tier === t ? 'true' : 'false'} className={`apl-pill ${form.tier === t ? 'on' : ''}`} disabled={!isOpen(pol('tier'))} onClick={() => set('tier', t)}>{tierWord(t, adFree)}</button>
           ))}
         </div>
       ),
@@ -308,13 +311,15 @@ export function PlaceBlock({ idPrefix, place }) {
 }
 
 // The folded options: runtime, ad breaks, ads, channels, the hero spot,
-// Tapa Original (the last two are the studio's on a live title).
-export function MoreOptions({ idPrefix, form, set, pol, live = false }) {
+// Tapa Original (the last two are the studio's on a live title). A podcast
+// (`adFree`, lib/adBreakRules.js) has no ad breaks and no ads switch: it
+// says it is ad-free instead.
+export function MoreOptions({ idPrefix, form, set, pol, live = false, adFree = false }) {
   return (
     <details className="show-ed-card show-ed-more">
       <summary>
         <span className="show-ed-more-title">More options</span>
-        <span className="show-ed-more-sub">Runtime, ad breaks, let channels air it{live ? ', the hero spot and Tapa Original (the last two are set by the studio)' : ', the hero spot, Tapa Original'}</span>
+        <span className="show-ed-more-sub">Runtime, {adFree ? '' : 'ad breaks, '}let channels air it{live ? ', the hero spot and Tapa Original (the last two are set by the studio)' : ', the hero spot, Tapa Original'}</span>
       </summary>
       <div className="show-ed-more-body">
         <div className="apl-grid2 show-ed-grid2">
@@ -322,14 +327,20 @@ export function MoreOptions({ idPrefix, form, set, pol, live = false }) {
             <FieldHead htmlFor={`${idPrefix}-runtime`} label="Runtime" hint=" MM:SS" locked={pol('runtime').mode === 'locked'} />
             <input id={`${idPrefix}-runtime`} className="show-ed-input" type="text" value={form.runtime} placeholder="22:04" maxLength={9} disabled={!isOpen(pol('runtime'))} onChange={(e) => set('runtime', e.target.value)} />
           </div>
-          <div className="show-ed-field">
-            <FieldHead htmlFor={`${idPrefix}-breaks`} label="Ad breaks" hint=" MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
-            <input id={`${idPrefix}-breaks`} className="show-ed-input" type="text" value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChange={(e) => set('adBreaksText', e.target.value)} />
-          </div>
+          {!adFree && (
+            <div className="show-ed-field">
+              <FieldHead htmlFor={`${idPrefix}-breaks`} label="Ad breaks" hint=" MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
+              <input id={`${idPrefix}-breaks`} className="show-ed-input" type="text" value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChange={(e) => set('adBreaksText', e.target.value)} />
+            </div>
+          )}
         </div>
-        <SwitchRow id={`${idPrefix}-ads`} title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
-          Off plays it without ad breaks for everyone.
-        </SwitchRow>
+        {adFree ? (
+          <p className="show-ed-hint">{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</p>
+        ) : (
+          <SwitchRow id={`${idPrefix}-ads`} title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
+            Off plays it without ad breaks for everyone.
+          </SwitchRow>
+        )}
         <SwitchRow id={`${idPrefix}-channels`} title="Let channels air it" on={form.channelOptIn} onChange={(v) => set('channelOptIn', v)} disabled={!isOpen(pol('channelOptIn'))} policy={pol('channelOptIn').mode === 'locked' ? pol('channelOptIn') : null}>
           TapaTV can schedule it live, with ads.
         </SwitchRow>

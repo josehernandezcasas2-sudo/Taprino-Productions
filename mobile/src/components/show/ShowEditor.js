@@ -21,6 +21,7 @@ import {
 import { AboutField, OneLineField } from './EpisodeFields';
 import { PaidLine } from './PayeeCard';
 import { InfoIcon, LinkText, PREMIUM_WORD, RoomToast, SmallButton, UploadIcon, askUs, publicRoute, shortDate, showRoute, ss, useRoomToast } from './ShowBits';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 
 // Edit show in the app (the series revamp, slice 5; the website's
 // components/show/ShowEditor.js, amendment 13, boards ShowEditor and
@@ -511,13 +512,16 @@ function ShowEditorReady({ initial, startTab, auth }) {
         </View>
         <View style={{ gap: 6 }}>
           <FieldHead label="Who can watch" />
-          <ChoiceChips options={[{ value: 'free', label: 'Free with ads' }, { value: 'premium', label: PREMIUM_WORD }]} value={form.tier} disabled={!isOpen(defaultsPolicy)} onChange={(v) => set('tier', v)} />
+          {/* A podcast carries no ads of ours (mobile/src/lib/adBreakRules.js). */}
+          <ChoiceChips options={[{ value: 'free', label: podcast ? 'Free' : 'Free with ads' }, { value: 'premium', label: PREMIUM_WORD }]} value={form.tier} disabled={!isOpen(defaultsPolicy)} onChange={(v) => set('tier', v)} />
         </View>
         <View style={{ gap: 6 }}>
           <FieldHead label={podcast ? 'Hosted by' : 'Made by'} />
           <EdInput value={form.artist} maxLength={120} placeholder={show.ownerName || 'Your name, as credited'} disabled={!isOpen(defaultsPolicy)} onChangeText={(t) => set('artist', t)} accessibilityLabel={podcast ? 'Hosted by' : 'Made by'} />
         </View>
-        <SwitchRow title="Ads between scenes" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(defaultsPolicy)} />
+        {podcast
+          ? <Text style={ss.small}>{PODCASTS_AD_FREE} No ad of ours plays in an episode; a sponsor read in your own audio is yours.</Text>
+          : <SwitchRow title="Ads between scenes" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(defaultsPolicy)} />}
         <View style={ss.row}><InfoIcon size={13} /><Text style={[ss.small, { flex: 1 }]}>Episodes already added keep their own rating and who can watch.</Text></View>
         <FieldNote policy={defaultsPolicy} edited={edited('defaults')} />
       </View>

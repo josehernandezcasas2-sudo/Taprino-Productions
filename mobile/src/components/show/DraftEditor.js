@@ -484,7 +484,7 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
           <View style={ss.card}>
             <AboutField value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={DIRECT} edited={edited('description')} />
           </View>
-          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: title }} />
+          <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: title, adFree: kind === 'podcast' }} />
           {/* A draft is never live: the uploader ticks and unticks it freely. */}
           <View style={ss.card}>
             <FlashingLightsField checked={form.hasFlashingLights} onChange={(v) => set('hasFlashingLights', v)} />
@@ -497,7 +497,7 @@ export default function DraftEditor({ showId, initialDraft, auth }) {
             <Text style={ss.cardK}>Once it’s sent</Text>
             <Text style={ss.small}>Its own poster and still (it uses {show ? `${show.name}’s` : 'the show’s'} art until then), captions, a trailer, its own page and the credits are added in this editor once the draft is sent for review.</Text>
           </View>
-          <MoreOptions form={form} set={set} pol={pol} />
+          <MoreOptions form={form} set={set} pol={pol} adFree={kind === 'podcast'} />
 
           <SectionHead label="Place" />
           <View style={ss.card}>

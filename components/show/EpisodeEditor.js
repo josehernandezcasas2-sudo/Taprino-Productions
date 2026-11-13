@@ -906,7 +906,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
           <span className="show-ed-staged-live">Visitors see the live title image until we approve it; then the name shows as text.</span>
         </StagedBox>
       ) : null}
-      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'ep', titleForAsk: `${show ? `${show.name} · ` : ''}${title}` }} />
+      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'ep', titleForAsk: `${show ? `${show.name} · ` : ''}${title}`, adFree: ep.contentType === 'podcast' }} />
       {/* The uploader's mark (Jose, 2026-11-13): on at once in every state;
           ticked on a live title it is the team's to take off
           (lib/showRules.js flashingLightsPolicy, the server's policy). */}
@@ -1020,7 +1020,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         </div>
       )}
 
-      <MoreOptions idPrefix="ep" form={form} set={set} pol={pol} live={live} />
+      <MoreOptions idPrefix="ep" form={form} set={set} pol={pol} live={live} adFree={ep.contentType === 'podcast'} />
 
       {data.payee ? <PayeeCard payee={data.payee} mode="section" onChanged={onPayeeChanged} titleWord={`“${title}”`} /> : null}
     </>

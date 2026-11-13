@@ -498,7 +498,7 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
   const moreInfo = (
     <>
       <AboutField id="dr-about" value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={DIRECT} edited={edited('description')} />
-      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'dr', titleForAsk: title }} />
+      <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, idPrefix: 'dr', titleForAsk: title, adFree: kind === 'podcast' }} />
       {/* A draft is never live: the uploader ticks and unticks it freely. */}
       <FlashingLightsField id="dr-flashing" className="show-ed-field" checked={form.hasFlashingLights} onChange={(v) => set('hasFlashingLights', v)} />
       <div className="show-ed-field">
@@ -509,7 +509,7 @@ export default function DraftEditor({ showId, mode = 'creator', layout = 'page',
         <span className="show-ed-card-k">Once it’s sent</span>
         <p className="show-ed-hint">Its own poster and still (it uses {show ? `${show.name}’s` : 'the show’s'} art until then), captions, a trailer, its own page and the credits are added in this editor once the draft is sent for review.</p>
       </div>
-      <MoreOptions idPrefix="dr" form={form} set={set} pol={pol} />
+      <MoreOptions idPrefix="dr" form={form} set={set} pol={pol} adFree={kind === 'podcast'} />
     </>
   );
 

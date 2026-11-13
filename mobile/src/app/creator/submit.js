@@ -25,6 +25,7 @@ import { WarningIcon } from '../../components/WorkIcons';
 import { Chip, ChevronIcon, PlusIcon, Sheet, SmallButton } from '../../components/show/ShowBits';
 import ExtraKindField from '../../components/ExtraKindField';
 import FlashingLightsField from '../../components/FlashingLightsField';
+import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 
 // Creator Studio's submit, three steps (mirrors pages/creator/submit.js,
 // 2026-10-31): the file (uploading from the moment it's picked), about it
@@ -839,10 +840,13 @@ export default function SubmitTitle() {
                 <View style={{ gap: 12, marginTop: 12 }}>
                   <View style={{ gap: 6 }}>
                     <Text style={s.optLabel}>Who can watch</Text>
-                    <Text style={cp.help}>Free with ads, or Tapa + members only. The studio has the final say.</Text>
+                    <Text style={cp.help}>{form.contentType === 'podcast' ? 'Free' : 'Free with ads'}, or Tapa + members only. The studio has the final say.</Text>
                     <Chips small options={[{ value: 'free', label: 'Free' }, { value: 'premium', label: 'Tapa +' }]} value={form.tier === 'premium' ? 'premium' : 'free'} onChange={(v) => update('tier', v)} />
                   </View>
-                  <Field label="Ad breaks" note="MM:SS, comma-separated"><Input value={form.adBreaksText} onChangeText={(v) => update('adBreaksText', v)} /></Field>
+                  {/* Podcasts are ad-free (mobile/src/lib/adBreakRules.js): no breaks to set. */}
+                  {form.contentType === 'podcast'
+                    ? <Field label="Ad breaks"><Text style={cp.help}>{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</Text></Field>
+                    : <Field label="Ad breaks" note="MM:SS, comma-separated"><Input value={form.adBreaksText} onChangeText={(v) => update('adBreaksText', v)} /></Field>}
                   <Switch on={form.channelOptIn} onPress={() => update('channelOptIn', !form.channelOptIn)} label="Let channels air it" hint="TapaTV can schedule it live, with ads." />
                   <Switch on={form.featured} onPress={() => update('featured', !form.featured)} label="Ask for the home page hero" hint="The studio decides what rotates." />
                   <Switch on={form.isOriginal} onPress={() => update('isOriginal', !form.isOriginal)} label="Tapa Original" hint="Made with or for the studio." />
