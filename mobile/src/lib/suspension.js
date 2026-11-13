@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AppState } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from './stableAuth';
 import { apiGet, freshToken } from './api';
 import { getSuspension, lastChecked, markChecked, publishSuspension, clearSuspension, subscribeSuspension } from './suspensionStore';
 

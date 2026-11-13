@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, Pressable, StyleSheet } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import Svg, { Line, Polygon, Path } from 'react-native-svg';
 import { colors, absoluteFill } from '../lib/theme';
@@ -27,22 +27,45 @@ function VolumeIcon({ muted, size = 17 }) {
   );
 }
 
-export default function ReelPlayer({ src, active, muted, onToggleMute, onEnded, thumbnail }) {
+// `paused`: the feed is out of sight (another screen on top) — the reel
+// on screen holds where it is and carries on when the feed is back, where
+// `active` going false and true again starts it over.
+export default function ReelPlayer({ src, active, paused = false, muted, onToggleMute, onEnded, thumbnail }) {
   const player = useVideoPlayer(src || null, (p) => {
     p.loop = false;
   });
   // No screenshots or recording while a reel plays (mobile/src/lib/captureBlock.js).
-  useCaptureBlock(Boolean(active && src));
+  useCaptureBlock(Boolean(active && src && !paused));
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+  const activeRef = useRef(active);
+  activeRef.current = Boolean(active && src);
 
   useEffect(() => {
     if (!player) return;
     if (active && src) {
       player.currentTime = 0;
-      player.play();
+      if (!pausedRef.current) player.play();
     } else {
       player.pause();
     }
   }, [active, src, player]);
+
+  useEffect(() => {
+    if (!player || !activeRef.current) return;
+    try { if (paused) player.pause(); else player.play(); } catch { /* released */ }
+  }, [paused, player]);
+
+  // Back in the app (expo-video pauses every player in the background):
+  // the reel on screen plays on instead of sitting frozen.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active' && activeRef.current && !pausedRef.current) {
+        try { player.play(); } catch { /* released */ }
+      }
+    });
+    return () => { try { sub.remove(); } catch { /* gone */ } };
+  }, [player]);
 
   useEffect(() => {
     if (player) player.muted = muted;

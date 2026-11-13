@@ -3,6 +3,7 @@ import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, St
 import * as WebBrowser from 'expo-web-browser';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
+import { openInAppBrowser } from '../lib/inAppBrowser';
 import { colors, fonts, oliveTint, brassTint, absoluteFill } from '../lib/theme';
 import { Avatar } from './CrewBits';
 import { dollars } from '../lib/purchaseRules';
@@ -73,7 +74,8 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
       const token = await getToken();
       const data = await apiPost('/api/tips/checkout', { creatorId: tipping.creatorId, amountCents: check.amountCents, note: check.note, showName: check.showName, returnTo }, token);
       if (!data.url) throw new Error('Could not start the tip.');
-      await WebBrowser.openBrowserAsync(data.url);
+      // The title playing underneath pauses (lib/inAppBrowser.js).
+      await openInAppBrowser(data.url);
       onClose();
       if (onDone) onDone();
     } catch (err) {
@@ -84,7 +86,11 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
   }
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    // Every orientation: the sheet also opens from the full-screen player's
+    // top row, sideways — on iOS a portrait-only Modal over a landscape-only
+    // screen is an orientation crash, and over a rotated one it turned the
+    // phone back and closed full screen.
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose} supportedOrientations={['portrait', 'landscape', 'landscape-left', 'landscape-right']}>
       <Pressable style={styles.backdrop} onPress={onClose} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.sheetWrap} pointerEvents="box-none">
         <View style={styles.sheet}>

@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import * as Clipboard from 'expo-clipboard';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';

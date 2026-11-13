@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import * as Clipboard from 'expo-clipboard';
 import { API_BASE_URL, apiGet, apiPost, freshToken } from '../lib/api';
 import { colors, fonts, absoluteFill } from '../lib/theme';
@@ -83,8 +83,14 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [isSignedIn]);
 
+  // A site path the app has a screen for opens it (hrefToRoute, like a
+  // notification); any other path opens the website — pushing it as it
+  // was gave "Unmatched Route" for /terms, /about and the like.
   function openAnnouncement(url) {
-    if (/^https?:\/\//i.test(url)) Linking.openURL(url); else router.push(url);
+    if (/^https?:\/\//i.test(url)) { Linking.openURL(url); return; }
+    const to = hrefToRoute(url);
+    if (to && to.route) router.push(to.route);
+    else if (to && to.url) Linking.openURL(to.url);
   }
 
   if (state.loading) {

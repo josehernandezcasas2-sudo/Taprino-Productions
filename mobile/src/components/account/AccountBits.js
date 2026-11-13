@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { hostedAuthParams } from '../../lib/hostedAuth';
 import { signOutEverywhere } from '../../lib/signOut';
@@ -101,6 +101,9 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
   const [dashboard, setDashboard] = useState(null);
   const [profile, setProfile] = useState(null);
   const [originalAge, setOriginalAge] = useState(null);
+  // The profile read failed while the account read worked: the Profile
+  // screen says so with a Retry instead of "Loading…" for good.
+  const [profileFailed, setProfileFailed] = useState(false);
 
   const withToken = useCallback(
     () => Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]),
@@ -129,12 +132,14 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
     }
     setDashboard(dash);
     if (withProfile) {
-      setProfile(profileData ? { ...profileData, savedHandle: profileData.handle || '' } : null);
+      setProfileFailed(!profileData);
+      // A failed re-read (the hub reads on every focus) keeps what showed.
+      if (profileData) setProfile({ ...profileData, savedHandle: profileData.handle || '' });
       if (profileData) {
         updateOwnProfileCache({ userId: profileData.userId || null, handle: profileData.handle || null, avatarUrl: profileData.avatarUrl || null, avatarPosition: profileData.avatarPosition || null, avatarZoom: profileData.avatarZoom || null, stayInStream: !!profileData.stayInStream });
         rememberStayInStream(!!profileData.stayInStream);
       }
-      setOriginalAge(profileData ? profileData.age ?? null : null);
+      if (profileData) setOriginalAge(profileData.age ?? null);
     }
   }, [withToken, withProfile]);
 
@@ -149,6 +154,10 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
     clearTimeout(fallback);
     if (!isSignedIn) {
       setDashboard({ isSignedIn: false });
+      // Signed out: nothing of the last account stays (a failed read for
+      // the next one keeps what showed, which must not be theirs).
+      setProfile(null);
+      setProfileFailed(false);
       return undefined;
     }
     if (!refreshOnFocus) loadAll();
@@ -161,9 +170,9 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
     if (refreshOnFocus && isLoaded && isSignedIn) loadAll();
   }, [refreshOnFocus, isLoaded, isSignedIn, loadAll]));
 
-  const retry = useCallback(() => { setDashboard(null); loadAll(); }, [loadAll]);
+  const retry = useCallback(() => { setDashboard(null); setProfileFailed(false); loadAll(); }, [loadAll]);
 
-  return { dashboard, setDashboard, profile, setProfile, originalAge, setOriginalAge, reload: loadAll, retry, withToken, getToken, signOut, isLoaded, isSignedIn };
+  return { dashboard, setDashboard, profile, setProfile, profileFailed, originalAge, setOriginalAge, reload: loadAll, retry, withToken, getToken, signOut, isLoaded, isSignedIn };
 }
 
 // The frame: TopNav, the stage, a Back pill (to the hub by default; the
@@ -260,8 +269,9 @@ export function AccountFrame({ title, aside = null, dashboard, onRetry, back = '
             <BackArrowIcon size={14} color={colors.inkDim} /><Text style={styles.backPillText} numberOfLines={1}>{back.label || 'Back'}</Text>
           </Pressable>
         ) : back ? (
-          // navigate(): back to the hub if it's in the stack, else open it.
-          <Pressable style={styles.backPill} onPress={() => router.navigate('/account')}>
+          // dismissTo: back to the hub when it's in the stack, else the hub
+          // in this screen's place (navigate pushed a second hub on top).
+          <Pressable style={styles.backPill} onPress={() => router.dismissTo('/account')}>
             <BackArrowIcon size={14} color={colors.inkDim} /><Text style={styles.backPillText}>Account</Text>
           </Pressable>
         ) : null}

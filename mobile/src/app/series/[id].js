@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
@@ -17,6 +17,7 @@ import PreviewBar, { PreviewFootnote, openSiteHref } from '../../components/Prev
 import { freePlayNote, seriesPlayLabel, sortEpisodes } from '../../lib/seriesResume';
 import { episodeCodeOf, rowTierWord } from '../../lib/showRules';
 import { extraKindLabel, extraMetaLine } from '../../lib/extraKinds';
+import { useRefreshOnReturn } from '../../lib/useRefreshOnReturn';
 
 // Mirrors components/GenreRow.js's tierBadge classes (the same pills as
 // LibraryRows.js): free-ads = olive-deep, free-noads = green, premium = brass.
@@ -143,6 +144,9 @@ export default function SeriesHub() {
   const tokenRef = useRef(null);
   // Buy to own: bumping this reloads the hub after Checkout closes.
   const [reloadKey, setReloadKey] = useState(0);
+  // Back from an episode: read the show again ("Continue S1 E3", what's
+  // watched), keeping what shows until it answers.
+  useRefreshOnReturn(() => setReloadKey((k) => k + 1));
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => tokenRef.current), 4000),
     router,
@@ -171,7 +175,7 @@ export default function SeriesHub() {
         const nums = seasonNumbersOf(data);
         setActiveSeason(nums.includes(Number(data.season)) ? Number(data.season) : nums[0] || 1);
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, data: null });
+        if (!cancelled) setState((s) => (s.data ? s : { loading: false, error: err.message, data: null }));
       }
     }
     load();

@@ -2,8 +2,9 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { showCall, showPath } from '../../lib/showApi';
+import { cancelShowUpload } from '../../lib/showUploadQueue';
 import { SUBMIT_TYPES, bytesLabel } from '../../lib/submitRules';
 import { needsYou } from '../../lib/showRules';
 import { episodeCode } from '../../lib/seriesResume';
@@ -97,14 +98,18 @@ const first = (v) => (Array.isArray(v) ? v[0] : v);
 export default function CreatorStudio() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const submitted = typeof first(params.submitted) === 'string' ? first(params.submitted) : null;
+  const submittedParam = typeof first(params.submitted) === 'string' ? first(params.submitted) : null;
+  // "… is in." says it once: leaving the hub and coming back to it (the
+  // address keeps ?submitted=) doesn't say it again.
+  const [flashSeen, setFlashSeen] = useState(null);
+  const submittedRef = useRef(submittedParam);
+  submittedRef.current = submittedParam;
+  useFocusEffect(useCallback(() => () => { if (submittedRef.current) setFlashSeen(submittedRef.current); }, []));
+  const submitted = submittedParam && submittedParam !== flashSeen ? submittedParam : null;
   const submittedShow = typeof first(params.show) === 'string' && first(params.show) ? first(params.show) : null;
-  const { isSignedIn, getToken: clerkGetToken } = useAuth();
-  // One getter for the screen's life (Clerk's may change identity), so the
-  // loaders below don't change every render.
-  const tokenRef = useRef(clerkGetToken);
-  tokenRef.current = clerkGetToken;
-  const getToken = useCallback((...a) => tokenRef.current(...a), []);
+  // One getter for the screen's life (lib/stableAuth.js), so the loaders
+  // below don't change every render.
+  const { isSignedIn, getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, forbidden: false, subs: null, drafts: [] });
   // null while loading; the strip hides when it can't load.
   const [shows, setShows] = useState(null);
@@ -171,6 +176,9 @@ export default function CreatorStudio() {
     Alert.alert('Discard this draft?', 'Its uploaded file is deleted too.', [
       { text: 'Keep it', style: 'cancel' },
       { text: 'Discard', style: 'destructive', onPress: async () => {
+        // Its file stops uploading first (the show page's queue keeps going
+        // while you move around the app), like the show page's Discard.
+        cancelShowUpload(id);
         const r = await showCall('DELETE', '/api/creator/drafts', { id }, getToken);
         if (!r.ok) {
           Alert.alert('Could not discard it', r.error);

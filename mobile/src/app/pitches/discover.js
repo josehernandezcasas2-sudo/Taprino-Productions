@@ -1,4 +1,4 @@
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -50,6 +50,9 @@ export default function ListAPlace() {
   const [error, setError] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const toggleFeature = (k) => set({ features: form.features.includes(k) ? form.features.filter((x) => x !== k) : [...form.features, k] });
+  // The listing being edited fills the form once: coming back to this
+  // screen (it reads again on focus) never throws away edits not saved yet.
+  const filledFor = useRef(null);
 
   useFocusEffect(useCallback(() => {
     let alive = true;
@@ -57,7 +60,7 @@ export default function ListAPlace() {
       tokenRef.current = signedIn ? await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]) : null;
       try { const r = await apiGet('/api/locations?sort=new'); if (alive) setRules(r.rules); } catch (err) { /* chips stay empty */ }
       if (edit && tokenRef.current) {
-        try { const l = await apiGet(`/api/locations/${edit}`, tokenRef.current); if (alive && l.listing && l.listing.mine) { setEditing(l.listing); setForm(fromListing(l.listing)); } } catch (err) { if (alive) setError(err.message); }
+        try { const l = await apiGet(`/api/locations/${edit}`, tokenRef.current); if (alive && l.listing && l.listing.mine) { setEditing(l.listing); if (filledFor.current !== edit) { filledFor.current = edit; setForm(fromListing(l.listing)); } } } catch (err) { if (alive) setError(err.message); }
       }
       if (alive) setLoading(false);
     })();

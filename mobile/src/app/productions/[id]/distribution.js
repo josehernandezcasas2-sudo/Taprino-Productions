@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, T
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../../lib/stableAuth';
 import { apiGet, apiPatch, apiPost, apiDelete, freshToken, API_BASE_URL } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';

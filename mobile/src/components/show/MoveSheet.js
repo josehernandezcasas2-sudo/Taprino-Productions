@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { planMove, showNoun } from '../../lib/showRules';
 import { showCall, showPath } from '../../lib/showApi';
 import { colors, fonts, inkTint, oliveTint } from '../../lib/theme';
@@ -50,10 +50,7 @@ function targetTag(t, show) {
 }
 
 export default function MoveSheet({ show, episode, myShows = [], onMoved, onClose, visible = true }) {
-  const { getToken: clerkGetToken } = useAuth();
-  const tokenRef = useRef(clerkGetToken);
-  tokenRef.current = clerkGetToken;
-  const getToken = useCallback((...a) => tokenRef.current(...a), []);
+  const { getToken } = useAuth();
   const isDraft = episode.kind === 'draft' || episode.status === 'draft';
   const fromSeason = Number(episode.season) || 1;
   const fromNumber = Number(episode.seriesOrder) || null;

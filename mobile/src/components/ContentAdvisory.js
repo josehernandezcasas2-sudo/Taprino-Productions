@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Animated, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useIsFocused } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { colors, fonts, absoluteFill, surfaceTint, warnTint } from '../lib/theme';
 import { ADVISORY_MS } from '../lib/contentAdvisory';
@@ -32,9 +33,16 @@ export function useAdvisoryCard({ info, playing, episodeId, player }) {
   const held = useRef(false);
   const playerRef = useRef(player);
   playerRef.current = player;
+  // The warning's five seconds can run out after the viewer has left (the
+  // series page on top, the app in the background): the title stays
+  // paused then rather than starting out of sight.
+  const focused = useIsFocused();
+  const focusedRef = useRef(focused);
+  focusedRef.current = focused;
   const release = useCallback(() => {
     if (!held.current) return;
     held.current = false;
+    if (!focusedRef.current || AppState.currentState !== 'active') return;
     const p = playerRef.current;
     try {
       if (p && !p.playing) p.play();

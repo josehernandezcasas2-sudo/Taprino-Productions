@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../../../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet, absoluteUrl } from '../../../../lib/api';
 import { colors } from '../../../../lib/theme';

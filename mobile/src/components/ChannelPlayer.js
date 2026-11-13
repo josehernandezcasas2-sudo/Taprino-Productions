@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, AppState, Linking, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { StatusBar } from 'expo-status-bar';
@@ -152,6 +152,8 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
   // another tune, or leaving the screen, ends it first).
   const breakDone = useRef(null);
   const retryTimer = useRef(null);
+  // Failed tunes in a row (the next try waits longer, up to a minute).
+  const retuneTries = useRef(0);
   const mutedRef = useRef(false);
   const volumeRef = useRef(1);
 
@@ -249,6 +251,7 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
         setScreen('off_air');
       } else {
         setScreen('unavailable');
+        retuneSoon(seq);
       }
       return;
     }
@@ -283,12 +286,30 @@ export default function ChannelPlayer({ channelSlug, initialNow, onNowChange }) 
     try {
       await player.replaceAsync(play.src);
     } catch (err) {
+      if (seq !== tuneSeq.current) return;
       setScreen('unavailable');
+      retuneSoon(seq);
       return;
     }
     if (seq !== tuneSeq.current || !focused.current) return;
+    retuneTries.current = 0;
     setScreen(null);
     player.play();
+  }
+
+  // A play request that failed (a dropped connection, the server's 503
+  // "having a moment" — pages/api/channel/play.js expects the player to
+  // ask again) tries again while the screen is up, 5 s, 10 s, … a minute
+  // apart; it used to stay "unavailable" until the next program.
+  function retuneSoon(seq) {
+    if (!focused.current) return;
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    const wait = Math.min(60000, RETRY_MS * 2 ** Math.min(retuneTries.current, 4));
+    retuneTries.current += 1;
+    retryTimer.current = setTimeout(() => {
+      retryTimer.current = null;
+      if (seq === tuneSeq.current && focused.current) catchUp();
+    }, wait);
   }
 
   // A planned break: the plan's fill for exactly its booked seconds (the

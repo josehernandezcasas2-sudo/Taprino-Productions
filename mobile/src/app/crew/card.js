@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -58,6 +58,12 @@ export default function CrewCardScreen() {
   const [lang, setLang] = useState('');
   const [gearDraft, setGearDraft] = useState({ category: '', name: '', flag: 'brings' });
   const [creditDraft, setCreditDraft] = useState({ title: '', role: '', year: '' });
+  // The card as last read or saved: a read on coming back to the screen
+  // replaces the form only while nothing in it has changed since, so an
+  // edit not yet saved survives a trip to another screen.
+  const formRef = useRef(form);
+  formRef.current = form;
+  const baseRef = useRef(null);
 
   // Same rule as the Apply screen: never wait on Clerk (it can't finish
   // in the web preview) — treat "not loaded" as signed out and this
@@ -69,7 +75,10 @@ export default function CrewCardScreen() {
     try {
       const data = await apiGet('/api/crew/card', tokenRef.current);
       setState({ loading: false, error: null, card: data.card, creditedWork: data.creditedWork || [], options: { ...FALLBACK_OPTIONS, ...data.options } });
-      setForm(fromCard(data.card));
+      const next = fromCard(data.card);
+      const untouched = baseRef.current === null || JSON.stringify(formRef.current) === baseRef.current;
+      baseRef.current = JSON.stringify(next);
+      if (untouched) setForm(next);
       setGearDraft((d) => ({ ...d, category: d.category || (data.options && data.options.gearCategories[0]) || '' }));
     } catch (err) {
       setState((s) => ({ ...s, loading: false, error: err.message }));
@@ -112,7 +121,9 @@ export default function CrewCardScreen() {
     try {
       const data = await apiPost('/api/crew/card', form, await freshToken(getToken));
       setState((s) => ({ ...s, card: data.card }));
-      setForm(fromCard(data.card));
+      const saved = fromCard(data.card);
+      baseRef.current = JSON.stringify(saved);
+      setForm(saved);
       setStatus({ kind: 'ok', text: data.card.listed && (data.card.roles.length || data.card.gear.length) ? 'Saved — you’re on Crew Call.' : 'Saved.' });
     } catch (err) {
       setStatus({ kind: 'error', text: err.message });
@@ -132,6 +143,7 @@ export default function CrewCardScreen() {
           try {
             await apiDelete('/api/crew/card', {}, await freshToken(getToken));
             setState((s) => ({ ...s, card: null }));
+            baseRef.current = JSON.stringify(EMPTY);
             setForm(EMPTY);
             setStatus({ kind: 'ok', text: 'Card removed.' });
           } catch (err) {

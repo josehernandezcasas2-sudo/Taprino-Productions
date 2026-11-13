@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import * as WebBrowser from 'expo-web-browser';
+import { openInAppBrowser } from '../lib/inAppBrowser';
 import Svg, { Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
 import { colors, fonts, oliveTint } from '../lib/theme';
@@ -24,7 +24,9 @@ export async function buyTitle({ type, id, getToken, router, isSignedIn, returnT
   const token = await getToken();
   const data = await apiPost('/api/purchases/checkout', { type, id, returnTo }, token);
   if (!data.url) throw new Error('Could not start the payment.');
-  await WebBrowser.openBrowserAsync(data.url);
+  // The title playing underneath pauses (lib/inAppBrowser.js), and on
+  // Android this waits for the viewer to come back before the reload.
+  await openInAppBrowser(data.url);
   return true;
 }
 

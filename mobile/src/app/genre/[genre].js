@@ -2,10 +2,11 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { apiGet } from '../../lib/api';
 import { colors, absoluteFill } from '../../lib/theme';
 import { seriesPlayEpisodeId } from '../../lib/seriesResume';
+import { useRefreshOnReturn } from '../../lib/useRefreshOnReturn';
 import SmartImage from '../../components/SmartImage';
 import { PlayIcon, RollupTier, heroPlayLabel } from '../../components/HeroSpotlight';
 
@@ -31,6 +32,10 @@ export default function GenreLibrary() {
   // Signed in, the request carries the token so a series hero's Play can
   // continue where this viewer is (the route then answers privately).
   const { getToken } = useAuth();
+  // Back from a title: read again (a series hero's "Continue S1 E3"),
+  // keeping what shows until it answers.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnReturn(() => setRefreshKey((n) => n + 1));
   useEffect(() => {
     if (!genre) return undefined;
     let cancelled = false;
@@ -40,11 +45,11 @@ export default function GenreLibrary() {
         const feed = await apiGet(`/api/genre-feed?genre=${encodeURIComponent(genre)}`, token);
         if (!cancelled) setState({ loading: false, error: null, feed });
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, feed: null });
+        if (!cancelled) setState((s) => (s.feed ? s : { loading: false, error: err.message, feed: null }));
       }
     })();
     return () => { cancelled = true; };
-  }, [genre]);
+  }, [genre, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function goToCard(item) {
     if (item.isSeries || item.type === 'series') {

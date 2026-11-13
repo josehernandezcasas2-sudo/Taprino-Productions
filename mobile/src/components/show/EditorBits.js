@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path, Rect } from 'react-native-svg';
 import { useFocusEffect, usePreventRemove } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { absoluteUrl } from '../../lib/api';
 import { showCall } from '../../lib/showApi';
 import { brassTint, colors, dangerTint, fonts, inkTint, okTint, oliveTint } from '../../lib/theme';
@@ -78,13 +78,10 @@ export function openOnWebsite(path) {
   return WebBrowser.openBrowserAsync(absoluteUrl(path)).catch(() => {});
 }
 
-// One token getter for the screen's life (Clerk's may change identity) and
-// the show routes' caller on top of it.
+// The show routes' caller on top of the stable token getter
+// (lib/stableAuth.js: one getter for the screen's life).
 export function useShowAuth() {
-  const { isLoaded, isSignedIn, getToken: clerkGetToken } = useAuth();
-  const ref = useRef(clerkGetToken);
-  ref.current = clerkGetToken;
-  const getToken = useCallback((...a) => ref.current(...a), []);
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const call = useCallback((method, path, body) => showCall(method, path, body, getToken), [getToken]);
   return { isLoaded, isSignedIn, getToken, call, dashboard: !isLoaded ? null : { isSignedIn: Boolean(isSignedIn) } };
 }

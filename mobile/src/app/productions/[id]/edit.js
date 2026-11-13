@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../../lib/stableAuth';
 import { apiGet, apiPatch, freshToken } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';

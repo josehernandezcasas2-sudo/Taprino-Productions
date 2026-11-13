@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { apiGet } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { useProgress } from '../../lib/universityProgress';

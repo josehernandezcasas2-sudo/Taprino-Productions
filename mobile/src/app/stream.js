@@ -3,7 +3,7 @@ import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { apiGet } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 import TopNav from '../components/TopNav';
@@ -11,6 +11,7 @@ import HeroSpotlight from '../components/HeroSpotlight';
 import { CardRow, ContinueWatchingRow } from '../components/LibraryRows';
 import { useWishlist } from '../lib/useWishlist';
 import { seriesPlayEpisodeId } from '../lib/seriesResume';
+import { useRefreshOnReturn } from '../lib/useRefreshOnReturn';
 
 // Mirrors pages/stream.js: live banner, full-bleed HeroSpotlight, Continue
 // Watching, New Releases, Leaving Soon, the Tapa + promo, then one row per
@@ -25,6 +26,10 @@ export default function Stream() {
   const { getToken } = useAuth();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [state, setState] = useState({ loading: true, error: null, feed: null });
+  // Back from a title: read the feed again (Continue Watching, a series'
+  // "Continue S1 E3"), keeping what shows until it answers.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnReturn(() => setRefreshKey((n) => n + 1));
 
   useEffect(() => {
     let cancelled = false;
@@ -37,12 +42,12 @@ export default function Stream() {
         const feed = await apiGet('/api/stream-feed', token);
         if (!cancelled) setState({ loading: false, error: null, feed });
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, feed: null });
+        if (!cancelled) setState((s) => (s.feed ? s : { loading: false, error: err.message, feed: null }));
       }
     }
     load();
     return () => { cancelled = true; };
-  }, []);
+  }, [refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // pages/stream.js goToEpisode — Play means "start watching now": a series
   // opens the episode this viewer is on (episode 1 before they start).

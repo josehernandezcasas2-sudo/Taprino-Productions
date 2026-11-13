@@ -2,12 +2,12 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL, apiGet, apiPost, freshToken } from '../lib/api';
 import { hostedAuthParams } from '../lib/hostedAuth';
-import { startTusUpload } from '../lib/tusUpload';
+import { abortUpload, clearUpload, startTusUpload } from '../lib/tusUpload';
 import { APPLICATION_STATUS_LABEL, videoStateLine } from '../lib/submitRules';
 import { colors } from '../lib/theme';
 import TopNav from '../components/TopNav';
@@ -61,7 +61,11 @@ export default function Apply() {
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
   const upload = useUploadProgress();
+  // tus's own address for an upload, with the upload it belongs to
+  // ({ uid, url }): a replacement's first request goes out before its
+  // address exists, and the last upload's used to ride along with it.
   const tusUrlRef = useRef(null);
+  const tusUrlFor = (uid) => (tusUrlRef.current && tusUrlRef.current.uid === uid ? tusUrlRef.current.url : null);
   const appRef = useRef(null);
 
   const [state, setState] = useState({ loading: true, error: null, data: null });
@@ -117,7 +121,7 @@ export default function Apply() {
         urlPath: '/api/apply/upload-url',
         token: await freshToken(getToken),
         resumeUrl,
-        onUrl: (url) => { tusUrlRef.current = url; storeUploadUrl(started.uid, url); }
+        onUrl: (url) => { tusUrlRef.current = { uid: started.uid, url }; storeUploadUrl(started.uid, url); }
       });
       const info = { uid: started.uid, uploadUrl: resumeUrl || null, name: asset.fileName || 'video', bytes: asset.fileSize || null, runtimeSeconds: asset.duration ? Math.round(asset.duration / 1000) : null, width: asset.width || null, height: asset.height || null, state: 'uploading' };
       setVideo(info);
@@ -176,7 +180,7 @@ export default function Apply() {
     setBusy(true);
     setError(null);
     try {
-      const body = { ...form, rightsAnswers: answers, rightsAttested: true, ...(video ? { videoUid: video.uid, videoName: video.name, videoBytes: video.bytes, runtimeSeconds: video.runtimeSeconds, uploadUrl: tusUrlRef.current || video.uploadUrl || null } : {}) };
+      const body = { ...form, rightsAnswers: answers, rightsAttested: true, ...(video ? { videoUid: video.uid, videoName: video.name, videoBytes: video.bytes, runtimeSeconds: video.runtimeSeconds, uploadUrl: tusUrlFor(video.uid) || video.uploadUrl || null } : {}) };
       const res = await apiPost('/api/apply', body, await freshToken(getToken));
       setState((s) => ({ ...s, data: { ...s.data, application: res.application } }));
       setReapply(false);
@@ -200,8 +204,13 @@ export default function Apply() {
       const same = resume && app.video && app.video.uploadUrl && app.video.bytes === asset.fileSize;
       const info = await beginUpload(asset, { resumeUrl: same ? app.video.uploadUrl : null });
       if (!info || same) return;
-      const res = await apiPost('/api/apply/video', { id: app.id, videoUid: info.uid, videoName: info.name, videoBytes: info.bytes, runtimeSeconds: info.runtimeSeconds, uploadUrl: tusUrlRef.current || null }, await freshToken(getToken));
+      const res = await apiPost('/api/apply/video', { id: app.id, videoUid: info.uid, videoName: info.name, videoBytes: info.bytes, runtimeSeconds: info.runtimeSeconds, uploadUrl: tusUrlFor(info.uid) }, await freshToken(getToken));
       setState((s) => ({ ...s, data: { ...s.data, application: res.application } }));
+      // The address may have come in while that was on its way (the row
+      // still named the old upload then): keep it now.
+      appRef.current = res.application;
+      const url = tusUrlFor(info.uid);
+      if (url) storeUploadUrl(info.uid, url);
     } catch (err) {
       setError(err.message);
     }
@@ -295,7 +304,7 @@ export default function Apply() {
                   <Text style={cp.link} onPress={() => setLinkMode(true)}>or paste a link to it (Drive, Dropbox, WeTransfer)</Text>
                 </View>
               ) : null}
-              {video ? <ProgressCard video={video} upload={uploadNow} facts={factsFor(video)} onRemove={() => { setVideo(null); tusUrlRef.current = null; }} /> : null}
+              {video ? <ProgressCard video={video} upload={uploadNow} facts={factsFor(video)} onRemove={() => { if (uploadNow && uploadNow.status === 'uploading' && abortUpload('Stopped: not this file.')) clearUpload(); setVideo(null); tusUrlRef.current = null; }} /> : null}
               {linkMode && !video ? (
                 <Field label="Link to the files">
                   <Input value={form.mediaLink} onChangeText={(v) => update('mediaLink', v)} placeholder="https://" autoCapitalize="none" keyboardType="url" />

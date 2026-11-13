@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from './stableAuth';
 import { apiGet, apiPost } from './api';
 
 // Which Film University lessons the viewer has marked done, on the phone —

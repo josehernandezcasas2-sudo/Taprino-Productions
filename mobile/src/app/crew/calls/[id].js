@@ -1,10 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
-import { apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
+import { absoluteUrl, apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
@@ -72,6 +72,18 @@ export default function CallScreen() {
   }, `Sent — it's in your Messages with the call attached.`);
   const book = (responseId, action) => act(async () => apiPost(`/api/crew/calls/${id}/book`, { responseId, action }, await freshToken(getToken)));
   const shortlist = (responseId, body) => act(async () => apiPost(`/api/crew/calls/${id}/shortlist`, { responseId, ...body }, await freshToken(getToken)));
+  // A callback time: iOS asks in a prompt. Android has no Alert.prompt (it
+  // does nothing there), so the call opens on the website instead.
+  const askCallback = (r) => {
+    if (Platform.OS !== 'ios') {
+      Alert.alert('Set the callback on the website', 'The app can’t ask for a time on this phone yet.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open the call', onPress: () => WebBrowser.openBrowserAsync(absoluteUrl(`/crew/calls/${encodeURIComponent(id)}`)).catch(() => {}) }
+      ]);
+      return;
+    }
+    Alert.prompt('Callback', 'When? (YYYY-MM-DD HH:MM)', (v) => { const t = v ? new Date(v.trim().replace(' ', 'T')) : null; if (t && !Number.isNaN(t.getTime())) shortlist(r.id, { callbackAt: t.toISOString() }); }, 'plain-text', r.callbackAt ? new Date(r.callbackAt).toISOString().slice(0, 16).replace('T', ' ') : '');
+  };
   const sendTape = () => act(async () => apiPatch(`/api/crew/calls/${id}/respond`, { selfTapeUrl: tapeUrl }, await freshToken(getToken)), 'Tape attached — the poster has been told.');
   const outcome = (responseId, value) => act(async () => {
     const d = await apiPost(`/api/crew/calls/${id}/outcome`, { responseId, outcome: value }, await freshToken(getToken));
@@ -251,7 +263,7 @@ export default function CallScreen() {
                         {!r.outcome ? (
                           <View style={[crew.row, { flexWrap: 'wrap' }]}>
                             <Pressable style={[crew.btnSm, r.shortlisted && { borderColor: colors.olive }]} disabled={busy} onPress={() => shortlist(r.id, { shortlisted: !r.shortlisted })}><Text style={crew.btnSmText}>{r.shortlisted ? '★ Shortlisted' : '☆ Shortlist'}</Text></Pressable>
-                            <Pressable style={crew.btnSm} disabled={busy} onPress={() => Alert.prompt ? Alert.prompt('Callback', 'When? (YYYY-MM-DD HH:MM)', (v) => { const t = v ? new Date(v.trim().replace(' ', 'T')) : null; if (t && !Number.isNaN(t.getTime())) shortlist(r.id, { callbackAt: t.toISOString() }); }, 'plain-text', r.callbackAt ? new Date(r.callbackAt).toISOString().slice(0, 16).replace('T', ' ') : '') : setNote('Set callbacks from the website for now.')}><Text style={crew.btnSmText}>{r.callbackAt ? 'Change callback' : 'Set a callback'}</Text></Pressable>
+                            <Pressable style={crew.btnSm} disabled={busy} onPress={() => askCallback(r)}><Text style={crew.btnSmText}>{r.callbackAt ? 'Change callback' : 'Set a callback'}</Text></Pressable>
                             {r.callbackAt ? <Pressable style={crew.btnSm} disabled={busy} onPress={() => shortlist(r.id, { callbackAt: null })}><Text style={crew.btnSmText}>Clear</Text></Pressable> : null}
                           </View>
                         ) : null}

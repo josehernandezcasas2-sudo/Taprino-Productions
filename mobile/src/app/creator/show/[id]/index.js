@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, AppState, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../../../lib/stableAuth';
 import {
   compareEpisodes, fileMatches, nextFreeNumber, planMove, positionsFor, renumberFromOne, reorderBody, seasonLabel, undoMoveSteps
 } from '../../../../lib/showRules';
@@ -114,12 +114,9 @@ function ShowScreen() {
   const params = useLocalSearchParams();
   const showId = String(params.id || '');
   const arriveId = typeof params.ep === 'string' ? params.ep : typeof params.draft === 'string' ? params.draft : null;
-  const { isLoaded, isSignedIn, getToken: clerkGetToken } = useAuth();
-  // One getter for the screen's life (Clerk's may change identity): the
-  // reads below depend on it, and a new one each render would read again.
-  const tokenRef = useRef(clerkGetToken);
-  tokenRef.current = clerkGetToken;
-  const getToken = useCallback((...a) => tokenRef.current(...a), []);
+  // One getter for the screen's life (lib/stableAuth.js): the reads below
+  // depend on it, and a new one each render would read again.
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const call = useCallback((method, path, body) => showCall(method, path, body, getToken), [getToken]);
   const { toast, say } = useRoomToast();
   const q = useShowQueue(showId);
