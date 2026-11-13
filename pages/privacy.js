@@ -51,13 +51,13 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="November 12, 2026"
+      updated="November 13, 2026"
       account={account}
       summary={
         <>
           <strong>The short version.</strong> You can watch most of {SITE.name} without an
           account. If you make one, we store your email and what you&rsquo;ve watched so the site can
-          remember where you left off. We show ads on free content: our own and our advertisers&rsquo;
+          remember where you left off. We show ads on free content (never on podcasts): our own and our advertisers&rsquo;
           ads in the player, and Google&rsquo;s display ads on some public pages. We don&rsquo;t sell
           your personal information. You can ask us to delete your account and
           everything attached to it at any time by emailing {SITE.contactEmail}.
@@ -138,6 +138,7 @@ export default function Privacy({ account }) {
         isn&rsquo;t tied to you. On the website these ads play through Google&rsquo;s IMA player
         software, which loads from Google&rsquo;s servers like any Google resource. In the app they
         play in our own player, and the app doesn&rsquo;t load Google&rsquo;s advertising software.
+        Podcasts carry none of these ads: no ad of ours, and no Google ad, plays on a podcast episode.
       </p>
       <p>
         <strong>Google&rsquo;s ads.</strong> We use <strong>Google AdSense</strong> for display
@@ -179,9 +180,9 @@ export default function Privacy({ account }) {
       <p>
         This is Google&rsquo;s processing, not ours — we receive aggregate performance figures, not
         profiles of individual viewers. <strong>Premium and Sponsor members see no ads in the
-        player</strong>, and no ad is requested for them there. Google&rsquo;s display-ads script still
-        loads on our public pages for everyone, members included, and Live TV carries ads for every
-        viewer.
+        player</strong>, and no ad is requested for them there. Google&rsquo;s display-ads script
+        isn&rsquo;t loaded for them either: it loads on our public pages only for visitors who
+        aren&rsquo;t signed in and for members whose plan has ads. Live TV carries ads for every viewer.
       </p>
       <p>
         If you are in the EEA or UK, Google serves ads in accordance with its obligations under the
