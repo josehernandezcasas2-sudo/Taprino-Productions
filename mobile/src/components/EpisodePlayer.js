@@ -15,6 +15,7 @@ import EndCard from './EndCard';
 import AdBreakLayer from './AdBreakLayer';
 import MuteGlyph from './MuteGlyph';
 import { muteLabel, muteToggle } from '../lib/adBreakRules';
+import { onBrowserOpen } from '../lib/inAppBrowser';
 
 const CONTROLS_HIDE_MS = 3000;
 const SKIP_SECONDS = 10;
@@ -203,6 +204,31 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   // the browser sheet with it, and nothing would say the visit was over).
   const visitingRef = useRef(false);
   visitingRef.current = Boolean(ad && ad.state && ad.state.visiting);
+  // A Checkout page (Tip from the full-screen top row) is open: an iPhone
+  // is held upright under it (lib/inAppBrowser.js), and that turn must
+  // not close full screen — the Modal would take the Tip sheet and the
+  // browser with it. When it closes, the lock the player had comes back
+  // (sideways again from the button); an unlocked phone held upright
+  // leaves full screen as if it had been turned.
+  const browserOpenRef = useRef(false);
+  useEffect(() => onBrowserOpen(() => {
+    browserOpenRef.current = true;
+    return () => {
+      browserOpenRef.current = false;
+      if (!CAN_ROTATE) return;
+      setTimeout(async () => {
+        if (!fullscreenRef.current || !autoRotate.current || browserOpenRef.current) return;
+        try {
+          // Sideways from the button: the lock came back and turns it.
+          const lockNow = await ScreenOrientation.getOrientationLockAsync();
+          if (lockNow !== OrientationLock.DEFAULT && lockNow !== OrientationLock.ALL) return;
+          const o = await ScreenOrientation.getOrientationAsync();
+          if (o === Orientation.PORTRAIT_UP && fullscreenRef.current && autoRotate.current && !browserOpenRef.current) exitFullscreen(false);
+        } catch { /* the next turn of the phone decides */ }
+      }, 600);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), []);
 
   // The one mute: the title player's own, followed live.
   // (Its volume is never turned down in the app — the phone's buttons do
@@ -387,7 +413,7 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
       if (CAN_ROTATE) ScreenOrientation.unlockAsync().catch(() => {});
       const sub = ScreenOrientation.addOrientationChangeListener(({ orientationInfo }) => {
         const o = orientationInfo && orientationInfo.orientation;
-        if (visitingRef.current) return;
+        if (visitingRef.current || browserOpenRef.current) return;
         if (isLandscape(o) && autoRotate.current) enterFullscreen(false);
         else if (o === Orientation.PORTRAIT_UP && fullscreenRef.current && autoRotate.current) exitFullscreen(false);
       });

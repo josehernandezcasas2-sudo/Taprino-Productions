@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
-import { openInAppBrowser } from '../lib/inAppBrowser';
+import { openCheckout, appReturnAddress, alertWhenBack } from '../lib/inAppBrowser';
 import Svg, { Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
 import { colors, fonts, oliveTint } from '../lib/theme';
@@ -9,8 +9,9 @@ import { dollars } from '../lib/purchaseRules';
 // Buy to own, the app's side — mirrors components/BuyBits.js on the
 // website: "Own this title" ("Own this episode" for a show's episode) on
 // the episode screen, "Own the whole series" on the series screen, the Owned / Buy chips on episode rows.
-// Buying opens Stripe Checkout in the in-app browser (like a membership);
-// the caller reloads its screen when the browser closes.
+// Buying opens Stripe Checkout in the in-app browser (like a membership),
+// which comes back to the app by itself once paid or cancelled
+// (lib/inAppBrowser.js openCheckout); the caller reloads its screen.
 
 const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '');
 
@@ -22,12 +23,12 @@ export async function buyTitle({ type, id, getToken, router, isSignedIn, returnT
     return false;
   }
   const token = await getToken();
-  const data = await apiPost('/api/purchases/checkout', { type, id, returnTo }, token);
+  const data = await apiPost('/api/purchases/checkout', { type, id, returnTo, appReturn: appReturnAddress() }, token);
   if (!data.url) throw new Error('Could not start the payment.');
   // The title playing underneath pauses (lib/inAppBrowser.js), and on
   // Android this waits for the viewer to come back before the reload.
-  await openInAppBrowser(data.url);
-  return true;
+  const back = await openCheckout(data.url);
+  return back.status === 'paid' ? 'paid' : true;
 }
 
 export function useBuy({ getToken, router, isSignedIn, onDone }) {
@@ -36,7 +37,16 @@ export function useBuy({ getToken, router, isSignedIn, onDone }) {
     setBusy(true);
     try {
       const went = await buyTitle({ type, id, getToken, router, isSignedIn, returnTo });
-      if (went && onDone) await onDone();
+      if (went === 'paid') {
+        // The website's words (components/BuyBits.js BoughtBanner).
+        alertWhenBack('It’s yours', 'It’s in your library for good. Find it any time under Account → Your purchases.');
+      }
+      if (went && onDone) {
+        await onDone();
+        // Stripe tells the site a moment after it sends the buyer back:
+        // one more read so the page says Owned.
+        if (went === 'paid') setTimeout(() => { Promise.resolve(onDone()).catch(() => {}); }, 3000);
+      }
     } catch (err) {
       Alert.alert('Could not start the purchase', err.message);
     } finally {

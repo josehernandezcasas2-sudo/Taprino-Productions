@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { openInAppBrowser } from '../../lib/inAppBrowser';
+import { openCheckout, appReturnAddress, alertWhenBack } from '../../lib/inAppBrowser';
 import { apiPost } from '../../lib/api';
 import { readVia } from '../../lib/referral';
 import MembershipPlans from '../../components/MembershipPlans';
@@ -33,16 +33,23 @@ export default function AccountMembership() {
   const [redeemSuccess, setRedeemSuccess] = useState(null);
 
   // Join Tapa +: Stripe Checkout in the in-app browser (same as backing a
-  // pitch), then re-read the account so the plan row flips.
+  // pitch), which comes back to the app by itself once paid or cancelled
+  // (lib/inAppBrowser.js openCheckout), then re-read the account so the
+  // plan row flips.
   async function startCheckout(tier) {
     setJoiningTier(tier);
     try {
       const token = await withToken();
       const via = referredBy.trim();
-      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account/membership', ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
+      const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account/membership', appReturn: appReturnAddress(), ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
       if (data.url) {
-        await openInAppBrowser(data.url);
+        const back = await openCheckout(data.url);
         await reload();
+        if (back.status === 'paid') {
+          alertWhenBack('Welcome to Tapa +', 'Your membership is on.');
+          // Stripe tells the site a moment after it sends the member back.
+          setTimeout(() => { Promise.resolve(reload()).catch(() => {}); }, 3000);
+        }
       }
     } catch (err) {
       Alert.alert('Could not start checkout', err.message);
@@ -55,12 +62,12 @@ export default function AccountMembership() {
     setPortalLoading(true);
     try {
       const token = await withToken();
-      const data = await apiPost('/api/create-portal-session', {}, token);
+      const data = await apiPost('/api/create-portal-session', { appReturn: appReturnAddress() }, token);
       // The in-app browser, then a fresh read: a plan switched or cancelled
-      // in the portal shows when the viewer is back (Linking left the app
-      // for Safari and nothing re-read).
+      // in the portal shows when the viewer is back. The portal's Return
+      // link comes back to the app by itself (lib/appReturn.js).
       if (data.url) {
-        await openInAppBrowser(data.url);
+        await openCheckout(data.url);
         await reload();
       }
     } catch (err) {

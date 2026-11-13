@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
-import * as WebBrowser from 'expo-web-browser';
+import { openCheckout, appReturnAddress } from '../../lib/inAppBrowser';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
@@ -128,14 +128,20 @@ export default function PitchDetail() {
     }
     setDonating(true);
     try {
-      const data = await apiPost('/api/pitches/donate', { pitchId, amountDollars: amount }, await freshToken(getToken));
-      // Stripe Checkout in the in-app browser; when it closes, re-read the
-      // pitch so a paid backing shows in the total.
-      await WebBrowser.openBrowserAsync(data.url);
-      setDonationAmount('');
-      setDonationSuccess(true);
+      const data = await apiPost('/api/pitches/donate', { pitchId, amountDollars: amount, appReturn: appReturnAddress() }, await freshToken(getToken));
+      // Stripe Checkout in the in-app browser, which comes back to the app
+      // by itself once paid or cancelled (lib/inAppBrowser.js openCheckout);
+      // then re-read the pitch so a paid backing shows in the total. The
+      // thank-you shows only after a payment (it showed after a cancel too).
+      const back = await openCheckout(data.url);
       setReloadKey((k) => k + 1);
-      setTimeout(() => setDonationSuccess(false), 6000);
+      if (back.status !== 'cancelled') {
+        setDonationAmount('');
+        setDonationSuccess(true);
+        setTimeout(() => setDonationSuccess(false), 6000);
+        // Stripe tells the site a moment after it sends the backer back.
+        if (back.status === 'paid') setTimeout(() => setReloadKey((k) => k + 1), 3000);
+      }
     } catch (err) {
       setDonationError(err.message);
     } finally {

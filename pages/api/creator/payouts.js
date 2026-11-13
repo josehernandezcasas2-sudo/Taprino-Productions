@@ -57,9 +57,9 @@ export default async function handler(req, res) {
       if (!isStripeConfigured()) return res.status(503).json({ error: 'Payments aren’t switched on for this site yet.' });
       // Each action asks Stripe for a fresh link (security round 2).
       if (!(await checkRateLimit(`payout-links:${userId}`, 10, 3600))) return res.status(429).json({ error: 'Too many tries in a row — give it a little while.' });
-      const { action, returnTo } = req.body || {};
+      const { action, returnTo, appReturn } = req.body || {};
       if (action === 'onboard') {
-        const url = await createOnboardingLink({ userId, email, origin: requestOrigin(req), returnTo });
+        const url = await createOnboardingLink({ userId, email, origin: requestOrigin(req), returnTo, appReturn });
         return res.status(200).json({ url });
       }
       if (action === 'dashboard') {

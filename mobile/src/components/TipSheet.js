@@ -3,7 +3,7 @@ import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, St
 import * as WebBrowser from 'expo-web-browser';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
-import { openInAppBrowser } from '../lib/inAppBrowser';
+import { openCheckout, appReturnAddress, alertWhenBack } from '../lib/inAppBrowser';
 import { colors, fonts, oliveTint, brassTint, absoluteFill } from '../lib/theme';
 import { Avatar } from './CrewBits';
 import { dollars } from '../lib/purchaseRules';
@@ -15,8 +15,9 @@ import { tipQuote, parseTipAmount, validateTipInput, MAX_NOTE_CHARS, MIN_TIP_CEN
 // creatorAvatar, cutPercent, maxCents, minCents, presets, fiscalSponsor }
 // or { enabled: false } (payouts not ready, your own profile, not a
 // creator); every button here renders nothing then. Paying opens Stripe
-// Checkout in the in-app browser like backing; Checkout returns to the
-// website, so the fan closes the browser when it's done.
+// Checkout in the in-app browser like backing; once the fan has paid (or
+// cancelled) Checkout sends the browser back to the app, which closes it
+// and says thank you (lib/inAppBrowser.js openCheckout).
 
 const short = (name) => (name || 'the creator').trim().split(/\s+/)[0];
 const whole = (cents) => dollars(cents).replace(/\.00$/, '');
@@ -72,11 +73,14 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
     setError(null);
     try {
       const token = await getToken();
-      const data = await apiPost('/api/tips/checkout', { creatorId: tipping.creatorId, amountCents: check.amountCents, note: check.note, showName: check.showName, returnTo }, token);
+      const data = await apiPost('/api/tips/checkout', { creatorId: tipping.creatorId, amountCents: check.amountCents, note: check.note, showName: check.showName, returnTo, appReturn: appReturnAddress() }, token);
       if (!data.url) throw new Error('Could not start the tip.');
-      // The title playing underneath pauses (lib/inAppBrowser.js).
-      await openInAppBrowser(data.url);
+      // The title playing underneath pauses, and an iPhone turns upright
+      // for Checkout and back after (lib/inAppBrowser.js).
+      const back = await openCheckout(data.url);
       onClose();
+      // The website's words (components/TipSheet.js TippedBanner).
+      if (back.status === 'paid') alertWhenBack('Thank you', `Your ${whole(check.amountCents)} tip to ${name} is going through.`);
       if (onDone) onDone();
     } catch (err) {
       setError(err.message);

@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import * as WebBrowser from 'expo-web-browser';
+import { openCheckout } from '../../lib/inAppBrowser';
 import { apiGet, apiPatch, apiPost } from '../../lib/api';
 import { colors } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
@@ -56,7 +56,8 @@ export default function MyLocations() {
     else go();
   }
   const updateRequest = (r) => setState((s) => ({ ...s, requests: s.requests.map((x) => (x.id === r.id ? r : x)) }));
-  const onPay = async (url) => { await WebBrowser.openBrowserAsync(url); load(); };
+  // Back to the app by itself once paid or cancelled (openCheckout).
+  const onPay = async (url) => { await openCheckout(url); load(); };
 
   const { listings, requests } = state;
   const waiting = requests.filter((r) => r.status === 'requested').length;

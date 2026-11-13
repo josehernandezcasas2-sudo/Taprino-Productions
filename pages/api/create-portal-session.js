@@ -1,3 +1,4 @@
+import { bounceUrl } from '../../lib/appReturn';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { applyCors } from '../../lib/cors';
 import { requestOrigin, getStripe } from '../../lib/stripe';
@@ -26,16 +27,17 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Not signed in.' });
   }
 
-  // From a native app, req.headers.origin/host describe our own API
-  // domain, not anything the mobile client can usefully return to — the
-  // portal's "return" link just opens the website in a browser, which is
-  // a reasonable fallback rather than something that needs its own path.
+  // The portal's "Return" link: from the app, back to the app, which
+  // closes the browser and re-reads the plan (lib/appReturn.js; the
+  // website is signed out in the in-app browser); else the account page.
   const origin = requestOrigin(req);
+  const body = req.body || {};
+  const appBack = bounceUrl(origin, body.appReturn, { kind: 'portal', status: 'back' });
 
   try {
     const session = await getStripe().billingPortal.sessions.create({
       customer: customerId,
-      return_url: `${origin}/account`
+      return_url: appBack || `${origin}/account`
     });
     res.status(200).json({ url: session.url });
   } catch (err) {

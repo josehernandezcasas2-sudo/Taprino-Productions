@@ -36,7 +36,7 @@ export default async function handler(req, res) {
           return res.status(200).json({ request: await acceptCounter(userId, id) });
         case 'pay': {
           if (!isStripeConfigured()) return res.status(503).json({ error: 'Payments aren’t switched on for this site yet.' });
-          return res.status(200).json(await createBookingCheckout(userId, id, { origin: requestOrigin(req) }));
+          return res.status(200).json(await createBookingCheckout(userId, id, { origin: requestOrigin(req), appReturn: body.appReturn }));
         }
         case 'cancel':
           return res.status(200).json({ request: await cancelRequest(userId, id, body, { isAdmin: rc.isAdmin }) });

@@ -23,13 +23,13 @@ export default async function handler(req, res) {
   // Each call opens a Stripe Checkout session and a pending row
   // (security round, 2026-10-26).
   if (!(await checkRateLimit(`purchase-checkout:${account.userId}`, 20, 3600))) return res.status(429).json({ error: 'That’s a lot of checkouts — try again in a little while.' });
-  const { type, id, returnTo } = req.body || {};
+  const { type, id, returnTo, appReturn } = req.body || {};
   // One of the site's own addresses, never the request's Host header
   // (the security round's rule for every Stripe return path; this route
   // was the one still reading the header, 2026-10-28).
   const origin = requestOrigin(req);
   try {
-    const out = await createPurchaseCheckout({ type, id, buyerId: account.userId, buyerEmail: account.email, isMember: account.isSubscriber, origin, returnTo });
+    const out = await createPurchaseCheckout({ type, id, buyerId: account.userId, buyerEmail: account.email, isMember: account.isSubscriber, origin, returnTo, appReturn });
     return res.status(200).json(out);
   } catch (err) {
     return sendError(res, err, 'purchases/checkout', 'Could not open checkout. Try again in a moment.');

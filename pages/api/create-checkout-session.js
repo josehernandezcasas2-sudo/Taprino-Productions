@@ -1,4 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
+import { checkoutReturns } from '../../lib/appReturn';
 import { getStripe, isStripeConfigured, requestOrigin } from '../../lib/stripe';
 import { getStripeCustomerIdFromRequest } from '../../lib/clerkStripeLink';
 import { getPlanForTier, getMembershipPlans } from '../../lib/membershipPlans';
@@ -109,14 +110,17 @@ export default async function handler(req, res) {
     const viaStamp = ref.via ? { via: ref.via, ...source } : ref.handle ? { via_handle: ref.handle, ...source } : {};
     const stamp = { tier: plan.tier, ...(userId ? { member: userId } : {}), ...viaStamp };
 
+    // From the app: back to the app, which closes the browser and re-reads
+    // the membership (lib/appReturn.js) — the website's pages are signed
+    // out in the in-app browser.
+    const viaApp = checkoutReturns({ origin, app: body.appReturn, kind: 'membership' });
     const params = {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      success_url: `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back !== '/' ? '&to=account' : ''}`,
-      // From the account page (web or app) land back on it; the in-app
-      // browser then closes and the screen re-reads membership.
-      cancel_url: `${origin}${back}?checkout=cancelled`,
+      success_url: viaApp ? viaApp.success : `${origin}/api/confirm-checkout?session_id={CHECKOUT_SESSION_ID}${back !== '/' ? '&to=account' : ''}`,
+      // From the account page on the website, land back on it.
+      cancel_url: viaApp ? viaApp.cancel : `${origin}${back}?checkout=cancelled`,
       allow_promotion_codes: true,
       customer: existingCustomerId,
       ...(userId ? { client_reference_id: userId } : {}),

@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
+import { openCheckout, appReturnAddress } from '../lib/inAppBrowser';
 import { apiGet, apiPost, freshToken } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
 
@@ -49,8 +50,11 @@ export default function PayoutsCard({ showEarningsLink = true }) {
     setError(null);
     try {
       const token = await freshToken(getToken);
-      const d = await apiPost('/api/creator/payouts', { action }, token);
-      await WebBrowser.openBrowserAsync(d.url);
+      // Stripe's onboarding comes back to the app by itself when it's done
+      // (lib/inAppBrowser.js openCheckout); the dashboard is closed by hand.
+      const d = await apiPost('/api/creator/payouts', { action, appReturn: appReturnAddress() }, token);
+      if (action === 'onboard') await openCheckout(d.url);
+      else await WebBrowser.openBrowserAsync(d.url);
       await load(true);
     } catch (err) {
       setError(err.message);

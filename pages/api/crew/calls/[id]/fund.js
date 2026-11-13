@@ -22,13 +22,13 @@ export default async function handler(req, res) {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Sign in first.' });
   const callId = String(req.query.id || '');
-  const { responseId } = req.body || {};
+  const { responseId, appReturn } = req.body || {};
   if (!/^[0-9a-f-]{36}$/i.test(callId) || !/^[0-9a-f-]{36}$/i.test(String(responseId || ''))) return res.status(404).json({ error: 'Not found.' });
   // Each call opens a Stripe Checkout and a payment row (security round 2).
   if (!(await checkRateLimit(`crew-pay-fund:${userId}`, 10, 3600))) return res.status(429).json({ error: 'That’s a lot of checkouts — try again in a little while.' });
   try {
     const email = await getUserEmail(userId).catch(() => null);
-    const out = await createCrewPayCheckout({ posterId: userId, posterEmail: email, callId, responseId, origin: requestOrigin(req) });
+    const out = await createCrewPayCheckout({ posterId: userId, posterEmail: email, callId, responseId, origin: requestOrigin(req), appReturn });
     return res.status(200).json(out);
   } catch (err) {
     return sendError(res, err, 'crew/calls/fund', 'Could not start the payment right now.');

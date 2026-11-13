@@ -6,7 +6,7 @@ import { applyCors } from '../../../lib/cors';
 import { requestOrigin } from '../../../lib/stripe';
 import { sendError } from '../../../lib/apiErrors';
 
-// POST { creatorId, amountCents, note, showName, returnTo } → { url }:
+// POST { creatorId, amountCents, note, showName, returnTo, appReturn? } → { url }:
 // a Stripe Checkout session for a tip (lib/tips.js). Signed in only;
 // the server re-checks every rule (amount, note, who can be tipped).
 // CORS-open for the app, which opens the URL in expo-web-browser.
@@ -24,7 +24,7 @@ export default async function handler(req, res) {
   if (!(await checkRateLimit(`tip-checkout:${userId}`, 20, 3600))) {
     return res.status(429).json({ error: 'That’s a lot of tips in an hour. Try again later.' });
   }
-  const { creatorId, amountCents, note, showName, returnTo } = req.body || {};
+  const { creatorId, amountCents, note, showName, returnTo, appReturn } = req.body || {};
   try {
     const user = await getClerkUser(req, userId).catch(() => null);
     const primary = user && user.emailAddresses ? user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId) || user.emailAddresses[0] : null;
@@ -39,7 +39,8 @@ export default async function handler(req, res) {
       note,
       showName,
       origin,
-      returnTo
+      returnTo,
+      appReturn
     });
     return res.status(200).json({ url: out.url, tipId: out.tipId, quote: out.quote });
   } catch (err) {

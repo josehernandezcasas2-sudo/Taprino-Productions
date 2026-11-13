@@ -27,7 +27,7 @@ export default async function handler(req, res) {
     return res.status(401).json({ error: 'Sign in to back this project.' });
   }
 
-  const { pitchId, amountDollars } = req.body || {};
+  const { pitchId, amountDollars, appReturn } = req.body || {};
   // Dollars in from the form, cents to the lib layer — same convention
   // used everywhere else money enters this app.
   const amountCents = amountDollars != null ? Math.round(Number(amountDollars) * 100) : NaN;
@@ -47,7 +47,7 @@ export default async function handler(req, res) {
     const primary = user.emailAddresses.find((e) => e.id === user.primaryEmailAddressId);
     const donorEmail = primary ? primary.emailAddress : null;
 
-    const { url, split } = await createDonationCheckout({ pitchId, donorUserId: userId, donorEmail, amountCents, origin: requestOrigin(req) });
+    const { url, split } = await createDonationCheckout({ pitchId, donorUserId: userId, donorEmail, amountCents, origin: requestOrigin(req), appReturn });
     return res.status(200).json({ url, split });
   } catch (err) {
     console.error('pitch donate error:', err.message);

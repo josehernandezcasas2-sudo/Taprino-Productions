@@ -3,6 +3,7 @@ import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-nativ
 import * as ImagePicker from 'expo-image-picker';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { apiPatch, apiPost } from '../lib/api';
+import { appReturnAddress } from '../lib/inAppBrowser';
 import { colors, fonts } from '../lib/theme';
 import { crew, Avatar, Chip } from './CrewBits';
 import SmartImage from './SmartImage';
@@ -227,7 +228,7 @@ export function ProducerActions({ r, token, onChange, onPay }) {
     <View style={{ gap: 6 }}>
       <View style={[crew.row, { flexWrap: 'wrap' }]}>
         {r.status === 'countered' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'accept_counter' })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>Accept {dollars(r.counterCents)}{r.cleaningCents ? ` + ${dollars(r.cleaningCents)} cleaning` : ''}</Text></Pressable> : null}
-        {r.status === 'accepted' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'pay' })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)}${r.taxNote ? ' + tax' : ''} to confirm`}</Text></Pressable> : null}
+        {r.status === 'accepted' ? <Pressable style={[crew.btnSm, crew.btnPrimary, busy && { opacity: 0.5 }]} disabled={busy} onPress={() => run({ action: 'pay', appReturn: appReturnAddress() })}><Text style={[crew.btnSmText, crew.btnPrimaryText]}>{busy ? 'Opening Stripe…' : `Pay ${dollars(r.totalChargedCents)}${r.taxNote ? ' + tax' : ''} to confirm`}</Text></Pressable> : null}
         {['requested', 'countered', 'accepted', 'paid'].includes(r.status) ? <Pressable style={crew.btnSm} disabled={busy} onPress={cancel}><Text style={[crew.btnSmText, { color: colors.inkDim }]}>{r.status === 'paid' ? 'Cancel booking' : 'Withdraw'}</Text></Pressable> : null}
       </View>
       {error ? <Text style={crew.error}>{error}</Text> : null}

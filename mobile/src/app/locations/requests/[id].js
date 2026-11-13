@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
-import * as WebBrowser from 'expo-web-browser';
+import { openCheckout } from '../../../lib/inAppBrowser';
 import { apiGet } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
@@ -41,7 +41,8 @@ export default function RequestScreen() {
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const setR = (r) => setState((s) => ({ ...s, r }));
-  const onPay = async (url) => { await WebBrowser.openBrowserAsync(url); load(); };
+  // Back to the app by itself once paid or cancelled (openCheckout).
+  const onPay = async (url) => { await openCheckout(url); load(); };
   const r = state.r;
   const side = r ? (r.mineAsHost ? 'host' : r.mineAsProducer ? 'producer' : 'admin') : null;
   const other = r ? (side === 'host' ? r.producer : r.host) : null;

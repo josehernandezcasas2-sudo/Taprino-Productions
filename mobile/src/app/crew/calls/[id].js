@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
+import { openCheckout, appReturnAddress } from '../../../lib/inAppBrowser';
 import { absoluteUrl, apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
@@ -92,9 +93,10 @@ export default function CallScreen() {
   });
   const setStatus = (status) => act(async () => apiPatch(`/api/crew/calls/${id}`, { status }, await freshToken(getToken)));
   const fund = (responseId) => act(async () => {
-    const d = await apiPost(`/api/crew/calls/${id}/fund`, { responseId }, await freshToken(getToken));
+    const d = await apiPost(`/api/crew/calls/${id}/fund`, { responseId, appReturn: appReturnAddress() }, await freshToken(getToken));
     if (d && d.url) {
-      await WebBrowser.openBrowserAsync(d.url);
+      // Back to the app by itself once paid or cancelled (openCheckout).
+      await openCheckout(d.url);
       // The webhook marks it held a moment after Stripe says paid.
       await new Promise((r) => setTimeout(r, 1500));
     }
