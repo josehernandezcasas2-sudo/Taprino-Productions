@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { API_BASE_URL } from '../lib/api';
 import { useSuspension, checkSuspension } from '../lib/suspension';

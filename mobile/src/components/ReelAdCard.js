@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { AppState, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { colors, absoluteFill } from '../lib/theme';
 import { REEL_AD_CTA } from '../lib/adBreakRules';
 import { firePixel } from '../lib/adSlots';

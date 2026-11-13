@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Linking } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { refreshPushRegistration } from '../lib/push';
 import { API_BASE_URL } from '../lib/api';
 

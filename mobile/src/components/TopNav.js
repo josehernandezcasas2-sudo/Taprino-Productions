@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
-import { useAuth, useUser } from '@clerk/expo';
+import { useUser } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { apiGet, absoluteUrl, freshToken } from '../lib/api';
 import { colors, fonts, inkTint, oliveTint, absoluteFill } from '../lib/theme';
 import {

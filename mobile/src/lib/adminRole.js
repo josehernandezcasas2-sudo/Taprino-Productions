@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from './stableAuth';
 import { apiGet } from './api';
 
 // Whether the signed-in person can open the admin area (admin or

@@ -70,6 +70,16 @@ export default [
       parserOptions: { ecmaFeatures: { jsx: true } },
       globals: { ...globals.browser, ...globals.node, ...globals.es2021, __DEV__: 'readonly' }
     },
-    rules: correctness
+    rules: {
+      ...correctness,
+      // @clerk/expo's useAuth hands back a new getToken on every render, so
+      // a hook that lists it re-runs on every render (the request loops of
+      // 2026-11-13). mobile/src/lib/stableAuth.js is the one that keeps it.
+      'no-restricted-imports': ['error', { paths: [{ name: '@clerk/expo', importNames: ['useAuth'], message: "Import useAuth from mobile/src/lib/stableAuth.js: Clerk's getToken changes on every render." }] }]
+    }
+  },
+  {
+    files: ['mobile/src/lib/stableAuth.js'],
+    rules: { 'no-restricted-imports': 'off' }
   }
 ];

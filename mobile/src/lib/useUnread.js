@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from './stableAuth';
 import { apiGet, apiPost, freshToken } from './api';
 
 // The signed-in person's bell: /api/notifications, the same poll the

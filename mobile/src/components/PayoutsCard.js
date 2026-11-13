@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost, freshToken } from '../lib/api';
 import { colors, fonts } from '../lib/theme';
@@ -24,7 +24,7 @@ const SCHEDULE_WORDS = { daily: 'paying out daily', weekly: 'paying out weekly',
 
 export default function PayoutsCard({ showEarningsLink = true }) {
   const router = useRouter();
-  const { getToken } = useAuth();
+  const { isLoaded, isSignedIn, getToken } = useAuth();
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   // Why the GET failed, kept apart from the Stripe-button errors: with no
@@ -33,6 +33,7 @@ export default function PayoutsCard({ showEarningsLink = true }) {
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async (sync) => {
+    if (!isLoaded || !isSignedIn) return;
     setLoadError(null);
     try {
       const token = await freshToken(getToken);
@@ -40,7 +41,7 @@ export default function PayoutsCard({ showEarningsLink = true }) {
     } catch (err) {
       setLoadError(err.message || 'Something went wrong.');
     }
-  }, [getToken]);
+  }, [isLoaded, isSignedIn, getToken]);
   useFocusEffect(useCallback(() => { load(false); }, [load]));
 
   async function go(action) {

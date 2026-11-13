@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { hostedAuthParams } from '../../lib/hostedAuth';
 import { apiGet, apiPost } from '../../lib/api';

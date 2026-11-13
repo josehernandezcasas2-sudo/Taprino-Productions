@@ -2,7 +2,7 @@ import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack, useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { apiGet, apiPost } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { dollars } from '../../lib/purchaseRules';
@@ -16,15 +16,16 @@ const KIND = { movie: 'Feature', short: 'Short film', series: 'Series', podcast:
 
 export default function Purchases() {
   const router = useRouter();
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isLoaded, isSignedIn } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [busy, setBusy] = useState(null);
   // Tips you've sent (lib/tips.js getTipsSent): lines, not titles.
   const [tips, setTips] = useState([]);
 
   const load = useCallback(async () => {
+    if (!isLoaded) return;
     try {
-      const token = await getToken().catch(() => null);
+      const token = isSignedIn ? await getToken().catch(() => null) : null;
       if (!token) { setState({ loading: false, error: 'Sign in to see what you own.', data: null }); return; }
       const [data, sent] = await Promise.all([apiGet('/api/purchases', token), apiGet('/api/tips?mine=1', token).catch(() => ({ tips: [] }))]);
       setState({ loading: false, error: null, data });
@@ -32,7 +33,7 @@ export default function Purchases() {
     } catch (err) {
       setState({ loading: false, error: err.message, data: null });
     }
-  }, [getToken]);
+  }, [isLoaded, isSignedIn, getToken]);
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   function refund(item) {

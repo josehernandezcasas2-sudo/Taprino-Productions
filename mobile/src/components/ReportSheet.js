@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { useRouter } from 'expo-router';
 import { apiPost } from '../lib/api';
 import { colors, fonts } from '../lib/theme';

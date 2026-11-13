@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Linking, ScrollView, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import * as WebBrowser from 'expo-web-browser';
 import { API_BASE_URL, apiGet, apiPost, freshToken } from '../lib/api';

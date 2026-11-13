@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from '../../lib/stableAuth';
 import { showCall, showPath } from '../../lib/showApi';
 import { SUBMIT_TYPES, bytesLabel } from '../../lib/submitRules';
 import { needsYou } from '../../lib/showRules';
@@ -99,12 +99,9 @@ export default function CreatorStudio() {
   const params = useLocalSearchParams();
   const submitted = typeof first(params.submitted) === 'string' ? first(params.submitted) : null;
   const submittedShow = typeof first(params.show) === 'string' && first(params.show) ? first(params.show) : null;
-  const { isSignedIn, getToken: clerkGetToken } = useAuth();
-  // One getter for the screen's life (Clerk's may change identity), so the
-  // loaders below don't change every render.
-  const tokenRef = useRef(clerkGetToken);
-  tokenRef.current = clerkGetToken;
-  const getToken = useCallback((...a) => tokenRef.current(...a), []);
+  // One getter for the screen's life (lib/stableAuth.js), so the loaders
+  // below don't change every render.
+  const { isSignedIn, getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, forbidden: false, subs: null, drafts: [] });
   // null while loading; the strip hides when it can't load.
   const [shows, setShows] = useState(null);

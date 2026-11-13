@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Alert } from 'react-native';
 import { useRouter } from 'expo-router';
-import { useAuth } from '@clerk/expo';
+import { useAuth } from './stableAuth';
 import { apiGet, apiPost } from './api';
 
 function withTimeout(promise, ms) {
