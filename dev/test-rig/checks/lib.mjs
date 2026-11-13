@@ -50,7 +50,7 @@ export async function runCheck(label, body) {
   try {
     await body();
   } catch (err) {
-    ok(`${label} ran to the end`, false, err && err.stack ? err.stack.split('\n').slice(0, 4).join(' | ') : String(err));
+    ok(`${label} ran to the end`, false, err && err.stack ? err.stack.split('\n').slice(0, 12).join(' | ') : String(err));
   } finally {
     finish(label);
   }
@@ -212,6 +212,21 @@ export async function browser() {
     const ctx = await b.newContext({ viewport: { width, height: phone ? 844 : 900 }, ...(phone ? { isMobile: true, hasTouch: true } : {}) });
     await ctx.addCookies((who || SIGNED_OUT).cookies.map((c) => ({ name: c.name, value: c.value, url: BASE })));
     await ctx.route('**/*', (route) => (local(route.request().url()) ? route.continue() : route.abort()));
+    // Next's development error overlay opens over the whole page once
+    // Clerk's frontend script fails to load (the rig doesn't serve it, see
+    // the README), and a long check then clicks into it ("<nextjs-portal>
+    // intercepts pointer events"). Page errors are still counted below.
+    await ctx.addInitScript(() => {
+      const hide = () => {
+        if (document.getElementById('rig-hide-next-overlay')) return;
+        const s = document.createElement('style');
+        s.id = 'rig-hide-next-overlay';
+        s.textContent = 'nextjs-portal { display: none !important; pointer-events: none !important; }';
+        (document.head || document.documentElement).appendChild(s);
+      };
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hide);
+      else hide();
+    });
     const pg = await ctx.newPage();
     const errors = [];
     // Clerk's frontend script lives on clerk.example.com, which the rig
