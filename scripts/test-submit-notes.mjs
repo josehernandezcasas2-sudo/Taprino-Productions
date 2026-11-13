@@ -52,4 +52,23 @@ t('the app’s copy says the same', () => {
   assert.equal(bodyLine.exec(app)[0], bodyLine.exec(web)[0]);
 });
 
+t('"Contains flashing lights" rides with the form for every type (Jose, 2026-11-13)', () => {
+  assert.equal(EMPTY_SUBMIT_FORM.hasFlashingLights, false, 'unticked to start');
+  for (const { value } of SUBMIT_TYPES) {
+    const f = form({ contentType: value, seriesId: 'night-bus-show', seriesOrder: '1' });
+    assert.equal(toSubmitBody({ ...f, hasFlashingLights: true }, {}).hasFlashingLights, true, `${value} ticked`);
+    assert.equal(toSubmitBody(f, {}).hasFlashingLights, false, `${value} unticked`);
+  }
+  assert.equal(toSubmitBody(form({ hasFlashingLights: 'yes' }), {}).hasFlashingLights, false, 'only a real true');
+  const { hasFlashingLights, ...oldDraft } = form({});
+  assert.equal(hasFlashingLights, false);
+  assert.equal(toSubmitBody(oldDraft, {}).hasFlashingLights, false, 'an old draft without the key');
+  const app = readFileSync(new URL('../mobile/src/lib/submitRules.js', import.meta.url), 'utf8');
+  const web = readFileSync(new URL('../lib/submitRules.js', import.meta.url), 'utf8');
+  const line = /hasFlashingLights: f\.hasFlashingLights === true,/;
+  assert.match(web, line);
+  assert.match(app, line, 'the app sends it the same way');
+  assert.match(app, /hasFlashingLights: false,/);
+});
+
 console.log(`\n${n} submit-notes checks passed`);

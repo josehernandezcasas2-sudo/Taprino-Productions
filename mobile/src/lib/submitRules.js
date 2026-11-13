@@ -41,6 +41,9 @@ export const EMPTY_SUBMIT_FORM = {
   channelOptIn: false,
   featured: false,
   isOriginal: false,
+  // "Contains flashing lights" (Jose, 2026-11-13): the uploader's mark;
+  // the photosensitivity warning shows before the title plays.
+  hasFlashingLights: false,
   fundingUrl: '',
   // What kind of extra (bonus content only; migration 121): the chip that
   // is on ('', a preset's id or 'other') and the words under Other.
@@ -129,6 +132,7 @@ export function toSubmitBody(form, media, extras = {}) {
     channelOptIn: f.channelOptIn === true,
     featured: f.featured === true,
     isOriginal: f.isOriginal === true,
+    hasFlashingLights: f.hasFlashingLights === true,
     fundingUrl: String(f.fundingUrl || '').trim(),
     ...(f.contentType === 'bonus' ? { extraKind: extraKindFromChoice(f.extraKindChoice, f.extraKindOther) } : {}),
     ...(submitHasOwnPage(f.contentType) && String(f.pageNotes || '').trim() ? { pageNotes: String(f.pageNotes).trim() } : {}),

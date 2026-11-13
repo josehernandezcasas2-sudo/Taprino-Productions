@@ -13546,3 +13546,16 @@ a.ep-credit-name:hover { color: var(--brass); }
 .adc-adfree-note { color: var(--ink-dim); line-height: 1.55; margin: 0; }
 .adc-adfree-note strong { color: var(--ink); }
 
+/* "Contains flashing lights" (components/FlashingLightsField.js; Jose,
+   2026-11-13): the uploader's checkbox, with the hint under the label and,
+   on a live title whose warning only the team can take off, the line why
+   it is greyed. */
+.flash-field { margin: 0.2rem 0 0.9rem; }
+.flash-check { display: flex; gap: 0.65rem; align-items: flex-start; cursor: pointer; }
+.flash-check input { width: 18px; height: 18px; margin: 0.15rem 0 0; flex: none; accent-color: var(--brass); cursor: pointer; }
+.flash-check-text { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
+.flash-check-label { font-weight: 600; color: var(--ink); }
+.flash-check-hint { font-size: 0.82rem; color: var(--ink-dim); line-height: 1.4; }
+.flash-check-lock { color: var(--warn); }
+.flash-field.locked .flash-check, .flash-field.locked .flash-check input { cursor: not-allowed; }
+.flash-field.locked .flash-check-label { color: var(--ink-dim); }

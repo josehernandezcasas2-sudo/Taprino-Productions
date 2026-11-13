@@ -10,7 +10,8 @@ import {
 } from '../../components/WorkIcons';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall } from '../../lib/showApi';
-import { episodeHasPage, fieldPolicy, fieldPolicyLine, needsYou, saveSummary } from '../../lib/showRules';
+import { episodeHasPage, fieldPolicy, fieldPolicyLine, flashingLightsPolicy, needsYou, saveSummary } from '../../lib/showRules';
+import FlashingLightsField from '../../components/FlashingLightsField';
 import { pickImageAsDataUrl } from '../../components/CreatorBits';
 import { episodeCode, sortEpisodes } from '../../lib/seriesResume';
 import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
@@ -86,7 +87,8 @@ function editValuesFor(s) {
     pendingTitle: s.pendingTitle || null,
     pendingDescription: s.pendingDescription || null,
     pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
-    pageNotesWaitReady: s.pageNotesWaitReady !== false
+    pageNotesWaitReady: s.pageNotesWaitReady !== false,
+    hasFlashingLights: s.hasFlashingLights === true
   };
 }
 
@@ -958,9 +960,12 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onTitleImage, onDele
 // changes already waiting are listed with Cancel and the boxes start from
 // them, only what changed is sent, and the Save label says what goes to
 // review. Before migration 122 a live title's notes have nowhere to wait:
-// the box is greyed with the reason.
+// the box is greyed with the reason. "Contains flashing lights" (Jose,
+// 2026-11-13) rides on the same save: ticking it applies at once, a live
+// title included; once a live title has it the box is ticked and greyed
+// with "Only the team can remove this warning from a live title."
 const NOTES_122_LINE = 'Notes need a database update (migration 122).';
-const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes' };
+const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning' };
 function listOf(fields) {
   const named = fields.map((f) => DONE_WORDS[f]).filter(Boolean);
   return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
@@ -983,6 +988,8 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
   const [description, setDescription] = useState(start.description);
   const notesShown = isEpisode && cv.notesShown === true;
   const [notes, setNotes] = useState(start.pageNotes);
+  const startFlashing = cv.hasFlashingLights === true;
+  const [flashing, setFlashing] = useState(startFlashing);
   const [waiting, setWaiting] = useState(waitingStart);
   const [cancelling, setCancelling] = useState(null);
   const [done, setDone] = useState(null);
@@ -992,10 +999,12 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
   const modeOf = (f) => (notes122(f) ? 'locked' : fieldPolicy(f, ctx));
   const lineOf = (f) => (notes122(f) ? NOTES_122_LINE : fieldPolicyLine(f, ctx));
   const open = (f) => ['direct', 'staged'].includes(modeOf(f));
+  const flashingPolicy = isEpisode ? flashingLightsPolicy(ctx, startFlashing) : { mode: 'locked', line: null };
   const changes = [];
   if (nameValue.trim() !== start.title.trim()) changes.push({ field: 'title', mode: modeOf('title') });
   if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
   if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
+  if (isEpisode && flashing !== startFlashing) changes.push({ field: 'hasFlashingLights', mode: 'direct' });
   const summary = saveSummary(changes);
   const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
   const anyWaiting = Object.values(waiting).some((v) => v !== null);
@@ -1006,6 +1015,7 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
       if (c.field === 'title') body.title = nameValue.trim();
       if (c.field === 'description') body.description = description.trim();
       if (c.field === 'pageNotes') body.pageNotes = notes.trim();
+      if (c.field === 'hasFlashingLights') body.hasFlashingLights = flashing;
     }
     const result = await onSubmit(body);
     if (result) setDone(result);
@@ -1089,6 +1099,14 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
             {!open('pageNotes') ? lineOf('pageNotes') : modeOf('pageNotes') === 'staged' ? 'Waits for approval like the description.' : 'Saved at once: it isn’t live yet.'}
           </Text>
         </>
+      ) : null}
+      {isEpisode ? (
+        <FlashingLightsField
+          checked={flashing}
+          onChange={setFlashing}
+          locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
+          style={{ marginTop: 12 }}
+        />
       ) : null}
       {summary.note ? <Text style={styles.notesHelp}>{summary.note}.</Text> : null}
       {error ? <Text style={styles.errorText}>{error}</Text> : null}

@@ -24,6 +24,7 @@ import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, StagedLe
 import { PREVIEW_BUILT } from './ShowCards';
 import PayeeCard, { PaidLine } from './PayeeCard';
 import ExtraKindField from '../ExtraKindField';
+import FlashingLightsField from '../FlashingLightsField';
 import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
 import {
   CheckIcon, LinkText, PlusIcon, RoomToast, SmallButton, UploadIcon, askUs, episodeEditorRoute, episodePublicRoute,
@@ -89,6 +90,7 @@ function episodeForm(ep, hasShow) {
     channelOptIn: Boolean(ep.channelOptIn),
     featured: Boolean(ep.featured),
     isOriginal: Boolean(ep.isOriginal),
+    hasFlashingLights: Boolean(ep.hasFlashingLights),
     hasPage: Boolean(ep.hasPage),
     pageNotes: ep.pageNotes || '',
     credits: creditsToForm(ep.credits, { inherit: hasShow }),
@@ -299,6 +301,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     if (form.runtime.trim() !== init.runtime.trim()) add('runtime', 'runtime', form.runtime.trim());
     if (form.fundingUrl.trim() !== init.fundingUrl.trim()) add('fundingUrl', 'fundingUrl', form.fundingUrl.trim());
     for (const key of ['adsEnabled', 'channelOptIn', 'featured', 'isOriginal']) if (form[key] !== init[key]) add(key, key, form[key]);
+    if (form.hasFlashingLights !== init.hasFlashingLights) add('hasFlashingLights', 'hasFlashingLights', form.hasFlashingLights);
     const breaks = parseAdBreaks(form.adBreaksText);
     if (JSON.stringify(breaks) !== JSON.stringify(parseAdBreaks(init.adBreaksText))) add('adBreakSeconds', 'adBreakSeconds', breaks);
     if (form.hasPage !== init.hasPage) add('hasPage', 'hasPage', form.hasPage);
@@ -923,6 +926,16 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             <Text style={ss.small}>A picture is saved the moment you pick it.</Text>
           </View>
           <SameAsShow inShow={Boolean(show)} ctx={{ form, set, defaults, showYear: show ? show.year : null, resets, reset, pol, titleForAsk: `${show ? `${show.name} · ` : ''}${title}` }} />
+          {/* The uploader's mark (Jose, 2026-11-13): on at once in every
+              state; ticked on a live title it is the team's to take off
+              (the server's policy, mobile/src/lib/showRules.js). */}
+          <View style={ss.card}>
+            <FlashingLightsField
+              checked={form.hasFlashingLights}
+              onChange={(v) => set('hasFlashingLights', v)}
+              locked={pol('hasFlashingLights').mode === 'locked' ? pol('hasFlashingLights').line || 'This can’t be changed here' : null}
+            />
+          </View>
 
           <View style={ss.card}>
             <Text style={ss.cardK}>Captions</Text>

@@ -24,6 +24,7 @@ import { BackArrowIcon } from '../../components/account/AccountBits';
 import { WarningIcon } from '../../components/WorkIcons';
 import { Chip, ChevronIcon, PlusIcon, Sheet, SmallButton } from '../../components/show/ShowBits';
 import ExtraKindField from '../../components/ExtraKindField';
+import FlashingLightsField from '../../components/FlashingLightsField';
 
 // Creator Studio's submit, three steps (mirrors pages/creator/submit.js,
 // 2026-10-31): the file (uploading from the moment it's picked), about it
@@ -792,6 +793,8 @@ export default function SubmitTitle() {
             <Field label="Your name, as credited"><Input value={form.artist} onChangeText={(v) => update('artist', v)} maxLength={200} /></Field>
             <Field label="Genre"><Chips small options={MAIN_GENRES.map((g) => ({ value: g, label: g }))} value={form.mainGenre} onChange={(v) => update('mainGenre', v)} /></Field>
             <Field label="Rating" note="not set = treated as 17+"><Chips small options={[{ value: '', label: 'Not set' }, ...ratings.map((r) => ({ value: r.code, label: r.code }))]} value={form.rating} onChange={(v) => update('rating', v)} /></Field>
+            {/* The uploader's own mark (Jose, 2026-11-13); saved with the draft. */}
+            <FlashingLightsField checked={form.hasFlashingLights === true} onChange={(v) => update('hasFlashingLights', v)} />
             <View style={s.two}>
               <Field label="Runtime" note={video && video.runtimeSeconds ? 'read from the file' : 'MM:SS'} style={{ flex: 1 }}><Input value={form.runtime} onChangeText={(v) => update('runtime', v)} placeholder="12:04" /></Field>
               <Field label="Year" note="optional" style={{ flex: 1 }}><Input value={String(form.releaseYear || '')} onChangeText={(v) => update('releaseYear', v)} keyboardType="number-pad" placeholder={String(new Date().getFullYear())} /></Field>

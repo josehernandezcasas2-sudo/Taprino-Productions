@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import PageNotesField from './PageNotesField';
-import { fieldPolicy, fieldPolicyLine, saveSummary } from '../lib/showRules';
+import FlashingLightsField from './FlashingLightsField';
+import { fieldPolicy, fieldPolicyLine, flashingLightsPolicy, saveSummary } from '../lib/showRules';
 
 // A standalone title's title, description and (a film's or a short's)
 // notes for its own page, from Your work. A show's details are edited on
@@ -21,12 +22,19 @@ import { fieldPolicy, fieldPolicyLine, saveSummary } from '../lib/showRules';
 // a live title's notes have nowhere to wait: the box is greyed with the
 // reason (the save would answer 503 migration-122).
 //
+// "Contains flashing lights" (Jose, 2026-11-13) rides on the same save:
+// ticking it applies at once, a live title included; once a live title has
+// it, the box is ticked and greyed with "Only the team can remove this
+// warning from a live title." (lib/showRules.js flashingLightsPolicy; the
+// server refuses the same).
+//
 // currentValues = { id, title, description, pageNotes, notesShown, status,
 // held, deletionRequested, withdrawnAt, pendingTitle, pendingDescription,
-// pendingPageNotes, pageNotesWaitReady }.
+// pendingPageNotes, pageNotesWaitReady, hasFlashingLights }.
 
 const NOTES_122_LINE = 'Notes need a database update (migration 122).';
 const WAITING_WORDS = { title: 'the new title', description: 'the new description', pageNotes: 'the new notes' };
+const FIELD_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning' };
 
 export default function RequestEditModal({ type = 'episode', currentValues, onClose, onSubmitted }) {
   const cv = currentValues || {};
@@ -46,6 +54,8 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
   const [description, setDescription] = useState(start.description);
   const notesShown = isEpisode && cv.notesShown === true;
   const [notes, setNotes] = useState(start.pageNotes);
+  const startFlashing = cv.hasFlashingLights === true;
+  const [flashing, setFlashing] = useState(startFlashing);
   const [stillWaiting, setStillWaiting] = useState(waiting);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(null);
@@ -65,11 +75,13 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
     return fieldPolicyLine(field, ctx);
   };
   const open = (field) => ['direct', 'staged'].includes(modeOf(field));
+  const flashingPolicy = isEpisode ? flashingLightsPolicy(ctx, startFlashing) : { mode: 'locked', line: null };
 
   const changes = [];
   if (nameValue.trim() !== start.title.trim()) changes.push({ field: 'title', mode: modeOf('title') });
   if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
   if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
+  if (isEpisode && flashing !== startFlashing) changes.push({ field: 'hasFlashingLights', mode: 'direct' });
   const summary = saveSummary(changes);
   const anyWaiting = Object.values(stillWaiting).some((v) => v !== null);
   const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
@@ -108,6 +120,7 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
         if (c.field === 'title') body.title = nameValue.trim();
         if (c.field === 'description') body.description = description.trim();
         if (c.field === 'pageNotes') body.pageNotes = notes.trim();
+        if (c.field === 'hasFlashingLights') body.hasFlashingLights = flashing;
       }
       const res = await fetch(`/api/show/episode/${encodeURIComponent(String(cv.id))}`, {
         method: 'PATCH',
@@ -128,7 +141,7 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
   }
 
   const words = (list) => {
-    const named = list.map((f) => ({ title: 'the title', description: 'the description', pageNotes: 'the notes' }[f])).filter(Boolean);
+    const named = list.map((f) => FIELD_WORDS[f]).filter(Boolean);
     return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
   };
 
@@ -183,6 +196,14 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
                 onChange={setNotes}
                 disabled={!open('pageNotes')}
                 note={!open('pageNotes') ? lineOf('pageNotes') : modeOf('pageNotes') === 'staged' ? 'Waits for approval like the description.' : 'Saved at once: it isn’t live yet.'}
+              />
+            )}
+            {isEpisode && (
+              <FlashingLightsField
+                id="req-edit-flashing"
+                checked={flashing}
+                onChange={setFlashing}
+                locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
               />
             )}
             {summary.note && <p className="req-edit-line">{summary.note}.</p>}

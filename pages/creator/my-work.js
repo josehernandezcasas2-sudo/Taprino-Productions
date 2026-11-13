@@ -34,7 +34,8 @@ function editValuesFor(s) {
     pendingTitle: s.pendingTitle || null,
     pendingDescription: s.pendingDescription || null,
     pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
-    pageNotesWaitReady: s.pageNotesWaitReady !== false
+    pageNotesWaitReady: s.pageNotesWaitReady !== false,
+    hasFlashingLights: s.hasFlashingLights === true
   };
 }
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';

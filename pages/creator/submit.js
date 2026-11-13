@@ -19,6 +19,7 @@ import { useUpload } from '../../contexts/UploadContext';
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
+import FlashingLightsField from '../../components/FlashingLightsField';
 import ExtraKindField from '../../components/ExtraKindField';
 import PageNotesField from '../../components/PageNotesField';
 import { WarningIcon } from '../../components/PlayerIcons';
@@ -801,6 +802,8 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
                 </select>
               </div>
             </div>
+            {/* The uploader's own mark (Jose, 2026-11-13); saved with the draft. */}
+            <FlashingLightsField id="sub-flashing" checked={form.hasFlashingLights === true} onChange={(v) => update('hasFlashingLights', v)} />
             <div className="apl-grid2">
               <div className="apl-field">
                 <label className="apl-label" htmlFor="sub-runtime">Runtime <em>{video && video.runtimeSeconds ? 'read from the file' : 'MM:SS'}</em></label>

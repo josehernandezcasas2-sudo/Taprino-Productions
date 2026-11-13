@@ -1647,6 +1647,47 @@ function suite(R, who) {
     assert.equal(R.fileMatches(null, { video: { name: 'x', bytes: 1 } }), false);
     assert.equal(R.fileMatches({ name: '', size: 1 }, { video: { name: '', bytes: 1 } }), false);
   });
+
+  tt('the flashing-lights warning: on at once anywhere, off only before it is live (Jose, 2026-11-13)', () => {
+    const up = { target: 'episode', isUploader: true };
+    assert.equal(R.FLASHING_LIGHTS_LABEL, 'Contains flashing lights');
+    assert.equal(R.FLASHING_LIGHTS_HINT, 'Shows a photosensitivity warning before the title plays.');
+    assert.equal(R.FLASHING_LIGHTS_LOCKED, 'Only the team can remove this warning from a live title.');
+    // Turning it on: the uploader, in every state, a live title included.
+    for (const status of ['draft', 'pending', 'rejected', 'approved', null]) {
+      assert.deepEqual(R.flashingLightsChange({ ...up, status }, false, true), { ok: true, change: true }, `on, ${status}`);
+      assert.deepEqual(R.flashingLightsPolicy({ ...up, status }, false), { mode: 'direct', line: null }, `unticked, ${status}`);
+    }
+    assert.deepEqual(R.flashingLightsChange({ ...up, status: 'approved', held: true }, false, true), { ok: true, change: true }, 'a pulled title can still get the warning');
+    assert.deepEqual(R.flashingLightsChange({ ...up, status: 'approved', withdrawn: true }, false, true), { ok: true, change: true }, 'so can one kept for its buyers');
+    // Turning it off: at once before it is live…
+    for (const status of ['draft', 'pending', 'rejected']) {
+      assert.deepEqual(R.flashingLightsChange({ ...up, status }, true, false), { ok: true, change: false }, `off, ${status}`);
+      assert.deepEqual(R.flashingLightsPolicy({ ...up, status }, true), { mode: 'direct', line: null }, `ticked, ${status}`);
+    }
+    // …never by its uploader on a live title (no status reads as live).
+    for (const status of ['approved', null]) {
+      assert.deepEqual(R.flashingLightsChange({ ...up, status }, true, false), { ok: false, status: 403, code: 'locked', line: R.FLASHING_LIGHTS_LOCKED }, `off, ${status}`);
+      assert.deepEqual(R.flashingLightsPolicy({ ...up, status }, true), { mode: 'locked', line: R.FLASHING_LIGHTS_LOCKED });
+    }
+    assert.equal(R.flashingLightsChange({ ...up, status: 'approved', held: true }, true, false).line, R.FLASHING_LIGHTS_LOCKED, 'pulled but live: still the team’s');
+    assert.equal(R.flashingLightsChange({ ...up, status: 'pending', held: true }, true, false).line, 'Pulled while an admin looks at it');
+    assert.equal(R.flashingLightsChange({ ...up, status: 'pending', deletionRequested: true }, true, false).ok, false);
+    // The team: both ways, any state.
+    for (const status of ['pending', 'approved', null]) {
+      assert.deepEqual(R.flashingLightsChange({ target: 'episode', isAdmin: true, status }, true, false), { ok: true, change: false });
+      assert.deepEqual(R.flashingLightsChange({ target: 'episode', isAdmin: true, status }, false, true), { ok: true, change: true });
+      assert.equal(R.flashingLightsPolicy({ target: 'episode', isAdmin: true, status }, true).mode, 'direct');
+    }
+    // Someone else (the show's owner who didn't upload it): neither way.
+    const runner = { target: 'episode', isRunner: true, isUploader: false, status: 'pending' };
+    assert.equal(R.flashingLightsChange(runner, false, true).ok, false);
+    assert.equal(R.flashingLightsPolicy(runner, false).mode, 'locked');
+    // Nothing changed: nothing to write, whoever asks.
+    assert.deepEqual(R.flashingLightsChange({ status: 'approved' }, true, true), { ok: true, change: null });
+    assert.deepEqual(R.flashingLightsChange(up, false, false), { ok: true, change: null });
+    assert.deepEqual(R.flashingLightsChange(up, false, 'yes'), { ok: true, change: null }, 'only a real true ticks it');
+  });
 }
 
 suite(web, 'web');
