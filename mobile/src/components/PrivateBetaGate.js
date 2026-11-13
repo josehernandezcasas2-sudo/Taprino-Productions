@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import { AppState, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -27,10 +27,31 @@ export default function PrivateBetaGate() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
 
+  // Until the settings answer, ask again (2 s, 4 s, … at most a minute
+  // apart, and straight away when the app comes back): a first read that
+  // failed — no signal at launch — used to leave the door open for the
+  // whole session.
   useEffect(() => {
     let cancelled = false;
-    loadSettings().then((s) => { if (!cancelled && s) setPrivateBeta(Boolean(s.privateBeta)); });
-    return () => { cancelled = true; };
+    let known = false;
+    let timer = null;
+    let tries = 0;
+    const ask = () => {
+      if (timer) { clearTimeout(timer); timer = null; }
+      loadSettings().then((s) => {
+        if (cancelled || known) return;
+        if (s) { known = true; setPrivateBeta(Boolean(s.privateBeta)); return; }
+        tries += 1;
+        timer = setTimeout(ask, Math.min(60000, 2000 * 2 ** Math.min(tries - 1, 5)));
+      });
+    };
+    ask();
+    const sub = AppState.addEventListener('change', (st) => { if (st === 'active' && !known) ask(); });
+    return () => {
+      cancelled = true;
+      if (timer) clearTimeout(timer);
+      try { sub.remove(); } catch { /* gone */ }
+    };
   }, []);
 
   if (!privateBeta || !isLoaded || isSignedIn) return null;

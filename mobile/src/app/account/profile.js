@@ -22,7 +22,7 @@ import { AccountFrame, useAccountData, CardHead, Label, SaveRow, GENDERS, styles
 
 export default function AccountProfile() {
   const router = useRouter();
-  const { dashboard, retry, profile, setProfile, originalAge, setOriginalAge, withToken } = useAccountData();
+  const { dashboard, retry, profile, setProfile, profileFailed, originalAge, setOriginalAge, withToken } = useAccountData();
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileSaved, setProfileSaved] = useState(false);
   const [profileError, setProfileError] = useState(null);
@@ -233,7 +233,16 @@ export default function AccountProfile() {
   const publicHref = dashboard && dashboard.userId ? `/profile/${(profile && profile.handle) || dashboard.userId}` : null;
 
   let body = null;
-  if (signedIn && !profile) {
+  if (signedIn && !profile && profileFailed) {
+    body = (
+      <View style={styles.card}>
+        <Text style={styles.cardP}>Your profile didn’t load. Check your connection and try again.</Text>
+        <Pressable style={[styles.btnSmall, { alignSelf: 'flex-start', marginTop: 10 }]} onPress={retry} accessibilityRole="button">
+          <Text style={styles.btnSmallText}>Retry</Text>
+        </Pressable>
+      </View>
+    );
+  } else if (signedIn && !profile) {
     body = <View style={styles.card}><Text style={styles.cardP}>Loading…</Text></View>;
   } else if (signedIn) {
     const avatarLetter = dashboard.email && dashboard.email[0] ? dashboard.email[0].toUpperCase() : '?';

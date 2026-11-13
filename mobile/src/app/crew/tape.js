@@ -31,7 +31,6 @@ export default function TapeScreen() {
     return () => { alive = false; };
   }, [call, response]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const player = useVideoPlayer(src || null, (p) => { if (src) p.play(); });
   // A self-tape is a performer's private audition: no screenshots or recording while it plays.
   useCaptureBlock(Boolean(src));
 
@@ -42,10 +41,19 @@ export default function TapeScreen() {
         <Text style={crew.eyebrow}>Self-tape</Text>
         {error ? <Text style={crew.error}>{error}</Text> : null}
         {!src && !error ? <ActivityIndicator color={colors.brass} style={{ marginTop: 24 }} /> : null}
-        {src ? <VideoView player={player} style={styles.video} contentFit="contain" nativeControls allowsFullscreen /> : null}
+        {src ? <TapePlayer src={src} /> : null}
       </View>
     </SafeAreaView>
   );
+}
+
+// Made once the signed address is in, so the player starts with it and
+// plays: a player made before (with no source) never ran its setup again
+// when the address arrived — expo-video swaps the source in place — and
+// the tape sat on its first frame.
+function TapePlayer({ src }) {
+  const player = useVideoPlayer(src, (p) => { p.play(); });
+  return <VideoView player={player} style={styles.video} contentFit="contain" nativeControls allowsFullscreen />;
 }
 
 const styles = StyleSheet.create({ video: { width: '100%', aspectRatio: 16 / 9, backgroundColor: '#000', borderRadius: 10 } });

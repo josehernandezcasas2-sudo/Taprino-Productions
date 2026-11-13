@@ -118,6 +118,7 @@ export default function RootLayout() {
           <Stack.Screen name="creator/pitches" options={{ headerShown: false }} />
           <Stack.Screen name="creator/pitch-new" options={{ headerShown: false }} />
           <Stack.Screen name="creator/numbers" options={{ headerShown: false }} />
+          <Stack.Screen name="creator/money" options={{ headerShown: false }} />
           <Stack.Screen name="recs" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
           {/* The creator path (2026-10-31): apply, the hub and the three-step submit draw the site header. */}

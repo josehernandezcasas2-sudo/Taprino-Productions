@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, Pressable, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
+import { openInAppBrowser } from '../../lib/inAppBrowser';
 import { apiPost } from '../../lib/api';
 import { readVia } from '../../lib/referral';
 import MembershipPlans from '../../components/MembershipPlans';
@@ -41,7 +41,7 @@ export default function AccountMembership() {
       const via = referredBy.trim();
       const data = await apiPost('/api/create-checkout-session', { tier, returnTo: '/account/membership', ...(via ? { via, viaSource: via === viaFromLink ? 'link' : 'typed' } : {}) }, token);
       if (data.url) {
-        await WebBrowser.openBrowserAsync(data.url);
+        await openInAppBrowser(data.url);
         await reload();
       }
     } catch (err) {
@@ -56,7 +56,13 @@ export default function AccountMembership() {
     try {
       const token = await withToken();
       const data = await apiPost('/api/create-portal-session', {}, token);
-      if (data.url) await Linking.openURL(data.url);
+      // The in-app browser, then a fresh read: a plan switched or cancelled
+      // in the portal shows when the viewer is back (Linking left the app
+      // for Safari and nothing re-read).
+      if (data.url) {
+        await openInAppBrowser(data.url);
+        await reload();
+      }
     } catch (err) {
       Alert.alert('Could not open subscription settings', err.message);
     } finally {

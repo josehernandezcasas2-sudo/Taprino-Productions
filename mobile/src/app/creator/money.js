@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
@@ -37,6 +37,9 @@ export default function CreatorMoneyScreen() {
   const [copied, setCopied] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [noteBusy, setNoteBusy] = useState(null);
+  // The month the first read answered for: setting it as `period` must not
+  // read the same month a second time.
+  const answeredFor = useRef(null);
 
   const load = useCallback(async (key) => {
     if (!isLoaded) return;
@@ -44,13 +47,16 @@ export default function CreatorMoneyScreen() {
     try {
       const data = await apiGet(`/api/creator/money${key ? `?period=${encodeURIComponent(key)}` : ''}`, await freshToken(getToken));
       setState({ loading: false, error: null, data });
-      if (!key) setPeriod(data.period);
+      if (!key) { answeredFor.current = data.period; setPeriod(data.period); }
     } catch (err) {
       setState({ loading: false, error: err.message, data: null });
     }
   }, [isLoaded, isSignedIn, getToken]);
 
-  useFocusEffect(useCallback(() => { load(period); }, [load, period]));
+  useFocusEffect(useCallback(() => {
+    if (period && answeredFor.current === period) { answeredFor.current = null; return; }
+    load(period);
+  }, [load, period]));
 
   // Tips: hide a note from your own view (or show it again).
   async function toggleNote(line) {
@@ -158,7 +164,7 @@ export default function CreatorMoneyScreen() {
 
         <View style={styles.kpis}>
           <View style={styles.kpi}>
-            <Text style={styles.kpiLabel}>{isYearView ? `${data.year} · all lanes` : 'This month'}</Text>
+            <Text style={styles.kpiLabel}>{isYearView ? `${data.year} · all lanes` : data.period === (data.periods && data.periods[0]) ? 'This month' : periodLabel(data.period)}</Text>
             <Text style={styles.kpiAmount}>{dollars(data.top.monthCents)}</Text>
             <Text style={styles.kpiNote}>all lanes</Text>
           </View>

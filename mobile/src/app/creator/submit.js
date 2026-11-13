@@ -5,7 +5,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
 import { apiDelete, apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall, showPath } from '../../lib/showApi';
-import { startTusUpload } from '../../lib/tusUpload';
+import { abortUpload, clearUpload, startTusUpload } from '../../lib/tusUpload';
 import {
   SUBMIT_TYPES, MAIN_GENRES, STEPS, EMPTY_SUBMIT_FORM, typeNeedsShow, typeIsNumbered, showNoun, stepBlocker, toSubmitBody, formatRuntime, bytesLabel,
   SUBMIT_NOTES_MAX, submitHasOwnPage
@@ -437,6 +437,12 @@ export default function SubmitTitle() {
     }
   }
 
+  // "Not this file": a file still uploading stops (or the next pick is
+  // refused: one upload at a time) before it is let go.
+  function dropUpload(uploading) {
+    if (uploading && abortUpload('Stopped: not this file.')) clearUpload();
+  }
+
   async function pickTrailer() {
     if (anyUploading) { setError('The master is still uploading. Pick the trailer once it has finished.'); return; }
     try {
@@ -606,7 +612,7 @@ export default function SubmitTitle() {
           About it) above the keyboard; Android resizes the window itself. */}
       <ScrollView contentContainerStyle={[cp.scroll, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <View style={s.head}>
-          <Pressable onPress={() => router.navigate('/creator')} hitSlop={8} style={s.back} accessibilityRole="button" accessibilityLabel="Back to Creator Studio"><BackArrowIcon size={16} color={colors.inkDim} /></Pressable>
+          <Pressable onPress={() => router.dismissTo('/creator')} hitSlop={8} style={s.back} accessibilityRole="button" accessibilityLabel="Back to Creator Studio"><BackArrowIcon size={16} color={colors.inkDim} /></Pressable>
           <Text style={s.headTitle}>Submit a title</Text>
           <Text style={s.headStep}>STEP {step} OF 3</Text>
         </View>
@@ -632,7 +638,7 @@ export default function SubmitTitle() {
                 <GhostButton label="Choose a video" onPress={pickMaster} />
               </View>
             ) : null}
-            {video ? <ProgressCard video={video} upload={masterUploading ? upload : null} facts={factsFor(video)} onRemove={() => setVideo(null)} onResume={video.state === 'uploading' && !masterUploading ? pickMaster : null} /> : null}
+            {video ? <ProgressCard video={video} upload={masterUploading ? upload : null} facts={factsFor(video)} onRemove={() => { dropUpload(masterUploading); setVideo(null); }} onResume={video.state === 'uploading' && !masterUploading ? pickMaster : null} /> : null}
             {form.audioUrl ? (
               <View style={cp.progress}>
                 <View style={cp.progressRow}><Text style={cp.progressName}>Audio imported{form.audioBytes ? ` · ${bytesLabel(form.audioBytes)}` : ''}</Text><Text style={cp.progressRight}>ready ✓</Text></View>
@@ -825,7 +831,7 @@ export default function SubmitTitle() {
             ) : null}
             <Field label="Trailer" note="optional · 15–30 s">
               {trailer
-                ? <ProgressCard video={{ ...trailer, bytes: null }} upload={trailerUploading ? upload : null} facts={[]} onRemove={() => setTrailer(null)} />
+                ? <ProgressCard video={{ ...trailer, bytes: null }} upload={trailerUploading ? upload : null} facts={[]} onRemove={() => { dropUpload(trailerUploading); setTrailer(null); }} />
                 : <GhostButton label={anyUploading ? 'Once the master has finished' : 'Pick a clip, or skip'} disabled={anyUploading} onPress={pickTrailer} style={{ alignSelf: 'stretch' }} />}
             </Field>
             <Text style={cp.help}>Captions (SRT or VTT) are added from Your work on the website once it&rsquo;s in; otherwise we caption what we can.</Text>

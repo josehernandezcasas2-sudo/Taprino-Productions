@@ -10,6 +10,14 @@ import { colors, fonts, brassTint } from '../lib/theme';
 const DETAIL_ON = 'On: messages, tips, crew calls that match your card, payouts, reviews of your work.';
 const DETAIL_OFF = 'Off: the bell in the app still shows everything.';
 
+// Why turning pushes on didn't take (enablePush's reason), in words.
+function reasonLine(reason) {
+  if (reason === 'denied') return 'Notifications are off for this app in your phone’s Settings. Allow them there and flip the switch under Preferences.';
+  if (reason === 'unsupported') return 'Pushes don’t reach Expo Go on Android; they will in the Play build.';
+  if (reason === 'simulator') return 'Needs a real phone: simulators can’t receive pushes.';
+  return `Couldn’t turn them on: ${reason || 'something went wrong'}. The app tries again the next time it opens.`;
+}
+
 function useStatus() {
   const [status, setStatus] = useState(null);
   const refresh = () => pushStatus().then(setStatus).catch(() => setStatus({ pref: '', permission: 'undetermined', supported: false }));
@@ -21,16 +29,16 @@ export function PushPrompt({ getToken }) {
   const [status, refresh] = useStatus();
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState(null);
-  if (!status || !status.supported || status.pref) return null;
+  // A Turn on that didn't take keeps the card up with the reason (the
+  // preference is 'on' by then, which used to hide the card and its note).
+  if (!status || !status.supported || (status.pref && !note)) return null;
 
   async function turnOn() {
     setBusy(true);
     const out = await enablePush(getToken);
     setBusy(false);
     if (out.ok) { setNote(null); refresh(); return; }
-    if (out.reason === 'denied') setNote('Notifications are off for this app in your phone’s Settings. Allow them there and flip the switch under Preferences.');
-    else if (out.reason === 'unsupported') setNote('Pushes don’t reach Expo Go on Android; they will in the Play build.');
-    else setNote(out.reason);
+    setNote(reasonLine(out.reason));
     refresh();
   }
   async function notNow() {
@@ -59,20 +67,30 @@ export function PushPrompt({ getToken }) {
 export function PushRow({ getToken, Row }) {
   const [status, refresh] = useStatus();
   const [busy, setBusy] = useState(false);
+  // Turning on that didn't register (no token, a network error, Expo Go on
+  // Android): the switch stays off and says why, instead of reading On with
+  // nothing registered.
+  const [failed, setFailed] = useState(null);
   if (!status) return null;
-  const on = status.pref === 'on' && status.permission === 'granted';
   const blocked = status.pref === 'on' && status.permission === 'denied';
+  const on = status.pref === 'on' && status.permission === 'granted' && !failed;
 
   async function toggle(next) {
     setBusy(true);
-    if (next) await enablePush(getToken); else await disablePush(getToken);
+    if (next) {
+      const out = await enablePush(getToken);
+      setFailed(out && out.ok ? null : reasonLine(out && out.reason));
+    } else {
+      setFailed(null);
+      await disablePush(getToken);
+    }
     setBusy(false);
     refresh();
   }
 
   const detail = !status.supported
     ? 'Needs a real phone: simulators can’t receive pushes.'
-    : blocked ? 'Allow notifications for Studio Tapa TV in your phone’s Settings, then come back.' : on ? DETAIL_ON : DETAIL_OFF;
+    : blocked ? 'Allow notifications for Studio Tapa TV in your phone’s Settings, then come back.' : failed || (on ? DETAIL_ON : DETAIL_OFF);
 
   return (
     <Row label="Push notifications" detail={detail} divider>
