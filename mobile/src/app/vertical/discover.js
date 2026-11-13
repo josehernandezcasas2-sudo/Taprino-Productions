@@ -1,5 +1,5 @@
 import { useAuth } from '../../lib/stableAuth';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
@@ -75,6 +75,9 @@ export default function VerticalDiscover() {
   const [feedState, setFeedState] = useState({ loading: true, error: null, feed: null });
   const [deck, setDeck] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Another screen on top: the reel holds and the ad card stops (they kept
+  // playing, with sound, out of sight).
+  const focused = useIsFocused();
   const [muted, setMuted] = useState(true);
   const [srcByEpisodeId, setSrcByEpisodeId] = useState({});
   const [wishlistSet, setWishlistSet] = useState(new Set());
@@ -270,6 +273,7 @@ export default function VerticalDiscover() {
                 <ReelPlayer
                   src={srcByEpisodeId[slide.episode.id] || null}
                   active={i === activeIndex}
+                  paused={!focused}
                   muted={muted}
                   onToggleMute={() => setMuted((m) => !m)}
                   thumbnail={slide.episode.thumbnail}
@@ -305,7 +309,7 @@ export default function VerticalDiscover() {
             ) : slide.kind === 'ad' ? (
               <ReelAdCard
                 ad={slide.ad}
-                active={i === activeIndex}
+                active={focused && i === activeIndex}
                 muted={muted}
                 onToggleMute={() => setMuted((m) => !m)}
                 insets={insets}

@@ -1,5 +1,5 @@
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { Stack, useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -184,6 +184,11 @@ export default function PodcastShow() {
     const sub = player.addListener('playToEnd', () => setIsPlaying(false));
     return () => sub.remove();
   }, [player]);
+
+  // Another screen on top: the episode pauses (the app has no player that
+  // follows you around, so it played on with nothing to stop it — and
+  // "Watch instead" opened the video over the audio, two tracks at once).
+  useFocusEffect(useCallback(() => () => setIsPlaying(false), []));
 
   async function playAudio(ep) {
     if (playingId === ep.id) {

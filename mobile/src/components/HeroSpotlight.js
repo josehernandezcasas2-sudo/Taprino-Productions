@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useIsFocused } from 'expo-router';
+import { useAuth } from '../lib/stableAuth';
+import { useTrailerLink } from '../lib/trailerLink';
 import Svg, { Circle, Line, Path, Polygon, Rect } from 'react-native-svg';
 import SmartImage from './SmartImage';
 import { colors, fonts, absoluteFill, okTint } from '../lib/theme';
@@ -89,7 +92,7 @@ function PauseIcon() {
   );
 }
 
-function TrailerBackground({ src, muted, paused, height }) {
+function TrailerBackground({ src, muted, paused, height, onError }) {
   const player = useVideoPlayer(src, (p) => {
     p.loop = true;
     p.muted = true;
@@ -103,10 +106,15 @@ function TrailerBackground({ src, muted, paused, height }) {
   // A play() issued before the stream has loaded can be silently dropped
   // (the trailer would load and then just sit paused on its first frame),
   // so ask again the moment the player reports it's ready.
+  // A link that has run out fails like a dropped connection: ask for a
+  // fresh one (lib/trailerLink.js), or show the artwork.
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
   useEffect(() => {
     if (!player) return undefined;
     const sub = player.addListener('statusChange', ({ status }) => {
       if (status === 'readyToPlay' && !paused) player.play();
+      else if (status === 'error' && onErrorRef.current) onErrorRef.current();
     });
     return () => sub.remove();
   }, [player, paused]);
@@ -123,6 +131,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(true);
   const timerRef = useRef(null);
+  // Another screen on top (the series page, an episode): the trailer and
+  // the rotation stop instead of looping out of sight.
+  const focused = useIsFocused();
+  const { getToken } = useAuth();
 
   // 56% of the screen since 2026-10-29 (option A of the Stream cards canvas;
   // the website's .hero-carousel clamp is the same), so the first row of
@@ -130,19 +142,31 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
   const heroHeight = Math.min(600, Math.max(300, Math.round(windowHeight * 0.56)));
 
   useEffect(() => {
-    if (paused || pool.length <= 1) return undefined;
+    if (paused || !focused || pool.length <= 1) return undefined;
     timerRef.current = setTimeout(() => setIndex((i) => (i + 1) % pool.length), ROTATE_MS);
     return () => clearTimeout(timerRef.current);
-  }, [index, paused, pool.length]);
+  }, [index, paused, focused, pool.length]);
 
-  if (pool.length === 0) return null;
+  const ep = pool.length ? pool[index % pool.length] : null;
+  // The trailer's signed link lasts an hour: a fresh one when it has run
+  // out or fails, the artwork when there's none (lib/trailerLink.js).
+  const trailer = useTrailerLink({
+    src: ep ? ep.trailerSrc || null : null,
+    expiresAt: ep ? ep.trailerExpiresAt || null : null,
+    ref: ep ? ep.trailerRef || null : null,
+    wanted: Boolean(ep && ep.trailerSrc && focused),
+    getToken
+  });
 
-  const ep = pool[index % pool.length];
-  const fallbackImage = !ep.trailerSrc ? (ep.poster || ep.thumbnail) : null;
+  if (!ep) return null;
+
+  const hasTrailer = Boolean(ep.trailerSrc) && !trailer.failed;
+  const fallbackImage = !hasTrailer ? (ep.poster || ep.thumbnail) : null;
   const imageSrc = preferTrailer
-    ? (ep.trailerSrc ? null : (ep.heroImage || ep.poster || ep.thumbnail))
+    ? (hasTrailer ? null : (ep.heroImage || ep.poster || ep.thumbnail))
     : (ep.heroImage || fallbackImage);
   const isImageMode = !!imageSrc;
+  const holdImage = !isImageMode && hasTrailer && !trailer.src ? (ep.poster || ep.thumbnail || null) : null;
   const runtime = formatRuntimeLong(ep.runtime) || ep.runtime;
   const metaText = [ep.mainGenre, ep.releaseYear, runtime].filter(Boolean).join(' · ');
   const goTo = (i) => setIndex(((i % pool.length) + pool.length) % pool.length);
@@ -151,8 +175,10 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
     <View style={[styles.hero, { height: heroHeight }]}>
       {isImageMode ? (
         <SmartImage key={ep.id} uri={imageSrc} style={absoluteFill} />
-      ) : ep.trailerSrc ? (
-        <TrailerBackground key={ep.id} src={ep.trailerSrc} muted={muted} paused={paused} height={heroHeight} />
+      ) : trailer.src ? (
+        <TrailerBackground key={`${ep.id}:${trailer.src}`} src={trailer.src} muted={muted} paused={paused || !focused} height={heroHeight} onError={trailer.onError} />
+      ) : holdImage ? (
+        <SmartImage key={`${ep.id}:hold`} uri={holdImage} style={absoluteFill} />
       ) : null}
       <LinearGradient
         colors={['rgba(10,10,14,0.35)', 'rgba(10,10,14,0.15)', 'rgba(10,10,14,0.45)', 'rgba(10,10,14,0.92)']}
@@ -169,7 +195,7 @@ export default function HeroSpotlight({ pool, onPlay, onTrailer, eyebrow, render
         </View>
       ) : null}
 
-      {!isImageMode && ep.trailerSrc ? (
+      {!isImageMode && trailer.src ? (
         <View style={styles.controls}>
           <Pressable style={styles.circleBtn} onPress={() => setMuted((m) => !m)}><VolumeIcon muted={muted} /></Pressable>
           <Pressable style={styles.circleBtn} onPress={() => setPaused((p) => !p)}>{paused ? <PlayIcon size={13} color={colors.ink} /> : <PauseIcon />}</Pressable>

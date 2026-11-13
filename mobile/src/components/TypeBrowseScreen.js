@@ -12,6 +12,7 @@ import SmartImage from './SmartImage';
 import HeroSpotlight from './HeroSpotlight';
 import { CardRow } from './LibraryRows';
 import { useWishlist } from '../lib/useWishlist';
+import { useRefreshOnReturn } from '../lib/useRefreshOnReturn';
 
 
 // Default emoji icons from components/GenreBrowseRow.js — an admin-uploaded
@@ -44,20 +45,24 @@ export default function TypeBrowseScreen({ type }) {
   // Signed in, the request carries the token so a series hero's Play can
   // continue where this viewer is (the route then answers privately).
   const { getToken } = useAuth();
+  // Back from a title: read again (a series hero's "Continue S1 E3"),
+  // keeping what shows until it answers.
+  const [refreshKey, setRefreshKey] = useState(0);
+  useRefreshOnReturn(() => setRefreshKey((n) => n + 1));
   useEffect(() => {
     let cancelled = false;
-    setState({ loading: true, error: null, feed: null });
+    setState((s) => (s.feed ? s : { loading: true, error: null, feed: null }));
     (async () => {
       try {
         const token = await Promise.race([getToken().catch(() => null), new Promise((r) => setTimeout(() => r(null), 4000))]);
         const feed = await apiGet(`/api/type-feed?type=${encodeURIComponent(type)}`, token);
         if (!cancelled) setState({ loading: false, error: null, feed });
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, feed: null });
+        if (!cancelled) setState((s) => (s.feed ? s : { loading: false, error: err.message, feed: null }));
       }
     })();
     return () => { cancelled = true; };
-  }, [type]);
+  }, [type, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Card taps and the hero's "More info" (website: goToInfo / onTrailer).
   function goToEpisode(item) {

@@ -83,8 +83,14 @@ export default function Home() {
     return () => { cancelled = true; };
   }, [isSignedIn]);
 
+  // A site path the app has a screen for opens it (hrefToRoute, like a
+  // notification); any other path opens the website — pushing it as it
+  // was gave "Unmatched Route" for /terms, /about and the like.
   function openAnnouncement(url) {
-    if (/^https?:\/\//i.test(url)) Linking.openURL(url); else router.push(url);
+    if (/^https?:\/\//i.test(url)) { Linking.openURL(url); return; }
+    const to = hrefToRoute(url);
+    if (to && to.route) router.push(to.route);
+    else if (to && to.url) Linking.openURL(to.url);
   }
 
   if (state.loading) {

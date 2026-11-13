@@ -15,6 +15,8 @@ import { colors, fonts, absoluteFill, inkTint, oliveTint, warnTint } from '../..
 import { parseRuntimeToSeconds as runtimeSeconds } from '../../lib/runtime';
 import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
+import { useTrailerLink } from '../../lib/trailerLink';
+import { onBrowserOpen } from '../../lib/inAppBrowser';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { withQueryFlag } from '../../lib/captions';
@@ -296,7 +298,16 @@ export default function Episode() {
     return () => { cancelled = true; };
   }, [episode, showPlayer, showingTrailer]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const activeSrc = showingTrailer ? (episode && episode.trailerSrc) : playback.src;
+  // The trailer's signed link lasts an hour: a fresh one when it has run
+  // out or fails (lib/trailerLink.js); none to be had goes back below.
+  const trailerLink = useTrailerLink({
+    src: episode ? episode.trailerSrc || null : null,
+    expiresAt: episode ? episode.trailerExpiresAt || null : null,
+    ref: episode ? episode.trailerRef || null : null,
+    wanted: showingTrailer,
+    getToken
+  });
+  const activeSrc = showingTrailer ? trailerLink.src : playback.src;
   const player = useVideoPlayer(activeSrc || null, (p) => { p.play(); });
   // The title's ads (the website's adsEnabled: never a preview, a trailer,
   // an ad-free member, the team or a buyer, nor a title with ads off).
@@ -354,10 +365,14 @@ export default function Episode() {
   const { width: windowWidth } = useWindowDimensions();
   // A preview starts at the beginning and saves no progress.
   const resumeSeconds = previewing ? 0 : (state.page && state.page.resumeSeconds) || 0;
-  useWatchProgress({
+  // `resumedFrom`: where the title really jumped to — the resume toast
+  // says that, never a resume that didn't happen (after the trailer or a
+  // Buy the title comes back where it was).
+  const { resumedFrom } = useWatchProgress({
     player,
     episodeId: episode && episode.id,
     enabled: Boolean(state.page && state.page.isSignedIn && !previewing && !showingTrailer && playback.src),
+    active: Boolean(!showingTrailer && playback.src),
     startAt: resumeSeconds,
     getToken: () => withTimeout(getToken().catch(() => null), 4000)
   });
@@ -367,6 +382,25 @@ export default function Episode() {
   // The full-screen Tip pill grows with the device like the player's own
   // chrome (mobile/src/lib/fullscreenChrome.js).
   const chrome = useFullscreenChrome();
+
+  // Own, Tip and the other Checkout pages open over the screen without
+  // taking it out of focus on iOS: the title pauses first.
+  useEffect(() => onBrowserOpen(() => {
+    try { player.pause(); } catch { /* a released player */ }
+  }), [player]);
+  // A trailer that can't play (its link failed and no fresh one came):
+  // back to the title, or to the page it was opened from.
+  const trailerOnError = trailerLink.onError;
+  useEffect(() => {
+    if (!showingTrailer || !player) return undefined;
+    const sub = player.addListener('statusChange', ({ status }) => { if (status === 'error') trailerOnError(); });
+    return () => sub.remove();
+  }, [player, showingTrailer, trailerOnError]);
+  useEffect(() => {
+    if (!showingTrailer || !trailerLink.failed) return;
+    setShowingTrailer(false);
+    if (!playback.src && episode && episodeHasPage(episode) && autoplay !== '1') setShowPlayer(false);
+  }, [showingTrailer, trailerLink.failed]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Same reason as HeroSpotlight's trailer: a play() issued before the
   // stream has loaded can be dropped, so start again once it's ready.
@@ -543,6 +577,7 @@ export default function Episode() {
   // standalone title's landing; a show's episode's landing shows it only
   // for the warning its chip points at. Not over a locked title.
   const showA11yPanel = !playback.locked && (!landing || standaloneTitle || flashing);
+  const lockShown = Boolean(playback.locked) && !(showingTrailer && activeSrc);
   const toPanel = () => {
     if (panelY.current === null || !scrollRef.current) return;
     scrollRef.current.scrollTo({ y: Math.max(0, stageY.current + panelY.current - 12), animated: true });
@@ -592,7 +627,9 @@ export default function Episode() {
           </View>
         ) : (
           <View style={styles.playerWrap}>
-            {playback.locked === 'held' ? (
+            {/* The trailer plays over any lock (the website's rule): it
+                used to play its sound behind the lock panel. */}
+            {lockShown && playback.locked === 'held' ? (
               <View style={styles.lockPanel}>
                 <Text style={styles.lockGlyph}>{'◈'}</Text>
                 <Text style={styles.lockTitle}>Pulled while our team looks at it</Text>
@@ -601,7 +638,7 @@ export default function Episode() {
                   <Text style={styles.unlockText}>Email us</Text>
                 </Pressable>
               </View>
-            ) : playback.locked ? (
+            ) : lockShown ? (
               playback.locked === 'early' ? (
                 <View style={styles.lockPanel}>
                   <Text style={styles.lockGlyph}>{'◈'}</Text>
@@ -659,7 +696,7 @@ export default function Episode() {
                 rating={episode.rating || null}
                 onNext={upNext ? () => router.replace(playHref(upNext.id)) : null}
                 nextLabel={upNext ? `Next · ${episodeCode(upNext) || upNext.title}` : 'Next episode'}
-                resumeSeconds={showingTrailer ? 0 : resumeSeconds}
+                resumeSeconds={showingTrailer ? 0 : resumedFrom}
                 endCard={endCardProps}
                 captions={captions}
                 getToken={tokenFn}

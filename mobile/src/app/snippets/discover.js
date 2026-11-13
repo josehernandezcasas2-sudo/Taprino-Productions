@@ -1,5 +1,5 @@
 import { useAuth } from '../../lib/stableAuth';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useIsFocused, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Modal, Pressable, Share, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
@@ -81,6 +81,9 @@ export default function SnippetsDiscover() {
   const [feedState, setFeedState] = useState({ loading: true, error: null, feed: null });
   const [deck, setDeck] = useState([]);
   const [activeIndex, setActiveIndex] = useState(0);
+  // Another screen on top (an author's profile): the reel holds and the ad
+  // card stops (they kept playing, and advancing, out of sight).
+  const focused = useIsFocused();
   const [muted, setMuted] = useState(true);
   const [shareCopiedKey, setShareCopiedKey] = useState(null);
   const [menuSlide, setMenuSlide] = useState(null);
@@ -277,11 +280,12 @@ export default function SnippetsDiscover() {
         renderItem={({ item: slide, index: i }) => (
           <View style={{ height: windowHeight, width: '100%' }}>
             {slide.kind === 'ad' ? (
-              <ReelAdCard ad={slide.ad} active={i === activeIndex} muted={muted} onToggleMute={() => setMuted((m) => !m)} insets={insets} />
+              <ReelAdCard ad={slide.ad} active={focused && i === activeIndex} muted={muted} onToggleMute={() => setMuted((m) => !m)} insets={insets} />
             ) : (
               <ReelSlide
                 slide={slide}
                 active={i === activeIndex}
+                paused={!focused}
                 muted={muted}
                 onToggleMute={() => setMuted((m) => !m)}
                 onEnded={() => {
@@ -333,7 +337,7 @@ export default function SnippetsDiscover() {
   );
 }
 
-function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onShare, shareCopied, onOpenMenu, onOpenAuthor, insets }) {
+function ReelSlide({ slide, active, paused = false, muted, onToggleMute, onEnded, onClose, onShare, shareCopied, onOpenMenu, onOpenAuthor, insets }) {
   const authorName = slide.episode.authorName || 'A viewer';
   // Signed playback src, asked for as the slide comes into view — the feed
   // carries no video address (the website's lib/snippetsFeed.js, 2026-10-25).
@@ -351,6 +355,7 @@ function ReelSlide({ slide, active, muted, onToggleMute, onEnded, onClose, onSha
       <ReelPlayer
         src={src}
         active={active}
+        paused={paused}
         muted={muted}
         onToggleMute={onToggleMute}
         thumbnail={slide.episode.thumbnail}
