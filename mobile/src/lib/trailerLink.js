@@ -66,14 +66,18 @@ export function useTrailerLink({ src = null, expiresAt = null, ref = null, wante
 
   const refresh = useCallback(() => {
     const e = key ? memory.get(key) : null;
-    if (!e || e.asking || e.broken) return;
+    if (!e || e.asking) return;
     const r = refRef.current;
-    if (!trailerKeyOf(r) || Date.now() - e.askedAt < RETRY_GAP_MS) {
+    const tooSoon = Date.now() - e.askedAt < RETRY_GAP_MS;
+    // A broken trailer is tried again once five minutes have passed.
+    if (e.broken && (tooSoon || !trailerKeyOf(r))) return;
+    if (!trailerKeyOf(r) || tooSoon) {
       e.broken = true;
       bump((n) => n + 1);
       return;
     }
     e.asking = true;
+    e.broken = false;
     e.askedAt = Date.now();
     bump((n) => n + 1);
     fetchTrailerSrc(r, tokenRef.current).then((fresh) => {
@@ -84,10 +88,14 @@ export function useTrailerLink({ src = null, expiresAt = null, ref = null, wante
   }, [key]);
 
   const expired = Boolean(entry && trailerExpired(entry.expiresAt));
+  const broken = Boolean(entry && entry.broken);
+  // Failed for now: broken, and no fresh link may be asked for yet (one
+  // that may be is asked for as soon as the trailer is wanted).
+  const retryable = Boolean(entry && trailerKeyOf(ref)) && Date.now() - entry.askedAt >= RETRY_GAP_MS;
   useEffect(() => {
-    if (wanted && expired) refresh();
-  }, [wanted, expired, refresh]);
+    if (wanted && (expired || broken)) refresh();
+  }, [wanted, expired, broken, retryable, refresh]);
 
   if (!entry) return { src: null, failed: false, onError: refresh };
-  return { src: !entry.broken && !entry.asking && !expired ? entry.src : null, failed: entry.broken, onError: refresh };
+  return { src: !entry.broken && !entry.asking && !expired ? entry.src : null, failed: entry.broken && !retryable, onError: refresh };
 }
