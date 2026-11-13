@@ -52,9 +52,13 @@ export default async function handler(req, res) {
 
   const { episodeId, seriesId, part, preview } = req.body || {};
   if (part === 'trailer') return trailerToken(req, res, { episodeId, seriesId });
-  if (part !== undefined && part !== null && part !== 'main') {
-    return res.status(400).json({ error: 'part must be "main" or "trailer".' });
+  // `part: 'described'`: the title's audio-described version, behind the
+  // same gate as the title (the episode page's player refreshes it with
+  // this when its signed link runs out).
+  if (part !== undefined && part !== null && part !== 'main' && part !== 'described') {
+    return res.status(400).json({ error: 'part must be "main", "described" or "trailer".' });
   }
+  const described = part === 'described';
   if (!episodeId || typeof episodeId !== 'string') {
     return res.status(400).json({ error: 'episodeId is required' });
   }
@@ -79,18 +83,19 @@ export default async function handler(req, res) {
   if (gate.denied) return res.status(gate.denied.status).json(gate.denied.body);
   const { episode, owned } = gate;
   const previewFlag = gate.preview === true ? { preview: true } : {};
+  const stored = described ? episode.audioDescriptionSrc : episode.src;
 
-  if (!episode.src) {
-    return res.status(404).json({ error: 'No video attached to this episode.' });
+  if (!stored) {
+    return res.status(404).json({ error: described ? 'No described version attached to this episode.' : 'No video attached to this episode.' });
   }
 
-  const signed = await signedSrcForStoredUrl(episode.src);
+  const signed = await signedSrcForStoredUrl(stored);
   if (!signed) {
     // Not a Cloudflare Stream URL (a self-hosted mp4, say), or Cloudflare
     // isn't configured in this environment: the stored URL is the answer.
     // A Cloudflare video whose signing failed gets a 503, never its
     // permanent address (lib/videoSigning.js unsignedFallback).
-    const fallback = unsignedFallback(episode.src);
+    const fallback = unsignedFallback(stored);
     if (!fallback) return res.status(503).json({ error: 'Playback is having a moment — try again shortly.' });
     return res.status(200).json({ src: fallback, signed: false, ...previewFlag });
   }

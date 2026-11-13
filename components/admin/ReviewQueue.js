@@ -195,7 +195,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     const meta = item.meta || {};
     const showInfo = item.kind === 'submission' ? meta.show || null : null;
     const eyebrow = showInfo ? STAGE_EYEBROW[showInfo.stage] || STAGE_EYEBROW.private : null;
-    const blocked = item.kind === 'submission' ? meta.blocked || null : null;
+    const blocked = item.kind === 'submission' ? meta.blocked || null : item.kind === 'application' && meta.canAccept === false ? meta.acceptBlocker || 'A full admin accepts an application.' : null;
     const tierNow = tiers[item.id] || (item.kind === 'submission' ? (meta.tier === 'premium' ? 'premium' : 'free') : 'free');
     // A submission's Approve says which file it was looking at (meta.seen):
     // a file replaced since answers 409 and the queue reloads.
@@ -217,7 +217,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
           {item.kind === 'ad' ? (
             <button type="button" className="rq-btn" onClick={() => setReviewingAd(item)} disabled={busy}>Review…</button>
           ) : (
-            <button type="button" className="rq-btn rq-btn-ok" onClick={() => decide(item, 'approve', approveExtra)} disabled={busy || Boolean(blocked)} title={isApplication ? (meta.masterReady ? 'Puts it live now and grants Creator Studio' : 'Grants Creator Studio') : blocked || undefined}>
+            <button type="button" className="rq-btn rq-btn-ok" onClick={() => decide(item, 'approve', approveExtra)} disabled={busy || Boolean(blocked)} title={blocked || (isApplication ? (meta.masterReady ? 'Puts it live now and grants Creator Studio' : 'Grants Creator Studio') : undefined)}>
               {busy ? 'Working…' : isApplication ? (meta.masterReady ? 'Accept · live' : 'Accept') : 'Approve'}
             </button>
           )}

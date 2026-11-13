@@ -95,7 +95,7 @@ async function postJson(url, body) {
 
 export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, application, preview = null }) {
   const { isSignedIn: clerkSignedIn, user } = useUser();
-  const { activeUpload, startVideoUpload } = useUpload();
+  const { activeUpload, startVideoUpload, cancelVideoUpload } = useUpload();
   // The server knew at render time; Clerk's modal sign-in updates the
   // client without a reload, so trust either.
   const signedIn = preview ? preview === 'member' : (isSignedIn || Boolean(clerkSignedIn));
@@ -115,7 +115,11 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
   const [pendingFile, setPendingFile] = useState(null);
   const [linkMode, setLinkMode] = useState(false);
   const [over, setOver] = useState(false);
+  // tus's own address for an upload, with the upload it belongs to
+  // ({ uid, url }): a replacement's first request goes out before its
+  // address exists, and the last upload's used to ride along with it.
   const tusUrlRef = useRef(null);
+  const tusUrlFor = (uid) => (tusUrlRef.current && tusUrlRef.current.uid === uid ? tusUrlRef.current.url : null);
   const appRef = useRef(app);
   appRef.current = app;
 
@@ -168,7 +172,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
       const started = await startVideoUpload(file, {
         urlEndpoint: '/api/apply/upload-url',
         resumeUrl,
-        onUrl: (url) => { tusUrlRef.current = url; storeUploadUrl(started.uid, url); }
+        onUrl: (url) => { tusUrlRef.current = { uid: started.uid, url }; storeUploadUrl(started.uid, url); }
       });
       const info = { uid: started.uid, uploadUrl: resumeUrl || null, name: file.name, bytes: file.size, runtimeSeconds: meta.duration ? Math.round(meta.duration) : null, width: meta.width, height: meta.height };
       setVideo(info);
@@ -245,7 +249,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
         ...form,
         rightsAnswers: answers,
         rightsAttested: true,
-        ...(video ? { videoUid: video.uid, videoName: video.name, videoBytes: video.bytes, runtimeSeconds: video.runtimeSeconds, uploadUrl: tusUrlRef.current || video.uploadUrl || null } : {})
+        ...(video ? { videoUid: video.uid, videoName: video.name, videoBytes: video.bytes, runtimeSeconds: video.runtimeSeconds, uploadUrl: tusUrlFor(video.uid) || video.uploadUrl || null } : {})
       };
       const data = await postJson('/api/apply', body);
       setApp(data.application);
@@ -272,8 +276,13 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
     if (!info) return;
     if (sameFile) return; // the row already names this upload
     try {
-      const data = await postJson('/api/apply/video', { id: app.id, videoUid: info.uid, videoName: info.name, videoBytes: info.bytes, runtimeSeconds: info.runtimeSeconds, uploadUrl: tusUrlRef.current || null });
+      const data = await postJson('/api/apply/video', { id: app.id, videoUid: info.uid, videoName: info.name, videoBytes: info.bytes, runtimeSeconds: info.runtimeSeconds, uploadUrl: tusUrlFor(info.uid) });
       setApp(data.application);
+      // The address may have come in while that was on its way (the row
+      // still named the old upload then): keep it now.
+      appRef.current = data.application;
+      const url = tusUrlFor(info.uid);
+      if (url) storeUploadUrl(info.uid, url);
     } catch (err) {
       setError(err.message);
     }
@@ -387,7 +396,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
                   <button type="button" className="apl-link" onClick={() => setLinkMode(true)}>or paste a link to it (Drive, Dropbox, WeTransfer)</button>
                 </div>
               )}
-              {video && <UploadProgress video={video} upload={uploadNow} onRemove={() => { setVideo(null); tusUrlRef.current = null; }} />}
+              {video && <UploadProgress video={video} upload={uploadNow} onRemove={() => { cancelVideoUpload(video.uid); setVideo(null); tusUrlRef.current = null; }} />}
               {linkMode && !video && (
                 <div className="apl-field">
                   <label className="apl-label" htmlFor="apl-link">Link to the files</label>

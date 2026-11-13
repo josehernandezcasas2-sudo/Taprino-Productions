@@ -10,7 +10,8 @@ import { SITE } from '../../../lib/siteConfig';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
 import RatingOptions from '../../../components/RatingOptions';
-import { readAsDataUrl, useObjectUrl } from '../../../components/show/EditorBits';
+import { useObjectUrl } from '../../../components/show/EditorBits';
+import { PICTURES_TOO_LARGE, shrinkArtwork } from '../../../lib/shrinkImage';
 import { BackArrowIcon } from '../../../components/PlayerIcons';
 import { UploadIcon, pickerKeys } from '../../../components/show/roomBits';
 
@@ -102,7 +103,11 @@ export default function NewShowPage({ displayName, mainGenres, isSignedIn, isSub
     setSaving(true);
     setError(null);
     try {
-      const [posterBase64, thumbnailBase64] = await Promise.all([poster ? readAsDataUrl(poster) : null, still ? readAsDataUrl(still) : null]);
+      // Shrunk to what the site draws, and kept under the host's body
+      // limit together (lib/shrinkImage.js).
+      const art = await shrinkArtwork([{ key: 'poster', file: poster }, { key: 'still', file: still }]);
+      const posterBase64 = art.poster || null;
+      const thumbnailBase64 = art.still || null;
       const defaults = { tier, adsEnabled };
       if (mainGenre) defaults.mainGenre = mainGenre;
       if (rating) defaults.rating = rating;
@@ -118,6 +123,7 @@ export default function NewShowPage({ displayName, mainGenres, isSignedIn, isSub
       };
       const res = await fetch('/api/show', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
+      if (res.status === 413) throw new Error(PICTURES_TOO_LARGE);
       if (!res.ok) throw new Error(data.error || `Could not create the show (${res.status}).`);
       router.push(`/creator/show/${encodeURIComponent(data.id)}?created=1`);
     } catch (err) {

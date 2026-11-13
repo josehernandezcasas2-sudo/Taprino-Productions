@@ -16,6 +16,7 @@ import { showPickerTag, nextFreeExcept, MAX_EPISODE_NUMBER } from '../../lib/sho
 import { isTitleId } from '../../lib/titleIds';
 import { changedFields, mediaChanged } from '../../lib/draftPatch';
 import { useUpload } from '../../contexts/UploadContext';
+import { PICTURES_TOO_LARGE, bodyBytes, shrinkArtwork } from '../../lib/shrinkImage';
 import HeaderNav from '../../components/HeaderNav';
 import Footer from '../../components/Footer';
 import RatingOptions from '../../components/RatingOptions';
@@ -108,6 +109,9 @@ function readAsDataUrl(f) {
 async function postJson(url, body, method = 'POST') {
   const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
   const data = await res.json().catch(() => ({}));
+  // A body over the host's limit (Vercel's 4.5 MB) is refused before the
+  // route runs, with a page of its own: only pictures get that big.
+  if (res.status === 413) throw Object.assign(new Error(PICTURES_TOO_LARGE), { data, status: 413 });
   if (!res.ok) throw Object.assign(new Error(data.error || 'Something went wrong.'), { data, status: res.status });
   return data;
 }
@@ -138,7 +142,7 @@ function kindFits(kind, contentType) {
 
 export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, viewerId, draft, initialType, initialSeriesId, initialSeason, initialNumber }) {
   const router = useRouter();
-  const { activeUpload, startVideoUpload } = useUpload();
+  const { activeUpload, startVideoUpload, cancelVideoUpload } = useUpload();
   const [form, setForm] = useState(() => initialForm(draft, initialType, initialSeriesId, initialSeason, initialNumber));
   const [video, setVideo] = useState(draft ? draft.video : null);
   const [trailer, setTrailer] = useState(draft ? draft.trailer : null);
@@ -441,7 +445,11 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
     try {
       const started = await startVideoUpload(file, { urlEndpoint: '/api/creator/get-upload-url', kind: 'trailer' });
       setTrailer({ uid: started.uid, state: 'uploading', name: file.name });
-      started.done.then(() => setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'processing' } : t))).catch(() => {});
+      // A trailer that stops isn't sent (lib/submitRules.js toSubmitBody):
+      // it says so, and can be dropped again.
+      started.done
+        .then(() => setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'processing' } : t)))
+        .catch((err) => { if (!(err && err.cancelled)) setTrailer((t) => (t && t.uid === started.uid ? { ...t, state: 'stopped' } : t)); });
     } catch (err) {
       setError(err.message || 'Could not start the trailer upload.');
     }
@@ -492,6 +500,8 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
       const why = stepBlocker(s, form, media) || (s === 2 ? placeBlocker : null);
       if (why) { setError(why); setStep(s); return; }
     }
+    // A trailer still on its way would be left out of what is sent.
+    if (trailerUploading) { setError('The trailer is still uploading — send it once it’s up, or take it out.'); return; }
     setSubmitting(true);
     setError(null);
     // Swap first: the episode on the number moves out of the way.
@@ -509,7 +519,17 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
       }
     }
     try {
-      const [posterBase64, thumbnailBase64, captionsBase64, titleImageBase64] = await Promise.all([readAsDataUrl(form.cutArtwork ? null : posterFile), readAsDataUrl(form.cutArtwork ? null : stillFile), readAsDataUrl(captionsFile), readAsDataUrl(titleImageFile)]);
+      const captionsBase64 = await readAsDataUrl(captionsFile);
+      // The pictures, shrunk to what the site draws and kept under the
+      // host's body limit with the captions (lib/shrinkImage.js).
+      const art = await shrinkArtwork([
+        { key: 'poster', file: form.cutArtwork ? null : posterFile },
+        { key: 'still', file: form.cutArtwork ? null : stillFile },
+        { key: 'titleImage', file: titleImageFile, keepAlpha: true }
+      ], { room: 64 * 1024 + bodyBytes(captionsBase64) });
+      const posterBase64 = art.poster || null;
+      const thumbnailBase64 = art.still || null;
+      const titleImageBase64 = art.titleImage || null;
       const body = toSubmitBody(form, media, {
         adBreakSeconds: form.adsEnabled !== false ? parseAdBreaksInput(form.adBreaksText) : [0],
         ...(posterBase64 ? { posterBase64, posterFileName: posterFile.name } : {}),
@@ -624,7 +644,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
                 state={masterUploading ? 'uploading' : video.state}
                 upload={masterUploading ? uploadNow : null}
                 facts={[runtimeClock(video.runtimeSeconds), video.width && video.height ? `${video.width} × ${video.height}` : null].filter(Boolean)}
-                onRemove={() => setVideo(null)}
+                onRemove={() => { cancelVideoUpload(video.uid); setVideo(null); }}
                 onResume={video.state === 'uploading' && !masterUploading ? (f) => pickMaster(f) : null}
               />
             )}
@@ -856,7 +876,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
             <div className="apl-field">
               <div className="apl-label">Trailer <em>optional · 15–30 s</em></div>
               {trailer ? (
-                <MediaProgress name={trailer.name} bytes={null} state={trailerUploading ? 'uploading' : trailer.state} upload={trailerUploading ? uploadNow : null} facts={[]} onRemove={() => setTrailer(null)} />
+                <MediaProgress name={trailer.name} bytes={null} state={trailerUploading ? 'uploading' : trailer.state} upload={trailerUploading ? uploadNow : null} facts={[]} onRemove={() => { cancelVideoUpload(trailer.uid); setTrailer(null); }} />
               ) : (
                 <label className={`sub-slot ${anyUploading ? 'off' : ''}`}>
                   {anyUploading ? 'Drop a clip once the master has finished uploading' : 'Drop a clip, or skip'}
@@ -958,7 +978,7 @@ function MediaProgress({ name, bytes, state, upload, facts, onRemove, onResume }
   const speed = upload ? upload.bytesUploaded / elapsed : 0;
   const left = upload && speed > 0 ? Math.round((upload.fileSize - upload.bytesUploaded) / speed) : null;
   const leftLabel = left == null ? '' : left < 60 ? 'under a minute left' : `${Math.round(left / 60)} min left`;
-  const right = state === 'uploading' && upload ? `${pct}%${leftLabel ? ` · ${leftLabel}` : ''}` : state === 'uploading' ? 'upload stopped' : state === 'processing' ? 'uploaded · processing' : state === 'ready' ? 'ready ✓' : state === 'error' ? 'failed' : state;
+  const right = state === 'uploading' && upload ? `${pct}%${leftLabel ? ` · ${leftLabel}` : ''}` : state === 'uploading' || state === 'stopped' ? 'upload stopped' : state === 'processing' ? 'uploaded · processing' : state === 'ready' ? 'ready ✓' : state === 'error' ? 'failed' : state;
   return (
     <div className={`apl-progress ${state === 'error' ? 'is-error' : ''}`} aria-live="polite">
       <div className="apl-progress-row"><span className="apl-progress-name">{name}{bytes ? ` · ${bytesLabel(bytes)}` : ''}</span><span>{right}</span></div>
@@ -966,6 +986,8 @@ function MediaProgress({ name, bytes, state, upload, facts, onRemove, onResume }
       <div className="apl-progress-meta">
         {state === 'uploading' && !upload
           ? <span>The upload stopped. {onResume ? <label className="apl-link">Pick the same file again to resume<input type="file" accept={VIDEO_ACCEPT} hidden onChange={(e) => { onResume(e.target.files && e.target.files[0]); e.target.value = ''; }} /></label> : null}</span>
+          : state === 'stopped'
+            ? <span>The upload stopped, so it isn’t sent. Take it out and drop it again.</span>
           : state === 'error'
             ? <span>Cloudflare couldn’t process it. Pick another file.</span>
             : facts.length

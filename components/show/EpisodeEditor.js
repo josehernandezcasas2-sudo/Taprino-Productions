@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useUpload } from '../../contexts/UploadContext';
 import { readVideoMetadata } from '../../lib/videoMetadata';
+import { shrinkArtwork } from '../../lib/shrinkImage';
 import { bytesLabel, runtimeClock } from '../../lib/creatorRights';
 import { formatAdBreaksForInput, parseAdBreaksInput } from '../../lib/adBreaks';
 import { joinDescription, planMove, saveSummary, splitDescription } from '../../lib/showRules';
@@ -581,16 +582,23 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     setError(null);
     const body = { ...computed.body };
     try {
+      // Shrunk to what the site draws, and kept under the host's body limit
+      // together (lib/shrinkImage.js; a camera's poster and still were a 413).
+      const art = await shrinkArtwork([
+        { key: 'poster', file: files.poster },
+        { key: 'thumbnail', file: files.thumbnail },
+        { key: 'titleImage', file: files.titleImage, keepAlpha: true }
+      ]);
       if (files.poster) {
-        body.posterBase64 = await readAsDataUrl(files.poster);
+        body.posterBase64 = art.poster;
         body.posterFileName = files.poster.name;
       }
       if (files.thumbnail) {
-        body.thumbnailBase64 = await readAsDataUrl(files.thumbnail);
+        body.thumbnailBase64 = art.thumbnail;
         body.thumbnailFileName = files.thumbnail.name;
       }
       if (files.titleImage) {
-        body.titleImageBase64 = await readAsDataUrl(files.titleImage);
+        body.titleImageBase64 = art.titleImage;
         body.titleImageFileName = files.titleImage.name;
       }
     } catch (err) {
@@ -682,7 +690,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
           level="warn"
           icon={<WarningIcon size={16} />}
           title={`Not this time${ep.rejectionReason ? ':' : ''}`}
-          action={canAct && !ep.deletionRequested ? <button type="button" className="apl-btn-secondary show-ed-banner-btn" disabled={saving} onClick={() => save({ resubmit: true })}>{saving ? 'Sending…' : 'Send again for review'}</button> : null}
+          action={canAct && !ep.deletionRequested ? <button type="button" className="apl-btn-secondary show-ed-banner-btn" disabled={saving || Boolean(trailerUp && trailerUp.state === 'uploading')} title={trailerUp && trailerUp.state === 'uploading' ? 'The trailer is still uploading — send it once it’s up.' : undefined} onClick={() => save({ resubmit: true })}>{saving ? 'Sending…' : 'Send again for review'}</button> : null}
         >
           {ep.rejectionReason ? <p>{ep.rejectionReason}</p> : null}
           <p className="show-ed-banner-sub">Fix what it needs here, then send it again{computed.changes.length ? ' — your changes go with it' : ''}.</p>

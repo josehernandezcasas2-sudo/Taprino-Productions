@@ -75,15 +75,15 @@ export async function getServerSideProps({ req, params, res }) {
   const viewCounts = viewCountsResult || {};
   let heroPool;
   if (isRedisConfigured()) {
-    const candidates = buildHeroCandidates(episodes, allSeries, viewCounts);
+    const candidates = buildHeroCandidates(episodes, allSeries, viewCounts, { showEpisodes: episodesNoBonus });
     const ranked = candidates.filter((c) => c.views > 0).sort((a, b) => b.views - a.views);
-    heroPool = ranked.length > 0 ? ranked.slice(0, 5) : buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
+    heroPool = ranked.length > 0 ? ranked.slice(0, 5) : buildHeroCandidates(episodes, allSeries, {}, { showEpisodes: episodesNoBonus }).filter((c) => c.featured);
   } else {
-    heroPool = buildHeroCandidates(episodes, allSeries).filter((c) => c.featured);
+    heroPool = buildHeroCandidates(episodes, allSeries, {}, { showEpisodes: episodesNoBonus }).filter((c) => c.featured);
   }
-  if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries).slice(0, 5);
+  if (heroPool.length === 0) heroPool = buildHeroCandidates(episodes, allSeries, {}, { showEpisodes: episodesNoBonus }).slice(0, 5);
   // A series hero's Play continues where this viewer is (lib/seriesResume.js).
-  heroPool = withSeriesResume(heroPool, episodes, hasSession ? await getViewerProgress(req, episodes) : null);
+  heroPool = withSeriesResume(heroPool, episodesNoBonus, hasSession ? await getViewerProgress(req, episodesNoBonus) : null);
   // Trailers go out as signed links, as on /stream (pages/stream.js says why).
   heroPool = await signHeroTrailers(heroPool);
 

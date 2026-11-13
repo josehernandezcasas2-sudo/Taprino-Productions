@@ -6,6 +6,7 @@ import MobileTabBar from '../MobileTabBar';
 import Footer from '../Footer';
 import { SITE } from '../../lib/siteConfig';
 import { dayCount } from '../../lib/locationRules';
+import { shrinkImage } from '../../lib/shrinkImage';
 
 // Shared pieces for the Locations pages (mockups/locations-v1.html):
 // the page shell, status pills, a month calendar, and the photo
@@ -121,27 +122,10 @@ export function daysBetween(a, b) {
 // Reads a picked file and shrinks it to a JPEG no wider than `max` px, as
 // a data URL — gallery photos come off phones at 4000px and 5 MB, which
 // is more than an upload needs and more than a request may carry.
-export function shrinkImage(file, max = 1600, quality = 0.85) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Could not read that file.'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('That file isn’t an image.'));
-      img.onload = () => {
-        const scale = Math.min(1, max / Math.max(img.width, img.height));
-        if (scale === 1 && file.size < 1200000) { resolve(reader.result); return; }
-        const canvas = document.createElement('canvas');
-        canvas.width = Math.round(img.width * scale);
-        canvas.height = Math.round(img.height * scale);
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
-      };
-      img.src = reader.result;
-    };
-    reader.readAsDataURL(file);
-  });
-}
+// The JPEG shrink lives in lib/shrinkImage.js (the show and submit pages'
+// artwork uses it too); kept here under its old name for the pages that
+// import it from this file.
+export { shrinkImage };
 
 export async function uploadImage(file, purpose = 'photo') {
   return (await uploadImageFull(file, purpose)).url;

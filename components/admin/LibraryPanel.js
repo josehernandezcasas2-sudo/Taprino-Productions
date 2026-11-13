@@ -187,6 +187,9 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
   // creator replaced since is refused instead of going live unseen.
   const resolveArtwork = (type, id, decision, seen) => postDecision('/api/admin/resolve-artwork', { type, id, decision, ...(seen ? { seen } : {}) }, setArtworkActionLoading, setArtworkError, `${type}-${id}`,
     () => Promise.all([loadPendingArtwork(), loadOrphans(), loadLibrary(librarySearch)]));
+  // A title's new video file (part 'video': review_submissions decides it).
+  const resolveVideo = (id, decision, seen) => postDecision('/api/admin/resolve-artwork', { type: 'episode', id, decision, part: 'video', ...(seen ? { seen } : {}) }, setArtworkActionLoading, setArtworkError, `video-${id}`,
+    () => Promise.all([loadPendingArtwork(), loadOrphans(), loadLibrary(librarySearch)]));
   const resolveEdit = (type, id, decision, seen) => postDecision('/api/admin/resolve-edit', { type, id, decision, ...(seen ? { seen } : {}) }, setEditActionLoading, setEditError, `${type}-${id}`,
     () => Promise.all([loadPendingEdits(), loadLibrary(librarySearch)]));
   const resolveDeletion = (type, id, decision) => postDecision('/api/admin/resolve-deletion', { type, id, decision }, setDeletionActionLoading, setDeletionError, `${type}-${id}`,
@@ -279,11 +282,22 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
 
       <div id="library-artwork" className="account-card">
         <div className="account-eyebrow">Pending artwork changes</div>
-        <h3>Poster, thumbnail, and trailer changes awaiting approval</h3>
+        <h3>Poster, thumbnail, trailer and video changes awaiting approval</h3>
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Approving replaces what&rsquo;s currently shown; denying discards the upload and keeps the current one.</p>
         {artworkError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{artworkError}</p>}
-        {!pendingArtwork ? <p>Loading…</p> : pendingArtwork.episodes.length === 0 && pendingArtwork.series.length === 0 ? <p className="adm-empty">Nothing pending right now.</p> : (
+        {!pendingArtwork ? <p>Loading…</p> : pendingArtwork.episodes.length === 0 && pendingArtwork.series.length === 0 && !(pendingArtwork.videos || []).length ? <p className="adm-empty">Nothing pending right now.</p> : (
           <>
+            {(pendingArtwork.videos || []).map((v) => (
+              <div key={`video-${v.id}`} className="lib-staged-video" style={rowStyle}>
+                {kindTag('New video', 'var(--signal-amber)')}
+                <h4 style={{ margin: '0 0 0.3rem' }}>{v.title}</h4>
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+                  A new video file waits for review; the current one keeps playing until it&rsquo;s approved.
+                  {v.media && v.media.iframe ? <> <a href={v.media.iframe} target="_blank" rel="noopener noreferrer">Watch the new file ↗</a></> : null}
+                </p>
+                {decideButtons(artworkActionLoading === `video-${v.id}`, () => resolveVideo(v.id, 'approve', v.seen), () => resolveVideo(v.id, 'deny', v.seen))}
+              </div>
+            ))}
             {pendingArtwork.episodes.map((e) => (
               <div key={`episode-${e.id}`} style={rowStyle}>
                 {kindTag('Episode', 'var(--signal-amber)')}
