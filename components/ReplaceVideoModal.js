@@ -24,11 +24,19 @@ export default function ReplaceVideoModal({ submission, onClose }) {
     // Fire-and-forget, same pattern as the main submission form — this
     // upload now lives in the shared context and survives navigating away
     // from this modal (or this page) entirely. Track it via the corner
-    // widget, not this modal.
-    startUpload(file, { episodeId: submission.id }, undefined, 'tus', '/api/creator/replace-video');
+    // widget, not this modal. Saved the way the show editor's "Replace the
+    // file" is (lib/showPage.js replaceEpisodeVideo): on a live title the
+    // new file waits for an admin while the current one keeps playing; the
+    // route's own line says what happened.
+    startUpload(file, {}, undefined, 'tus', `/api/show/episode/${encodeURIComponent(submission.id)}/video`, {
+      label: 'New file uploaded',
+      meta: wasLive ? 'It waits for an admin; the current one keeps playing until then.' : 'Saved.'
+    }).catch((err) => { setStarted(false); setError((err && err.message) || 'Could not start the upload.'); });
     setStarted(true);
   }
 
+  // Live, or pulled while an admin looks (a new file waits for review then
+  // too): the title stays as it is until an admin approves the new file.
   const wasLive = submission.status === 'approved';
 
   return (
@@ -41,8 +49,10 @@ export default function ReplaceVideoModal({ submission, onClose }) {
         <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
           For &ldquo;{submission.title}&rdquo;.{' '}
           {wasLive
-            ? 'This episode is currently live — replacing the video sends it back into the review queue, since an admin only approved the previous file, not this new one.'
-            : 'The old video file will no longer be used once this finishes.'}
+            ? 'It’s live, and it stays live: the new file goes to an admin first, and the current one keeps playing (for its buyers too) until it’s approved.'
+            : submission.status === 'rejected'
+              ? 'It comes back into review with the new file.'
+              : 'The new file replaces the old one; it stays in review.'}
         </p>
 
         {!started ? (
