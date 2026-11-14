@@ -24,9 +24,12 @@ const APP_ROUTES = [
   // app has these screens, and these addresses used to open the website.
   /^\/productions(\/[^/]+(\/(edit|distribution|day\/\d+))?)?$/, /^\/stream$/,
   // Downloads (2026-11-14): the website's /downloads is the app's page.
-  /^\/downloads$/
+  /^\/downloads$/,
+  // The creator's Dashboard (2026-11-14) and Your numbers, one of its tabs.
+  /^\/creator\/dashboard$/, /^\/creator\/numbers$/
 ];
-const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work' };
+// The website's /creator/analytics is the app's Your numbers.
+const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work', '/creator/analytics': '/creator/numbers' };
 // Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:
 //   /creator#get-paid           → /creator (payee_invite, payee_invite_cancelled;
 //                                 the hash goes before the match, and the
@@ -97,6 +100,14 @@ const PUBLIC_KEEP = { season: /^\d{1,4}$/, preview: /^1$/, autoplay: /^1$/ };
 // app's podcast screen has no seasons or autoplay).
 const PODCAST_SHOW = /^\/podcasts\/[^/]+$/;
 const PODCAST_KEEP = { preview: /^1$/ };
+// Two creator screens keep what their address asks for (the Dashboard's
+// rows link to them, 2026-11-14): the three-step submit opens the draft or
+// the show, season and number it names; Your work opens on the filter.
+// Until then "Continue" on a draft would have opened an empty form.
+const SCREEN_KEEP = {
+  '/creator/submit': { draft: /^[A-Za-z0-9_-]{1,80}$/, type: /^[a-z]{1,20}$/, series: /^[A-Za-z0-9_-]{1,160}$/, season: /^\d{1,4}$/, number: /^\d{1,5}$/ },
+  '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/ }
+};
 
 function keptQuery(href, keep = PUBLIC_KEEP) {
   const q = queryOf(href);
@@ -113,6 +124,7 @@ export function hrefToRoute(href) {
   if (target === '/') return { route: '/' };
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
+  if (Object.prototype.hasOwnProperty.call(SCREEN_KEEP, target)) return { route: `${target}${keptQuery(href, SCREEN_KEEP[target])}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };
   return { url: `${API_BASE_URL}${href}` };
 }

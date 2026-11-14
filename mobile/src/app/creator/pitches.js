@@ -7,6 +7,7 @@ import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import PayoutsCard from '../../components/PayoutsCard';
+import DashboardTabs from '../../components/dashboard/DashboardTabs';
 
 // Your pitches (pages/creator/pitch/dashboard.js on the web): the Payouts
 // card (components/PayoutsCard.js), every project you've submitted with
@@ -123,6 +124,8 @@ export default function YourPitches() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {/* The Dashboard's row of tabs (2026-11-14). */}
+        <DashboardTabs current="pitches" style={styles.dashTabs} />
         <Text style={styles.eyebrow}>Pitch Room</Text>
         <Text style={styles.h1}>Your pitches</Text>
         <Text style={styles.lede}>Track status, post progress updates, and see your live project pages.</Text>
@@ -172,6 +175,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
   scrollView: { flex: 1 },
   scroll: { padding: 19, paddingBottom: 120 },
+  dashTabs: { marginBottom: 16 },
   eyebrow: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.olive, marginBottom: 8 },
   h1: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 34, color: colors.ink, marginBottom: 8 },
   lede: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, color: colors.inkDim, marginBottom: 14 },

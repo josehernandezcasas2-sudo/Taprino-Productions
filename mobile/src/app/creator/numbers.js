@@ -7,6 +7,7 @@ import Svg, { Path } from 'react-native-svg';
 import { apiGet, freshToken } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
+import DashboardTabs from '../../components/dashboard/DashboardTabs';
 
 // Your numbers (pages/creator/analytics.js on the web): views, what's
 // published and pending, the day-by-day trend, every episode with its
@@ -154,6 +155,8 @@ export default function YourNumbers() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+        {/* The Dashboard's row of tabs (2026-11-14). */}
+        <DashboardTabs current="numbers" style={styles.dashTabs} />
         <Text style={styles.eyebrow}>Creator dashboard</Text>
         <Text style={styles.h1}>Your numbers</Text>
         <Text style={styles.lede}>How your work is doing on Studio Tapa TV. Only you can see this.</Text>
@@ -243,6 +246,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 14 },
   scrollView: { flex: 1 },
   scroll: { padding: 19, paddingBottom: 120 },
+  dashTabs: { marginBottom: 16 },
   eyebrow: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.6, color: colors.olive, marginBottom: 8 },
   h1: { fontFamily: fonts.displayBold, fontSize: 32, lineHeight: 34, color: colors.ink, marginBottom: 8 },
   lede: { fontFamily: fonts.body, fontSize: 15, lineHeight: 23, color: colors.inkDim, marginBottom: 14 },

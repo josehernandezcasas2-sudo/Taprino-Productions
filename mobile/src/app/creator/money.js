@@ -9,6 +9,7 @@ import { apiGet, apiPost, freshToken, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import PayoutsCard from '../../components/PayoutsCard';
+import DashboardTabs from '../../components/dashboard/DashboardTabs';
 import { LANES, LANE_ORDER, dollars, signed, periodLabel } from '../../lib/creatorMoneyRules';
 
 // The creator's Money page, stacked (mockup signed off 2026-10-23):
@@ -129,6 +130,9 @@ export default function CreatorMoneyScreen() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll}>
+        {/* The Dashboard's row of tabs (2026-11-14); nothing for a host
+            who has no Dashboard. */}
+        <DashboardTabs current="money" style={styles.dashTabs} />
         <View style={styles.headRow}>
           <Text style={styles.eyebrow}>{data.creator.displayName ? `Creator · ${data.creator.displayName}` : 'Creator'}</Text>
           <Pressable style={styles.periodBtn} onPress={() => setPickerOpen((o) => !o)}>
@@ -287,6 +291,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
   scrollView: { flex: 1 },
   scroll: { padding: 16, paddingBottom: 120 },
+  dashTabs: { marginBottom: 16 },
   p: { fontFamily: fonts.body, fontSize: 15, color: colors.inkDim, textAlign: 'center' },
   error: { fontFamily: fonts.mono, fontSize: 11.5, color: colors.danger, marginBottom: 8 },
   headRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginBottom: 6 },

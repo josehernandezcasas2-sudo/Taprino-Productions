@@ -39,6 +39,19 @@ export function AccountIcon({ size = 20, color = '#fbe8d3' }) {
   );
 }
 
+// The creator's Dashboard tab (2026-11-14): four uneven tiles, the website's
+// DashboardIcon in PlayerIcons.js. BottomNav's tab and TopNav's row.
+export function DashboardIcon({ size = 20, color = '#fbe8d3' }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Rect x="3" y="3" width="8" height="10" rx="1.5" />
+      <Rect x="13" y="3" width="8" height="6" rx="1.5" />
+      <Rect x="13" y="11" width="8" height="10" rx="1.5" />
+      <Rect x="3" y="15" width="8" height="6" rx="1.5" />
+    </Svg>
+  );
+}
+
 export function SearchIcon({ size = 18, color = '#fbe8d3' }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

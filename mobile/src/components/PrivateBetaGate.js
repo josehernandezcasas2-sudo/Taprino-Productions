@@ -8,6 +8,7 @@ import { loadSettings } from './TopNav';
 import { API_BASE_URL } from '../lib/api';
 import { hostedAuthParams } from '../lib/hostedAuth';
 import { colors, fonts, absoluteFill, oliveTint } from '../lib/theme';
+import { useSignInLanding } from './dashboard/useSignInLanding';
 
 // The app's half of the private beta door (pages/welcome.js on the web;
 // mockup: the "Private beta gate" canvas, App board). /api/site-settings
@@ -26,6 +27,10 @@ export default function PrivateBetaGate() {
   const [privateBeta, setPrivateBeta] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  // A creator or a team member who comes in through the door lands on the
+  // Dashboard (2026-11-14), unless the screen under it is one they were
+  // already on their way to.
+  const land = useSignInLanding();
 
   // Until the settings answer, ask again (2 s, 4 s, … at most a minute
   // apart, and straight away when the app comes back): a first read that
@@ -60,7 +65,8 @@ export default function PrivateBetaGate() {
     setBusy(true);
     setError(null);
     try {
-      await startHostedAuth(hostedAuthParams('sign-in'));
+      const done = await startHostedAuth(hostedAuthParams('sign-in'));
+      if (done && done.createdSessionId) land();
     } catch (err) {
       setError(err.message || 'Sign-in failed.');
     } finally {

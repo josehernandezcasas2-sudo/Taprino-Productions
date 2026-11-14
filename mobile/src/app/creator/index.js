@@ -14,6 +14,7 @@ import SmartImage from '../../components/SmartImage';
 import { cp, PrimaryButton, SecondaryButton } from '../../components/CreatorBits';
 import { ClockIcon } from '../../components/WorkIcons';
 import { KindChip, PlusIcon, StateChip, showRoute } from '../../components/show/ShowBits';
+import DashboardTabs from '../../components/dashboard/DashboardTabs';
 
 // Creator Studio's hub (mirrors pages/creator.js): Submit a title, the
 // types under it, "Your shows", the drafts in flight, and the three piles
@@ -330,6 +331,8 @@ export default function CreatorStudio() {
     <SafeAreaView style={cp.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView contentContainerStyle={cp.scroll}>
+        {/* The Dashboard's row of tabs (2026-11-14). */}
+        <DashboardTabs current="studio" />
         <View style={{ gap: 6 }}>
           <Text style={cp.eyebrow}>Creator Studio</Text>
           <Text style={cp.h1}>Your titles, in one place.</Text>

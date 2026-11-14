@@ -9,7 +9,7 @@ import { colors, fonts, inkTint, oliveTint, absoluteFill } from '../lib/theme';
 import { panelRoom } from '../lib/menuScroll';
 import {
   SearchIcon, AccountIcon, BellIcon, MenuIcon, SettingsIcon, LockIcon, HeartIcon, ChatIcon, SparkleIcon, TargetIcon,
-  CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon
+  CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, DashboardIcon
 } from './TabBarIcons';
 import PositionedImage from './PositionedImage';
 import { rememberStayInStream } from '../lib/stayInStream';
@@ -17,6 +17,8 @@ import { useNotifications } from '../lib/useUnread';
 import { useAdminRole } from '../lib/adminRole';
 import { signOutEverywhere } from '../lib/signOut';
 import { hrefToRoute } from './PushListener';
+import { DASHBOARD_PATH, seesDashboard } from '../lib/creatorDashboardRules';
+import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
 
 // lib/siteConfig.js SITE.premiumTier on the website.
 const PREMIUM_TIER = 'Tapa +';
@@ -437,7 +439,11 @@ export default function TopNav() {
                     plan picker, Manage subscription for a paying member,
                     the free-access note for the team. */}
                 <MenuRow Icon={isSubscriber ? CardIcon : SparkleIcon} label={isSubscriber ? 'Membership' : `Join ${PREMIUM_TIER}`} onPress={() => go('/account/membership')} />
-                {role.isCreator ? <View style={styles.panelDivider} /> : null}
+                {/* The creator's Dashboard (2026-11-14), above the creator
+                    rows: the same people who get its tab in the bottom
+                    bar (a creator, an admin, a sub-admin). */}
+                {seesDashboard(role) ? <View style={styles.panelDivider} /> : null}
+                {seesDashboard(role) ? <MenuRow Icon={DashboardIcon} label="Dashboard" active={pathname === DASHBOARD_PATH} onPress={() => (pathname === DASHBOARD_PATH ? setPanel(null) : go(DASHBOARD_PATH))} /> : null}
                 {role.isCreator ? <MenuRow Icon={BarChartIcon} label="Your numbers" onPress={() => go('/creator/numbers')} /> : null}
                 {role.isCreator || role.isAdmin ? (
                   <>
@@ -459,7 +465,9 @@ export default function TopNav() {
             ) : (
               <>
                 <Text style={styles.panelLabel}>Account</Text>
-                <MenuRow Icon={ArrowRightIcon} label="Log in / Create account" onPress={() => go('/account')} />
+                {/* The general way in: a creator who signs in from here
+                    lands on the Dashboard (useSignInLanding.js). */}
+                <MenuRow Icon={ArrowRightIcon} label="Log in / Create account" onPress={() => go(`/account?${GENERAL_SIGN_IN}`)} />
                 <MenuRow Icon={HeartIcon} label="My Wishlist" onPress={() => go('/account/wishlist')} />
                 <View style={styles.panelDivider} />
                 <MenuRow Icon={ClapperboardIcon} label="Become a creator" onPress={() => go('/apply')} />

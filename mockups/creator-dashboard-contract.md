@@ -104,3 +104,14 @@ What changed between this agreement and the code, and the choices made on the wa
 **The rig**
 
 - `dev/test-rig/bin/upstash.mjs` is an opt-in stand-in for Upstash that keeps only the view-counting keys, so views can be real numbers in a check without the catalogue being cached or anyone being rate limited. `checks/creator-dashboard.mjs` checks whichever it finds.
+
+**The app**
+
+- The screen follows the phone board. The six-month bars are left out (as section 6 allowed), the views chart has no day-under-the-finger readout, and a title's sales/ads split is only in the row's spoken label; a live row shows its earnings, its views with the small line, and "64% watched".
+- A refused route's number tiles are left out (the website shows a dash when a route fails, and leaves the whole row out for a sub-admin).
+- The row of tabs keeps the stack short: from the Dashboard a tab opens on top of it, between the other screens a tab takes the screen's place, and Overview goes back down to the Dashboard, so Back is always the Dashboard.
+- Six tabs for an admin: `mobile/src/lib/tabBarFit.js` (pure, `node scripts/test-tab-bar-fit.mjs`) gives way a step at a time — closer letters, a squarer lit pill, no carets and a wider Dashboard tab, then a smaller size. 8.3pt down to a 360pt phone, 7.3pt at 320. A viewer's four tabs are untouched.
+- Sign-in: in the app nearly every action sends a signed-out person to the same account card, so the general entries are marked instead (`/account?signin=general` from the top bar's Log in row, the bottom bar's Settings / Account row while signed out, and the Dashboard itself), and only a marked visit lands. The beta door lands unless the screen under it is one the person was already headed to. It uses `router.dismissTo`, so there is never a second copy of the Dashboard in the stack.
+- `hrefToRoute` keeps the query on `/creator/submit` and Your work (Continue on a draft opened an empty form before, from a notification too) and knows `/creator/analytics` as Your numbers.
+- "Open Money" is the money card's link in the app (the app's Money screen has no CSV). The loading and "couldn't load" lines are the website's, copied; "Also yours", "Retry", "Month", "Not yet" and "% watched" are the app's own.
+- Verified with check:refs, lint, both exports, the unit tests and a browser harness of the real screen files (react-native-web, 82 checks). Not on a device.

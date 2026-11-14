@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useAuth } from '../../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { hostedAuthParams } from '../../lib/hostedAuth';
+import { isGeneralSignIn, useSignInLanding } from '../dashboard/useSignInLanding';
 import { signOutEverywhere } from '../../lib/signOut';
 import { apiGet, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
@@ -188,11 +189,18 @@ export function AccountFrame({ title, aside = null, dashboard, onRetry, back = '
   const { signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
   const [busyMode, setBusyMode] = useState(null);
+  // The sign-in card opened as the way to sign in (/account?signin=general:
+  // the top bar's Log in row, the bottom bar's Account row, the Dashboard):
+  // a creator or a team member then lands on the Dashboard. Opened by an
+  // action (Tip, Buy, Back it…) it carries no mark and the person stays.
+  const params = useLocalSearchParams();
+  const land = useSignInLanding();
 
   async function handleStartAuth(mode) {
     setBusyMode(mode);
     try {
-      await startHostedAuth(hostedAuthParams(mode));
+      const done = await startHostedAuth(hostedAuthParams(mode));
+      if (done && done.createdSessionId && isGeneralSignIn(params)) land();
     } catch (err) {
       Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {

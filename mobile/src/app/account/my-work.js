@@ -23,6 +23,7 @@ import SmartImage from '../../components/SmartImage';
 import SellTitleSheet, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/SellTitleSheet';
 import { ChevronIcon, KindChip, Sheet, StateChip, episodeEditorRoute, showRoute, ss } from '../../components/show/ShowBits';
 import PayeeCard from '../../components/show/PayeeCard';
+import DashboardTabs from '../../components/dashboard/DashboardTabs';
 import { dollars } from '../../lib/purchaseRules';
 import { extraKindLabel } from '../../lib/extraKinds';
 
@@ -695,6 +696,8 @@ export default function MyWork() {
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
       <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
+        {/* The Dashboard's row of tabs (2026-11-14). */}
+        <DashboardTabs current="work" style={styles.dashTabs} />
         <View style={styles.head}>
           <Text style={styles.eyebrow}>Creator Studio</Text>
           <Text style={styles.title}>Your work</Text>
@@ -1215,6 +1218,7 @@ const styles = StyleSheet.create({
   note: { color: colors.inkDim, fontSize: 14, lineHeight: 20, marginTop: 8 },
   link: { color: colors.olive },
 
+  dashTabs: { marginBottom: 16 },
   head: { marginBottom: 14 },
   eyebrow: { color: colors.olive, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
   title: { color: colors.ink, fontSize: 22, fontWeight: '800', marginBottom: 6 },

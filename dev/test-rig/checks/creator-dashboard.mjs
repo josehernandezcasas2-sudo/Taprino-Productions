@@ -10,7 +10,8 @@
 //      where they were headed; never off the site.
 //   3. The routes' additions: the money route's `dashboard` block (six
 //      months, the month before, what each title earned, the newest
-//      lines) and the numbers route's compare=1, windowViews and spark.
+//      lines) and the numbers route's compare=1, windowViews and spark;
+//      the same six routes asked the way the app asks (a token, no cookie).
 //   4. The page for a creator at 1280: the tab on the rail, the row of
 //      tabs, the four numbers, Your titles (a show adds up its episodes,
 //      a film its own; an episode in review, a draft), Needs you, the
@@ -239,6 +240,19 @@ await runCheck('creator-dashboard', async () => {
     } else {
       ok('numbers: no counting, so no views and no change (run the Upstash stand-in for real numbers)', numbers.totals.windowViews === 0 && numbers.totals.changePct === null);
     }
+
+    // The app asks the same six routes with a token and no cookie.
+    const viaApp = async (pathname) => { const r = await call(pathname, { who: MARA, bearer: true }); return { status: r.status, body: r.json || {} }; };
+    const appMoney = await viaApp('/api/creator/money');
+    const appNumbers = await viaApp('/api/creator/analytics?days=30&compare=1');
+    ok('the app’s calls: the money route’s dashboard block', appMoney.status === 200 && appMoney.body.dashboard && appMoney.body.dashboard.months.length === 6 && appMoney.body.top.monthCents === money.top.monthCents, `status ${appMoney.status}`);
+    ok('the app’s calls: the numbers route with compare=1', appNumbers.status === 200 && appNumbers.body.comparedTo === 'previous' && appNumbers.body.totals.windowViews === numbers.totals.windowViews, `status ${appNumbers.status}`);
+    for (const [pathname, key] of [['/api/creator/my-submissions', 'submissions'], ['/api/show?mine=1', 'shows'], ['/api/creator/drafts', 'drafts'], ['/api/payees/mine', 'invites']]) {
+      const r = await viaApp(pathname);
+      ok(`the app’s calls: ${pathname}`, r.status === 200 && Array.isArray(r.body[key]), `status ${r.status}`);
+    }
+    const subApp = await call('/api/creator/money', { who: sub, bearer: true });
+    ok('the app’s calls: a sub-admin who is not a creator is refused the money, not handed zeros', subApp.status === 403, `status ${subApp.status}`);
 
     // ---- 4. the page at 1280 ------------------------------------------------------
     const b = await browser();

@@ -4,18 +4,39 @@ import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { riseRoom } from '../lib/menuScroll';
 import { colors, fonts } from '../lib/theme';
-import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
+import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon, DashboardIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
 import { useUnreadMessages } from '../lib/useUnread';
 import { useOwnProfile, ownProfileHref, loadSettings } from './TopNav';
 import { useDownloadCount } from '../lib/useDownloads';
 import { DOWNLOAD_WORDS } from '../lib/downloadRules';
 import { DownloadGlyph } from './downloads/DownloadBits';
+import { DASHBOARD_PATH, seesDashboard } from '../lib/creatorDashboardRules';
+import { SQUARE_RADIUS, tabBarFit } from '../lib/tabBarFit';
+import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
 // navigating directly, so the app's nav covers every page the site's
 // does.
+//
+// The creator's Dashboard (Jose, 2026-11-14: "add a dashboard to the tab
+// bar … all creators and teams see the tab"): one more tab between Watch
+// and Account for a creator, an admin or a sub-admin (seesDashboard). A tap
+// goes straight to the screen, no menu. It is the lit tab on the Dashboard
+// and on the screens its row of tabs opens (Creator Studio, Your work, Your
+// numbers, Money, Your pitches, the show screens and the rest of
+// /creator/*), so Account no longer lights up for Your work. The people who
+// have it lose My Work, Creator Studio, Your Numbers and Money from the
+// Account menu: those are the Dashboard's own tabs
+// (components/dashboard/DashboardTabs.js). An admin then has six tabs;
+// lib/tabBarFit.js decides how the labels fit whatever the phone's width
+// (closer letters, a squarer lit pill, no carets and a wider Dashboard tab,
+// and last a smaller size), so no label is ever cut, wrapped, or left
+// poking out of its pill.
+const onCreatorScreen = (p) => p === '/creator' || p.startsWith('/creator/') || p === '/account/my-work';
+const DASHBOARD_TAB = { label: 'Dashboard', Icon: DashboardIcon, href: DASHBOARD_PATH, match: onCreatorScreen };
+
 const GROUPS = {
   home: {
     label: 'Home',
@@ -64,8 +85,11 @@ const GROUPS = {
     Icon: AccountIcon,
     // A function, like MobileTabBar.js's: "View profile" only exists once
     // the signed-in viewer's own profile is known (TopNav's cache).
-    items: ({ profileHref, role }) => [
-      { href: '/account', label: 'Settings / Account' },
+    items: ({ profileHref, role, hasDashboard }) => [
+      // Signed out, this row is the bar's way to the sign-in card: a
+      // creator who signs in from it lands on the Dashboard
+      // (components/dashboard/useSignInLanding.js).
+      { href: role.isSignedIn ? '/account' : `/account?${GENERAL_SIGN_IN}`, label: 'Settings / Account' },
       ...(profileHref ? [{ href: profileHref, label: 'View profile' }] : []),
       // The account hub's screens (option B, 2026-10-29).
       { href: '/account/membership', label: 'Membership' },
@@ -77,14 +101,17 @@ const GROUPS = {
       // The Account screen's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
       { href: '/stream', label: 'Continue Watching' },
-      { href: '/account/my-work', label: 'My Work' },
+      // My Work, Creator Studio, Your Numbers and Money: the Dashboard's
+      // tabs for the people who have the Dashboard tab (2026-11-14).
+      ...(hasDashboard ? [] : [{ href: '/account/my-work', label: 'My Work' }]),
       { href: '/locations/mine', label: 'My locations' },
-      ...(role.isCreator || role.isAdmin ? [{ href: '/creator', label: 'Creator Studio' }] : []),
-      ...(role.isCreator || role.canAccessAdmin ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
-      ...(role.isCreator || role.isAdmin ? [{ href: '/creator/money', label: 'Money' }] : []),
+      ...(!hasDashboard && (role.isCreator || role.isAdmin) ? [{ href: '/creator', label: 'Creator Studio' }] : []),
+      ...(!hasDashboard && (role.isCreator || role.canAccessAdmin) ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
+      ...(!hasDashboard && (role.isCreator || role.isAdmin) ? [{ href: '/creator/money', label: 'Money' }] : []),
       ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ],
-    match: (p) => p.startsWith('/account') || p.startsWith('/messages')
+    // Your work lights the Dashboard tab for the people who have it.
+    match: (p, { hasDashboard } = {}) => (p.startsWith('/account') && !(hasDashboard && p === '/account/my-work')) || p.startsWith('/messages')
   }
 };
 
@@ -105,7 +132,7 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
-  const { height: windowHeight } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight, fontScale } = useWindowDimensions();
   const [openKey, setOpenKey] = useState(null);
   // Measured layouts, used to center the drop-up over the tab that opened
   // it (same approach as MobileTabBar.js's useLayoutEffect).
@@ -114,7 +141,17 @@ export default function BottomNav() {
   const [dropupWidth, setDropupWidth] = useState(0);
   const anim = useRef(new Animated.Value(0)).current;
   const role = useAdminRole();
-  const groups = role.canAccessAdmin ? { ...GROUPS, admin: ADMIN_GROUP } : GROUPS;
+  const hasDashboard = seesDashboard(role);
+  // Left to right: Home, Discover, Watch, Dashboard (creators and the
+  // team), Account, Admin (the team).
+  const groups = {
+    home: GROUPS.home,
+    discover: GROUPS.discover,
+    watch: GROUPS.watch,
+    ...(hasDashboard ? { dashboard: DASHBOARD_TAB } : {}),
+    account: GROUPS.account,
+    ...(role.canAccessAdmin ? { admin: ADMIN_GROUP } : {})
+  };
   // Unread conversations: a dot on the Account tab and a count on the
   // Messages row (the website's header badge).
   const unreadMessages = useUnreadMessages();
@@ -142,8 +179,23 @@ export default function BottomNav() {
     setOpenKey(null);
     router.push(href);
   }
+  // A tab that is a link (the Dashboard): straight to its screen, and
+  // nothing when that screen is already the one showing.
+  function goTab(href) {
+    setOpenKey(null);
+    if (pathname !== href) router.push(href);
+  }
 
   const openGroup = openKey ? groups[openKey] : null;
+  // How the labels fit this bar on this phone (lib/tabBarFit.js): one size
+  // and spacing for all of them, whether the carets show, how round the lit
+  // pill is, and the share of the bar a tab that is a link (the Dashboard,
+  // the longest word) takes.
+  const fit = tabBarFit({
+    barWidth: barLayout ? barLayout.width : windowWidth - 32,
+    tabs: Object.entries(groups).map(([key, group]) => ({ text: group.label, caret: key !== 'discover' && !group.href, long: Boolean(group.href) })),
+    fontScale
+  });
 
   let dropupLeft = 0;
   const item = openKey ? itemLayouts[openKey] : null;
@@ -191,7 +243,7 @@ export default function BottomNav() {
           >
             <ScrollView style={{ maxHeight: dropupMaxHeight }} keyboardShouldPersistTaps="handled">
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
-            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads }) : openGroup.items).map((entry) => (
+            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads, hasDashboard }) : openGroup.items).map((entry) => (
               <Pressable
                 key={entry.href}
                 style={({ pressed }) => [styles.dropupItem, entry.glyph && styles.dropupItemRow, pressed && styles.dropupItemPressed]}
@@ -210,27 +262,48 @@ export default function BottomNav() {
         )}
         <View style={styles.bar} onLayout={(e) => setBarLayout(e.nativeEvent.layout)}>
           {Object.entries(groups).map(([key, group]) => {
-            const active = group.match(pathname);
+            const active = group.match(pathname, { hasDashboard });
             const isDiscover = key === 'discover';
+            // A tab with an address of its own is a link, not a menu.
+            const isLink = Boolean(group.href);
             const tint = active ? colors.onBrass : isDiscover ? colors.sky : colors.inkDim;
             const Icon = group.Icon;
             return (
               <View
                 key={key}
-                style={styles.itemSlot}
+                style={[styles.itemSlot, isLink && fit.share !== 1 && { flex: fit.share }]}
                 onLayout={(e) => {
                   const { x, width } = e.nativeEvent.layout;
                   setItemLayouts((prev) => ({ ...prev, [key]: { x, width } }));
                 }}
               >
-                <Pressable style={[styles.item, active && styles.itemActive]} onPress={() => toggle(key)}>
+                <Pressable
+                  style={[styles.item, !fit.round && styles.itemSquarer, active && styles.itemActive]}
+                  onPress={() => (isLink ? goTab(group.href) : toggle(key))}
+                  accessibilityRole={isLink ? 'link' : undefined}
+                  accessibilityLabel={isLink ? group.label : undefined}
+                  accessibilityState={isLink ? { selected: active } : undefined}
+                >
                   <View>
                     <Icon size={20} color={tint} />
                     {key === 'account' && unreadMessages > 0 ? <View style={styles.badgeDot} /> : null}
                   </View>
                   <View style={styles.labelRow}>
-                    <Text style={[styles.label, { color: tint }]}>{group.label}</Text>
-                    {isDiscover ? null : <CaretUpIcon size={7} color={tint} />}
+                    {/* The size comes from tabBarFit, in real points (it has
+                        the phone's text-size setting already, so scaling is
+                        off here); adjustsFontSizeToFit is the net under it
+                        (a fallback font is wider), so a label is shrunk,
+                        never cut or wrapped. */}
+                    <Text
+                      style={[styles.label, { color: tint, fontSize: fit.size, letterSpacing: fit.spacing }]}
+                      allowFontScaling={false}
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.6}
+                    >
+                      {group.label}
+                    </Text>
+                    {isDiscover || isLink || !fit.carets ? null : <CaretUpIcon size={7} color={tint} />}
                   </View>
                 </Pressable>
               </View>
@@ -261,10 +334,15 @@ const styles = StyleSheet.create({
   },
   itemSlot: { flex: 1 },
   item: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center', gap: 3, borderRadius: 999, paddingVertical: 4 },
+  // On a tight bar the lit pill's corners are squarer, so its round ends
+  // don't take the room the label needs (lib/tabBarFit.js).
+  itemSquarer: { borderRadius: SQUARE_RADIUS },
   itemActive: { backgroundColor: colors.brass },
-  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 3 },
+  labelRow: { flexDirection: 'row', alignItems: 'center', gap: 3, maxWidth: '100%' },
   badgeDot: { position: 'absolute', top: -2, right: -4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.brass, borderWidth: 1, borderColor: colors.barBackground },
-  label: { fontFamily: fonts.mono, fontSize: 8.3, letterSpacing: 0.8, textTransform: 'uppercase' },
+  // The size and spacing here are the bar's when there is room; the render
+  // sets both from tabBarFit.
+  label: { fontFamily: fonts.mono, fontSize: 8.3, letterSpacing: 0.8, textTransform: 'uppercase', flexShrink: 1 },
   dropup: {
     position: 'absolute',
     backgroundColor: colors.dropupBackground,
