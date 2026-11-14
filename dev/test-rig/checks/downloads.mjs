@@ -386,7 +386,7 @@ async function whoMayDownload(ctx) {
   r = await start(premium, ID.film, P.premium);
   ok('Premium, the first ask: 202 while Cloudflare makes the file', r.status === 202 && r.json.ready === false && r.json.percent === 0, brief(r));
   const waiting = copy(premium, P.premium, ID.film);
-  ok('…the title holds its place on record from this first ask, without a date yet', activeCount(premium, P.premium) === 1 && waiting.status === 'active' && waiting.licensed_until === null && waiting.basis === 'member', waiting);
+  ok('…the title holds its place on record from this first ask, without a date yet', activeCount(premium, P.premium) === 1 && Boolean(waiting) && waiting.status === 'active' && waiting.licensed_until === null && waiting.basis === 'member', waiting);
   r = await get(`/api/downloads?deviceId=${P.premium}`, premium);
   ok('…it isn’t a copy yet: the list has the phone, with nothing on it', r.status === 200 && r.json.items.length === 0 && r.json.devices.length === 1 && r.json.devices[0].count === 0 && r.json.devices[0].current === true, brief(r));
   r = await sync(premium, P.premium, []);
@@ -491,12 +491,12 @@ async function theLink(ctx) {
 
   await cloudflare(`/__downloads?uid=${UID.slow}&state=inprogress&percent=40`, { method: 'POST' });
   r = await start(premium, ID.slow, P.premium);
-  ok('Cloudflare still making the file: 202 with its percent, the title waiting without a date', r.status === 202 && r.json.ready === false && r.json.percent === 40 && copy(premium, P.premium, ID.slow).licensed_until === null, brief(r));
+  ok('Cloudflare still making the file: 202 with its percent, the title waiting without a date', r.status === 202 && r.json.ready === false && r.json.percent === 40 && (copy(premium, P.premium, ID.slow) || {}).licensed_until === null, brief(r));
   await cloudflare(`/__downloads?uid=${UID.slow}&state=ready`, { method: 'POST' });
   r = await start(premium, ID.slow, P.premium);
   ok('…ready: 200', r.status === 200 && r.json.ready === true && claimsOf(r.json.url.split('/')[3]).sub === UID.slow, brief(r));
   r = await start(premium, ID.gone, P.premium);
-  ok('a video Cloudflare doesn’t have: 503 cloudflare, in plain words, no copy and no date', r.status === 503 && r.json.code === 'cloudflare' && r.json.error === START_WORDS.cloudflare && copy(premium, P.premium, ID.gone).licensed_until === null && !copiesOn(premium, P.premium).includes(ID.gone), brief(r));
+  ok('a video Cloudflare doesn’t have: 503 cloudflare, in plain words, no copy and no date', r.status === 503 && r.json.code === 'cloudflare' && r.json.error === START_WORDS.cloudflare && (copy(premium, P.premium, ID.gone) || {}).licensed_until === null && !copiesOn(premium, P.premium).includes(ID.gone), brief(r));
 
   // A video that never demanded signed links: protected before its file is made.
   const stateOf = async (uid) => ((await cloudflare('/__state')).json.videos.find((x) => x.uid === uid) || {});
@@ -701,18 +701,18 @@ async function firstAsk() {
   ok('the waiting title isn’t among the copies; the phone is listed with nothing on it', r.status === 200 && r.json.items.length === 0 && r.json.devices.length === 1 && r.json.devices[0].deviceId === W && r.json.devices[0].count === 0, brief(r));
   await cloudflare(`/__downloads?uid=${UID.wait}&state=ready`, { method: 'POST' });
   r = await start(who, ID.wait, W);
-  const dated = copy(who, W, ID.wait);
-  ok('the file ready: 200 with its link and date on the same row (nothing more to count)', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string' && dated.licensed_until !== null && near(dated.licensed_until, r.json.licensedUntil, 1000) && pairRows === 1 && countedThisHour(who) === NEW_COPIES_PER_HOUR, brief(r));
+  const dated = copy(who, W, ID.wait) || {};
+  ok('the file ready: 200 with its link and date on the same row (nothing more to count)', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string' && Boolean(dated.licensed_until) && near(dated.licensed_until, r.json.licensedUntil, 1000) && pairRows === 1 && countedThisHour(who) === NEW_COPIES_PER_HOUR, brief(r));
   // A waiting title the phone stopped asking for is freed by a check-in.
   await cloudflare(`/__downloads?uid=${UID.wait}&state=inprogress&percent=10`, { method: 'POST' });
   const who2 = await teamAdmin('dlask2');
   const W2 = phone('wb');
   await start(who2, ID.wait, W2);
   r = await sync(who2, W2, []);
-  const kept = copy(who2, W2, ID.wait);
+  const kept = copy(who2, W2, ID.wait) || {};
   sql(`update public.downloads set renewed_at = now() - interval '3 minutes' where user_id = ${q(who2.id)} and episode_id = ${q(ID.wait)}`);
   const r2 = await sync(who2, W2, []);
-  ok('a waiting title is spared by a check-in while the phone keeps asking, and freed once it has stopped for a couple of minutes', r.status === 200 && kept.status === 'active' && r2.status === 200 && copy(who2, W2, ID.wait).status === 'removed', `${kept.status} → ${copy(who2, W2, ID.wait).status}`);
+  ok('a waiting title is spared by a check-in while the phone keeps asking, and freed once it has stopped for a couple of minutes', r.status === 200 && kept.status === 'active' && r2.status === 200 && (copy(who2, W2, ID.wait) || {}).status === 'removed', `${kept.status} → ${(copy(who2, W2, ID.wait) || {}).status}`);
   await cloudflare(`/__downloads?uid=${UID.wait}&state=ready`, { method: 'POST' });
 }
 
