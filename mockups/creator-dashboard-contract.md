@@ -83,3 +83,24 @@ Mirror the phone board (the signed-off HTML is `DashboardPhone.dc.html` in the s
 ## 7. Done means
 
 `node scripts/test-creator-dashboard.mjs`, `node scripts/test-creator-money.mjs`, every other `scripts/test-*.mjs`, `npm run check:refs`, `npm run lint`, `next build`, both app exports; the rig check `dev/test-rig/checks/creator-dashboard.mjs` (a creator, an admin, a sub-admin, a viewer, signed out; 390 and 1280; the tab, the sections, Make it public, the month picker, the sign-in landing). Not on a device.
+
+## 8. As built (2026-11-14)
+
+What changed between this agreement and the code, and the choices made on the way.
+
+**The website**
+
+- The page is `/creator/dashboard`, under `/creator` so the rules that already keep creator pages private (no ads script, robots, the tab bar's lit tab) cover it without a new entry.
+- On a wide screen the cards sit in two columns that each flow on their own: Your titles, Views a day and Latest on the left; Needs you, Money this month, the six months, the pitch and the link on the right. The mockup had three full-width rows under the titles, which left a hole beside whichever of the first two columns was shorter. Under 1101px it is one column in the phone's order. The page picks the structure (`useWide`, before the first paint), so the reading order is the order on screen.
+- The first number's label is "Earned this month" ("Earned in October" for another month). "· all lanes" made it wrap to two lines beside three one-line labels; the money card under it shows the lanes.
+- The mockup's "Ad share so far" is "Ad share", the amount credited in the month, with the line "Ad share for a month's plays is credited on the 1st of the next month." The site works ad share out once a month; an estimate of the running month would have made the Dashboard's total differ from the money page's.
+- The six months show the amount on the month so far only; the other bars show theirs under the pointer or on focus.
+- Latest is the money page's newest lines plus titles approved or turned down in the last 30 days. "A member picked you" is not an event the site records with a date, so it is not in the list (the Supporters number counts picks).
+- A draft row says where its file stands in the hub's words ("The upload stopped", "The file is processing", "Ready to send", "No file yet"): the progress bar in the mockup would need the upload to be running in this browser.
+- A sub-admin who is not a creator: the titles, drafts, invites, money and numbers routes all refuse them (the numbers page itself sends them to Stream), so their tabs row is empty and the page is the head and `DASH_WORDS.teamOnly`. `dashboardTabs` gives Numbers to creators and admins only. The old Account-menu row "Your Numbers" was offered to sub-admins and bounced them; it is gone with the other two.
+- Where a sign-in lands is decided by `/signed-in`, which only the account page's sign-in card and the beta door use. A sign-in started by a button in the middle of something (a tip, a purchase, backing a pitch, answering a call) returns to that page as before, so the action can finish. This is a reading of "a creator should be sent there"; Jose to confirm.
+- Not on the Dashboard, and still only in Creator Studio: the type pills under Submit a title, Accept / Not now on an invite to be paid (Needs you has a row that opens it), the "Paid to you" list with Stop getting it, and Discard for a draft. If the Dashboard replaces Creator Studio these four need a home first; then `/creator` forwards to the Dashboard and `dashboardTabs(role, { studio: false })` drops the tab.
+
+**The rig**
+
+- `dev/test-rig/bin/upstash.mjs` is an opt-in stand-in for Upstash that keeps only the view-counting keys, so views can be real numbers in a check without the catalogue being cached or anyone being rate limited. `checks/creator-dashboard.mjs` checks whichever it finds.

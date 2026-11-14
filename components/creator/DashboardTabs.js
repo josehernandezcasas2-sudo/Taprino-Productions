@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { dashboardTabs } from '../../lib/creatorDashboardRules';
 
@@ -8,23 +7,10 @@ import { dashboardTabs } from '../../lib/creatorDashboardRules';
 // Which tabs a person gets is lib/creatorDashboardRules.js dashboardTabs;
 // someone with only Overview (a host on the Money page) gets no row.
 //
-// A page passes what it already knows (isCreator, isAdmin). Whether a
-// sub-admin is looking is asked from /api/my-role only when neither is
-// true, so a creator's page makes no extra request.
-export default function DashboardTabs({ current, isCreator = false, isAdmin = false, canAccessAdmin = null }) {
-  const [team, setTeam] = useState(canAccessAdmin === true);
-  const known = canAccessAdmin != null || isCreator || isAdmin;
-  useEffect(() => {
-    if (known) return undefined;
-    let on = true;
-    fetch('/api/my-role')
-      .then((r) => r.json())
-      .then((d) => { if (on) setTeam(Boolean(d && d.canAccessAdmin)); })
-      .catch(() => {});
-    return () => { on = false; };
-  }, [known]);
-
-  const tabs = dashboardTabs({ isCreator, isAdmin, canAccessAdmin: canAccessAdmin != null ? canAccessAdmin : team });
+// A page passes what it already knows (isCreator, isAdmin), so the row
+// costs no request.
+export default function DashboardTabs({ current, isCreator = false, isAdmin = false, canAccessAdmin = false }) {
+  const tabs = dashboardTabs({ isCreator, isAdmin, canAccessAdmin });
   if (tabs.length < 2) return null;
   return (
     <nav className="dash-tabs" aria-label="Creator pages">

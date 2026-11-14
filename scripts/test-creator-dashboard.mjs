@@ -30,10 +30,11 @@ t('who sees the tab: creators and the team', () => {
   assert.equal(R.canAddTitles({ isCreator: true }), true);
 });
 
-t('the tabs: a creator gets them all, a sub-admin Overview and Numbers', () => {
+t('the tabs: a creator gets them all, a sub-admin Overview alone', () => {
   assert.deepEqual(R.dashboardTabs({ isCreator: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches', 'studio']);
   assert.deepEqual(R.dashboardTabs({ isCreator: true }, { studio: false }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches']);
-  assert.deepEqual(R.dashboardTabs({ canAccessAdmin: true }).map((x) => x.key), ['overview', 'numbers']);
+  assert.deepEqual(R.dashboardTabs({ canAccessAdmin: true }).map((x) => x.key), ['overview']);
+  assert.deepEqual(R.dashboardTabs({ isAdmin: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches', 'studio']);
   assert.equal(R.dashboardTabs({ isCreator: true })[0].href, '/creator/dashboard');
   assert.deepEqual(R.dashboardTabs({}).map((x) => x.key), ['overview']);
 });

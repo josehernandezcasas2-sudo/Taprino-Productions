@@ -59,6 +59,7 @@ The checkout needs its `node_modules` (a worktree can symlink them:
 | 54323 | fake Clerk |
 | 54324 | fake Cloudflare Stream (API and delivery host) |
 | 54325 / 54326 | PostgREST / its admin port (`/ready`) |
+| 54327 | the opt-in view-count stand-in (`bin/upstash.mjs`; not started by `start.sh`) |
 | 54329 | Postgres (`psql -h 127.0.0.1 -p 54329 -U postgres`, trust auth) |
 
 ## Accounts
@@ -378,6 +379,27 @@ Not covered: real video. The addresses the app hands a browser are
 plays in a browser; the manifest the fake serves has no segments. No
 watermarks, captions, clipping or webhooks.
 
+### View counts (:54327, opt-in)
+
+The rig runs with Upstash blank, so every view count is zero and the numbers
+pages say view counting isn't switched on. `bin/upstash.mjs` is a stand-in
+for Upstash's REST API that keeps **only the view-counting keys**
+(`episode_views`, `episode_views:<day>`, `episode_watch_seconds`,
+`creator_views`) in memory; every other Redis call answers as an empty
+Redis would and stores nothing, so the catalogue is never cached and nobody
+is ever rate limited. `start.sh` doesn't start it. To have real view numbers:
+
+```bash
+node dev/test-rig/bin/upstash.mjs &
+RIG_APP_ENV_UPSTASH_REDIS_REST_URL=http://127.0.0.1:54327 \
+RIG_APP_ENV_UPSTASH_REDIS_REST_TOKEN=rig bash dev/test-rig/start.sh
+```
+
+`POST /__seed { zsets: { key: { member: score } }, hashes: { key: { field: n } } }`,
+`POST /__reset`, `GET /__state`. `checks/creator-dashboard.mjs` seeds it when
+it is there and checks whichever it finds (views as numbers, or the "not
+switched on" words).
+
 ## The smoke check
 
 `node dev/test-rig/smoke.mjs [--http-only|--browser-only]`: the main pages
@@ -396,8 +418,8 @@ the podcast preview as the app calls them, the moderation cleanup, money
 through the fakes, stuck payee invites, the money edge cases, web push,
 podcast audio and the crawler refusal, notes and descriptions waiting for
 review, season art, sales tax, the flashing-lights card, the round's
-small fixes, downloads in the app before and after 123); see
-`checks/README.md`.
+small fixes, downloads in the app before and after 123, the creator's
+Dashboard); see `checks/README.md`.
 
 ## Things in the app that reach outside the rig
 

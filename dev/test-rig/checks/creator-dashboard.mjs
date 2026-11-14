@@ -156,7 +156,10 @@ const json = async (pathname, who) => {
 
 await runCheck('creator-dashboard', async () => {
   cleanup();
-  const tracked = await upstashUp();
+  // Real view numbers need both: the stand-in running, and the app
+  // started pointed at it (the numbers route says whether it counts).
+  const counting = (await json('/api/creator/analytics?days=30', MARA)).body.tracking === true;
+  const tracked = counting && (await upstashUp());
   const before = (await json('/api/creator/money', MARA)).body;
   const baseline = Object.fromEntries(Object.keys(ADDED).map((k) => [k, before.lanes ? before.lanes[k].monthCents : 0]));
   const baseTotal = before.top ? before.top.monthCents : 0;
@@ -462,7 +465,7 @@ await runCheck('creator-dashboard', async () => {
       await team.page.waitForTimeout(1500);
       ok('a sub-admin is told the account has no titles of its own', /isn’t a creator account/.test(await team.page.locator('.dash-flash.quiet').innerText()));
       ok('…with no Submit button and no section drawn as zeros', (await team.page.locator('.dash-head-acts').count()) === 0 && (await team.page.locator('.dash-titles, .dash-money, .dash-needs, .dash-latest').count()) === 0 && !(await team.page.locator('.dash').innerText()).includes('$0.00'));
-      ok('…the tabs are Overview and Numbers', (await team.page.locator('.dash-tab').allInnerTexts()).join('|') === 'Overview|Numbers');
+      ok('…and no row of tabs: the other creator pages would send them away', (await team.page.locator('.dash-tabs').count()) === 0);
       ok('…and the tab bar has the Dashboard tab', (await team.page.locator('.tabbar .tabbar-dash').count()) === 1);
       ok('no page errors for a sub-admin', team.errors.length === 0, team.errors.join(' | '));
       await team.ctx.close();
