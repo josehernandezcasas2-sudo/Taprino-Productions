@@ -100,3 +100,53 @@ Dependencies are in `mobile/package.json` already: `expo-file-system` and `expo-
 ## 5. What can't be proved here
 
 No device: local `file://` playback in expo-video (it works in the source, the docs don't promise it), whether a paused download resumes or restarts against Cloudflare, background behaviour, how big Cloudflare's MP4 really is, and whether iOS clears the cache in practice. Say so in the hand-back; don't claim them.
+
+## 6. As built (2026-11-14) — where the code departs from or adds to the above
+
+Both halves were built to this file, reviewed independently, and fixed; these are the shapes as they are now. Where this section and an earlier one disagree, this one is right.
+
+**Dates.** Every date on every route is an ISO 8601 string (`expiresAt`, `licensedUntil`, `serverTime`, `paidThrough`, `endedAt`, `keepUntil`, `lastSeenAt`, `changedAt`, `lockedAt`).
+
+**`POST /api/downloads/start`**
+- 200 also carries `serverTime` (the clock the date was worked out on) and `item.hasFlashingLights`.
+- Asking again for a title the phone already holds is free: no limit, a fresh link, a renewed date. The app re-asks while it gets 202s, after a restart, when a link is about to run out and after a failed transfer.
+- **A new title is counted at its first ask**: a row is written before Cloudflare is asked, with no date (`licensed_until` null), and gets its date with the link. It holds one of the phone's 25 places while it waits. New copies are **30 an hour and 60 a day per account**; the route's own ceiling is 600 asks an hour. A refusal comes at the first ask, never at a later poll.
+- Both limits are asked again after the row is written (so racing requests can't pass them); a row taken back at a limit is `revoked` / `revoke_reason: 'limit'`.
+- 429 `{ code: 'rate', limit: 'hour' | 'day' | 'requests', retryAfter }` with a `Retry-After` header.
+- 403 `{ code: 'app-only' }` on `start`, `sync` and `remove` for anything carrying an `Origin` or `Sec-Fetch-Site` header or signed in by cookie rather than `Authorization: Bearer`. A speed bump, not a lock: a member can still fetch a copy with their own token outside the app, and the public words say so.
+- The playback gate's own 403s pass through with their line and no `code`.
+- 503 `{ code: 'unavailable' }` whenever something couldn't be read: the switch, the plan (Stripe, Clerk, the comped list, a promo's date), purchases, a suspension. Never "no plan" on a guess.
+- The video is made to demand signed links before its MP4 is made.
+
+**`POST /api/downloads/sync`**
+- `have` must be an array (400 `{ code: 'have' }` otherwise). `[]` frees every row of the phone. With a list, an unlisted row is freed unless it was licensed in the last 120 seconds; a title still waiting for its file is freed after 120 seconds without a poll.
+- `reason` on a revoked item: `title` | `refund` | `device` | `removed`.
+- A phone removed elsewhere: its rows are `revoked` / `device`, and `deviceRemoved: true` comes back until that phone's next successful `start`.
+- The app does not check in while the phone holds nothing, so a phone becomes one of the two only at its first `start`.
+
+**Phones.** `devices` lists phones holding at least one copy, plus the asking phone once it is on record; only those count toward the two. `GET /api/downloads` leaves titles still waiting for their file out of `items` and `count`, and answers 503 when the plan can't be read. `POST /api/downloads/devices { remove }` answers `{ ok: true, devices }`.
+
+**The episode payload.** `download` in a preview is `{ state: 'hidden', reason: 'preview' }`.
+
+**The creator switch.** Not in `FIELD_POLICY` (`lib/showRules.js` is shared word for word with the app): the server computes `policy.downloadsAllowed = { mode, line }` in `lib/downloadSiteRules.js`, and leaves it out for a podcast (a PATCH sending the field for a podcast is 400 `{ code: 'kind' }`). `GET /api/show/episode/<id>` answers `episode` and `policy` at the top level; they sit under `view` only in the PATCH answer. Films and shorts get the box in Your work's two edit modals on the website and in the app's Your work sheet; `/api/creator/my-submissions` rows carry `downloadsAllowed` and `downloadsAllowedReady`.
+
+**Admin → Downloads.** GET adds `switch.readFailed`; `changedBy` / `lockedBy` are emails; the audit `details` is a JSON string `{ actor, words, field, from, to }`; extra codes 400 `one` / `value`, 409 `changed`. The page and the route read the settings row fresh, never a cached copy. The audit line and the alert mail are best effort, like the Security switches.
+
+**Migration 123** also has check constraints (the device id's shape, the platform, `basis`, `status`) and a third index, `downloads_user_created_idx (user_id, created_at desc)`.
+
+**Account context.** `getAccountContext` gained `paidThrough` (ms) and `billingKnown` (false when Stripe, Clerk, the comped list or the promo read failed).
+
+**Account deletion** is done by hand; `supabase/delete_account_downloads.sql` is its downloads step.
+
+**The app.**
+- The wait on Cloudflare: every 5 s for the first minute, 15 s to five minutes, 30 s to twenty.
+- Dates are kept in the phone's own clock: `now + (date − serverTime)` (`onPhoneClock`), so a phone whose clock is wrong plays exactly as long as it should. `paidThrough` and `endedAt` are only shown and stay as sent.
+- The index is `index.json` plus `index.json.tmp` with a save counter; it is only ever replaced by a move, and nothing is swept unless an index was really read or neither file exists.
+- The phone id lives only in the keychain (`WHEN_UNLOCKED_THIS_DEVICE_ONLY`); an index naming an id the keychain doesn't hold is a restored phone and starts fresh.
+- Links live in memory only; a paused transfer's state is a file in the cache.
+- Sign-out: take the token, sign out, and only then delete the files and tell the server; a sign-out that fails deletes nothing.
+- A title whose `start` answers 5xx or 429 steps aside, is retried after 20 s and 60 s, then shows as failed.
+- "Try again" always sends the check-in.
+- The page-open check-in is spaced 30 s; the chip shows the end of the paid month, not the two grace days after it.
+- Films open on their landing, so the Download action is also a pill there.
+- Clerk fails for the whole run when the app starts offline; `DownloadsBoot` runs its loader again (`useClerk().loadHeadlessClerk()`, not in Clerk's typings) once the phone is back.
