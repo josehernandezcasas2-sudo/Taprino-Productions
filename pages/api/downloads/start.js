@@ -12,16 +12,19 @@ import { isTitleId } from '../../../lib/titleIds';
 // Cloudflare.
 //   200 { ready: true, url, expiresAt, basis, licensedUntil, paidThrough,
 //         item: { episodeId, title, kicker, seriesId, seriesName, season,
-//         number, contentType, runtimeSeconds, rating, art, hasCaptions } }
+//         number, contentType, runtimeSeconds, rating, art, hasCaptions,
+//         hasFlashingLights } }
 //   202 { ready: false, percent }   Cloudflare is making the file: ask again
 //   401 signed out · 403 { suspended: true } · 403 the gate's own answers
 //   (age, terms, early screening, plan) · 403 { code: 'off' | 'title' |
 //   'plan' } · 404 · 409 { code: 'titles' } / { code: 'devices', devices }
 //   · 422 { code: 'kind' } · 429 { code: 'rate' } · 503 { code:
 //   'migration-123' | 'cloudflare' | 'unavailable' }
-// Every date is an ISO string. The route may be asked every few seconds
-// while a file is being made (600 an hour per account); links themselves
-// are limited to 60 an hour per account.
+// Every date is an ISO string. Asking again for a title the phone already
+// holds is the same call (never refused by a limit; a fresh link and a
+// renewed date). The route may be asked every few seconds while a file is
+// being made: 600 asks an hour per account, of which at most 60 may make a
+// NEW copy (a 429 means wait, not fail).
 export default async function handler(req, res) {
   try {
     const account = await startDownloadRoute(req, res, { methods: ['POST'], scope: 'downloads-start', perHour: 600 });

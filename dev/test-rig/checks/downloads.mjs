@@ -56,6 +56,8 @@ import { CHECKIN_DAYS, DOWNLOAD_WORDS, GRACE_DAYS, KEEP_AFTER_END_DAYS, LINK_SEC
 import { ADMIN_DOWNLOAD_WORDS, DOWNLOADS_ALLOWED_LABEL, MIGRATION_123_MSG, START_WORDS, SWITCH_CHANGES_PER_HOUR, UNLOCK_WORD } from '../../../lib/downloadSiteRules.js';
 
 const HAS123 = hasColumn('site_settings', 'downloads_enabled');
+// lib/downloads.js NEW_COPIES_PER_HOUR (a server-only file: not imported here).
+const NEW_COPIES = 60;
 const DAY = 86400000;
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
@@ -142,7 +144,7 @@ async function seed() {
   insert('episodes', film(ID.gone, { src: srcOf(UID.gone) }));
   insert('episodes', film(ID.held));
   insert('episodes', film(ID.leaving));
-  insert('episodes', film(ID.teen, { rating: 'TV-14' }));
+  insert('episodes', film(ID.teen, { rating: 'TV-14', has_flashing_lights: true }));
   await cloudflare('/__video', { method: 'POST', body: { uid: UID.open, name: `Check download open ${RUN}`, creator: USERS.mara, duration: 1440, ready: true, requireSignedURLs: false } });
   insert('episodes', film(ID.open, { src: srcOf(UID.open) }));
   insert('series', { id: ID.show, name: `Check download show ${RUN}`, description: 'Downloads in the app.', creator_id: USERS.mara, status: 'approved', kind: 'series', public_at: ago(30) });
@@ -407,8 +409,11 @@ async function theLink(ctx) {
 
   const it = s.item || {};
   ok('the item the app keeps: title, kicker, type, runtime, rating, art', it.episodeId === ID.film && /^Check download/.test(it.title || '') && it.kicker === 'Movie · Drama' && it.contentType === 'movie' && it.runtimeSeconds === 1440 && it.rating === 'TV-PG'
-    && it.seriesId === null && it.seriesName === null && it.season === null && it.number === null && it.hasCaptions === false && Object.prototype.hasOwnProperty.call(it, 'art'), it);
-  let r = await download(premium, IDS.nbS1E1, P.premium);
+    && it.seriesId === null && it.seriesName === null && it.season === null && it.number === null && it.hasCaptions === false && it.hasFlashingLights === false && Object.prototype.hasOwnProperty.call(it, 'art'), it);
+  let r = await download(premium, ID.teen, P.premium);
+  ok('a title marked with flashing lights says so in its item (the warning shows offline too)', r.status === 200 && r.json.item.hasFlashingLights === true && r.json.item.rating === 'TV-14', brief(r));
+  await post('/api/downloads/remove', premium, { deviceId: P.premium, episodeId: ID.teen });
+  r = await download(premium, IDS.nbS1E1, P.premium);
   const ep = (r.json && r.json.item) || {};
   ok('a show’s episode: the show’s name, its season and number, the page’s kicker, a picture to keep', r.status === 200 && ep.seriesId === IDS.nightBus && ep.seriesName === 'Night Bus' && ep.season === 1 && ep.number === 1 && ep.kicker === 'Night Bus · Season 1 · Episode 1' && ep.contentType === 'series' && /^https?:\/\//.test(ep.art || ''), brief(r));
 
@@ -416,10 +421,14 @@ async function theLink(ctx) {
   ok('the copy is on record: active, a member’s, licensed until the answer’s date', row && row.status === 'active' && row.basis === 'member' && near(row.licensed_until, s.licensedUntil, 1000) && row.ended_at === null, row);
   const dev = rows(`select name, platform, removed_at, last_seen_at from public.download_devices where user_id = ${q(premium.id)} and device_id = ${q(P.premium)}`)[0];
   ok('…and so is the phone, with its name and platform', dev && dev.name === 'Check phone' && dev.platform === 'ios' && dev.removed_at === null, dev);
+  await sleep(1100);
   r = await start(premium, ID.film, P.premium, { deviceName: '  <b>Mara’s</b>   iPhone  ', platform: 'iOS' });
   const again = rows(`select count(*)::int as n from public.downloads where user_id = ${q(premium.id)} and device_id = ${q(P.premium)} and episode_id = ${q(ID.film)}`)[0];
   const renamed = rows(`select name from public.download_devices where user_id = ${q(premium.id)} and device_id = ${q(P.premium)}`)[0];
-  ok('asking again (a link ran out): a fresh link, still one row, the phone’s name cleaned', r.status === 200 && r.json.url !== undefined && Number(again.n) === 1 && renamed.name === 'b Mara’s /b iPhone', `${brief(r)} | ${again.n} | ${renamed.name}`);
+  const rowAgain = copy(premium, P.premium, ID.film);
+  ok('asking again (a link ran out, the app restarted): ready, a fresh link, a date, still one row, renewed', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string' && r.json.url !== s.url && Date.parse(r.json.licensedUntil) >= Date.parse(s.licensedUntil)
+    && Number(again.n) === 1 && rowAgain.renewed_at !== row.renewed_at && near(rowAgain.licensed_until, r.json.licensedUntil, 1000), `${brief(r)} | ${again.n} | ${JSON.stringify(rowAgain)}`);
+  ok('…and the phone’s name is cleaned', renamed.name === 'b Mara’s /b iPhone', renamed.name);
 
   await cloudflare(`/__downloads?uid=${UID.slow}&state=inprogress&percent=40`, { method: 'POST' });
   r = await start(premium, ID.slow, P.premium);
@@ -443,6 +452,8 @@ async function theLink(ctx) {
   ok('GET /api/downloads: the plan, the limits, this phone and its copies', r.status === 200 && r.json.enabled === true && r.json.plan.carries === true && r.json.plan.tier === 'premium'
     && r.json.limits.titles === MAX_TITLES_PER_DEVICE && r.json.limits.devices === MAX_DEVICES && mine.length === 1 && mine[0].deviceId === P.premium && mine[0].current === true && mine[0].count === r.json.items.length
     && r.json.items.some((x) => x.episodeId === ID.film && x.basis === 'member' && near(x.licensedUntil, s.licensedUntil, 1000) && x.endedAt === null), brief(r));
+  const shape = (d) => Object.keys(d || {}).sort().join(',');
+  ok('…each phone is { deviceId, name, platform, lastSeenAt, count, current }', shape(mine[0]) === 'count,current,deviceId,lastSeenAt,name,platform', shape(mine[0]));
   r = await get('/api/downloads', premium);
   ok('…without a phone id (the website): the phones, no copies', r.status === 200 && r.json.items.length === 0 && r.json.devices.length === 1 && r.json.devices[0].current === false, brief(r));
   r = await get('/api/downloads?deviceId=nope', premium);
@@ -529,8 +540,10 @@ async function theLimits(ctx) {
     && told.some((d) => d.deviceId === A && d.name === 'Phone A' && d.count === MAX_TITLES_PER_DEVICE && d.platform === 'ios' && d.current === false && Boolean(d.lastSeenAt))
     && told.some((d) => d.deviceId === B && d.name === 'Phone B' && d.count === 1 && d.platform === 'android'), brief(r));
   ok('…and the third phone isn’t on record', rows(`select 1 from public.download_devices where user_id = ${q(who.id)} and device_id = ${q(C)}`).length === 0);
+  const keys = (d) => Object.keys(d || {}).sort().join(',');
   r = await get('/api/downloads/devices', who);
-  ok('GET /api/downloads/devices lists the two', r.status === 200 && r.json.devices.length === 2 && r.json.devices.every((d) => d.current === false), brief(r));
+  ok('GET /api/downloads/devices lists the two, in the same shape as the 409', r.status === 200 && r.json.devices.length === 2 && r.json.devices.every((d) => d.current === false)
+    && [...told, ...r.json.devices].every((d) => keys(d) === 'count,current,deviceId,lastSeenAt,name,platform'), brief(r));
 
   r = await post('/api/downloads/devices', who, { remove: B });
   ok('removing a phone: { ok, devices } with the one left', r.status === 200 && r.json.ok === true && r.json.devices.length === 1 && r.json.devices[0].deviceId === A, brief(r));
@@ -549,19 +562,65 @@ async function theLimits(ctx) {
   ctx.limits = { who, A, B, C, start };
 }
 
+// ---- asking again, and how many new copies an hour ---------------------------------------------
+async function askingAgain() {
+  section(`Asking again, and ${NEW_COPIES} new copies an hour`);
+  const who = await teamAdmin('dlagain');
+  const R = phone('ag');
+  const go = (id) => start(who, id, R);
+  const drop = (id) => post('/api/downloads/remove', who, { deviceId: R, episodeId: id });
+  let r = await go(LIMIT[0]);
+  const first = r.json || {};
+  let bad = 0;
+  const links = new Set([first.url]);
+  for (let i = 0; i < NEW_COPIES + 4; i += 1) {
+    const x = await go(LIMIT[0]);
+    if (x.status !== 200 || x.json.ready !== true || !x.json.url || !x.json.licensedUntil) bad += 1;
+    else links.add(x.json.url);
+  }
+  ok(`${NEW_COPIES + 5} asks in a row for a title the phone holds (202 polls, restarts, a link running out): every one 200 with a link and a date, never refused`, r.status === 200 && bad === 0 && activeCount(who, R) === 1 && links.size > 1, `${bad} bad, ${links.size} links`);
+  let failed = 0;
+  for (const id of LIMIT.slice(1, MAX_TITLES_PER_DEVICE)) if ((await go(id)).status !== 200) failed += 1;
+  r = await go(LIMIT[MAX_TITLES_PER_DEVICE - 1]);
+  ok('a full phone asking again for one of its titles: still 200', failed === 0 && activeCount(who, R) === MAX_TITLES_PER_DEVICE && r.status === 200 && r.json.ready === true, `${failed} | ${brief(r)}`);
+  // New copies: 25 so far; make it 60, then one more.
+  let made = MAX_TITLES_PER_DEVICE;
+  let refusedEarly = 0;
+  while (made < NEW_COPIES) {
+    const batch = LIMIT.slice(0, Math.min(MAX_TITLES_PER_DEVICE, NEW_COPIES - made));
+    for (const id of batch) await drop(id);
+    for (const id of batch) {
+      if ((await go(id)).status !== 200) refusedEarly += 1;
+      made += 1;
+    }
+  }
+  ok(`${NEW_COPIES} new copies within the hour all go through`, refusedEarly === 0 && activeCount(who, R) === MAX_TITLES_PER_DEVICE, refusedEarly);
+  await drop(LIMIT[0]);
+  r = await go(LIMIT[0]);
+  ok(`the ${NEW_COPIES + 1}st new copy: 429 rate with Retry-After (wait, not fail), nothing on record`, r.status === 429 && r.json.code === 'rate' && Number(r.headers.get('retry-after')) > 0 && copy(who, R, LIMIT[0]).status === 'removed', brief(r));
+  r = await go(LIMIT[1]);
+  ok('…while a title the phone already holds still gets its fresh link', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string', brief(r));
+}
+
 // ---- the check-in ---------------------------------------------------------------------------
 async function theCheckIn(ctx) {
   section('The check-in');
   const { admin, premium, sponsor, buyer, phones: P } = ctx;
 
   // A copy the phone no longer lists.
-  let r = await sync(sponsor, P.sponsor, []);
-  ok('a copy just downloaded that the phone doesn’t list yet stays on record (a check-in mid-download)', r.status === 200 && r.json.items.length === 0 && copy(sponsor, P.sponsor, ID.film).status === 'active', brief(r));
-  sql(`update public.downloads set renewed_at = now() - interval '7 hours', created_at = now() - interval '7 hours' where user_id = ${q(sponsor.id)} and episode_id = ${q(ID.film)}`);
+  await download(sponsor, ID.prem, P.sponsor);
+  await start(sponsor, ID.film, P.sponsor);
+  let r = await sync(sponsor, P.sponsor, [ID.prem]);
+  ok('a copy licensed a moment ago that this check-in doesn’t list keeps its row (its start’s answer may still be on the way)', r.status === 200 && r.json.items.length === 1 && item(r, ID.prem).state === 'ok' && copy(sponsor, P.sponsor, ID.film).status === 'active', brief(r));
+  sql(`update public.downloads set renewed_at = now() - interval '3 minutes', created_at = now() - interval '3 minutes' where user_id = ${q(sponsor.id)} and episode_id = ${q(ID.film)}`);
+  r = await sync(sponsor, P.sponsor, [ID.prem]);
+  ok('…a couple of minutes on, the copy it doesn’t list is removed and its slot freed; the listed one is renewed', r.status === 200 && copy(sponsor, P.sponsor, ID.film).status === 'removed' && copy(sponsor, P.sponsor, ID.prem).status === 'active' && activeCount(sponsor, P.sponsor) === 1, copy(sponsor, P.sponsor, ID.film));
   r = await sync(sponsor, P.sponsor, []);
-  ok('…once a link’s life has passed, it is removed and the slot is free', r.status === 200 && copy(sponsor, P.sponsor, ID.film).status === 'removed', copy(sponsor, P.sponsor, ID.film));
+  ok('an empty list (the phone lost everything, a reinstall): every copy removed at once, however fresh', r.status === 200 && r.json.items.length === 0 && r.json.deviceRemoved === false && copy(sponsor, P.sponsor, ID.prem).status === 'removed' && activeCount(sponsor, P.sponsor) === 0, brief(r));
+  r = await get(`/api/downloads?deviceId=${P.sponsor}`, sponsor);
+  ok('…and the phone’s places are free', r.status === 200 && r.json.items.length === 0, brief(r));
   r = await sync(sponsor, P.sponsor, [ID.film, `ck-dl-never-${RUN}`]);
-  ok('a title the phone holds with no copy on record: revoked (removed)', r.status === 200 && item(r, ID.film).state === 'revoked' && item(r, ID.film).reason === 'removed' && item(r, `ck-dl-never-${RUN}`).reason === 'removed' && r.json.deviceRemoved === false, brief(r));
+  ok('a title the phone holds with no copy on record: revoked (removed) — an answer for every title listed', r.status === 200 && r.json.items.length === 2 && item(r, ID.film).state === 'revoked' && item(r, ID.film).reason === 'removed' && item(r, `ck-dl-never-${RUN}`).state === 'revoked' && item(r, `ck-dl-never-${RUN}`).reason === 'removed' && r.json.deviceRemoved === false, brief(r));
   r = await post('/api/downloads/sync', sponsor, { deviceId: P.sponsor, have: Array.from({ length: 61 }, (_, i) => `t-${i}`) });
   const notList = await post('/api/downloads/sync', sponsor, { deviceId: P.sponsor, have: 'all' });
   const badPhone = await post('/api/downloads/sync', sponsor, { deviceId: 'x', have: [] });
@@ -637,7 +696,7 @@ async function theCheckIn(ctx) {
   sql(`update public.episodes set moderation_hold = true where id = ${q(ID.held)}`);
   sql(`update public.episodes set deletion_requested = true, deletion_requested_at = now() where id = ${q(ID.leaving)}`);
   r = await sync(premium, P.premium, [ID.film, ID.held, ID.leaving]);
-  ok('a title pulled, and one on its way out: revoked (title); the rest ok', r.status === 200 && item(r, ID.held).state === 'revoked' && item(r, ID.held).reason === 'title' && item(r, ID.leaving).state === 'revoked' && item(r, ID.leaving).reason === 'title' && item(r, ID.film).state === 'ok'
+  ok('a title pulled, and one on its way out: revoked (title); the rest ok — three listed, three answered', r.status === 200 && r.json.items.length === 3 && item(r, ID.held).state === 'revoked' && item(r, ID.held).reason === 'title' && item(r, ID.leaving).state === 'revoked' && item(r, ID.leaving).reason === 'title' && item(r, ID.film).state === 'ok'
     && copy(premium, P.premium, ID.held).status === 'revoked' && copy(premium, P.premium, ID.held).revoke_reason === 'title', brief(r));
   if (ctx.owner) {
     sql(`update public.episodes set deletion_requested = true, withdrawn_at = now() where id = ${q(ID.bought)}`);
@@ -681,7 +740,7 @@ async function creatorSwitch(ctx) {
   let r = await editor(MARA, ID.film);
   ok('the editor’s read: allowed, the box open, 123 in', r.status === 200 && r.json.episode.downloadsAllowed === true && r.json.policy.downloadsAllowed.mode === 'direct' && r.json.migration.episodes123 === true, r.json && r.json.policy && r.json.policy.downloadsAllowed);
   r = await patch(MARA, ID.film, { downloadsAllowed: false }, { bearer: true });
-  ok('the uploader switches it off on a live title: applies at once', r.status === 200 && r.json.applied.includes('downloadsAllowed') && !(r.json.staged || []).includes('downloadsAllowed') && allowed(ID.film) === false && r.json.view.episode.downloadsAllowed === false, brief(r));
+  ok('the uploader switches it off on a live title: applies at once', r.status === 200 && r.json.applied.includes('downloadsAllowed') && !(r.json.staged || []).includes('downloadsAllowed') && allowed(ID.film) === false && r.json.view.episode.downloadsAllowed === false && r.json.view.policy.downloadsAllowed.mode === 'direct', brief(r));
   ok('…the Download button is gone for a member', JSON.stringify(await offer(premium, ID.film)) === JSON.stringify({ state: 'hidden', reason: 'title' }));
   r = await start(premium, ID.film, P.premium);
   ok('…a new download is refused (403 title)', r.status === 403 && r.json.code === 'title', brief(r));
@@ -696,6 +755,10 @@ async function creatorSwitch(ctx) {
   r = await patch(MARA, ID.film, { downloadsAllowed: 'no' });
   ok('a value that isn’t yes or no: 400', r.status === 400 && allowed(ID.film) === true, brief(r));
 
+  r = await editor(MARA, ID.pod);
+  ok('a podcast episode has no such entry in the editor’s policy (no checkbox, web or app)', r.status === 200 && !Object.prototype.hasOwnProperty.call(r.json.policy, 'downloadsAllowed') && Object.prototype.hasOwnProperty.call(r.json.policy, 'hasFlashingLights'), r.json && Object.keys(r.json.policy || {}).length);
+  r = await patch(MARA, ID.pod, { downloadsAllowed: false });
+  ok('…and a save that sends it is refused (400 kind)', r.status === 400 && r.json.code === 'kind' && allowed(ID.pod) === true, brief(r));
   r = await patch(MARA, ID.held, { downloadsAllowed: false });
   ok('a pulled title: the switch still applies (every state)', r.status === 200 && allowed(ID.held) === false, brief(r));
   r = await patch(MARA, ID.leaving, { downloadsAllowed: false });
@@ -832,13 +895,21 @@ async function thePages(ctx) {
     ok('the episode editor’s More info has the checkbox, ticked, with its words', status === 200 && (await box.isChecked()) && !(await box.isDisabled()) && (await v.page.locator('label[for="ep-downloads"]').innerText()).includes(DOWNLOADS_ALLOWED_LABEL), status);
     await v.ctx.close();
 
-    // The Library's modal.
+    // The Library's modal. (On a dev server compiling the page for the
+    // first time, Next can reload the page under the modal: asked twice.)
+    const openModal = async (pg, id) => {
+      const any = pg.locator('label.admin-checkbox', { hasText: 'Tapa Original' });
+      for (let attempt = 0; attempt < 2 && (await any.count()) === 0; attempt += 1) {
+        await goto(pg, `/admin/library?edit=${encodeURIComponent(id)}`);
+        await any.waitFor({ timeout: 25000 }).catch(() => {});
+      }
+      return (await any.count()) === 1;
+    };
     v = await b.open(admin, 1280);
-    await goto(v.page, `/admin/library?edit=${encodeURIComponent(ID.off)}`);
+    const opened = await openModal(v.page, ID.off);
     const tick = v.page.locator('label.admin-checkbox', { hasText: DOWNLOADS_ALLOWED_LABEL }).locator('input[type="checkbox"]');
-    await tick.waitFor({ timeout: 30000 }).catch(() => {});
-    ok('the Library’s modal has the checkbox, unticked for a title switched off', (await tick.count()) === 1 && !(await tick.isChecked()));
-    await tick.check();
+    ok('the Library’s modal has the checkbox, unticked for a title switched off', opened && (await tick.count()) === 1 && !(await tick.isChecked()), opened);
+    await tick.check({ timeout: 10000 });
     await v.page.locator('button[type="submit"]', { hasText: /Save/ }).first().click();
     await v.page.waitForFunction(() => !document.querySelector('label.admin-checkbox input[type="checkbox"]'), null, { timeout: 30000 }).catch(() => {});
     await sleep(1500);
@@ -846,9 +917,8 @@ async function thePages(ctx) {
     ok('no page errors in the Library', v.errors.length === 0, v.errors);
     await v.ctx.close();
     v = await b.open(admin, 1280);
-    await goto(v.page, `/admin/library?edit=${encodeURIComponent(ID.pod)}`);
-    await v.page.locator('label.admin-checkbox', { hasText: 'Tapa Original' }).waitFor({ timeout: 30000 }).catch(() => {});
-    ok('…and a podcast episode has no such checkbox', (await v.page.locator('label.admin-checkbox', { hasText: 'Tapa Original' }).count()) === 1 && (await v.page.locator('label.admin-checkbox', { hasText: DOWNLOADS_ALLOWED_LABEL }).count()) === 0);
+    const podOpened = await openModal(v.page, ID.pod);
+    ok('…and a podcast episode has no such checkbox', podOpened && (await v.page.locator('label.admin-checkbox', { hasText: DOWNLOADS_ALLOWED_LABEL }).count()) === 0, podOpened);
     await v.ctx.close();
   } finally {
     await b.close();
@@ -949,6 +1019,7 @@ await runCheck(`downloads (${HAS123 ? 'after' : 'before'} 123)`, async () => {
     await theLink(ctx);
     await theDates(ctx);
     await theLimits(ctx);
+    await askingAgain(ctx);
     await theCheckIn(ctx);
     await creatorSwitch(ctx);
     await thePages(ctx);

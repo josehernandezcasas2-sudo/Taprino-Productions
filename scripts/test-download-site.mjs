@@ -127,6 +127,10 @@ t('the two limits: 25 titles on a phone, 2 phones an account', () => {
   assert.equal(R.startLimits({ deviceId: C, episodeId: 'x', devices: [{ deviceId: A }, { deviceId: B, removedAt: '2026-11-01T00:00:00Z' }], copies: two }).ok, true);
   // A third phone that somehow holds a copy already keeps adding (it is one of the phones).
   assert.equal(R.startLimits({ deviceId: C, episodeId: 'x', devices: phones, copies: [...two, ...copies(C, 1, 'v')] }).ok, true);
+  // Asking again for a title the phone holds never meets either limit:
+  // a full phone, and a phone beside two others that hold copies.
+  assert.deepEqual(R.startLimits({ deviceId: A, episodeId: 't-24', devices: phones, copies: [...copies(A, 25), ...copies(B, 25, 'u'), ...copies(C, 2, 'v')] }), { ok: true, again: true });
+  assert.deepEqual(R.startLimits({ deviceId: C, episodeId: 'v-0', devices: phones, copies: [...two, ...copies(C, 1, 'v')] }), { ok: true, again: true });
 });
 
 t('until when a copy plays: the rules’ date, and a promo never past its end', () => {
@@ -144,14 +148,20 @@ t('until when a copy plays: the rules’ date, and a promo never past its end', 
   assert.equal(R.copyLicensedUntil({ basis: 'owned', now: NOW, promoEnd: at(3) }), at(30));
 });
 
-t('a copy the phone didn’t list frees its slot only after a link’s life', () => {
-  const life = D.LINK_SECONDS * 1000;
-  assert.equal(R.frees({ renewedAt: NOW - 60000, now: NOW }), false, 'started a minute ago: still downloading, perhaps');
-  assert.equal(R.frees({ renewedAt: NOW - life, now: NOW }), false);
-  assert.equal(R.frees({ renewedAt: NOW - life - 1, now: NOW }), true);
-  assert.equal(R.frees({ renewedAt: new Date(NOW - 7 * 3600000).toISOString(), now: NOW }), true);
-  assert.equal(R.frees({ renewedAt: null, createdAt: NOW - 1000, now: NOW }), false, 'no renewal on record: its creation counts');
-  assert.equal(R.frees({ renewedAt: null, createdAt: null, now: NOW }), true);
+t('a copy the phone didn’t list frees its slot — at once when it lists nothing, after a moment when it lists others', () => {
+  const grace = R.START_GRACE_SECONDS * 1000;
+  assert.equal(R.START_GRACE_SECONDS, 120);
+  // The phone lists nothing at all (a reinstall): everything goes, however fresh.
+  assert.equal(R.frees({ renewedAt: NOW - 1000, now: NOW, listed: 0 }), true);
+  assert.equal(R.frees({ renewedAt: NOW - 1000, now: NOW }), true);
+  // It lists other titles: a copy licensed a moment ago is a start whose
+  // answer may still be on its way, and keeps its row for now.
+  assert.equal(R.frees({ renewedAt: NOW - 1000, now: NOW, listed: 3 }), false);
+  assert.equal(R.frees({ renewedAt: NOW - grace, now: NOW, listed: 1 }), false);
+  assert.equal(R.frees({ renewedAt: NOW - grace - 1, now: NOW, listed: 1 }), true);
+  assert.equal(R.frees({ renewedAt: new Date(NOW - 10 * 60000).toISOString(), now: NOW, listed: 1 }), true);
+  assert.equal(R.frees({ renewedAt: null, createdAt: NOW - 1000, now: NOW, listed: 1 }), false, 'no renewal on record: its creation counts');
+  assert.equal(R.frees({ renewedAt: null, createdAt: null, now: NOW, listed: 1 }), true);
 });
 
 t('the words over a downloaded title, as the episode page prints them', () => {

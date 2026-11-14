@@ -5,7 +5,12 @@ import { isTitleId } from '../../../lib/titleIds';
 
 // POST /api/downloads/sync { deviceId, deviceName, platform, have: [episodeId] }
 // The phone's check-in (lib/downloads.js syncDownloads): it says which
-// titles it holds (at most 60) and hears, for each, what happens to it.
+// titles it holds (at most 60: finished, still downloading, paused or
+// failed — anything start ever answered 200 for) and hears, for each one
+// of them, what happens to it. A copy on record that it doesn't list is
+// marked removed and its slot freed; an empty list says the phone lost
+// everything (a reinstall) and frees them all. A phone that never
+// downloaded isn't put on record by a check-in.
 //   200 { enabled, serverTime, paidThrough, plan: { carries, tier },
 //         limits, deviceRemoved, items: [{ episodeId, state: 'ok' |
 //         'paused' | 'ended' | 'revoked', basis, licensedUntil, endedAt,
