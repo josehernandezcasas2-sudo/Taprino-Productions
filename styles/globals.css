@@ -186,6 +186,60 @@ button { font-family: inherit; cursor: pointer; }
 }
 .dropdown-left { left: 0; }
 .dropdown-right { right: 0; }
+/* A header panel (browse, search, notifications, account) hangs from
+   under the nav bar and is its own scroll area (Jose, 2026-11-14: "have
+   the section be scrollable apart from the rest of the site … reach any
+   of the sections regardless of device … make it go under the nav bar
+   too"). HeaderNav.js measures the two numbers when a panel opens and
+   whenever the window changes: --menu-drop puts the panel's top edge on
+   the bar's bottom edge, --menu-max is the room from there to the bottom
+   of the screen, or to the phone's tab bar. Past that the panel scrolls,
+   and its scrolling never moves the page behind it (overscroll-behavior
+   here, lib/menuScroll.js for a wheel or a finger the panel can't use).
+   The fallbacks are what a panel gets for the instant before the
+   measurement. Until this rule only the account panel under 480px and
+   the browse panel under 1180px were capped, so on a tablet or a short
+   laptop window the account menu ran off the screen with no way to reach
+   its last rows. */
+.dropdown.menu-panel {
+  top: calc(100% + var(--menu-drop, 8px));
+  max-height: var(--menu-max, calc(100vh - 140px));
+  max-height: var(--menu-max, calc(100dvh - 140px));
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 232, 211, 0.22) transparent;
+  /* It comes out from under the bar: no top edge of its own, square top
+     corners, and a shadow that falls on the page, never back up the bar. */
+  border-top: none;
+  border-radius: 0 0 10px 10px;
+  clip-path: inset(0 -60px -60px -60px);
+  /* A soft edge where rows carry on past the top or the bottom, and none
+     once the list is at that end: the two "local" covers ride with the
+     rows and hide the shadows drawn on the panel itself. */
+  background:
+    linear-gradient(var(--void-2) 35%, transparent) top / 100% 26px no-repeat local,
+    linear-gradient(transparent, var(--void-2) 65%) bottom / 100% 26px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0)) top / 100% 12px no-repeat scroll,
+    linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.42)) bottom / 100% 12px no-repeat scroll,
+    var(--void-2);
+}
+/* On a phone every right-hand panel keeps a little air from the screen's
+   edge. The shared `.dropdown-right { right: -1rem }` under 640px dates
+   from when a panel was placed against its own button group; it is placed
+   against the bar now, so that rule put the notifications panel 16px off
+   the right of the screen, and the search panel's `left: -0.5rem` put it
+   8px off the left. */
+@media (max-width: 640px) {
+  .dropdown.menu-panel.dropdown-right { right: max(0.75rem, env(safe-area-inset-right, 0px)); }
+  .dropdown.menu-panel.search-dropdown { left: auto; }
+  .dropdown.menu-panel.notification-dropdown { width: min(300px, calc(100vw - 1.5rem)); }
+}
+.dropdown.menu-panel::-webkit-scrollbar { width: 6px; }
+.dropdown.menu-panel::-webkit-scrollbar-thumb { background: rgba(251, 232, 211, 0.22); border-radius: 3px; }
+.dropdown.menu-panel::-webkit-scrollbar-track { background: transparent; }
 .search-dropdown { min-width: 280px; padding: 0.6rem; }
 @media (max-width: 480px) {
   .search-dropdown { min-width: 0; width: min(82vw, 320px); }
@@ -265,15 +319,7 @@ button { font-family: inherit; cursor: pointer; }
        cap instead of an unconditional fixed minimum. */
     min-width: 0;
     width: min(78vw, 300px);
-    /* This menu has grown to ~11 items for a signed-in admin (Account
-       Settings through Sign Out) — the base .dropdown rule has no
-       max-height, so on a phone it was running almost the full screen
-       height below the avatar with nothing to scroll it, same bug the
-       hamburger menu's comment above describes and was already fixed
-       for. Same fix here: cap it and let it scroll instead of just
-       growing indefinitely. */
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
+    /* Its height and scrolling are .menu-panel's now, at every width. */
   }
 }
 .account-dropdown-header {
@@ -2039,6 +2085,115 @@ button { font-family: inherit; cursor: pointer; }
 }
 .modal-close:hover { color: var(--ink); }
 
+/* Your work's two edit boxes — "Edit submission" (a title still in review,
+   components/EditSubmissionModal.js) and "Title & description" (a live
+   title or a show, components/RequestEditModal.js) — in the show editor's
+   look (Jose, 2026-11-14: "style those edit submissions and title and
+   description"). Until this block their labels, fields and selects had no
+   rule at all and drew as the browser's own white boxes. The numbers are
+   .show-ed-*'s: mono capitals for a label, a 46px field on surface-2 with
+   the ocean border and the gold focus ring. One column on a phone; the
+   short fields pair up from 520px (.ebx-grid). The box is never taller
+   than the screen: its heading and its Save row stay put and the fields
+   scroll between them (.ebx-body), in the box, not the page. */
+.modal-backdrop { overscroll-behavior: contain; }
+.modal-card.ebx {
+  --ebx-line: color-mix(in srgb, var(--ink) 14%, transparent);
+  --ebx-pad: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  max-width: 560px;
+  /* Never taller than the screen (the backdrop keeps 4rem above and
+     below): the heading and the Save row stay put and the fields scroll
+     between them, in the box, not the page. */
+  max-height: calc(100vh - 8rem);
+  max-height: calc(100dvh - 8rem);
+  padding: 0;
+  border-radius: 14px;
+  border: 1px solid var(--ebx-line);
+  background: var(--surface-1);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+.ebx-head { flex: none; display: flex; align-items: flex-start; justify-content: space-between; gap: 0.75rem; padding: var(--ebx-pad) var(--ebx-pad) 0.85rem; border-bottom: 1px solid var(--ebx-line); }
+.ebx-head-main { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.ebx-kicker { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--brass); }
+.ebx-title { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 1.3rem; line-height: 1.2; color: var(--ink); overflow-wrap: anywhere; }
+.ebx-close { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--ebx-line); background: transparent; color: var(--ink); font-size: 0.95rem; line-height: 1; cursor: pointer; }
+.ebx-close:hover { border-color: var(--olive); color: var(--olive); }
+.ebx-lede { margin: 0; font-size: 0.86rem; line-height: 1.5; color: var(--ink-dim); }
+.ebx-form, .ebx-done { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; min-width: 0; }
+.ebx-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem var(--ebx-pad) 1.15rem;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(251, 232, 211, 0.22) transparent;
+}
+.ebx-body > * { flex: none; }
+.ebx-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1rem; }
+@media (min-width: 520px) {
+  .ebx-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.ebx-field { display: flex; flex-direction: column; gap: 0.35rem; min-width: 0; }
+.ebx-field > label { font-family: var(--font-mono); font-size: 0.64rem; font-weight: 400; letter-spacing: 0.12em; line-height: 1.5; text-transform: uppercase; color: var(--ink-dim); }
+.ebx-field > label em, .ebx-field > label span { margin-left: 0.3rem; font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; opacity: 0.8; }
+.ebx-field input[type="text"], .ebx-field input[type="number"], .ebx-field select, .ebx-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border-radius: 10px;
+  border: 1px solid var(--ocean-ink);
+  background: var(--surface-2);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+}
+.ebx-field input[type="text"], .ebx-field input[type="number"], .ebx-field select { height: 46px; padding: 0 0.8rem; }
+.ebx-field input.is-title { font-size: 1.05rem; }
+.ebx-field select { color-scheme: dark; cursor: pointer; }
+.ebx-field textarea { padding: 0.7rem 0.8rem; line-height: 1.5; resize: vertical; min-height: 96px; }
+.ebx-field input:focus, .ebx-field select:focus, .ebx-field textarea:focus { outline: none; border-color: var(--olive); box-shadow: 0 0 0 3px rgba(var(--olive-rgb), 0.18); }
+.ebx-field input:disabled, .ebx-field select:disabled, .ebx-field textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+.ebx-field input::placeholder, .ebx-field textarea::placeholder { color: var(--ink-faint); opacity: 0.75; }
+.ebx-field > p { margin: 0; }
+/* The tick boxes (flashing lights, downloads) sit together in one frame. */
+.ebx-switches { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.9rem; border-radius: 12px; border: 1px solid var(--ebx-line); }
+.ebx-switches .flash-field { margin: 0; }
+.ebx-switches .flash-check-label { font-family: var(--font-display); font-size: 0.95rem; }
+.ebx-error { margin: 0; padding: 0.55rem 0.7rem; border-radius: 8px; background: rgba(var(--danger-rgb), 0.12); color: var(--ink); font-size: 0.84rem; line-height: 1.4; border: 1px solid rgba(var(--danger-rgb), 0.45); }
+.ebx-done-line { margin: 0; padding: 0.7rem 0.85rem; border-radius: 10px; border: 1px solid color-mix(in srgb, var(--ok) 50%, transparent); background: color-mix(in srgb, var(--ok) 10%, transparent); color: var(--ink); font-size: 0.9rem; line-height: 1.5; }
+.ebx .req-edit-waiting, .ebx .req-edit-line { margin: 0; }
+.ebx-actions {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  padding: 0.85rem var(--ebx-pad) calc(0.95rem + env(safe-area-inset-bottom, 0px));
+  background: var(--surface-1);
+  border-top: 1px solid var(--ebx-line);
+}
+.ebx-actions .account-btn-primary, .ebx-actions .account-btn-secondary { width: auto; min-height: 44px; margin: 0; padding: 0 1.3rem; }
+@media (max-width: 640px) {
+  /* A phone: the box takes the screen's width and nearly its height. */
+  .modal-backdrop:has(> .ebx) { padding: 1rem 0.75rem; }
+  .modal-card.ebx { max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); }
+  .ebx-actions .account-btn-primary { flex: 1 1 auto; }
+}
+@media (max-height: 520px) {
+  /* A phone held sideways: little height, so less of it goes to the frame. */
+  .modal-backdrop:has(> .ebx) { padding-top: 0.6rem; padding-bottom: 0.6rem; }
+  .modal-card.ebx { max-height: calc(100vh - 1.2rem); max-height: calc(100dvh - 1.2rem); }
+  .ebx-head { padding-top: 0.8rem; padding-bottom: 0.6rem; }
+  .ebx-actions { padding-top: 0.6rem; padding-bottom: calc(0.6rem + env(safe-area-inset-bottom, 0px)); }
+}
+
 .dash-stats {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
@@ -2214,6 +2369,8 @@ button { font-family: inherit; cursor: pointer; }
   max-height: 360px;
   overflow-y: auto;
 }
+/* 360px at most, and never more than the room under the bar. */
+.dropdown.menu-panel.notification-dropdown { max-height: min(360px, var(--menu-max, 360px)); }
 .notification-mark-all {
   background: none;
   border: none;
@@ -2379,12 +2536,23 @@ button { font-family: inherit; cursor: pointer; }
     display: flex;
     flex-direction: column;
     animation: tabbar-dropup-in 0.14s ease forwards;
+    /* Its own scroll area, never taller than the room above the bar
+       (--dropup-max from MobileTabBar.js): on a phone held sideways the
+       Account menu used to run off the top of the screen. */
+    max-height: var(--dropup-max, 70vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(251, 232, 211, 0.22) transparent;
   }
   @keyframes tabbar-dropup-in {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
   }
   .tabbar-dropup-item {
+    flex: 0 0 auto;
     padding: 0.7rem 1.1rem;
     color: var(--ink);
     text-decoration: none;
@@ -2487,12 +2655,19 @@ button { font-family: inherit; cursor: pointer; }
     display: flex;
     flex-direction: column;
     animation: tabbar-flyout-in 0.14s ease forwards;
+    /* The rail's fly-out: its own scroll area, never taller than the rail. */
+    max-height: var(--dropup-max, 80vh);
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(251, 232, 211, 0.22) transparent;
   }
   @keyframes tabbar-flyout-in {
     from { opacity: 0; transform: translateX(-6px); }
     to { opacity: 1; transform: translateX(0); }
   }
-  .tabbar-dropup-item { padding: 0.6rem 1rem; color: var(--ink); text-decoration: none; font-size: 0.88rem; white-space: nowrap; }
+  .tabbar-dropup-item { flex: 0 0 auto; padding: 0.6rem 1rem; color: var(--ink); text-decoration: none; font-size: 0.88rem; white-space: nowrap; }
   .tabbar-dropup-item:hover { background: rgba(251, 232, 211, 0.06); }
   .tabbar-dropup-item:active { background: rgba(var(--brass-rgb), 0.15); }
 }
@@ -5941,8 +6116,8 @@ body:has(.mini-player) { padding-bottom: 72px; }
        pixel top value would be wrong on devices with different safe-area
        insets (notch sizes vary), so only width/height/scroll change here. */
     width: min(86vw, 340px);
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
+    /* Its height and scrolling are .menu-panel's (measured, at every
+       width), not a typed 100vh − 140px any more. */
   }
   /* Two-class selector so this wins over the shared .dropdown-left rule
      (left: -1rem, which pulls it toward the screen edge) without editing

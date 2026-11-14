@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { avatarImgStyle } from '../lib/profileBanner';
+import { keepScrollInside, panelRoom, viewBottom } from '../lib/menuScroll';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
@@ -20,6 +21,11 @@ import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, T
 // behind a small "More" menu on desktop and the hamburger on mobile, since
 // there isn't room for 10 genres as top-level links the way the mockup's
 // five fixed content-type links fit.
+// A layout effect in the browser (an opening panel is placed before it is
+// painted, so it never jumps), a plain effect on the server, where a
+// layout effect only logs a warning.
+const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 export default function HeaderNav({ activeType, activeGenre, mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator, liveStream }) {
   const iconOverrides = usePlayerIconOverrides();
   const router = useRouter();
@@ -136,6 +142,50 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
     if (openMenu === 'search' && searchInputRef.current) {
       searchInputRef.current.focus();
     }
+  }, [openMenu]);
+
+  // The open panel hangs from under the bar and is its own scroll area
+  // (Jose, 2026-11-14: "have the section be scrollable apart from the rest
+  // of the site … reach any of the sections regardless of device … make it
+  // go under the nav bar too"). Measured, not typed: the bar's height
+  // changes with the breakpoint and the notch, and a phone's tab bar takes
+  // the bottom of the screen. --menu-drop puts the panel's top edge on the
+  // bar's bottom edge; --menu-max is the room down to the bottom of the
+  // screen (or to the tab bar), past which the panel scrolls
+  // (.menu-panel in globals.css). keepScrollInside stops a wheel or a drag
+  // the panel can't use from moving the page behind it.
+  const panelRef = useRef(null);
+  useIsoLayoutEffect(() => {
+    if (!openMenu) return undefined;
+    const panel = panelRef.current;
+    const bar = rootRef.current;
+    if (!panel || !bar) return undefined;
+    const fit = () => {
+      const barRect = bar.getBoundingClientRect();
+      const anchor = panel.offsetParent ? panel.offsetParent.getBoundingClientRect() : barRect;
+      panel.style.setProperty('--menu-drop', `${Math.max(0, Math.round(barRect.bottom - anchor.bottom))}px`);
+      // The phone's tab bar floats over the bottom of the page: stop above
+      // it. On wide screens the same element is the rail down the left
+      // edge, which a panel never has to clear.
+      const tab = document.querySelector('.tabbar');
+      const tabRect = tab ? tab.getBoundingClientRect() : null;
+      const floor = tabRect && tabRect.height > 0 && tabRect.width > tabRect.height && tabRect.top > barRect.bottom ? tabRect.top : null;
+      panel.style.setProperty('--menu-max', `${panelRoom({ top: barRect.bottom, viewBottom: viewBottom(window), floor })}px`);
+    };
+    fit();
+    const release = keepScrollInside(panel);
+    const vv = window.visualViewport;
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    window.addEventListener('scroll', fit, { passive: true });
+    if (vv) { vv.addEventListener('resize', fit); vv.addEventListener('scroll', fit); }
+    return () => {
+      release();
+      window.removeEventListener('resize', fit);
+      window.removeEventListener('orientationchange', fit);
+      window.removeEventListener('scroll', fit);
+      if (vv) { vv.removeEventListener('resize', fit); vv.removeEventListener('scroll', fit); }
+    };
   }, [openMenu]);
 
   function submitSearch(e) {
@@ -293,7 +343,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         </nav>
 
         {openMenu === 'ham' && (
-          <div className="dropdown dropdown-left open hamburger-dropdown">
+          <div ref={panelRef} className="dropdown dropdown-left open menu-panel hamburger-dropdown">
             <div className="dropdown-label">Browse by type</div>
             {typeLinks.map((l) => (
               <Link key={l.href} href={l.href} className={`dropdown-item ${l.match ? 'active-cat' : ''}`} onClick={() => setOpenMenu(null)}>
@@ -361,7 +411,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         </button>
 
         {openMenu === 'search' && (
-          <div className="dropdown dropdown-right open search-dropdown">
+          <div ref={panelRef} className="dropdown dropdown-right open menu-panel search-dropdown">
             <form onSubmit={submitSearch}>
               <input
                 ref={searchInputRef}
@@ -391,7 +441,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
             </button>
 
             {openMenu === 'notifications' && (
-              <div className="dropdown dropdown-right open notification-dropdown">
+              <div ref={panelRef} className="dropdown dropdown-right open menu-panel notification-dropdown">
                 <div className="dropdown-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <span>Notifications</span>
                   {unreadCount > 0 && (
@@ -445,7 +495,7 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
         </button>
 
         {openMenu === 'account' && (
-          <div className="dropdown dropdown-right open account-dropdown">
+          <div ref={panelRef} className="dropdown dropdown-right open menu-panel account-dropdown">
             {isSignedIn ? (
               <>
                 {ownProfileHref ? (

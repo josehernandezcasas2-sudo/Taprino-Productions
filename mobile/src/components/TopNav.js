@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, Image, Linking, Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { usePathname, useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUser } from '@clerk/expo';
 import { useAuth } from '../lib/stableAuth';
 import { apiGet, absoluteUrl, freshToken } from '../lib/api';
 import { colors, fonts, inkTint, oliveTint, absoluteFill } from '../lib/theme';
+import { panelRoom } from '../lib/menuScroll';
 import {
   SearchIcon, AccountIcon, BellIcon, MenuIcon, SettingsIcon, LockIcon, HeartIcon, ChatIcon, SparkleIcon, TargetIcon,
   CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon
@@ -146,6 +148,7 @@ export default function TopNav() {
   const { isSignedIn, user } = useUser();
   const { getToken, signOut } = useAuth();
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const [settings, setSettings] = useState(settingsCache);
   const [ownProfile, setOwnProfile] = useState(ownProfileCache);
   const [genres, setGenres] = useState(genresCache || []);
@@ -217,14 +220,26 @@ export default function TopNav() {
     if (panel === which) { setPanel(null); return; }
     const node = barRef.current;
     if (node && typeof node.measureInWindow === 'function') {
+      // The panel hangs from the bar's bottom edge, as on the website
+      // (Jose, 2026-11-14: "make it go under the nav bar").
       node.measureInWindow((x, y, w, h) => {
-        setAnchorTop(y + h + 8);
+        setAnchorTop(y + h);
         setPanel(which);
       });
     } else {
       setPanel(which);
     }
   }
+
+  // The phone was turned (or the window changed) with a panel open: the
+  // bar has moved, so find its bottom edge again.
+  useEffect(() => {
+    if (!panel) return;
+    const node = barRef.current;
+    if (node && typeof node.measureInWindow === 'function') {
+      node.measureInWindow((x, y, w, h) => { if (Number.isFinite(y) && Number.isFinite(h)) setAnchorTop(y + h); });
+    }
+  }, [windowWidth, windowHeight]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function go(href) {
     setPanel(null);
@@ -284,8 +299,11 @@ export default function TopNav() {
 
   const menuWidth = Math.min(Math.round(windowWidth * 0.86), 340);
   const bellWidth = Math.min(300, windowWidth - 32);
-  // A panel never runs off the bottom of the screen: it scrolls instead.
-  const panelMaxHeight = Math.max(240, windowHeight - anchorTop - 24);
+  // A panel never runs off the bottom of the screen: it is its own scroll
+  // area from the bar down to the home indicator (lib/menuScroll.js, the
+  // website's rule), so every row can be reached on any phone, upright or
+  // sideways. It sits in a Modal, so nothing behind it moves.
+  const panelMaxHeight = panelRoom({ top: anchorTop, viewBottom: windowHeight - insets.bottom });
 
   return (
     <>
@@ -548,10 +566,13 @@ const styles = StyleSheet.create({
   // .dropdown: the website's panel (void-2 fill, hairline, 8px radius,
   // deep shadow); .hamburger-dropdown is min(86vw, 340px) and scrolls.
   backdrop: { ...absoluteFill },
+  // It comes out from under the bar (.menu-panel): no top edge of its own
+  // and square top corners.
   panel: {
     position: 'absolute',
     backgroundColor: colors.surface1,
-    borderWidth: 1, borderColor: inkTint(0.14), borderRadius: 8,
+    borderWidth: 1, borderTopWidth: 0, borderColor: inkTint(0.14),
+    borderTopLeftRadius: 0, borderTopRightRadius: 0, borderBottomLeftRadius: 10, borderBottomRightRadius: 10,
     shadowColor: '#000', shadowOpacity: 0.45, shadowRadius: 34, shadowOffset: { width: 0, height: 16 }, elevation: 16,
     overflow: 'hidden'
   },

@@ -1,4 +1,5 @@
 import { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import { PANEL_LEAST, keepScrollInside, riseRoom } from '../lib/menuScroll';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
@@ -240,29 +241,55 @@ export default function MobileTabBar() {
   // real button and bar at open time keeps this correct at any width.
   // useLayoutEffect (not useEffect) so this is set before the browser
   // paints — no visible jump from a wrong position to the right one.
+  //
+  // The menu is also its own scroll area (Jose, 2026-11-14: every row
+  // reachable on any device): --dropup-max is the room it has — the rail's
+  // height, or from the bar up to the header — set before its height is
+  // read, and kept current while the window changes; keepScrollInside
+  // stops a wheel or a drag the menu can't use from moving the page.
   useLayoutEffect(() => {
-    if (!openMenu || !dropdownRef.current || !barRef.current) return;
+    if (!openMenu || !dropdownRef.current || !barRef.current) return undefined;
     const btn = triggerRefs.current[openMenu];
-    if (!btn) return;
-    const barRect = barRef.current.getBoundingClientRect();
-    const btnRect = btn.getBoundingClientRect();
+    if (!btn) return undefined;
+    const menu = dropdownRef.current;
+    const bar = barRef.current;
     const margin = 6;
-    if (wide) {
-      // Rail: the fly-out sits beside its button, top-aligned with it,
-      // nudged up if it would run past the bottom of the rail.
-      const dropdownHeight = dropdownRef.current.offsetHeight;
-      let top = btnRect.top - barRect.top;
-      top = Math.max(margin, Math.min(top, barRect.height - dropdownHeight - margin));
-      dropdownRef.current.style.left = '';
-      dropdownRef.current.style.top = `${top}px`;
-      return;
-    }
-    const dropdownWidth = dropdownRef.current.offsetWidth;
-    const btnCenter = btnRect.left + btnRect.width / 2 - barRect.left;
-    let left = btnCenter - dropdownWidth / 2;
-    left = Math.max(margin, Math.min(left, barRect.width - dropdownWidth - margin));
-    dropdownRef.current.style.top = '';
-    dropdownRef.current.style.left = `${left}px`;
+    const place = () => {
+      const barRect = bar.getBoundingClientRect();
+      const btnRect = btn.getBoundingClientRect();
+      if (wide) {
+        // Rail: the fly-out sits beside its button, top-aligned with it,
+        // nudged up if it would run past the bottom of the rail.
+        menu.style.setProperty('--dropup-max', `${Math.max(PANEL_LEAST, Math.floor(barRect.height - margin * 2))}px`);
+        const dropdownHeight = menu.offsetHeight;
+        let top = btnRect.top - barRect.top;
+        top = Math.max(margin, Math.min(top, barRect.height - dropdownHeight - margin));
+        menu.style.left = '';
+        menu.style.top = `${top}px`;
+        return;
+      }
+      // Bar: the menu rises from it, as far as the header when the header
+      // is on screen, else to the top of the screen. 10px is the gap the
+      // stylesheet leaves between the bar and its menu.
+      const header = document.querySelector('header.channel-bar');
+      const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
+      menu.style.setProperty('--dropup-max', `${riseRoom({ bottom: barRect.top - 10, ceiling: headerBottom })}px`);
+      const dropdownWidth = menu.offsetWidth;
+      const btnCenter = btnRect.left + btnRect.width / 2 - barRect.left;
+      let left = btnCenter - dropdownWidth / 2;
+      left = Math.max(margin, Math.min(left, barRect.width - dropdownWidth - margin));
+      menu.style.top = '';
+      menu.style.left = `${left}px`;
+    };
+    place();
+    const release = keepScrollInside(menu);
+    window.addEventListener('resize', place);
+    window.addEventListener('orientationchange', place);
+    return () => {
+      release();
+      window.removeEventListener('resize', place);
+      window.removeEventListener('orientationchange', place);
+    };
   }, [openMenu, wide]);
 
   return (

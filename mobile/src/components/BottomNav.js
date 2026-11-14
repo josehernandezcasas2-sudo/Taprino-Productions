@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Easing, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, Pressable, StyleSheet, Text, View, ScrollView, useWindowDimensions } from 'react-native';
 import { useRouter, usePathname } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { riseRoom } from '../lib/menuScroll';
 import { colors, fonts } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
@@ -104,6 +105,7 @@ export default function BottomNav() {
   const router = useRouter();
   const pathname = usePathname();
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const [openKey, setOpenKey] = useState(null);
   // Measured layouts, used to center the drop-up over the tab that opened
   // it (same approach as MobileTabBar.js's useLayoutEffect).
@@ -154,6 +156,11 @@ export default function BottomNav() {
     dropupLeft = Math.max(margin, Math.min(center - width / 2, barLayout.width - width - margin));
   }
   const measured = !!(item && barLayout);
+  // The menu is its own scroll area, never taller than the room between
+  // the bar and the top of the screen (lib/menuScroll.js, the website's
+  // rule): on a phone held sideways the Account menu used to run off the
+  // top with no way to reach its first rows.
+  const dropupMaxHeight = riseRoom({ bottom: windowHeight - (insets.bottom + 18) - (barLayout ? barLayout.height : 64) - 10, ceiling: insets.top });
 
   // Fade/slide in only once the position is known (.tabbar-dropup's 0.14s
   // tabbar-dropup-in), so it never animates from the wrong spot.
@@ -182,6 +189,7 @@ export default function BottomNav() {
               { opacity: measured ? anim : 0, transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [6, 0] }) }] }
             ]}
           >
+            <ScrollView style={{ maxHeight: dropupMaxHeight }} keyboardShouldPersistTaps="handled">
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
             {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads }) : openGroup.items).map((entry) => (
               <Pressable
@@ -197,6 +205,7 @@ export default function BottomNav() {
               </Pressable>
             ))}
             </View>
+            </ScrollView>
           </Animated.View>
         )}
         <View style={styles.bar} onLayout={(e) => setBarLayout(e.nativeEvent.layout)}>

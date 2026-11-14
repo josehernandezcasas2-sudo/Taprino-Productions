@@ -234,8 +234,8 @@ export function AccountFrame({ title, aside = null, dashboard, onRetry, back = '
         <View style={styles.center}>
           <Text style={styles.title}>Sign in or create your account</Text>
           <Text style={styles.subtitle}>
-            Real email + password — sign in if you've been here before, or create a free account if
-            you're new. Either way, it's the same account you use on studiotapatv.site.
+            Sign in if you've been here before, or create a free account if you're new. Either way,
+            it's the same account you use on studiotapatv.site.
           </Text>
           <Pressable style={styles.primaryBtn} onPress={() => handleStartAuth('sign-in')} disabled={!!busyMode}>
             {busyMode === 'sign-in' ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.primaryBtnText}>Sign in</Text>}

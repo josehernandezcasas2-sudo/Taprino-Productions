@@ -93,9 +93,8 @@ export default function Account(props) {
           <div className="account-eyebrow">Your account</div>
           <h3>Sign in or create your account</h3>
           <p>
-            Real email + password now — sign in if you&rsquo;ve been here before, or create a free
-            account if you&rsquo;re new. Either way, you can upgrade to {SITE.premiumTier} any time once
-            signed in.
+            Sign in if you&rsquo;ve been here before, or create a free account if you&rsquo;re new.
+            Either way, you can upgrade to {SITE.premiumTier} any time once signed in.
           </p>
           <SignInButton mode="modal" forceRedirectUrl="/account">
             <button className="account-btn-primary">Sign in</button>

@@ -142,9 +142,10 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
         <BackButton fallbackHref="/stream" />
         <div className="library-heading">Pitch Room</div>
         <div className="library-sub">
-          Projects looking for backing. Studio Tapa doesn&rsquo;t handle any of this funding directly —
-          each project links straight to the creator&rsquo;s own page. Save one to follow along and get
-          notified when they post an update.
+          Projects looking for backing. Where backing is open you can back a project from its
+          page: the payment goes through Stripe straight to the creator&rsquo;s account, and you see
+          what they receive before you pay. Save one to follow along and get notified when they
+          post an update.
         </div>
 
         <div style={{ margin: '1rem 0 1.4rem' }}>

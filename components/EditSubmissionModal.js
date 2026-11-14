@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { keepScrollInside } from '../lib/menuScroll';
 import { SITE } from '../lib/siteConfig';
 import { MAIN_GENRES, SUBMIT_TYPES } from '../lib/submitRules';
 import RatingOptions from './RatingOptions';
@@ -36,6 +37,10 @@ const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical
 // lib/downloadsAllowedSave.js: it applies at once, and before migration
 // 123 the box is greyed with the server's line.
 export default function EditSubmissionModal({ submission, onClose, onSaved }) {
+  // The box scrolls its own fields; a wheel or a finger that has nothing
+  // left to scroll in it never moves the page behind (lib/menuScroll.js).
+  const backdropRef = useRef(null);
+  useEffect(() => keepScrollInside(backdropRef.current), []);
   const [form, setForm] = useState({
     title: submission.title || '',
     description: submission.description || '',
@@ -98,85 +103,121 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
     }
   }
 
+  // The box is drawn in the show editor's look (.ebx in globals.css;
+  // Jose, 2026-11-14: "style those edit submissions and title and
+  // description" — until then its labels and fields were the browser's
+  // own). One column on a phone; the short fields pair up from 520px. The
+  // box is never taller than the screen: the heading and the Save row stay
+  // put and the fields scroll between them (.ebx-body).
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>Edit submission</h3>
-          <button className="modal-close" onClick={onClose} aria-label="Close">✕</button>
+    <div className="modal-backdrop" ref={backdropRef} onClick={onClose}>
+      <div className="modal-card ebx" role="dialog" aria-modal="true" aria-labelledby="ebx-submission-title" onClick={(e) => e.stopPropagation()}>
+        <div className="ebx-head">
+          <div className="ebx-head-main">
+            <span className="ebx-kicker">Your work · In review</span>
+            <h3 className="ebx-title" id="ebx-submission-title">Edit submission</h3>
+          </div>
+          <button type="button" className="ebx-close" onClick={onClose} aria-label="Close">✕</button>
         </div>
-        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)', marginTop: '-0.4rem' }}>
-          Only available while this is still pending review — once an admin reviews it, these fields lock.
-        </p>
+        <form onSubmit={handleSave} className="ebx-form">
+          <div className="ebx-body">
+          <p className="ebx-lede">
+            You can change these while it&rsquo;s still in review. Once it has been reviewed, they lock.
+          </p>
 
-        <form onSubmit={handleSave}>
-          <label>Title</label>
-          <input type="text" value={form.title} onChange={(e) => update('title', e.target.value)} required />
+          <div className="ebx-field">
+            <label htmlFor="ebx-sub-title">Title</label>
+            <input id="ebx-sub-title" type="text" className="is-title" value={form.title} onChange={(e) => update('title', e.target.value)} required />
+          </div>
 
-          <label>Description</label>
-          <textarea value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} style={{ width: '100%', boxSizing: 'border-box' }} />
+          <div className="ebx-field">
+            <label htmlFor="ebx-sub-description">Description</label>
+            <textarea id="ebx-sub-description" value={form.description} onChange={(e) => update('description', e.target.value)} required rows={3} />
+          </div>
 
-          {notesShown && <PageNotesField id="edit-submission-notes" value={notes} onChange={setNotes} />}
+          {notesShown && <PageNotesField id="edit-submission-notes" value={notes} onChange={setNotes} wrapClassName="ebx-field" />}
 
-          <label>Your name / artist credit</label>
-          <input type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />
+          <div className="ebx-field">
+            <label htmlFor="ebx-sub-artist">Your name / artist credit</label>
+            <input id="ebx-sub-artist" type="text" value={form.artist} onChange={(e) => update('artist', e.target.value)} required />
+          </div>
 
-          <label>Runtime (e.g. 05:30)</label>
-          <input type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+          <div className="ebx-grid">
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-runtime">Runtime <em>e.g. 05:30</em></label>
+              <input id="ebx-sub-runtime" type="text" value={form.runtime} onChange={(e) => update('runtime', e.target.value)} required placeholder="mm:ss" />
+            </div>
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-year">Year created <em>optional</em></label>
+              <input
+                id="ebx-sub-year"
+                type="number"
+                value={form.releaseYear}
+                onChange={(e) => update('releaseYear', e.target.value)}
+                placeholder={String(new Date().getFullYear())}
+                min="1900"
+                max={new Date().getFullYear() + 1}
+              />
+            </div>
+          </div>
 
-          <label>Year created <span style={{ fontWeight: 'normal' }}>optional</span></label>
-          <input
-            type="number"
-            value={form.releaseYear}
-            onChange={(e) => update('releaseYear', e.target.value)}
-            placeholder={String(new Date().getFullYear())}
-            min="1900"
-            max={new Date().getFullYear() + 1}
-          />
+          <div className="ebx-grid">
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-type">Content type</label>
+              <select id="ebx-sub-type" value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
+                {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </select>
+            </div>
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-rating">Content rating <em>optional</em></label>
+              <select id="ebx-sub-rating" value={form.rating} onChange={(e) => update('rating', e.target.value)}>
+                <option value="">Not set</option>
+                <RatingOptions />
+              </select>
+            </div>
+          </div>
 
-          <label>Content type</label>
-          <select value={form.contentType} onChange={(e) => update('contentType', e.target.value)} required>
-            {types.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </select>
+          <div className="ebx-grid">
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-main-genre">Main genre</label>
+              <select id="ebx-sub-main-genre" value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
+                {genres.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+            <div className="ebx-field">
+              <label htmlFor="ebx-sub-genre">Specific genre</label>
+              <input id="ebx-sub-genre" type="text" value={form.genre} onChange={(e) => update('genre', e.target.value)} required />
+            </div>
+          </div>
 
-          <label>Content rating <span style={{ fontWeight: 'normal' }}>optional</span></label>
-          <select value={form.rating} onChange={(e) => update('rating', e.target.value)}>
-            <option value="">Not set</option>
-            <RatingOptions />
-          </select>
+          <div className="ebx-field">
+            <label htmlFor="ebx-sub-tier">Suggested tier <em>the team has final say</em></label>
+            <select id="ebx-sub-tier" value={form.tier} onChange={(e) => update('tier', e.target.value)} required>
+              <option value="free">Free</option>
+              <option value="premium">{SITE.premiumTier} (premium)</option>
+            </select>
+          </div>
 
-          <FlashingLightsField id="edit-submission-flashing" checked={form.hasFlashingLights} onChange={(v) => update('hasFlashingLights', v)} />
+          <div className="ebx-switches">
+            <FlashingLightsField id="edit-submission-flashing" checked={form.hasFlashingLights} onChange={(v) => update('hasFlashingLights', v)} />
+            {downloadsShown && (
+              <DownloadsAllowedField
+                id="edit-submission-downloads"
+                checked={downloads}
+                onChange={setDownloads}
+                locked={downloadsReady ? null : MIGRATION_123_MSG}
+              />
+            )}
+          </div>
 
-          {downloadsShown && (
-            <DownloadsAllowedField
-              id="edit-submission-downloads"
-              checked={downloads}
-              onChange={setDownloads}
-              locked={downloadsReady ? null : MIGRATION_123_MSG}
-            />
-          )}
+          {error && <p className="ebx-error" role="alert">{error}</p>}
+          </div>
 
-          <label>Main genre</label>
-          <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>
-            {genres.map((g) => <option key={g} value={g}>{g}</option>)}
-          </select>
-
-          <label>Specific genre</label>
-          <input type="text" value={form.genre} onChange={(e) => update('genre', e.target.value)} required />
-
-          <label>Suggested tier — the admin has final say</label>
-          <select value={form.tier} onChange={(e) => update('tier', e.target.value)} required>
-            <option value="free">Free</option>
-            <option value="premium">{SITE.premiumTier} (premium)</option>
-          </select>
-
-          {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
-
-          <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
-            <button className="account-btn-primary" type="submit" disabled={saving} style={{ width: 'auto' }}>
+          <div className="ebx-actions">
+            <button className="account-btn-primary" type="submit" disabled={saving}>
               {saving ? 'Saving…' : 'Save changes'}
             </button>
-            <button className="account-btn-secondary" type="button" onClick={onClose} disabled={saving} style={{ width: 'auto' }}>
+            <button className="account-btn-secondary" type="button" onClick={onClose} disabled={saving}>
               Cancel
             </button>
           </div>

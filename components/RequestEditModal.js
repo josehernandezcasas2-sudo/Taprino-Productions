@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { keepScrollInside } from '../lib/menuScroll';
 import PageNotesField from './PageNotesField';
 import FlashingLightsField from './FlashingLightsField';
 import DownloadsAllowedField from './DownloadsAllowedField';
@@ -47,6 +48,10 @@ const WAITING_WORDS = { title: 'the new title', description: 'the new descriptio
 const FIELD_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning', downloadsAllowed: 'the downloads switch' };
 
 export default function RequestEditModal({ type = 'episode', currentValues, onClose, onSubmitted }) {
+  // The box scrolls its own fields; a wheel or a finger that has nothing
+  // left to scroll in it never moves the page behind (lib/menuScroll.js).
+  const backdropRef = useRef(null);
+  useEffect(() => keepScrollInside(backdropRef.current), []);
   const cv = currentValues || {};
   const isEpisode = type === 'episode';
   const waiting = {
@@ -161,29 +166,42 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
     return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
   };
 
+  // Drawn in the show editor's look (.ebx in globals.css; Jose,
+  // 2026-11-14), like Your work's other box, components/EditSubmissionModal.js.
+  const heading = notesShown ? 'Title, description & notes' : 'Title & description';
   return (
-    <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <h3>{notesShown ? 'Title, description & notes' : 'Title & description'}</h3>
-        <p style={{ fontSize: '0.85rem', color: 'var(--ink-dim)', marginBottom: '1rem' }}>
-          {liveRules
-            ? 'It’s live, so these go to Studio Tapa for approval before visitors see them — what’s there now stays until then.'
-            : 'It isn’t live yet, so these apply as soon as you save.'}
-        </p>
-
+    <div className="modal-backdrop" ref={backdropRef} onClick={onClose}>
+      <div className="modal-card ebx" role="dialog" aria-modal="true" aria-labelledby="ebx-request-title" onClick={(e) => e.stopPropagation()}>
+        <div className="ebx-head">
+          <div className="ebx-head-main">
+            <span className="ebx-kicker">Your work · {liveRules ? 'Live' : 'Not live yet'}</span>
+            <h3 className="ebx-title" id="ebx-request-title">{heading}</h3>
+          </div>
+          <button type="button" className="ebx-close" onClick={onClose} aria-label="Close">✕</button>
+        </div>
         {done ? (
-          <>
-            <p style={{ color: 'var(--ok)' }}>
+          <div className="ebx-done">
+            <div className="ebx-body">
+            <p className="ebx-done-line" role="status">
               {done.staged.length > 0 ? `Sent for review: ${words(done.staged)}. Visitors see what’s live until we approve it.` : null}
               {done.staged.length > 0 && done.applied.length > 0 ? ' ' : null}
               {done.applied.length > 0 ? `Saved: ${words(done.applied)}.` : null}
               {done.staged.length === 0 && done.applied.length === 0 ? (done.notices[0] || 'Saved.') : null}
             </p>
-            {done.notices.length > 0 && (done.staged.length > 0 || done.applied.length > 0) && <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>{done.notices.join(' ')}</p>}
-            <button className="account-btn-primary" style={{ width: 'auto' }} onClick={onClose}>Close</button>
-          </>
+            {done.notices.length > 0 && (done.staged.length > 0 || done.applied.length > 0) && <p className="req-edit-line">{done.notices.join(' ')}</p>}
+            </div>
+            <div className="ebx-actions">
+              <button type="button" className="account-btn-primary" onClick={onClose}>Close</button>
+            </div>
+          </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="ebx-form">
+            <div className="ebx-body">
+            <p className="ebx-lede">
+              {liveRules
+                ? 'It’s live, so these go to Studio Tapa for approval before visitors see them — what’s there now stays until then.'
+                : 'It isn’t live yet, so these apply as soon as you save.'}
+            </p>
             {anyWaiting && (
               <div className="req-edit-waiting" role="status">
                 <strong>Waiting for approval</strong>
@@ -198,44 +216,54 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
                 <p>Visitors see what’s live until we approve it. The boxes below start from what waits.</p>
               </div>
             )}
-            {error && <p style={{ color: 'var(--danger)' }}>{error}</p>}
-            <label htmlFor="req-edit-title">{isEpisode ? 'Title' : 'Show name'}</label>
-            <input id="req-edit-title" type="text" value={nameValue} onChange={(e) => setNameValue(e.target.value)} required disabled={!open('title')} maxLength={200} />
-            {!open('title') && <p className="req-edit-line">{lineOf('title')}</p>}
-            <label htmlFor="req-edit-description">Description</label>
-            <textarea id="req-edit-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={4000} disabled={!open('description')} style={{ width: '100%', boxSizing: 'border-box' }} />
-            {!open('description') && <p className="req-edit-line">{lineOf('description')}</p>}
+            {error && <p className="ebx-error" role="alert">{error}</p>}
+            <div className="ebx-field">
+              <label htmlFor="req-edit-title">{isEpisode ? 'Title' : 'Show name'}</label>
+              <input id="req-edit-title" type="text" className="is-title" value={nameValue} onChange={(e) => setNameValue(e.target.value)} required disabled={!open('title')} maxLength={200} />
+              {!open('title') && <p className="req-edit-line">{lineOf('title')}</p>}
+            </div>
+            <div className="ebx-field">
+              <label htmlFor="req-edit-description">Description</label>
+              <textarea id="req-edit-description" value={description} onChange={(e) => setDescription(e.target.value)} rows={4} maxLength={4000} disabled={!open('description')} />
+              {!open('description') && <p className="req-edit-line">{lineOf('description')}</p>}
+            </div>
             {notesShown && (
               <PageNotesField
                 id="request-edit-notes"
                 value={notes}
                 onChange={setNotes}
                 disabled={!open('pageNotes')}
+                wrapClassName="ebx-field"
                 note={!open('pageNotes') ? lineOf('pageNotes') : modeOf('pageNotes') === 'staged' ? 'Waits for approval like the description.' : 'Saved at once: it isn’t live yet.'}
               />
             )}
-            {isEpisode && (
-              <FlashingLightsField
-                id="req-edit-flashing"
-                checked={flashing}
-                onChange={setFlashing}
-                locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
-              />
-            )}
-            {downloadsShown && (
-              <DownloadsAllowedField
-                id="req-edit-downloads"
-                checked={downloads}
-                onChange={setDownloads}
-                locked={downloadsReady ? null : MIGRATION_123_MSG}
-              />
+            {(isEpisode || downloadsShown) && (
+              <div className="ebx-switches">
+                {isEpisode && (
+                  <FlashingLightsField
+                    id="req-edit-flashing"
+                    checked={flashing}
+                    onChange={setFlashing}
+                    locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
+                  />
+                )}
+                {downloadsShown && (
+                  <DownloadsAllowedField
+                    id="req-edit-downloads"
+                    checked={downloads}
+                    onChange={setDownloads}
+                    locked={downloadsReady ? null : MIGRATION_123_MSG}
+                  />
+                )}
+              </div>
             )}
             {summary.note && <p className="req-edit-line">{summary.note}.</p>}
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
-              <button className="account-btn-primary" type="submit" disabled={saving || changes.length === 0} style={{ width: 'auto' }}>
+            </div>
+            <div className="ebx-actions">
+              <button className="account-btn-primary" type="submit" disabled={saving || changes.length === 0}>
                 {saving ? 'Sending…' : summary.label}
               </button>
-              <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={onClose}>Cancel</button>
+              <button type="button" className="account-btn-secondary" onClick={onClose}>Cancel</button>
             </div>
           </form>
         )}

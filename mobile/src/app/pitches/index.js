@@ -177,7 +177,7 @@ export default function PitchRoom() {
       <Text style={styles.eyebrow}>Pitch Room</Text>
       <Text style={styles.heading}>Back what gets{'\n'}made next.</Text>
       <Text style={styles.sub}>
-        Projects looking for backing. Each one links straight to the creator's own page — save one to follow along and get notified when they post an update.
+        Projects looking for backing. Where backing is open you can back a project from its page: the payment goes through Stripe straight to the creator's account, and you see what they receive before you pay. Save one to follow along and get notified when they post an update.
       </Text>
 
       <Pressable onPress={() => router.push('/pitches/discover')} style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
