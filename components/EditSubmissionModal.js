@@ -4,7 +4,11 @@ import { MAIN_GENRES, SUBMIT_TYPES } from '../lib/submitRules';
 import RatingOptions from './RatingOptions';
 import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
 import FlashingLightsField from './FlashingLightsField';
+import DownloadsAllowedField from './DownloadsAllowedField';
 import { savePageNotes } from '../lib/pageNotesSave';
+import { saveDownloadsAllowed } from '../lib/downloadsAllowedSave';
+import { downloadableKind } from '../lib/downloadRules';
+import { MIGRATION_123_MSG } from '../lib/downloadSiteRules';
 
 // A standalone title's own types: the ones that sit in no show.
 const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical'].includes(t.value));
@@ -26,6 +30,11 @@ const STANDALONE_TYPES = SUBMIT_TYPES.filter((t) => ['movie', 'short', 'vertical
 // like the description here, through the show editor's own save
 // (lib/pageNotesSave.js → PATCH /api/show/episode/<id>, which holds the
 // rules for who may change them).
+//
+// "Allow downloads in the app" (2026-11-14) is here for every title that
+// can be downloaded (not a podcast), saved the same way through
+// lib/downloadsAllowedSave.js: it applies at once, and before migration
+// 123 the box is greyed with the server's line.
 export default function EditSubmissionModal({ submission, onClose, onSaved }) {
   const [form, setForm] = useState({
     title: submission.title || '',
@@ -44,9 +53,13 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
   });
   const startNotes = submission.pageNotes || '';
   const [notes, setNotes] = useState(startNotes);
+  const startDownloads = submission.downloadsAllowed !== false;
+  const [downloads, setDownloads] = useState(startDownloads);
+  const downloadsReady = submission.downloadsAllowedReady !== false;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const notesShown = pageNotesBoxShows(submission, { contentType: form.contentType });
+  const downloadsShown = downloadableKind(form.contentType);
   // A title of another type (an older one, or an extra whose show isn't
   // one of this creator's) keeps its type; the list only adds it.
   const types = STANDALONE_TYPES.some((t) => t.value === form.contentType)
@@ -73,6 +86,10 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
       if (notesShown && notes.trim() !== startNotes.trim()) {
         const saved = await savePageNotes(submission.id, notes);
         if (!saved.ok) throw new Error(`The other changes are saved, but not the notes: ${saved.error}`);
+      }
+      if (downloadsShown && downloadsReady && downloads !== startDownloads) {
+        const saved = await saveDownloadsAllowed(submission.id, downloads);
+        if (!saved.ok) throw new Error(`The other changes are saved, but not the downloads switch: ${saved.error}`);
       }
       onSaved();
     } catch (err) {
@@ -129,6 +146,15 @@ export default function EditSubmissionModal({ submission, onClose, onSaved }) {
           </select>
 
           <FlashingLightsField id="edit-submission-flashing" checked={form.hasFlashingLights} onChange={(v) => update('hasFlashingLights', v)} />
+
+          {downloadsShown && (
+            <DownloadsAllowedField
+              id="edit-submission-downloads"
+              checked={downloads}
+              onChange={setDownloads}
+              locked={downloadsReady ? null : MIGRATION_123_MSG}
+            />
+          )}
 
           <label>Main genre</label>
           <select value={form.mainGenre} onChange={(e) => update('mainGenre', e.target.value)} required>

@@ -1,7 +1,10 @@
 // node scripts/test-download-site.mjs — downloads in the app, the server's
 // and the website's own rules (lib/downloadSiteRules.js, 2026-11-14): what
-// the app may send, the start route's refusals and its two limits, a
-// promo's cap, when a check-in frees a slot, the words over a downloaded
+// the app may send (and what a browser sends), the start route's refusals,
+// its two limits before and after a row is written, the new copies an
+// account may ask for in an hour and a day, a promo's cap, when a check-in
+// frees a slot, the settings read that says when its row is an older one,
+// the comped and promo reads that say when they failed, the words over a downloaded
 // title, the admin switch and its lock, the creator's switch per title —
 // and the Cloudflare download token (lib/cloudflareUpload.js): signed
 // with `downloadable: true`, never mixed with the playback tokens.
@@ -12,6 +15,7 @@ import { generateKeyPairSync, createVerify } from 'node:crypto';
 import * as R from '../lib/downloadSiteRules.js';
 import * as D from '../lib/downloadRules.js';
 import { isTitleId } from '../lib/titleIds.js';
+import * as SW from '../lib/securitySwitches.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
@@ -74,8 +78,9 @@ t('a phone’s name is cleaned, its platform is ios, android or nothing', () => 
   assert.equal(R.deviceLabel({}), 'A phone');
 });
 
-t('a check-in’s list: at most 60 title ids, each once', () => {
-  assert.deepEqual(R.cleanHave(undefined, isTitleId), { ok: true, ids: [] });
+t('a check-in’s list: at most 60 title ids, each once — and it has to be there', () => {
+  // An empty list frees every slot on the phone, so "no list" is never read as one.
+  for (const missing of [undefined, null, '', 0, {}, 'night-bus-lx3k9a']) assert.equal(R.cleanHave(missing, isTitleId).ok, false, JSON.stringify(missing));
   assert.deepEqual(R.cleanHave([], isTitleId), { ok: true, ids: [] });
   assert.deepEqual(R.cleanHave(['night-bus-lx3k9a', 'kitchen-hours-m1q8zt', 'night-bus-lx3k9a'], isTitleId), { ok: true, ids: ['night-bus-lx3k9a', 'kitchen-hours-m1q8zt'] });
   assert.equal(R.cleanHave('night-bus-lx3k9a', isTitleId).ok, false);
@@ -83,6 +88,33 @@ t('a check-in’s list: at most 60 title ids, each once', () => {
   assert.equal(R.cleanHave(['ok-id', 'not a title id'], isTitleId).ok, false);
   assert.equal(R.cleanHave(Array.from({ length: 60 }, (_, i) => `t-${i}`), isTitleId).ok, true);
   assert.equal(R.cleanHave(Array.from({ length: 61 }, (_, i) => `t-${i}`), isTitleId).ok, false);
+});
+
+t('start, sync and remove are the app’s: anything that looks like a browser is refused', () => {
+  const app = { authorization: 'Bearer eyJhbGciOi.token.sig', 'content-type': 'application/json', 'user-agent': 'StudioTapaTV/1.1 CFNetwork' };
+  assert.equal(R.looksLikeABrowser(app), false);
+  assert.equal(R.looksLikeABrowser({ ...app, authorization: 'bearer abc' }), false, 'the scheme in any case');
+  // A browser's fetch: its Origin, its Sec-Fetch-Site — with or without a token.
+  assert.equal(R.looksLikeABrowser({ ...app, origin: 'https://www.studiotapatv.site' }), true);
+  assert.equal(R.looksLikeABrowser({ ...app, 'sec-fetch-site': 'same-origin' }), true);
+  assert.equal(R.looksLikeABrowser({ ...app, 'sec-fetch-site': 'none' }), true);
+  assert.equal(R.looksLikeABrowser({ ...app, origin: 'null' }), true);
+  // A session cookie is not the app's way in.
+  assert.equal(R.looksLikeABrowser({ cookie: '__session=abc' }), true);
+  assert.equal(R.looksLikeABrowser({ authorization: 'Basic abc' }), true);
+  assert.equal(R.looksLikeABrowser({ authorization: 'Bearer ' }), true);
+  assert.equal(R.looksLikeABrowser({}), true);
+  assert.equal(R.looksLikeABrowser(undefined), true);
+  // The two questions the routes ask, one before sign-in and one after
+  // (a request with no sign-in at all hears 401 in between).
+  assert.equal(R.browserHeaders(app), false);
+  assert.equal(R.browserHeaders({}), false);
+  assert.equal(R.browserHeaders({ origin: 'http://127.0.0.1:3100' }), true);
+  assert.equal(R.browserHeaders({ 'sec-fetch-site': 'same-origin' }), true);
+  assert.equal(R.browserHeaders({ origin: '  ' }), false);
+  assert.equal(R.bearerSent(app), true);
+  assert.equal(R.bearerSent({ cookie: '__session=abc' }), false);
+  assert.equal(R.bearerSent(undefined), false);
 });
 
 t('the start route’s refusal for each answer of the Download button', () => {
@@ -133,6 +165,84 @@ t('the two limits: 25 titles on a phone, 2 phones an account', () => {
   assert.deepEqual(R.startLimits({ deviceId: C, episodeId: 'v-0', devices: phones, copies: [...two, ...copies(C, 1, 'v')] }), { ok: true, again: true });
 });
 
+t('the two limits again, once the row is in: the request that finds one passed takes its own row back', () => {
+  const rows = (deviceId, count, licensed = true, prefix = deviceId) => Array.from({ length: count }, (_, i) => ({ id: `${prefix}-${i}`, deviceId, licensed }));
+  // 25 on the phone with mine in: fine. 26: over, whoever asks.
+  assert.equal(R.overLimits({ deviceId: A, mine: 'mine', copies: [...rows(A, 24), { id: 'mine', deviceId: A, licensed: false }] }), null);
+  assert.equal(R.overLimits({ deviceId: A, mine: 'mine', copies: [...rows(A, 25), { id: 'mine', deviceId: A, licensed: false }] }), 'titles');
+  // Ten at once on a phone that held 24: every one of them sees 34.
+  assert.equal(R.overLimits({ deviceId: A, mine: 'r-3', copies: [...rows(A, 24), ...rows(A, 10, false, 'r')] }), 'titles');
+  // A second phone's first title: fine. A third phone's: over.
+  assert.equal(R.overLimits({ deviceId: B, mine: 'mine', copies: [...rows(A, 3), { id: 'mine', deviceId: B, licensed: false }] }), null);
+  assert.equal(R.overLimits({ deviceId: C, mine: 'mine', copies: [...rows(A, 3), ...rows(B, 1), { id: 'mine', deviceId: C, licensed: false }] }), 'devices');
+  // A phone that already holds a licensed copy is one of the phones: its
+  // next title is never the one taken back for a third phone's race.
+  assert.equal(R.overLimits({ deviceId: B, mine: 'mine', copies: [...rows(A, 3), ...rows(B, 1), { id: 'mine', deviceId: B, licensed: false }, { id: 'c-0', deviceId: C, licensed: false }] }), null);
+  // Two first titles at once on a new phone, beside two that hold: neither
+  // row makes the phone one of the two (the other one isn't licensed).
+  const twoAtOnce = [...rows(A, 1), ...rows(B, 1), { id: 'c-0', deviceId: C, licensed: false }, { id: 'c-1', deviceId: C, licensed: false }];
+  assert.equal(R.overLimits({ deviceId: C, mine: 'c-0', copies: twoAtOnce }), 'devices');
+  assert.equal(R.overLimits({ deviceId: C, mine: 'c-1', copies: twoAtOnce }), 'devices');
+  // Its own row, licensed, doesn't vouch for itself.
+  assert.equal(R.overLimits({ deviceId: C, mine: 'c-0', copies: [...rows(A, 1), ...rows(B, 1), { id: 'c-0', deviceId: C, licensed: true }] }), 'devices');
+  assert.equal(R.overLimits(), null);
+});
+
+t('new copies: 30 an hour and 60 a day, counted at the first ask, once per title per phone in six hours', () => {
+  const MIN = 60000;
+  const HOUR = 3600000;
+  assert.equal(R.NEW_COPIES_PER_HOUR, 30);
+  assert.equal(R.NEW_COPIES_PER_DAY, 60);
+  assert.equal(R.NEW_COPY_REPEAT_HOURS, 6);
+  const row = (i, ago, over = {}) => ({ id: `r${i}`, deviceId: A, episodeId: `t-${i}`, createdAt: NOW - ago, undone: false, ...over });
+  const ask = { now: NOW, deviceId: A, episodeId: 'new-title' };
+  // Nothing yet: fine. 29 in the last hour: the 30th fits. 30: the 31st doesn't.
+  assert.equal(R.newCopyRefusal([], ask), null);
+  assert.equal(R.newCopyRefusal(Array.from({ length: 29 }, (_, i) => row(i, (i + 1) * MIN)), ask), null);
+  const thirty = Array.from({ length: 30 }, (_, i) => row(i, (i + 1) * MIN));
+  const hour = R.newCopyRefusal(thirty, ask);
+  assert.equal(hour.limit, 'hour');
+  // The oldest of the thirty was asked for 30 minutes ago: one fits in another 30.
+  assert.equal(hour.retryAfter, 30 * 60);
+  // Whatever became of the rows (removed, taken back by the site) they were asked for…
+  assert.equal(R.newCopyRefusal(thirty.map((r) => ({ ...r, status: 'removed' })), ask).limit, 'hour');
+  // …except the ones the server itself took back at a limit: they count for nothing.
+  assert.equal(R.newCopyRefusal(thirty.map((r, i) => (i < 5 ? { ...r, undone: true } : r)), ask), null);
+  // A title asked for more than an hour ago left the hour.
+  assert.equal(R.newCopyRefusal(thirty.map((r, i) => (i === 0 ? { ...r, createdAt: NOW - HOUR - 1 } : r)), ask), null);
+  // The same title on the same phone again within six hours is not a new copy:
+  // it is let through even with the hour full, and adds nothing to the count.
+  assert.equal(R.newCopyRefusal([...thirty, { id: 'old', deviceId: A, episodeId: 'new-title', createdAt: NOW - 5 * HOUR }], ask), null);
+  assert.equal(R.newCopyRefusal([...thirty, { id: 'old', deviceId: A, episodeId: 'new-title', createdAt: NOW - 7 * HOUR }], ask).limit, 'hour');
+  // …on another phone it is a new copy.
+  assert.equal(R.newCopyRefusal([...thirty, { id: 'old', deviceId: B, episodeId: 'new-title', createdAt: NOW - 5 * HOUR }], ask).limit, 'hour');
+  // Start, delete, start again, twenty times over: one copy.
+  const churn = Array.from({ length: 20 }, (_, i) => ({ id: `c${i}`, deviceId: A, episodeId: 't-0', createdAt: NOW - (i + 1) * MIN }));
+  assert.equal(R.newCopyRefusal([...churn, ...Array.from({ length: 28 }, (_, i) => row(i + 1, (i + 1) * MIN))], ask), null);
+  // The day: 60 spread so that no hour is full.
+  const sixty = Array.from({ length: 60 }, (_, i) => row(i, 2 * HOUR + i * 20 * MIN));
+  const day = R.newCopyRefusal(sixty, ask);
+  assert.equal(day.limit, 'day');
+  // The oldest was asked for 21 h 40 min ago: one fits in 2 h 20 min.
+  assert.equal(day.retryAfter, 2 * 3600 + 20 * 60);
+  assert.equal(R.newCopyRefusal(sixty.slice(1), ask), null);
+  // Both full: the longer wait is the one named.
+  assert.equal(R.newCopyRefusal([...thirty, ...Array.from({ length: 30 }, (_, i) => row(100 + i, 3 * HOUR + i * MIN))], ask).limit, 'day');
+  // After the write: the row itself is in the list. 30 with mine: fine; 31: mine goes.
+  const mine = { id: 'mine', deviceId: A, episodeId: 'new-title', createdAt: NOW };
+  assert.equal(R.newCopyRefusal([...thirty.slice(1), mine], { now: NOW, mine: 'mine' }), null);
+  assert.equal(R.newCopyRefusal([...thirty, mine], { now: NOW, mine: 'mine' }).limit, 'hour');
+  // Ten written at once with 25 before them: each of the ten sees 35.
+  const burst = Array.from({ length: 10 }, (_, i) => ({ id: `b${i}`, deviceId: A, episodeId: `b-${i}`, createdAt: NOW }));
+  for (const b of burst) assert.equal(R.newCopyRefusal([...thirty.slice(5), ...burst], { now: NOW, mine: b.id }).limit, 'hour');
+  // A row that isn't a new copy (the same title again) is never the one to go.
+  assert.equal(R.newCopyRefusal([...thirty, ...burst, { id: 'again', deviceId: A, episodeId: 't-3', createdAt: NOW }], { now: NOW, mine: 'again' }), null);
+  // Dates as the database hands them over.
+  assert.equal(R.newCopyRefusal(thirty.map((r) => ({ ...r, createdAt: new Date(r.createdAt).toISOString() })), ask).limit, 'hour');
+  assert.equal(R.newCopyRefusal(thirty.map((r) => ({ ...r, createdAt: new Date(r.createdAt) })), ask).limit, 'hour');
+  assert.ok(R.RATE_WORDS.hour && R.RATE_WORDS.day && R.RATE_WORDS.requests);
+});
+
 t('until when a copy plays: the rules’ date, and a promo never past its end', () => {
   assert.equal(R.copyLicensedUntil({ basis: 'member', now: NOW, paidThrough: at(10) }), at(12));
   assert.equal(R.copyLicensedUntil({ basis: 'member', now: NOW, paidThrough: null }), at(30));
@@ -162,6 +272,12 @@ t('a copy the phone didn’t list frees its slot — at once when it lists nothi
   assert.equal(R.frees({ renewedAt: new Date(NOW - 10 * 60000).toISOString(), now: NOW, listed: 1 }), true);
   assert.equal(R.frees({ renewedAt: null, createdAt: NOW - 1000, now: NOW, listed: 1 }), false, 'no renewal on record: its creation counts');
   assert.equal(R.frees({ renewedAt: null, createdAt: null, now: NOW, listed: 1 }), true);
+  // A title still waiting for its file is never on the phone's list, so an
+  // empty list says nothing about it: only the phone going quiet frees it.
+  assert.equal(R.frees({ renewedAt: NOW - 1000, now: NOW, listed: 0, pending: true }), false);
+  assert.equal(R.frees({ renewedAt: NOW - 1000, now: NOW, listed: 2, pending: true }), false);
+  assert.equal(R.frees({ renewedAt: NOW - grace - 1, now: NOW, listed: 0, pending: true }), true);
+  assert.equal(R.frees({ renewedAt: NOW - grace - 1, now: NOW, listed: 2, pending: true }), true);
 });
 
 t('the words over a downloaded title, as the episode page prints them', () => {
@@ -367,6 +483,43 @@ await ta('without a signing key the token comes from Cloudflare’s API, asked f
   const again = await CF.createCloudflareDownloadToken(OTHER);
   assert.equal(calls.length, 4);
   assert.match(again.token, /-download$/, 'and a download token after a playback token is never the cached playback one');
+});
+
+await ta('the settings read says when its row is an older one (a start never rests on yesterday’s "on")', async () => {
+  const env = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+  process.env.SUPABASE_URL = 'https://rig.example';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-key';
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    SW.forgetSecuritySwitches();
+    const up = async () => ({ ok: true, json: async () => [{ id: 1, downloads_enabled: true, downloads_locked: false }] });
+    const down = async () => { throw new Error('connection refused'); };
+    const refused = async () => ({ ok: false, status: 503, json: async () => ({}) });
+    // No row yet and the read fails: not ok.
+    assert.deepEqual(await SW.readSecurityRowFresh({ fetchImpl: down }), { row: null, ok: false, stale: false });
+    // A read that works.
+    const good = await SW.readSecurityRowFresh({ fetchImpl: up });
+    assert.equal(good.ok, true);
+    assert.equal(good.stale, false);
+    assert.equal(good.row.downloads_enabled, true);
+    // The next one fails: the older row is still handed over, marked as older.
+    for (const broken of [down, refused]) {
+      const old = await SW.readSecurityRowFresh({ fetchImpl: broken });
+      assert.equal(old.ok, true, 'as it always was: the row is usable');
+      assert.equal(old.stale, true, 'but it is not this read’s');
+      assert.equal(old.row.downloads_enabled, true);
+    }
+    // The pages go on with the older row, as before.
+    assert.equal((await SW.getSecurityRow({ fetchImpl: down })).downloads_enabled, true);
+    // And a read that works again clears it.
+    assert.equal((await SW.readSecurityRowFresh({ fetchImpl: up })).stale, false);
+  } finally {
+    console.error = quiet;
+    SW.forgetSecuritySwitches();
+    if (env.url === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = env.url;
+    if (env.key === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = env.key;
+  }
 });
 
 await ta('Cloudflare refusing, or not configured, throws (the route answers 503 cloudflare)', async () => {

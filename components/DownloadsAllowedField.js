@@ -8,8 +8,11 @@ import { DOWNLOADS_ALLOWED_HINT, DOWNLOADS_ALLOWED_LABEL } from '../lib/download
 // the title. `locked` is the line when the box can't be changed (someone
 // who neither uploaded the title nor owns its show, or a database before
 // migration 123): the box stays as it is, greyed, with the line under it.
-// Drawn in the episode editor's More info (components/show/EpisodeEditor.js);
-// the Library's modal has its own row (components/AdminEditEpisodeModal.js).
+// Drawn in the episode editor's More info (components/show/EpisodeEditor.js)
+// and, for a film or a short — a title in no show — in Your work's two
+// edit boxes (components/EditSubmissionModal.js while it is in review,
+// components/RequestEditModal.js once it is live); the Library's modal has
+// its own row (components/AdminEditEpisodeModal.js).
 // The look is the flashing-lights checkbox's (.flash-field).
 export default function DownloadsAllowedField({ id, checked, onChange, locked = null, className = '' }) {
   const hintId = `${id}-hint`;

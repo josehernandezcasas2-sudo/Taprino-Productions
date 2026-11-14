@@ -5,11 +5,12 @@ import { isTitleId } from '../../../lib/titleIds';
 
 // POST /api/downloads/remove { deviceId, episodeId } → { ok: true }
 // The phone deleted its copy of a title: the slot is free at once. A copy
-// that isn't on record answers the same. 401 · 403 { suspended: true } ·
-// 429 · 503 { code: 'migration-123' }.
+// that isn't on record answers the same. 401 · 403 { code: 'app-only' } a
+// browser (lib/downloadSiteRules.js looksLikeABrowser) · 403 { suspended:
+// true } · 429 · 503 { code: 'migration-123' | 'unavailable' }.
 export default async function handler(req, res) {
   try {
-    const account = await startDownloadRoute(req, res, { methods: ['POST'], scope: 'downloads-remove', perHour: 240 });
+    const account = await startDownloadRoute(req, res, { methods: ['POST'], scope: 'downloads-remove', perHour: 240, appOnly: true });
     if (!account) return undefined;
     const body = bodyOf(req);
     if (!isDeviceId(body.deviceId)) throw new DownloadError('That isn’t a phone’s id.', 400, { code: 'device' });

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Downloads in the app (2026-11-14; contract mockups/app-downloads-contract.md,
 // migration 123), called the way the app calls: Authorization: Bearer, no
-// Origin, no cookie (the website's own calls with the cookie).
+// Origin, no cookie (the website's own calls with the cookie; start, sync
+// and remove refuse those).
 //
 // After 123:
 //   the switch       Admin → Downloads: a full admin turns it on and off,
@@ -16,7 +17,8 @@
 //                    suspended 403; the gate's own answers (no terms, no
 //                    plan for a premium title); /api/episode-page's and
 //                    the website page's `download`
-//   the link         202 while Cloudflare makes the file, then a link that
+//   the link         202 while Cloudflare makes the file (the title holds
+//                    its place without a date), then a link that
 //                    really downloads from the fake (whole and by range)
 //                    with the `downloadable` claim; a playback token and
 //                    the bare uid don't; a video Cloudflare doesn't have
@@ -26,18 +28,36 @@
 //                    promo never past its end
 //   the two limits   25 titles on a phone, 2 phones an account; removing a
 //                    title or a phone frees the place
+//   new copies       asking again never counts; 30 new copies an hour and
+//                    60 a day per account (429 says which, and for how
+//                    long); the same title on the same phone again isn't
+//                    a new copy; a title is counted at its first ask, the
+//                    asks while its file is made are not
+//   racing           ten titles at once onto a phone with room for one,
+//                    six phones at once beside one that holds a copy, six
+//                    new copies at once with room for two: the limits hold
+//   only the app     start, sync and remove refuse a browser's session
+//                    cookie and a request with an Origin or Sec-Fetch-Site
+//                    header (403 `app-only`); the list of phones stays
+//                    open to the website
 //   the check-in     a copy the phone no longer lists frees its slot (only
 //                    after a link's life); a plan that ended (`ended`,
 //                    `keepUntil`, set once, cleared on rejoining); a bought
 //                    copy refunded; a title switched off, pulled or on its
 //                    way out (`revoked`; an owner keeps a withdrawn one);
 //                    the switch off (`paused`, nothing renewed); a phone
-//                    removed from the website (`deviceRemoved`); and never
-//                    on a guess: Clerk not answering, or the purchases
-//                    unreadable, answers 5xx and changes nothing
+//                    removed from the website (`deviceRemoved`); a
+//                    check-in without its list is refused and frees
+//                    nothing; and never on a guess: Clerk not answering,
+//                    or the purchases, the comped list, a promo's date, a
+//                    suspension or the settings unreadable, answers 503
+//                    `unavailable` and changes nothing — a buyer on Basic
+//                    is never told "plan", no link goes out on an older
+//                    "on"
 //   the creator's switch  the uploader and the show's owner in every
 //                    state, the team (the show editor's save and the
-//                    Library's), someone else refused; the Library's row
+//                    Library's), someone else refused; the Library's row;
+//                    Your work's two edit boxes for a film or a short
 //   the pages        /admin/downloads for a full admin at 390 and 1280 (a
 //                    real click on the switch, the lock, UNLOCK), a
 //                    sub-admin sent away; /downloads signed out and with
@@ -47,18 +67,20 @@
 // route's 503 `migration-123`, the switch reading off, the creator's
 // switch greyed and refused, the admin page's banner.
 //   node dev/test-rig/checks/downloads.mjs
-// RIG_CHECK_SKIP_REVOKE=1 leaves out the part that takes SELECT on
-// purchases from service_role for a moment.
+// RIG_CHECK_SKIP_REVOKE=1 leaves out the parts that take SELECT on a table
+// (purchases, comped_access, user_profiles, account_suspensions,
+// site_settings) from service_role for a moment.
 import crypto from 'node:crypto';
 import { IDS, USERS, RUN, BASE, FAKES, ok, section, runCheck, call, sql, rows, q, insert, hasColumn, session, newUser, removeUser, clerk, stripeHook, stripeApi, cloudflare, forgetInvoiceEvents, ago, browser, goto, overflowPx, SIGNED_OUT } from './lib.mjs';
 import { FAKE_KEYS } from '../lib/config.mjs';
 import { CHECKIN_DAYS, DOWNLOAD_WORDS, GRACE_DAYS, KEEP_AFTER_END_DAYS, LINK_SECONDS, MAX_DEVICES, MAX_TITLES_PER_DEVICE, MEMBER_MAX_DAYS, playState } from '../../../lib/downloadRules.js';
-import { ADMIN_DOWNLOAD_WORDS, DOWNLOADS_ALLOWED_LABEL, MIGRATION_123_MSG, START_WORDS, SWITCH_CHANGES_PER_HOUR, UNLOCK_WORD } from '../../../lib/downloadSiteRules.js';
+import { ADMIN_DOWNLOAD_WORDS, DOWNLOADS_ALLOWED_LABEL, MIGRATION_123_MSG, NEW_COPIES_PER_DAY, NEW_COPIES_PER_HOUR, RATE_WORDS, START_WORDS, SWITCH_CHANGES_PER_HOUR, UNAVAILABLE_LINE, UNDONE_REASON, UNLOCK_WORD } from '../../../lib/downloadSiteRules.js';
 
 const HAS123 = hasColumn('site_settings', 'downloads_enabled');
-// lib/downloads.js NEW_COPIES_PER_HOUR (a server-only file: not imported here).
-const NEW_COPIES = 60;
 const DAY = 86400000;
+const SKIP_REVOKE = process.env.RIG_CHECK_SKIP_REVOKE === '1';
+// The tables a part of this check takes SELECT from for a moment.
+const REVOKED = ['purchases', 'comped_access', 'user_profiles', 'account_suspensions', 'site_settings'];
 const MARA = session(USERS.mara);
 const DEE = session(USERS.dee);
 
@@ -101,8 +123,18 @@ async function eventually(ask, good, seconds = 45) {
   return r;
 }
 const near = (a, b, slack = 5000) => Math.abs(Date.parse(a) - Date.parse(b)) <= slack;
+// The site's own key can't read `table` while `work` runs.
+async function unreadable(table, work) {
+  sql(`revoke select on public.${table} from service_role`);
+  try {
+    return await work();
+  } finally {
+    sql(`grant select on public.${table} to service_role`);
+  }
+}
+const isUnavailable = (r) => r.status === 503 && r.json && r.json.code === 'unavailable' && r.json.error === UNAVAILABLE_LINE;
 
-const UID = { main: crypto.randomBytes(16).toString('hex'), slow: crypto.randomBytes(16).toString('hex'), gone: crypto.randomBytes(16).toString('hex'), open: crypto.randomBytes(16).toString('hex') };
+const UID = { main: crypto.randomBytes(16).toString('hex'), slow: crypto.randomBytes(16).toString('hex'), gone: crypto.randomBytes(16).toString('hex'), open: crypto.randomBytes(16).toString('hex'), wait: crypto.randomBytes(16).toString('hex') };
 const srcOf = (uid) => `https://customer-test.cloudflarestream.com/${uid}/manifest/video.m3u8`;
 const ID = {
   film: `ck-dl-film-${RUN}`, // free, Mara's
@@ -117,6 +149,9 @@ const ID = {
   leaving: `ck-dl-leaving-${RUN}`, // its removal asked for later
   teen: `ck-dl-teen-${RUN}`, // rated TV-14: the viewing terms first
   open: `ck-dl-open-${RUN}`, // its video doesn't demand signed links yet
+  wait: `ck-dl-wait-${RUN}`, // Cloudflare takes its time over this one's file
+  review: `ck-dl-review-${RUN}`, // Mara's short, still in review
+  freebuy: `ck-dl-freebuy-${RUN}`, // a free title someone bought anyway
   show: `ck-dl-show-${RUN}`, // Mara's show
   showEp: `ck-dl-show-ep-${RUN}` // an episode of it, uploaded by Dee
 };
@@ -133,7 +168,10 @@ const film = (id, extra = {}) => ({
 });
 
 async function seed() {
-  for (const uid of [UID.main, UID.slow]) await cloudflare('/__video', { method: 'POST', body: { uid, name: `Check download ${RUN}`, creator: USERS.mara, duration: 1440, ready: true, requireSignedURLs: true } });
+  for (const uid of [UID.main, UID.slow, UID.wait]) await cloudflare('/__video', { method: 'POST', body: { uid, name: `Check download ${RUN}`, creator: USERS.mara, duration: 1440, ready: true, requireSignedURLs: true } });
+  insert('episodes', film(ID.wait, { src: srcOf(UID.wait) }));
+  insert('episodes', film(ID.review, { content_type: 'short', status: 'pending', reviewed_at: null, released_at: null }));
+  insert('episodes', film(ID.freebuy));
   insert('episodes', film(ID.film));
   insert('episodes', film(ID.prem, { tier: 'premium' }));
   insert('episodes', film(ID.off, { downloads_allowed: false }));
@@ -153,7 +191,7 @@ async function seed() {
 }
 
 async function cleanup() {
-  for (const t of ['purchases']) sql(`grant select on public.${t} to service_role`);
+  for (const t of REVOKED) sql(`grant select on public.${t} to service_role`);
   await clerk('/__fail?user=*&on=0', { method: 'POST' });
   const eps = [...Object.values(ID).filter((id) => id !== ID.show), ...LIMIT].map(q).join(', ');
   const ids = people.map(q).join(', ') || "''";
@@ -165,6 +203,7 @@ async function cleanup() {
     sql(`delete from public.download_devices where user_id in (${ids})`);
   }
   sql(`delete from public.account_suspensions where user_id in (${ids})`);
+  sql(`delete from public.comped_access where email like ${q(`%-${RUN}@rig.example.com`)}`);
   sql(`delete from public.purchases where buyer_id in (${ids})`);
   sql(`delete from public.creator_ledger where member_id in (${ids})`);
   sql(`delete from public.member_referrals where user_id in (${ids})`);
@@ -175,7 +214,7 @@ async function cleanup() {
   sql(`delete from public.notifications where user_id in (${ids}) or episode_id in (${eps})`);
   sql(`delete from public.episodes where id in (${eps})`);
   sql(`delete from public.series where id = ${q(ID.show)}`);
-  for (const uid of [UID.main, UID.slow, UID.open]) await fetch(`${FAKES.cloudflare}/client/v4/accounts/rig/stream/${uid}`, { method: 'DELETE', headers: { Authorization: `Bearer ${FAKE_KEYS.cloudflareToken}` } }).catch(() => {});
+  for (const uid of [UID.main, UID.slow, UID.open, UID.wait]) await fetch(`${FAKES.cloudflare}/client/v4/accounts/rig/stream/${uid}`, { method: 'DELETE', headers: { Authorization: `Bearer ${FAKE_KEYS.cloudflareToken}` } }).catch(() => {});
   if (before) sql(`update public.site_settings set downloads_enabled = ${before.enabled}, downloads_locked = ${before.locked} where id = 1`);
   for (const id of people) await removeUser(id);
 }
@@ -214,6 +253,20 @@ const adminPost = (who, body) => call('/api/admin/downloads', { ...app(who), met
 const auditOf = (who) => rows(`select details, target_id, admin_email from public.audit_log where action = 'downloads_switch' and admin_id = ${q(who.id)} order by created_at`);
 const copy = (who, deviceId, episodeId) => rows(`select status, basis, licensed_until, ended_at, renewed_at, removed_at, revoke_reason from public.downloads where user_id = ${q(who.id)} and device_id = ${q(deviceId)} and episode_id = ${q(episodeId)} order by created_at desc limit 1`)[0] || null;
 const activeCount = (who, deviceId) => Number(rows(`select count(*)::int as n from public.downloads where user_id = ${q(who.id)} and device_id = ${q(deviceId)} and status = 'active'`)[0].n);
+// The copies on a phone (a title still waiting for its file isn't one), and
+// a check-in that lists them all — so that nothing is freed by the way.
+const copiesOn = (who, deviceId) => rows(`select episode_id from public.downloads where user_id = ${q(who.id)} and device_id = ${q(deviceId)} and status = 'active' and licensed_until is not null order by created_at`).map((x) => x.episode_id);
+const syncAll = (who, deviceId) => sync(who, deviceId, copiesOn(who, deviceId));
+// Rows on record as if made earlier: copies a phone holds, or titles it
+// asked for and no longer has.
+function pastRows(who, deviceId, count, { tag, status = 'active', ago: back = '2 days' }) {
+  sql(`insert into public.downloads (user_id, device_id, episode_id, basis, status, licensed_until, renewed_at, created_at, removed_at)
+    select ${q(who.id)}, ${q(deviceId)}, 'ck-dl-${tag}' || g || '-${RUN}', 'member', ${q(status)}, now() + interval '20 days', now() - interval '${back}', now() - interval '${back}', ${status === 'active' ? 'null' : 'now()'}
+    from generate_series(1, ${count}) g`);
+}
+const phoneRow = (who, deviceId, name = 'Check phone') => insert('download_devices', { user_id: who.id, device_id: deviceId, name, platform: 'ios' });
+// The account's rows that count as new copies in the last hour.
+const countedThisHour = (who) => Number(rows(`select count(*)::int as n from public.downloads where user_id = ${q(who.id)} and created_at > now() - interval '1 hour' and revoke_reason is distinct from ${q(UNDONE_REASON)}`)[0].n);
 const item = (r, id) => (r.json && Array.isArray(r.json.items) ? r.json.items.find((x) => x.episodeId === id) : null) || null;
 const offer = async (who, id) => {
   const r = await get(`/api/episode-page?id=${encodeURIComponent(id)}&terms=1`, who);
@@ -332,7 +385,12 @@ async function whoMayDownload(ctx) {
 
   r = await start(premium, ID.film, P.premium);
   ok('Premium, the first ask: 202 while Cloudflare makes the file', r.status === 202 && r.json.ready === false && r.json.percent === 0, brief(r));
-  ok('…and no copy is on record yet', activeCount(premium, P.premium) === 0);
+  const waiting = copy(premium, P.premium, ID.film);
+  ok('…the title holds its place on record from this first ask, without a date yet', activeCount(premium, P.premium) === 1 && waiting.status === 'active' && waiting.licensed_until === null && waiting.basis === 'member', waiting);
+  r = await get(`/api/downloads?deviceId=${P.premium}`, premium);
+  ok('…it isn’t a copy yet: the list has the phone, with nothing on it', r.status === 200 && r.json.items.length === 0 && r.json.devices.length === 1 && r.json.devices[0].count === 0 && r.json.devices[0].current === true, brief(r));
+  r = await sync(premium, P.premium, []);
+  ok('…and a check-in that lists nothing leaves it waiting (it was never on the phone’s list)', r.status === 200 && activeCount(premium, P.premium) === 1, brief(r));
   r = await start(premium, ID.film, P.premium);
   ok('…then 200 with a link', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string' && r.json.basis === 'member', brief(r));
   ctx.premiumStart = r.json;
@@ -433,12 +491,12 @@ async function theLink(ctx) {
 
   await cloudflare(`/__downloads?uid=${UID.slow}&state=inprogress&percent=40`, { method: 'POST' });
   r = await start(premium, ID.slow, P.premium);
-  ok('Cloudflare still making the file: 202 with its percent, nothing on record', r.status === 202 && r.json.ready === false && r.json.percent === 40 && copy(premium, P.premium, ID.slow) === null, brief(r));
+  ok('Cloudflare still making the file: 202 with its percent, the title waiting without a date', r.status === 202 && r.json.ready === false && r.json.percent === 40 && copy(premium, P.premium, ID.slow).licensed_until === null, brief(r));
   await cloudflare(`/__downloads?uid=${UID.slow}&state=ready`, { method: 'POST' });
   r = await start(premium, ID.slow, P.premium);
   ok('…ready: 200', r.status === 200 && r.json.ready === true && claimsOf(r.json.url.split('/')[3]).sub === UID.slow, brief(r));
   r = await start(premium, ID.gone, P.premium);
-  ok('a video Cloudflare doesn’t have: 503 cloudflare, in plain words, nothing on record', r.status === 503 && r.json.code === 'cloudflare' && r.json.error === START_WORDS.cloudflare && copy(premium, P.premium, ID.gone) === null, brief(r));
+  ok('a video Cloudflare doesn’t have: 503 cloudflare, in plain words, no copy and no date', r.status === 503 && r.json.code === 'cloudflare' && r.json.error === START_WORDS.cloudflare && copy(premium, P.premium, ID.gone).licensed_until === null && !copiesOn(premium, P.premium).includes(ID.gone), brief(r));
 
   // A video that never demanded signed links: protected before its file is made.
   const stateOf = async (uid) => ((await cloudflare('/__state')).json.videos.find((x) => x.uid === uid) || {});
@@ -471,7 +529,7 @@ async function theDates(ctx) {
   ok('…which the app’s own rule reads as playable now and locked after it', playState({ now: Date.now(), licensedUntil: s.licensedUntil, lastSeenAt: Date.now() }).ok === true
     && playState({ now: Date.parse(s.licensedUntil) + 1000, licensedUntil: s.licensedUntil, lastSeenAt: Date.now() }).reason === 'expired');
 
-  let r = await sync(premium, P.premium, [ID.film]);
+  let r = await syncAll(premium, P.premium);
   let it = item(r, ID.film);
   ok('the check-in’s answer: enabled, serverTime, paidThrough, plan, limits, items, deviceRemoved', r.status === 200 && r.json.enabled === true && near(r.json.serverTime, new Date().toISOString(), 20000) && r.json.paidThrough === s.paidThrough
     && r.json.plan.carries === true && r.json.plan.tier === 'premium' && r.json.limits.titles === MAX_TITLES_PER_DEVICE && r.json.deviceRemoved === false && Array.isArray(r.json.items), brief(r));
@@ -479,11 +537,11 @@ async function theDates(ctx) {
 
   const subscription = await subscriptionOf(premium);
   await stripeHook(`/__subscriptions/${subscription.id}/period`, { method: 'POST', body: { endsInDays: 300 } });
-  r = await sync(premium, P.premium, [ID.film]);
+  r = await syncAll(premium, P.premium);
   it = item(r, ID.film);
   ok(`a yearly plan: never longer than ${MEMBER_MAX_DAYS + GRACE_DAYS} days without connecting`, it && Date.parse(it.licensedUntil) === Date.parse(r.json.serverTime) + (MEMBER_MAX_DAYS + GRACE_DAYS) * DAY && Date.parse(r.json.paidThrough) > Date.now() + 290 * DAY, { it, serverTime: r.json.serverTime, paidThrough: r.json.paidThrough });
   await stripeHook(`/__subscriptions/${subscription.id}/period`, { method: 'POST', body: { endsInDays: 3 } });
-  r = await sync(premium, P.premium, [ID.film]);
+  r = await syncAll(premium, P.premium);
   it = item(r, ID.film);
   ok('a month about to end: three days plus the two of grace', it && Date.parse(it.licensedUntil) === Date.parse(r.json.paidThrough) + GRACE_DAYS * DAY && near(r.json.paidThrough, new Date(Date.now() + 3 * DAY).toISOString(), 60000), { it, paidThrough: r.json.paidThrough });
   ok('…written on the row', near(copy(premium, P.premium, ID.film).licensed_until, it.licensedUntil, 1000));
@@ -505,6 +563,7 @@ async function theDates(ctx) {
   const promoPhone = phone('pr');
   r = await download(promo, ID.film, promoPhone);
   ok('a promo code’s access: downloads, but never past the promo’s end', r.status === 200 && r.json.basis === 'member' && r.json.paidThrough === null && near(r.json.licensedUntil, promoEnd, 2000), brief(r));
+  ctx.promo = { who: promo, phone: promoPhone };
 }
 
 // ---- the two limits ---------------------------------------------------------------------
@@ -563,44 +622,237 @@ async function theLimits(ctx) {
   ctx.limits = { who, A, B, C, start };
 }
 
-// ---- asking again, and how many new copies an hour ---------------------------------------------
+// ---- asking again, and how many new copies an hour and a day -------------------------------------
 async function askingAgain() {
-  section(`Asking again, and ${NEW_COPIES} new copies an hour`);
+  section(`Asking again, and ${NEW_COPIES_PER_HOUR} new copies an hour, ${NEW_COPIES_PER_DAY} a day`);
   const who = await teamAdmin('dlagain');
   const R = phone('ag');
-  const go = (id) => start(who, id, R);
-  const drop = (id) => post('/api/downloads/remove', who, { deviceId: R, episodeId: id });
+  const R2 = phone('ag2');
+  const go = (id, dev = R) => start(who, id, dev);
+  const drop = (id, dev = R) => post('/api/downloads/remove', who, { deviceId: dev, episodeId: id });
+  const isRate = (r, limit) => r.status === 429 && r.json.code === 'rate' && r.json.limit === limit && r.json.error === RATE_WORDS[limit]
+    && Number(r.json.retryAfter) >= 60 && Number(r.headers.get('retry-after')) === Number(r.json.retryAfter);
   let r = await go(LIMIT[0]);
   const first = r.json || {};
   let bad = 0;
   const links = new Set([first.url]);
-  for (let i = 0; i < NEW_COPIES + 4; i += 1) {
+  for (let i = 0; i < NEW_COPIES_PER_HOUR + 10; i += 1) {
     const x = await go(LIMIT[0]);
     if (x.status !== 200 || x.json.ready !== true || !x.json.url || !x.json.licensedUntil) bad += 1;
     else links.add(x.json.url);
   }
-  ok(`${NEW_COPIES + 5} asks in a row for a title the phone holds (202 polls, restarts, a link running out): every one 200 with a link and a date, never refused`, r.status === 200 && bad === 0 && activeCount(who, R) === 1 && links.size > 1, `${bad} bad, ${links.size} links`);
+  ok(`${NEW_COPIES_PER_HOUR + 11} asks in a row for a title the phone holds (202 polls, restarts, a link running out): every one 200 with a link and a date, never refused`, r.status === 200 && bad === 0 && activeCount(who, R) === 1 && links.size > 1, `${bad} bad, ${links.size} links`);
+  ok('…and they are one new copy, not forty', countedThisHour(who) === 1, countedThisHour(who));
   let failed = 0;
   for (const id of LIMIT.slice(1, MAX_TITLES_PER_DEVICE)) if ((await go(id)).status !== 200) failed += 1;
   r = await go(LIMIT[MAX_TITLES_PER_DEVICE - 1]);
   ok('a full phone asking again for one of its titles: still 200', failed === 0 && activeCount(who, R) === MAX_TITLES_PER_DEVICE && r.status === 200 && r.json.ready === true, `${failed} | ${brief(r)}`);
-  // New copies: 25 so far; make it 60, then one more.
-  let made = MAX_TITLES_PER_DEVICE;
-  let refusedEarly = 0;
-  while (made < NEW_COPIES) {
-    const batch = LIMIT.slice(0, Math.min(MAX_TITLES_PER_DEVICE, NEW_COPIES - made));
-    for (const id of batch) await drop(id);
-    for (const id of batch) {
-      if ((await go(id)).status !== 200) refusedEarly += 1;
-      made += 1;
-    }
-  }
-  ok(`${NEW_COPIES} new copies within the hour all go through`, refusedEarly === 0 && activeCount(who, R) === MAX_TITLES_PER_DEVICE, refusedEarly);
-  await drop(LIMIT[0]);
-  r = await go(LIMIT[0]);
-  ok(`the ${NEW_COPIES + 1}st new copy: 429 rate with Retry-After (wait, not fail), nothing on record`, r.status === 429 && r.json.code === 'rate' && Number(r.headers.get('retry-after')) > 0 && copy(who, R, LIMIT[0]).status === 'removed', brief(r));
+
+  // The same title on the same phone again (deleted, downloaded again) is not a new copy.
+  for (const id of LIMIT.slice(0, 6)) await drop(id);
+  failed = 0;
+  for (const id of LIMIT.slice(0, 6)) if ((await go(id)).status !== 200) failed += 1;
+  ok('six titles deleted and downloaded again on the same phone: all go through, and count for nothing new', failed === 0 && activeCount(who, R) === MAX_TITLES_PER_DEVICE, failed);
+
+  // New copies: 25 so far (one phone's worth). A second phone takes the hour to 30.
+  const more = NEW_COPIES_PER_HOUR - MAX_TITLES_PER_DEVICE;
+  failed = 0;
+  for (const id of LIMIT.slice(0, more)) if ((await go(id, R2)).status !== 200) failed += 1;
+  ok(`${NEW_COPIES_PER_HOUR} new copies within the hour all go through`, failed === 0 && activeCount(who, R2) === more, failed);
+  r = await go(LIMIT[more], R2);
+  ok(`the ${NEW_COPIES_PER_HOUR + 1}st new copy: 429 rate, limit "hour", in plain words, with how long to wait (Retry-After and retryAfter)`, isRate(r, 'hour') && Number(r.json.retryAfter) <= 3600, brief(r));
+  ok('…nothing on record for it, and Cloudflare wasn’t asked for a link', copy(who, R2, LIMIT[more]) === null && !r.json.url, copy(who, R2, LIMIT[more]));
+  r = await go(LIMIT[more], R2);
+  ok('…asking for it again is refused again (a refused ask is never remembered as counted)', isRate(r, 'hour'), brief(r));
   r = await go(LIMIT[1]);
   ok('…while a title the phone already holds still gets its fresh link', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string', brief(r));
+  await drop(LIMIT[2]);
+  r = await go(LIMIT[2]);
+  ok('…and a title deleted from the phone can come back to it (not a new copy)', r.status === 200 && r.json.ready === true, brief(r));
+
+  // The day: those thirty were asked for two hours ago, and thirty more three hours ago.
+  sql(`update public.downloads set created_at = now() - interval '2 hours' where user_id = ${q(who.id)}`);
+  pastRows(who, R, NEW_COPIES_PER_DAY - NEW_COPIES_PER_HOUR - 1, { tag: 'day', status: 'removed', ago: '3 hours' });
+  r = await go(LIMIT[more], R2);
+  ok(`with the hour clear and ${NEW_COPIES_PER_DAY - 1} asked for today, one more goes through (the ${NEW_COPIES_PER_DAY}th)`, r.status === 200 && r.json.ready === true, brief(r));
+  r = await go(LIMIT[more + 1], R2);
+  ok(`the ${NEW_COPIES_PER_DAY + 1}st new copy of the day: 429 rate, limit "day", with a wait of hours`, isRate(r, 'day') && Number(r.json.retryAfter) > 3600 && Number(r.json.retryAfter) <= 86400 && copy(who, R2, LIMIT[more + 1]) === null, brief(r));
+  r = await go(LIMIT[3]);
+  ok('…a title the phone holds still gets its link', r.status === 200 && r.json.ready === true, brief(r));
+}
+
+// ---- a title is counted when it is first asked for ------------------------------------------------
+async function firstAsk() {
+  section('A new title is counted at its first ask, not when its link goes out');
+  const who = await teamAdmin('dlask');
+  const W = phone('wa');
+  pastRows(who, W, NEW_COPIES_PER_HOUR - 1, { tag: 'ask', status: 'removed', ago: '30 minutes' });
+  await cloudflare(`/__downloads?uid=${UID.wait}&state=inprogress&percent=10`, { method: 'POST' });
+  let r = await start(who, ID.wait, W);
+  const row = copy(who, W, ID.wait);
+  ok(`the ${NEW_COPIES_PER_HOUR}th new title of the hour, its file still being made: 202, and its row is on record without a date`, r.status === 202 && r.json.percent === 10 && row && row.status === 'active' && row.licensed_until === null, brief(r));
+  let other = 0;
+  for (let i = 0; i < 6; i += 1) if ((await start(who, ID.wait, W)).status !== 202) other += 1;
+  const pairRows = Number(rows(`select count(*)::int as n from public.downloads where user_id = ${q(who.id)} and device_id = ${q(W)} and episode_id = ${q(ID.wait)}`)[0].n);
+  ok('six more asks while the file is made: 202 each, still one row, and none of them refused though the hour is full', other === 0 && pairRows === 1 && countedThisHour(who) === NEW_COPIES_PER_HOUR, `${other} | ${pairRows} | ${countedThisHour(who)}`);
+  r = await start(who, LIMIT[0], W);
+  ok('another new title now: 429 hour — the waiting title was counted when it was first asked for, before any link', r.status === 429 && r.json.limit === 'hour' && copy(who, W, LIMIT[0]) === null, brief(r));
+  r = await get(`/api/downloads?deviceId=${W}`, who);
+  ok('the waiting title isn’t among the copies; the phone is listed with nothing on it', r.status === 200 && r.json.items.length === 0 && r.json.devices.length === 1 && r.json.devices[0].deviceId === W && r.json.devices[0].count === 0, brief(r));
+  await cloudflare(`/__downloads?uid=${UID.wait}&state=ready`, { method: 'POST' });
+  r = await start(who, ID.wait, W);
+  const dated = copy(who, W, ID.wait);
+  ok('the file ready: 200 with its link and date on the same row (nothing more to count)', r.status === 200 && r.json.ready === true && typeof r.json.url === 'string' && dated.licensed_until !== null && near(dated.licensed_until, r.json.licensedUntil, 1000) && pairRows === 1 && countedThisHour(who) === NEW_COPIES_PER_HOUR, brief(r));
+  // A waiting title the phone stopped asking for is freed by a check-in.
+  await cloudflare(`/__downloads?uid=${UID.wait}&state=inprogress&percent=10`, { method: 'POST' });
+  const who2 = await teamAdmin('dlask2');
+  const W2 = phone('wb');
+  await start(who2, ID.wait, W2);
+  r = await sync(who2, W2, []);
+  const kept = copy(who2, W2, ID.wait);
+  sql(`update public.downloads set renewed_at = now() - interval '3 minutes' where user_id = ${q(who2.id)} and episode_id = ${q(ID.wait)}`);
+  const r2 = await sync(who2, W2, []);
+  ok('a waiting title is spared by a check-in while the phone keeps asking, and freed once it has stopped for a couple of minutes', r.status === 200 && kept.status === 'active' && r2.status === 200 && copy(who2, W2, ID.wait).status === 'removed', `${kept.status} → ${copy(who2, W2, ID.wait).status}`);
+  await cloudflare(`/__downloads?uid=${UID.wait}&state=ready`, { method: 'POST' });
+}
+
+// ---- the limits when requests race -----------------------------------------------------------------
+async function racing() {
+  section('The limits hold when requests arrive at the same moment');
+  // Ten new titles at once onto a phone that holds 24.
+  const who = await teamAdmin('dlrace');
+  const A = phone('ra');
+  phoneRow(who, A);
+  pastRows(who, A, MAX_TITLES_PER_DEVICE - 1, { tag: 'old' });
+  let burst = await Promise.all(LIMIT.slice(0, 10).map((id) => start(who, id, A)));
+  let won = burst.filter((r) => r.status === 200);
+  let lost = burst.filter((r) => r.status !== 200);
+  ok(`ten new titles at once onto a phone holding ${MAX_TITLES_PER_DEVICE - 1}: the phone never passes ${MAX_TITLES_PER_DEVICE}`, activeCount(who, A) <= MAX_TITLES_PER_DEVICE, `${activeCount(who, A)} on record`);
+  ok('…at most one link went out, one row per link, and the others heard 409 titles', won.length <= 1 && activeCount(who, A) === MAX_TITLES_PER_DEVICE - 1 + won.length && lost.every((r) => r.status === 409 && r.json.code === 'titles' && !r.json.url), burst.map((r) => r.status).join(','));
+  ok('…the one that fit got through (the others looked again once things had settled)', won.length === 1, burst.map((r) => r.status).join(','));
+  let r = await start(who, LIMIT[11], A);
+  ok('…and the phone is full for the next ask', r.status === 409 && r.json.code === 'titles', brief(r));
+
+  // Six phones at once beside one that holds a copy.
+  const who2 = await teamAdmin('dlrace2');
+  const first = phone('r0');
+  phoneRow(who2, first, 'First phone');
+  pastRows(who2, first, 1, { tag: 'one' });
+  const others = Array.from({ length: 6 }, (_, i) => phone(`r${i + 1}`));
+  burst = await Promise.all(others.map((dev, i) => start(who2, LIMIT[i], dev)));
+  won = burst.filter((x) => x.status === 200);
+  lost = burst.filter((x) => x.status !== 200);
+  const holders = Number(rows(`select count(distinct device_id)::int as n from public.downloads where user_id = ${q(who2.id)} and status = 'active'`)[0].n);
+  ok(`six other phones asking at once beside one that holds a copy: never more than ${MAX_DEVICES} phones hold one`, holders <= MAX_DEVICES, `${holders} phones`);
+  ok('…at most one of them got a link, and the others heard 409 devices', won.length <= 1 && holders === 1 + won.length && lost.every((x) => x.status === 409 && x.json.code === 'devices' && Array.isArray(x.json.devices) && !x.json.url), burst.map((x) => x.status).join(','));
+  ok('…one did get in', won.length === 1, burst.map((x) => x.status).join(','));
+  const listed = Number(rows(`select count(*)::int as n from public.download_devices where user_id = ${q(who2.id)} and removed_at is null`)[0].n);
+  ok('…and only the phones that hold a copy are on record', listed === holders, `${listed} on record, ${holders} holding`);
+
+  // Six new copies at once with room for two in the hour.
+  const who3 = await teamAdmin('dlrace3');
+  const R = phone('rr');
+  pastRows(who3, R, NEW_COPIES_PER_HOUR - 2, { tag: 'hr', status: 'removed', ago: '30 minutes' });
+  burst = await Promise.all(LIMIT.slice(0, 6).map((id) => start(who3, id, R)));
+  won = burst.filter((x) => x.status === 200);
+  lost = burst.filter((x) => x.status !== 200);
+  ok(`six new copies at once with room for two this hour: the account never passes ${NEW_COPIES_PER_HOUR}`, countedThisHour(who3) <= NEW_COPIES_PER_HOUR && won.length <= 2 && countedThisHour(who3) === NEW_COPIES_PER_HOUR - 2 + won.length, `${countedThisHour(who3)} counted, ${won.length} links`);
+  ok('…the others heard 429 hour, and their rows were taken back', lost.every((x) => x.status === 429 && x.json.code === 'rate' && x.json.limit === 'hour') && activeCount(who3, R) === won.length, burst.map((x) => x.status).join(','));
+  ok('…and the room there was got used', won.length >= 1, burst.map((x) => x.status).join(','));
+}
+
+// ---- only the app ----------------------------------------------------------------------------------
+async function onlyTheApp(ctx) {
+  section('Only the app starts, checks in and removes');
+  const { premium, phones: P } = ctx;
+  const held = copiesOn(premium, P.premium);
+  const bodies = {
+    start: { episodeId: ID.prem, deviceId: P.premium, deviceName: 'Check phone', platform: 'ios', terms: 1 },
+    sync: { deviceId: P.premium, deviceName: 'Check phone', platform: 'ios', have: [] },
+    remove: { deviceId: P.premium, episodeId: held[0] }
+  };
+  const isAppOnly = (r) => r.status === 403 && r.json && r.json.code === 'app-only' && r.json.error === DOWNLOAD_WORDS.webOnly && !r.json.url;
+  const fromPage = (route, headers) => call(`/api/downloads/${route}`, { who: premium, bearer: true, method: 'POST', body: bodies[route], headers: { 'X-Forwarded-For': ip(premium), ...headers } });
+  for (const route of ['start', 'sync', 'remove']) {
+    const cookie = await call(`/api/downloads/${route}`, { ...web(premium), method: 'POST', body: bodies[route] });
+    ok(`${route}: a signed-in browser session (the cookie, no token) is refused — 403 app-only, in the app’s words`, isAppOnly(cookie), brief(cookie));
+    const origin = await fromPage(route, { Origin: BASE });
+    const fetchSite = await fromPage(route, { 'Sec-Fetch-Site': 'same-origin' });
+    ok(`${route}: the token sent from a page (an Origin header, or Sec-Fetch-Site) is refused the same way`, isAppOnly(origin) && isAppOnly(fetchSite), `${brief(origin)} | ${brief(fetchSite)}`);
+  }
+  ok('…and none of the nine started, freed or removed anything', held.length > 0 && JSON.stringify(copiesOn(premium, P.premium)) === JSON.stringify(held), `${held.length} before, ${copiesOn(premium, P.premium).length} after`);
+  let r = await call('/api/downloads/start', { method: 'POST', body: bodies.start, headers: { 'X-Forwarded-For': ip(SIGNED_OUT) } });
+  ok('with no sign-in at all it is still 401', r.status === 401, brief(r));
+  r = await post('/api/downloads/sync', premium, { deviceId: P.premium, deviceName: 'Check phone', platform: 'ios', have: held });
+  ok('the app’s own call (a token, no Origin) goes through as before', r.status === 200 && r.json.items.length === held.length, brief(r));
+  r = await call('/api/downloads', web(premium));
+  const phones = await call('/api/downloads/devices', web(premium));
+  const removeNone = await call('/api/downloads/devices', { ...web(premium), method: 'POST', body: { remove: phone('zz') }, headers: { 'X-Forwarded-For': ip(premium), Origin: BASE } });
+  ok('the list of phones stays open to the website: GET /api/downloads, GET and POST /api/downloads/devices with the cookie', r.status === 200 && phones.status === 200 && Array.isArray(phones.json.devices) && removeNone.status === 200 && removeNone.json.ok === true, `${r.status} ${phones.status} ${brief(removeNone)}`);
+}
+
+// ---- never on a guess ------------------------------------------------------------------------------
+async function neverOnAGuess(ctx) {
+  section('Never on a guess: what can’t be read is 503, and nothing changes');
+  const { admin, premium, viewer, phones: P } = ctx;
+  if (SKIP_REVOKE) {
+    console.log('skip the unreadable-table parts (RIG_CHECK_SKIP_REVOKE=1)');
+    return;
+  }
+  // A buyer on Basic while the purchases can't be read: never "plan", never "members only".
+  const buyer = await person('dlbuy2');
+  const bp = phone('b2');
+  buy(buyer, 'episode', ID.freebuy);
+  buy(buyer, 'episode', ID.prem);
+  let [free, prem] = await unreadable('purchases', async () => [await start(buyer, ID.freebuy, bp), await start(buyer, ID.prem, bp)]);
+  ok('a buyer on Basic, the purchases unreadable: a free title they bought is 503 unavailable — not "Downloads come with Premium"', isUnavailable(free) && free.json.code !== 'plan', brief(free));
+  ok('…and a premium title they bought is 503 unavailable — not the gate’s "for members"', isUnavailable(prem), brief(prem));
+  ok('…nothing was put on record', activeCount(buyer, bp) === 0);
+  free = await download(buyer, ID.freebuy, bp);
+  prem = await download(buyer, ID.prem, bp);
+  ok('…readable again: both download, theirs', free.status === 200 && free.json.basis === 'owned' && prem.status === 200 && prem.json.basis === 'owned', `${brief(free)} | ${brief(prem)}`);
+
+  // An account with free access (the comped list): the list can't be read.
+  const comp = await person('dlcomp');
+  const cp = phone('cp');
+  insert('comped_access', { email: comp.email, reason: 'Check', granted_by: 'rig' });
+  let r = await download(comp, ID.freebuy, cp);
+  ok('an account given free access downloads as a member', r.status === 200 && r.json.basis === 'member' && r.json.paidThrough === null, brief(r));
+  const compRow = copy(comp, cp, ID.freebuy);
+  let [checkIn, again, fresh, list] = await unreadable('comped_access', async () => [await sync(comp, cp, [ID.freebuy]), await start(comp, ID.freebuy, cp), await start(comp, ID.wait, cp), await get(`/api/downloads?deviceId=${cp}`, comp)]);
+  let after = copy(comp, cp, ID.freebuy);
+  ok('the comped list unreadable: the check-in is 503 unavailable — the copy is not `ended`', isUnavailable(checkIn) && after.status === 'active' && after.ended_at === null && after.renewed_at === compRow.renewed_at, `${brief(checkIn)} | ${JSON.stringify(after)}`);
+  ok('…a fresh link and a new title are 503 unavailable too — not "Downloads come with Premium" — and so is the list', isUnavailable(again) && isUnavailable(fresh) && isUnavailable(list) && copy(comp, cp, ID.wait) === null, `${brief(again)} | ${brief(fresh)} | ${brief(list)}`);
+  r = await sync(comp, cp, [ID.freebuy]);
+  ok('…readable again: ok, a member’s copy', r.status === 200 && item(r, ID.freebuy).state === 'ok' && r.json.plan.carries === true, brief(r));
+
+  // A promo code's access: the promo's date can't be read.
+  const { who: promo, phone: pp } = ctx.promo;
+  const promoRow = copy(promo, pp, ID.film);
+  [checkIn, fresh] = await unreadable('user_profiles', async () => [await sync(promo, pp, [ID.film]), await start(promo, ID.freebuy, pp)]);
+  after = copy(promo, pp, ID.film);
+  ok('a promo’s date unreadable: the check-in is 503 unavailable, the copy untouched, and nothing new starts', isUnavailable(checkIn) && isUnavailable(fresh) && after.status === 'active' && after.ended_at === null && after.renewed_at === promoRow.renewed_at, `${brief(checkIn)} | ${brief(fresh)} | ${JSON.stringify(after)}`);
+  r = await sync(promo, pp, [ID.film]);
+  ok('…readable again: ok', r.status === 200 && item(r, ID.film).state === 'ok', brief(r));
+
+  // Whether the account is suspended can't be read.
+  const heldNow = copiesOn(premium, P.premium);
+  [list, checkIn, fresh] = await unreadable('account_suspensions', async () => [await get(`/api/downloads?deviceId=${P.premium}`, premium), await sync(premium, P.premium, heldNow), await start(premium, heldNow[0], P.premium)]);
+  const phonesRead = await unreadable('account_suspensions', () => call('/api/downloads/devices', web(premium)));
+  ok('the suspensions unreadable: the list, the check-in, a link and the phones are all 503 unavailable (never "not suspended" on a guess)', isUnavailable(list) && isUnavailable(checkIn) && isUnavailable(fresh) && isUnavailable(phonesRead) && !fresh.json.url, `${brief(list)} | ${brief(checkIn)} | ${brief(fresh)} | ${brief(phonesRead)}`);
+  r = await get(`/api/downloads?deviceId=${P.premium}`, premium);
+  ok('…readable again: 200', r.status === 200, brief(r));
+
+  // The switch can't be read: a start never goes on an older "on".
+  r = await start(premium, heldNow[0], P.premium);
+  ok('(the switch is on, and a held title gets its fresh link)', r.status === 200 && typeof r.json.url === 'string', brief(r));
+  let adminRead;
+  [fresh, again, adminRead] = await unreadable('site_settings', async () => [await start(premium, heldNow[0], P.premium), await start(viewer, ID.freebuy, phone('vv')), await get('/api/admin/downloads', admin)]);
+  ok('the settings unreadable: a start is 503 unavailable — no link on the "on" it read a moment ago', isUnavailable(fresh) && !fresh.json.url && isUnavailable(again), `${brief(fresh)} | ${brief(again)}`);
+  ok('…and Admin → Downloads says it can’t read them (503 unavailable), not an older state', adminRead.status === 503 && adminRead.json.code === 'unavailable', brief(adminRead));
+  r = await eventually(() => start(premium, heldNow[0], P.premium), (x) => x.status === 200, 20);
+  const adminAgain = await get('/api/admin/downloads', admin);
+  ok('…readable again: the link, and the admin’s read', r.status === 200 && typeof r.json.url === 'string' && adminAgain.status === 200 && adminAgain.json.switch.enabled === true, `${brief(r)} | ${adminAgain.status}`);
 }
 
 // ---- the check-in ---------------------------------------------------------------------------
@@ -616,6 +868,9 @@ async function theCheckIn(ctx) {
   sql(`update public.downloads set renewed_at = now() - interval '3 minutes', created_at = now() - interval '3 minutes' where user_id = ${q(sponsor.id)} and episode_id = ${q(ID.film)}`);
   r = await sync(sponsor, P.sponsor, [ID.prem]);
   ok('…a couple of minutes on, the copy it doesn’t list is removed and its slot freed; the listed one is renewed', r.status === 200 && copy(sponsor, P.sponsor, ID.film).status === 'removed' && copy(sponsor, P.sponsor, ID.prem).status === 'active' && activeCount(sponsor, P.sponsor) === 1, copy(sponsor, P.sponsor, ID.film));
+  const noList = await post('/api/downloads/sync', sponsor, { deviceId: P.sponsor, deviceName: 'Check phone', platform: 'ios' });
+  const nullList = await post('/api/downloads/sync', sponsor, { deviceId: P.sponsor, have: null });
+  ok('a check-in without its list (no `have` at all, or null) is refused — 400 have — and frees nothing', noList.status === 400 && noList.json.code === 'have' && nullList.status === 400 && nullList.json.code === 'have' && copy(sponsor, P.sponsor, ID.prem).status === 'active' && activeCount(sponsor, P.sponsor) === 1, `${brief(noList)} | ${brief(nullList)} | ${activeCount(sponsor, P.sponsor)}`);
   r = await sync(sponsor, P.sponsor, []);
   ok('an empty list (the phone lost everything, a reinstall): every copy removed at once, however fresh', r.status === 200 && r.json.items.length === 0 && r.json.deviceRemoved === false && copy(sponsor, P.sponsor, ID.prem).status === 'removed' && activeCount(sponsor, P.sponsor) === 0, brief(r));
   r = await get(`/api/downloads?deviceId=${P.sponsor}`, sponsor);
@@ -660,7 +915,7 @@ async function theCheckIn(ctx) {
   r = await sync(buyer, P.buyer, [ID.bought]);
   ok('…and the next check-in still says why', item(r, ID.bought).state === 'revoked' && item(r, ID.bought).reason === 'refund', item(r, ID.bought));
   sql(`update public.purchases set status = 'refunded', refunded_at = now() where buyer_id = ${q(premium.id)} and target_id = ${q(ID.prem)}`);
-  r = await sync(premium, P.premium, [ID.prem]);
+  r = await syncAll(premium, P.premium);
   ok('…for a member the refunded copy becomes a member’s copy', r.status === 200 && item(r, ID.prem).state === 'ok' && item(r, ID.prem).basis === 'member' && copy(premium, P.premium, ID.prem).basis === 'member', brief(r));
 
   // Never on a guess.
@@ -670,7 +925,7 @@ async function theCheckIn(ctx) {
   await clerk(`/__fail?user=${premium.id}&on=0`, { method: 'POST' });
   const rowAfter = copy(premium, P.premium, ID.film);
   ok('Clerk not answering for the account: 503 unavailable, and the copies are as they were', r.status === 503 && r.json.code === 'unavailable' && rowAfter.status === 'active' && rowAfter.ended_at === null && rowAfter.renewed_at === rowBefore.renewed_at, `${brief(r)} | ${JSON.stringify(rowAfter)}`);
-  if (process.env.RIG_CHECK_SKIP_REVOKE === '1') {
+  if (SKIP_REVOKE) {
     console.log('skip the purchases fail-closed part (RIG_CHECK_SKIP_REVOKE=1)');
   } else {
     const owner = await person('dlowner');
@@ -678,14 +933,9 @@ async function theCheckIn(ctx) {
     buy(owner, 'episode', ID.bought);
     await download(owner, ID.bought, ownerPhone);
     const kept = copy(owner, ownerPhone, ID.bought);
-    sql('revoke select on public.purchases from service_role');
-    try {
-      r = await sync(owner, ownerPhone, [ID.bought]);
-    } finally {
-      sql('grant select on public.purchases to service_role');
-    }
+    r = await unreadable('purchases', () => sync(owner, ownerPhone, [ID.bought]));
     const still = copy(owner, ownerPhone, ID.bought);
-    ok('the purchases unreadable: 500 in plain words, the bought copy untouched', r.status === 500 && !/purchases|permission|relation/i.test(r.text) && still.status === 'active' && still.renewed_at === kept.renewed_at, `${brief(r)} | ${JSON.stringify(still)}`);
+    ok('the purchases unreadable: 503 unavailable in plain words, the bought copy untouched', isUnavailable(r) && !/purchases|permission|relation/i.test(r.text) && still.status === 'active' && still.renewed_at === kept.renewed_at, `${brief(r)} | ${JSON.stringify(still)}`);
     r = await sync(owner, ownerPhone, [ID.bought]);
     ok('…readable again: ok, owned', r.status === 200 && item(r, ID.bought).state === 'ok' && item(r, ID.bought).basis === 'owned', brief(r));
     ctx.owner = { who: owner, phone: ownerPhone };
@@ -696,8 +946,9 @@ async function theCheckIn(ctx) {
   await download(premium, ID.leaving, P.premium);
   sql(`update public.episodes set moderation_hold = true where id = ${q(ID.held)}`);
   sql(`update public.episodes set deletion_requested = true, deletion_requested_at = now() where id = ${q(ID.leaving)}`);
-  r = await sync(premium, P.premium, [ID.film, ID.held, ID.leaving]);
-  ok('a title pulled, and one on its way out: revoked (title); the rest ok — three listed, three answered', r.status === 200 && r.json.items.length === 3 && item(r, ID.held).state === 'revoked' && item(r, ID.held).reason === 'title' && item(r, ID.leaving).state === 'revoked' && item(r, ID.leaving).reason === 'title' && item(r, ID.film).state === 'ok'
+  const listed = copiesOn(premium, P.premium);
+  r = await sync(premium, P.premium, listed);
+  ok('a title pulled, and one on its way out: revoked (title); the rest ok — an answer for every title listed', r.status === 200 && listed.length >= 3 && r.json.items.length === listed.length && item(r, ID.held).state === 'revoked' && item(r, ID.held).reason === 'title' && item(r, ID.leaving).state === 'revoked' && item(r, ID.leaving).reason === 'title' && item(r, ID.film).state === 'ok'
     && copy(premium, P.premium, ID.held).status === 'revoked' && copy(premium, P.premium, ID.held).revoke_reason === 'title', brief(r));
   if (ctx.owner) {
     sql(`update public.episodes set deletion_requested = true, withdrawn_at = now() where id = ${q(ID.bought)}`);
@@ -713,7 +964,7 @@ async function theCheckIn(ctx) {
   // The switch off: nothing renewed, nothing taken away.
   const held = copy(premium, P.premium, ID.film);
   await setSwitch(admin, false);
-  r = await sync(premium, P.premium, [ID.film]);
+  r = await syncAll(premium, P.premium);
   it = item(r, ID.film);
   const paused = copy(premium, P.premium, ID.film);
   ok('the switch off: the copy is `paused` with the date it had, and isn’t renewed', r.status === 200 && r.json.enabled === false && it.state === 'paused' && it.basis === 'member' && near(it.licensedUntil, held.licensed_until, 1000) && paused.status === 'active' && paused.renewed_at === held.renewed_at && paused.licensed_until === held.licensed_until, `${brief(r)} | ${JSON.stringify(paused)}`);
@@ -792,9 +1043,16 @@ async function creatorSwitch(ctx) {
   const off = (r.json && r.json.titlesOff) || [];
   const expected = Number(rows('select count(*)::int as n from public.episodes where downloads_allowed = false')[0].n);
   ok('Admin → Downloads lists the titles switched off and counts them', r.status === 200 && r.json.numbers.titlesOff === expected && [ID.off, ID.held, ID.leaving].every((id) => off.some((t) => t.id === id && /^Check download/.test(t.title))) && !off.some((t) => t.id === ID.film), { n: r.json && r.json.numbers, expected });
-  const copies = Number(rows("select count(*)::int as n from public.downloads where status = 'active'")[0].n);
-  const phonesNow = Number(rows("select count(*)::int as n from (select distinct user_id, device_id from public.downloads where status = 'active') x")[0].n);
-  ok('…and counts the copies and the phones that hold them', r.json.numbers.copies === copies && r.json.numbers.phones === phonesNow && copies > MAX_TITLES_PER_DEVICE, { n: r.json.numbers, copies, phonesNow });
+  const copies = Number(rows("select count(*)::int as n from public.downloads where status = 'active' and licensed_until is not null")[0].n);
+  const phonesNow = Number(rows("select count(*)::int as n from (select distinct user_id, device_id from public.downloads where status = 'active' and licensed_until is not null) x")[0].n);
+  const waitingNow = Number(rows("select count(*)::int as n from public.downloads where status = 'active' and licensed_until is null")[0].n);
+  ok('…and counts the copies and the phones that hold them (a title still waiting for its file isn’t a copy)', r.json.numbers.copies === copies && r.json.numbers.phones === phonesNow && copies > MAX_TITLES_PER_DEVICE, { n: r.json.numbers, copies, phonesNow, waitingNow });
+
+  // Your work's rows carry the switch for the two edit boxes.
+  r = await call('/api/creator/my-submissions', web(MARA));
+  const mine = ((r.json && r.json.submissions) || []);
+  const rowOf = (id) => mine.find((x) => x.id === id) || null;
+  ok('Your work’s rows carry the switch and that the database has it', r.status === 200 && rowOf(ID.review) && rowOf(ID.review).downloadsAllowed === true && rowOf(ID.review).downloadsAllowedReady === true && rowOf(ID.off) && rowOf(ID.off).downloadsAllowed === false, rowOf(ID.review) && { a: rowOf(ID.review).downloadsAllowed, ready: rowOf(ID.review).downloadsAllowedReady });
 }
 
 // ---- the pages -------------------------------------------------------------------------------
@@ -822,10 +1080,11 @@ async function thePages(ctx) {
   const sentence = 'keep a title in the app to watch offline';
   r = await eventually(() => html('/ai-policy', SIGNED_OUT), (x) => x.text.includes(sentence));
   ok('the AI policy says how downloads work while the switch is on', r.status === 200 && r.text.includes(sentence) && r.text.includes('not an encrypted one'), r.status);
+  ok('…without promising more than the app does: no "plays only in the app", and it says a copy can be fetched outside it', !/plays only in the app/.test(r.text) && r.text.includes('outside the app') && r.text.includes('We limit how many titles an account can take'), r.status);
   r = await html('/terms', SIGNED_OUT);
   ok('the Terms have their downloads paragraph', r.status === 200 && r.text.includes('id="downloads"') && /Downloads in the app/.test(r.text), r.status);
   r = await html('/privacy', SIGNED_OUT);
-  ok('…and the Privacy page its own', r.status === 200 && /If you download in the app/.test(r.text), r.status);
+  ok('…and the Privacy page its own, and the download records among what a deletion removes', r.status === 200 && /If you download in the app/.test(r.text) && r.text.includes('the record of your phones and downloads within 30 days'), r.status);
 
   const b = await browser();
   try {
@@ -894,6 +1153,42 @@ async function thePages(ctx) {
     const box = v.page.locator('#ep-downloads');
     await box.waitFor({ timeout: 30000 }).catch(() => {});
     ok('the episode editor’s More info has the checkbox, ticked, with its words', status === 200 && (await box.isChecked()) && !(await box.isDisabled()) && (await v.page.locator('label[for="ep-downloads"]').innerText()).includes(DOWNLOADS_ALLOWED_LABEL), status);
+    await v.ctx.close();
+
+    // Your work's two edit boxes: a film or a short has the switch there too.
+    const titleOf = (id) => rows(`select title from public.episodes where id = ${q(id)}`)[0].title;
+    const allowedNow = (id) => rows(`select downloads_allowed as a from public.episodes where id = ${q(id)}`)[0].a;
+    v = await b.open(MARA, 1280);
+    const workStatus = await goto(v.page, '/creator/my-work');
+    const reviewRow = v.page.locator('.work-episode-row', { hasText: titleOf(ID.review) });
+    await reviewRow.waitFor({ timeout: 60000 }).catch(() => {});
+    await reviewRow.locator('button[title="Edit"]').click();
+    const inReview = v.page.locator('#edit-submission-downloads');
+    await inReview.waitFor({ timeout: 30000 }).catch(() => {});
+    ok('Your work, a short still in review: its edit box has “Allow downloads in the app”, ticked', workStatus === 200 && (await inReview.count()) === 1 && (await inReview.isChecked()) && !(await inReview.isDisabled()) && (await v.page.locator('label[for="edit-submission-downloads"]').innerText()).includes(DOWNLOADS_ALLOWED_LABEL), workStatus);
+    await inReview.uncheck();
+    await v.page.getByRole('button', { name: 'Save changes' }).click();
+    await v.page.waitForFunction(() => !document.querySelector('#edit-submission-downloads'), null, { timeout: 30000 }).catch(() => {});
+    ok('…unticking it and saving switches downloads off for the title', allowedNow(ID.review) === false, allowedNow(ID.review));
+    const openMenu = async (id) => {
+      await v.page.getByRole('button', { name: `Options for ${titleOf(id)}` }).click();
+      await v.page.getByRole('menuitem', { name: /Edit title/ }).click();
+    };
+    await openMenu(ID.teen);
+    const live = v.page.locator('#req-edit-downloads');
+    await live.waitFor({ timeout: 30000 }).catch(() => {});
+    ok('Your work, a live film: its edit box has the switch too, ticked', (await live.count()) === 1 && (await live.isChecked()) && !(await live.isDisabled()));
+    await live.uncheck();
+    const save = v.page.locator('.modal-card button[type="submit"]');
+    ok('…the Save button says it applies at once (nothing goes to review)', /applies at once/.test(await save.innerText()), await save.innerText());
+    await save.click();
+    await v.page.getByText('Saved: the downloads switch.').waitFor({ timeout: 30000 }).catch(() => {});
+    ok('…and saving switches downloads off for the live title, at once', allowedNow(ID.teen) === false && (await v.page.getByText('Saved: the downloads switch.').count()) === 1, allowedNow(ID.teen));
+    await v.page.getByRole('button', { name: 'Close', exact: true }).click();
+    await openMenu(ID.pod);
+    await v.page.locator('#req-edit-title').waitFor({ timeout: 30000 }).catch(() => {});
+    ok('…a podcast’s edit box has no such switch', (await v.page.locator('#req-edit-title').count()) === 1 && (await v.page.locator('#req-edit-downloads').count()) === 0);
+    ok('no page errors on Your work', v.errors.length === 0, v.errors);
     await v.ctx.close();
 
     // The Library's modal. (On a dev server compiling the page for the
@@ -976,6 +1271,11 @@ async function before123() {
   ok('the Library’s row: no such column yet (the modal leaves the checkbox out)', r.status === 200 && r.json.episodes[0].downloadsAllowedReady === false && r.json.episodes[0].downloadsAllowed === true, r.json && r.json.episodes && r.json.episodes[0] && r.json.episodes[0].downloadsAllowedReady);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.film)}`, { ...web(MARA), method: 'PATCH', body: { genre: 'Mystery' } });
   ok('every other save of the editor works as before', r.status === 200 && r.json.applied.includes('genre'), brief(r));
+  r = await call('/api/creator/my-submissions', web(MARA));
+  const mineRow = ((r.json && r.json.submissions) || []).find((x) => x.id === ID.film) || null;
+  ok('Your work’s row: allowed, no such column yet (its edit boxes grey the switch with the migration’s line)', r.status === 200 && mineRow && mineRow.downloadsAllowed === true && mineRow.downloadsAllowedReady === false, mineRow && { a: mineRow.downloadsAllowed, ready: mineRow.downloadsAllowedReady });
+  r = await call('/api/downloads/start', { ...web(admin), method: 'POST', body: { episodeId: ID.film, deviceId: P, terms: 1 } });
+  ok('a browser’s session is refused by the app’s routes before 123 too (403 app-only)', r.status === 403 && r.json.code === 'app-only', brief(r));
 
   const html = (path, who) => call(path, { ...web(who), accept: 'text/html,application/xhtml+xml' });
   r = await html('/admin/downloads', admin);
@@ -1023,6 +1323,10 @@ await runCheck(`downloads (${HAS123 ? 'after' : 'before'} 123)`, async () => {
     await askingAgain(ctx);
     await theCheckIn(ctx);
     await creatorSwitch(ctx);
+    await firstAsk(ctx);
+    await racing(ctx);
+    await onlyTheApp(ctx);
+    await neverOnAGuess(ctx);
     await thePages(ctx);
   } finally {
     await cleanup().catch((err) => ok('cleanup', false, String(err && err.message)));

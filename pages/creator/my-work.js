@@ -35,7 +35,11 @@ function editValuesFor(s) {
     pendingDescription: s.pendingDescription || null,
     pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
     pageNotesWaitReady: s.pageNotesWaitReady !== false,
-    hasFlashingLights: s.hasFlashingLights === true
+    hasFlashingLights: s.hasFlashingLights === true,
+    // "Allow downloads in the app" (not for a podcast; greyed before 123).
+    contentType: s.contentType || null,
+    downloadsAllowed: s.downloadsAllowed !== false,
+    downloadsAllowedReady: s.downloadsAllowedReady !== false
   };
 }
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';

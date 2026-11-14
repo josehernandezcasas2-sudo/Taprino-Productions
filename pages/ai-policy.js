@@ -28,8 +28,12 @@ export async function getServerSideProps({ req, res }) {
   // Card 01 follows Admin → AI security's "Block AI answer engines"
   // (lib/securitySwitches.js, migration 119).
   // Card 05's sentence about downloads shows only while Admin → Downloads'
-  // switch is on (site_settings.downloads_enabled, migration 123; the same
-  // copy of the settings row, half a minute old at most).
+  // switch is on (site_settings.downloads_enabled, migration 123). The
+  // server reads it from the same copy of the settings row, about half a
+  // minute old; but a visitor without a session gets this page from the
+  // CDN (ten minutes, then up to an hour more while a fresh one is made —
+  // the header above), so after a flip the sentence can take that long to
+  // appear or go for them. A signed-in visitor's page is made per request.
   const [account, episodes, sw, settingsRow] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getSecuritySwitches(), getSecurityRow().catch(() => null)]);
   return {
     props: {
@@ -129,7 +133,7 @@ export default function AiPolicy({ account = {}, answerEnginesBlocked = true, do
                     sentence when the measure changes. */}
                 {downloadsOn && (
                   <>
-                    {' '}Premium and Sponsor members, and people who bought a title, can keep a title in the app to watch offline. The copy sits in the app&rsquo;s own storage, out of the phone&rsquo;s backups, plays only in the app, and locks if the phone hasn&rsquo;t checked in with us by its date. It is an ordinary video file, not an encrypted one, so we can&rsquo;t promise nobody ever gets one out of a phone; a creator can switch downloads off for any title of theirs.
+                    {' '}Premium and Sponsor members, and people who bought a title, can keep a title in the app to watch offline. The app keeps the copy in its own storage, out of the phone&rsquo;s backups, and stops playing it if the phone hasn&rsquo;t checked in with us by its date. It is an ordinary video file, not an encrypted one, and it reaches the phone through a link given to that person&rsquo;s own account &mdash; so we can&rsquo;t promise that nobody ever copies one out of a phone, or fetches one with their own account outside the app. We limit how many titles an account can take, and a creator can switch downloads off for any title of theirs.
                   </>
                 )}
               </p>

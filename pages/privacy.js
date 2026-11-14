@@ -227,8 +227,8 @@ export default function Privacy({ account }) {
       <h2>How long we keep it</h2>
       <p>
         Account data is kept while your account exists. Ask us to delete it and we remove your
-        account, watch history, and wishlist within 30 days — except records we&rsquo;re required to
-        keep, such as payment records for tax purposes. Anonymous view counters and daily totals
+        account, watch history, wishlist, and the record of your phones and downloads within 30 days —
+        except records we&rsquo;re required to keep, such as payment records for tax purposes. Anonymous view counters and daily totals
         expire on their own after roughly 400 days. Submitted work is kept while it&rsquo;s published;
         creators can request removal.
       </p>

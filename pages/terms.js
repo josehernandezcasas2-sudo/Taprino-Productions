@@ -193,8 +193,8 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         Sponsor members, and people who bought your title, can keep it inside our app to watch offline,
         under the limits described there. Each title has a switch, &ldquo;Allow downloads in the
         app&rdquo;, which is on unless you turn it off. Turn it off and no new copy can be made, and
-        copies already on phones are removed the next time those phones connect; a phone that stays
-        offline keeps its copy until its date runs out, at most {MEMBER_MAX_DAYS + GRACE_DAYS} days.
+        our app removes the copies already on phones the next time those phones connect; a phone that
+        stays offline keeps its copy until its date runs out, at most {MEMBER_MAX_DAYS + GRACE_DAYS} days.
       </p>
       <p>
         <strong>What you&rsquo;re promising us.</strong> That you own or have licensed everything in
