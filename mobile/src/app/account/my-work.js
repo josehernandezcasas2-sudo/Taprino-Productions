@@ -12,6 +12,9 @@ import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { showCall } from '../../lib/showApi';
 import { episodeHasPage, fieldPolicy, fieldPolicyLine, flashingLightsPolicy, needsYou, saveSummary } from '../../lib/showRules';
 import FlashingLightsField from '../../components/FlashingLightsField';
+import DownloadsAllowedField from '../../components/DownloadsAllowedField';
+import { downloadableKind } from '../../lib/downloadRules';
+import { downloadsSwitchFrom, saveAroundDownloads } from '../../lib/downloadLogic';
 import { pickImageAsDataUrl } from '../../components/CreatorBits';
 import { episodeCode, sortEpisodes } from '../../lib/seriesResume';
 import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
@@ -76,6 +79,7 @@ function notesBoxShows(s) {
 function editValuesFor(s) {
   return {
     id: s.id,
+    contentType: s.contentType ?? null,
     title: s.title,
     description: s.description || '',
     pageNotes: s.pageNotes || '',
@@ -203,6 +207,9 @@ export default function MyWork() {
   const [editModal, setEditModal] = useState(null); // { type, currentValues }
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState(null);
+  // The server's line when a save found the database without migration 123:
+  // the edit box greys "Allow downloads in the app" with it.
+  const [downloadsBehind, setDownloadsBehind] = useState(null);
   const [deleteModal, setDeleteModal] = useState(null); // episode item
   const [deleteReason, setDeleteReason] = useState('');
   const [deleteSaving, setDeleteSaving] = useState(false);
@@ -274,12 +281,20 @@ export default function MyWork() {
   // the server's field policy decides: on a live title they wait for
   // approval (the notes in migration 122's column), on one that has never
   // been live they apply at once. → the words for the done line.
+  // "Allow downloads in the app" rides on the same save and applies at once
+  // in every state of the title. A database without migration 123 refuses
+  // the whole save over it (503 'migration-123'): the box greys with the
+  // server's line and whatever else changed is sent again without it
+  // (mobile/src/lib/downloadLogic.js saveAroundDownloads).
   async function submitEdit(body) {
     const cv = editModal.currentValues;
+    const path = `/api/show/episode/${encodeURIComponent(String(cv.id))}`;
     setEditSaving(true);
     setEditError(null);
     try {
-      const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, body, getToken);
+      const { r, behind } = await saveAroundDownloads((b) => showCall('PATCH', path, b, getToken), body);
+      if (behind) setDownloadsBehind(behind);
+      if (!r) return null;
       if (!r.ok) throw new Error(r.error);
       const notSaved = Array.isArray(r.data.notSaved) ? r.data.notSaved : [];
       if (notSaved.length) throw new Error(notSaved.map((n) => n && n.reason).filter(Boolean).join(' ') || 'Some of it didn’t save.');
@@ -291,6 +306,19 @@ export default function MyWork() {
     } finally {
       setEditSaving(false);
     }
+  }
+
+  // Where "Allow downloads in the app" stands for the title in the edit box
+  // (Your work's list doesn't carry it): the episode editor's own read,
+  // GET /api/show/episode/<id>. The server sends a policy entry for it only
+  // for a title that can be downloaded (never a podcast) — locked with the
+  // migration's line on a database without 123. → { allowed, locked } or
+  // null (no box: a podcast, an older server, or the read failed;
+  // mobile/src/lib/downloadLogic.js downloadsSwitchFrom).
+  async function loadDownloadsSwitch() {
+    const cv = editModal && editModal.currentValues;
+    if (!cv || !cv.id) return null;
+    return downloadsSwitchFrom(await showCall('GET', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, undefined, getToken));
   }
 
   // A change waiting for approval taken back (DELETE …/staged?field=).
@@ -740,7 +768,7 @@ export default function MyWork() {
             {actionSheet ? <ActionSheetContent
               actionSheet={actionSheet}
               onClose={() => setActionSheet(null)}
-              onEdit={(target) => { setActionSheet(null); setEditError(null); setTimeout(() => setEditModal(target), SHEET_HANDOFF_MS); }}
+              onEdit={(target) => { setActionSheet(null); setEditError(null); setDownloadsBehind(null); setTimeout(() => setEditModal(target), SHEET_HANDOFF_MS); }}
               onTitleImage={(item, opts) => { setActionSheet(null); setTimeout(() => pickTitleImage(item, opts), SHEET_HANDOFF_MS); }}
               onDelete={(item) => { setActionSheet(null); setDeleteReason(''); setDeleteError(null); setTimeout(() => setDeleteModal(item), SHEET_HANDOFF_MS); }}
               onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
@@ -808,6 +836,8 @@ export default function MyWork() {
                 onCancel={() => setEditModal(null)}
                 onSubmit={submitEdit}
                 onCancelWaiting={cancelWaiting}
+                onLoadDownloads={loadDownloadsSwitch}
+                downloadsBehind={downloadsBehind}
               /> : null}
             </Pressable>
           </Pressable>
@@ -964,14 +994,20 @@ function ActionSheetContent({ actionSheet, onClose, onEdit, onTitleImage, onDele
 // 2026-11-13) rides on the same save: ticking it applies at once, a live
 // title included; once a live title has it the box is ticked and greyed
 // with "Only the team can remove this warning from a live title."
+// "Allow downloads in the app" (Jose, 2026-11-14; a film or a short has no
+// episode editor in the app, so its switch is here): the box shows once the
+// title's own read has answered, for a title that can be downloaded (never
+// a podcast), and rides on the same save — it applies at once, a live title
+// included. On a database without migration 123 it is greyed with the
+// server's line, from the read or from a save that found out.
 const NOTES_122_LINE = 'Notes need a database update (migration 122).';
-const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning' };
+const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning', downloadsAllowed: 'downloads in the app' };
 function listOf(fields) {
   const named = fields.map((f) => DONE_WORDS[f]).filter(Boolean);
   return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
 }
 
-function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCancelWaiting }) {
+function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCancelWaiting, onLoadDownloads, downloadsBehind = null }) {
   const cv = editModal.currentValues || {};
   const isEpisode = editModal.type === 'episode';
   const waitingStart = {
@@ -990,6 +1026,24 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
   const [notes, setNotes] = useState(start.pageNotes);
   const startFlashing = cv.hasFlashingLights === true;
   const [flashing, setFlashing] = useState(startFlashing);
+  // { allowed, locked } once the title's own read has answered; `allow` is
+  // the box. No box until then, nor for a podcast.
+  const downloadable = isEpisode && downloadableKind(cv.contentType);
+  const [downloads, setDownloads] = useState(null);
+  const [allow, setAllow] = useState(true);
+  const loadDownloadsRef = useRef(onLoadDownloads);
+  loadDownloadsRef.current = onLoadDownloads;
+  useEffect(() => {
+    if (!downloadable || !loadDownloadsRef.current) return undefined;
+    let closed = false;
+    Promise.resolve(loadDownloadsRef.current()).then((d) => {
+      if (closed || !d) return;
+      setDownloads(d);
+      setAllow(d.allowed);
+    }).catch(() => {});
+    return () => { closed = true; };
+  }, [downloadable, cv.id]);
+  const downloadsLocked = downloads ? downloadsBehind || downloads.locked : null;
   const [waiting, setWaiting] = useState(waitingStart);
   const [cancelling, setCancelling] = useState(null);
   const [done, setDone] = useState(null);
@@ -1005,6 +1059,7 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
   if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
   if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
   if (isEpisode && flashing !== startFlashing) changes.push({ field: 'hasFlashingLights', mode: 'direct' });
+  if (downloads && !downloadsLocked && allow !== downloads.allowed) changes.push({ field: 'downloadsAllowed', mode: 'direct' });
   const summary = saveSummary(changes);
   const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
   const anyWaiting = Object.values(waiting).some((v) => v !== null);
@@ -1016,6 +1071,7 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
       if (c.field === 'description') body.description = description.trim();
       if (c.field === 'pageNotes') body.pageNotes = notes.trim();
       if (c.field === 'hasFlashingLights') body.hasFlashingLights = flashing;
+      if (c.field === 'downloadsAllowed') body.downloadsAllowed = allow;
     }
     const result = await onSubmit(body);
     if (result) setDone(result);
@@ -1038,7 +1094,9 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
           {[
             done.staged.length ? `Sent for review: ${listOf(done.staged)}. Visitors see what’s live until we approve it.` : null,
             done.applied.length ? `Saved: ${listOf(done.applied)}.` : null,
-            !done.staged.length && !done.applied.length ? done.notices[0] || 'Saved.' : null
+            !done.staged.length && !done.applied.length ? done.notices[0] || 'Saved.' : null,
+            // The rest went through; the downloads box didn't (no migration 123).
+            downloadsBehind ? `Not saved: ${DONE_WORDS.downloadsAllowed}. ${downloadsBehind}` : null
           ].filter(Boolean).join(' ')}
         </Text>
         <Pressable style={styles.primaryBtn} onPress={onCancel}><Text style={styles.primaryBtnText}>Close</Text></Pressable>
@@ -1106,6 +1164,14 @@ function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCanc
           onChange={setFlashing}
           locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
           style={{ marginTop: 12 }}
+        />
+      ) : null}
+      {downloads ? (
+        <DownloadsAllowedField
+          checked={downloadsLocked ? downloads.allowed : allow}
+          onChange={setAllow}
+          locked={downloadsLocked}
+          style={{ marginTop: 6 }}
         />
       ) : null}
       {summary.note ? <Text style={styles.notesHelp}>{summary.note}.</Text> : null}

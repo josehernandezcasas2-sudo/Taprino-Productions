@@ -9,8 +9,8 @@ import { reportSuspension } from './suspensionStore';
 import { readViewingTerms } from './viewingTerms';
 import * as rules from './downloadRules';
 import {
-  APP_WORDS, LINK_MARGIN_MS, PAGE_SYNC_EVERY_MS, PREPARE_MAX_MS, SYNC_EVERY_MS,
-  createDownloadLogic, emptyIndex, isTitleSlug, normalizeIndex, pickMeta, preparePollDelay
+  APP_WORDS, LINK_MARGIN_MS, PAGE_SYNC_EVERY_MS, PAUSE_GRACE_MS, PREPARE_MAX_MS, START_RETRY_MS, SYNC_EVERY_MS,
+  createDownloadLogic, emptyIndex, isTitleSlug, normalizeIndex, onPhoneClock, pickIndex, pickMeta, preparePollDelay
 } from './downloadLogic';
 
 // Downloads in the app: the store and the manager (Jose, 2026-11-14;
@@ -22,7 +22,12 @@ import {
 // stored files.
 //
 // Where things are:
-//   Paths.document/downloads/index.json   the index (small; no video, no link)
+//   Paths.document/downloads/index.json   the index (small; no video, no link).
+//                                         It is only ever replaced by a
+//                                         move: the new one is written
+//                                         beside it (index.json.tmp) first,
+//                                         and read from there when the
+//                                         index itself is missing or broken
 //   Paths.cache/downloads/<id>.mp4        the title (decision 9: the cache is
 //                                         never in an iCloud or desktop
 //                                         backup; the phone may clear it)
@@ -38,6 +43,13 @@ import {
 // play" before it plays and once a minute while it does (canPlay). A
 // check-in that fails changes nothing. `revoked` deletes the file, `ended`
 // keeps it until keepUntil, a phone removed elsewhere loses everything.
+// The licensed date is kept in the phone's own clock: the server's clock
+// only says how long from now (downloadLogic.js onPhoneClock).
+//
+// Which phone: an id made once and kept in the keychain, for this device
+// only (it is in no backup). The index names it too, as a mark and never as
+// a source: an index that names a phone the keychain doesn't know came from
+// another phone's backup, and isn't this phone's list.
 //
 // Whose copies: index.userId. Clerk saying "another account" deletes them;
 // Clerk saying "signed out" hides them (sign-out itself deletes them, in
@@ -57,6 +69,15 @@ let loaded = false;
 // that — nothing written over it, no file swept — and it is read again the
 // next time the app comes to the front.
 let indexLocked = false;
+// It is there (or its copy is) and isn't an index: nothing is swept on that
+// guess, and it isn't written over until there is something to keep.
+let indexBroken = false;
+// Strays may be swept: an index was really read, or there is none at all.
+let sweepAllowed = false;
+// A save that didn't go through (no room, a move that failed): the index on
+// the phone is as it was, and the save is tried again.
+let saveFailed = false;
+let saveRetryTimer = null;
 let booted = false;
 // What Clerk says: known = it has loaded; userId null = signed out.
 let session = { known: false, userId: null, getToken: null };
@@ -69,7 +90,8 @@ let snapshot = null;
 let version = 0;
 let emitTimer = null;
 let saveTimer = null;
-// The one transfer: { id, task, stop } — stop says why it was asked to.
+// The one transfer: { id, task, stop, done } — `stop` says why it was asked
+// to; `done` ends the wait for it whatever the native side does.
 let active = null;
 let pumping = false;
 let pumpAgain = false;
@@ -78,8 +100,11 @@ let stallCount = 0;
 let serverChain = Promise.resolve();
 let syncing = null;
 let lastSyncTry = 0;
-let deviceIdPromise = null;
+let deviceId = null; // this phone's id, once the keychain has said
+let deviceIdAsk = null;
+let authSignal = null; // ends retryConnection's wait when Clerk reports back
 const links = new Map(); // id → { url, expiresAt }
+const backoff = new Map(); // id → { tries, at }: a title whose `start` the server couldn't answer
 const polls = new Map(); // id → { timer, since }
 const attempts = new Map(); // id → failed transfers this run
 const missing = new Map(); // id → the ready file is gone
@@ -90,6 +115,7 @@ const authRetryListeners = new Set();
 const filesDir = () => new Directory(Paths.cache, 'downloads');
 const indexDir = () => new Directory(Paths.document, 'downloads');
 const indexFile = () => new File(indexDir(), 'index.json');
+const indexCopy = () => new File(indexDir(), 'index.json.tmp');
 const videoName = (id) => `${id}.mp4`;
 const captionsName = (id) => `${id}.vtt`;
 const resumeName = (id) => `${id}.resume.json`;
@@ -132,25 +158,55 @@ function wipeFiles() {
 
 /* ---------------- the index ---------------- */
 
+// One of the two index files, read. → { exists, locked, value }: `locked`
+// when it is there and can't be read at all; `value` the parsed object, or
+// null when it is absent or isn't JSON.
+function readIndexFile(file) {
+  let exists = false;
+  try {
+    exists = Boolean(file.exists);
+    if (!exists) return { exists: false, locked: false, value: null };
+    const text = file.textSync();
+    try {
+      const value = JSON.parse(text);
+      return { exists: true, locked: false, value: value && typeof value === 'object' && !Array.isArray(value) ? value : null };
+    } catch {
+      return { exists: true, locked: false, value: null };
+    }
+  } catch {
+    return { exists: true, locked: true, value: null };
+  }
+}
+
 function load() {
   if (loaded) return;
   loaded = true;
   index = emptyIndex();
   indexLocked = false;
+  indexBroken = false;
+  sweepAllowed = false;
   if (!SUPPORTED) return;
-  let text = null;
-  try {
-    const f = indexFile();
-    if (!f.exists) return;
-    text = f.textSync();
-  } catch {
+  const main = readIndexFile(indexFile());
+  const copy = readIndexFile(indexCopy());
+  // Unreadable (not: unparseable) and nothing better to go on: decide nothing.
+  if (main.locked || (!main.value && copy.locked)) {
     indexLocked = true;
     return;
   }
-  try {
-    index = normalizeIndex(JSON.parse(text));
-  } catch {
-    index = emptyIndex(); // not an index any more: the phone starts clean
+  const pick = pickIndex(main.value, copy.value);
+  if (!pick) {
+    // Neither file: a phone with no downloads (strays are nobody's). A file
+    // that isn't an index: the phone starts empty and touches nothing.
+    indexBroken = main.exists || copy.exists;
+    sweepAllowed = !indexBroken;
+    return;
+  }
+  index = normalizeIndex(pick === 'copy' ? copy.value : main.value);
+  sweepAllowed = true;
+  if (pick === 'copy') {
+    // The save was cut short after the copy was whole (or the old index was
+    // removed and the new one never moved in): finish it now.
+    try { indexCopy().moveSync(indexFile(), { overwrite: true }); } catch { /* the next save does */ }
   }
   refreshMissing();
 }
@@ -162,30 +218,42 @@ function loadAgainIfLocked() {
   sweepOrphans();
   // Whoever is signed in is checked against the index now it's read.
   claimIndex();
+  if (!deviceId) getDeviceId({ make: false });
   emit();
 }
 
+// The index is never written in place: the new one goes beside it, whole,
+// and is then moved over it. If either step fails the index on the phone
+// is as it was (and the copy beside it, when it is whole and newer, is what
+// the next launch reads); the save is tried again.
 function writeIndex() {
   if (!SUPPORTED || indexLocked) return;
+  const nothing = Object.keys(index.items).length === 0 && index.notices.length === 0;
+  // An index that couldn't be parsed isn't written over for nothing.
+  if (indexBroken && nothing) return;
   // A phone that has never downloaded anything gets no file at all.
-  const blank = Object.keys(index.items).length === 0 && index.notices.length === 0 && !index.deviceKnown && !index.deviceId;
-  try {
-    if (blank && !indexFile().exists) return;
-  } catch { /* written below */ }
-  const text = JSON.stringify(index);
-  ensureDir(indexDir());
-  try {
-    // Beside it, then over it: a write cut short never leaves half an index.
-    const tmp = new File(indexDir(), 'index.json.tmp');
-    tmp.create({ intermediates: true, overwrite: true });
-    tmp.writeSync(text);
-    tmp.moveSync(indexFile(), { overwrite: true });
-  } catch {
+  if (nothing && !index.deviceKnown) {
     try {
-      const f = indexFile();
-      if (!f.exists) f.create({ intermediates: true, overwrite: true });
-      f.writeSync(text);
-    } catch { /* the next save tries again */ }
+      if (!indexFile().exists && !indexCopy().exists) return;
+    } catch { /* written below */ }
+  }
+  index.rev = (Number(index.rev) || 0) + 1;
+  try {
+    ensureDir(indexDir());
+    const copy = indexCopy();
+    copy.create({ intermediates: true, overwrite: true });
+    copy.writeSync(JSON.stringify(index));
+    copy.moveSync(indexFile(), { overwrite: true });
+    indexBroken = false;
+    saveFailed = false;
+  } catch {
+    saveFailed = true;
+    if (!saveRetryTimer) {
+      saveRetryTimer = setTimeout(() => {
+        saveRetryTimer = null;
+        if (saveFailed) writeIndex();
+      }, 15000);
+    }
   }
 }
 function saveNow() {
@@ -283,21 +351,64 @@ function newDeviceId() {
     return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
   }
 }
-// Made once and kept (SecureStore; the index holds a copy in case the
-// keychain can't be read).
-export function getDeviceId() {
+// This phone's id: made once, kept in the keychain for this device only (it
+// is in no backup and on no other phone). → the id, or null when the
+// keychain can't say right now (locked, failing): nothing is decided from
+// that, and nothing that needs the id is asked.
+//
+// The index names the id too, as a mark. If the keychain holds none (or
+// another one) while the index names a phone, the index came from another
+// phone — a backup restored onto this one carries Documents, not the
+// keychain or the cache — and it isn't this phone's list: this phone starts
+// empty under its own id, and nothing is said to the server in the other
+// phone's name.
+//
+// `make: false` (the launch, the app coming to the front) only looks: a
+// phone that has never downloaded is given no id and no keychain entry
+// until it needs one.
+const KEYCHAIN = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+const ID_SHAPE = /^[A-Za-z0-9_-]{16,80}$/;
+export async function getDeviceId({ make = true } = {}) {
   load();
-  if (!deviceIdPromise) {
-    deviceIdPromise = (async () => {
-      let id = null;
-      try { id = await SecureStore.getItemAsync(DEVICE_KEY); } catch { id = null; }
-      if (!id || !/^[A-Za-z0-9_-]{16,80}$/.test(id)) id = index.deviceId && /^[A-Za-z0-9_-]{16,80}$/.test(index.deviceId) ? index.deviceId : newDeviceId();
-      try { await SecureStore.setItemAsync(DEVICE_KEY, id); } catch { /* the index keeps it */ }
-      if (index.deviceId !== id) { index = { ...index, deviceId: id }; saveSoon(); }
-      return id;
-    })();
+  if (deviceId) return deviceId;
+  if (!SUPPORTED) return null;
+  // One look at the keychain at a time.
+  while (deviceIdAsk) await deviceIdAsk;
+  if (deviceId) return deviceId;
+  deviceIdAsk = findDeviceId(make).catch(() => null).finally(() => { deviceIdAsk = null; });
+  return deviceIdAsk;
+}
+async function findDeviceId(make) {
+  let stored = null;
+  try { stored = await SecureStore.getItemAsync(DEVICE_KEY, KEYCHAIN); } catch { return null; }
+  // The index can't be read either: which phone it names isn't known yet.
+  if (indexLocked) return null;
+  const named = index.deviceId;
+  let id = stored && ID_SHAPE.test(stored) ? stored : null;
+  // The index names a phone the keychain doesn't know: another phone's list.
+  if (named && named !== id) foreignIndex();
+  if (!id) {
+    if (!make) return null;
+    id = newDeviceId();
+    try { await SecureStore.setItemAsync(DEVICE_KEY, id, KEYCHAIN); } catch { return null; }
   }
-  return deviceIdPromise;
+  deviceId = id;
+  // The mark, written with the index whenever there is something to keep.
+  if (index.deviceId !== id) index = { ...index, deviceId: id };
+  return id;
+}
+// An index made on another phone: its rows go (their films were never
+// here), and whatever is in this phone's cache with them.
+function foreignIndex() {
+  if (active) stopIfActive(active.id, 'remove');
+  for (const id of Array.from(polls.keys())) cancelPoll(id);
+  links.clear();
+  attempts.clear();
+  backoff.clear();
+  wipeFiles();
+  index = { ...emptyIndex(), rev: index.rev, wifiOnly: index.wifiOnly };
+  saveNow();
+  emit();
 }
 export function deviceName() {
   return Device.deviceName || Device.modelName || (Platform.OS === 'ios' ? 'iPhone' : 'Android phone');
@@ -307,8 +418,11 @@ export function deviceName() {
 
 // The whole answer, like lib/showApi.js showCall: the screens need the
 // status and the body's code, not a line.
-async function call(method, path, body, { getToken = session.getToken, timeoutMs = 20000 } = {}) {
-  const token = await freshToken(getToken);
+async function call(method, path, body, { getToken = session.getToken, token: given = null, timeoutMs = 20000 } = {}) {
+  // Always the session's token, never without one (the downloads routes
+  // answer only the app: a Bearer token and no Origin, which React Native's
+  // fetch never sends).
+  const token = given || await freshToken(getToken);
   if (!token) return { ok: false, status: 0, data: {}, noSession: true };
   const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctrl ? setTimeout(() => ctrl.abort(), timeoutMs) : null;
@@ -340,29 +454,35 @@ const refusalOf = (r) => ({ ok: false, status: r.status, code: typeof r.data.cod
 
 function askStart(id) {
   return serverCall(async () => {
-    const deviceId = await getDeviceId();
-    return call('POST', '/api/downloads/start', { episodeId: id, deviceId, deviceName: deviceName(), platform: Platform.OS, terms: await readViewingTerms() });
+    const phone = await getDeviceId();
+    // The keychain can't say which phone this is: nothing is asked in a guessed name.
+    if (!phone) return { ok: false, status: 0, data: { code: 'device' }, noDevice: true };
+    return call('POST', '/api/downloads/start', { episodeId: id, deviceId: phone, deviceName: deviceName(), platform: Platform.OS, terms: await readViewingTerms() });
   });
 }
 
-// A 200 from start: the licence, the link, what the title is.
+// A 200 from start: the licence, the link, what the title is. The dates the
+// phone will compare with its own clock (the licence, the link's end) are
+// kept in that clock (`serverTime` says what the server's read).
 function applyStart(id, data) {
   const meta = pickMeta(data.item);
-  const expiresAt = typeof data.expiresAt === 'number' ? data.expiresAt : Date.parse(data.expiresAt);
-  links.set(id, { url: data.url, expiresAt: Number.isFinite(expiresAt) ? expiresAt : Date.now() + rules.LINK_SECONDS * 1000 });
-  const until = typeof data.licensedUntil === 'number' ? data.licensedUntil : Date.parse(data.licensedUntil);
+  const now = Date.now();
+  const expiresAt = onPhoneClock(data.expiresAt, data.serverTime, now);
+  links.set(id, { url: data.url, expiresAt: expiresAt !== null ? expiresAt : now + rules.LINK_SECONDS * 1000 });
   const it = patch(id, {
     ...meta,
     basis: data.basis === 'owned' ? 'owned' : 'member',
-    licensedUntil: Number.isFinite(until) ? until : null,
+    licensedUntil: onPhoneClock(data.licensedUntil, data.serverTime, now),
     endedAt: null,
     keepUntil: null,
     licensed: true,
     preparePercent: null,
     artUrl: data.item && typeof data.item.art === 'string' ? data.item.art : null
   });
-  const paid = data.paidThrough === null || data.paidThrough === undefined ? null : typeof data.paidThrough === 'number' ? data.paidThrough : Date.parse(data.paidThrough);
-  index = { ...index, paidThrough: Number.isFinite(paid) ? paid : null, deviceKnown: true, enabled: true };
+  // Only shown ("your month ended on…"): the server's date as it is.
+  const paid = onPhoneClock(data.paidThrough, null, now);
+  index = { ...index, paidThrough: paid, deviceKnown: true, enabled: true };
+  backoff.delete(id);
   saveNow();
   if (it) fetchExtras(id);
   return it;
@@ -441,8 +561,10 @@ function transferGate() {
   return null;
 }
 const eligible = (it) => !it.endedAt && (it.state === 'queued' || (it.state === 'paused' && !it.userPaused));
+// A title whose `start` the server couldn't answer steps aside until its next try.
+const heldBack = (id) => { const b = backoff.get(id); return Boolean(b && b.at > Date.now()); };
 function nextTransfer() {
-  return logic.sortedItems(index).find(eligible) || null;
+  return logic.sortedItems(index).find((it) => eligible(it) && !heldBack(it.episodeId)) || null;
 }
 function markWaiting(why) {
   let changed = false;
@@ -452,22 +574,66 @@ function markWaiting(why) {
   if (changed) { saveSoon(); emit(); }
 }
 
+// Stops the transfer in flight: 'remove' cancels it, anything else pauses
+// it ('user' the member's own tap; 'wifi' / 'offline' / 'hidden' / 'ended'
+// the manager's).
+//   · The first reason stands. A task that is already stopping isn't asked
+//     a second time, and a Wi-Fi change right after the member's own pause
+//     doesn't turn that pause into a wait that resumes by itself. The
+//     member's tap on top of an automatic stop makes it theirs; a removal
+//     always wins.
+//   · The wait for the task never depends on the native side settling its
+//     promise: a cancel ends it at once (on Android a cancelled transfer
+//     can return without ever settling), a pause after PAUSE_GRACE_MS if
+//     native hasn't answered with its resume data by then.
 function stopIfActive(id, why) {
   if (!active || active.id !== id) return;
-  active.stop = why;
+  const mine = active;
+  if (why === 'remove') {
+    if (mine.stop === 'remove') return;
+    mine.stop = 'remove';
+    try { mine.task.cancel(); } catch { /* it has already ended */ }
+    mine.done({ stopped: true });
+    return;
+  }
+  if (mine.stop) {
+    if (why === 'user' && mine.stop !== 'remove') mine.stop = 'user';
+    return;
+  }
+  mine.stop = why;
   try {
-    if (why === 'remove') active.task.cancel();
-    else active.task.pause();
-  } catch { /* it has already ended */ }
+    mine.task.pause();
+  } catch {
+    // Not running any more (it is finishing, or failed): nothing to wait for.
+    mine.done({ stopped: true });
+    return;
+  }
+  setTimeout(() => mine.done({ stopped: true }), PAUSE_GRACE_MS);
 }
 
 function fail(id, line) {
   removeFile(resumeName(id));
   removeFile(videoName(id));
   links.delete(id);
+  backoff.delete(id);
   patch(id, { state: 'failed', error: line || WORDS.failed, wait: null, userPaused: false, progress: 0, preparePercent: null });
   saveNow();
   emit();
+}
+
+// The server couldn't answer `start` for this title (a 5xx, a limit): the
+// titles behind it go first; this one is asked again after a wait, twice,
+// and then says it failed with the server's line (tap to try again).
+function holdBack(id, line) {
+  const tries = (backoff.get(id) || { tries: 0 }).tries;
+  if (tries >= START_RETRY_MS.length) {
+    fail(id, line);
+    return 'next';
+  }
+  const wait = START_RETRY_MS[tries];
+  backoff.set(id, { tries: tries + 1, at: Date.now() + wait });
+  setTimeout(pump, wait + 50);
+  return 'next';
 }
 
 function onProgress(id, written, total) {
@@ -498,16 +664,23 @@ async function runTransfer(id) {
       link = links.get(id);
       fresh = true;
     } else if (r.status === 202) {
+      backoff.delete(id);
       patch(id, { state: 'preparing', wait: null, preparePercent: Number(r.data.percent) || 0 });
       saveSoon();
       emit();
       schedulePoll(id, Date.now());
       return 'next';
-    } else if (r.status === 0 || r.status === 429 || (r.status >= 500 && r.data.code !== 'migration-123')) {
-      // The connection, a limit or the server having a moment: wait.
-      patch(id, { wait: r.status === 0 ? 'offline' : null });
+    } else if (r.noDevice) {
+      // The keychain can't say which phone this is: nothing moves for now.
+      return 'stop';
+    } else if (r.status === 0) {
+      // No connection: nothing can move; everything waits for it.
+      patch(id, { wait: 'offline' });
       emit();
       return 'stop';
+    } else if (r.status === 429 || (r.status >= 500 && r.data.code !== 'migration-123')) {
+      // A limit, or the server having a moment with this title: the next one.
+      return holdBack(id, logic.refusal(refusalOf(r)).body);
     } else {
       fail(id, logic.refusal(refusalOf(r)).body);
       return 'next';
@@ -529,6 +702,7 @@ async function runTransfer(id) {
   // task itself doesn't outlive the app — after a restart it starts again.
   const options = { sessionType: 'background', onProgress: (p) => onProgress(id, p.bytesWritten, p.totalBytes) };
   let task;
+  let native;
   try {
     if (resume) {
       task = DownloadTask.fromSavable({ url: Platform.OS === 'android' ? link.url : saved.url, fileUri: dest.uri, isDirectory: false, headers: saved.headers, resumeData: saved.resumeData }, options);
@@ -537,71 +711,79 @@ async function runTransfer(id) {
       removeFile(videoName(id));
       task = File.createDownloadTask(link.url, dest, options);
     }
+    // What native says in the end, as a value: { file } (null = paused) or { error }.
+    native = (resume ? task.resumeAsync() : task.downloadAsync()).then((file) => ({ file }), (error) => ({ error: error || true }));
   } catch {
     removeFile(resumeName(id));
     patch(id, { state: 'queued' });
+    try { if (task) task.release(); } catch { /* released with the task */ }
     return bumpAttempt(id);
   }
-  active = { id, task, stop: null };
+  // The wait ends when native answers — or when this manager stops the
+  // transfer and native doesn't (stopIfActive). Whatever native says after
+  // that is not listened to.
+  let done;
+  const stopped = new Promise((resolve) => { done = resolve; });
+  const mine = { id, task, stop: null, done };
+  active = mine;
   patch(id, { state: 'downloading', wait: null, error: null, userPaused: false, file: videoName(id), progress: resume ? it.progress : 0 });
   saveNow();
   emit();
-  let outcome;
+  const result = await Promise.race([native, stopped]);
+  const why = mine.stop;
+  active = null;
+  let outcome = 'next';
   let retryWait = false;
-  try {
-    const file = resume ? await task.resumeAsync() : await task.downloadAsync();
-    const why = active.stop;
-    if (!index.items[id]) {
-      outcome = 'next';
-    } else if (file) {
-      const size = Number(file.size) || 0;
-      if (size > 0) {
-        removeFile(resumeName(id));
-        links.delete(id);
-        attempts.delete(id);
-        missing.set(id, false);
-        patch(id, { state: 'ready', progress: 1, bytes: size, file: videoName(id), wait: null, error: null, userPaused: false });
-        saveNow();
-        emit();
-        fetchExtras(id);
-        stallCount = 0;
-        outcome = 'next';
-      } else {
-        outcome = bumpAttempt(id);
-      }
-    } else {
-      // Paused: by the member, or because the connection it may use went.
-      let state = null;
-      try { state = task.savable(); } catch { state = null; }
-      savePauseState(id, state);
-      patch(id, { state: 'paused', userPaused: why === 'user', wait: why === 'wifi' || why === 'offline' ? why : null });
-      saveNow();
-      emit();
-      outcome = why === 'wifi' || why === 'offline' || why === 'hidden' ? 'stop' : 'next';
-    }
-  } catch {
-    const why = active ? active.stop : null;
-    if (why === 'remove' || !index.items[id]) {
-      outcome = 'next';
-    } else {
-      // The link ran out, a resume the server refused, or the connection
-      // dropped: the next try starts over with a fresh link.
+  if (result.stopped) {
+    // Native never answered: the task is done with, whatever it does now.
+    try { task.cancel(); } catch { /* it has already ended */ }
+  }
+  try { task.release(); } catch { /* released with the task */ }
+  if (!index.items[id] || why === 'remove') {
+    // Removed while it was coming down: nothing of it is kept.
+  } else if (result.file) {
+    const size = Number(result.file.size) || 0;
+    if (size > 0) {
       removeFile(resumeName(id));
       links.delete(id);
-      if (net.known && !net.online) {
-        patch(id, { state: 'paused', userPaused: false, wait: 'offline' });
-        saveNow();
-        emit();
-        outcome = 'stop';
-      } else {
-        patch(id, { state: 'queued', wait: null });
-        outcome = bumpAttempt(id);
-        retryWait = true;
-      }
+      attempts.delete(id);
+      missing.set(id, false);
+      patch(id, { state: 'ready', progress: 1, bytes: size, file: videoName(id), wait: null, error: null, userPaused: false });
+      saveNow();
+      emit();
+      fetchExtras(id);
+      stallCount = 0;
+    } else {
+      outcome = bumpAttempt(id);
     }
-  } finally {
-    active = null;
-    try { task.release(); } catch { /* released with the task */ }
+  } else if (result.error && !why) {
+    // The link ran out, a resume the server refused, or the connection
+    // dropped: the next try starts over with a fresh link.
+    removeFile(resumeName(id));
+    links.delete(id);
+    if (net.known && !net.online) {
+      patch(id, { state: 'paused', userPaused: false, wait: 'offline' });
+      saveNow();
+      emit();
+      outcome = 'stop';
+    } else {
+      patch(id, { state: 'queued', wait: null });
+      outcome = bumpAttempt(id);
+      retryWait = true;
+    }
+  } else {
+    // Paused: by the member, or because the connection it may use went.
+    // Native's resume data when it answered; none when it didn't (or
+    // failed while stopping), and the title starts over next time.
+    let state = null;
+    if (!result.stopped && !result.error) {
+      try { state = task.savable(); } catch { state = null; }
+    }
+    savePauseState(id, state);
+    patch(id, { state: 'paused', userPaused: why === 'user', wait: why === 'wifi' || why === 'offline' ? why : null });
+    saveNow();
+    emit();
+    outcome = why === 'wifi' || why === 'offline' || why === 'hidden' ? 'stop' : 'next';
   }
   // Not straight back at it: a moment first.
   if (retryWait && index.items[id] && index.items[id].state === 'queued') await new Promise((r) => setTimeout(r, 2000));
@@ -683,13 +865,22 @@ async function poll(id) {
     patch(id, { preparePercent: Number(r.data.percent) || 0 });
     emitSoon();
     schedulePoll(id, p.since);
-  } else if (r.status === 429) {
-    // Asked too often: ask less, inside the same five minutes.
-    schedulePoll(id, p.since, 30000);
+  } else if (r.noDevice) {
+    // The keychain can't say which phone this is right now: back in line.
+    patch(id, { state: 'queued', wait: null });
+    emit();
+    scheduleStall();
   } else if (r.status === 0) {
     patch(id, { state: 'queued', wait: 'offline' });
     emit();
     scheduleStall();
+  } else if (r.status === 429 || (r.status >= 500 && r.data.code !== 'migration-123')) {
+    // A limit, or the server having a moment: it steps aside and is asked
+    // again after a wait, then says so in the server's own words.
+    patch(id, { state: 'queued', wait: null });
+    emit();
+    holdBack(id, logic.refusal(refusalOf(r)).body);
+    pump();
   } else {
     fail(id, logic.refusal(refusalOf(r)).body);
     pump();
@@ -707,6 +898,10 @@ export async function startDownload(episodeId, meta = {}) {
   loadAgainIfLocked();
   if (!SUPPORTED || indexLocked) return { ok: false, status: 0, code: 'unsupported', error: '', devices: [] };
   if (!isTitleSlug(episodeId)) return { ok: false, status: 404, code: 'title', error: '', devices: [] };
+  if (!session.userId || !session.getToken || hidden()) return { ok: false, status: 401, code: 'signin', error: '', devices: [] };
+  // Which phone this is, before anything is kept or asked (a locked
+  // keychain: not now; an index that was another phone's is emptied here).
+  if (!(await getDeviceId())) return { ok: false, status: 0, code: 'device', error: '', devices: [] };
   if (!session.userId || !session.getToken || hidden()) return { ok: false, status: 401, code: 'signin', error: '', devices: [] };
   if (index.items[episodeId]) { resumeDownload(episodeId); return { ok: true, preparing: false }; }
   if (logic.phoneFull(index)) return { ok: false, status: 409, code: 'titles', error: '', devices: [] };
@@ -780,6 +975,7 @@ export function resumeDownload(id) {
   const it = index.items[id];
   if (!it || it.state === 'ready' || it.state === 'downloading' || it.state === 'preparing') return;
   attempts.delete(id);
+  backoff.delete(id);
   stallCount = 0;
   patch(id, { state: it.state === 'failed' ? 'queued' : it.state, userPaused: false, wait: null, error: null });
   saveSoon();
@@ -796,13 +992,17 @@ export function removeDownload(id) {
   cancelPoll(id);
   links.delete(id);
   attempts.delete(id);
+  backoff.delete(id);
   deleteFiles(id, it);
   drop(id);
   saveNow();
   emit();
   if (it.licensed && session.getToken) {
     // If this never arrives, the next check-in's list says the same thing.
-    serverCall(async () => call('POST', '/api/downloads/remove', { deviceId: await getDeviceId(), episodeId: id })).catch(() => {});
+    serverCall(async () => {
+      const phone = await getDeviceId();
+      return phone ? call('POST', '/api/downloads/remove', { deviceId: phone, episodeId: id }) : null;
+    }).catch(() => {});
   }
   pump();
 }
@@ -819,7 +1019,7 @@ export function dismissNotice(notice) {
 // The check-in. Nothing is asked while the phone holds nothing (a phone
 // that never downloads is never one of the account's two), unless forced.
 // → { ok: true } | { ok: true, skipped } | { ok: false, reason: 'nosession'
-//   | 'network' | 'server' | 'changed' | 'unsupported', status }
+//   | 'network' | 'server' | 'changed' | 'device' | 'unsupported', status }
 export function checkIn({ force = false, minGapMs = SYNC_EVERY_MS } = {}) {
   load();
   if (!SUPPORTED) return Promise.resolve({ ok: false, reason: 'unsupported' });
@@ -830,8 +1030,14 @@ export function checkIn({ force = false, minGapMs = SYNC_EVERY_MS } = {}) {
   lastSyncTry = Date.now();
   const user = session.userId;
   syncing = serverCall(async () => {
-    const deviceId = await getDeviceId();
-    const r = await call('POST', '/api/downloads/sync', { deviceId, deviceName: deviceName(), platform: Platform.OS, have: logic.haveIds(index) });
+    const phone = await getDeviceId();
+    // The keychain can't say which phone this is: nothing is asked, nothing
+    // changes, and the next trigger tries again.
+    if (!phone) { lastSyncTry = 0; return { ok: false, reason: 'device', status: 0 }; }
+    // (An index that was another phone's has just been emptied.)
+    if (!force && Object.keys(index.items).length === 0) return { ok: true, skipped: true };
+    // `have` is always a list, of the ids the server has a row for.
+    const r = await call('POST', '/api/downloads/sync', { deviceId: phone, deviceName: deviceName(), platform: Platform.OS, have: logic.haveIds(index) });
     if (r.status !== 200) {
       // A check-in that fails changes nothing; the next trigger tries again.
       if (r.status === 0) lastSyncTry = 0;
@@ -865,23 +1071,55 @@ export function checkIn({ force = false, minGapMs = SYNC_EVERY_MS } = {}) {
   return syncing;
 }
 
-// The lock card's "Try again": look at the connection again, then check in.
-// → { ok } | { ok: false, reason: 'offline' | 'nosession' | 'network' | 'server' }
+// The lock card's "Try again". A press always tries: the phone's own idea
+// of its connection (which can be wrong — a Wi-Fi it thinks has no
+// internet, a VPN) never stands in for asking. Only the answer decides what
+// the card says.
+// → { ok, enabled } | { ok: false, reason: 'offline' | 'nosession' |
+//   'network' | 'server' | 'device' }
 export async function retryConnection() {
   boot();
   try { onNet(await Network.getNetworkStateAsync()); } catch { /* what we knew stands */ }
-  if (net.known && !net.online) return { ok: false, reason: 'offline' };
+  const saysOffline = () => net.known && !net.online;
   if (!session.getToken) {
     // Clerk gave up when the app started offline: ask the root layout to
-    // load it again, and give it a moment.
+    // load it again, and wait for it to report back (or a few seconds).
     askAuthRetry();
-    for (let i = 0; i < 16 && !session.getToken; i += 1) await new Promise((r) => setTimeout(r, 500));
-    if (!session.getToken) return { ok: false, reason: 'nosession' };
+    await waitForSession(saysOffline() ? 4000 : 8000);
+    if (!session.getToken) return { ok: false, reason: saysOffline() ? 'offline' : 'nosession' };
   }
   const r = await checkIn({ force: true });
-  if (r.ok) { touchSeen(); housekeeping(); }
-  // `enabled`: the admin switch as the server just said (off = no renewals).
-  return r.ok ? { ...r, enabled: index.enabled } : r;
+  if (r.ok) {
+    touchSeen();
+    housekeeping();
+    // `enabled`: the admin switch as the server just said (off = no renewals).
+    return { ...r, enabled: index.enabled };
+  }
+  // It tried and nothing came back, and the phone says it has no
+  // connection: that is what the card says.
+  if (r.reason === 'network' && saysOffline()) return { ...r, reason: 'offline' };
+  return r;
+}
+// Until Clerk has handed a session over, the layout says its try ended
+// (authRetrySettled), or `maxMs` passes.
+function waitForSession(maxMs) {
+  return new Promise((resolve) => {
+    let over = false;
+    let tick = null;
+    let cap = null;
+    const end = () => {
+      if (over) return;
+      over = true;
+      clearInterval(tick);
+      clearTimeout(cap);
+      authSignal = null;
+      resolve();
+    };
+    tick = setInterval(() => { if (session.getToken) end(); }, 250);
+    cap = setTimeout(end, maxMs);
+    // Clerk reported back: a moment for the session to reach setSession.
+    authSignal = () => setTimeout(end, 600);
+  });
 }
 
 // The Downloads page's read when it opens online: the plan, the limits, the
@@ -889,8 +1127,9 @@ export async function retryConnection() {
 export async function loadAccount() {
   load();
   if (!SUPPORTED || !session.userId || !session.getToken || hidden()) return null;
-  const deviceId = await getDeviceId();
-  const r = await call('GET', `/api/downloads?deviceId=${encodeURIComponent(deviceId)}`);
+  const phone = await getDeviceId();
+  if (!phone) return null;
+  const r = await call('GET', `/api/downloads?deviceId=${encodeURIComponent(phone)}`);
   if (r.status !== 200) return null;
   const data = r.data;
   index = {
@@ -907,9 +1146,9 @@ export async function loadAccount() {
   return data;
 }
 // "Remove" beside another phone (the two-phones sheet, the page's list).
-export async function removeDevice(deviceId) {
+export async function removeDevice(otherId) {
   if (!session.getToken) return { ok: false };
-  const r = await serverCall(() => call('POST', '/api/downloads/devices', { remove: deviceId }));
+  const r = await serverCall(() => call('POST', '/api/downloads/devices', { remove: otherId }));
   return { ok: r.status === 200, devices: Array.isArray(r.data.devices) ? r.data.devices : null };
 }
 // The Downloads page opening: a check-in (not more than every half minute).
@@ -991,8 +1230,9 @@ function wipeLocal() {
   for (const id of Array.from(polls.keys())) cancelPoll(id);
   links.clear();
   attempts.clear();
+  backoff.clear();
   wipeFiles();
-  index = { ...emptyIndex(), deviceId: index.deviceId, wifiOnly: index.wifiOnly, lastSeenAt: index.lastSeenAt };
+  index = { ...emptyIndex(), rev: index.rev, deviceId: index.deviceId, wifiOnly: index.wifiOnly, lastSeenAt: index.lastSeenAt };
   saveNow();
 }
 
@@ -1028,20 +1268,36 @@ export function setSession({ known = false, userId = null, getToken = null } = {
   emit();
 }
 
-// Signing out (lib/signOut.js, before Clerk's signOut): this phone's copies
-// are deleted, then the server is told this phone is no longer one of the
-// account's — for a few seconds at most, sign-out doesn't wait on it.
-export async function clearForSignOut(getToken) {
+// Signing out, in two halves (lib/signOut.js signOutEverywhere). Nothing is
+// deleted until Clerk's signOut has gone through: with no connection it
+// throws, and a member who is still signed in keeps their downloads.
+//
+// Before signOut: what telling the server afterwards will need — a token
+// (the session is gone by then) and this phone's id. Best effort, a couple
+// of seconds at most. → the ticket for afterSignOut
+export async function beforeSignOut(getToken) {
+  load();
+  if (!SUPPORTED) return null;
+  // A phone that never downloaded has nothing to tell.
+  if (!(index.deviceKnown || Object.keys(index.items).length > 0)) return { tell: false, token: null, phone: null };
+  const [token, phone] = await Promise.all([
+    freshToken(getToken, 2500),
+    Promise.race([getDeviceId().catch(() => null), new Promise((r) => setTimeout(() => r(null), 2500))])
+  ]);
+  return { tell: true, token: token || null, phone: phone || null };
+}
+// After signOut went through (never when it threw): this phone's copies
+// are deleted, then the server is told the phone is no longer one of the
+// account's, with the token taken before — for a few seconds at most.
+export async function afterSignOut(ticket) {
   load();
   if (!SUPPORTED) return;
-  const tell = index.deviceKnown || Object.keys(index.items).length > 0;
   wipeLocal();
   emit();
-  if (!tell) return;
+  if (!ticket || !ticket.tell || !ticket.token || !ticket.phone) return;
   try {
-    const deviceId = await getDeviceId();
     await Promise.race([
-      call('POST', '/api/downloads/devices', { remove: deviceId }, { getToken, timeoutMs: 6000 }),
+      call('POST', '/api/downloads/devices', { remove: ticket.phone }, { token: ticket.token, timeoutMs: 6000 }),
       new Promise((r) => setTimeout(r, 6500))
     ]);
   } catch { /* the website's list has "Remove this phone" too */ }
@@ -1082,6 +1338,8 @@ function onNet(state) {
 
 function onFront() {
   loadAgainIfLocked();
+  // The keychain may have been locked when the app started.
+  if (!deviceId) getDeviceId({ make: false });
   touchSeen();
   housekeeping();
   refreshMissing();
@@ -1113,11 +1371,13 @@ export function boot() {
     housekeeping();
   }, 60000);
   sweepOrphans();
+  // Which phone this is — and whether the index is this phone's at all.
+  getDeviceId({ make: false });
 }
 
 // Files no row points at (a removal cut short, an index that was lost).
 function sweepOrphans() {
-  if (indexLocked) return;
+  if (indexLocked || !sweepAllowed) return;
   try {
     const dir = filesDir();
     if (!dir.exists) return;
@@ -1144,6 +1404,11 @@ function askAuthRetry() {
   for (const fn of Array.from(authRetryListeners)) {
     try { fn(); } catch { /* the layout's own trouble */ }
   }
+}
+// The layout: Clerk reported back on a try ("ready", or "error" again).
+// Ends "Try again"'s wait early.
+export function authRetrySettled() {
+  if (authSignal) authSignal();
 }
 
 /* ---------------- reading ---------------- */

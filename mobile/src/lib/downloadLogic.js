@@ -26,16 +26,28 @@ export const ITEM_STATES = ['queued', 'preparing', 'downloading', 'paused', 'rea
 export const SYNC_EVERY_MS = 10 * 60 * 1000;
 // …and this often when the Downloads page opens (the server allows 120 an hour).
 export const PAGE_SYNC_EVERY_MS = 30 * 1000;
-// While Cloudflare makes the file: ask again every 5 s for the first
-// minute, every 15 s after it, for up to 5 minutes — 28 asks, not 60: the
-// route allows an account 60 an hour, and a film can take minutes to make.
+// While Cloudflare makes the file (a film can take many minutes): ask again
+// every 5 s for the first minute, every 15 s to five minutes, every 30 s
+// after that, for twenty minutes in all — 58 asks. The route allows an
+// account 600 asks an hour and counts only NEW copies against its limit.
 export const PREPARE_POLL_MS = 5000;
 export const PREPARE_SLOW_AFTER_MS = 60 * 1000;
 export const PREPARE_SLOW_POLL_MS = 15000;
-export const PREPARE_MAX_MS = 5 * 60 * 1000;
+export const PREPARE_SLOWER_AFTER_MS = 5 * 60 * 1000;
+export const PREPARE_SLOWER_POLL_MS = 30000;
+export const PREPARE_MAX_MS = 20 * 60 * 1000;
 export function preparePollDelay(waitedMs) {
-  return Number(waitedMs) >= PREPARE_SLOW_AFTER_MS ? PREPARE_SLOW_POLL_MS : PREPARE_POLL_MS;
+  const waited = Number(waitedMs) || 0;
+  if (waited >= PREPARE_SLOWER_AFTER_MS) return PREPARE_SLOWER_POLL_MS;
+  return waited >= PREPARE_SLOW_AFTER_MS ? PREPARE_SLOW_POLL_MS : PREPARE_POLL_MS;
 }
+// A `start` the server couldn't answer (a 5xx, a limit): the title steps
+// aside for the ones behind it and is asked again after these waits, then
+// says it failed (tap to try again).
+export const START_RETRY_MS = [20000, 60000];
+// A pause native hasn't answered after this long is taken as paused anyway
+// (the transfer starts over when it is picked up again).
+export const PAUSE_GRACE_MS = 5000;
 // A link this close to its end isn't started on.
 export const LINK_MARGIN_MS = 60 * 1000;
 // "No longer available" notes stay this long unless dismissed.
@@ -50,6 +62,71 @@ const num = (v) => {
 };
 const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
 
+// A date the server worked out, kept in the phone's own clock. The phone
+// compares it with its own Date.now() while it has no connection, so what
+// counts is how long from now, and only the server's clock can say that:
+//   until = phoneNow + (serverDate − serverTime)
+// A phone whose clock is weeks behind doesn't gain those weeks, and one
+// whose clock is ahead isn't locked the moment it checks in. Without
+// `serverTime` the date is taken as given.
+export function onPhoneClock(serverDate, serverTime, phoneNow = Date.now()) {
+  const date = num(serverDate);
+  if (date === null) return null;
+  const server = num(serverTime);
+  const phone = num(phoneNow);
+  if (server === null || phone === null) return date;
+  return phone + (date - server);
+}
+
+// Which of the two index files to read: the index, and the copy written
+// beside it before it is moved into place (`index.json.tmp`). Each is
+// handed in parsed, or null when it is absent or won't parse. The newer
+// save wins (`rev` counts them); a file that won't parse never does.
+// → 'main' | 'copy' | null
+export function pickIndex(main, copy) {
+  const ok = (v) => Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+  if (!ok(main)) return ok(copy) ? 'copy' : null;
+  if (!ok(copy)) return 'main';
+  return (Number(copy.rev) || 0) > (Number(main.rev) || 0) ? 'copy' : 'main';
+}
+
+/* ---- the creator's switch on a title of its own (Your work's edit box) ---- */
+
+// Where "Allow downloads in the app" stands, from the episode editor's own
+// read (GET /api/show/episode/<id>; `r` is showCall's answer). The server
+// sends a policy entry for it only for a title that can be downloaded
+// (never a podcast), locked with the migration's line on a database
+// without 123. → { allowed, locked: the line | null } or null (no box: a
+// podcast, a server without the switch, a read that failed).
+export const SWITCH_LOCKED_LINE = 'This can’t be changed here';
+export function downloadsSwitchFrom(r) {
+  if (!r || r.ok !== true || !r.data || typeof r.data !== 'object') return null;
+  const policy = r.data.policy && r.data.policy.downloadsAllowed;
+  if (!policy || typeof policy !== 'object') return null;
+  const episode = r.data.episode;
+  return {
+    allowed: !(episode && episode.downloadsAllowed === false),
+    locked: policy.mode === 'direct' ? null : (typeof policy.line === 'string' && policy.line) || SWITCH_LOCKED_LINE
+  };
+}
+
+// A save that carries the switch (PATCH /api/show/episode/<id>, with the
+// title, the notes…). A database without migration 123 refuses the whole
+// save over it (503, code 'migration-123'): the switch is then left out and
+// whatever else changed is sent again. `send(body)` → showCall's answer.
+// → { r: the answer that counts (null when the switch was all there was),
+//     behind: the server's line when it said so, else null }
+export async function saveAroundDownloads(send, body) {
+  const first = await send(body);
+  const refused = Boolean(first) && first.ok !== true && first.status === 503 && Boolean(first.data) && first.data.code === 'migration-123';
+  if (!refused || !body || !Object.prototype.hasOwnProperty.call(body, 'downloadsAllowed')) return { r: first, behind: null };
+  const behind = (typeof first.error === 'string' && first.error) || (typeof first.data.error === 'string' && first.data.error) || SWITCH_LOCKED_LINE;
+  const rest = { ...body };
+  delete rest.downloadsAllowed;
+  if (Object.keys(rest).length === 0) return { r: null, behind };
+  return { r: await send(rest), behind };
+}
+
 // A title id as the site makes them (lib/titleIds.js): also what makes it
 // safe as a file name.
 export function isTitleSlug(id) {
@@ -59,6 +136,7 @@ export function isTitleSlug(id) {
 export function emptyIndex() {
   return {
     version: INDEX_VERSION,
+    rev: 0,
     userId: null,
     deviceId: null,
     deviceKnown: false,
@@ -80,6 +158,7 @@ export function emptyIndex() {
 export function normalizeIndex(raw) {
   const out = emptyIndex();
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  out.rev = Math.max(0, Math.floor(Number(raw.rev) || 0));
   out.userId = typeof raw.userId === 'string' && raw.userId ? raw.userId : null;
   out.deviceId = typeof raw.deviceId === 'string' && raw.deviceId ? raw.deviceId : null;
   out.deviceKnown = raw.deviceKnown === true;
@@ -203,6 +282,7 @@ export const APP_WORDS = {
   offBody: 'Your downloads are still on this phone. They play again once downloads are switched back on.',
   tooMany: 'Too many downloads started. Try again in a little while.',
   notSetUp: 'Downloads aren’t set up yet.',
+  noDevice: 'This phone can’t be told apart from others right now. Unlock it and try again.',
   fileNotReady: 'The file isn’t ready yet. Try again in a minute.',
   unsupported: 'Downloads work in the Studio Tapa TV app on a phone or tablet.',
   ownedLockNote: 'Connect once to keep playing'
@@ -255,7 +335,7 @@ export function createDownloadLogic(rules) {
       const it = next.items[r.episodeId];
       if (!it) continue;
       if (r.state === 'ok') {
-        const until = num(r.licensedUntil);
+        const until = onPhoneClock(r.licensedUntil, res.serverTime, now);
         next.items[r.episodeId] = {
           ...it,
           basis: r.basis === 'owned' || r.basis === 'member' ? r.basis : it.basis,
@@ -264,8 +344,13 @@ export function createDownloadLogic(rules) {
           keepUntil: null
         };
       } else if (r.state === 'ended') {
-        const endedAt = num(r.endedAt) || it.endedAt || now;
-        next.items[r.episodeId] = { ...it, endedAt, keepUntil: num(r.keepUntil) || keepUntil(endedAt) };
+        // The day it ended is only shown: the server's. How long the file
+        // is kept is counted on the phone's clock.
+        const said = num(r.endedAt);
+        const endedAt = said || it.endedAt || now;
+        const keep = num(r.keepUntil) !== null ? onPhoneClock(r.keepUntil, res.serverTime, now)
+          : said ? onPhoneClock(keepUntil(said), res.serverTime, now) : keepUntil(endedAt);
+        next.items[r.episodeId] = { ...it, endedAt, keepUntil: keep };
       } else if (r.state === 'revoked') {
         // "No row" for a download that never got its licence is the
         // server not knowing it yet, not a take-back.
@@ -481,6 +566,8 @@ export function createDownloadLogic(rules) {
     if (code === 'titles') return { kind: 'titles', title: DOWNLOAD_WORDS.button, body: DOWNLOAD_WORDS.titleLimit };
     if (code === 'devices') return { kind: 'devices', title: DOWNLOAD_WORDS.button, body: DOWNLOAD_WORDS.deviceLimit, devices: Array.isArray(r.devices) ? r.devices : [] };
     if (code === 'off') return { kind: 'message', title: DOWNLOAD_WORDS.button, body: DOWNLOAD_WORDS.off };
+    // The phone's id can't be read (a locked keychain), or the server didn't take it.
+    if (code === 'device') return { kind: 'message', title: DOWNLOAD_WORDS.button, body: line || APP_WORDS.noDevice };
     if (code === 'unsupported') return { kind: 'message', title: DOWNLOAD_WORDS.button, body: APP_WORDS.unsupported };
     if (status === 0) return { kind: 'message', title: DOWNLOAD_WORDS.button, body: APP_WORDS.unreachable };
     if (status === 429) return { kind: 'message', title: DOWNLOAD_WORDS.button, body: line || APP_WORDS.tooMany };

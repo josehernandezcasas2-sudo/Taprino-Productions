@@ -358,15 +358,111 @@ t('what the Download button says when the server says no, by its code', () => {
   assert.equal(say({ status: 403, error: 'Early screening: this opens for your plan tomorrow.' }).body, 'Early screening: this opens for your plan tomorrow.');
 });
 
-t('while the file is being made: every 5 s for a minute, then every 15 s — 28 asks in five minutes', () => {
+t('while the file is being made: every 5 s for a minute, every 15 s to five minutes, every 30 s to twenty — 58 asks', () => {
   assert.equal(lib.preparePollDelay(0), 5000);
   assert.equal(lib.preparePollDelay(59999), 5000);
   assert.equal(lib.preparePollDelay(60000), 15000);
+  assert.equal(lib.preparePollDelay(5 * 60000 - 1), 15000);
+  assert.equal(lib.preparePollDelay(5 * 60000), 30000);
+  assert.equal(lib.preparePollDelay(19 * 60000), 30000);
+  assert.equal(lib.PREPARE_MAX_MS, 20 * 60000);
   let waited = 0;
   let asks = 1; // the first, when Download is pressed
   while (waited < lib.PREPARE_MAX_MS) { waited += lib.preparePollDelay(waited); if (waited < lib.PREPARE_MAX_MS) asks += 1; }
-  assert.equal(asks, 28);
-  assert.ok(asks * 2 <= 60, 'two slow titles in an hour stay inside the route’s limit');
+  assert.equal(asks, 58);
+  // The route takes 600 asks an hour: ten slow titles in a row stay inside it.
+  assert.ok(asks * 10 <= 600);
+});
+
+t('a start the server couldn’t answer is tried again twice, a little apart, before it says so', () => {
+  assert.deepEqual(lib.START_RETRY_MS, [20000, 60000]);
+  assert.ok(lib.PAUSE_GRACE_MS >= 1000 && lib.PAUSE_GRACE_MS <= 10000);
+});
+
+t('a date the phone will compare with its own clock is kept in that clock', () => {
+  const server = Date.UTC(2026, 10, 14, 18, 0, 0);
+  const until = server + 8 * DAY;
+  // The same clocks: the date as given.
+  assert.equal(lib.onPhoneClock(until, server, server), until);
+  assert.equal(lib.onPhoneClock(new Date(until).toISOString(), new Date(server).toISOString(), server), until);
+  // The phone 25 days behind: still 8 days from the phone's now (not 33).
+  assert.equal(lib.onPhoneClock(until, server, server - 25 * DAY), server - 25 * DAY + 8 * DAY);
+  // The phone 3 days ahead: still 8 days from the phone's now (not 5).
+  assert.equal(lib.onPhoneClock(until, server, server + 3 * DAY), server + 3 * DAY + 8 * DAY);
+  // An older server that doesn't say its time: the date as given.
+  assert.equal(lib.onPhoneClock(until, undefined, server - 25 * DAY), until);
+  assert.equal(lib.onPhoneClock(until, 'not a date', server - 25 * DAY), until);
+  // Nothing to keep.
+  assert.equal(lib.onPhoneClock(null, server, server), null);
+  assert.equal(lib.onPhoneClock('nonsense', server, server), null);
+});
+
+t('a check-in with the server’s time: the licence and the kept-until date go by the phone’s clock, the shown dates stay the server’s', () => {
+  const phone = NOW - 25 * DAY; // this phone's clock is 25 days behind
+  const index = indexOf([item({ episodeId: 'a', licensedUntil: phone + 2 * DAY }), item({ episodeId: 'b', licensedUntil: phone + 2 * DAY })], { lastSeenAt: phone });
+  const res = {
+    enabled: true,
+    serverTime: new Date(NOW).toISOString(),
+    paidThrough: new Date(at(8)).toISOString(),
+    plan: { carries: true, tier: 'premium' },
+    items: [
+      { episodeId: 'a', state: 'ok', basis: 'member', licensedUntil: new Date(at(8)).toISOString(), endedAt: null, keepUntil: null, reason: null },
+      { episodeId: 'b', state: 'ended', basis: 'member', licensedUntil: new Date(at(-1)).toISOString(), endedAt: new Date(at(-1)).toISOString(), keepUntil: new Date(at(6)).toISOString(), reason: null }
+    ],
+    deviceRemoved: false
+  };
+  const { index: next } = logic.applySync(index, res, { now: phone });
+  // 8 days of licence left by the server's count → 8 days from the phone's now.
+  assert.equal(next.items.a.licensedUntil, phone + 8 * DAY);
+  assert.deepEqual(logic.itemPlayState(next, next.items.a, { now: phone + 7 * DAY }), { ok: true });
+  assert.deepEqual(logic.itemPlayState(next, next.items.a, { now: phone + 8 * DAY + 1 }), { ok: false, reason: 'expired' }, 'not 33 days');
+  // The file of an ended copy is kept 6 more days by the server's count.
+  assert.equal(next.items.b.keepUntil, phone + 6 * DAY);
+  // What is only shown stays as the server said it.
+  assert.equal(next.items.b.endedAt, at(-1));
+  assert.equal(next.paidThrough, at(8));
+  // Without serverTime (an older server): the dates as given.
+  const old = { ...res };
+  delete old.serverTime;
+  const { index: plain } = logic.applySync(index, old, { now: phone });
+  assert.equal(plain.items.a.licensedUntil, at(8));
+  assert.equal(plain.items.b.keepUntil, at(6));
+});
+
+t('which index file to read: the newer save, never one that won’t parse', () => {
+  assert.equal(lib.pickIndex(null, null), null);
+  assert.equal(lib.pickIndex({ rev: 4 }, null), 'main');
+  assert.equal(lib.pickIndex(null, { rev: 4 }), 'copy');
+  assert.equal(lib.pickIndex({ rev: 4 }, { rev: 5 }), 'copy'); // the app died between the write and the move
+  assert.equal(lib.pickIndex({ rev: 5 }, { rev: 5 }), 'main');
+  assert.equal(lib.pickIndex({ rev: 6 }, { rev: 5 }), 'main');
+  assert.equal(lib.pickIndex({}, { rev: 1 }), 'copy');
+  assert.equal(lib.pickIndex([], { rev: 1 }), 'copy');
+  assert.equal(lib.pickIndex('text', 12), null);
+  // The count of saves survives a read.
+  assert.equal(lib.emptyIndex().rev, 0);
+  assert.equal(lib.normalizeIndex({ rev: 41, items: {} }).rev, 41);
+  assert.equal(lib.normalizeIndex({ rev: 'x', items: {} }).rev, 0);
+});
+
+t('the creator’s switch on a title of its own: what the editor’s read says', () => {
+  const ok = (data) => ({ ok: true, status: 200, data, error: null });
+  assert.deepEqual(lib.downloadsSwitchFrom(ok({ episode: { downloadsAllowed: true }, policy: { downloadsAllowed: { mode: 'direct', line: null } } })), { allowed: true, locked: null });
+  assert.deepEqual(lib.downloadsSwitchFrom(ok({ episode: { downloadsAllowed: false }, policy: { downloadsAllowed: { mode: 'direct', line: null } } })), { allowed: false, locked: null });
+  // A database without migration 123: greyed with the server's line.
+  assert.deepEqual(
+    lib.downloadsSwitchFrom(ok({ episode: { downloadsAllowed: true }, policy: { downloadsAllowed: { mode: 'locked', line: 'Downloads need a database update (migration 123).' } } })),
+    { allowed: true, locked: 'Downloads need a database update (migration 123).' }
+  );
+  // Locked without a line, or a mode this app doesn't know: greyed all the same.
+  assert.equal(lib.downloadsSwitchFrom(ok({ episode: {}, policy: { downloadsAllowed: { mode: 'locked' } } })).locked, lib.SWITCH_LOCKED_LINE);
+  assert.equal(lib.downloadsSwitchFrom(ok({ episode: {}, policy: { downloadsAllowed: { mode: 'staged', line: null } } })).locked, lib.SWITCH_LOCKED_LINE);
+  // No box: a podcast (no policy entry), an older server, a read that failed.
+  assert.equal(lib.downloadsSwitchFrom(ok({ episode: { downloadsAllowed: true }, policy: { title: 'staged' } })), null);
+  assert.equal(lib.downloadsSwitchFrom(ok({ episode: { downloadsAllowed: true } })), null);
+  assert.equal(lib.downloadsSwitchFrom({ ok: false, status: 404, data: { error: 'That episode isn’t there.' }, error: 'That episode isn’t there.' }), null);
+  assert.equal(lib.downloadsSwitchFrom({ ok: false, status: 0, data: {}, error: 'offline' }), null);
+  assert.equal(lib.downloadsSwitchFrom(null), null);
 });
 
 t('this phone is full at the shared limit', () => {
@@ -378,5 +474,64 @@ t('every word the app says is there, and none of the shared ones is retyped', ()
   for (const [key, value] of Object.entries(lib.APP_WORDS)) assert.ok(typeof value === 'string' && value.length > 0, key);
   for (const shared of Object.values(W)) assert.ok(!Object.values(lib.APP_WORDS).includes(shared), `"${shared}" is in the shared rules`);
 });
+
+t('the server’s own line is what a refusal shows: which limit, a phone it can’t name, a route that only answers the app', () => {
+  const hour = logic.refusal({ status: 429, code: 'rate', error: 'That’s 30 new downloads in an hour. Try again in a little while.' });
+  assert.deepEqual([hour.kind, hour.body], ['message', 'That’s 30 new downloads in an hour. Try again in a little while.']);
+  assert.equal(logic.refusal({ status: 429, code: 'rate', error: 'That’s 60 new downloads today. Try again tomorrow.' }).body, 'That’s 60 new downloads today. Try again tomorrow.');
+  assert.equal(logic.refusal({ status: 429, code: '', error: '' }).body, lib.APP_WORDS.tooMany);
+  assert.equal(logic.refusal({ status: 403, code: 'app-only', error: 'Downloads are in the Studio Tapa TV app.' }).body, 'Downloads are in the Studio Tapa TV app.');
+  // The keychain can't say which phone this is.
+  assert.equal(logic.refusal({ status: 0, code: 'device', error: '' }).body, lib.APP_WORDS.noDevice);
+  assert.equal(logic.refusal({ status: 400, code: 'device', error: 'That isn’t a phone’s id.' }).body, 'That isn’t a phone’s id.');
+});
+
+// A save that carries the creator's switch (async: outside t()).
+{
+  const sent = [];
+  const answers = [];
+  const send = async (body) => { sent.push(body); return answers.shift(); };
+  const ok = { ok: true, status: 200, data: { applied: ['downloadsAllowed'], staged: [], notices: [] }, error: null };
+  const behind = { ok: false, status: 503, data: { code: 'migration-123', error: 'Downloads need a database update (migration 123).' }, error: 'Downloads need a database update (migration 123).' };
+
+  // It saves: one request, nothing behind.
+  answers.push(ok);
+  assert.deepEqual(await lib.saveAroundDownloads(send, { downloadsAllowed: false }), { r: ok, behind: null });
+  assert.deepEqual(sent, [{ downloadsAllowed: false }]);
+
+  // Before migration 123, the switch alone: the line, and nothing sent again.
+  sent.length = 0;
+  answers.push(behind);
+  assert.deepEqual(await lib.saveAroundDownloads(send, { downloadsAllowed: false }), { r: null, behind: 'Downloads need a database update (migration 123).' });
+  assert.equal(sent.length, 1);
+
+  // Before 123, with a new title too: the rest is sent again without the switch.
+  sent.length = 0;
+  const saved = { ok: true, status: 200, data: { applied: [], staged: ['title'], notices: [] }, error: null };
+  answers.push(behind, saved);
+  const body = { title: 'Harbour Lights', downloadsAllowed: true };
+  assert.deepEqual(await lib.saveAroundDownloads(send, body), { r: saved, behind: 'Downloads need a database update (migration 123).' });
+  assert.deepEqual(sent, [{ title: 'Harbour Lights', downloadsAllowed: true }, { title: 'Harbour Lights' }]);
+  assert.deepEqual(body, { title: 'Harbour Lights', downloadsAllowed: true }, 'the caller’s body is left alone');
+
+  // Any other refusal is the answer as it is: a 503 for another migration, a 403, no connection.
+  for (const other of [
+    { ok: false, status: 503, data: { code: 'migration-122', error: 'Notes need a database update (migration 122).' }, error: 'Notes need a database update (migration 122).' },
+    { ok: false, status: 403, data: { code: 'locked', error: 'Only the person who uploaded it or the show’s owner can change this' }, error: 'Only the person who uploaded it or the show’s owner can change this' },
+    { ok: false, status: 0, data: {}, error: 'offline' }
+  ]) {
+    sent.length = 0;
+    answers.push(other);
+    assert.deepEqual(await lib.saveAroundDownloads(send, { title: 'x', downloadsAllowed: false }), { r: other, behind: null });
+    assert.equal(sent.length, 1);
+  }
+  // A 503 migration-123 on a save that doesn't carry the switch isn't about it.
+  sent.length = 0;
+  answers.push(behind);
+  assert.deepEqual(await lib.saveAroundDownloads(send, { title: 'x' }), { r: behind, behind: null });
+  assert.equal(sent.length, 1);
+  n += 1;
+  console.log('ok', 'a save that carries the creator’s switch: before migration 123 the switch is left out and the rest is sent again');
+}
 
 console.log(`\n${n} checks passed`);
