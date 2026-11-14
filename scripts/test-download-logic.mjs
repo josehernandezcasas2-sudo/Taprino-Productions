@@ -315,6 +315,11 @@ t('the card over the list: the membership’s end first, then the clock, then th
 t('one copy’s lock (the offline player)', () => {
   const index = indexOf([item()], { paidThrough: at(-3) });
   assert.match(logic.itemLock(index, item(), 'expired', { now: NOW }).body, /^Your month ended on Nov 11/);
+  // The admin switch was off at the last check-in: connecting won't unlock it, and the card says so.
+  const off = logic.itemLock({ ...index, enabled: false }, item(), 'expired', { now: NOW });
+  assert.equal(off.title, rules.DOWNLOAD_WORDS.off);
+  assert.equal(off.body, lib.APP_WORDS.offBody);
+  assert.equal(off.action, 'retry');
   assert.match(logic.itemLock(index, item({ basis: 'owned' }), 'expired', { now: NOW }).body, /^This phone hasn’t been online for 30 days/);
   assert.equal(logic.itemLock(index, item({ endedAt: at(-1) }), 'ended', { now: NOW }).action, 'plans');
   assert.deepEqual(logic.itemLock(index, item(), 'missing', { now: NOW }), { reason: 'missing', ...rules.lockCard('missing') });

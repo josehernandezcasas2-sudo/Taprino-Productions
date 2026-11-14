@@ -198,6 +198,9 @@ export const APP_WORDS = {
   notReady: 'This download hasn’t finished yet.',
   unreachable: 'Couldn’t reach the site — check the connection and try again.',
   cantDownload: 'This title can’t be downloaded.',
+  // A copy past its date while the admin switch is off: connecting
+  // won't unlock it (the server renews nothing then), so the card says so.
+  offBody: 'Your downloads are still on this phone. They play again once downloads are switched back on.',
   tooMany: 'Too many downloads started. Try again in a little while.',
   notSetUp: 'Downloads aren’t set up yet.',
   fileNotReady: 'The file isn’t ready yet. Try again in a minute.',
@@ -427,6 +430,9 @@ export function createDownloadLogic(rules) {
       return { reason, ids: mine.map((s) => s.item.episodeId), ...lockCard('ended', { endedAt: Number.isFinite(endedAt) ? endedAt : null, now }) };
     }
     if (reason === 'expired') {
+      // The switch was off at the last check-in: nothing is renewed, so
+      // "connect once" would be untrue.
+      if (index.enabled === false) return { reason, ids: mine.map((s) => s.item.episodeId), title: DOWNLOAD_WORDS.off, body: APP_WORDS.offBody, action: 'retry' };
       // "Your month ended on…" only when a member's copy ran out and the
       // month really is over; a bought title or a team account reads
       // "hasn't been online for 30 days".
@@ -442,6 +448,7 @@ export function createDownloadLogic(rules) {
     if (reason === 'notready') return { reason, title: APP_WORDS.notReady, body: '', action: null };
     if (reason === 'nothere') return { reason, title: APP_WORDS.notHere, body: '', action: 'download' };
     if (reason === 'expired') {
+      if (index.enabled === false) return { reason, title: DOWNLOAD_WORDS.off, body: APP_WORDS.offBody, action: 'retry' };
       const paid = num(index.paidThrough);
       return { reason, ...lockCard('expired', { paidThrough: item && item.basis !== 'owned' && paid !== null && paid < now ? paid : null, now }) };
     }
