@@ -418,6 +418,7 @@ async function theLink(ctx) {
   ok('a show’s episode: the show’s name, its season and number, the page’s kicker, a picture to keep', r.status === 200 && ep.seriesId === IDS.nightBus && ep.seriesName === 'Night Bus' && ep.season === 1 && ep.number === 1 && ep.kicker === 'Night Bus · Season 1 · Episode 1' && ep.contentType === 'series' && /^https?:\/\//.test(ep.art || ''), brief(r));
 
   const row = copy(premium, P.premium, ID.film);
+  ok('the answer carries serverTime, the clock its date was worked out on (the phone keeps the date in its own clock)', near(s.serverTime, new Date().toISOString(), 20000) && Date.parse(s.licensedUntil) > Date.parse(s.serverTime), { serverTime: s.serverTime, licensedUntil: s.licensedUntil });
   ok('the copy is on record: active, a member’s, licensed until the answer’s date', row && row.status === 'active' && row.basis === 'member' && near(row.licensed_until, s.licensedUntil, 1000) && row.ended_at === null, row);
   const dev = rows(`select name, platform, removed_at, last_seen_at from public.download_devices where user_id = ${q(premium.id)} and device_id = ${q(P.premium)}`)[0];
   ok('…and so is the phone, with its name and platform', dev && dev.name === 'Check phone' && dev.platform === 'ios' && dev.removed_at === null, dev);
