@@ -191,7 +191,8 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
             {done.notices.length > 0 && (done.staged.length > 0 || done.applied.length > 0) && <p className="req-edit-line">{done.notices.join(' ')}</p>}
             </div>
             <div className="ebx-actions">
-              <button type="button" className="account-btn-primary" onClick={onClose}>Close</button>
+              {/* "Done", not a second "Close": the round button in the heading is the box's Close. */}
+              <button type="button" className="account-btn-primary" onClick={onClose}>Done</button>
             </div>
           </div>
         ) : (
