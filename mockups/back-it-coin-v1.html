@@ -1,0 +1,234 @@
+<title>Back it coin</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: the six options as a grid of cards you can tick, then the ticked one drawn in the three real places it lives. */
+:root {
+  /* Studio Tapa TV's own tokens (styles/globals.css): this page mocks the site, so it keeps the site's one dark look. */
+  --surface-0: #0c131f; --surface-1: #121c2d; --surface-2: #18243c; --ocean-ink: #283c63;
+  --ink: #fbe8d3; --ink-dim: #cab59e; --ink-faint: #8f8372;
+  --brass: #ff8c42; --olive: #f2c14e; --danger: #ef5b5b; --on-brass: #241a05;
+  --hair: rgba(251, 232, 211, 0.12); --hair-strong: rgba(251, 232, 211, 0.25);
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Fraunces', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  color-scheme: dark;
+}
+body { background: var(--surface-0); color: var(--ink); font-family: var(--font-body); font-size: 16px; line-height: 1.55; }
+.page { max-width: 1120px; margin: 0 auto; padding-block: 40px 72px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 44px; }
+.eyebrow { font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--olive); margin: 0 0 10px; }
+h1 { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 5vw, 40px); line-height: 1.05; margin: 0 0 12px; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-weight: 600; font-size: 20px; margin: 0 0 6px; }
+p { margin: 0; max-width: 64ch; color: var(--ink-dim); }
+p strong { color: var(--ink); font-weight: 600; }
+.ic { width: 1em; height: 1em; display: block; flex: none; }
+
+.today { display: flex; flex-wrap: wrap; gap: 14px; }
+.today-item { display: flex; align-items: center; gap: 14px; padding: 14px 18px; border: 1px solid var(--hair); border-radius: 10px; background: var(--surface-1); flex: 1 1 280px; min-width: 0; }
+.today-item .ic { font-size: 34px; }
+.today-item.now .ic { color: var(--ink-dim); }
+.today-item.tip .ic { color: var(--olive); }
+.today-item b { font-family: var(--font-display); font-weight: 600; display: block; }
+.today-item span { font-size: 14px; color: var(--ink-dim); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+.opt { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 18px; border: 1px solid var(--hair); border-radius: 12px; background: var(--surface-1); cursor: pointer; min-width: 0; }
+.opt input { position: absolute; opacity: 0; pointer-events: none; }
+.opt:hover { border-color: var(--hair-strong); }
+.opt:has(input:checked) { border-color: var(--olive); box-shadow: 0 0 0 1px var(--olive); }
+.opt:has(input:focus-visible) { outline: 2px solid var(--ink); outline-offset: 3px; }
+.opt-head { display: flex; align-items: center; gap: 10px; }
+.letter { width: 28px; height: 28px; border-radius: 999px; border: 1px solid var(--hair-strong); display: grid; place-items: center; font-family: var(--font-mono); font-size: 12px; font-weight: 600; flex: none; }
+.opt:has(input:checked) .letter { background: var(--olive); border-color: var(--olive); color: var(--on-brass); }
+.opt-name { font-family: var(--font-display); font-weight: 600; font-size: 18px; }
+.opt-picked { margin-left: auto; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--olive); visibility: hidden; }
+.opt:has(input:checked) .opt-picked { visibility: visible; }
+.well { display: grid; place-items: center; height: 136px; border-radius: 8px; background: var(--surface-0); border: 1px solid var(--hair); }
+.well .ic { font-size: 84px; stroke-width: 1.6; }
+.why { font-size: 15px; color: var(--ink-dim); min-height: 3.1em; }
+.real { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--hair); }
+.real-item { display: flex; align-items: center; }
+.versus { display: flex; align-items: center; gap: 10px; }
+.versus-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-faint); margin-right: auto; }
+
+/* The site's own pieces, at their real sizes. */
+.action { width: 78px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--ink); }
+.ring { width: 44px; height: 44px; border-radius: 999px; border: 1px solid var(--hair-strong); display: grid; place-items: center; flex: none; }
+.ring .ic { font-size: 16px; }
+.ring.tip, .action.tip .ring { border-color: rgba(242, 193, 78, 0.6); color: var(--olive); }
+.action.tip .action-label { color: var(--olive); }
+.action.on { color: var(--danger); }
+.action-label { font-family: var(--font-mono); font-size: 9.6px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-dim); text-align: center; }
+.pill { min-height: 48px; padding: 0 18px; border-radius: 999px; border: 1px solid color-mix(in srgb, var(--ink) 55%, transparent); display: inline-flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.pill .ic { font-size: 14px; }
+.pill.play { background: var(--ink); color: var(--surface-0); border-color: var(--ink); flex: 1 1 140px; justify-content: center; }
+.pill.tip { border-color: rgba(242, 193, 78, 0.7); color: var(--olive); }
+.chip { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.04em; color: var(--brass); border: 1px solid rgba(255, 140, 66, 0.5); border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.chip .ic { font-size: 11px; }
+
+.place { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; }
+.panel { border: 1px solid var(--hair); border-radius: 12px; background: var(--surface-1); padding: 18px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.panel-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-faint); }
+.actions-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.pills-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.kicker { font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--olive); }
+.t-title { font-family: var(--font-display); font-weight: 700; font-size: 22px; line-height: 1.1; }
+.pitch { border-radius: 8px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--hair); }
+.pitch-art { height: 92px; background: linear-gradient(135deg, #3a2a52, #283c63 55%, #8a3a0f); }
+.pitch-body { padding: 12px 14px 14px; display: flex; flex-direction: column; gap: 7px; }
+.pitch-name { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.track { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.12); overflow: hidden; }
+.track i { display: block; height: 100%; width: 62%; background: var(--brass); }
+.raised { font-size: 12px; color: var(--ink-dim); font-variant-numeric: tabular-nums; }
+.fund { align-self: flex-start; display: inline-flex; align-items: center; gap: 9px; background: var(--brass); color: var(--on-brass); padding: 13px 26px; border-radius: 8px; font-family: var(--font-display); font-weight: 700; font-size: 15px; }
+.fund .ic { font-size: 17px; stroke-width: 2.2; }
+.note { font-size: 13.5px; color: var(--ink-faint); }
+
+/* Only the ticked option's drawing shows in the three places. */
+.v { display: none; }
+.page:has(#pick-a:checked) .v-a { display: inline-flex; }.page:has(#pick-b:checked) .v-b { display: inline-flex; }.page:has(#pick-c:checked) .v-c { display: inline-flex; }.page:has(#pick-d:checked) .v-d { display: inline-flex; }.page:has(#pick-e:checked) .v-e { display: inline-flex; }.page:has(#pick-f:checked) .v-f { display: inline-flex; }
+
+.pick { border: 1px solid rgba(242, 193, 78, 0.45); border-radius: 12px; padding: 20px; background: color-mix(in srgb, var(--olive) 7%, var(--surface-1)); display: flex; flex-direction: column; gap: 8px; }
+.pick p { color: var(--ink); }
+</style>
+
+<div class="page">
+  <header>
+    <p class="eyebrow">Studio Tapa TV · icon options</p>
+    <h1>Back it, as a coin</h1>
+    <p>Six ways to draw it. Tick one to see it in the three places Back it lives, then tell me the letter. <strong>Nothing changes on the site until you pick.</strong></p>
+  </header>
+
+  <section aria-label="What is there today">
+    <div class="today">
+      <div class="today-item now"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l9 9-9 9-9-9z"/></svg><div><b>Back it today</b><span>A bare diamond. It doesn’t say money, and at small sizes it reads as a bullet point.</span></div></div>
+      <div class="today-item tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg><div><b>Tip, already a coin</b><span>A flat coin with a dollar sign, in gold. Whatever you pick has to stay easy to tell apart from this.</span></div></div>
+    </div>
+  </section>
+
+  <section aria-label="The six options">
+    <div class="grid">
+<label class="opt" for="pick-a">
+  <input type="radio" name="pick" id="pick-a" value="a">
+  <span class="opt-head"><span class="letter">A</span><span class="opt-name">Lift</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span>
+  <span class="why">A coin with some thickness and an arrow going up. Says “raise this”.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span></span>
+</label>
+<label class="opt" for="pick-b">
+  <input type="radio" name="pick" id="pick-b" value="b">
+  <span class="opt-head"><span class="letter">B</span><span class="opt-name">Pair</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span>
+  <span class="why">Two coins, one behind the other. Says “more than a tip”.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span></span>
+</label>
+<label class="opt" for="pick-c">
+  <input type="radio" name="pick" id="pick-c" value="c" checked>
+  <span class="opt-head"><span class="letter">C</span><span class="opt-name">Drop in</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span>
+  <span class="why">A coin dropping into an open box. Says “put money into this project”.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span></span>
+</label>
+<label class="opt" for="pick-d">
+  <input type="radio" name="pick" id="pick-d" value="d">
+  <span class="opt-head"><span class="letter">D</span><span class="opt-name">Minted diamond</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span>
+  <span class="why">Today’s diamond, stamped on a coin. Keeps the mark people already know.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span></span>
+</label>
+<label class="opt" for="pick-e">
+  <input type="radio" name="pick" id="pick-e" value="e">
+  <span class="opt-head"><span class="letter">E</span><span class="opt-name">Seed</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span>
+  <span class="why">A sprout growing out of a coin. Says “seed money”.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span></span>
+</label>
+<label class="opt" for="pick-f">
+  <input type="radio" name="pick" id="pick-f" value="f">
+  <span class="opt-head"><span class="letter">F</span><span class="opt-name">Chip in</span><span class="opt-picked">Showing below</span></span>
+  <span class="well"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span>
+  <span class="why">A coin with a plus beside it. Says “add yours to the pot”.</span>
+  <span class="real">
+    <span class="real-item"><span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span><span class="action-label">Back it</span></span></span>
+    <span class="real-item"><span class="pill"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg> Back it</span></span>
+    <span class="real-item"><span class="chip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg> Back it</span></span>
+  </span>
+  <span class="versus"><span class="versus-label">Beside Tip</span><span class="ring tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span></span>
+</label>
+    </div>
+  </section>
+
+  <section aria-label="The ticked option in place">
+    <h2>The one you ticked, where it lives</h2>
+    <p style="margin-bottom:16px">Same sizes and colours as the site and the app.</p>
+    <div class="place">
+      <div class="panel">
+        <span class="panel-label">A title’s page · the round actions</span>
+        <div><div class="kicker">Night Bus · Season 1 · Episode 2</div><div class="t-title">Last Stop</div></div>
+        <div class="actions-row">
+          <span class="action on"><span class="ring" style="border-color:rgba(239,91,91,.6)"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21s-6.7-4.35-9.33-8.2C.86 10.1 1.3 6.6 4.1 4.9a5.4 5.4 0 0 1 7.1 1.2 5.4 5.4 0 0 1 7.1-1.2c2.8 1.7 3.24 5.2 1.43 7.9C18.7 16.65 12 21 12 21z"/></svg></span><span class="action-label" style="color:inherit">Saved</span></span>
+          <span class="action tip"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg></span><span class="action-label">Tip Mara</span></span>
+          <span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.7 1.7 0 0 0 0 3.2v1.6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.6a1.7 1.7 0 0 0 0-3.2z"/><path d="M15 6.5v11" stroke-dasharray="1.6 1.6"/></svg></span><span class="action-label">Own · $1.99</span></span>
+          <span class="action"><span class="ring"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg></span><span class="action-label">Trailer</span></span>
+          <span class="action"><span class="ring"><span class="v v-a"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="v v-b"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="v v-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="v v-d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="v v-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="v v-f"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span></span><span class="action-label">Back it</span></span>
+        </div>
+        <span class="panel-label" style="margin-top:6px">A film’s own page · the pills</span>
+        <div class="pills-row">
+          <span class="pill play"><svg class="ic" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M8 5v14l11-7z"/></svg> Play</span>
+          <span class="pill tip"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v10"/><path d="M14.6 9.6c-.4-.9-1.4-1.5-2.6-1.5-1.5 0-2.6.8-2.6 1.9 0 2.6 5.2 1.3 5.2 3.9 0 1.2-1.1 2-2.6 2-1.3 0-2.3-.6-2.7-1.6"/></svg> Tip Mara</span>
+          <span class="pill"><span class="v v-a"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="v v-b"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="v v-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="v v-d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="v v-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="v v-f"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span> Back it</span>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">Pitch Room · a pitch’s card</span>
+        <div class="pitch">
+          <div class="pitch-art"></div>
+          <div class="pitch-body">
+            <div class="pitch-name">The Lighthouse Keeper’s Daughter</div>
+            <div class="track"><i></i></div>
+            <div class="raised">$6,200.00 of $10,000 goal</div>
+            <span class="chip" style="align-self:flex-start"><span class="v v-a"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="v v-b"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="v v-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="v v-d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="v v-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="v v-f"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span> Back it</span>
+          </div>
+        </div>
+      </div>
+      <div class="panel">
+        <span class="panel-label">A pitch’s page · the main button</span>
+        <span class="fund"><span class="v v-a"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="v v-b"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="v v-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="v v-d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="v v-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="v v-f"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span> Back this project</span>
+        <span class="note">Website and app. Today this button starts with ◆.</span>
+        <span class="panel-label" style="margin-top:6px">Checkout line under it</span>
+        <span class="fund" style="background:transparent;color:var(--brass);border:1px solid rgba(255,140,66,.5)"><span class="v v-a"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.75" cy="10.75" r="7.5"/><path d="M17.15 6.85A7.5 7.5 0 1 1 6.85 17.15"/><path d="M10.75 14.2V7.6"/><path d="M7.9 10.3l2.85-2.85 2.85 2.85"/></svg></span><span class="v v-b"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="9" r="6"/><path d="M15 9A6 6 0 1 1 9 15"/><path d="M9 6.6v4.8"/></svg></span><span class="v v-c"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="9.5" r="5"/><path d="M12 7.4v4.2"/><path d="M3.5 13.5h3.3"/><path d="M17.2 13.5h3.3"/><path d="M5 13.5v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"/></svg></span><span class="v v-d"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7.2l3.4 4.8-3.4 4.8L8.6 12z"/></svg></span><span class="v v-e"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="17.5" rx="7.5" ry="2.8"/><path d="M4.5 17.5v1.2c0 1.55 3.36 2.8 7.5 2.8s7.5-1.25 7.5-2.8v-1.2"/><path d="M12 17V9.6"/><path d="M12 11c0-2.6 1.8-4.6 5-4.6 0 2.9-1.9 4.6-5 4.6z"/><path d="M12 13.6c0-2-1.4-3.4-3.9-3.4 0 2.1 1.4 3.4 3.9 3.4z"/></svg></span><span class="v v-f"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="10.5" cy="13.5" r="7.5"/><path d="M10.5 10.6v5.8"/><path d="M19 2.5v5"/><path d="M16.5 5h5"/></svg></span> Back with $25.00</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="pick" aria-label="My pick">
+    <h2>If it were my call: C, Drop in</h2>
+    <p>It is the only one that shows the action — money going into a project — so it can’t be mistaken for Tip, which is a coin by itself. It also holds up at the smallest size, the 11px chip on a pitch’s card.</p>
+    <p>Second choice is D, Minted diamond, if you’d rather keep the diamond people have already seen on pitches. B and D sit closest to the Tip coin, A can read as “upload”, and E is the most detailed, so it is the first to blur when small.</p>
+  </section>
+</div>

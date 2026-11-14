@@ -4783,6 +4783,13 @@ img.house-ad-preview { object-fit: cover; background: #000; }
   width: 100%;
   padding: 0 2.4rem;
 }
+/* Between a phone and a laptop (a tablet upright, a phone held sideways)
+   the six columns can't shrink below their widest word and the sign-up
+   field, and the last one ran 4–76px off the screen from 784 to 856px
+   (found 2026-11-14 on a sideways iPhone): three across there. */
+@media (min-width: 781px) and (max-width: 899px) {
+  .footer-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 @media (max-width: 780px) {
   .footer-grid { grid-template-columns: 1fr; gap: 1.6rem; }
 }
@@ -11369,6 +11376,11 @@ a.prod-day:hover { background: var(--surface-3); }
 .acct-lede { margin: -0.4rem 0 1.2rem; color: var(--ink-dim); font-size: 0.9rem; line-height: 1.55; max-width: 60ch; }
 .acct-body { display: flex; flex-direction: column; gap: 1.2rem; }
 .acct-body > .account-card { margin: 0; }
+/* Signed out: the sign-in card in the middle of the page, with the Back
+   pill on its left edge. */
+.acct-signin { width: 100%; max-width: 560px; align-self: center; display: flex; flex-direction: column; gap: 1.2rem; }
+.acct-signin > .account-card { margin: 0; }
+.acct-signin > .back-button { margin-bottom: 0; }
 
 /* The hub's tiles: two across on a phone, three from 900px. The icon,
    the name, two or three lines of live state, and the action word. */

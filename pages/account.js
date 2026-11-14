@@ -81,11 +81,15 @@ export default function Account(props) {
 
   const shellProps = { mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator };
 
+  // Signed out: one centred column (.acct-signin) — the Back pill on the
+  // left edge of the card, the card in the middle of the page. It was
+  // pinned to the left of the stage (Jose, 2026-11-14).
   if (!isSignedIn) {
     return (
       <AccountShell {...shellProps} back={false}>
+        <div className="acct-signin">
         <BackButton fallbackHref="/stream" />
-        <div className="account-card" style={{ maxWidth: 560 }}>
+        <div className="account-card">
           <div className="account-eyebrow">Your account</div>
           <h3>Sign in or create your account</h3>
           <p>
@@ -103,6 +107,7 @@ export default function Account(props) {
             A free account doesn&rsquo;t unlock {SITE.premiumTier} content by itself — you can upgrade any time
             from the account page once signed in.
           </div>
+        </div>
         </div>
       </AccountShell>
     );

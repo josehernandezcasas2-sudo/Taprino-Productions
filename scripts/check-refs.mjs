@@ -29,7 +29,10 @@ for (const d of DIRS) {
   })(dir);
 }
 const rel = (f) => path.relative(ROOT, f).replace(/\\/g, '/');
-const stripComments = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+// Whole-line // comments go first: one that mentions a glob ("components/account/*.js")
+// would otherwise open a block comment that runs to the file's next "*/" and hide
+// the declarations in between (pages/account.js, 2026-11-14).
+const stripComments = (s) => s.replace(/^\s*\/\/.*$/gm, '').replace(/\/\*[\s\S]*?\*\//g, '');
 
 /* ---- 1. imports resolve to real exports ---- */
 const exportCache = new Map();
