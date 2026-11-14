@@ -283,6 +283,23 @@ export function TipIcon({ src, size = 18 }) {
   );
 }
 
+// Backing (2026-11-14; Jose picked it from six coins, "a coin going into a
+// box"): a coin dropping into an open box, seen a little from above. Back
+// it on a title, a pitch's card and a pitch's page; never the Tip coin (a
+// coin by itself with a dollar sign) and no longer the bare diamond.
+// mobile/src/components/BackItGlyph.js draws the same.
+export function BackItIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="12" cy="4.9" r="3.3" />
+      <path d="M12 3.7v2.4" />
+      <path d="M4 15l2.8-3h10.4l2.8 3" />
+      <path d="M4 15h16v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z" />
+    </svg>
+  );
+}
+
 export function SeriesListIcon({ src, size = 18 }) {
   if (src) return <IconImage src={src} size={size} />;
   return (

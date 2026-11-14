@@ -5510,7 +5510,7 @@ img.house-ad-preview { object-fit: cover; background: #000; }
 .fund-btn {
   background: var(--brass); color: #241a05; padding: 0.85rem 1.7rem;
   border-radius: 8px; font-family: var(--font-display); font-weight: 700;
-  font-size: 0.95rem; text-decoration: none; display: inline-block; border: none; cursor: pointer;
+  font-size: 0.95rem; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; gap: 0.55rem; border: none; cursor: pointer;
 }
 .pitch-preset-btn {
   background: rgba(251, 232, 211, 0.08);
@@ -9903,7 +9903,7 @@ a.crew-credit:hover { background: var(--surface-3); }
 .fund-closed p { margin: 0; font-size: 0.9rem; color: var(--ink-dim); line-height: 1.5; }
 .fund-closed p a { color: var(--olive); }
 .fund-closed p.fund-closed-admin { margin-top: 0.45rem; font-family: var(--font-mono); font-size: 0.7rem; color: var(--brass); }
-.pitch-back-cta { display: inline-block; margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; color: var(--brass); border: 1px solid rgba(var(--brass-rgb), 0.5); border-radius: 999px; padding: 0.12rem 0.55rem; }
+.pitch-back-cta { display: inline-flex; align-items: center; gap: 0.3rem; align-self: flex-start; margin-top: 0.4rem; font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.04em; color: var(--brass); border: 1px solid rgba(var(--brass-rgb), 0.5); border-radius: 999px; padding: 0.12rem 0.55rem; }
 
 /* ---- Pitch Room backings (admin, components/admin/PitchBackings.js) and creator earnings (components/creator/PitchEarnings.js) ---- */
 .bk { margin-top: 0.6rem; }

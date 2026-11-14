@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { splitDonation, dollars } from '../../lib/donationMath';
 import { SignInButton } from '@clerk/nextjs';
-import { ShareIcon, CheckIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { ShareIcon, CheckIcon, BackItIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import WishlistButton from '../../components/WishlistButton';
 import { getPitchDetailData } from '../../lib/pitchDetailHub';
 import HeaderNav from '../../components/HeaderNav';
@@ -466,10 +466,10 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <p>{pitch.logline}</p>
             <div className="hero-actions">
               {pitch.funding_enabled && (
-                <a href="#fund" className="fund-btn">&#9670; Back this project</a>
+                <a href="#fund" className="fund-btn"><BackItIcon size={17} src={iconOverrides.back_it} /> Back this project</a>
               )}
               {!pitch.funding_enabled && pitch.project_url && (
-                <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn">&#9670; Fund this project</a>
+                <a href={pitch.project_url} target="_blank" rel="noopener noreferrer" className="fund-btn"><BackItIcon size={17} src={iconOverrides.back_it} /> Fund this project</a>
               )}
               <WishlistButton isActive={saved} onToggle={toggleSave} className="wishlist-btn-large" />
               <div className="pitch-share-wrap">
@@ -535,7 +535,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                       disabled={donating}
                     />
                     <button type="submit" className="fund-btn" disabled={donating || !preview}>
-                      {donating ? 'Opening Stripe…' : preview ? `\u25C6 Back with ${dollars(preview.amountCents)}` : '\u25C6 Back this project'}
+                      {donating ? 'Opening Stripe…' : <><BackItIcon size={17} src={iconOverrides.back_it} /> {preview ? `Back with ${dollars(preview.amountCents)}` : 'Back this project'}</>}
                     </button>
                     </div>
                     {preview && (

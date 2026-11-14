@@ -17,6 +17,7 @@ import { useWishlist } from '../../lib/useWishlist';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import { useTrailerLink } from '../../lib/trailerLink';
 import { onBrowserOpen } from '../../lib/inAppBrowser';
+import BackItGlyph from '../../components/BackItGlyph';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useFullscreenChrome } from '../../lib/fullscreenChrome';
 import { withQueryFlag } from '../../lib/captions';
@@ -97,19 +98,12 @@ function ChevronIcon({ size = 10, color = colors.brass }) {
     </Svg>
   );
 }
-// components/PlayerIcons.js TicketIcon / DiamondIcon.
+// components/PlayerIcons.js TicketIcon (Back it draws BackItGlyph).
 function TicketIcon({ size = 18, color = colors.ink }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
       <Path d="M3 8.5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.2a1.7 1.7 0 0 0 0 3.2v1.6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.6a1.7 1.7 0 0 0 0-3.2z" />
       <Path d="M15 6.5v11" strokeDasharray="1.6 1.6" />
-    </Svg>
-  );
-}
-function DiamondIcon({ size = 16, color = colors.ink }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinejoin="round">
-      <Path d="M12 3l9 9-9 9-9-9z" />
     </Svg>
   );
 }
@@ -805,7 +799,7 @@ export default function Episode() {
               {/* Back it is a money link: never in a preview (the website's rule). */}
               {episode.fundingUrl && !previewing ? (
                 <Pressable style={styles.pill} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
-                  <DiamondIcon size={14} />
+                  <BackItGlyph size={14} />
                   <Text style={styles.pillText}>Back it</Text>
                 </Pressable>
               ) : null}
@@ -854,7 +848,7 @@ export default function Episode() {
               )) : null}
               {episode.fundingUrl && !previewing ? (
                 <Pressable style={styles.action} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
-                  <View style={styles.ring}><DiamondIcon /></View>
+                  <View style={styles.ring}><BackItGlyph /></View>
                   <Text style={styles.actionLabel}>BACK IT</Text>
                 </Pressable>
               ) : null}

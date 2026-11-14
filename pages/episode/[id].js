@@ -3,7 +3,7 @@ import ReportButton from '../../components/ReportButton';
 import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
-import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, DiamondIcon, WarningIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
+import { PlayIcon, HeartIcon, TipIcon, TicketIcon, RestoreIcon, ArrowRightIcon, BackItIcon, WarningIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { FLASHING_CHIP } from '../../lib/contentAdvisory';
 import { episodeCode } from '../../lib/seriesResume';
 import { endCardFor } from '../../lib/endCardRules';
@@ -897,7 +897,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 ))}
                 {episode.fundingUrl && !previewing && (
                   <a className="ep-action" href={episode.fundingUrl} target="_blank" rel="noopener noreferrer">
-                    <span className="ep-action-ring"><DiamondIcon size={16} src={iconOverrides.diamond} /></span>
+                    <span className="ep-action-ring"><BackItIcon size={16} src={iconOverrides.back_it} /></span>
                     <span className="ep-action-label">Back it</span>
                   </a>
                 )}
@@ -923,7 +923,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 )}
                 {episode.fundingUrl && !previewing && (
                   <a className="epl-btn" href={episode.fundingUrl} target="_blank" rel="noopener noreferrer">
-                    <DiamondIcon size={14} src={iconOverrides.diamond} /> Back it
+                    <BackItIcon size={14} src={iconOverrides.back_it} /> Back it
                   </a>
                 )}
               </div>

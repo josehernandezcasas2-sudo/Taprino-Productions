@@ -3,7 +3,7 @@ import Link from 'next/link';
 import BackButton from '../components/BackButton';
 import { useState } from 'react';
 import { useRouter } from 'next/router';
-import { HeartIcon, SwipeDeckIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
+import { HeartIcon, SwipeDeckIcon, BackItIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 import { PITCH_TAGS } from '../lib/pitchRules';
 import { getPitchRoomData } from '../lib/pitchRoom';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
@@ -263,7 +263,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
                         </div>
                       </>
                     )}
-                    {p.funding_enabled && <div className="pitch-back-cta">&#9670; Back it</div>}
+                    {p.funding_enabled && <div className="pitch-back-cta"><BackItIcon size={11} src={iconOverrides.back_it} /> Back it</div>}
                     {remaining !== null && (
                       <div className="pitch-deadline">
                         {remaining === 1 ? 'Last day' : `${remaining} days left`}

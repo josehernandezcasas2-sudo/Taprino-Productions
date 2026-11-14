@@ -5,6 +5,7 @@ import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Share, StyleS
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { openCheckout, appReturnAddress } from '../../lib/inAppBrowser';
+import BackItGlyph from '../../components/BackItGlyph';
 import Svg, { Path } from 'react-native-svg';
 import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
@@ -495,8 +496,9 @@ export default function PitchDetail() {
               </View>
 
               {!pitch.funding_enabled && pitch.project_url ? (
-                <Pressable style={styles.primaryBtn} onPress={() => Linking.openURL(pitch.project_url)}>
-                  <Text style={styles.primaryBtnText}>◆ Fund this project</Text>
+                <Pressable style={[styles.primaryBtn, styles.primaryBtnRow]} onPress={() => Linking.openURL(pitch.project_url)}>
+                  <BackItGlyph size={17} color={colors.onBrass} />
+                  <Text style={styles.primaryBtnText}>Fund this project</Text>
                 </Pressable>
               ) : null}
 
@@ -528,8 +530,9 @@ export default function PitchDetail() {
                           />
                         </View>
                       </View>
-                      <Pressable style={styles.primaryBtn} disabled={donating} onPress={() => donate(pitch.id)}>
-                        <Text style={styles.primaryBtnText}>{donating ? 'Opening Stripe…' : `◆ Back this project${donationAmount ? ` · $${donationAmount}` : ''}`}</Text>
+                      <Pressable style={[styles.primaryBtn, styles.primaryBtnRow]} disabled={donating} onPress={() => donate(pitch.id)}>
+                        {donating ? null : <BackItGlyph size={17} color={colors.onBrass} />}
+                        <Text style={styles.primaryBtnText}>{donating ? 'Opening Stripe…' : `Back this project${donationAmount ? ` · $${donationAmount}` : ''}`}</Text>
                       </Pressable>
                       {donationSuccess ? <Text style={styles.okText}>If you completed the payment, thank you — it shows in the total as soon as Stripe confirms.</Text> : null}
                     </>
@@ -754,6 +757,8 @@ const styles = StyleSheet.create({
   statLabel: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint, marginTop: 2 },
   primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 14, alignItems: 'center', marginTop: 16 },
   primaryBtnText: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.onBrass },
+  // The Back it coin sits before the words.
+  primaryBtnRow: { flexDirection: 'row', justifyContent: 'center', gap: 8 },
   donation: { marginTop: 4 },
   fundClosed: { marginTop: 14, padding: 12, borderRadius: 12, borderWidth: 1, borderStyle: 'dashed', borderColor: colors.hairline },
   fundClosedKicker: { fontFamily: fonts.monoMedium, fontSize: 10, letterSpacing: 2, textTransform: 'uppercase', color: colors.olive, marginBottom: 4 },
