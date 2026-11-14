@@ -75,7 +75,10 @@ async function studioPick() {
   try {
     const a = await b.open(ADMIN, 1280);
     await goto(a.page, '/admin/creator-money');
-    await a.page.waitForTimeout(2500);
+    // The panel fetches its numbers after the page draws, and on a rig that
+    // has just been built that route compiles on this first hit: wait for
+    // the words (up to 20 s) rather than a fixed moment.
+    await a.page.getByText('Kept by the studio').first().waitFor({ timeout: 20000 }).catch(() => {});
     ok('/admin/creator-money says "Kept by the studio"', (await a.page.locator('body').innerText()).includes('Kept by the studio'));
     ok('…no page errors', a.errors.length === 0, a.errors);
     await goto(a.page, '/creator/money');
