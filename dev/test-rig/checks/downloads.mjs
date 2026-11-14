@@ -53,7 +53,7 @@ import crypto from 'node:crypto';
 import { IDS, USERS, RUN, BASE, FAKES, ok, section, runCheck, call, sql, rows, q, insert, hasColumn, session, newUser, removeUser, clerk, stripeHook, stripeApi, cloudflare, forgetInvoiceEvents, ago, browser, goto, overflowPx, SIGNED_OUT } from './lib.mjs';
 import { FAKE_KEYS } from '../lib/config.mjs';
 import { CHECKIN_DAYS, DOWNLOAD_WORDS, GRACE_DAYS, KEEP_AFTER_END_DAYS, LINK_SECONDS, MAX_DEVICES, MAX_TITLES_PER_DEVICE, MEMBER_MAX_DAYS, playState } from '../../../lib/downloadRules.js';
-import { ADMIN_DOWNLOAD_WORDS, DOWNLOADS_ALLOWED_LABEL, MIGRATION_123_MSG, START_WORDS, UNLOCK_WORD } from '../../../lib/downloadSiteRules.js';
+import { ADMIN_DOWNLOAD_WORDS, DOWNLOADS_ALLOWED_LABEL, MIGRATION_123_MSG, START_WORDS, SWITCH_CHANGES_PER_HOUR, UNLOCK_WORD } from '../../../lib/downloadSiteRules.js';
 
 const HAS123 = hasColumn('site_settings', 'downloads_enabled');
 const DAY = 86400000;
@@ -272,6 +272,12 @@ async function theSwitch(ctx) {
   r = await get('/api/admin/audit-log', admin);
   const mine = ((r.json && r.json.entries) || []).filter((e) => e.action === 'downloads_switch' && e.adminEmail === admin.email);
   ok('the audit log prints their words', mine.some((e) => e.words === 'Downloads off → on') && mine.some((e) => e.words === 'the Downloads switch locked'), mine.map((e) => e.words));
+  // 30 changes an hour: a fresh admin's 31st ask in a row is turned away
+  // (asks the route refuses count too), and nothing was written.
+  const busy = await teamAdmin('dlbusy');
+  let last = null;
+  for (let i = 0; i < SWITCH_CHANGES_PER_HOUR + 1; i += 1) last = await adminPost(busy, { enabled: 'x' });
+  ok(`the ${SWITCH_CHANGES_PER_HOUR + 1}st change an admin asks for within the hour is 429`, last.status === 429 && auditOf(busy).length === 0 && settingsNow().enabled === true, brief(last));
   r = await get('/api/admin/security?page=security', admin);
   ok('…and Admin → Security’s latest events list them', r.status === 200 && r.json.alerts.events.some((e) => /Downloads|the Downloads switch/.test(e.line)), r.json && r.json.alerts && r.json.alerts.events);
 }
