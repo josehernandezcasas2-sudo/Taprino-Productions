@@ -28,10 +28,12 @@ import { markOfflineStart } from '../../lib/offlineStart';
 //    the front, "Try again") and Clerk's status is "error", its own loader
 //    is run once more. `loadHeadlessClerk` is what the provider itself calls
 //    on mount; it isn't in Clerk's typings, so it is only called when it is
-//    there, at most every ten seconds, and never while Clerk is loading or
-//    loaded.
+//    there, at most every ten seconds, never while Clerk is loading or
+//    loaded, and never while an earlier try is still out (two loads at once
+//    would replay what the app queued twice).
 let launchChecked = false;
 let lastClerkRetry = 0;
+let clerkRetryOut = false;
 
 export default function DownloadsBoot() {
   const { isLoaded, isSignedIn, userId, getToken } = useAuth();
@@ -60,11 +62,23 @@ export default function DownloadsBoot() {
     }).catch(() => {});
   }, [navKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Every status Clerk reports ("error" again, "ready") ends the try that
+  // was out.
+  useEffect(() => {
+    if (!clerk || typeof clerk.on !== 'function' || typeof clerk.off !== 'function') return undefined;
+    const settled = () => { clerkRetryOut = false; };
+    try { clerk.on('status', settled); } catch { return undefined; }
+    return () => { try { clerk.off('status', settled); } catch { /* gone with the provider */ } };
+  }, [clerk]);
+
   useEffect(() => onAuthRetry(() => {
     try {
       if (!clerk || clerk.loaded || clerk.status !== 'error' || typeof clerk.loadHeadlessClerk !== 'function') return;
-      if (Date.now() - lastClerkRetry < 10000) return;
+      const since = Date.now() - lastClerkRetry;
+      // A try that never reported back is given a minute, then let go.
+      if (since < 10000 || (clerkRetryOut && since < 60000)) return;
       lastClerkRetry = Date.now();
+      clerkRetryOut = true;
       clerk.loadHeadlessClerk();
     } catch { /* Clerk stays as it was; closing and opening the app loads it */ }
   }), [clerk]);
