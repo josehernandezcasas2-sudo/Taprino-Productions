@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { usePathname } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
+import { rememberTask, useResumeTask } from '../lib/resumeTask';
+import { tipTask } from '../lib/resumeTaskRules';
 import { openCheckout, appReturnAddress, alertWhenBack } from '../lib/inAppBrowser';
 import { colors, fonts, oliveTint, brassTint, absoluteFill } from '../lib/theme';
 import { Avatar } from './CrewBits';
@@ -34,10 +37,20 @@ export function TipGlyph({ size = 14, color = colors.olive }) {
   );
 }
 
-export function promptTipSignIn(router) {
+// A signed-out fan pressed Tip. `creatorId` and `path` (the screen they are
+// on) leave a note before the sign-in card opens (2026-11-14): once they
+// have signed in or created an account there the card brings them back to
+// this screen, and the sheet opens by itself (lib/resumeTask.js).
+export function promptTipSignIn(router, { creatorId = null, path = null } = {}) {
   Alert.alert('Sign in to tip', 'Tips go straight to the creator through their Stripe account.', [
     { text: 'Not now', style: 'cancel' },
-    { text: 'Sign in', onPress: () => router.push('/account') }
+    {
+      text: 'Sign in',
+      onPress: () => {
+        if (creatorId && path) rememberTask(tipTask(creatorId), path);
+        router.push('/account');
+      }
+    }
   ]);
 }
 
@@ -170,12 +183,29 @@ export function TipSheet({ tipping, visible, initialAmountCents = 500, onClose, 
 // `renderInner` draws the button's content instead of the glyph + label
 // row (the episode screen's round action: a ring with the coin, the
 // label under it).
-export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, iconColor = colors.olive, iconSize = 13, children, presetCents = 500, onDone, renderInner = null }) {
+// `resumes` (on by default): this is the button whose sheet opens by
+// itself when the fan comes back signed in after pressing Tip signed out
+// (2026-11-14). A screen with two Tip buttons up at once turns it off on
+// one of them — the full-screen player's pill, which leaves the screen
+// with full screen — so one sheet opens, never two.
+export function TipButton({ tipping, isSignedIn, router, getToken, returnTo, style, textStyle, iconColor = colors.olive, iconSize = 13, children, presetCents = 500, onDone, renderInner = null, resumes = true, onOpenChange = null }) {
   const [open, setOpen] = useState(false);
-  if (!tipping || !tipping.enabled) return null;
+  const pathname = usePathname();
+  // `onOpenChange(open)`: for a place that must stay as it is while the
+  // sheet is up. The full-screen player draws this button inside its
+  // controls, which hide three seconds into playback and would take the
+  // button, and with it the open sheet, away (2026-11-14).
+  useEffect(() => {
+    if (!onOpenChange) return undefined;
+    onOpenChange(open);
+    return () => { if (open) onOpenChange(false); };
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+  const enabled = Boolean(tipping && tipping.enabled);
+  useResumeTask(enabled && resumes && tipping.creatorId ? tipTask(tipping.creatorId) : null, isSignedIn, () => setOpen(true));
+  if (!enabled) return null;
   return (
     <>
-      <Pressable style={renderInner ? style : [style, { flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
+      <Pressable style={renderInner ? style : [style, { flexDirection: 'row', alignItems: 'center', gap: 5 }]} onPress={() => (isSignedIn ? setOpen(true) : promptTipSignIn(router, { creatorId: tipping.creatorId, path: pathname }))} accessibilityLabel={`Tip ${tipping.creatorName}`}>
         {renderInner ? renderInner() : (
           <>
             <TipGlyph size={iconSize} color={iconColor} />

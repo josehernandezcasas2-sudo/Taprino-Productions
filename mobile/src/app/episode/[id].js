@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
 import { useVideoPlayer } from 'expo-video';
 import { useEvent } from 'expo';
@@ -40,6 +40,8 @@ import { formatOpensAt } from '../../lib/earlyAccess';
 import { adsOnFor } from '../../lib/adBreakRules';
 import { useTitleAds } from '../../lib/useTitleAds';
 import { DownloadAction } from '../../components/downloads/DownloadBits';
+import { rememberTask, useRereadWhenSignedIn, useResumeTask } from '../../lib/resumeTask';
+import { TASKS, buyParts } from '../../lib/resumeTaskRules';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_COLOR = { movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -211,14 +213,25 @@ function TitleArt({ uri, title, maxWidth, maxHeight, fallback = null }) {
 // landing — from `download` on /api/episode-page ({ state: 'ok' | 'plan' |
 // 'signin' | 'hidden' }) and the copy on this phone, if there is one
 // (components/downloads/DownloadBits.js DownloadAction; never in a preview).
+//
+// Signing in or up in the middle of something (Jose, 2026-11-14): Tip, Own
+// and "See plans" send a signed-out viewer to the sign-in card, which
+// brings them back here once they have an account. The page was read
+// signed out, so it is read again as them (useRereadWhenSignedIn), and
+// what they had pressed carries on by itself (lib/resumeTask.js): the Tip
+// sheet opens (components/TipSheet.js), Checkout starts for this title, or
+// the Membership screen opens for someone who still has no plan.
 export default function Episode() {
   const { id, autoplay, trailer, preview: previewParam } = useLocalSearchParams();
   const previewAsked = previewParam === '1';
   const router = useRouter();
+  const pathname = usePathname();
   const { getToken } = useAuth();
   const { isWishlisted, toggle: toggleWishlist } = useWishlist();
   const [state, setState] = useState({ loading: true, error: null, page: null });
   const [showPlayer, setShowPlayer] = useState(false);
+  // The full-screen player's Tip sheet is open: its controls stay up.
+  const [fsTipOpen, setFsTipOpen] = useState(false);
   const [showingTrailer, setShowingTrailer] = useState(trailer === '1');
   const [playback, setPlayback] = useState({ loading: false, src: null, locked: false, error: null });
   // Bumping this reloads the page: after Buy to own's Checkout closes, or
@@ -261,12 +274,39 @@ export default function Episode() {
   const owned = Boolean(purchase && purchase.owned);
   // Tips (components/TipSheet.js): never in a preview.
   const tipping = previewing ? null : state.page && state.page.tipping;
+  const pageSignedIn = Boolean(state.page && state.page.isSignedIn);
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => null), 4000),
     router,
-    isSignedIn: Boolean(state.page && state.page.isSignedIn),
+    isSignedIn: pageSignedIn,
     onDone: () => setReloadKey((k) => k + 1)
   });
+  // Back from the sign-in card signed in: the page read signed out is read
+  // again as this person (their plan, what they own, whether they can tip).
+  useRereadWhenSignedIn(state.loading ? null : state.page, pageSignedIn, () => setReloadKey((k) => k + 1));
+  // …and what they had pressed carries on. Own: this title, through the
+  // same handler as the button (its busy state and its error), and only
+  // while the page still offers it to them — someone who turns out to own
+  // it already is asked for nothing.
+  useResumeTask(previewing ? null : `${TASKS.buy}:`, pageSignedIn, (task) => {
+    const parts = buyParts(task);
+    if (!parts || parts.type !== 'episode' || !episode || parts.id !== episode.id) return;
+    if (!purchase || !purchase.forSale || purchase.owned) return;
+    buy('episode', episode.id, `/episode/${episode.id}`);
+  });
+  // "See plans" / "Join Tapa +": the plans, for someone who signed in and
+  // still has none. A member's title just plays.
+  useResumeTask(previewing ? null : TASKS.plans, pageSignedIn, () => {
+    if (state.page && !state.page.isSubscriber) router.push('/account/membership');
+  });
+  // The plans from this screen. Signed in: the Membership screen (the plan
+  // picker, or Manage subscription). Signed out: the sign-in card, with a
+  // note to open the plans once they are back here with an account.
+  function seePlans() {
+    if (pageSignedIn) { router.push('/account/membership'); return; }
+    rememberTask(TASKS.plans, pathname);
+    router.push('/account');
+  }
 
   // Fetch the real (entitlement- and age-checked) src only once the player
   // is actually shown — never for the landing view.
@@ -622,7 +662,7 @@ export default function Episode() {
       isSubscriber={page.isSubscriber}
       busy={buyBusy}
       onBuy={() => buy('episode', episode.id, returnTo)}
-      onSeePlans={() => router.push('/account')}
+      onSeePlans={seePlans}
       onSeries={() => router.push(`/series/${episode.seriesId}`)}
     />
   ) : null;
@@ -678,7 +718,7 @@ export default function Episode() {
                         <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
                       </Pressable>
                     ) : null}
-                    <Pressable style={[styles.unlockBtn, purchase && purchase.forSale ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass } : null]} onPress={() => router.push('/account')}>
+                    <Pressable style={[styles.unlockBtn, purchase && purchase.forSale ? { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass } : null]} onPress={seePlans}>
                       <Text style={[styles.unlockText, purchase && purchase.forSale ? { color: colors.brass } : null]}>{state.page.isSubscriber ? 'Switch to Tapa +' : 'See plans'}</Text>
                     </Pressable>
                     {episode.trailerSrc ? (
@@ -697,7 +737,7 @@ export default function Episode() {
                     <Pressable style={[styles.unlockBtn, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)}>
                       <Text style={styles.unlockText}>{buyBusy ? 'Opening Stripe…' : `Buy for ${dollars(purchase.payCents)}`}</Text>
                     </Pressable>
-                    <Pressable style={[styles.unlockBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass }]} onPress={() => router.push('/account')}>
+                    <Pressable style={[styles.unlockBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: colors.brass }]} onPress={seePlans}>
                       <Text style={[styles.unlockText, { color: colors.brass }]}>Join Tapa +</Text>
                     </Pressable>
                   </View>
@@ -707,7 +747,7 @@ export default function Episode() {
                   <Text style={styles.lockGlyph}>{'◈'}</Text>
                   <Text style={styles.lockTitle}>Available to Tapa + members</Text>
                   <Text style={styles.lockBody}>This one only screens for people who&rsquo;ve joined the circle. Members get early drops, deleted scenes, and creator updates before anyone else.</Text>
-                  <Pressable style={styles.unlockBtn} onPress={() => router.push('/account')}>
+                  <Pressable style={styles.unlockBtn} onPress={seePlans}>
                     <Text style={styles.unlockText}>Join Tapa +</Text>
                   </Pressable>
                 </View>
@@ -727,8 +767,12 @@ export default function Episode() {
                 getToken={tokenFn}
                 advisoryOn={advisoryOn}
                 ad={showingTrailer ? null : titleAds}
+                holdControls={fsTipOpen}
                 topRight={!showingTrailer ? (
-                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
+                  // `resumes` off: the Tip button under the player is the one
+                  // whose sheet opens after a sign-in (full screen closes
+                  // when the sign-in card opens).
+                  <TipButton tipping={tipping} isSignedIn={isSignedIn} router={router} getToken={tokenFn} returnTo={returnTo} resumes={false} onOpenChange={setFsTipOpen} style={[styles.fsTip, { height: chrome.s(36), paddingHorizontal: chrome.s(14) }]} textStyle={[styles.fsTipText, { fontSize: chrome.s(11.5) }]} iconSize={chrome.s(14)}>
                     Tip {tipFirstName}
                   </TipButton>
                 ) : null}

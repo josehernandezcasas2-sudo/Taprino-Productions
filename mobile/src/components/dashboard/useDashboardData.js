@@ -10,7 +10,7 @@ import { showCall } from '../../lib/showApi';
 //   subs     GET /api/creator/my-submissions   → { submissions }
 //   shows    GET /api/show?mine=1              → { shows }
 //   drafts   GET /api/creator/drafts           → { drafts }
-//   mine     GET /api/payees/mine              → { invites }
+//   mine     GET /api/payees/mine              → { invites, paidFor }
 //   money    GET /api/creator/money?period=    (with its `dashboard` block)
 //   numbers  GET /api/creator/analytics?days=30&compare=1
 //
@@ -43,17 +43,21 @@ export function useDashboardData({ enabled, getToken, period = null }) {
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
 
+  // → the answer when this read was the newest for its route and it
+  // worked (a caller that has to know what the list says now: an invite
+  // answered or withdrawn meanwhile); undefined otherwise.
   const read = useCallback(async (key) => {
-    if (!PATHS[key]) return;
+    if (!PATHS[key]) return undefined;
     const mine = (turn.current[key] || 0) + 1;
     turn.current[key] = mine;
     const r = await showCall('GET', PATHS[key](periodRef.current), undefined, getToken);
-    if (turn.current[key] !== mine || !enabledRef.current) return;
+    if (turn.current[key] !== mine || !enabledRef.current) return undefined;
     setBoxes((b) => {
       if (r.ok) return { ...b, [key]: { state: 'ok', data: r.data } };
       if (r.status === 401 || r.status === 403) return { ...b, [key]: { state: 'refused', data: null } };
       return { ...b, [key]: { state: 'failed', data: b[key] ? b[key].data : null } };
     });
+    return r.ok ? r.data : undefined;
   }, [getToken]);
 
   const readAll = useCallback(() => Promise.all(KEYS.map((key) => read(key))), [read]);

@@ -31,8 +31,19 @@ import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 // 2026-10-31): the file (uploading from the moment it's picked), about it
 // (with "+ New show" inline), artwork with the options folded away. Saved
 // as a draft as the creator goes (/api/creator/drafts), reopened at the
-// same step from the hub; the stopped upload resumes when the same file
-// is picked again. Captions are the website's (no document picker here).
+// same step from the Dashboard's draft row; the stopped upload resumes
+// when the same file is picked again. Captions are the website's (no
+// document picker here).
+//
+// Where it leaves (2026-11-14, the Dashboard in the hub's place): Back, a
+// discarded draft and a sent title all go to the Dashboard with
+// router.dismissTo — back down the stack to the Dashboard when it is open
+// underneath (the usual way in: its "+ Submit a title"), in this screen's
+// place when it isn't (a notification, Your work, a show page) — so the
+// form is never left under the Dashboard and there is never a second
+// Dashboard on top of the first. A sent title hands over
+// ?submitted=<title>&id=<its id>&show=<show id>, which the Dashboard says
+// once ("… is in.", with the link to the show page).
 //
 // Step 2's Place block (the series revamp, slice 5; the website's
 // SubmitPlace board): where a series or podcast episode goes comes first —
@@ -43,8 +54,8 @@ import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 // E4 | Swap"; Swap moves that episode to the next free number when the
 // title is sent, and back if sending fails). Going on is blocked while the
 // number is taken. ?series=&season=&number= fill all three in (the show
-// screen's "+ Add episode"); a title sent into a show lands on the hub
-// with "Open the show page".
+// screen's "+ Add episode"); a title sent into a show lands on the
+// Dashboard with "Open the show page".
 
 const firstParam = (v) => (Array.isArray(v) ? v[0] : v);
 
@@ -508,7 +519,7 @@ export default function SubmitTitle() {
         try {
           if (draftId) await apiDelete('/api/creator/drafts', { id: draftId }, await freshToken(getToken));
           if (saveTimer.current) clearTimeout(saveTimer.current);
-          router.replace('/creator');
+          router.dismissTo('/creator/dashboard');
         } catch (err) {
           setError(err.message);
         }
@@ -571,7 +582,7 @@ export default function SubmitTitle() {
     if (saveTimer.current) clearTimeout(saveTimer.current);
     latest.current = { form: EMPTY_SUBMIT_FORM, video: null, trailer: null, draftId: null };
     const showId = r.data.seriesId || (r.data.newShow && r.data.newShow.id) || null;
-    router.replace(`/creator?submitted=${encodeURIComponent(form.title.trim())}${r.data.id ? `&id=${encodeURIComponent(r.data.id)}` : ''}${showId ? `&show=${encodeURIComponent(showId)}` : ''}`);
+    router.dismissTo(`/creator/dashboard?submitted=${encodeURIComponent(form.title.trim())}${r.data.id ? `&id=${encodeURIComponent(r.data.id)}` : ''}${showId ? `&show=${encodeURIComponent(showId)}` : ''}`);
   }
 
   if (loading) {
@@ -620,7 +631,7 @@ export default function SubmitTitle() {
           About it) above the keyboard; Android resizes the window itself. */}
       <ScrollView contentContainerStyle={[cp.scroll, { paddingTop: 8 }]} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
         <View style={s.head}>
-          <Pressable onPress={() => router.dismissTo('/creator')} hitSlop={8} style={s.back} accessibilityRole="button" accessibilityLabel="Back to Creator Studio"><BackArrowIcon size={16} color={colors.inkDim} /></Pressable>
+          <Pressable onPress={() => router.dismissTo('/creator/dashboard')} hitSlop={8} style={s.back} accessibilityRole="button" accessibilityLabel="Back to the Dashboard"><BackArrowIcon size={16} color={colors.inkDim} /></Pressable>
           <Text style={s.headTitle}>Submit a title</Text>
           <Text style={s.headStep}>STEP {step} OF 3</Text>
         </View>

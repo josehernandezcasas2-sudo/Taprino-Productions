@@ -24,12 +24,13 @@ import { GENERAL_SIGN_IN } from './dashboard/useSignInLanding';
 // bar … all creators and teams see the tab"): one more tab between Watch
 // and Account for a creator, an admin or a sub-admin (seesDashboard). A tap
 // goes straight to the screen, no menu. It is the lit tab on the Dashboard
-// and on the screens its row of tabs opens (Creator Studio, Your work, Your
-// numbers, Money, Your pitches, the show screens and the rest of
-// /creator/*), so Account no longer lights up for Your work. The people who
-// have it lose My Work, Creator Studio, Your Numbers and Money from the
-// Account menu: those are the Dashboard's own tabs
-// (components/dashboard/DashboardTabs.js). An admin then has six tabs;
+// and on the screens its row of tabs opens (Your work, Your numbers, Money,
+// Your pitches, the show screens and the rest of /creator/*), so Account no
+// longer lights up for Your work. The people who have it lose My Work, Your
+// Numbers and Money from the Account menu: those are the Dashboard's own
+// tabs (components/dashboard/DashboardTabs.js). Creator Studio's hub is gone
+// (the Dashboard took its place the same day), and so is its row in the
+// Account menu. An admin then has six tabs;
 // lib/tabBarFit.js decides how the labels fit whatever the phone's width
 // (closer letters, a squarer lit pill, no carets and a wider Dashboard tab,
 // and last a smaller size), so no label is ever cut, wrapped, or left
@@ -101,13 +102,10 @@ const GROUPS = {
       // The Account screen's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
       { href: '/stream', label: 'Continue Watching' },
-      // My Work, Creator Studio, Your Numbers and Money: the Dashboard's
-      // tabs for the people who have the Dashboard tab (2026-11-14).
+      // My Work, Your Numbers and Money: the Dashboard's tabs for the
+      // people who have the Dashboard tab (2026-11-14).
       ...(hasDashboard ? [] : [{ href: '/account/my-work', label: 'My Work' }]),
       { href: '/locations/mine', label: 'My locations' },
-      ...(!hasDashboard && (role.isCreator || role.isAdmin) ? [{ href: '/creator', label: 'Creator Studio' }] : []),
-      ...(!hasDashboard && (role.isCreator || role.canAccessAdmin) ? [{ href: '/creator/numbers', label: 'Your Numbers' }] : []),
-      ...(!hasDashboard && (role.isCreator || role.isAdmin) ? [{ href: '/creator/money', label: 'Money' }] : []),
       ...(role.isSignedIn && !role.isCreator ? [{ href: '/apply', label: 'Become a creator' }] : [])
     ],
     // Your work lights the Dashboard tab for the people who have it.
@@ -180,10 +178,15 @@ export default function BottomNav() {
     router.push(href);
   }
   // A tab that is a link (the Dashboard): straight to its screen, and
-  // nothing when that screen is already the one showing.
-  function goTab(href) {
+  // nothing when that screen is already the one showing. From one of the
+  // screens its row of tabs opens (Your work, Money…) the Dashboard is
+  // usually underneath: go back down to it rather than push a second copy
+  // on top (dismissTo opens it in this screen's place when it isn't there).
+  function goTab(href, match) {
     setOpenKey(null);
-    if (pathname !== href) router.push(href);
+    if (pathname === href) return;
+    if (match && match(pathname)) router.dismissTo(href);
+    else router.push(href);
   }
 
   const openGroup = openKey ? groups[openKey] : null;
@@ -279,7 +282,7 @@ export default function BottomNav() {
               >
                 <Pressable
                   style={[styles.item, !fit.round && styles.itemSquarer, active && styles.itemActive]}
-                  onPress={() => (isLink ? goTab(group.href) : toggle(key))}
+                  onPress={() => (isLink ? goTab(group.href, group.match) : toggle(key))}
                   accessibilityRole={isLink ? 'link' : undefined}
                   accessibilityLabel={isLink ? group.label : undefined}
                   accessibilityState={isLink ? { selected: active } : undefined}

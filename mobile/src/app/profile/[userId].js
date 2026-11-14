@@ -16,6 +16,7 @@ import { PerformerFacts } from '../../components/CastingBits';
 import { TipButton } from '../../components/TipSheet';
 import { rememberVia } from '../../lib/referral';
 import { useCaptureBlock } from '../../lib/captureBlock';
+import { useRereadWhenSignedIn } from '../../lib/resumeTask';
 
 const SITE_ORIGIN = 'https://studiotapatv.site';
 
@@ -99,6 +100,14 @@ export default function PublicProfile() {
   // (the website's PostViewerModal has no mobile equivalent yet; video
   // posts still go to /snippets/discover, which is the real reel viewer).
   const [photoPost, setPhotoPost] = useState(null);
+  // Bumping this reads the profile again, keeping what shows until it
+  // answers. Back from the sign-in card signed in (2026-11-14: Follow,
+  // Message and Tip send a signed-out visitor there, and the card brings
+  // them back here), the profile read signed out is read again as them, so
+  // Follow follows and the Tip button opens its sheet — by itself when Tip
+  // is what they had pressed (components/TipSheet.js, lib/resumeTask.js).
+  const [reloadKey, setReloadKey] = useState(0);
+  useRereadWhenSignedIn(state.data, Boolean(state.data && state.data.isSignedIn), () => setReloadKey((k) => k + 1));
 
   useEffect(() => {
     if (!profileUserId) return undefined;
@@ -117,11 +126,12 @@ export default function PublicProfile() {
           setFollowerCount(data.followerCount || 0);
         }
       } catch (err) {
-        if (!cancelled) setState({ loading: false, error: err.message, data: null });
+        // A re-read that fails keeps the profile that was showing.
+        if (!cancelled) setState((st) => (st.data ? st : { loading: false, error: err.message, data: null }));
       }
     })();
     return () => { cancelled = true; };
-  }, [profileUserId]);
+  }, [profileUserId, reloadKey]);
 
   function share(profile, canonicalPath) {
     // The nice /profile/<handle> link when one exists, same as the site.

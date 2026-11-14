@@ -122,7 +122,9 @@ export default function RootLayout() {
           <Stack.Screen name="creator/money" options={{ headerShown: false }} />
           <Stack.Screen name="recs" options={{ headerShown: false }} />
           <Stack.Screen name="search" options={{ title: 'Search' }} />
-          {/* The creator path (2026-10-31): apply, the hub and the three-step submit draw the site header. */}
+          {/* The creator path (2026-10-31): apply and the three-step submit
+              draw the site header. creator/index was Creator Studio's hub;
+              since 2026-11-14 it only forwards to the Dashboard. */}
           <Stack.Screen name="apply" options={{ headerShown: false }} />
           <Stack.Screen name="creator/index" options={{ headerShown: false }} />
           <Stack.Screen name="creator/submit" options={{ headerShown: false }} />

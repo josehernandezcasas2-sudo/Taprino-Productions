@@ -798,7 +798,7 @@ function ShowScreen() {
 
   // --- the screen -----------------------------------------------------------------------------
   const dashboard = !isLoaded ? null : { isSignedIn: Boolean(isSignedIn) };
-  const back = { href: '/creator', label: 'Creator Studio' };
+  const back = { href: '/creator/dashboard', label: 'Dashboard' };
 
   if (!view || phase.state !== 'ready') {
     const notThere = phase.status === 404;

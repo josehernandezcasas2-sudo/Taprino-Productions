@@ -1,12 +1,13 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, usePathname, useRouter } from 'expo-router';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { useAuth } from '../../lib/stableAuth';
 import { useHostedAuth } from '@clerk/expo/hosted-auth';
 import { hostedAuthParams } from '../../lib/hostedAuth';
 import { isGeneralSignIn, useSignInLanding } from '../dashboard/useSignInLanding';
+import { forgetTask } from '../../lib/resumeTask';
 import { signOutEverywhere } from '../../lib/signOut';
 import { apiGet, API_BASE_URL } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
@@ -179,28 +180,61 @@ export function useAccountData({ withProfile = true, refreshOnFocus = false } = 
 // The frame: TopNav, the stage, a Back pill (to the hub by default; the
 // hub itself has the standard Back to Stream), the title and the body;
 // the spinner / couldn't-load / sign-in states come first.
-// `back` may also be { href, label } (the show page's "Creator Studio",
-// the editors' "<Show name>"): the pill then goes back to that screen (or
+// `back` may also be { href, label } (the show page's "Dashboard", the
+// editors' "<Show name>"): the pill then goes back to that screen (or
 // opens it in this one's place when it isn't in the stack). `overlay` is
 // drawn over the scroll, fixed (a toast); `refreshControl` rides on the
 // ScrollView.
+// The sign-in card every signed-out action opens (`router.push('/account')`).
+export const SIGN_IN_CARD_PATH = '/account';
+
 export function AccountFrame({ title, aside = null, dashboard, onRetry, back = 'account', scrollRef, scrollEnabled = true, overlay = null, refreshControl, children }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { signOut, getToken } = useAuth();
   const { startHostedAuth } = useHostedAuth();
   const [busyMode, setBusyMode] = useState(null);
-  // The sign-in card opened as the way to sign in (/account?signin=general:
-  // the top bar's Log in row, the bottom bar's Account row, the Dashboard):
-  // a creator or a team member then lands on the Dashboard. Opened by an
-  // action (Tip, Buy, Back it…) it carries no mark and the person stays.
+  // Where signing in (or creating an account) on the card leaves the
+  // person (Jose, 2026-11-14: "i want them to be able to sign up and sign
+  // in but maintain within what they were doing"):
+  //   - the card opened as the way to sign in (/account?signin=general:
+  //     the top bar's Log in row, the bottom bar's Account row, the
+  //     Dashboard): a creator or a team member lands on the Dashboard,
+  //     everyone else stays on their account (useSignInLanding.js);
+  //   - the card opened by something they pressed (Tip, Own, Back it, a
+  //     message, saving a title: they all push /account with no mark): back
+  //     to the screen they came from, which carries on with what they
+  //     pressed where it left a note (lib/resumeTask.js);
+  //   - the card standing in for a screen they opened themselves (Your
+  //     purchases, Membership, a show page): they stay, and the screen
+  //     loads.
   const params = useLocalSearchParams();
   const land = useSignInLanding();
+  // A session made on this card, and whether the Account screen's card was
+  // ever the thing on screen: leaving it without one forgets what the
+  // person had pressed, so a sign-in later on doesn't open a Tip sheet or a
+  // Checkout by itself.
+  const madeSession = useRef(false);
+  const cardShown = useRef(false);
+  const showsCard = Boolean(dashboard && !dashboard.loadError && !dashboard.isSignedIn);
+  useEffect(() => {
+    if (showsCard && pathname === SIGN_IN_CARD_PATH) cardShown.current = true;
+  }, [showsCard, pathname]);
+  useEffect(() => () => {
+    if (cardShown.current && !madeSession.current) forgetTask();
+  }, []);
 
   async function handleStartAuth(mode) {
     setBusyMode(mode);
     try {
+      // Resolves once the new session is the active one (sign-in and
+      // sign-up alike), or with no session when the browser was closed.
       const done = await startHostedAuth(hostedAuthParams(mode));
-      if (done && done.createdSessionId && isGeneralSignIn(params)) land();
+      if (done && done.createdSessionId) {
+        madeSession.current = true;
+        if (isGeneralSignIn(params)) land();
+        else if (pathname === SIGN_IN_CARD_PATH && router.canGoBack()) router.back();
+      }
     } catch (err) {
       Alert.alert(mode === 'sign-up' ? 'Sign-up failed' : 'Sign-in failed', err.message || 'Something went wrong.');
     } finally {

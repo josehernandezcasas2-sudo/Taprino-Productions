@@ -177,7 +177,7 @@ function RestoreGlyph({ size = 11 }) {
 // (mobile/src/lib/useTitleAds.js) and on every press during one, so
 // muting during the ad keeps the programme muted after it and a muted
 // title starts its ad muted. Mute only — an ad has no skip or seek.
-export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, ad = null, children }) {
+export default function EpisodePlayer({ player, playing, heading, rating, onNext, nextLabel = 'Next episode', topRight = null, holdControls = false, resumeSeconds = 0, endCard = null, captions = null, getToken = null, advisoryOn = false, ad = null, children }) {
   const [controlsShown, setControlsShown] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -298,11 +298,13 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   const showControls = useCallback(() => setControlsShown(true), []);
   useEffect(() => {
     if (hideTimer.current) clearTimeout(hideTimer.current);
-    if (controlsShown && playing && scrubbing === null) {
+    // `holdControls`: something drawn inside the controls is in use (the
+    // Tip sheet opened from the full-screen top row), so they stay.
+    if (controlsShown && playing && scrubbing === null && !holdControls) {
       hideTimer.current = setTimeout(() => setControlsShown(false), CONTROLS_HIDE_MS);
     }
     return () => hideTimer.current && clearTimeout(hideTimer.current);
-  }, [controlsShown, playing, scrubbing]);
+  }, [controlsShown, playing, scrubbing, holdControls]);
 
   function togglePlay() {
     showControls();

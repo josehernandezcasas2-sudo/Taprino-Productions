@@ -18,9 +18,13 @@ import { hrefToRoute } from '../PushListener';
 //     Dashboard itself sending a signed-out person there. Those open
 //     /account?signin=general, and AccountFrame lands only with that mark;
 //   - the private beta door (PrivateBetaGate).
-// A sign-in started by an action — Tip, Buy, Back it, answering a call, a
-// message, saving a title: they all open /account with no mark — leaves the
-// person where they were, as before.
+// A sign-in (or a new account) started by an action — Tip, Own, Back it,
+// answering a call, a message, saving a title: they all open /account with
+// no mark — never lands here. Since 2026-11-14 the card takes the person
+// back to the screen they pressed it on (AccountFrame in
+// components/account/AccountBits.js), and Tip, Own and the plans carry on
+// there by themselves (lib/resumeTask.js). Until then they were left on
+// the Account screen.
 export const GENERAL_SIGN_IN = 'signin=general';
 
 export function isGeneralSignIn(params) {

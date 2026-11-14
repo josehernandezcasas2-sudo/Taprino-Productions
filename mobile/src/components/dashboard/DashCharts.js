@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { View } from 'react-native';
+import { StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from 'react-native-svg';
 import { count } from '../../lib/creatorDashboardRules';
 import { colors, fonts, inkTint } from '../../lib/theme';
 
 // The Dashboard's drawings in the app (2026-11-14; the website's
 // components/creator/dashboard/DashCharts.js and the signed-off phone
-// board). One colour each: views are the theme's sky. Text is always one of
+// board). One colour each: views are the theme's sky, the months the
+// theme's gold with the month so far in the accent. Text is always one of
 // the theme's inks, never the line's colour. Every number a chart shows
 // comes from lib/creatorDashboardRules.js; these only place it.
 
@@ -100,3 +101,73 @@ export function Spark({ values, label, width = 62, height = 22 }) {
     </View>
   );
 }
+
+// Earned · last six months: six bars from one baseline, oldest first, each
+// month's short name under its bar (2026-11-14, when the Dashboard was
+// fleshed out; the first build left them off the phone). `months` is
+// dashboardMonths(money). The month so far is the accent bar. The amounts
+// sit over the bars when the longest of them fits a column; on a narrow
+// phone only the last bar — the month the page is showing — carries its
+// amount, the others are in the spoken summary.
+const BAR_AREA = 96;
+const BAR_GAP = 8;
+const AMOUNT = 10.5;
+// The amounts follow the phone's text size, up to this much.
+const AMOUNT_SCALE_MAX = 1.3;
+
+export function MonthBars({ months }) {
+  const [width, setWidth] = useState(0);
+  const { fontScale } = useWindowDimensions();
+  const bars = months.bars;
+  const column = bars.length ? Math.max(0, (width - BAR_GAP * (bars.length - 1)) / bars.length) : 0;
+  const size = AMOUNT * Math.min(AMOUNT_SCALE_MAX, Math.max(1, fontScale || 1));
+  const widest = Math.max(0, ...bars.map((bar) => textWidth(bar.value, size)));
+  const every = column > 0 && widest <= column;
+  return (
+    <View
+      style={mb.wrap}
+      onLayout={(e) => setWidth(Math.round(e.nativeEvent.layout.width))}
+      accessible
+      accessibilityRole="image"
+      accessibilityLabel={months.summary}
+    >
+      {width > 0 ? bars.map((bar, i) => {
+        const last = i === bars.length - 1;
+        // A bar with money in it is never drawn as nothing.
+        const height = bar.cents > 0 ? Math.max(3, Math.round(bar.share * BAR_AREA)) : 0;
+        return (
+          <View key={bar.period} style={[mb.column, { width: column, marginLeft: i > 0 ? BAR_GAP : 0 }]}>
+            <View style={mb.amountRow}>
+              {every || last ? (
+                <View style={every ? mb.amountFit : mb.amountLoose}>
+                  <Text style={[mb.amount, bar.current && mb.amountOn]} numberOfLines={1} maxFontSizeMultiplier={AMOUNT_SCALE_MAX}>{bar.value}</Text>
+                </View>
+              ) : null}
+            </View>
+            <View style={mb.track}>
+              <View style={[mb.bar, bar.current && mb.barOn, { height, width: Math.min(30, column * 0.7) }]} />
+            </View>
+            <Text style={[mb.name, bar.current && mb.nameOn]} numberOfLines={1} maxFontSizeMultiplier={AMOUNT_SCALE_MAX}>{bar.label}</Text>
+          </View>
+        );
+      }) : null}
+    </View>
+  );
+}
+
+const mb = StyleSheet.create({
+  wrap: { flexDirection: 'row', alignItems: 'flex-end', minHeight: BAR_AREA + 44 },
+  column: { alignItems: 'center', gap: 5 },
+  amountRow: { height: 18, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-end' },
+  amount: { fontFamily: fonts.mono, fontSize: AMOUNT, color: colors.inkDim, fontVariant: ['tabular-nums'] },
+  amountOn: { color: colors.ink },
+  amountFit: { alignSelf: 'stretch', alignItems: 'center' },
+  // Alone over the last bar it may be wider than its column: it keeps its
+  // right edge on the column's and runs left over the bars that carry none.
+  amountLoose: { position: 'absolute', right: 0, bottom: 0, width: 160, alignItems: 'flex-end' },
+  track: { height: BAR_AREA, alignSelf: 'stretch', alignItems: 'center', justifyContent: 'flex-end', borderBottomWidth: 1, borderBottomColor: inkTint(0.22) },
+  bar: { borderTopLeftRadius: 4, borderTopRightRadius: 4, backgroundColor: colors.olive },
+  barOn: { backgroundColor: colors.brass },
+  name: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.inkFaint },
+  nameOn: { color: colors.ink }
+});

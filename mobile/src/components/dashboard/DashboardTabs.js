@@ -8,14 +8,15 @@ import { hrefToRoute } from '../PushListener';
 
 // The row of tabs across the creator screens (2026-11-14, with the
 // Dashboard; the website's components/creator/DashboardTabs.js): Overview ·
-// Your work · Numbers · Money · Pitches, and Creator Studio until Jose
-// decides whether the Dashboard replaces it. Which tabs a person gets is
-// lib/creatorDashboardRules.js dashboardTabs; someone with only Overview (a
-// sub-admin who is not a creator, a host on the Money screen) gets no row.
+// Your work · Numbers · Money · Pitches. (Creator Studio's hub had a sixth
+// tab for a few hours, until the Dashboard took its place the same day.)
+// Which tabs a person gets is lib/creatorDashboardRules.js dashboardTabs;
+// someone with only Overview (a sub-admin who is not a creator, a host on
+// the Money screen) gets no row.
 //
 // `current` is the tab of the screen it sits on: 'overview' | 'work' |
-// 'numbers' | 'money' | 'pitches' | 'studio'. The row scrolls sideways and
-// starts with the current tab in sight.
+// 'numbers' | 'money' | 'pitches'. The row scrolls sideways and starts
+// with the current tab in sight.
 //
 // Moving between them keeps the stack short: from the Dashboard a tab opens
 // on top of it; from one of the others a tab takes that screen's place; and
@@ -33,9 +34,9 @@ export default function DashboardTabs({ current, style }) {
   const tabs = dashboardTabs(role);
   if (tabs.length < 2) return null;
 
-  // The row starts with the current tab in sight (Creator Studio is the
-  // sixth of six). Asked again when the row's width settles, since the
-  // first layout can come before the fonts.
+  // The row starts with the current tab in sight (Pitches is the fifth of
+  // five, off the edge of a narrow phone). Asked again when the row's width
+  // settles, since the first layout can come before the fonts.
   function place() {
     if (moved.current || currentX.current == null || !scroller.current) return;
     scroller.current.scrollTo({ x: Math.max(0, currentX.current - 24), animated: false });

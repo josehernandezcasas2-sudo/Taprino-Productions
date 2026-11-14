@@ -267,7 +267,7 @@ export default function Apply() {
         {creator && !acceptedHere ? (
           <StatusCard level="ok" tag="Creator Studio" title="You already have Creator Studio.">
             <Text style={cp.p}>No need to apply. Submit films, shorts and everything else there, and track their review.</Text>
-            <View style={cp.actions}><PrimaryButton label="Open Creator Studio" onPress={() => router.push('/creator')} /></View>
+            <View style={cp.actions}><PrimaryButton label="Open your Dashboard" onPress={() => router.push('/creator/dashboard')} /></View>
           </StatusCard>
         ) : null}
 
@@ -284,7 +284,7 @@ export default function Apply() {
             onResume={() => replaceFile({ resume: true })}
             onArtwork={sendArtwork}
             onView={() => router.push(app.episodeHref)}
-            onStudio={() => router.push('/creator')}
+            onDashboard={() => router.push('/creator/dashboard')}
           />
         ) : null}
 
@@ -378,7 +378,7 @@ export default function Apply() {
   );
 }
 
-function ApplicationStatus({ app, labels, onboarding, upload, busy, reapplying, onReapply, onReplace, onResume, onArtwork, onView, onStudio }) {
+function ApplicationStatus({ app, labels, onboarding, upload, busy, reapplying, onReapply, onReplace, onResume, onArtwork, onView, onDashboard }) {
   const label = labels[app.status] || app.status;
   const mailto = `mailto:${CONTACT}?subject=${encodeURIComponent(`${app.title}: what you asked for`)}`;
   if (app.status === 'accepted') {
@@ -389,7 +389,9 @@ function ApplicationStatus({ app, labels, onboarding, upload, busy, reapplying, 
         {app.decisionNote ? <Text style={cp.p}><Text style={cp.strong}>A note from us: </Text>{app.decisionNote}</Text> : null}
         <View style={cp.actions}>
           {live ? <PrimaryButton label="View the page" onPress={onView} /> : null}
-          {live ? <SecondaryButton label="Open Creator Studio" onPress={onStudio} /> : <PrimaryButton label="Open Creator Studio" onPress={onStudio} />}
+          {/* The Dashboard is where a creator's titles and money are (it
+              took Creator Studio's hub's place, 2026-11-14). */}
+          {live ? <SecondaryButton label="Open your Dashboard" onPress={onDashboard} /> : <PrimaryButton label="Open your Dashboard" onPress={onDashboard} />}
         </View>
       </StatusCard>
     );

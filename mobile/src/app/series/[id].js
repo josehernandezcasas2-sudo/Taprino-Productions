@@ -18,6 +18,8 @@ import { freePlayNote, seriesPlayLabel, sortEpisodes } from '../../lib/seriesRes
 import { episodeCodeOf, rowTierWord } from '../../lib/showRules';
 import { extraKindLabel, extraMetaLine } from '../../lib/extraKinds';
 import { useRefreshOnReturn } from '../../lib/useRefreshOnReturn';
+import { useRereadWhenSignedIn, useResumeTask } from '../../lib/resumeTask';
+import { TASKS, buyParts } from '../../lib/resumeTaskRules';
 
 // Mirrors components/GenreRow.js's tierBadge classes (the same pills as
 // LibraryRows.js): free-ads = olive-deep, free-noads = green, premium = brass.
@@ -147,11 +149,35 @@ export default function SeriesHub() {
   // Back from an episode: read the show again ("Continue S1 E3", what's
   // watched), keeping what shows until it answers.
   useRefreshOnReturn(() => setReloadKey((k) => k + 1));
+  const dataSignedIn = Boolean(state.data && state.data.isSignedIn);
   const { buy, busy: buyBusy } = useBuy({
     getToken: () => withTimeout(getToken().catch(() => tokenRef.current), 4000),
     router,
-    isSignedIn: Boolean(state.data && state.data.isSignedIn),
+    isSignedIn: dataSignedIn,
     onDone: () => setReloadKey((k) => k + 1)
+  });
+  // Signing in or up in the middle of buying (Jose, 2026-11-14): Buy sends
+  // a signed-out viewer to the sign-in card, which brings them back here
+  // with an account. The show was read signed out, so it is read again as
+  // them, and the purchase they had pressed carries on through the same
+  // handler as the button (lib/resumeTask.js) — only while it is still for
+  // sale to them: someone who turns out to own it already is asked for
+  // nothing.
+  useRereadWhenSignedIn(state.data, dataSignedIn, () => setReloadKey((k) => k + 1));
+  useResumeTask(`${TASKS.buy}:`, dataSignedIn, (task) => {
+    const parts = buyParts(task);
+    const d = state.data;
+    if (!parts || !d || !d.seriesInfo || (d.preview && typeof d.preview === 'object')) return;
+    const ownsAll = Boolean(d.bundle && d.bundle.owned);
+    if (parts.type === 'series') {
+      if (parts.id !== d.seriesInfo.id || !d.bundle || !d.bundle.forSale || ownsAll) return;
+    } else if (parts.type === 'episode') {
+      const offer = d.episodeOffers ? d.episodeOffers[parts.id] : null;
+      if (!offer || !offer.forSale || offer.owned || ownsAll) return;
+    } else {
+      return;
+    }
+    buy(parts.type, parts.id, `/series/${d.seriesInfo.id}`);
   });
 
   useEffect(() => {

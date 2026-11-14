@@ -108,7 +108,7 @@ export default function NewShowScreen() {
   }
 
   const dashboard = !isLoaded ? null : { isSignedIn: Boolean(isSignedIn) };
-  const back = { href: '/creator', label: 'Creator Studio' };
+  const back = { href: '/creator/dashboard', label: 'Dashboard' };
 
   if (gate.state === 'forbidden') {
     return (

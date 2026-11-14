@@ -17,7 +17,7 @@ Notifications.setNotificationHandler({
 
 const APP_ROUTES = [
   /^\/messages(\/[^/]+)?$/, /^\/crew\/calls(\/[^/]+)?$/, /^\/crew\/card$/, /^\/creator\/money$/, /^\/creator\/pitches$/,
-  /^\/apply$/, /^\/creator$/, /^\/creator\/submit$/,
+  /^\/apply$/, /^\/creator\/submit$/, /^\/creator\/pitch-new$/,
   /^\/account(\/(purchases|wishlist|my-work|artist-support|membership|profile|preferences|security))?$/, /^\/pitches\/[^/]+$/, /^\/episode\/[^/]+$/, /^\/series\/[^/]+$/,
   /^\/podcasts\/[^/]+$/, /^\/profile\/[^/]+$/, /^\/locations(\/[^/]+)?$/, /^\/locations\/requests(\/[^/]+)?$/, /^\/university(\/.*)?$/,
   // Productions (crew added, a call sheet, distribution) and Stream: the
@@ -25,15 +25,28 @@ const APP_ROUTES = [
   /^\/productions(\/[^/]+(\/(edit|distribution|day\/\d+))?)?$/, /^\/stream$/,
   // Downloads (2026-11-14): the website's /downloads is the app's page.
   /^\/downloads$/,
-  // The creator's Dashboard (2026-11-14) and Your numbers, one of its tabs.
-  /^\/creator\/dashboard$/, /^\/creator\/numbers$/
+  // Your numbers, one of the Dashboard's tabs (2026-11-14; the Dashboard
+  // itself is in SCREEN_KEEP below).
+  /^\/creator\/numbers$/
 ];
-// The website's /creator/analytics is the app's Your numbers.
-const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work', '/creator/analytics': '/creator/numbers' };
+// The website's /creator/analytics is the app's Your numbers, its
+// /creator/pitch/new the app's Submit a project. /creator was Creator
+// Studio's hub until the Dashboard took its place (2026-11-14): every
+// address that meant the hub opens the Dashboard.
+const ALIASES = {
+  '/creator/pitch/dashboard': '/creator/pitches',
+  '/creator/pitch/new': '/creator/pitch-new',
+  '/admin': '/admin',
+  '/wishlist': '/account/wishlist',
+  '/creator/my-work': '/account/my-work',
+  '/creator/analytics': '/creator/numbers',
+  '/creator': '/creator/dashboard'
+};
 // Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:
-//   /creator#get-paid           → /creator (payee_invite, payee_invite_cancelled;
-//                                 the hash goes before the match, and the
-//                                 Get paid card is the hub's first thing)
+//   /creator#get-paid           → /creator/dashboard (payee_invite,
+//   /creator/dashboard#get-paid   payee_invite_cancelled; the hash goes
+//                                 before the match, and the Get paid card
+//                                 is the first card under the numbers)
 //   /creator/money              → /creator/money (payee_changed)
 //   /creator/show/<id>#ep-<eid> → /creator/show/<id>?ep=<eid> (payee_invite_accepted
 //                                 / _declined, payee_changed from the cut-over)
@@ -86,7 +99,8 @@ function showScreen(path, href) {
     else if (q.draft) row = { key: 'draft', id: q.draft };
     return `/creator/show/${page[1]}${row ? `?${row.key}=${enc(row.id)}` : ''}`;
   }
-  if (path === '/creator/series') return q.series ? `/creator/show/${enc(q.series)}` : '/creator';
+  // With no show named it meant the hub, which is the Dashboard now.
+  if (path === '/creator/series') return q.series ? `/creator/show/${enc(q.series)}` : '/creator/dashboard';
   return null;
 }
 
@@ -100,13 +114,16 @@ const PUBLIC_KEEP = { season: /^\d{1,4}$/, preview: /^1$/, autoplay: /^1$/ };
 // app's podcast screen has no seasons or autoplay).
 const PODCAST_SHOW = /^\/podcasts\/[^/]+$/;
 const PODCAST_KEEP = { preview: /^1$/ };
-// Two creator screens keep what their address asks for (the Dashboard's
+// Three creator screens keep what their address asks for (the Dashboard's
 // rows link to them, 2026-11-14): the three-step submit opens the draft or
 // the show, season and number it names; Your work opens on the filter.
-// Until then "Continue" on a draft would have opened an empty form.
+// Until then "Continue" on a draft would have opened an empty form. The
+// Dashboard keeps what the three steps hand it when a title is sent
+// (?submitted=<title>&id=<title id>&show=<show id>: "… is in.").
 const SCREEN_KEEP = {
   '/creator/submit': { draft: /^[A-Za-z0-9_-]{1,80}$/, type: /^[a-z]{1,20}$/, series: /^[A-Za-z0-9_-]{1,160}$/, season: /^\d{1,4}$/, number: /^\d{1,5}$/ },
-  '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/ }
+  '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/ },
+  '/creator/dashboard': { submitted: /^[\s\S]{1,300}$/, id: /^[A-Za-z0-9_-]{1,160}$/, show: /^[A-Za-z0-9_-]{1,160}$/ }
 };
 
 function keptQuery(href, keep = PUBLIC_KEEP) {

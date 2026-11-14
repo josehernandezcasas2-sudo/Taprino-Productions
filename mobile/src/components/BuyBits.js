@@ -1,8 +1,11 @@
 import { useState } from 'react';
 import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { usePathname } from 'expo-router';
 import { openCheckout, appReturnAddress, alertWhenBack } from '../lib/inAppBrowser';
 import Svg, { Path } from 'react-native-svg';
 import { apiPost } from '../lib/api';
+import { rememberTask } from '../lib/resumeTask';
+import { buyTask } from '../lib/resumeTaskRules';
 import { colors, fonts, oliveTint } from '../lib/theme';
 import { dollars } from '../lib/purchaseRules';
 
@@ -17,8 +20,13 @@ const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month
 
 // Starts Checkout for a title. `getToken` is the screen's Clerk token
 // getter; a signed-out viewer is sent to the account screen to sign in.
-export async function buyTitle({ type, id, getToken, router, isSignedIn, returnTo }) {
+// `path` is the screen they pressed Buy on: a note of the purchase is left
+// there first (2026-11-14), so once they have signed in or created an
+// account the sign-in card brings them back and the screen carries on with
+// this purchase (lib/resumeTask.js; the screen's useResumeTask('buy:')).
+export async function buyTitle({ type, id, getToken, router, isSignedIn, returnTo, path = null }) {
   if (!isSignedIn) {
+    if (path) rememberTask(buyTask(type, id), path);
     router.push('/account');
     return false;
   }
@@ -33,10 +41,12 @@ export async function buyTitle({ type, id, getToken, router, isSignedIn, returnT
 
 export function useBuy({ getToken, router, isSignedIn, onDone }) {
   const [busy, setBusy] = useState(false);
+  // The screen the Buy button is on (it is the one showing when pressed).
+  const pathname = usePathname();
   async function buy(type, id, returnTo) {
     setBusy(true);
     try {
-      const went = await buyTitle({ type, id, getToken, router, isSignedIn, returnTo });
+      const went = await buyTitle({ type, id, getToken, router, isSignedIn, returnTo, path: pathname });
       if (went === 'paid') {
         // The website's words (components/BuyBits.js BoughtBanner).
         alertWhenBack('It’s yours', 'It’s in your library for good. Find it any time under Account → Your purchases.');

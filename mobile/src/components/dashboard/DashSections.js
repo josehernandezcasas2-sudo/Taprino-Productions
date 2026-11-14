@@ -6,20 +6,182 @@ import { ChevronIcon } from '../show/ShowBits';
 import { API_BASE_URL } from '../../lib/api';
 import { DASH_WORDS, TITLE_FILTERS, TITLES_LIMIT, count, dollars, filterTitles } from '../../lib/creatorDashboardRules';
 import { brassTint, colors, dangerTint, fonts, inkTint, okTint, oliveTint } from '../../lib/theme';
-import { Spark, ViewsChart } from './DashCharts';
+import { MonthBars, Spark, ViewsChart } from './DashCharts';
 
 // The Dashboard's sections in the app (2026-11-14; the website's
 // components/creator/dashboard/DashSections.js, laid out like the signed-off
 // phone board). Each takes what lib/creatorDashboardRules.js built and
 // draws it: no number or sentence about a title or about money is worked
-// out here. The few lines for "still loading" and "couldn't load" are the
-// website's own.
+// out here. The few lines for "still loading", "couldn't load" and an
+// empty chart are the website's own.
 //
 // `onOpen(href)` takes a website path (every href the rules hand out is
 // one) and opens the app's screen for it; `onPublish(action)` is Make it
-// public; `busy` is the show id being made public.
+// public; `busy` is the show id being made public. `acting` is the other
+// thing in flight, if any — 'invite:<id>:accept' | 'invite:<id>:decline',
+// 'stop:<row key>', 'discard:<draft id>' — and while either is set every
+// button that writes waits.
+//
+// The same day the Dashboard took Creator Studio's place (the agreement's
+// §9), so the four pieces that lived only in the hub are here: Start (the
+// kinds of title under Submit a title), GetPaid (an invite to be paid,
+// with its two answers), PaidTo (the titles whose earnings come to this
+// account, Stop getting it…) and Discard on a draft's row; with them the
+// six months as bars, Supporters, and a tip's note under its line in
+// Latest.
 
 const PAPER = colors.oliveShadow;
+// The screen's side padding (app/creator/dashboard.js): a row that scrolls
+// sideways runs out to the screen's edges through it.
+export const GUTTER = 18;
+// Where "set up payouts" leads: the Money screen, whose Payouts card is at
+// its top.
+const PAYOUTS_HREF = '/creator/money#payouts';
+
+// "To receive it, set up payouts under Money." (DASH_WORDS.payoutsLine, or
+// the same line in an invite's body): the whole line opens Money, and the
+// word itself reads as the link.
+export function PayoutsLine({ text, style, onOpen }) {
+  const words = String(text || '');
+  const at = words.lastIndexOf('Money');
+  return (
+    <Text style={style} onPress={() => onOpen(PAYOUTS_HREF)} accessibilityRole="link">
+      {at < 0 ? <Text style={d.inlineLink}>{words}</Text> : (
+        <>
+          {words.slice(0, at)}
+          <Text style={d.inlineLink}>Money</Text>
+          {words.slice(at + 5)}
+        </>
+      )}
+    </Text>
+  );
+}
+
+// --- start something -------------------------------------------------------------
+
+// The kinds of title under Submit a title, then a pitch: one pill each, in
+// a row that scrolls sideways (`items` is dashboardStart(SUBMIT_TYPES)).
+export function Start({ items, onOpen }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <View style={d.start}>
+      <Text style={d.k} accessibilityRole="header">{DASH_WORDS.start}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={d.startScroll} contentContainerStyle={d.startRow}>
+        {items.map((item) => (
+          <Pressable
+            key={item.key}
+            style={({ pressed }) => [d.startPill, pressed && d.pressed]}
+            onPress={() => onOpen(item.href)}
+            hitSlop={{ top: 2, bottom: 2 }}
+            accessibilityRole="link"
+            accessibilityLabel={`${DASH_WORDS.start}: ${item.label}`}
+          >
+            <Text style={d.startPillText}>{item.label}</Text>
+          </Pressable>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+// --- get paid --------------------------------------------------------------------
+
+// An invite to be paid for a title (`invites` is dashboardInvites): who
+// asked, what accepting means, Accept and Not now, and what Not now does.
+// Drawn only while one waits. `errors` is invite id → the line to show
+// under it; `onAnswer(invite, 'accept' | 'decline')`.
+export function GetPaid({ invites, acting, busy, errors, onAnswer, onOpen }) {
+  if (!invites || invites.length === 0) return null;
+  const waiting = Boolean(acting || busy);
+  return (
+    <View style={[d.card, d.cardGetPaid]}>
+      <Text style={[d.k, d.kAccent]} accessibilityRole="header">{DASH_WORDS.getPaid}{invites.length > 1 ? ` · ${invites.length}` : ''}</Text>
+      {invites.map((inv, i) => {
+        const accepting = acting === `invite:${inv.id}:accept`;
+        const declining = acting === `invite:${inv.id}:decline`;
+        const error = errors ? errors[inv.id] : null;
+        return (
+          <View key={inv.key} style={[d.invite, i > 0 && d.lineTop]}>
+            <Text style={d.inviteTitle} accessibilityRole="header">{inv.headline}</Text>
+            <Text style={d.needSub}>{inv.asked}</Text>
+            {inv.body.map((line) => (line.payouts
+              ? <PayoutsLine key={line.text} text={line.text} style={d.inviteLine} onOpen={onOpen} />
+              : <Text key={line.text} style={d.inviteLine}>{line.text}</Text>))}
+            {error ? <Text style={d.error} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
+            <View style={d.inviteActs}>
+              <Pressable
+                style={({ pressed }) => [d.btn, d.btnGold, pressed && d.pressed, waiting && !accepting && d.disabled]}
+                disabled={waiting}
+                onPress={() => onAnswer(inv, 'accept')}
+                accessibilityRole="button"
+                accessibilityLabel={`${DASH_WORDS.accept}: ${inv.headline}`}
+                accessibilityState={{ busy: accepting, disabled: waiting }}
+              >
+                <Text style={[d.btnText, d.btnTextGold]}>{accepting ? DASH_WORDS.accepting : DASH_WORDS.accept}</Text>
+              </Pressable>
+              <Pressable
+                style={({ pressed }) => [d.btn, pressed && d.pressed, waiting && !declining && d.disabled]}
+                disabled={waiting}
+                onPress={() => onAnswer(inv, 'decline')}
+                accessibilityRole="button"
+                accessibilityLabel={`${DASH_WORDS.notNow}: ${inv.headline}`}
+                accessibilityState={{ busy: declining, disabled: waiting }}
+              >
+                <Text style={d.btnText}>{declining ? DASH_WORDS.declining : DASH_WORDS.notNow}</Text>
+              </Pressable>
+            </View>
+            <Text style={d.fine}>{inv.foot}</Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+// --- paid to you -----------------------------------------------------------------
+
+// The titles whose earnings come to this account (`rows` is
+// dashboardPaidFor). A title with a page opens it; "Stop getting it…" asks
+// first (`onStop(row)`); a title that can't be stepped down from says why.
+export function PaidTo({ rows, acting, busy, error, onStop, onOpen }) {
+  if (!rows || rows.length === 0) return null;
+  const waiting = Boolean(acting || busy);
+  return (
+    <View style={[d.card, d.cardLatest]}>
+      <Text style={d.k} accessibilityRole="header">{DASH_WORDS.paidToYou}{rows.length > 1 ? ` · ${rows.length}` : ''}</Text>
+      {rows.map((row, i) => {
+        const stopping = acting === `stop:${row.key}`;
+        return (
+          <View key={row.key} style={[d.need, i > 0 && d.lineTop]}>
+            <Pressable
+              style={({ pressed }) => [d.needText, pressed && row.href && d.pressed]}
+              disabled={!row.href}
+              onPress={() => onOpen(row.href)}
+              accessibilityRole={row.href ? 'link' : 'text'}
+            >
+              <Text style={d.needTitle}>{row.title}</Text>
+              {row.meta ? <Text style={d.needSub}>{row.meta}</Text> : null}
+              {!row.canStop && row.locked ? <Text style={d.needSub}>{row.locked}</Text> : null}
+            </Pressable>
+            {row.canStop ? (
+              <Pressable
+                style={({ pressed }) => [d.needAct, pressed && d.pressed, waiting && !stopping && d.disabled]}
+                disabled={waiting}
+                onPress={() => onStop(row)}
+                accessibilityRole="button"
+                accessibilityLabel={`${DASH_WORDS.stop} ${row.title}`}
+                hitSlop={6}
+              >
+                <Text style={d.quietText}>{stopping ? DASH_WORDS.stopping : DASH_WORDS.stop}</Text>
+              </Pressable>
+            ) : null}
+          </View>
+        );
+      })}
+      {error ? <Text style={[d.error, d.errorFoot]} accessibilityRole="alert" accessibilityLiveRegion="assertive">{error}</Text> : null}
+    </View>
+  );
+}
 
 // "Couldn't load" with a way to ask again.
 function Retry({ onPress }) {
@@ -67,7 +229,7 @@ export function Tiles({ tiles }) {
 
 // --- needs you -------------------------------------------------------------------
 
-export function Needs({ needs, loading, busy, onOpen, onPublish }) {
+export function Needs({ needs, loading, busy, acting, onOpen, onPublish }) {
   return (
     <View style={[d.card, d.cardNeeds]}>
       <Text style={[d.k, d.kAccent]} accessibilityRole="header">{DASH_WORDS.needs}{needs.total > 0 ? ` · ${needs.total}` : ''}</Text>
@@ -85,7 +247,7 @@ export function Needs({ needs, loading, busy, onOpen, onPublish }) {
             {action ? (
               <Pressable
                 style={({ pressed }) => [d.needAct, pressed && d.pressed, publishing && d.disabled]}
-                disabled={Boolean(busy)}
+                disabled={Boolean(busy || acting)}
                 onPress={() => (action.kind === 'publish' ? onPublish(action) : onOpen(action.href))}
                 accessibilityRole={action.kind === 'publish' ? 'button' : 'link'}
                 accessibilityLabel={`${action.label}: ${row.title}`}
@@ -142,11 +304,19 @@ function viewsWords(views) {
 
 // `stack`: on a narrow phone a row's button goes under its words instead of
 // beside them, so "Ready to go public" and the show's name keep their line.
-function TitleRow({ row, busy, stack, onOpen, onPublish }) {
+// A draft's row may carry a second, quiet action (row.secondary, kind
+// 'discard'): under the button when the button sits beside the words,
+// beside it when the buttons sit under them.
+function TitleRow({ row, busy, acting, stack, onOpen, onPublish, onDiscard }) {
   const live = row.state === 'live';
   const action = row.action;
   const publish = Boolean(action && action.kind === 'publish');
   const publishing = publish && busy === action.showId;
+  const discard = row.secondary && row.secondary.kind === 'discard' && row.secondary.draftId ? row.secondary : null;
+  const discarding = Boolean(discard && acting === `discard:${discard.draftId}`);
+  const waiting = Boolean(busy || acting);
+  // "sales 36.80 · ads 21.40": one part a line, under the amount.
+  const detail = live && row.earnedDetail ? row.earnedDetail.split(' · ') : [];
   const heard = [
     row.title,
     row.stateLabel,
@@ -158,7 +328,8 @@ function TitleRow({ row, busy, stack, onOpen, onPublish }) {
     row.needsWhy,
     !live ? row.note : null
   ].filter(Boolean).join(', ');
-  const under = Boolean(stack && !live && action);
+  const acts = !live && (action || discard);
+  const under = Boolean(stack && acts);
   return (
     <View style={[d.row, under && d.rowStack, d.lineTop]}>
       <Pressable style={({ pressed }) => [d.rowMain, !under && d.rowMainBeside, pressed && d.pressed]} onPress={() => onOpen(row.href)} accessibilityRole="link" accessibilityLabel={heard}>
@@ -176,21 +347,39 @@ function TitleRow({ row, busy, stack, onOpen, onPublish }) {
         {live ? (
           <View style={d.rowNums}>
             <Text style={d.rowEarned}>{row.earnedCents == null ? '—' : dollars(row.earnedCents)}</Text>
+            {detail.map((part) => <Text key={part} style={d.rowDetail}>{part}</Text>)}
             <Text style={d.rowMetaText}>{row.views == null ? '—' : viewsWords(row.views)}</Text>
             <Spark values={row.spark} label={`Views over the last 30 days: ${row.views == null ? 'not known' : count(row.views)}`} />
           </View>
         ) : null}
       </Pressable>
-      {!live && action ? (
-        <Pressable
-          style={({ pressed }) => [d.rowBtn, publish && d.rowBtnGold, under && d.rowBtnUnder, pressed && d.pressed, publishing && d.disabled]}
-          disabled={Boolean(busy)}
-          onPress={() => (publish ? onPublish(action) : onOpen(action.href))}
-          accessibilityRole={publish ? 'button' : 'link'}
-          accessibilityLabel={`${action.label}: ${row.title}`}
-        >
-          <Text style={[d.rowBtnText, publish && d.rowBtnTextGold]}>{publishing ? 'Making it public…' : action.label}</Text>
-        </Pressable>
+      {acts ? (
+        <View style={[d.rowActs, under && d.rowActsUnder]}>
+          {action ? (
+            <Pressable
+              style={({ pressed }) => [d.rowBtn, publish && d.rowBtnGold, pressed && d.pressed, publishing && d.disabled]}
+              disabled={waiting}
+              onPress={() => (publish ? onPublish(action) : onOpen(action.href))}
+              accessibilityRole={publish ? 'button' : 'link'}
+              accessibilityLabel={`${action.label}: ${row.title}`}
+            >
+              <Text style={[d.rowBtnText, publish && d.rowBtnTextGold]}>{publishing ? 'Making it public…' : action.label}</Text>
+            </Pressable>
+          ) : null}
+          {discard ? (
+            <Pressable
+              style={({ pressed }) => [d.rowQuiet, pressed && d.pressed, waiting && !discarding && d.disabled]}
+              disabled={waiting}
+              onPress={() => onDiscard(discard)}
+              accessibilityRole="button"
+              accessibilityLabel={`${discard.label}: ${row.title}`}
+              accessibilityState={{ busy: discarding, disabled: waiting }}
+              hitSlop={{ top: 6, bottom: 6, left: 8, right: 8 }}
+            >
+              <Text style={d.quietText}>{discarding ? DASH_WORDS.discarding : discard.label}</Text>
+            </Pressable>
+          ) : null}
+        </View>
       ) : null}
     </View>
   );
@@ -199,7 +388,7 @@ function TitleRow({ row, busy, stack, onOpen, onPublish }) {
 // Under this width a row's button no longer fits beside its words.
 const STACK_UNDER = 380;
 
-export function Titles({ titles, loading, failed, busy, onOpen, onPublish, onRetry }) {
+export function Titles({ titles, loading, failed, busy, acting, onOpen, onPublish, onDiscard, onRetry }) {
   const { width } = useWindowDimensions();
   const [filter, setFilter] = useState('all');
   const [all, setAll] = useState(false);
@@ -240,7 +429,7 @@ export function Titles({ titles, loading, failed, busy, onOpen, onPublish, onRet
           <Text style={d.empty}>{loading ? 'Loading your titles…' : failed ? 'Your titles couldn’t be loaded.' : filter === 'all' ? DASH_WORDS.noTitles : 'Nothing in this group.'}</Text>
           {!loading && failed ? <Retry onPress={onRetry} /> : null}
         </View>
-      ) : shown.map((row) => <TitleRow key={row.key} row={row} busy={busy} stack={width < STACK_UNDER} onOpen={onOpen} onPublish={onPublish} />)}
+      ) : shown.map((row) => <TitleRow key={row.key} row={row} busy={busy} acting={acting} stack={width < STACK_UNDER} onOpen={onOpen} onPublish={onPublish} onDiscard={onDiscard} />)}
       {rows.length > TITLES_LIMIT ? (
         <Pressable style={({ pressed }) => [d.showAll, d.lineTop, pressed && d.pressed]} onPress={() => setAll((v) => !v)} accessibilityRole="button" accessibilityState={{ expanded: all }}>
           <Text style={d.linkText}>{all ? 'Show fewer' : `Show all ${rows.length}`}</Text>
@@ -334,8 +523,58 @@ export function Views({ views, loading, onOpen, onRetry }) {
   );
 }
 
+// --- earned · last six months ----------------------------------------------------
+
+// `months` is dashboardMonths(money); nothing without the money route's
+// answer (the money card says when that couldn't be loaded).
+export function Months({ months }) {
+  if (!months) return null;
+  return (
+    <View style={[d.card, d.cardMonths]}>
+      <Text style={d.k} accessibilityRole="header">{DASH_WORDS.months}</Text>
+      {months.empty ? <Text style={d.empty}>Nothing earned in these six months yet.</Text> : <MonthBars months={months} />}
+      {months.note ? <Text style={d.fine}>{months.note}</Text> : null}
+    </View>
+  );
+}
+
+// --- supporters ------------------------------------------------------------------
+
+// Who is behind the money (`card` is dashboardSupporters(money)): the
+// counts, the names of the members who chose to share theirs, the note
+// about everyone else, and the way to the Money screen's own list.
+export function Supporters({ card, onOpen }) {
+  if (!card) return null;
+  return (
+    <View style={[d.card, d.cardSupporters]}>
+      <Text style={d.k} accessibilityRole="header">{DASH_WORDS.supporters}</Text>
+      <View>
+        {card.rows.map((row, i) => (
+          <View key={row.key} style={[d.fact, i > 0 && d.lineTop]} accessible accessibilityLabel={`${row.label}: ${row.value}`}>
+            <Text style={d.factLabel}>{row.label}</Text>
+            <Text style={d.factValue}>{row.value}</Text>
+          </View>
+        ))}
+      </View>
+      {card.names.length > 0 ? (
+        <View style={d.names}>
+          <Text style={d.namesK}>{card.namesLabel}</Text>
+          <Text style={d.namesText}>{card.names.join(', ')}{card.more ? ` ${card.more}` : ''}</Text>
+        </View>
+      ) : null}
+      <Text style={d.fine}>{card.note}</Text>
+      <Pressable style={({ pressed }) => [d.cardLink, pressed && d.pressed]} onPress={() => onOpen(card.href)} accessibilityRole="link">
+        <Text style={d.linkText}>{DASH_WORDS.openSupporters}</Text>
+        <ChevronIcon size={13} color={colors.olive} />
+      </Pressable>
+    </View>
+  );
+}
+
 // --- latest ----------------------------------------------------------------------
 
+// A tip's note (row.quote, already in quotation marks) sits under its
+// line, dimmer, two lines at most.
 export function Latest({ rows, loading, onOpen }) {
   return (
     <View style={[d.card, d.cardLatest]}>
@@ -344,7 +583,10 @@ export function Latest({ rows, loading, onOpen }) {
         <Text style={[d.empty, d.emptyInCard]}>{loading ? 'Loading…' : DASH_WORDS.latestNone}</Text>
       ) : rows.map((row, i) => (
         <Pressable key={row.key} style={({ pressed }) => [d.latestRow, i > 0 && d.lineTop, pressed && d.pressed]} onPress={() => onOpen(row.href)} accessibilityRole="link">
-          <Text style={d.latestText}>{row.text}{row.amount ? <Text style={d.latestAmount}>{` · ${row.amount}`}</Text> : null}</Text>
+          <View style={d.latestMain}>
+            <Text style={d.latestText}>{row.text}{row.amount ? <Text style={d.latestAmount}>{` · ${row.amount}`}</Text> : null}</Text>
+            {row.quote ? <Text style={d.latestQuote} numberOfLines={2}>{row.quote}</Text> : null}
+          </View>
           <Text style={d.latestWhen}>{row.when}</Text>
         </Pressable>
       ))}
@@ -404,6 +646,12 @@ export const d = StyleSheet.create({
   disabled: { opacity: 0.5 },
   lineTop: { borderTopWidth: 1, borderTopColor: inkTint(0.08) },
   linkText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.olive },
+  // A word inside a sentence that opens something ("… under Money.").
+  inlineLink: { color: colors.olive, textDecorationLine: 'underline' },
+  // A second, quieter action: Discard, Stop getting it….
+  quietText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.inkDim, textDecorationLine: 'underline' },
+  error: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.danger },
+  errorFoot: { paddingBottom: 12 },
   retry: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   empty: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.inkDim },
   emptyInCard: { paddingTop: 8, paddingBottom: 12 },
@@ -418,6 +666,9 @@ export const d = StyleSheet.create({
   cardMoney: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 2, gap: 12 },
   cardViews: { paddingTop: 6, paddingHorizontal: 16, paddingBottom: 10 },
   cardLatest: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 4 },
+  cardGetPaid: { borderColor: brassTint(0.55), paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, gap: 12 },
+  cardMonths: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 14, gap: 12 },
+  cardSupporters: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 2, gap: 10 },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   cardLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4 },
   headLink: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 0 },
@@ -438,6 +689,23 @@ export const d = StyleSheet.create({
   tileV: { fontFamily: fonts.displayBold, fontSize: 26, lineHeight: 30, color: colors.ink, fontVariant: ['tabular-nums'] },
   tileSub: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17, color: colors.inkDim },
   skel: { height: 22, width: '62%', marginVertical: 4, borderRadius: 6, backgroundColor: inkTint(0.1) },
+
+  // start something
+  start: { gap: 8 },
+  startScroll: { marginHorizontal: -GUTTER },
+  startRow: { gap: 8, paddingHorizontal: GUTTER },
+  startPill: { height: 40, paddingHorizontal: 15, borderRadius: 20, borderWidth: 1, borderColor: colors.oceanInk, backgroundColor: colors.surface1, justifyContent: 'center' },
+  startPillText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.ink },
+
+  // get paid
+  invite: { gap: 7, paddingTop: 12 },
+  inviteTitle: { fontFamily: fonts.displayBold, fontSize: 17, lineHeight: 22, color: colors.ink },
+  inviteLine: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.ink },
+  inviteActs: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 3 },
+  btn: { minHeight: 44, minWidth: 124, flexGrow: 1, paddingHorizontal: 18, borderRadius: 22, borderWidth: 1, borderColor: inkTint(0.3), alignItems: 'center', justifyContent: 'center' },
+  btnGold: { backgroundColor: colors.olive, borderColor: colors.olive },
+  btnText: { fontFamily: fonts.displaySemi, fontSize: 14.5, color: colors.ink },
+  btnTextGold: { fontFamily: fonts.displayBold, color: PAPER },
 
   // needs you
   need: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 64, paddingVertical: 8 },
@@ -462,7 +730,11 @@ export const d = StyleSheet.create({
   // The narrow layout: the words on their own line, the button under them,
   // in line with the words (past the 38pt thumb and its 12pt gap).
   rowStack: { flexDirection: 'column', alignItems: 'stretch', justifyContent: 'center', paddingBottom: 12 },
-  rowBtnUnder: { alignSelf: 'flex-start', marginLeft: 50 },
+  // A row's button, with its quiet second action under it…
+  rowActs: { alignItems: 'center', gap: 2, flexShrink: 0 },
+  // …or, in the narrow layout, the two side by side under the words.
+  rowActsUnder: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: 16, marginLeft: 50 },
+  rowQuiet: { minHeight: 32, justifyContent: 'center' },
   thumb: { width: 38, height: 54, borderRadius: 6, backgroundColor: colors.surface2 },
   thumbEmpty: { borderWidth: 1, borderColor: inkTint(0.12) },
   thumbDraft: { backgroundColor: 'transparent', borderWidth: 1, borderStyle: 'dashed', borderColor: inkTint(0.35) },
@@ -474,6 +746,7 @@ export const d = StyleSheet.create({
   rowNote: { fontFamily: fonts.body, fontSize: 12.5, lineHeight: 17, color: colors.inkDim },
   rowNums: { alignItems: 'flex-end', gap: 2, flexShrink: 0 },
   rowEarned: { fontFamily: fonts.displayBold, fontSize: 15.5, color: colors.ink, fontVariant: ['tabular-nums'] },
+  rowDetail: { fontFamily: fonts.mono, fontSize: 10, lineHeight: 13, color: colors.inkDim, fontVariant: ['tabular-nums'] },
   rowBtn: { minHeight: 44, paddingHorizontal: 12, borderRadius: 22, borderWidth: 1, borderColor: inkTint(0.3), alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   rowBtnGold: { backgroundColor: colors.olive, borderColor: colors.olive },
   rowBtnText: { fontFamily: fonts.displaySemi, fontSize: 13.5, color: colors.ink },
@@ -502,9 +775,19 @@ export const d = StyleSheet.create({
 
   // latest
   latestRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 44, paddingVertical: 9 },
-  latestText: { flex: 1, minWidth: 0, fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.ink },
+  latestMain: { flex: 1, minWidth: 0, gap: 2 },
+  latestText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.ink },
+  latestQuote: { fontFamily: fonts.body, fontSize: 13, lineHeight: 18, color: colors.inkDim },
   latestAmount: { color: colors.inkDim },
   latestWhen: { flexShrink: 0, fontFamily: fonts.mono, fontSize: 11.5, color: colors.inkFaint },
+
+  // supporters
+  fact: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, paddingVertical: 8 },
+  factLabel: { flex: 1, minWidth: 0, fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.inkDim },
+  factValue: { fontFamily: fonts.displayBold, fontSize: 15, color: colors.ink, fontVariant: ['tabular-nums'] },
+  names: { gap: 3 },
+  namesK: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.2, textTransform: 'uppercase', color: colors.inkFaint },
+  namesText: { fontFamily: fonts.body, fontSize: 14, lineHeight: 20, color: colors.ink },
 
   // also yours
   also: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, minHeight: 60, paddingVertical: 10 },

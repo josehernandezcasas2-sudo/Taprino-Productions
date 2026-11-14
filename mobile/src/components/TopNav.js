@@ -449,8 +449,8 @@ export default function TopNav() {
                   <>
                     <MenuRow Icon={CardIcon} label="Money" onPress={() => go('/creator/money')} />
                     <View style={styles.panelDivider} />
-                    {/* Creator Studio's hub + the three-step submit (2026-10-31). */}
-                    <MenuRow Icon={ClapperboardIcon} label="Creator Studio" onPress={() => go('/creator')} />
+                    {/* Creator Studio's hub had a row here until the
+                        Dashboard (above) took its place, 2026-11-14. */}
                     <MenuRow Icon={FolderIcon} label="Your work" onPress={() => go('/account/my-work')} />
                   </>
                 ) : (
