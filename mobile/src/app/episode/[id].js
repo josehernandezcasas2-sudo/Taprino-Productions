@@ -39,6 +39,7 @@ import { dollars } from '../../lib/purchaseRules';
 import { formatOpensAt } from '../../lib/earlyAccess';
 import { adsOnFor } from '../../lib/adBreakRules';
 import { useTitleAds } from '../../lib/useTitleAds';
+import { DownloadAction } from '../../components/downloads/DownloadBits';
 
 const CONTENT_TYPE_LABEL = { movie: 'Movie', short: 'Short', vertical: 'Vertical', podcast: 'Podcast', bonus: 'Bonus' };
 const TYPE_COLOR = { movie: colors.mint, short: colors.sky, vertical: colors.rust, podcast: colors.olive, bonus: colors.inkFaint };
@@ -204,6 +205,12 @@ function TitleArt({ uri, title, maxWidth, maxHeight, fallback = null }) {
 // the preview bar, a signed play with no views, progress, Tip, Own, Buy or
 // end card, and the "Pulled" panel while it's held (the team still plays
 // it).
+//
+// Downloads (2026-11-14, mockups/app-downloads-v1.html "On a title"): the
+// Download action after Tip — a round button while playing, a pill on the
+// landing — from `download` on /api/episode-page ({ state: 'ok' | 'plan' |
+// 'signin' | 'hidden' }) and the copy on this phone, if there is one
+// (components/downloads/DownloadBits.js DownloadAction; never in a preview).
 export default function Episode() {
   const { id, autoplay, trailer, preview: previewParam } = useLocalSearchParams();
   const previewAsked = previewParam === '1';
@@ -538,6 +545,28 @@ export default function Episode() {
   const upNext = isSeries && showPlayer && !showingTrailer && nextEpisode && nextEpisode.canOpen !== false ? nextEpisode : null;
   const returnTo = `/episode/${episode.id}`;
   const tokenFn = () => withTimeout(getToken().catch(() => null), 4000);
+  // Downloads: the server's offer for this viewer and what the copy keeps
+  // of the title until the server's own item arrives (and its
+  // flashing-lights mark, which only this page knows, for the warning
+  // before it plays offline).
+  const downloadOffer = previewing ? null : page.download || null;
+  const downloadMeta = {
+    title: episode.title,
+    kicker: isSeries
+      ? [parentSeriesName, `Season ${Number(episode.season) || 1}`, episode.seriesOrder ? `Episode ${episode.seriesOrder}` : null].filter(Boolean).join(' · ')
+      : typeLabel,
+    seriesId: episode.seriesId || null,
+    seriesName: parentSeriesName || null,
+    season: Number(episode.season) || 1,
+    number: episode.seriesOrder || null,
+    contentType: episode.contentType || null,
+    runtimeSeconds: runtimeSeconds(episode.runtime) || null,
+    rating: episode.rating || null,
+    hasCaptions: Boolean(episode.captionsUrl),
+    hasFlashingLights: episode.hasFlashingLights === true,
+    art: episode.thumbnail || episode.poster || episode.heroImage || null,
+    resumeSeconds
+  };
   // The title's caption track (never the trailer's): the gated route the
   // website's <track> reads, which the server put on the episode only
   // because this viewer may watch it; a preview asks it the preview's way.
@@ -796,6 +825,10 @@ export default function Episode() {
                   </>
                 )}
               />
+              {/* Downloads: keep it on this phone (never in a preview). */}
+              {!previewing ? (
+                <DownloadAction episodeId={episode.id} offer={downloadOffer} meta={downloadMeta} router={router} variant="pill" style={styles.pill} pillTextStyle={styles.pillText} />
+              ) : null}
               {/* Back it is a money link: never in a preview (the website's rule). */}
               {episode.fundingUrl && !previewing ? (
                 <Pressable style={styles.pill} onPress={() => Linking.openURL(episode.fundingUrl)} accessibilityRole="link">
@@ -805,7 +838,7 @@ export default function Episode() {
               ) : null}
             </View>
           ) : (
-            // Four round actions: Save, Tip, Own, Trailer (Back it when the title has a funding link).
+            // The round actions: Save, Tip, Download, Own, Trailer (Back it when the title has a funding link).
             <View style={styles.actions}>
               {!previewing ? (
                 <Pressable style={styles.action} onPress={() => toggleWishlist(episode.id)} accessibilityRole="button" accessibilityState={{ selected: saved }}>
@@ -828,6 +861,10 @@ export default function Episode() {
                   </>
                 )}
               />
+              {/* Downloads: Download → a ring with the percent → a tick. */}
+              {!previewing ? (
+                <DownloadAction episodeId={episode.id} offer={downloadOffer} meta={downloadMeta} router={router} variant="round" style={styles.action} ringStyle={styles.ring} labelStyle={styles.actionLabel} />
+              ) : null}
               {/* Buy to own: compact while playing; the full card sits on the landing view. */}
               {showPlayer && !showingTrailer && purchase && purchase.forSale && !owned ? (
                 <Pressable style={[styles.action, buyBusy && { opacity: 0.6 }]} disabled={buyBusy} onPress={() => buy('episode', episode.id, returnTo)} accessibilityRole="button">

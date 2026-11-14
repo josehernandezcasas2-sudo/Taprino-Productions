@@ -44,7 +44,10 @@ export function isStreamRoute(pathname) {
     // Lists of titles (the website's /wishlist and /recs, Stream since
     // 2026-10-28).
     pathname === '/account/wishlist' ||
-    pathname === '/recs'
+    pathname === '/recs' ||
+    // Downloads and a downloaded title playing (2026-11-14).
+    pathname === '/downloads' ||
+    pathname.startsWith('/downloads/')
   );
 }
 

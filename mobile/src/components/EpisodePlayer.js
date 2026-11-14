@@ -146,7 +146,8 @@ function RestoreGlyph({ size = 11 }) {
 // Captions (the website's <track> + CC button): `captions` = { path,
 // label } — the episode's gated /api/captions/<id> (with ?preview=1 in a
 // preview), null for a title without them and always for a trailer — and
-// `getToken` for the request. A CC button in the bar turns them on and off
+// `getToken` for the request; or { track, label } with the track already
+// parsed (a downloaded title's stored file, played with no connection). A CC button in the bar turns them on and off
 // (remembered on the phone, mobile/src/lib/captions.js); the file is
 // fetched the first time they're on, parsed by mobile/src/lib/vtt.js, and
 // the cue at the player's time drawn bottom centre on a dark box, in both
@@ -250,10 +251,14 @@ export default function EpisodePlayer({ player, playing, heading, rating, onNext
   }
 
   // Captions: on or off (the phone remembers), the file once they're on.
-  const captionsPath = captions && captions.path ? captions.path : null;
+  // A downloaded title hands its track in already read from the phone
+  // (`captions.track`, app/downloads/[id].js): nothing is fetched for it.
+  const localTrack = captions && captions.track ? captions.track : null;
+  const captionsPath = !localTrack && captions && captions.path ? captions.path : null;
   const [ccOn, setCcOn] = useCaptionsPref();
-  const { track: captionTrackData, failed: captionsFailed } = useCaptionTrack(captionsPath, { enabled: ccOn, getToken });
-  const ccAvailable = Boolean(captionsPath) && !captionsFailed;
+  const { track: fetchedTrack, failed: captionsFailed } = useCaptionTrack(captionsPath, { enabled: ccOn, getToken });
+  const captionTrackData = localTrack || fetchedTrack;
+  const ccAvailable = Boolean(localTrack) || (Boolean(captionsPath) && !captionsFailed);
 
   // Times straight from the player, every quarter second. expo-video
   // sends none until asked (timeUpdateEventInterval is 0 by default), so

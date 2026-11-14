@@ -14,6 +14,7 @@ import BottomNav from '../components/BottomNav';
 import PrivateBetaGate from '../components/PrivateBetaGate';
 import SuspendedGate from '../components/SuspendedGate';
 import PushListener from '../components/PushListener';
+import DownloadsBoot from '../components/downloads/DownloadsBoot';
 import { colors } from '../lib/theme';
 
 const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
@@ -134,6 +135,11 @@ export default function RootLayout() {
           <Stack.Screen name="creator/show/[id]/edit" options={{ headerShown: false }} />
           <Stack.Screen name="admin/index" options={{ headerShown: false }} />
           <Stack.Screen name="admin/review" options={{ headerShown: false }} />
+          {/* Downloads (2026-11-14): the page and the offline player draw
+              the site header and their own Back pill. Neither waits on a
+              request, Clerk or a gate: they read the index and the files. */}
+          <Stack.Screen name="downloads/index" options={{ headerShown: false }} />
+          <Stack.Screen name="downloads/[id]" options={{ headerShown: false }} />
         </Stack>
         <BottomNav />
         {/* The private beta door: covers everything for a signed-out
@@ -144,6 +150,10 @@ export default function RootLayout() {
         <SuspendedGate />
         {/* Push: keeps the token fresh, opens what a tapped push points at. */}
         <PushListener />
+        {/* Downloads: starts the manager, tells it who is signed in, opens
+            the app on Downloads when it launches with no connection, and
+            loads Clerk again once the phone is back online. */}
+        <DownloadsBoot />
       </SafeAreaProvider>
     </ClerkProvider>
     </GestureHandlerRootView>
