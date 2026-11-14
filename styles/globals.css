@@ -9091,17 +9091,22 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
    Admin shell v2 (components/AdminShell.js) — grouped left nav,
    dashboard, review queue, Styles & Guides. 2026-10-08 redesign.
    ============================================================ */
-/* --adm-top is the site header's height, measured by AdminShell.js; 76px
-   is what it gets for the instant before that. */
-.adm-shell { --adm-top: 76px; display: grid; grid-template-columns: 232px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; min-height: 70vh; }
+/* --adm-top is the site header's height and --adm-room the part of the
+   admin area on screen below it (less than the window once the footer has
+   come up on a short page), both measured by AdminShell.js; 76px and the
+   window's height are what the nav gets for the instant before that.
+   --adm-min keeps the area at least as tall as the nav wants to be, so a
+   short page never squeezes the nav below the rows it could show. */
+.adm-shell { --adm-top: 76px; display: grid; grid-template-columns: 232px minmax(0, 1fr); max-width: 1180px; margin: 0 auto; min-height: 70vh; min-height: max(70vh, var(--adm-min, 0px)); }
 .adm-shell-wide { max-width: 1400px; }
 /* The side nav stays put under the header while the page scrolls, and is
    its own scroll area (Jose, 2026-11-14). It used to be pinned to the top
    of the window (top: 0) and a whole window tall (100vh): its first rows
    sat under the sticky header and its last rows below the bottom of the
    screen until the page itself was scrolled. Pinned under the header and
-   as tall as the room below it, every row is reachable by scrolling the
-   nav alone. Once it has more rows than fit (data-scrolls, set by
+   as tall as the admin area showing below it, every row is reachable by
+   scrolling the nav alone, and at the bottom of a short page it gets
+   shorter rather than sliding up under the header. Once it has more rows than fit (data-scrolls, set by
    AdminShell.js) its scrolling never carries on into the page; when it
    fits whole, the page scrolls under the pointer as anywhere else. The
    two "local" covers ride with the rows and hide the soft edges drawn on
@@ -9111,7 +9116,7 @@ label.optin-toggle { display: flex; align-items: center; gap: 0.5rem; font-famil
   top: var(--adm-top);
   align-self: start;
   max-height: calc(100vh - var(--adm-top));
-  max-height: calc(100dvh - var(--adm-top));
+  max-height: var(--adm-room, calc(100dvh - var(--adm-top)));
   overflow-x: hidden;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;

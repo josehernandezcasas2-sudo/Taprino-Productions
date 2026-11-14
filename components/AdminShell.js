@@ -6,6 +6,7 @@ import HeaderNav from './HeaderNav';
 import Footer from './Footer';
 import { SITE } from '../lib/siteConfig';
 import { visibleAdminNav } from '../lib/adminNav';
+import { viewBottom } from '../lib/menuScroll';
 
 // The shell every admin page renders inside (2026-10-08 redesign): the
 // site header, then a grouped left nav + the page. On phones the nav
@@ -28,7 +29,9 @@ import { visibleAdminNav } from '../lib/adminNav';
 // rows sat under the site header and its last rows below the bottom of
 // the screen until the page itself was scrolled. Now it is pinned under
 // the header (--adm-top, the header's measured height) and exactly as tall
-// as the room below it (.adm-nav in globals.css); once it has more rows
+// as the part of the admin area on screen below it (--adm-room; .adm-nav
+// in globals.css), so on a short page it gets shorter when the footer
+// comes up instead of sliding under the header; once it has more rows
 // than fit, a wheel or a finger on it scrolls it and never the page
 // (data-scrolls → overscroll-behavior), and when it fits whole the page
 // scrolls under the pointer as anywhere else. Where it was scrolled to is
@@ -38,6 +41,9 @@ import { visibleAdminNav } from '../lib/adminNav';
 // A layout effect in the browser (the nav is placed before it is painted),
 // a plain effect on the server, where a layout effect only logs a warning.
 const useIsoLayoutEffect = typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
+// The least the nav is ever given (a few rows to scroll through).
+const NAV_LEAST = 160;
 
 // Where the nav was scrolled to: this variable across pages in one visit,
 // sessionStorage across a reload.
@@ -97,21 +103,49 @@ export default function AdminShell({ account, mainGenres, title, crumbs = [], in
     const nav = navRef.current;
     if (!shell || !nav) return undefined;
     const header = document.querySelector('header.channel-bar');
+    // --adm-room is the part of the admin area on screen below the header:
+    // the whole height on a long page, less once the footer has come up on
+    // a short one. The nav is never taller than that, so it gets shorter
+    // at the bottom of a short page instead of sliding up under the header.
+    // --adm-min keeps the admin area at least as tall as the nav wants to
+    // be (all its rows, or the window below the header if that is less):
+    // without it the nav, capped at the area's own bottom edge, could
+    // never make a short page tall enough to show all its rows.
     const fit = () => {
-      shell.style.setProperty('--adm-top', `${header ? Math.round(header.getBoundingClientRect().height) : 0}px`);
+      const top = header ? Math.round(header.getBoundingClientRect().height) : 0;
+      const bottom = viewBottom(window);
+      shell.style.setProperty('--adm-top', `${top}px`);
+      shell.style.setProperty('--adm-min', `${Math.max(0, Math.min(nav.scrollHeight, Math.floor(bottom - top)))}px`);
+      const floor = Math.min(bottom, shell.getBoundingClientRect().bottom);
+      shell.style.setProperty('--adm-room', `${Math.max(NAV_LEAST, Math.floor(floor - top))}px`);
       nav.toggleAttribute('data-scrolls', nav.scrollHeight > nav.clientHeight + 1);
     };
     fit();
+    let frame = 0;
+    const onScroll = () => {
+      if (frame) return;
+      frame = window.requestAnimationFrame(() => { frame = 0; fit(); });
+    };
     let observer = null;
     if (typeof ResizeObserver !== 'undefined') {
       observer = new ResizeObserver(fit);
       if (header) observer.observe(header);
       observer.observe(nav);
+      observer.observe(shell);
+      // The nav's own box doesn't change when its rows do (the font
+      // arriving, a badge appearing) once it is capped: watch the rows.
+      Array.from(nav.children).forEach((child) => observer.observe(child));
     }
+    const vv = window.visualViewport;
     window.addEventListener('resize', fit);
+    window.addEventListener('scroll', onScroll, { passive: true });
+    if (vv) vv.addEventListener('resize', fit);
     return () => {
+      if (frame) window.cancelAnimationFrame(frame);
       if (observer) observer.disconnect();
       window.removeEventListener('resize', fit);
+      window.removeEventListener('scroll', onScroll);
+      if (vv) vv.removeEventListener('resize', fit);
     };
   }, []);
 

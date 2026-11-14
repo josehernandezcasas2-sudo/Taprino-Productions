@@ -150,25 +150,42 @@ async function laptop(b) {
   await ctx.close();
 }
 
-// A short admin page: the nav stays inside the admin area and goes up
-// with it when the footer comes; it never lies over the footer.
+// A short admin page: when the footer comes up the nav gets shorter; its
+// top stays under the header, it never lies over the footer, and every
+// row can still be reached by scrolling it.
 async function shortPage(b) {
-  section('A short admin page: the nav leaves with the page, never over the footer');
+  section('A short admin page: the nav shrinks when the footer comes, its top stays in view');
   const { ctx, page: pg, errors } = await b.open(ADMIN, 1280);
   await pg.setViewportSize({ width: 1280, height: 700 });
   await goto(pg, '/admin');
   await pg.locator('.adm-nav .adm-link').first().waitFor({ timeout: 30000 });
+  // As short as an admin page gets.
+  await pg.evaluate(() => { document.querySelector('.adm-main').style.maxHeight = '520px'; document.querySelector('.adm-main').style.overflow = 'hidden'; });
   await pg.waitForTimeout(300);
   await pg.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
-  await pg.waitForTimeout(300);
-  const m = await pg.evaluate(() => {
-    const nav = document.querySelector('.adm-nav').getBoundingClientRect();
-    const shell = document.querySelector('.adm-shell').getBoundingClientRect();
+  await pg.waitForTimeout(400);
+  const foot = await pg.evaluate(() => {
     const footer = document.querySelector('footer');
-    return { navBottom: nav.bottom, shellBottom: shell.bottom, footerTop: footer ? footer.getBoundingClientRect().top : null };
+    const shell = document.querySelector('.adm-shell').getBoundingClientRect();
+    return { footerTop: footer ? footer.getBoundingClientRect().top : null, shellBottom: shell.bottom, pageY: window.scrollY };
   });
-  ok('at the bottom of the page the nav ends where the admin area ends', m.navBottom <= m.shellBottom + 1, m);
-  ok('…and never over the footer', m.footerTop === null || m.navBottom <= m.footerTop + 1, m);
+  let m = await measure(pg);
+  ok('the page is scrolled to its end, with the footer on screen', foot.pageY > 0 && foot.footerTop !== null && foot.footerTop < m.viewH, foot);
+  ok('the nav’s top edge is still the header’s bottom edge', Math.abs(m.nav.top - m.header.bottom) <= 1, { navTop: m.nav.top, headerBottom: m.header.bottom });
+  ok('…its first row still in view', m.firstInside === true && m.scrollTop === 0, { firstInside: m.firstInside, scrollTop: m.scrollTop });
+  ok('it ends where the admin area ends, never over the footer', m.nav.bottom <= foot.shellBottom + 1 && m.nav.bottom <= foot.footerTop + 1, { navBottom: m.nav.bottom, ...foot });
+  await shot(pg, 'admin-nav-short-page');
+  await pg.mouse.move(m.nav.left + 110, m.nav.top + 80);
+  for (let i = 0; i < 16; i += 1) await pg.mouse.wheel(0, 500);
+  await pg.waitForTimeout(350);
+  m = await measure(pg);
+  ok('every row can still be reached by scrolling the nav', m.lastInside === true && m.lastOnTop === true, { lastInside: m.lastInside, lastOnTop: m.lastOnTop });
+  ok('…and the page did not move', m.pageY === foot.pageY, { before: foot.pageY, after: m.pageY });
+  // Back up the page: the nav grows to the whole height again.
+  await pg.evaluate(() => window.scrollTo(0, 0));
+  await pg.waitForTimeout(400);
+  m = await measure(pg);
+  ok('back at the top of the page the nav has the whole height again', Math.abs(m.nav.top - m.header.bottom) <= 1 && m.nav.bottom >= Math.min(m.viewH, m.nav.top + 400), { navTop: m.nav.top, navBottom: m.nav.bottom, viewH: m.viewH });
   ok('no page errors', errors.length === 0, errors);
   await ctx.close();
 }
