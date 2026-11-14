@@ -22,7 +22,9 @@ const APP_ROUTES = [
   /^\/podcasts\/[^/]+$/, /^\/profile\/[^/]+$/, /^\/locations(\/[^/]+)?$/, /^\/locations\/requests(\/[^/]+)?$/, /^\/university(\/.*)?$/,
   // Productions (crew added, a call sheet, distribution) and Stream: the
   // app has these screens, and these addresses used to open the website.
-  /^\/productions(\/[^/]+(\/(edit|distribution|day\/\d+))?)?$/, /^\/stream$/
+  /^\/productions(\/[^/]+(\/(edit|distribution|day\/\d+))?)?$/, /^\/stream$/,
+  // Downloads (2026-11-14): the website's /downloads is the app's page.
+  /^\/downloads$/
 ];
 const ALIASES = { '/creator/pitch/dashboard': '/creator/pitches', '/admin': '/admin', '/wishlist': '/account/wishlist', '/creator/my-work': '/account/my-work' };
 // Who gets paid (the series revamp, slice 3b; lib/payees.js) sends:

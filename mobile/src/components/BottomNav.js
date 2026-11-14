@@ -6,7 +6,10 @@ import { colors, fonts } from '../lib/theme';
 import { HouseIcon, CompassIcon, WatchTabIcon, AccountIcon, CaretUpIcon, ShieldIcon } from './TabBarIcons';
 import { useAdminRole } from '../lib/adminRole';
 import { useUnreadMessages } from '../lib/useUnread';
-import { useOwnProfile, ownProfileHref } from './TopNav';
+import { useOwnProfile, ownProfileHref, loadSettings } from './TopNav';
+import { useDownloadCount } from '../lib/useDownloads';
+import { DOWNLOAD_WORDS } from '../lib/downloadRules';
+import { DownloadGlyph } from './downloads/DownloadBits';
 
 // Mirrors components/MobileTabBar.js on the website: four groups, each a
 // button that opens a small drop-up menu above itself rather than
@@ -41,14 +44,19 @@ const GROUPS = {
   watch: {
     label: 'Watch',
     Icon: WatchTabIcon,
-    items: [
+    // A function since 2026-11-14: Downloads is the first row (the mockup's
+    // "Getting there" screen) while the admin switch is on, or while this
+    // phone holds copies — so they stay reachable with no connection, when
+    // the settings can't be read. The count is how many titles are here.
+    items: ({ downloads }) => [
+      ...(downloads.show ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav, glyph: 'download', count: downloads.count }] : []),
       { href: '/live', label: 'Live TV' },
       { href: '/watch/series', label: 'Watch Series' },
       { href: '/watch/movies', label: 'Watch Movies' },
       { href: '/watch/podcasts', label: 'Podcasts' },
       { href: '/watch/vertical', label: 'Vertical' }
     ],
-    match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/')
+    match: (p) => p.startsWith('/watch') || p === '/live' || p.startsWith('/live/') || p === '/downloads' || p.startsWith('/downloads/')
   },
   account: {
     label: 'Account',
@@ -109,6 +117,16 @@ export default function BottomNav() {
   // Messages row (the website's header badge).
   const unreadMessages = useUnreadMessages();
   const profileHref = ownProfileHref(useOwnProfile());
+  // Downloads: the phone's own count (the index file, no request), and the
+  // admin switch from the settings every screen already shares.
+  const downloadCount = useDownloadCount();
+  const [downloadsEnabled, setDownloadsEnabled] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    loadSettings().then((s) => { if (alive && s) setDownloadsEnabled(s.downloadsEnabled === true); });
+    return () => { alive = false; };
+  }, [openKey]);
+  const downloads = { show: downloadsEnabled || downloadCount > 0, count: downloadCount };
 
   useEffect(() => { setOpenKey(null); }, [pathname]);
 
@@ -165,13 +183,17 @@ export default function BottomNav() {
             ]}
           >
             <View onLayout={(e) => setDropupWidth(e.nativeEvent.layout.width + 2)}>
-            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role }) : openGroup.items).map((entry) => (
+            {(typeof openGroup.items === 'function' ? openGroup.items({ profileHref, role, downloads }) : openGroup.items).map((entry) => (
               <Pressable
                 key={entry.href}
-                style={({ pressed }) => [styles.dropupItem, pressed && styles.dropupItemPressed]}
+                style={({ pressed }) => [styles.dropupItem, entry.glyph && styles.dropupItemRow, pressed && styles.dropupItemPressed]}
                 onPress={() => go(entry.href)}
+                accessibilityRole="link"
+                accessibilityLabel={entry.count > 0 ? `${entry.label}, ${entry.count}` : undefined}
               >
+                {entry.glyph === 'download' ? <DownloadGlyph size={15} color={colors.ink} /> : null}
                 <Text style={styles.dropupItemText}>{entry.label}{entry.badge === 'messages' && unreadMessages > 0 ? ` · ${unreadMessages}` : ''}</Text>
+                {entry.count > 0 ? <View style={styles.dropupCount}><Text style={styles.dropupCountText}>{entry.count}</Text></View> : null}
               </Pressable>
             ))}
             </View>
@@ -249,6 +271,11 @@ const styles = StyleSheet.create({
     minWidth: 180
   },
   dropupItem: { paddingVertical: 11, paddingHorizontal: 18 },
+  // The Downloads row: its glyph, the label, the count pushed to the right
+  // (the mockup's .menu-row + .count).
+  dropupItemRow: { flexDirection: 'row', alignItems: 'center', gap: 9 },
+  dropupCount: { marginLeft: 'auto', minWidth: 20, borderRadius: 999, backgroundColor: colors.olive, paddingHorizontal: 7, paddingVertical: 1, alignItems: 'center' },
+  dropupCountText: { fontFamily: fonts.monoBold, fontSize: 10.5, color: colors.onBrass },
   dropupItemPressed: { backgroundColor: 'rgba(255,140,66,0.15)' },
   dropupItemText: { color: colors.ink, fontSize: 13.6, fontFamily: fonts.body }
 });

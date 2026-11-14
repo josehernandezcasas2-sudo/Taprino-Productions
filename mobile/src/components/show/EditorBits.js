@@ -69,7 +69,8 @@ export const NOT_SAVED_WORDS = {
   defaults: 'the defaults',
   seasons: 'the season names',
   kind: 'the kind',
-  extraKind: 'what kind of extra it is'
+  extraKind: 'what kind of extra it is',
+  downloadsAllowed: 'downloads in the app'
 };
 
 // "Add captions on the website", "Open on the website": the site's own

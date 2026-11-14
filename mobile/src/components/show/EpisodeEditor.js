@@ -25,6 +25,7 @@ import { PREVIEW_BUILT } from './ShowCards';
 import PayeeCard, { PaidLine } from './PayeeCard';
 import ExtraKindField from '../ExtraKindField';
 import FlashingLightsField from '../FlashingLightsField';
+import DownloadsAllowedField from '../DownloadsAllowedField';
 import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
 import {
   CheckIcon, LinkText, PlusIcon, RoomToast, SmallButton, UploadIcon, askUs, episodeEditorRoute, episodePublicRoute,
@@ -91,6 +92,9 @@ function episodeForm(ep, hasShow) {
     featured: Boolean(ep.featured),
     isOriginal: Boolean(ep.isOriginal),
     hasFlashingLights: Boolean(ep.hasFlashingLights),
+    // "Allow downloads in the app" (migration 123): on unless switched off;
+    // a server that doesn't send it reads as on.
+    downloadsAllowed: ep.downloadsAllowed !== false,
     hasPage: Boolean(ep.hasPage),
     pageNotes: ep.pageNotes || '',
     credits: creditsToForm(ep.credits, { inherit: hasShow }),
@@ -187,7 +191,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   // isn't): the server's own line, and the controls that need it grey.
   const [behind, setBehind] = useState({});
   const noteBehind = useCallback((r) => {
-    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && ['migration-120', 'migration-122'].includes(r.data.code) ? { code: r.data.code, line: r.error } : null);
+    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && ['migration-120', 'migration-122', 'migration-123'].includes(r.data.code) ? { code: r.data.code, line: r.error } : null);
     if (m) setBehind((b) => ({ ...b, [m.code]: m.line }));
     return Boolean(m);
   }, []);
@@ -302,6 +306,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     if (form.fundingUrl.trim() !== init.fundingUrl.trim()) add('fundingUrl', 'fundingUrl', form.fundingUrl.trim());
     for (const key of ['adsEnabled', 'channelOptIn', 'featured', 'isOriginal']) if (form[key] !== init[key]) add(key, key, form[key]);
     if (form.hasFlashingLights !== init.hasFlashingLights) add('hasFlashingLights', 'hasFlashingLights', form.hasFlashingLights);
+    if (form.downloadsAllowed !== init.downloadsAllowed) add('downloadsAllowed', 'downloadsAllowed', form.downloadsAllowed);
     const breaks = parseAdBreaks(form.adBreaksText);
     if (JSON.stringify(breaks) !== JSON.stringify(parseAdBreaks(init.adBreaksText))) add('adBreakSeconds', 'adBreakSeconds', breaks);
     if (form.hasPage !== init.hasPage) add('hasPage', 'hasPage', form.hasPage);
@@ -1018,6 +1023,21 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             ) : null}
             {!has118 ? <FieldNote policy={NEEDS_118} /> : null}
           </View>
+
+          {/* "Allow downloads in the app" (2026-11-14, migration 123): the
+              creator's switch, on by default. Shown once the server sends
+              its policy (applies at once for the uploader, the show's owner
+              and the team); never for a podcast, which isn't downloaded. */}
+          {policy.downloadsAllowed && ep.contentType !== 'podcast' ? (
+            <View style={ss.card}>
+              <DownloadsAllowedField
+                checked={form.downloadsAllowed}
+                onChange={(v) => set('downloadsAllowed', v)}
+                locked={behind['migration-123'] || (pol('downloadsAllowed').mode === 'locked' ? pol('downloadsAllowed').line || 'This can’t be changed here' : null)}
+              />
+              <FieldNote policy={null} edited={edited('downloadsAllowed')} />
+            </View>
+          ) : null}
 
           <View style={ss.card}>
             <Text style={ss.cardK}>Credits</Text>

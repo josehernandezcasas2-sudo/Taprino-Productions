@@ -5,11 +5,13 @@ import { colors } from '../../lib/theme';
 import { updateOwnProfileCache } from '../../components/TopNav';
 import { rememberStayInStream } from '../../lib/stayInStream';
 import { PushRow } from '../../components/PushPrompt';
+import { WifiOnlySwitch } from '../../components/downloads/DownloadBits';
 import { AccountFrame, useAccountData, Row, styles } from '../../components/account/AccountBits';
 
 // Preferences (option B, 2026-10-29; mirrors pages/account/preferences.js):
-// the newsletter, "Here only for the stream?" and the push switch
-// (components/PushPrompt.js PushRow). Each saves at once.
+// the newsletter, "Here only for the stream?", the push switch
+// (components/PushPrompt.js PushRow) and "Download on Wi-Fi only"
+// (components/downloads/DownloadBits.js). Each saves at once.
 export default function AccountPreferences() {
   const { dashboard, setDashboard, retry, profile, setProfile, withToken, getToken } = useAccountData();
   const [newsletterLoading, setNewsletterLoading] = useState(false);
@@ -80,6 +82,8 @@ export default function AccountPreferences() {
         {/* Push notifications (2026-10-24): the switch; the hub's card
             asks first. */}
         <PushRow getToken={getToken} Row={Row} />
+        {/* Downloads (2026-11-14): the same switch as the Downloads page. */}
+        <WifiOnlySwitch Row={Row} />
       </View>
     </>
   ) : null;

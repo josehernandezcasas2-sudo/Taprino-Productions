@@ -14,6 +14,7 @@ import HomeOnNow from '../components/HomeOnNow';
 import { Avatar, TierChip } from '../components/CrewBits';
 import { hrefToRoute } from '../components/PushListener';
 import { readStayInStream, takeLaunchCheck } from '../lib/stayInStream';
+import { startedOffline } from '../lib/offlineStart';
 import { useUnreadMessages } from '../lib/useUnread';
 
 const PAPER_INK = '#241a05';
@@ -36,10 +37,11 @@ export default function Home() {
   const [isCreator, setIsCreator] = useState(false);
   const messagesUnread = useUnreadMessages();
 
-  // "Here only for the stream?" on: the app opens on Stream.
+  // "Here only for the stream?" on: the app opens on Stream — unless it
+  // opened with no connection and went to Downloads (lib/offlineStart.js).
   useEffect(() => {
     if (!takeLaunchCheck()) return;
-    readStayInStream().then((on) => { if (on) router.replace('/stream'); });
+    readStayInStream().then((on) => { if (on && !startedOffline()) router.replace('/stream'); });
   }, []);
 
   // Signed in, the feed measures the board from the viewer's own card and
