@@ -1,7 +1,7 @@
 // node scripts/test-creator-money.mjs — the creator's Money page maths
 // (lib/creatorMoneyRules.js).
 import assert from 'node:assert/strict';
-import { buildHistory, laneTotals, owedCents, owedSplitCents, paidInYearCents, monthRange, yearRange, rangeFor, periodOf, periodsBetween, periodLabel, toCsv, signed, dollars } from '../lib/creatorMoneyRules.js';
+import { buildHistory, laneTotals, owedCents, owedSplitCents, paidInYearCents, monthRange, yearRange, rangeFor, periodOf, periodsBetween, periodLabel, toCsv, signed, dollars, earnedByTitle, monthTotals, periodsBack } from '../lib/creatorMoneyRules.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
@@ -202,6 +202,23 @@ t('money strings', () => {
   assert.equal(signed(357, 'sales'), '+$3.57');
   assert.equal(signed(-226, 'sales'), '−$2.26');
   assert.equal(signed(2280, 'payouts'), '$22.80');
+});
+
+t('dashboard: what each title earned in a month, and the months before it', () => {
+  // October: e1 sold (+357); e2 sold (+226) and was refunded (−226). Tips,
+  // member support and backing are never against a title.
+  assert.deepEqual(earnedByTitle(lines, monthRange('2026-10')), { 'episode:e1': { salesCents: 357, adsCents: 0 }, 'episode:e2': { salesCents: 0, adsCents: 0 } });
+  const withAds = buildHistory({
+    ledger: [{ id: 'a1', kind: 'ad_share', cents: 2140, episode_id: 'e1', units: 1240, note: 'The Salt Hours · 1,240 ads · October 2026', payout_id: null, created_at: '2026-11-01T09:00:00Z' }],
+    purchases: [{ id: 's1', status: 'completed', title: 'Night Bus', target_type: 'series', target_id: 'night-bus', paid_cents: 999, creator_cents: 760, completed_at: '2026-11-03T10:00:00Z' }]
+  });
+  assert.deepEqual(earnedByTitle(withAds, monthRange('2026-11')), { 'episode:e1': { salesCents: 0, adsCents: 2140 }, 'series:night-bus': { salesCents: 760, adsCents: 0 } });
+  assert.deepEqual(earnedByTitle(withAds, monthRange('2026-10')), {});
+  assert.deepEqual(periodsBack('2026-02', 4), ['2025-11', '2025-12', '2026-01', '2026-02']);
+  const months = monthTotals(lines, '2026-10', 3);
+  assert.deepEqual(months.map((m) => m.period), ['2026-08', '2026-09', '2026-10']);
+  assert.equal(months[2].cents, laneTotals(lines, monthRange('2026-10')).total);
+  assert.equal(months[1].cents, laneTotals(lines, monthRange('2026-09')).total);
 });
 
 console.log(`${n} passed`);

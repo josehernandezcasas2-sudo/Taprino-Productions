@@ -36,6 +36,12 @@ export default async function handler(req, res) {
   // only grow that request count forever as time passes.
   const isAllTime = req.query.days === 'all';
   const days = isAllTime ? 365 : Math.min(Math.max(parseInt(req.query.days, 10) || 30, 7), 90);
+  // The Dashboard (/creator/dashboard, 2026-11-14) asks with compare=1:
+  // the change is then this window against the same number of days right
+  // before it ("18% more than the 30 days before"), which takes twice the
+  // days of daily counts. Without it the answer is what it always was.
+  const compare = req.query.compare === '1' && !isAllTime;
+  const readDays = compare ? days * 2 : days;
   const supabase = getSupabase();
 
   // A creator's numbers now cover two things, not just one: episodes they
@@ -91,7 +97,21 @@ export default async function handler(req, res) {
   const myIds = new Set(mine.map((e) => e.id));
   const approved = mine.filter((e) => e.status === 'approved');
 
-  const [totals, daily, watchTotals] = await Promise.all([getViewCounts(), getDailyViews(days), getWatchSecondsTotals()]);
+  const [totals, allDaily, watchTotals] = await Promise.all([getViewCounts(), getDailyViews(readDays), getWatchSecondsTotals()]);
+  // `daily` is the window asked for; `earlier` the days before it (compare).
+  const daily = compare ? allDaily.slice(-days) : allDaily;
+  const earlier = compare ? allDaily.slice(0, Math.max(0, allDaily.length - days)) : [];
+
+  // Each title's own views inside the window, and their shape in at most
+  // ten steps (the Dashboard's row and its small line).
+  const SPARK_STEPS = 10;
+  const windowOf = (id) => {
+    const perDay = daily.map((day) => Number(day.counts[id]) || 0);
+    const size = Math.max(1, Math.ceil(perDay.length / SPARK_STEPS));
+    const spark = [];
+    for (let i = 0; i < perDay.length; i += size) spark.push(perDay.slice(i, i + size).reduce((a, b) => a + b, 0));
+    return { windowViews: perDay.reduce((a, b) => a + b, 0), spark };
+  };
 
   // Per-episode lifetime totals, biggest first.
   const perEpisode = approved
@@ -106,6 +126,7 @@ export default async function handler(req, res) {
       seriesOrder: e.series_order,
       publishedAt: e.created_at,
       views: totals[e.id] || 0,
+      ...windowOf(e.id),
       // null (not 0) when there's nothing to compute from yet — the page
       // shows that as "—" rather than a misleading "0:00".
       avgWatchSeconds: totals[e.id] > 0 && watchTotals[e.id] != null
@@ -139,7 +160,14 @@ export default async function handler(req, res) {
   const half = Math.floor(trend.length / 2);
   const recentHalf = trend.slice(half).reduce((a, b) => a + b.views, 0);
   const priorHalf = trend.slice(0, half).reduce((a, b) => a + b.views, 0);
-  const changePct = priorHalf > 0 ? Math.round(((recentHalf - priorHalf) / priorHalf) * 100) : null;
+  const earlierViews = earlier.reduce((sum, day) => {
+    let n = 0;
+    for (const [epId, c] of Object.entries(day.counts)) if (myIds.has(epId)) n += c;
+    return sum + n;
+  }, 0);
+  const changePct = compare
+    ? (earlierViews > 0 ? Math.round(((windowViews - earlierViews) / earlierViews) * 100) : null)
+    : (priorHalf > 0 ? Math.round(((recentHalf - priorHalf) / priorHalf) * 100) : null);
 
   return res.status(200).json({
     // Surfaced so the page can say "tracking isn't switched on yet" rather
@@ -147,6 +175,9 @@ export default async function handler(req, res) {
     tracking: isRedisConfigured(),
     days,
     isAllTime,
+    // 'previous' = against the same number of days before; 'halves' = the
+    // second half of the window against the first.
+    comparedTo: compare ? 'previous' : 'halves',
     totals: {
       views: totalViews,
       windowViews,
