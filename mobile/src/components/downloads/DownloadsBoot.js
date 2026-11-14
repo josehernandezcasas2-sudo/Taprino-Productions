@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useRootNavigationState, useRouter } from 'expo-router';
 import { useClerk } from '@clerk/expo';
 import { useAuth } from '../../lib/stableAuth';
-import { boot, onAuthRetry, setSession, shouldOpenOnDownloads } from '../../lib/downloads';
+import { authRetrySettled, boot, onAuthRetry, setSession, shouldOpenOnDownloads } from '../../lib/downloads';
 import { markOfflineStart } from '../../lib/offlineStart';
 
 // Renders nothing (the root layout mounts it once, beside PushListener).
@@ -63,10 +63,10 @@ export default function DownloadsBoot() {
   }, [navKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Every status Clerk reports ("error" again, "ready") ends the try that
-  // was out.
+  // was out, and "Try again"'s wait for it.
   useEffect(() => {
     if (!clerk || typeof clerk.on !== 'function' || typeof clerk.off !== 'function') return undefined;
-    const settled = () => { clerkRetryOut = false; };
+    const settled = () => { clerkRetryOut = false; authRetrySettled(); };
     try { clerk.on('status', settled); } catch { return undefined; }
     return () => { try { clerk.off('status', settled); } catch { /* gone with the provider */ } };
   }, [clerk]);
