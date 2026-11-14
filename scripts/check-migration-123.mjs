@@ -8,10 +8,16 @@
 // (basis and status values, the defaults), that the partial unique index
 // really refuses a second active copy of a title on a phone while a
 // removed one and another phone's are fine, the writes the site makes (the
-// phone's upsert on its conflict target, a copy renewed, ended, revoked),
-// that both tables are locked (row level security on, nothing granted to
-// anon or authenticated), the closing report's row, and that a second run
-// changes nothing and keeps a switch that was turned on.
+// phone's upsert on its conflict target, a copy renewed, ended, revoked; a
+// title asked for and still waiting for its file — a row without a date —
+// then given its date, or taken back at a limit; the newest-rows read the
+// new-copy limits count from, and its index), that both tables are locked
+// (row level security on, nothing granted to anon or authenticated), the
+// closing report's row, that a second run changes nothing and keeps a
+// switch that was turned on — and supabase/delete_account_downloads.sql,
+// the by-hand step of an account's deletion: it takes that account's
+// phones and copies and nobody else's, and deletes nothing with its
+// placeholder left in.
 // Needs PGlite (see scripts/pg-chain.mjs): node scripts/check-migration-123.mjs
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -70,9 +76,10 @@ assert.equal(Number(report.titles_switched_off), 0);
 assert.equal(report.phones_row_level_security_expect_true, true);
 assert.equal(report.copies_row_level_security_expect_true, true);
 assert.equal(Number(report.one_copy_per_phone_index_expect_1), 1);
+assert.equal(Number(report.newest_rows_index_expect_1), 1);
 assert.equal(Number(report.phones), 0);
 assert.equal(Number(report.copies_on_phones), 0);
-ok('the closing report reads (off, unlocked, 1 column, 0 titles off, both tables locked, the index, 0 phones, 0 copies)');
+ok('the closing report reads (off, unlocked, 1 column, 0 titles off, both tables locked, both indexes, 0 phones, 0 copies)');
 
 for (const [t, c, def] of [['site_settings', 'downloads_enabled', 'false'], ['site_settings', 'downloads_locked', 'false'], ['episodes', 'downloads_allowed', 'true']]) {
   const x = await col(db, t, c);
@@ -157,6 +164,29 @@ assert.ok(ended.ended_at);
 await db.query('update downloads set bytes = 3221225472 where episode_id = $1', [SHORT]);
 ok('the check-in’s writes go in: a copy renewed with a new date and basis, one marked ended, a size over 2 GB (bigint)');
 
+// A title asked for whose file isn't ready: the row the site writes at the
+// first ask (lib/downloads.js startDownload) has no date yet. It holds the
+// one live row for that phone and title; then it gets its date, or — when
+// a limit was met — is taken back and marked as counting for nothing.
+const PHONE_W = 'phoneW_0123456789abcdef';
+const asked = (await db.query("insert into downloads (user_id, device_id, episode_id, basis, status, renewed_at) values ('user_wait', $1, $2, 'member', 'active', now()) returning id, licensed_until, created_at", [PHONE_W, FILM])).rows[0];
+assert.match(asked.id, /^[0-9a-f-]{36}$/);
+assert.equal(asked.licensed_until, null, 'no date until the link goes out');
+assert.ok(asked.created_at);
+await refused(db, "insert into downloads (user_id, device_id, episode_id, basis, status, renewed_at) values ('user_wait', $1, $2, 'member', 'active', now())", [PHONE_W, FILM], '23505', 'the same title asked for twice at once on one phone');
+const dated = (await db.query("update downloads set basis = 'member', licensed_until = $1, renewed_at = now(), ended_at = null where id = $2 and status = 'active' returning id", [until, asked.id])).rows;
+assert.equal(dated.length, 1, 'the waiting row takes its date');
+const second = (await db.query("insert into downloads (user_id, device_id, episode_id, basis, status, renewed_at) values ('user_wait', $1, $2, 'member', 'active', now()) returning id", [PHONE_W, SHORT])).rows[0];
+const undone = (await db.query("update downloads set status = 'revoked', revoke_reason = 'limit', removed_at = now() where id = $1 and status = 'active' returning id", [second.id])).rows;
+assert.equal(undone.length, 1);
+assert.equal((await db.query("update downloads set licensed_until = $1 where id = $2 and status = 'active' returning id", [until, second.id])).rows.length, 0, 'a row taken back can no longer be given a date');
+await db.query("insert into downloads (user_id, device_id, episode_id, basis, status, renewed_at) values ('user_wait', $1, $2, 'member', 'active', now())", [PHONE_W, SHORT]);
+// The newest rows of the account, whatever became of them (the new-copy limits' read).
+const newest = (await db.query("select id, device_id, episode_id, status, revoke_reason, created_at from downloads where user_id = 'user_wait' order by created_at desc limit 1000")).rows;
+assert.equal(newest.length, 3);
+assert.deepEqual(newest.map((r) => `${r.status}:${r.revoke_reason || ''}`).sort(), ['active:', 'active:', 'revoked:limit']);
+ok('a title asked for is a row without a date (one per phone and title), then takes its date; a row taken back at a limit is marked "limit" and its slot is free; the account’s newest rows read back');
+
 await refused(db, "insert into downloads (user_id, device_id, episode_id, basis) values ('user_x', $1, $2, 'rented')", [PHONE_B, SHORT], '23514', 'a basis that is neither member nor owned');
 await refused(db, "insert into downloads (user_id, device_id, episode_id, basis, status) values ('user_x', $1, $2, 'member', 'paused')", [PHONE_B, SHORT], '23514', 'a status outside active, removed, revoked');
 await refused(db, "insert into downloads (user_id, device_id, basis) values ('user_x', $1, 'member')", [PHONE_B], '23502', 'a copy with no title');
@@ -172,7 +202,8 @@ for (const t of ['download_devices', 'downloads']) {
 const idx = (await db.query("select indexname, indexdef from pg_indexes where schemaname = 'public' and tablename = 'downloads' order by indexname")).rows;
 assert.ok(idx.find((i) => i.indexname === 'downloads_active_uq' && /UNIQUE/.test(i.indexdef) && /status = 'active'/.test(i.indexdef)));
 assert.ok(idx.find((i) => i.indexname === 'downloads_episode_idx'));
-ok('both tables have row level security on and grant nothing to anon or authenticated; the partial unique index and the title index exist');
+assert.ok(idx.find((i) => i.indexname === 'downloads_user_created_idx' && /\(user_id, created_at DESC\)/.test(i.indexdef)), 'the newest-rows index, on (user_id, created_at desc)');
+ok('both tables have row level security on and grant nothing to anon or authenticated; the partial unique index, the title index and the newest-rows index exist');
 
 // A switch turned on, a title switched off: a second run keeps both.
 await db.query('update site_settings set downloads_enabled = true, downloads_locked = true where id = 1');
@@ -183,11 +214,36 @@ assert.equal(report2.downloads_on_expect_false_on_first_run, true, 'a switch tha
 assert.equal(report2.switch_locked_expect_false_on_first_run, true, 'a lock stays');
 assert.equal(Number(report2.titles_switched_off), 1);
 assert.equal(Number(report2.phones), 2);
-assert.equal(Number(report2.copies_on_phones), 4);
+assert.equal(Number(report2.copies_on_phones), 6);
 assert.equal(Number(report2.one_copy_per_phone_index_expect_1), 1);
+assert.equal(Number(report2.newest_rows_index_expect_1), 1);
 const cons = (await db.query(`select count(*)::int as c from pg_constraint where conname in
   ('download_devices_user_device_uq', 'download_devices_device_id_check', 'download_devices_platform_check', 'downloads_basis_check', 'downloads_status_check')`)).rows[0];
 assert.equal(cons.c, 5);
 ok('a second run changes nothing: the switch, the lock, the title’s switch, the phones and the copies are kept, no constraint twice');
+
+// An account's deletion, carried out by hand: its download records go.
+const DELETE_SQL = fs.readFileSync(path.join(SUPABASE_DIR, 'delete_account_downloads.sql'), 'utf8');
+assert.equal((DELETE_SQL.match(/'user_REPLACE_ME'/g) || []).length, 1, 'one place to put the account id');
+const counts = async () => (await db.query(`select
+  (select count(*)::int from downloads where user_id = 'user_mara') as mara_copies,
+  (select count(*)::int from download_devices where user_id = 'user_mara') as mara_phones,
+  (select count(*)::int from downloads where user_id <> 'user_mara') as other_copies,
+  (select count(*)::int from download_devices where user_id <> 'user_mara') as other_phones`)).rows[0];
+const had = await counts();
+assert.ok(had.mara_copies >= 4 && had.mara_phones === 1 && had.other_copies >= 3 && had.other_phones === 1, JSON.stringify(had));
+const untouched = (await db.exec(DELETE_SQL)).pop().rows[0];
+assert.equal(untouched.account, 'user_REPLACE_ME');
+assert.equal(Number(untouched.download_rows_deleted), 0);
+assert.equal(Number(untouched.phone_rows_deleted), 0);
+assert.deepEqual(await counts(), had, 'with the placeholder left in, nothing goes');
+const gone = (await db.exec(DELETE_SQL.replace("'user_REPLACE_ME'", "'user_mara'"))).pop().rows[0];
+assert.equal(gone.account, 'user_mara');
+assert.equal(Number(gone.download_rows_deleted), had.mara_copies, 'every row of the account, active, removed and revoked alike');
+assert.equal(Number(gone.phone_rows_deleted), 1);
+assert.deepEqual(await counts(), { mara_copies: 0, mara_phones: 0, other_copies: had.other_copies, other_phones: had.other_phones }, 'and nobody else’s');
+const twice = (await db.exec(DELETE_SQL.replace("'user_REPLACE_ME'", "'user_mara'"))).pop().rows[0];
+assert.equal(Number(twice.download_rows_deleted) + Number(twice.phone_rows_deleted), 0);
+ok('delete_account_downloads.sql takes one account’s phones and every copy on record, nobody else’s, nothing with its placeholder left in, and nothing more the second time');
 
 console.log(`\n${n} checks passed`);

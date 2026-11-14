@@ -211,6 +211,11 @@ export default async function handler(req, res) {
       isOriginal: !!ep.is_original,
       // The flashing-lights warning (an admin's "Edit full details" shows it).
       hasFlashingLights: !!ep.has_flashing_lights,
+      // "Allow downloads in the app" (migration 123): on unless its maker
+      // switched it off. `downloadsAllowedReady` false = the database has
+      // no such column yet, and Your work's edit boxes grey the switch.
+      downloadsAllowed: ep.downloads_allowed !== false,
+      downloadsAllowedReady: Object.prototype.hasOwnProperty.call(ep, 'downloads_allowed'),
       channelOptIn: !!ep.channel_opt_in,
       // Pulled from everywhere while an admin reviews it (lib/moderation.js),
       // and why.

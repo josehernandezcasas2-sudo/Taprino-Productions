@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import PageNotesField from './PageNotesField';
 import FlashingLightsField from './FlashingLightsField';
+import DownloadsAllowedField from './DownloadsAllowedField';
 import { fieldPolicy, fieldPolicyLine, flashingLightsPolicy, saveSummary } from '../lib/showRules';
+import { downloadableKind } from '../lib/downloadRules';
+import { MIGRATION_123_MSG } from '../lib/downloadSiteRules';
 
 // A standalone title's title, description and (a film's or a short's)
 // notes for its own page, from Your work. A show's details are edited on
@@ -28,13 +31,20 @@ import { fieldPolicy, fieldPolicyLine, flashingLightsPolicy, saveSummary } from 
 // warning from a live title." (lib/showRules.js flashingLightsPolicy; the
 // server refuses the same).
 //
+// "Allow downloads in the app" (2026-11-14) rides on it too, for every
+// title that can be downloaded (not a podcast): it applies at once, a live
+// title included (lib/downloadSiteRules.js downloadsAllowedPolicy; the
+// server decides the same), and before migration 123 the box is greyed
+// with "Downloads need a database update (migration 123)."
+//
 // currentValues = { id, title, description, pageNotes, notesShown, status,
 // held, deletionRequested, withdrawnAt, pendingTitle, pendingDescription,
-// pendingPageNotes, pageNotesWaitReady, hasFlashingLights }.
+// pendingPageNotes, pageNotesWaitReady, hasFlashingLights, contentType,
+// downloadsAllowed, downloadsAllowedReady }.
 
 const NOTES_122_LINE = 'Notes need a database update (migration 122).';
 const WAITING_WORDS = { title: 'the new title', description: 'the new description', pageNotes: 'the new notes' };
-const FIELD_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning' };
+const FIELD_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning', downloadsAllowed: 'the downloads switch' };
 
 export default function RequestEditModal({ type = 'episode', currentValues, onClose, onSubmitted }) {
   const cv = currentValues || {};
@@ -56,6 +66,10 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
   const [notes, setNotes] = useState(start.pageNotes);
   const startFlashing = cv.hasFlashingLights === true;
   const [flashing, setFlashing] = useState(startFlashing);
+  const downloadsShown = isEpisode && downloadableKind(cv.contentType);
+  const downloadsReady = cv.downloadsAllowedReady !== false;
+  const startDownloads = cv.downloadsAllowed !== false;
+  const [downloads, setDownloads] = useState(startDownloads);
   const [stillWaiting, setStillWaiting] = useState(waiting);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(null);
@@ -82,6 +96,7 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
   if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
   if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
   if (isEpisode && flashing !== startFlashing) changes.push({ field: 'hasFlashingLights', mode: 'direct' });
+  if (downloadsShown && downloadsReady && downloads !== startDownloads) changes.push({ field: 'downloadsAllowed', mode: 'direct' });
   const summary = saveSummary(changes);
   const anyWaiting = Object.values(stillWaiting).some((v) => v !== null);
   const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
@@ -121,6 +136,7 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
         if (c.field === 'description') body.description = description.trim();
         if (c.field === 'pageNotes') body.pageNotes = notes.trim();
         if (c.field === 'hasFlashingLights') body.hasFlashingLights = flashing;
+        if (c.field === 'downloadsAllowed') body.downloadsAllowed = downloads;
       }
       const res = await fetch(`/api/show/episode/${encodeURIComponent(String(cv.id))}`, {
         method: 'PATCH',
@@ -204,6 +220,14 @@ export default function RequestEditModal({ type = 'episode', currentValues, onCl
                 checked={flashing}
                 onChange={setFlashing}
                 locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
+              />
+            )}
+            {downloadsShown && (
+              <DownloadsAllowedField
+                id="req-edit-downloads"
+                checked={downloads}
+                onChange={setDownloads}
+                locked={downloadsReady ? null : MIGRATION_123_MSG}
               />
             )}
             {summary.note && <p className="req-edit-line">{summary.note}.</p>}

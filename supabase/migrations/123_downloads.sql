@@ -26,7 +26,11 @@
 --                                       the plan, 'owned' = bought), until
 --                                       when without the phone connecting,
 --                                       and how it ended ('removed' by the
---                                       phone, 'revoked' by the site).
+--                                       phone, 'revoked' by the site). The
+--                                       row is written when the phone first
+--                                       asks for the title; it has no date
+--                                       (licensed_until) until the file is
+--                                       ready and its link has gone out.
 --
 -- Columns and two tables; no existing row changes. Safe to run more than
 -- once. Before it has run the switch reads as off, every title reads as
@@ -79,11 +83,14 @@ create table if not exists public.downloads (
   constraint downloads_basis_check check (basis in ('member', 'owned')),
   constraint downloads_status_check check (status in ('active', 'removed', 'revoked'))
 );
-comment on table public.downloads is 'One row per copy of a title on a phone. basis: member (the plan) or owned (bought). licensed_until: plays offline until then. ended_at: the first check-in at which the plan no longer carried downloads. status: active, removed (the phone no longer holds it) or revoked (the site took it back; revoke_reason says why). Migration 123.';
+comment on table public.downloads is 'One row per copy of a title on a phone. basis: member (the plan) or owned (bought). licensed_until: plays offline until then; null while the phone has asked for the title and its file is still being made. ended_at: the first check-in at which the plan no longer carried downloads. status: active, removed (the phone no longer holds it) or revoked (the site took it back; revoke_reason says why — limit = the row was taken back at once because a limit was met, and counts for nothing). Migration 123.';
 
 -- One live copy per phone and title; ended rows are kept as history.
 create unique index if not exists downloads_active_uq on public.downloads (user_id, device_id, episode_id) where status = 'active';
 create index if not exists downloads_episode_idx on public.downloads (episode_id);
+-- An account's newest rows, whatever became of them: the new copies it
+-- asked for in the last hour and day (30 and 60) are counted from these.
+create index if not exists downloads_user_created_idx on public.downloads (user_id, created_at desc);
 
 -- Migration 112's rule: every new table is locked to the site's own server key.
 alter table public.download_devices enable row level security;
@@ -105,5 +112,6 @@ select
   (select relrowsecurity from pg_class where oid = 'public.download_devices'::regclass) as phones_row_level_security_expect_true,
   (select relrowsecurity from pg_class where oid = 'public.downloads'::regclass) as copies_row_level_security_expect_true,
   (select count(*) from pg_indexes where schemaname = 'public' and indexname = 'downloads_active_uq') as one_copy_per_phone_index_expect_1,
+  (select count(*) from pg_indexes where schemaname = 'public' and indexname = 'downloads_user_created_idx') as newest_rows_index_expect_1,
   (select count(*) from public.download_devices where removed_at is null) as phones,
   (select count(*) from public.downloads where status = 'active') as copies_on_phones;

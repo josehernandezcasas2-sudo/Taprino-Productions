@@ -11,7 +11,11 @@ import { isDeviceId } from '../../../lib/downloadSiteRules';
 // once it has downloaded). `items`: the live copies on the phone asking
 // (none without a deviceId: the website asks without one). Every date is
 // an ISO string. Signed in (401), not suspended (403 { suspended: true });
-// before migration 123 it answers 503 { code: 'migration-123' }.
+// before migration 123 it answers 503 { code: 'migration-123' }, and when
+// the plan or a suspension can't be read 503 { code: 'unavailable' } —
+// "your plan doesn't carry downloads" is never said on a guess. A title
+// still waiting for its file isn't in `items` (it has no date yet). The
+// website reads this too, so a browser is welcome here.
 export default async function handler(req, res) {
   try {
     const account = await startDownloadRoute(req, res, { methods: ['GET'], scope: 'downloads-read', perHour: 240 });
