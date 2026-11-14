@@ -825,6 +825,25 @@ async function thePages(ctx) {
     await box.waitFor({ timeout: 30000 }).catch(() => {});
     ok('the episode editor’s More info has the checkbox, ticked, with its words', status === 200 && (await box.isChecked()) && !(await box.isDisabled()) && (await v.page.locator('label[for="ep-downloads"]').innerText()).includes(DOWNLOADS_ALLOWED_LABEL), status);
     await v.ctx.close();
+
+    // The Library's modal.
+    v = await b.open(admin, 1280);
+    await goto(v.page, `/admin/library?edit=${encodeURIComponent(ID.off)}`);
+    const tick = v.page.locator('label.admin-checkbox', { hasText: DOWNLOADS_ALLOWED_LABEL }).locator('input[type="checkbox"]');
+    await tick.waitFor({ timeout: 30000 }).catch(() => {});
+    ok('the Library’s modal has the checkbox, unticked for a title switched off', (await tick.count()) === 1 && !(await tick.isChecked()));
+    await tick.check();
+    await v.page.locator('button[type="submit"]', { hasText: /Save/ }).first().click();
+    await v.page.waitForFunction(() => !document.querySelector('label.admin-checkbox input[type="checkbox"]'), null, { timeout: 30000 }).catch(() => {});
+    await sleep(1500);
+    ok('…ticking it and saving switches downloads on for the title', rows(`select downloads_allowed as a from public.episodes where id = ${q(ID.off)}`)[0].a === true);
+    ok('no page errors in the Library', v.errors.length === 0, v.errors);
+    await v.ctx.close();
+    v = await b.open(admin, 1280);
+    await goto(v.page, `/admin/library?edit=${encodeURIComponent(ID.pod)}`);
+    await v.page.locator('label.admin-checkbox', { hasText: 'Tapa Original' }).waitFor({ timeout: 30000 }).catch(() => {});
+    ok('…and a podcast episode has no such checkbox', (await v.page.locator('label.admin-checkbox', { hasText: 'Tapa Original' }).count()) === 1 && (await v.page.locator('label.admin-checkbox', { hasText: DOWNLOADS_ALLOWED_LABEL }).count()) === 0);
+    await v.ctx.close();
   } finally {
     await b.close();
   }
