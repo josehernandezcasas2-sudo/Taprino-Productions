@@ -13571,3 +13571,11 @@ a.ep-credit-name:hover { color: var(--brass); }
 .flash-check-lock { color: var(--warn); }
 .flash-field.locked .flash-check, .flash-field.locked .flash-check input { cursor: not-allowed; }
 .flash-field.locked .flash-check-label { color: var(--ink-dim); }
+
+/* Admin → Downloads (2026-11-14, pages/admin/downloads.js): the page is
+   the Security page's cards (.sec-*); only the "type UNLOCK" row is its own. */
+.dl-unlock { display: flex; flex-direction: column; gap: 0.45rem; }
+.dl-unlock-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.dl-unlock-input { font-family: var(--font-mono); font-size: 0.9rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink); background: var(--surface-2); border: 1px solid rgba(251, 232, 211, 0.25); border-radius: 4px; padding: 0.5rem 0.7rem; min-height: 40px; width: 11rem; max-width: 100%; }
+.dl-unlock-input:focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+@media (max-width: 640px) { .dl-unlock-input { min-height: 44px; width: 100%; } }

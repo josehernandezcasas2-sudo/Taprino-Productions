@@ -6,6 +6,8 @@ import { parseAdBreaksInput, formatAdBreaksForInput } from '../lib/adBreaks';
 import PageNotesField, { pageNotesBoxShows } from './PageNotesField';
 import ExtraKindField from './ExtraKindField';
 import { extraKindChoice, extraKindFromChoice } from '../lib/extraKinds';
+import { downloadableKind } from '../lib/downloadRules';
+import { DOWNLOADS_ALLOWED_HINT, DOWNLOADS_ALLOWED_LABEL } from '../lib/downloadSiteRules';
 
 // The kind of extra's line before migration 121 (lib/showPage.js
 // EXTRA_KIND_121_MSG says the same).
@@ -76,6 +78,8 @@ function formFromEpisode(episode) {
     discoverCurated: !!episode.discoverCurated,
     isOriginal: !!episode.isOriginal,
     hasFlashingLights: !!episode.hasFlashingLights,
+    // "Allow downloads in the app" (migration 123): on unless switched off.
+    downloadsAllowed: episode.downloadsAllowed !== false,
     fundingUrl: episode.fundingUrl || '',
     availableFrom: toDateInputValue(episode.availableFrom),
     availableUntil: toDateInputValue(episode.availableUntil),
@@ -231,6 +235,11 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
       const kindBefore = extraKindFromChoice(start.extraKind.choice, start.extraKind.other);
       const kindAfter = extraKindFromChoice(form.extraKind.choice, form.extraKind.other);
       if (kindAfter !== kindBefore) changes.extraKind = kindAfter;
+    }
+    // The download switch, once the database has its column (migration
+    // 123) and only when it moved.
+    if (episode.downloadsAllowedReady === true && downloadableKind(form.contentType) && Boolean(form.downloadsAllowed) !== Boolean(start.downloadsAllowed)) {
+      changes.downloadsAllowed = Boolean(form.downloadsAllowed);
     }
     // Notes only while their box is on the form (the title, as typed now,
     // has its own page and the database has the column).
@@ -484,6 +493,16 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
             <input type="checkbox" checked={form.hasFlashingLights} onChange={(e) => update('hasFlashingLights', e.target.checked)} />
             Contains flashing lights <span className="admin-optional"> — shows a warning on its page and holds the video under a photosensitivity card before it plays</span>
           </label>
+
+          {/* The creator's switch for downloads in the app (2026-11-14;
+              migration 123): shown once the database has the column, and
+              never for a podcast (podcasts aren't downloaded). */}
+          {episode.downloadsAllowedReady === true && downloadableKind(form.contentType) && (
+            <label className="admin-checkbox">
+              <input type="checkbox" checked={form.downloadsAllowed} onChange={(e) => update('downloadsAllowed', e.target.checked)} />
+              {DOWNLOADS_ALLOWED_LABEL} <span className="admin-optional"> — {DOWNLOADS_ALLOWED_HINT}</span>
+            </label>
+          )}
 
           <div className="admin-field">
             <label>Funding link <span className="admin-optional">optional — the creator's own project/funding page</span></label>

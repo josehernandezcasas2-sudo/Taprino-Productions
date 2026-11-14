@@ -23,6 +23,8 @@ import { PREVIEW_BUILT } from './ShowCards';
 import PayeeCard, { PayeeLine } from './PayeeCard';
 import ExtraKindField from '../ExtraKindField';
 import FlashingLightsField from '../FlashingLightsField';
+import DownloadsAllowedField from '../DownloadsAllowedField';
+import { downloadableKind } from '../../lib/downloadRules';
 import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
 
 // The episode editor (series revamp slice 2; spec Screens, "Episode
@@ -97,6 +99,8 @@ function episodeForm(ep, hasShow) {
     featured: Boolean(ep.featured),
     isOriginal: Boolean(ep.isOriginal),
     hasFlashingLights: Boolean(ep.hasFlashingLights),
+    // "Allow downloads in the app" (migration 123): on unless switched off.
+    downloadsAllowed: ep.downloadsAllowed !== false,
     hasPage: Boolean(ep.hasPage),
     pageNotes: ep.pageNotes || '',
     credits: creditsToForm(ep.credits, { inherit: hasShow }),
@@ -308,6 +312,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     if (form.fundingUrl.trim() !== init.fundingUrl.trim()) add('fundingUrl', 'fundingUrl', form.fundingUrl.trim());
     for (const key of ['adsEnabled', 'channelOptIn', 'featured', 'isOriginal']) if (form[key] !== init[key]) add(key, key, form[key]);
     if (form.hasFlashingLights !== init.hasFlashingLights) add('hasFlashingLights', 'hasFlashingLights', form.hasFlashingLights);
+    if (form.downloadsAllowed !== init.downloadsAllowed) add('downloadsAllowed', 'downloadsAllowed', form.downloadsAllowed);
     const breaks = parseAdBreaksInput(form.adBreaksText);
     if (JSON.stringify(breaks) !== JSON.stringify(parseAdBreaksInput(init.adBreaksText))) add('adBreakSeconds', 'adBreakSeconds', breaks);
     if (form.hasPage !== init.hasPage) add('hasPage', 'hasPage', form.hasPage);
@@ -925,6 +930,19 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         onChange={(v) => set('hasFlashingLights', v)}
         locked={pol('hasFlashingLights').mode === 'locked' ? pol('hasFlashingLights').line || 'This can’t be changed here' : null}
       />
+      {/* The creator's switch for downloads in the app (Jose, 2026-11-14;
+          lib/downloadSiteRules.js downloadsAllowedPolicy, the server's
+          policy): applies at once in every state. A podcast is never
+          downloaded, so it has no switch. */}
+      {downloadableKind(ep.contentType) && policy.downloadsAllowed ? (
+        <DownloadsAllowedField
+          id="ep-downloads"
+          className="show-ed-field"
+          checked={form.downloadsAllowed}
+          onChange={(v) => set('downloadsAllowed', v)}
+          locked={pol('downloadsAllowed').mode === 'locked' ? pol('downloadsAllowed').line || 'This can’t be changed here' : null}
+        />
+      ) : null}
 
       <div className="show-ed-card show-ed-captions">
         <span className="show-ed-card-k">Captions</span>

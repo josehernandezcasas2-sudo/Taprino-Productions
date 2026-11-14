@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
 import CreatePostModal from './CreatePostModal';
+import { DOWNLOAD_WORDS } from '../lib/downloadRules';
 
 // Four tabs, down from the previous five: Series and Films folded into one
 // "Watch" tab, My List moved into the Account menu alongside My Work, and
@@ -61,7 +62,12 @@ const GROUPS = {
     label: 'Watch',
     Icon: WatchTabIcon,
     iconKey: 'tab_watch',
-    items: [
+    // A function, like Home's: Downloads is the first row while the admin
+    // switch is on (site_settings.downloads_enabled through
+    // /api/site-settings; Jose, 2026-11-14). The page says downloads live
+    // in the app and lists the phones that hold them.
+    items: (roles, settings) => [
+      ...(settings && settings.downloadsEnabled ? [{ href: '/downloads', label: DOWNLOAD_WORDS.nav }] : []),
       { href: '/live', label: 'Live TV' },
       { href: '/type/series', label: 'Watch Series' },
       { href: '/type/movie', label: 'Watch Movies' },
@@ -69,6 +75,7 @@ const GROUPS = {
       { href: '/vertical/browse', label: 'Vertical' }
     ],
     match: (p, q) =>
+      p === '/downloads' ||
       p === '/live' ||
       p === '/live/[slug]' ||
       (p === '/type/[type]' && (q.type === 'series' || q.type === 'movie')) ||

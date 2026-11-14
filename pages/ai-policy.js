@@ -7,7 +7,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import { AiSealChip, AiSealStamp } from '../components/AiSeal';
 import { SITE } from '../lib/siteConfig';
-import { getSecuritySwitches } from '../lib/securitySwitches';
+import { getSecuritySwitches, getSecurityRow } from '../lib/securitySwitches';
 
 // The AI policy (Jose, 2026-10-25; canvas
 // https://claude.ai/artifact/68Gq3NnvmRGaAYYinZ1KX5): what the site does
@@ -27,10 +27,14 @@ export async function getServerSideProps({ req, res }) {
   }
   // Card 01 follows Admin → AI security's "Block AI answer engines"
   // (lib/securitySwitches.js, migration 119).
-  const [account, episodes, sw] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getSecuritySwitches()]);
+  // Card 05's sentence about downloads shows only while Admin → Downloads'
+  // switch is on (site_settings.downloads_enabled, migration 123; the same
+  // copy of the settings row, half a minute old at most).
+  const [account, episodes, sw, settingsRow] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getSecuritySwitches(), getSecurityRow().catch(() => null)]);
   return {
     props: {
       answerEnginesBlocked: sw.aiSearchBlocked,
+      downloadsOn: Boolean(settingsRow && settingsRow.downloads_enabled === true),
       account: {
         mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],
         isSignedIn: account.isSignedIn,
@@ -43,9 +47,9 @@ export async function getServerSideProps({ req, res }) {
   };
 }
 
-const UPDATED = 'November 12, 2026';
+const UPDATED = 'November 14, 2026';
 
-export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) {
+export default function AiPolicy({ account = {}, answerEnginesBlocked = true, downloadsOn = false }) {
   return (
     <>
       <Head>
@@ -118,7 +122,17 @@ export default function AiPolicy({ account = {}, answerEnginesBlocked = true }) 
             <div className="aip-card">
               <div className="aip-kicker">05 · The app</div>
               <h3>Captures come out black.</h3>
-              <p>Screenshots and screen recording are blocked while a title plays in the {SITE.name} app.</p>
+              <p>
+                Screenshots and screen recording are blocked while a title plays in the {SITE.name} app.
+                {/* Every claim here is something the app and the site do
+                    (lib/downloadRules.js, lib/downloads.js): change the
+                    sentence when the measure changes. */}
+                {downloadsOn && (
+                  <>
+                    {' '}Premium and Sponsor members, and people who bought a title, can keep a title in the app to watch offline. The copy sits in the app&rsquo;s own storage, out of the phone&rsquo;s backups, plays only in the app, and locks if the phone hasn&rsquo;t checked in with us by its date. It is an ordinary video file, not an encrypted one, so we can&rsquo;t promise nobody ever gets one out of a phone; a creator can switch downloads off for any title of theirs.
+                  </>
+                )}
+              </p>
             </div>
             <div className="aip-card">
               <div className="aip-kicker">06 · The seal</div>

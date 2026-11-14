@@ -51,6 +51,9 @@
 //   POST /__subscriptions/:id/renew { deliver?, ageMinutes? } → a paid
 //        renewal invoice (subscription_cycle) with its charge and
 //        invoice.paid, sent unless deliver: false.
+//   POST /__subscriptions/:id/period { endsInDays } → moves the end of
+//        the paid period (current_period_end, on the subscription and its
+//        items); no event.
 //   POST /__events/forget { ids? | invoices? | all? } → events leave the
 //        events list (a check's cleanup).
 //   GET /__tax → the tax state; POST /__tax { rate?, codeRates?, refuse?,
@@ -949,6 +952,17 @@ async function hooks(req, res, url, parts, body) {
     ev.created = at;
     const send = !(body.deliver === false || body.deliver === 'false');
     return sendJson(res, 200, { invoice: out(inv), event: out(ev), delivery: send ? await deliver(ev) : null });
+  }
+  // The end of a subscription's paid period, moved (downloads in the app:
+  // a copy plays offline until the paid month's end, so a check needs a
+  // month about to end, or a yearly plan). `endsInDays` from now, on the
+  // subscription and its items; no event is sent.
+  if (a === 'subscriptions' && c === 'period' && req.method === 'POST') {
+    const s = get(b, 'subscription');
+    const end = now() + Math.round(Number(body.endsInDays) * 86400);
+    s.current_period_end = end;
+    for (const it of (s.items && s.items.data) || []) it.current_period_end = end;
+    return sendJson(res, 200, { subscription: out(s) });
   }
   return sendJson(res, 404, { error: `no hook ${url.pathname}` });
 }

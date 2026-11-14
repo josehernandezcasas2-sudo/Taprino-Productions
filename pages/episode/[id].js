@@ -315,7 +315,11 @@ export async function getServerSideProps({ req, params, query, res }) {
       // that isn't live).
       credits: data.credits || [],
       notesFrom: data.notesFrom || null,
-      preview: previewInfo
+      preview: previewInfo,
+      // Downloads in the app (lib/downloadRules.js downloadOffer): the same
+      // answer /api/episode-page gives the app. The website draws nothing
+      // for it — a browser can't keep a title for offline viewing.
+      download: data.download || { state: 'hidden', reason: 'off' }
     }
   };
 }

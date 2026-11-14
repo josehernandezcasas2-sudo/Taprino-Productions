@@ -68,6 +68,10 @@ export default async function handler(req, res) {
   // below), for the modal's "What kind of extra?" field.
   const extraKinds = await extraKindsFor(supabase, data || []);
 
+  // The creators' switch "Allow downloads in the app" per row (migration
+  // 123; downloadsAllowedFor below), for the modal's checkbox.
+  const downloads = await downloadsAllowedFor(supabase, data || []);
+
   // `?? null` throughout: a row from a database without a column, or a
   // stand-in, mustn't hand the modal an undefined.
   return res.status(200).json({
@@ -115,6 +119,11 @@ export default async function handler(req, res) {
       // the database has the column (the modal greys the field before it).
       extraKind: extraKinds.ready && extraKinds.rows[e.id] ? extraKinds.rows[e.id].extra_kind ?? null : null,
       extraKindReady: extraKinds.ready,
+      // Migration 123: whether the title may be kept in the app to watch
+      // offline (on unless switched off), and whether the database has the
+      // column (the modal leaves the checkbox out before it).
+      downloadsAllowed: !(downloads.ready && downloads.rows[e.id] && downloads.rows[e.id].downloads_allowed === false),
+      downloadsAllowedReady: downloads.ready,
       availableFrom: e.available_from ?? null,
       availableUntil: e.available_until ?? null,
       adsEnabled: e.ads_enabled !== false,
@@ -163,6 +172,21 @@ async function extraKindsFor(supabase, rows) {
   const { data, error } = await supabase.from('episodes').select('id, extra_kind').in('id', ids);
   if (error) {
     if (!isMissingColumn(error)) console.error('admin library extra kinds:', error.message);
+    return { ready: false, rows: {} };
+  }
+  return { ready: true, rows: Object.fromEntries((data || []).filter((r) => r && r.id).map((r) => [r.id, r])) };
+}
+
+// The rows' download switches (migration 123's episodes.downloads_allowed),
+// in a read of their own like the two above: before 123 the column is
+// missing and `ready` is false (the modal leaves its checkbox out); any
+// other failure is logged and reads the same.
+async function downloadsAllowedFor(supabase, rows) {
+  const ids = rows.map((e) => e.id).filter(Boolean);
+  if (ids.length === 0) return { ready: true, rows: {} };
+  const { data, error } = await supabase.from('episodes').select('id, downloads_allowed').in('id', ids);
+  if (error) {
+    if (!isMissingColumn(error)) console.error('admin library downloads:', error.message);
     return { ready: false, rows: {} };
   }
   return { ready: true, rows: Object.fromEntries((data || []).filter((r) => r && r.id).map((r) => [r.id, r])) };

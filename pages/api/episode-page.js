@@ -123,6 +123,12 @@ export default async function handler(req, res) {
     // episode.pageNotes ride on the episode.
     credits: data.credits || [],
     notesFrom: data.notesFrom || null,
-    preview: data.preview || null
+    preview: data.preview || null,
+    // Downloads in the app (lib/downloadRules.js downloadOffer): what the
+    // Download button is for this viewer on this title — { state: 'ok',
+    // basis: 'member' | 'owned' }, { state: 'plan' }, { state: 'signin' }
+    // or { state: 'hidden', reason: 'off' | 'kind' | 'title' | 'preview' }.
+    // POST /api/downloads/start decides again from the session.
+    download: data.download || { state: 'hidden', reason: 'off' }
   });
 }

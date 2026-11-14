@@ -6,6 +6,7 @@ import { getShareSettings } from '../lib/artistSupport';
 import { dollars } from '../lib/artistSupportRules';
 import { getTipSettings } from '../lib/tips';
 import { getSiteSettings } from '../lib/siteSettings';
+import { CHECKIN_DAYS, GRACE_DAYS, KEEP_AFTER_END_DAYS, MAX_DEVICES, MAX_TITLES_PER_DEVICE, MEMBER_MAX_DAYS } from '../lib/downloadRules';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -68,7 +69,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-13';
+const TEXT_UPDATED = '2026-11-14';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -132,6 +133,24 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         affects them. Membership benefits may change over time; we won&rsquo;t remove a benefit that
         was the main reason you subscribed without telling you first.
       </p>
+      {/* Downloads in the app (2026-11-14; lib/downloadRules.js holds the
+          numbers, Admin → Downloads the switch). "Where we offer it": the
+          feature is off until the studio turns it on. */}
+      <p id="downloads">
+        <strong>Downloads in the app.</strong> Where we offer it, Premium and Sponsor members can keep
+        titles inside our app to watch without a connection: up to {MAX_TITLES_PER_DEVICE} titles on a
+        phone, on {MAX_DEVICES} phones. A downloaded title plays offline until {GRACE_DAYS} days after
+        the end of the month you&rsquo;ve paid for, and never longer than {MEMBER_MAX_DAYS + GRACE_DAYS} days
+        without the phone connecting to us; after that it is locked until the phone connects once. If
+        your membership ends, or moves to a plan without downloads, the copies lock and the app removes
+        them {KEEP_AFTER_END_DAYS} days later unless you rejoin. A title you bought (section 15) can be
+        kept the same way without a membership, as long as the phone connects at least every {CHECKIN_DAYS} days.
+        A download is a temporary copy for watching in our app, not a file you own: you may not copy it
+        out of the app, share it, or keep it by other means, and the app removes it if the title is
+        taken down or its creator switches downloads off for it. We can change this feature or switch
+        it off; switching it off deletes nothing you&rsquo;ve downloaded, but the copies aren&rsquo;t
+        renewed past their date.
+      </p>
       <p>
         <strong>Your creator share.</strong> We pay the people who make what&rsquo;s on {SITE.name} a
         share of our membership revenue. For each paid membership that share is {dollars(n.shareCents.standard)} a month on
@@ -168,6 +187,14 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         <strong>You can withdraw it.</strong> Request removal and we&rsquo;ll take it down within 30
         days. Copies already in circulation off-platform, and material already printed or scheduled
         in marketing, may take longer to fully disappear.
+      </p>
+      <p>
+        <strong>Downloads in the app.</strong> Where we offer downloads (section 4), Premium and
+        Sponsor members, and people who bought your title, can keep it inside our app to watch offline,
+        under the limits described there. Each title has a switch, &ldquo;Allow downloads in the
+        app&rdquo;, which is on unless you turn it off. Turn it off and no new copy can be made, and
+        copies already on phones are removed the next time those phones connect; a phone that stays
+        offline keeps its copy until its date runs out, at most {MEMBER_MAX_DAYS + GRACE_DAYS} days.
       </p>
       <p>
         <strong>What you&rsquo;re promising us.</strong> That you own or have licensed everything in
@@ -270,7 +297,10 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
 
       <h2>6. What you may not do</h2>
       <ul>
-        <li>Download, rip, record, restream, or redistribute content from the platform</li>
+        <li>
+          Download, rip, record, restream, or redistribute content from the platform, other than
+          keeping a title in our app with the app&rsquo;s own Download button (section 4)
+        </li>
         <li>Get around signed links, paywalls, or any other access control</li>
         <li>Share your account so people can watch premium content without subscribing</li>
         <li>Upload anything unlawful, hateful, harassing, or sexually explicit involving minors</li>
@@ -416,8 +446,9 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       <p>
         Some films, episodes and series can be bought outright instead of, or as well as, a membership.
         Buying a title gives you a personal, non-transferable licence to stream it on {SITE.name} and in
-        our app, without ads, for as long as the service exists. It is not a download and not a copy you
-        own; the creator keeps their copyright. The price is set by the creator and checked by us, and
+        our app, without ads, for as long as the service exists. It is not a file you own or can take
+        elsewhere; the creator keeps their copyright. Where we offer downloads, you can also keep it
+        inside our app to watch offline (section 4). The price is set by the creator and checked by us, and
         a price change only applies to new buyers. Where a creator runs a sale, the sale price is the
         price.
       </p>

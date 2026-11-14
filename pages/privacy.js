@@ -51,7 +51,7 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="November 13, 2026"
+      updated="November 14, 2026"
       account={account}
       summary={
         <>
@@ -117,6 +117,19 @@ export default function Privacy({ account }) {
       </p>
       <p>
         We keep a switched-off address or token marked as switched off, with no message content.
+      </p>
+
+      <h3>If you download in the app</h3>
+      <p>
+        When you keep a title in the app to watch offline, we store a random identifier the app makes
+        for that phone, the phone&rsquo;s name as it reports it (for example &ldquo;Mara&rsquo;s
+        iPhone&rdquo;), whether it is an iPhone or an Android phone, which titles are on it, when each
+        was downloaded and until when it may play, and when the phone last checked in with us. We use
+        this to keep downloads to the phones and titles your plan allows, and to show you your phones so
+        you can remove one. The file itself comes from our video host, Cloudflare, through a link that
+        lasts a few hours. Where you are in a downloaded title is kept on your phone, and reaches us as
+        watch progress only while the app is online. When you remove a phone it leaves your list; we
+        keep the record that it was removed and of the downloads it held.
       </p>
 
       <h3>If you submit work as a creator</h3>

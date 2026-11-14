@@ -11,12 +11,19 @@
 //   GET/POST /:uid/downloads[/audio], live_inputs (create/get/delete)
 // tus: POST/HEAD/PATCH/OPTIONS /tus/:uid; basic upload: POST /upload/:uid
 // Delivery: /:uidOrToken/thumbnails/thumbnail.jpg (a JPEG frame),
-//   /:uidOrToken/manifest/video.m3u8, /:uidOrToken/iframe,
-//   /:uid/downloads/default.mp4 — a protected video answers 401 unless the
-//   path carries one of this fake's tokens.
+//   /:uidOrToken/manifest/video.m3u8, /:uidOrToken/iframe — a protected
+//   video answers 401 unless the path carries one of this fake's tokens;
+//   /:uidOrToken/downloads/default.mp4 (downloads in the app, 2026-11-14):
+//   the video's MP4 once its download has been made (404 before, 409 while
+//   it is in progress), and for a protected video only with a token whose
+//   `downloadable` claim is true — a playback token answers 403, as
+//   Cloudflare's does. The file is DOWNLOAD_BYTES of a repeating pattern,
+//   served whole or by `Range: bytes=a-b` (206), HEAD too.
 // Hooks: GET /__state, POST /__reset, POST /__ready?uid=[&duration=],
 //   POST /__fail?uid=[&code=], POST /__autoready?seconds=N (0 = off),
-//   POST /__video { uid?, name, creator, duration, ready, requireSignedURLs }
+//   POST /__video { uid?, name, creator, duration, ready, requireSignedURLs },
+//   POST /__downloads?uid=&state=inprogress|ready|none[&percent=N] (the
+//   MP4's state as GET …/downloads reports it; `none` forgets it)
 import crypto from 'node:crypto';
 import http from 'node:http';
 import { PORTS, HOST, FAKE_KEYS, urls } from '../lib/config.mjs';
@@ -127,16 +134,45 @@ function readToken(token) {
   }
 }
 
-// Which video a delivery path names, and whether it may be served.
+// Which video a delivery path names, and whether it may be served
+// (`claims`: the token's, when the path carried one).
 function resolveDelivery(idOrToken) {
   const claims = readToken(idOrToken);
   if (claims) {
     const v = videos.get(claims.sub);
-    return v ? { v, allowed: true } : { v: null };
+    return v ? { v, allowed: true, claims } : { v: null };
   }
   const v = videos.get(idOrToken);
   if (!v) return { v: null };
-  return { v, allowed: !v.requireSignedURLs };
+  return { v, allowed: !v.requireSignedURLs, claims: null };
+}
+
+// The MP4 a download serves: not a real video, a pattern a check can
+// recognise at any offset (byte i = i mod 251).
+const DOWNLOAD_BYTES = 256 * 1024;
+const downloadFile = Buffer.alloc(DOWNLOAD_BYTES);
+for (let i = 0; i < DOWNLOAD_BYTES; i += 1) downloadFile[i] = i % 251;
+
+function serveDownload(req, res, v, claims) {
+  const cors = { 'Access-Control-Allow-Origin': '*' };
+  const entry = v._downloads.default;
+  if (!entry) return sendText(res, 404, 'No download has been made for this video', 'text/plain; charset=utf-8', cors);
+  if (entry.status !== 'ready') return sendText(res, 409, 'The download is still being made', 'text/plain; charset=utf-8', cors);
+  if (v.requireSignedURLs && !(claims && claims.downloadable === true)) return sendText(res, 403, 'This token cannot download', 'text/plain; charset=utf-8', cors);
+  const base = { 'Content-Type': 'video/mp4', 'Accept-Ranges': 'bytes', 'Cache-Control': 'private, no-store', ...cors };
+  const m = /^bytes=(\d*)-(\d*)$/.exec(String(req.headers.range || ''));
+  if (m && (m[1] !== '' || m[2] !== '')) {
+    let start = m[1] === '' ? Math.max(0, DOWNLOAD_BYTES - Number(m[2])) : Number(m[1]);
+    let end = m[1] === '' || m[2] === '' ? DOWNLOAD_BYTES - 1 : Math.min(Number(m[2]), DOWNLOAD_BYTES - 1);
+    if (!(start <= end) || start >= DOWNLOAD_BYTES) {
+      res.writeHead(416, { ...base, 'Content-Range': `bytes */${DOWNLOAD_BYTES}` });
+      return res.end();
+    }
+    res.writeHead(206, { ...base, 'Content-Range': `bytes ${start}-${end}/${DOWNLOAD_BYTES}`, 'Content-Length': end - start + 1 });
+    return res.end(req.method === 'HEAD' ? undefined : downloadFile.subarray(start, end + 1));
+  }
+  res.writeHead(200, { ...base, 'Content-Length': DOWNLOAD_BYTES });
+  return res.end(req.method === 'HEAD' ? undefined : downloadFile);
 }
 
 async function frameFor(v) {
@@ -306,6 +342,17 @@ const server = http.createServer(async (req, res) => {
       autoReadySeconds = Number(url.searchParams.get('seconds') || 0);
       return sendJson(res, 200, { autoReadySeconds });
     }
+    // The MP4's state, as GET …/downloads reports it (downloads in the
+    // app: a file Cloudflare is still making answers 202 from the site).
+    if (url.pathname === '/__downloads' && req.method === 'POST') {
+      const v = videos.get(url.searchParams.get('uid'));
+      if (!v) return sendJson(res, 404, { error: 'no such video' });
+      const state = url.searchParams.get('state') || 'ready';
+      if (state === 'none') delete v._downloads.default;
+      else if (state === 'inprogress') v._downloads.default = { status: 'inprogress', url: `${SELF}/${v.uid}/downloads/default.mp4`, percentComplete: Number(url.searchParams.get('percent') || 0) };
+      else v._downloads.default = { status: 'ready', url: `${SELF}/${v.uid}/downloads/default.mp4`, percentComplete: 100 };
+      return sendJson(res, 200, { uid: v.uid, downloads: v._downloads });
+    }
     if (url.pathname === '/__video' && req.method === 'POST') {
       let b = {};
       try { b = JSON.parse(body.toString('utf8') || '{}'); } catch (e) { b = {}; }
@@ -334,7 +381,7 @@ const server = http.createServer(async (req, res) => {
 
     // Delivery host.
     if (seg.length >= 2) {
-      const { v, allowed } = resolveDelivery(seg[0]);
+      const { v, allowed, claims } = resolveDelivery(seg[0]);
       if (!v) return sendText(res, 404, 'Video not found');
       if (!allowed) return sendText(res, 401, 'This video requires a signed URL');
       if (seg[1] === 'thumbnails') {
@@ -347,7 +394,8 @@ const server = http.createServer(async (req, res) => {
         return sendText(res, 200, manifest(seg[0]), 'application/vnd.apple.mpegurl', { 'Access-Control-Allow-Origin': '*' });
       }
       if (seg[1] === 'iframe' || seg[1] === 'watch') return sendText(res, 200, `<!doctype html><title>Fake Stream player</title><body style="margin:0;background:#000;color:#fff;font-family:monospace;display:grid;place-items:center;height:100vh">Fake Cloudflare player · ${v.uid}</body>`, 'text/html; charset=utf-8');
-      if (seg[1] === 'downloads') return sendText(res, 200, 'not a real video file', 'video/mp4');
+      if (seg[1] === 'downloads' && seg[2] === 'default.mp4') return serveDownload(req, res, v, claims);
+      if (seg[1] === 'downloads') return sendText(res, 200, 'not a real audio file', 'audio/mp4');
     }
     return sendText(res, 404, 'The rig\'s fake Cloudflare has no such route');
   } catch (err) {

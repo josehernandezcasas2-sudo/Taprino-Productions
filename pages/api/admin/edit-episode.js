@@ -18,6 +18,7 @@ import { syncNumberTitles } from '../../../lib/numberTitles';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, payeeShowIds, withPayeeStamps } from '../../../lib/payees';
 import { wellFormedBody } from '../../../lib/wellFormed';
+import { MIGRATION_123_MSG } from '../../../lib/downloadSiteRules';
 
 // The Library's "Edit full details" (components/AdminEditEpisodeModal.js).
 // Unlike pages/api/creator/edit-submission.js, this has no ownership
@@ -264,6 +265,17 @@ async function editEpisode(req, res, roleContext) {
     const notes = typeof fields.pageNotes === 'string' ? fields.pageNotes.trim() : '';
     if (notes.length > PAGE_NOTES_MAX) return res.status(400).json({ error: 'The notes are limited to 4,000 characters.' });
     updates.page_notes = notes || null;
+  }
+
+  // The creator's switch "Allow downloads in the app" (migration 123;
+  // lib/downloadRules.js), which the team may set for any title. Before
+  // 123 the row has no such column and the save is told why.
+  if (fields.downloadsAllowed !== undefined) {
+    if (typeof fields.downloadsAllowed !== 'boolean') return res.status(400).json({ error: 'Say whether it can be downloaded in the app.' });
+    if (!Object.prototype.hasOwnProperty.call(existing, 'downloads_allowed')) {
+      return res.status(503).json({ error: MIGRATION_123_MSG, code: 'migration-123' });
+    }
+    updates.downloads_allowed = fields.downloadsAllowed;
   }
 
   // What kind of extra (migration 121, lib/extraKinds.js), cleaned; only

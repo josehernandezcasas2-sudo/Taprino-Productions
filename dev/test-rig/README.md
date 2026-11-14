@@ -282,7 +282,10 @@ never got through — and `ageMinutes` dates it back),
 renewal invoice, `billing_reason: subscription_cycle`, with its charge and
 `invoice.paid`; the same two options — this is how the app's daily Stripe
 catch-up is exercised: a renewal never delivered, an hour or more old, is
-found in the events list and recorded), `POST /__events/forget` `{ ids? |
+found in the events list and recorded), `POST /__subscriptions/<id>/period`
+`{ endsInDays }` (moves the end of the paid period, `current_period_end` on
+the subscription and its items, with no event: a month about to end or a
+yearly plan, for `checks/downloads.mjs`), `POST /__events/forget` `{ ids? |
 invoices? | all? }` (events leave the events list: a check that deletes the
 rows an invoice made should forget its events too, or the daily catch-up —
 `/api/cron/creator-reminders`, which `payee-invites.mjs` runs — records that
@@ -350,16 +353,25 @@ CORS for the browser), `direct_upload` + `POST /upload/<uid>`, `GET/POST/DELETE
 /stream/<uid>` (status, `requireSignedURLs`, meta), `POST /stream/<uid>/token`,
 `POST /stream/copy`, `GET /stream`, downloads (default and audio, ready at
 once), live inputs (create/get/delete). A finished upload is `inprogress`
-until `/__ready` (or `RIG_CF_AUTOREADY_SECONDS`).
+until `/__ready` (or `RIG_CF_AUTOREADY_SECONDS`). A token asked for with
+`downloadable: true` carries that claim.
 
 Delivery (`CLOUDFLARE_STREAM_ORIGIN=http://127.0.0.1:54324`):
 `/<uid or token>/thumbnails/thumbnail.jpg` (a drawn JPEG frame),
 `/manifest/video.m3u8` (a playlist), `/iframe`; a protected video answers 401
 unless the path carries one of this fake's tokens.
+`/<uid or token>/downloads/default.mp4` (downloads in the app, 2026-11-14):
+the video's MP4 once its download has been made (404 before, 409 while it is
+in progress), and for a protected video only through a token whose
+`downloadable` claim is true — a playback token gets 403, as Cloudflare's
+does. The file is 256 KB of a repeating pattern (byte i = i mod 251), served
+whole, by `Range: bytes=a-b` (206) and to HEAD.
 
 Hooks: `POST /__ready?uid=…[&duration=]`, `POST /__fail?uid=…[&code=]`,
 `POST /__autoready?seconds=N`, `POST /__video` `{ uid?, name, creator,
-duration, ready, requireSignedURLs }`, `GET /__state`.
+duration, ready, requireSignedURLs }`, `POST /__downloads?uid=…&state=
+inprogress|ready|none[&percent=N]` (the MP4's state as `GET …/downloads`
+reports it), `GET /__state`.
 
 Not covered: real video. The addresses the app hands a browser are
 `https://customer-test.cloudflarestream.com/…`, which don't exist, so nothing
@@ -384,7 +396,8 @@ the podcast preview as the app calls them, the moderation cleanup, money
 through the fakes, stuck payee invites, the money edge cases, web push,
 podcast audio and the crawler refusal, notes and descriptions waiting for
 review, season art, sales tax, the flashing-lights card, the round's
-small fixes); see `checks/README.md`.
+small fixes, downloads in the app before and after 123); see
+`checks/README.md`.
 
 ## Things in the app that reach outside the rig
 
