@@ -13,6 +13,8 @@ import { episodeCode } from '../lib/seriesResume';
 import { isTitleId } from '../lib/titleIds';
 import HeaderNav from '../components/HeaderNav';
 import Footer from '../components/Footer';
+import MobileTabBar from '../components/MobileTabBar';
+import DashboardTabs from '../components/creator/DashboardTabs';
 import { ClockIcon, PlusIcon } from '../components/PlayerIcons';
 import { SITE } from '../lib/siteConfig';
 
@@ -353,6 +355,9 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
           <h1 className="cs-h1">Your titles, in one place.</h1>
         </div>
 
+        {/* The creator pages' row of tabs (2026-11-14, with the Dashboard). */}
+        <DashboardTabs current="studio" isCreator={isCreator} isAdmin={isAdmin} />
+
         {payNote && (
           <div className="cs-flash" role="status">
             <strong>{payNote.text}</strong>
@@ -537,6 +542,7 @@ export default function CreatorStudio({ mainGenres, drafts: initialDrafts, draft
         </nav>
       </main>
       <Footer />
+      <MobileTabBar />
     </>
   );
 }

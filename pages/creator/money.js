@@ -5,6 +5,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
 import MoneyPage from '../../components/creator/MoneyPage';
 import PayoutsCard from '../../components/creator/PayoutsCard';
+import DashboardTabs from '../../components/creator/DashboardTabs';
 import { BackArrowIcon } from '../../components/PlayerIcons';
 import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
@@ -56,6 +57,7 @@ export default function CreatorMoney({ mainGenres = [], isSignedIn, isSubscriber
       <MoneyPage
         back={<Link href="/account" className="acct-back"><BackArrowIcon size={14} /> Account</Link>}
         top={<PayoutsCard returnTo="/creator/money" />}
+        tabs={<DashboardTabs current="money" isCreator={isCreator} isAdmin={isAdmin} />}
       />
       <Footer />
       <MobileTabBar />

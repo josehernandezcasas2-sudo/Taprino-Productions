@@ -43,10 +43,14 @@ export async function getServerSideProps({ req, res, query }) {
 export default function Welcome({ next, hasTicket, preview, opened = false }) {
   const router = useRouter();
   const { isSignedIn } = useUser();
-  // Signed in through the modal (no reload): go where they were headed.
+  // /signed-in decides where a sign-in lands: a creator or a team member
+  // on the Dashboard unless they were headed somewhere, everyone else
+  // where they were headed (2026-11-14).
+  const landing = `/signed-in?next=${encodeURIComponent(next)}`;
+  // Signed in through the modal (no reload): go on from here.
   useEffect(() => {
-    if (isSignedIn && !hasTicket && !preview) router.replace(next);
-  }, [isSignedIn, hasTicket, preview, next, router]);
+    if (isSignedIn && !hasTicket && !preview) router.replace(landing);
+  }, [isSignedIn, hasTicket, preview, landing, router]);
 
   return (
     <>
@@ -74,7 +78,7 @@ export default function Welcome({ next, hasTicket, preview, opened = false }) {
               <div className="welcome-signup">
                 <SignUp routing="hash" forceRedirectUrl={next} signInUrl="/welcome" />
               </div>
-              <p className="welcome-note">Already made it? <SignInButton mode="modal" forceRedirectUrl={next}><button type="button" className="welcome-linkbtn">Sign in instead</button></SignInButton></p>
+              <p className="welcome-note">Already made it? <SignInButton mode="modal" forceRedirectUrl={landing}><button type="button" className="welcome-linkbtn">Sign in instead</button></SignInButton></p>
             </section>
           ) : (
             <>
@@ -84,7 +88,7 @@ export default function Welcome({ next, hasTicket, preview, opened = false }) {
                 <h1>{SITE.name} is opening to invited people first.</h1>
                 <p>Independent films, series and podcasts, and creators paid by the people who watch them. Invited creators and friends are in; everyone else, soon.</p>
                 <div className="welcome-cta">
-                  <SignInButton mode="modal" forceRedirectUrl={next}>
+                  <SignInButton mode="modal" forceRedirectUrl={landing}>
                     <button type="button" className="welcome-btn">Sign in</button>
                   </SignInButton>
                   <span className="welcome-note">Invited? The link in your email creates your account.</span>

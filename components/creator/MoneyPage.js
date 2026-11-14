@@ -18,7 +18,7 @@ function Row({ label, value }) {
   return <span className="money-row"><span>{label}</span><b>{value}</b></span>;
 }
 
-export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPath = '/api/creator/payouts', top = null, back = null }) {
+export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPath = '/api/creator/payouts', top = null, back = null, tabs = null }) {
   const [period, setPeriod] = useState(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
@@ -122,6 +122,9 @@ export default function MoneyPage({ apiPath = '/api/creator/money', payoutsApiPa
         {ready && <button type="button" className="unlock-btn money-btn" onClick={openStripe} disabled={stripeBusy}>{stripeBusy ? 'Opening…' : 'Open Stripe'}</button>}
       </div>
     </div>
+
+    {/* The creator pages' row of tabs (2026-11-14), when the page has one. */}
+    {tabs}
 
     {/* The Payouts card (Stripe Express: setup, balance, next payout)
         sits under the head since the account hub of 2026-10-29; the

@@ -139,7 +139,7 @@ const money = {
 t('the four numbers', () => {
   const tiles = R.dashboardTiles({ money, numbers, period: '2026-11', now: NOW });
   assert.deepEqual(tiles.map((x) => x.key), ['earned', 'owed', 'views', 'supporters']);
-  assert.deepEqual(tiles[0], { key: 'earned', label: 'Earned this month · all lanes', value: '$412.60', sub: '$96.00 more than October', tone: '' });
+  assert.deepEqual(tiles[0], { key: 'earned', label: 'Earned this month', value: '$412.60', sub: '$96.00 more than October', tone: '' });
   assert.deepEqual(tiles[1], { key: 'owed', label: 'Owed to you', value: '$187.40', sub: 'Next transfer Dec 1', tone: 'accent' });
   assert.deepEqual(tiles[2], { key: 'views', label: 'Views · last 30 days', value: '8,214', sub: '18% more than the 30 days before', tone: '' });
   assert.deepEqual(tiles[3], { key: 'supporters', label: 'Supporters', value: '46', sub: '31 picked you · 15 by watching', tone: '' });
@@ -149,7 +149,7 @@ t('the numbers say what they can when something is missing or off', () => {
   const loading = R.dashboardTiles({});
   assert.deepEqual(loading.map((x) => x.value), [null, null, null, null]);
   const past = R.dashboardTiles({ money: { ...money, top: { ...money.top, monthCents: 20000 } }, numbers, period: '2026-10', now: NOW });
-  assert.equal(past[0].label, 'Earned in October · all lanes');
+  assert.equal(past[0].label, 'Earned in October');
   assert.equal(past[0].sub, '$116.60 less than October');
   const noPayouts = R.dashboardTiles({ money: { ...money, top: { ...money.top, nextPayout: { on: '2026-12-01', willPay: false, reason: 'set up payouts' } } }, numbers, now: NOW });
   assert.equal(noPayouts[1].sub, 'Set up payouts to receive it');
@@ -371,7 +371,7 @@ t('latest: money lines and titles going live, newest first', () => {
     ['The Last Fare sold', '$3.57', 'Yesterday'],
     ['Night Bus S2 E4 went live', '', 'Nov 10'],
     ['Dee Park backed $25.00 · Harbor Lights: season one', '$23.75', 'Nov 8'],
-    ['Member support · Member share · A member · picked you', '$2.00', 'Nov 7'],
+    ['Member support · A member · picked you', '$2.00', 'Nov 7'],
     ['Title sales · First Stop · refunded', '−$1.50', 'Nov 6']
   ]);
   assert.equal(rows[2].href, '/creator/show/night-bus#ep-nb-e4');

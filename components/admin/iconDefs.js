@@ -1,4 +1,4 @@
-import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon, TicketIcon, BrowserTabIcon, SwipeDeckIcon, TipIcon, BackItIcon } from '../PlayerIcons';
+import { PlayIcon, PauseIcon, VolumeIcon, SettingsIcon, FullscreenIcon, SearchIcon, BellIcon, InfoIcon, HeartIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, LogoutIcon, ArrowRightIcon, HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, DashboardIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, TeamIcon, TvIcon, LiveDotIcon, AntennaIcon, InboxIcon, ImageIcon, SlidersIcon, CalendarIcon, PaletteIcon, HeadphonesIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, PencilIcon, EyeIcon, UndoIcon, ExternalLinkIcon, LinkIcon, TicketIcon, BrowserTabIcon, SwipeDeckIcon, TipIcon, BackItIcon } from '../PlayerIcons';
 
 // Every replaceable icon on the site, grouped for Styles & Guides →
 // Icons (components/admin/StylesGuides.js). Was pages/admin/player-icons.js's
@@ -31,6 +31,7 @@ export const PLAYER_ICON_GROUPS = [
       { key: 'tab_home', label: 'Tab bar — Home', Default: () => <HouseIcon size={22} /> },
       { key: 'tab_watch', label: 'Tab bar — Watch', Default: () => <WatchTabIcon size={22} /> },
       { key: 'tab_discover', label: 'Tab bar — Discover', Default: () => <CompassIcon size={22} /> },
+      { key: 'tab_dashboard', label: 'Tab bar — Dashboard', Default: () => <DashboardIcon size={22} /> },
       { key: 'tab_account', label: 'Tab bar — Account', Default: () => <AccountIcon size={22} /> },
       { key: 'admin_lock', label: 'Admin portal', Default: () => <LockIcon size={22} /> },
       { key: 'sparkle', label: 'Recs / upgrade', Default: () => <SparkleIcon size={22} /> },

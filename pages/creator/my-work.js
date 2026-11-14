@@ -45,6 +45,8 @@ function editValuesFor(s) {
 import SellTitleModal, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/creator/SellTitleModal';
 import { PayeeModal } from '../../components/show/PayeeCard';
 import Footer from '../../components/Footer';
+import MobileTabBar from '../../components/MobileTabBar';
+import DashboardTabs from '../../components/creator/DashboardTabs';
 import { ImageIcon, ChatIcon, TrashIcon, WarningIcon, ClockIcon, ClapperboardIcon, HeadphonesIcon, SettingsIcon, PencilIcon, EyeIcon, ExternalLinkIcon, LinkIcon, UndoIcon, TicketIcon, AccountIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
 import { dollars } from '../../lib/purchaseRules';
@@ -783,6 +785,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           </Link>
         </div>
 
+        <DashboardTabs current="work" isCreator={isCreator} isAdmin={isAdmin} />
+
         <div className="account-card">
           <p style={{ margin: '0 0 1rem', fontSize: '0.87rem', color: 'var(--ink-dim)' }}>
             Want to see how they&rsquo;re doing?{' '}
@@ -868,6 +872,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
         </div>
       </main>
       <Footer />
+      <MobileTabBar />
 
       {editingSubmission && (
         <EditSubmissionModal

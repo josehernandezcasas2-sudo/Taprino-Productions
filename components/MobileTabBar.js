@@ -2,15 +2,24 @@ import { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { PANEL_LEAST, keepScrollInside, riseRoom } from '../lib/menuScroll';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { HouseIcon, WatchTabIcon, CompassIcon, AccountIcon, DashboardIcon, PlusIcon, CaretUpIcon, usePlayerIconOverrides } from './PlayerIcons';
 import CreatePostModal from './CreatePostModal';
 import { DOWNLOAD_WORDS } from '../lib/downloadRules';
+import { DASHBOARD_PATH, seesDashboard } from '../lib/creatorDashboardRules';
 
 // Four tabs, down from the previous five: Series and Films folded into one
 // "Watch" tab, My List moved into the Account menu alongside My Work, and
 // a Discover tab surfaces the two swipe/reel discovery experiences
 // (Pitch Discover, Vertical Discover) that previously had no dedicated
 // spot in mobile navigation at all.
+//
+// The creator's Dashboard (Jose, 2026-11-14: "add a dashboard to the tab
+// bar … all creators and teams see the tab"): one more tab between Watch
+// and Account for a creator, an admin or a sub-admin (seesDashboard). It
+// is a link straight to /creator/dashboard, not a menu, it is the lit tab
+// on every /creator page, and the people who have it lose My Work, Your
+// Numbers and Money from the Account menu: those are the Dashboard's own
+// tabs now (components/creator/DashboardTabs.js).
 //
 // Every tab is a toggle button that opens a small drop-up menu above
 // itself — tapping one that's already open closes it, tapping a
@@ -108,12 +117,14 @@ const GROUPS = {
       // The account page's old quick links (2026-10-12) live here now.
       { href: '/recs', label: 'My Recs' },
       { href: '/#continue-watching', label: 'Continue Watching' },
-      ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/my-work', label: 'My Work' }] : []),
-      ...(roles.isCreator || roles.canAccessAdmin ? [{ href: '/creator/analytics', label: 'Your Numbers' }] : []),
-      ...(roles.isCreator || roles.isAdmin ? [{ href: '/creator/money', label: 'Money' }] : []),
+      // My Work, Your Numbers and Money sat here until the Dashboard tab
+      // (2026-11-14): everyone who could see them has that tab now.
       ...(roles.isContentScheduler || roles.isAdmin ? [{ href: '/schedule', label: 'Channel scheduler' }] : [])
     ],
-    match: (p) => p === '/account' || p === '/artist-support' || p === '/wishlist' || p.startsWith('/creator') || p === '/schedule'
+    // The /creator pages light the Dashboard tab for the people who have
+    // it; for anyone else there (a host on Money) Account stays lit: see
+    // the button below.
+    match: (p) => p === '/account' || p === '/artist-support' || p === '/wishlist' || p === '/schedule'
   }
 };
 
@@ -229,6 +240,7 @@ export default function MobileTabBar() {
     };
   }, [openMenu]);
 
+  const showDashboard = seesDashboard(roles);
   const openGroup = openMenu ? GROUPS[openMenu] : null;
   const openItems = openGroup ? (typeof openGroup.items === 'function' ? openGroup.items(roles, siteSettings) : openGroup.items) : [];
 
@@ -293,7 +305,7 @@ export default function MobileTabBar() {
   }, [openMenu, wide]);
 
   return (
-    <nav className="tabbar" aria-label="Primary" ref={barRef}>
+    <nav className={`tabbar${showDashboard ? ' has-dash' : ''}${showDashboard && roles.isAdmin ? ' six' : ''}`} aria-label="Primary" ref={barRef}>
       {openGroup && (
         <div ref={dropdownRef} className="tabbar-dropup" role="menu">
           {openItems.map((item) => (
@@ -352,10 +364,22 @@ export default function MobileTabBar() {
         <span className="tabbar-label">Watch <span className="tabbar-caret" aria-hidden="true"><CaretUpIcon size={7} src={iconOverrides.tab_caret} /></span></span>
       </button>
 
+      {showDashboard && (
+        <Link
+          href={DASHBOARD_PATH}
+          className={`tabbar-item tabbar-dash ${path.startsWith('/creator') ? 'active' : ''}`}
+          aria-current={path === DASHBOARD_PATH ? 'page' : undefined}
+          onClick={() => setOpenMenu(null)}
+        >
+          <span className="tabbar-glyph"><DashboardIcon size={20} src={iconOverrides.tab_dashboard} /></span>
+          <span className="tabbar-label">Dashboard</span>
+        </Link>
+      )}
+
       <button
         ref={(el) => { triggerRefs.current.account = el; }}
         type="button"
-        className={`tabbar-item ${GROUPS.account.match(path) ? 'active' : ''} ${openMenu === 'account' ? 'open' : ''}`}
+        className={`tabbar-item ${GROUPS.account.match(path) || (!showDashboard && path.startsWith('/creator')) ? 'active' : ''} ${openMenu === 'account' ? 'open' : ''}`}
         onClick={() => setOpenMenu((m) => (m === 'account' ? null : 'account'))}
         aria-expanded={openMenu === 'account'}
         aria-haspopup="menu"

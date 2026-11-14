@@ -648,6 +648,20 @@ export function WatchTabIcon({ src, size = 18 }) {
   );
 }
 
+// The creator's Dashboard tab (2026-11-14): four uneven tiles, the usual
+// mark for an overview page. Override key `tab_dashboard`.
+export function DashboardIcon({ src, size = 18 }) {
+  if (src) return <IconImage src={src} size={size} />;
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="3" y="3" width="8" height="10" rx="1.5" />
+      <rect x="13" y="3" width="8" height="6" rx="1.5" />
+      <rect x="13" y="11" width="8" height="10" rx="1.5" />
+      <rect x="3" y="15" width="8" height="6" rx="1.5" />
+    </svg>
+  );
+}
+
 // A compass rose — the established convention for "explore/discover" tabs
 // (Instagram, Pinterest, etc. all use a compass here), distinguishing this
 // tab's purpose (browse curated new things) from Home's (your usual spot).

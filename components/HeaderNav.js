@@ -8,7 +8,7 @@ import { useClerk } from '@clerk/nextjs';
 import { useNotifications } from '../lib/useNotifications';
 import { SITE } from '../lib/siteConfig';
 import { isStreamPath } from '../lib/streamSection';
-import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
+import { SearchIcon, BellIcon, HeartIcon, SettingsIcon, LockIcon, SparkleIcon, TargetIcon, CardIcon, BarChartIcon, ClapperboardIcon, FolderIcon, AntennaIcon, LogoutIcon, ArrowRightIcon, AccountIcon, DashboardIcon, HamburgerMenuIcon, usePlayerIconOverrides, ChatIcon } from './PlayerIcons';
 
 // Redesigned to match the horizontal-nav mockup: logo + top-level links on
 // the left (Home/Series/Films/Vertical/Podcasts/My List), search + a
@@ -546,7 +546,10 @@ export default function HeaderNav({ activeType, activeGenre, mainGenres, isSigne
                   {isSubscriber ? <CardIcon size={15} src={iconOverrides.card} /> : <SparkleIcon size={15} src={iconOverrides.sparkle} />}
                   {' '}{isSubscriber ? 'Membership' : `Join ${SITE.premiumTier}`}
                 </Link>
-                {isCreator && <div className="dropdown-divider" />}
+                {(isCreator || isAdmin || isSubAdmin) && <div className="dropdown-divider" />}
+                {/* The creator's Dashboard (2026-11-14): the same people
+                    who get its tab in the tab bar. */}
+                {(isCreator || isAdmin || isSubAdmin) && <Link href="/creator/dashboard" className="dropdown-item"><DashboardIcon size={15} src={iconOverrides.tab_dashboard} /> Dashboard</Link>}
                 {isCreator && <Link href="/creator/analytics" className="dropdown-item"><BarChartIcon size={15} src={iconOverrides.bar_chart} /> Your numbers</Link>}
                 {(isCreator || isAdmin) && <Link href="/creator/money" className="dropdown-item"><CardIcon size={15} src={iconOverrides.card} /> Money</Link>}
                 {(isCreator || isAdmin) && <div className="dropdown-divider" />}

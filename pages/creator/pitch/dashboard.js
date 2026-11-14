@@ -7,6 +7,8 @@ import { getPitchesForCreator } from '../../../lib/pitches';
 import { getAuth } from '@clerk/nextjs/server';
 import HeaderNav from '../../../components/HeaderNav';
 import Footer from '../../../components/Footer';
+import MobileTabBar from '../../../components/MobileTabBar';
+import DashboardTabs from '../../../components/creator/DashboardTabs';
 import PayoutsCard from '../../../components/creator/PayoutsCard';
 import PitchEarnings from '../../../components/creator/PitchEarnings';
 import { getEarningsForCreator } from '../../../lib/pitchDonations';
@@ -101,6 +103,8 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
           </Link>
         </div>
 
+        <DashboardTabs current="pitches" isCreator={isCreator} isAdmin={isAdmin} />
+
         <div style={{ marginBottom: '1rem' }}><PayoutsCard returnTo="/creator/pitch/dashboard" /></div>
 
         {pitches.length === 0 ? (
@@ -148,6 +152,7 @@ export default function PitchDashboard({ isSignedIn, isSubscriber, email, isAdmi
         )}
       </main>
       <Footer />
+      <MobileTabBar />
     </>
   );
 }

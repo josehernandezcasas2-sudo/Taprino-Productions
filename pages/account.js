@@ -96,7 +96,9 @@ export default function Account(props) {
             Sign in if you&rsquo;ve been here before, or create a free account if you&rsquo;re new.
             Either way, you can upgrade to {SITE.premiumTier} any time once signed in.
           </p>
-          <SignInButton mode="modal" forceRedirectUrl="/account">
+          {/* /signed-in decides where a sign-in lands: a creator or a team
+              member on the Dashboard, everyone else back here (2026-11-14). */}
+          <SignInButton mode="modal" forceRedirectUrl="/signed-in?next=/account">
             <button className="account-btn-primary">Sign in</button>
           </SignInButton>
           <SignUpButton mode="modal" forceRedirectUrl="/account">

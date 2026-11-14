@@ -7,6 +7,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
+import DashboardTabs from '../../components/creator/DashboardTabs';
 import { SITE } from '../../lib/siteConfig';
 import { tierBadge } from '../../lib/tierBadge';
 import { formatRuntime } from '../../lib/videoMetadata';
@@ -243,8 +244,10 @@ export default function CreatorAnalytics({ mainGenres, isSignedIn, isSubscriber,
             <h1>Your numbers</h1>
             <p className="ca-sub">How your work is doing on {SITE.name}. Only you can see this page.</p>
           </div>
-          <BackButton fallbackHref="/creator" />
+          <BackButton fallbackHref="/creator/dashboard" />
         </div>
+
+        <DashboardTabs current="numbers" isCreator={isCreator} isAdmin={isAdmin} />
 
         <div className="ca-range" role="group" aria-label="Time range">
           {[7, 30, 90].map((d) => (

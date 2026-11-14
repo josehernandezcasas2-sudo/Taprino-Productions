@@ -5,6 +5,7 @@ import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
 import { applyCors } from '../../../lib/cors';
 import { paidEpisodeIds, showExtraIds } from '../../../lib/payees';
 import { isTitleId } from '../../../lib/titleIds';
+import { splitWindow, titleWindow, viewsOf, changePercent } from '../../../lib/viewWindowRules';
 
 // Everything a creator can see about how their own work is performing.
 //
@@ -99,19 +100,7 @@ export default async function handler(req, res) {
 
   const [totals, allDaily, watchTotals] = await Promise.all([getViewCounts(), getDailyViews(readDays), getWatchSecondsTotals()]);
   // `daily` is the window asked for; `earlier` the days before it (compare).
-  const daily = compare ? allDaily.slice(-days) : allDaily;
-  const earlier = compare ? allDaily.slice(0, Math.max(0, allDaily.length - days)) : [];
-
-  // Each title's own views inside the window, and their shape in at most
-  // ten steps (the Dashboard's row and its small line).
-  const SPARK_STEPS = 10;
-  const windowOf = (id) => {
-    const perDay = daily.map((day) => Number(day.counts[id]) || 0);
-    const size = Math.max(1, Math.ceil(perDay.length / SPARK_STEPS));
-    const spark = [];
-    for (let i = 0; i < perDay.length; i += size) spark.push(perDay.slice(i, i + size).reduce((a, b) => a + b, 0));
-    return { windowViews: perDay.reduce((a, b) => a + b, 0), spark };
-  };
+  const { window: daily, earlier } = compare ? splitWindow(allDaily, days) : { window: allDaily, earlier: [] };
 
   // Per-episode lifetime totals, biggest first.
   const perEpisode = approved
@@ -126,7 +115,9 @@ export default async function handler(req, res) {
       seriesOrder: e.series_order,
       publishedAt: e.created_at,
       views: totals[e.id] || 0,
-      ...windowOf(e.id),
+      // Its own views inside the window, and their shape in at most ten
+      // steps (the Dashboard's row and its small line).
+      ...titleWindow(daily, e.id),
       // null (not 0) when there's nothing to compute from yet — the page
       // shows that as "—" rather than a misleading "0:00".
       avgWatchSeconds: totals[e.id] > 0 && watchTotals[e.id] != null
@@ -160,14 +151,7 @@ export default async function handler(req, res) {
   const half = Math.floor(trend.length / 2);
   const recentHalf = trend.slice(half).reduce((a, b) => a + b.views, 0);
   const priorHalf = trend.slice(0, half).reduce((a, b) => a + b.views, 0);
-  const earlierViews = earlier.reduce((sum, day) => {
-    let n = 0;
-    for (const [epId, c] of Object.entries(day.counts)) if (myIds.has(epId)) n += c;
-    return sum + n;
-  }, 0);
-  const changePct = compare
-    ? (earlierViews > 0 ? Math.round(((windowViews - earlierViews) / earlierViews) * 100) : null)
-    : (priorHalf > 0 ? Math.round(((recentHalf - priorHalf) / priorHalf) * 100) : null);
+  const changePct = compare ? changePercent(windowViews, viewsOf(earlier, myIds)) : changePercent(recentHalf, priorHalf);
 
   return res.status(200).json({
     // Surfaced so the page can say "tracking isn't switched on yet" rather
