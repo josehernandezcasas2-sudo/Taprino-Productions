@@ -306,7 +306,12 @@ export function createDownloadLogic(rules) {
   // One row's standing for the page.
   // → { kind: 'play' | 'locked' | 'missing' | 'downloading' | 'paused' |
   //     'waiting' | 'preparing' | 'queued' | 'failed', reason, percent }
-  function rowStatus(index, item, { now = Date.now(), missing = false } = {}) {
+  // `offline` / `wifiBlocked`: how the phone is connected right now (no
+  // connection; Wi-Fi only and not on Wi-Fi). A download that isn't done
+  // says why it isn't moving from that, not only from what the manager
+  // last wrote on it — with no connection at launch nothing has been
+  // written yet.
+  function rowStatus(index, item, { now = Date.now(), missing = false, offline = false, wifiBlocked = false } = {}) {
     const percent = Math.round((Number(item.progress) || 0) * 100);
     if (item.state === 'ready') {
       const p = itemPlayState(index, item, { now, missing });
@@ -317,9 +322,13 @@ export function createDownloadLogic(rules) {
     if (item.state === 'downloading') return { kind: 'downloading', reason: null, percent };
     if (item.state === 'preparing') return { kind: 'preparing', reason: null, percent };
     if (item.state === 'failed') return { kind: 'failed', reason: null, percent };
-    if (item.wait === 'wifi') return { kind: 'waiting', reason: 'wifi', percent };
-    if (item.state === 'paused') return { kind: 'paused', reason: item.userPaused ? 'user' : item.wait === 'offline' ? 'offline' : 'auto', percent };
-    return { kind: item.wait === 'offline' ? 'paused' : 'queued', reason: item.wait === 'offline' ? 'offline' : null, percent };
+    if (item.state === 'paused' && item.userPaused) return { kind: 'paused', reason: 'user', percent };
+    if (!item.endedAt) {
+      if (offline || item.wait === 'offline') return { kind: 'paused', reason: 'offline', percent };
+      if (wifiBlocked || item.wait === 'wifi') return { kind: 'waiting', reason: 'wifi', percent };
+    }
+    if (item.state === 'paused') return { kind: 'paused', reason: 'auto', percent };
+    return { kind: 'queued', reason: null, percent };
   }
 
   // The two lines under a row's title.
@@ -327,9 +336,12 @@ export function createDownloadLogic(rules) {
   // `lockShown`: a lock card is over the list, so a copy that still plays says so.
   function rowText(item, status, { offline = false, lockShown = false } = {}) {
     const code = episodeCodeOf(item);
-    const first = item.seriesName && code ? `${item.seriesName} ${code}` : item.seriesName || kindLabel(item);
+    const episode = Boolean(item.seriesName && code);
+    const first = episode ? `${item.seriesName} ${code}` : item.seriesName || kindLabel(item);
     const size = !offline && status.kind !== 'downloading' && status.kind !== 'paused' ? bytesLabel(item.bytes) : '';
-    const sub = [first, runtimeLabel(item.runtimeSeconds), size].filter(Boolean).join(' · ');
+    // "Night Bus S1 E2 · 310 MB", "Film · 1 h 31 min · 1.1 GB": a show's
+    // episode gives its length up for its size (the line is one line wide).
+    const sub = (episode && size ? [first, size] : [first, runtimeLabel(item.runtimeSeconds), size]).filter(Boolean).join(' · ');
     const total = bytesLabel(item.bytes);
     let note = '';
     let tone = 'gold';

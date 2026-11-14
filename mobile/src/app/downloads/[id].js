@@ -136,18 +136,24 @@ export default function DownloadedTitle() {
   }
   const toList = () => router.dismissTo('/downloads');
 
-  const lock = verdict.ok ? null : downloadLogic.itemLock(state.index, item, verdict.reason);
+  // It may play and the file can't be found after all: the same as gone.
+  const lock = verdict.ok
+    ? (uri ? null : downloadLogic.itemLock(state.index, item, 'missing'))
+    : downloadLogic.itemLock(state.index, item, verdict.reason);
   const lockActions = !lock ? [] : lock.action === 'retry' ? [{ label: APP_WORDS.retry, onPress: retry, busy: retrying }]
     : lock.action === 'plans' ? [{ label: DOWNLOAD_WORDS.planAction, onPress: () => router.push('/account/membership') }]
     : lock.action === 'download' && !state.offline && id ? [{ label: APP_WORDS.openTitle, onPress: () => router.replace(`/episode/${encodeURIComponent(id)}`) }]
     : [];
   const meta = item ? [runtimeLabel(item.runtimeSeconds)].filter(Boolean).join(' · ') : '';
-  const until = item && verdict.ok ? untilChip(item.licensedUntil) : '';
+  // The same day the Downloads page names (the end of the paid month when
+  // that comes before the copy's own date).
+  const untilDate = item && verdict.ok && uri ? downloadLogic.chipDate(state.index, [{ item, status: { kind: 'play' } }], {}) : null;
+  const until = untilDate ? untilChip(untilDate) : '';
 
   return (
     <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
       <TopNav />
-      {state.offline ? <OfflineBanner locked={!verdict.ok} /> : null}
+      {state.offline ? <OfflineBanner locked={Boolean(lock)} /> : null}
       <ScrollView contentContainerStyle={styles.scroll}>
         {uri ? (
           <View style={styles.playerWrap}>

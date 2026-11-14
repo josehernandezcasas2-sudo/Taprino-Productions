@@ -35,10 +35,11 @@ export function useDownloadRows() {
   // The clock is looked at again each minute and whenever the store changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [minute, state.version]);
-  const rows = useMemo(
-    () => state.items.map((item) => ({ item, status: downloadLogic.rowStatus(state.index, item, { now, missing: state.missing.get(item.episodeId) === true }) })),
-    [state, now]
-  );
+  const rows = useMemo(() => {
+    const offline = state.offline;
+    const wifiBlocked = !offline && state.index.wifiOnly !== false && state.net.known && !state.net.wifi;
+    return state.items.map((item) => ({ item, status: downloadLogic.rowStatus(state.index, item, { now, missing: state.missing.get(item.episodeId) === true, offline, wifiBlocked }) }));
+  }, [state, now]);
   return { state, rows, now };
 }
 

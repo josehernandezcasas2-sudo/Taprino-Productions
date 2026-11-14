@@ -197,7 +197,7 @@ t('the rows: each state and what it says (the mockup’s lines)', () => {
     return { status, ...logic.rowText(it, status, opts) };
   };
   let r = say({});
-  assert.deepEqual([r.status.kind, r.sub, r.note], ['play', 'Night Bus S1 E2 · 22 min · 310 MB', '']);
+  assert.deepEqual([r.status.kind, r.sub, r.note], ['play', 'Night Bus S1 E2 · 310 MB', '']);
   r = say({}, { offline: true });
   assert.equal(r.sub, 'Night Bus S1 E2 · 22 min');
   r = say({ contentType: 'movie', seriesId: null, seriesName: null, number: null, runtimeSeconds: 5460, bytes: 1.1 * 1024 * 1024 * 1024, resumeSeconds: 2470 });
@@ -220,6 +220,21 @@ t('the rows: each state and what it says (the mockup’s lines)', () => {
   assert.deepEqual([r.status.kind, r.note], ['waiting', W.waitingWifi]);
   r = say({ state: 'queued' });
   assert.deepEqual([r.status.kind, r.note], ['queued', lib.APP_WORDS.queued]);
+  // How the phone is connected right now says why a download isn't moving,
+  // even when nothing has been written on it (the app opened offline).
+  r = say({ state: 'paused', progress: 0.42 }, { offline: true }, { offline: true });
+  assert.deepEqual([r.status.reason, r.note], ['offline', 'Paused at 42% · finishes when you’re back online']);
+  r = say({ state: 'queued' }, {}, { wifiBlocked: true });
+  assert.deepEqual([r.status.kind, r.note], ['waiting', W.waitingWifi]);
+  r = say({ state: 'paused', progress: 0.42 }, {}, { offline: true, wifiBlocked: true });
+  assert.equal(r.status.reason, 'offline');
+  // The member's own pause, and a membership that ended, say only that.
+  r = say({ state: 'paused', progress: 0.42, userPaused: true }, {}, { offline: true });
+  assert.deepEqual([r.status.reason, r.note], ['user', 'Paused at 42%']);
+  r = say({ state: 'paused', progress: 0.42, endedAt: at(-1) }, {}, { offline: true });
+  assert.deepEqual([r.status.reason, r.note], ['auto', 'Paused at 42%']);
+  r = say({ state: 'paused', progress: 0.42 });
+  assert.deepEqual([r.status.reason, r.note], ['auto', 'Paused at 42%']);
   r = say({ state: 'preparing' });
   assert.deepEqual([r.status.kind, r.note], ['preparing', W.preparing]);
   r = say({ state: 'failed' });

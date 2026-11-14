@@ -167,6 +167,11 @@ function loadAgainIfLocked() {
 
 function writeIndex() {
   if (!SUPPORTED || indexLocked) return;
+  // A phone that has never downloaded anything gets no file at all.
+  const blank = Object.keys(index.items).length === 0 && index.notices.length === 0 && !index.deviceKnown && !index.deviceId;
+  try {
+    if (blank && !indexFile().exists) return;
+  } catch { /* written below */ }
   const text = JSON.stringify(index);
   ensureDir(indexDir());
   try {
@@ -244,6 +249,9 @@ function touchSeen() {
   if (next === index.lastSeenAt) return;
   const jumped = index.lastSeenAt === null || next - index.lastSeenAt > 5 * 60 * 1000;
   index.lastSeenAt = next;
+  // The mark only matters while there are copies: nothing is written for a
+  // phone that holds none.
+  if (Object.keys(index.items).length === 0) return;
   // The app back after a while: the mark is written at once (closing the
   // app in the next second mustn't lose it); a minute's tick can wait.
   if (jumped && SUPPORTED) saveNow(); else saveSoon(2000);
