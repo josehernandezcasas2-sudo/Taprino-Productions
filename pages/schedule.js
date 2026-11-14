@@ -938,7 +938,7 @@ function Uploads({ media, reload, channelId, setError, picked, setPicked, drag }
           </fieldset>
           {where === 'ondemand' ? (
             <p className="sch-muted">
-              Submit it in <Link href="/creator">Creator Studio</Link> like any title and tick &ldquo;Let channels air this&rdquo;.
+              Submit it from <Link href="/creator/dashboard">your Dashboard</Link> like any title and tick &ldquo;Let channels air this&rdquo;.
               Once it&rsquo;s approved it shows up under Series or Titles here.
             </p>
           ) : (

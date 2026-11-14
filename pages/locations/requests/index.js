@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../../components/SignInHere';
 import { LocationShell, Crumbs } from '../../../components/locations/LocationBits';
 import { RequestCard } from '../../../components/locations/RequestBits';
 import { getAccountContext } from '../../../lib/accountContext';
@@ -53,7 +53,7 @@ export default function MyRequests({ mainGenres, isSignedIn, isSubscriber, email
         </div>
       </div>
       {!isSignedIn ? (
-        <div className="crew-panel crew-signin"><p>Sign in to see your requests.</p><SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in</button></SignInButton></div>
+        <div className="crew-panel crew-signin"><p>Sign in to see your requests.</p><SignInHere><button type="button" className="crew-btn primary">Sign in</button></SignInHere></div>
       ) : (
         <div className="loc-narrowcol">
           {requests.length === 0 && <div className="crew-panel crew-empty">No requests yet. <Link href="/locations">Find a place</Link> and ask for dates.</div>}

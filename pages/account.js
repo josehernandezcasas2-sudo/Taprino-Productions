@@ -98,10 +98,12 @@ export default function Account(props) {
           </p>
           {/* /signed-in decides where a sign-in lands: a creator or a team
               member on the Dashboard, everyone else back here (2026-11-14). */}
-          <SignInButton mode="modal" forceRedirectUrl="/signed-in?next=/account">
+          {/* Each box can turn into the other ("Sign up" / "Sign in" at its
+              foot), so both name where each outcome lands. */}
+          <SignInButton mode="modal" forceRedirectUrl="/signed-in?next=/account" signUpForceRedirectUrl="/account">
             <button className="account-btn-primary">Sign in</button>
           </SignInButton>
-          <SignUpButton mode="modal" forceRedirectUrl="/account">
+          <SignUpButton mode="modal" forceRedirectUrl="/account" signInForceRedirectUrl="/signed-in?next=/account">
             <button className="account-btn-secondary">Create a free account</button>
           </SignUpButton>
           <div className="account-fineprint">

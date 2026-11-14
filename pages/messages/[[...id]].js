@@ -2,7 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
@@ -243,7 +243,7 @@ export default function MessagesPage({ mainGenres, isSignedIn, isSubscriber, ema
         {!isSignedIn ? (
           <div className="crew-panel crew-signin">
             <p>Sign in to see your messages. Anyone with an account can write to anyone on Crew Call.</p>
-            <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+            <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
           </div>
         ) : (
           <div className={`dm-inbox${convo ? ' has-convo' : ''}`}>

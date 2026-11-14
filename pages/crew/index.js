@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
@@ -160,7 +160,7 @@ export default function CrewCall({ mainGenres, isSignedIn, isSubscriber, email, 
           {isSignedIn ? (
             <Link href="/crew/card" className="crew-btn primary">{hasCard ? 'Your card' : '+ Set up your card'}</Link>
           ) : (
-            <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to make your card</button></SignInButton>
+            <SignInHere><button type="button" className="crew-btn primary">Sign in to make your card</button></SignInHere>
           )}
         </div>
 
@@ -332,7 +332,7 @@ function PersonCard({ p, signedIn }) {
 // "Message" / "Ask about it": opens (or starts) the conversation with the
 // person, with what it's about attached. Signed out → the sign-in modal.
 function MessageLink({ signedIn, userId, kind, label, className, children }) {
-  if (!signedIn) return <SignInButton mode="modal"><button type="button" className={className}>{children}</button></SignInButton>;
+  if (!signedIn) return <SignInHere><button type="button" className={className}>{children}</button></SignInHere>;
   return <Link href={`/messages?to=${encodeURIComponent(userId)}&kind=${kind}&label=${encodeURIComponent(label)}`} className={className}>{children}</Link>;
 }
 

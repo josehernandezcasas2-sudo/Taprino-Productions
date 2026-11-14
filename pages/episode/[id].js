@@ -18,6 +18,8 @@ import { adsOnFor } from '../../lib/adBreakRules';
 import { googleAdTagFor } from '../../lib/googleAds';
 import { parseRuntimeToSeconds, formatRuntimeLong } from '../../lib/videoMetadata';
 import { useWishlist } from '../../lib/useWishlist';
+import { TASKS, stayHereProps, stayHereSignUpProps } from '../../lib/resumeTaskRules';
+import { rememberTask, useResumeTask } from '../../lib/resumeTask';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import VideoPlayer from '../../components/VideoPlayer';
 import { fetchTrailerSrc, trailerKeyOf } from '../../components/HeroSpotlight';
@@ -430,6 +432,10 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     [episode.id, nextEpisode && nextEpisode.id, afterShow && afterShow.id, parentSeriesName, showingTrailer, Boolean(preview)]
   );
   const lockedNow = preview ? preview.canPlay === false : (episode.tier === 'premium' && !isSubscriber && !owned) || Boolean(earlyAccess && earlyAccess.locked);
+  // Back from the sign-in box the paywall's "See plans" opened (signed in
+  // now, or with a new account): if the title is still locked for them,
+  // carry on to the plans (2026-11-14, lib/resumeTaskRules.js).
+  useResumeTask(TASKS.plans, isSignedIn, () => { if (!preview && lockedNow) startCheckout(); });
   useEffect(() => {
     if (preview || !showPlayer || showingTrailer || lockedNow || !episode.id || resumeToastFor.current === episode.id) return undefined;
     const pos = getPosition(episode.id);
@@ -534,7 +540,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               <Link href="/account" className="account-btn-primary" style={{ display: 'inline-block', textDecoration: 'none' }}>Go to account settings</Link>
             ) : (
               <>
-                <button className="account-btn-primary" onClick={() => openSignUp({ redirectUrl: router.asPath })}>Create a free account</button>
+                <button className="account-btn-primary" onClick={() => openSignUp(stayHereSignUpProps(router.asPath))}>Create a free account</button>
                 <p style={{ fontSize: '0.75rem', color: 'var(--ink-dim)', marginTop: '0.7rem' }}>
                   By signing up you agree to our{' '}
                   <Link href="/terms" style={{ color: 'var(--ink-dim)', textDecoration: 'underline' }}>Terms of Service</Link>
@@ -544,7 +550,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
                 <p style={{ fontSize: '0.8rem', marginTop: '0.9rem' }}>
                   Already have an account?{' '}
                   <button
-                    onClick={() => openSignIn({ redirectUrl: router.asPath })}
+                    onClick={() => openSignIn(stayHereProps(router.asPath))}
                     style={{ background: 'none', border: 'none', padding: 0, color: 'var(--signal-amber)', textDecoration: 'underline', cursor: 'pointer', font: 'inherit' }}
                   >
                     Sign in
@@ -640,8 +646,11 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
     if (!isSignedIn) {
       // Checkout requires a signed-in account now (see
       // /api/create-checkout-session) — open the sign-in modal directly
-      // instead of letting them hit a rejected API call first.
-      openSignIn({ redirectUrl: router.asPath });
+      // instead of letting them hit a rejected API call first. They come
+      // back to this title either way (signing in or creating an account)
+      // and, if it is still locked for them, go on to the plans.
+      rememberTask(TASKS.plans);
+      openSignIn(stayHereProps(router.asPath));
       return;
     }
     // There's more than one plan now, so the paywall sends them to the

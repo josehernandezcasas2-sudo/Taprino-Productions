@@ -5,7 +5,7 @@ import BackButton from '../../components/BackButton';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { splitDonation, dollars } from '../../lib/donationMath';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import { ShareIcon, CheckIcon, BackItIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import WishlistButton from '../../components/WishlistButton';
 import { getPitchDetailData } from '../../lib/pitchDetailHub';
@@ -546,9 +546,9 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
                   </form>
                 ) : (
                   <p style={{ fontSize: 13, opacity: 0.75 }}>
-                    <SignInButton mode="modal">
+                    <SignInHere>
                       <span style={{ cursor: 'pointer', textDecoration: 'underline' }}>Sign in</span>
-                    </SignInButton>
+                    </SignInHere>
                     {' '}to support this project.
                   </p>
                 )}

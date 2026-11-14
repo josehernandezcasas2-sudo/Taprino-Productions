@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../../../components/SignInHere';
 import ProductionShell, { shellProps } from '../../../../components/productions/ProductionShell';
 import { StatusPill, fmtDay } from '../../../../components/productions/ProductionBits';
 import DayForm from '../../../../components/productions/DayForm';
@@ -67,7 +67,7 @@ export default function CallSheetPage(props) {
       <ProductionShell title="Call sheet" {...props}>
         <div className="crew-crumbs"><Link href="/productions">Productions</Link><span>/</span><Link href={`/productions/${productionId}`}>Production</Link><span>/</span><span>Call sheet</span></div>
         <div className="crew-panel crew-empty">
-          {problem === 'signin' && <>The call sheet is for the crew. <SignInButton mode="modal"><button type="button" className="crew-btn sm primary" style={{ marginLeft: '0.5rem' }}>Sign in</button></SignInButton></>}
+          {problem === 'signin' && <>The call sheet is for the crew. <SignInHere><button type="button" className="crew-btn sm primary" style={{ marginLeft: '0.5rem' }}>Sign in</button></SignInHere></>}
           {problem === 'crew' && <>The call sheet is for the crew on this production. Ask the owner to add you.</>}
           {problem === 'missing' && <>That shoot day isn’t on the sheet.</>}
           <br /><Link href={`/productions/${productionId}`} className="crew-btn sm" style={{ marginTop: '0.6rem' }}>Back to the production</Link>

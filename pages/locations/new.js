@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import PlaceSearch from '../../components/crew/PlaceSearch';
 import { LocationShell, Crumbs, PhotoStrip, uploadImage, uploadImageFull } from '../../components/locations/LocationBits';
 import { getAccountContext } from '../../lib/accountContext';
@@ -142,7 +142,7 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
           <span className="crew-eyebrow">Connect · Locations</span>
           <h1>List a place</h1>
           <p>A home, a warehouse, a café on its closed day, a yard: if you hold the keys, productions near you will pay to shoot there. Set your rates or take offers; the site handles the booking and the money.</p>
-          <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+          <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
         </div>
       </LocationShell>
     );

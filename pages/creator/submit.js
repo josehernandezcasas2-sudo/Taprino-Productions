@@ -483,7 +483,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
     if (!window.confirm('Discard this draft? The uploaded file is deleted too.')) return;
     try {
       if (draftId) await postJson('/api/creator/drafts', { id: draftId }, 'DELETE');
-      router.push('/creator');
+      router.push('/creator/dashboard');
     } catch (err) {
       setError(err.message);
     }
@@ -544,7 +544,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
       if (saveTimer.current) clearTimeout(saveTimer.current);
       latest.current = { form: EMPTY_SUBMIT_FORM, video: null, trailer: null, draftId: null };
       const showId = data.seriesId || (data.newShow && data.newShow.id) || null;
-      router.push(`/creator?submitted=${encodeURIComponent(form.title.trim())}&id=${encodeURIComponent(data.id)}${showId ? `&show=${encodeURIComponent(showId)}` : ''}`);
+      router.push(`/creator/dashboard?submitted=${encodeURIComponent(form.title.trim())}&id=${encodeURIComponent(data.id)}${showId ? `&show=${encodeURIComponent(showId)}` : ''}`);
     } catch (err) {
       // Sending failed after the swap: the episode goes back to its number.
       if (swapped) {
@@ -593,7 +593,7 @@ export default function SubmitTitle({ allSeries, mainGenres, isSignedIn, isSubsc
 
       <main id="main-content" className="apl sub">
         <div className="sub-head">
-          <Link href="/creator" className="sub-back" aria-label="Back to Creator Studio">
+          <Link href="/creator/dashboard" className="sub-back" aria-label="Back to the Dashboard">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6" /></svg>
           </Link>
           <span className="sub-head-title">Submit a title</span>

@@ -5,6 +5,7 @@ import { useClerk } from '@clerk/nextjs';
 import { Avatar } from '../crew/CrewBits';
 import { AVAILABLE_NOW_CHOICES } from '../../lib/crewCallRules';
 import { LANES, LANE_ORDER, dollars } from '../../lib/creatorMoneyRules';
+import { stayHereProps } from '../../lib/resumeTaskRules';
 
 // The desk column of the Connect homepage (pages/index.js, direction I of
 // the 2026-10-28 canvas): the pieces that talk to the server from the
@@ -55,7 +56,7 @@ export function FollowList({ people, isSignedIn }) {
   const [following, setFollowing] = useState({});
   const [busy, setBusy] = useState(null);
   async function toggle(userId) {
-    if (!isSignedIn) { openSignIn({ redirectUrl: router.asPath }); return; }
+    if (!isSignedIn) { openSignIn(stayHereProps(router.asPath)); return; }
     setBusy(userId);
     try {
       const res = await fetch('/api/profile-follow', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ followedId: userId }) });

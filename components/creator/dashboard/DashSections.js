@@ -5,7 +5,9 @@ import { Spark } from './DashCharts';
 
 // The Dashboard's sections (2026-11-14). Each takes what
 // lib/creatorDashboardRules.js built and draws it: no number or sentence
-// is worked out here.
+// is worked out here. Start something, Get paid, Paid to you and Discard
+// came over from Creator Studio's hub when the Dashboard took its place;
+// Supporters and a tip's note in Latest came with them.
 
 function bg(url) {
   return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
@@ -70,7 +72,7 @@ export function Needs({ needs, loading, busy, onPublish }) {
   );
 }
 
-function TitleRow({ row, busy, onPublish }) {
+function TitleRow({ row, busy, onPublish, onDiscard }) {
   const live = row.state === 'live';
   return (
     <li className={`dash-row state-${row.state}`}>
@@ -102,6 +104,11 @@ function TitleRow({ row, busy, onPublish }) {
         <span className="dash-cell dash-note">
           {row.note && <span>{row.note}</span>}
           <Act action={row.action} busy={busy} onPublish={onPublish} className={row.action && row.action.kind === 'publish' ? 'dash-btn gold' : 'dash-btn'} />
+          {row.secondary && row.secondary.kind === 'discard' && (
+            <button type="button" className="dash-quiet" disabled={busy === `discard:${row.secondary.draftId}`} onClick={() => onDiscard(row.secondary)} aria-label={`${row.secondary.label} ${row.title}`}>
+              {busy === `discard:${row.secondary.draftId}` ? DASH_WORDS.discarding : row.secondary.label}
+            </button>
+          )}
         </span>
       )}
       <Link href={row.href} className="dash-open" aria-label={`Open ${row.title}`}><Chevron /></Link>
@@ -109,7 +116,7 @@ function TitleRow({ row, busy, onPublish }) {
   );
 }
 
-export function Titles({ titles, loading, failed, busy, onPublish, monthShort, filter, setFilter, all, setAll }) {
+export function Titles({ titles, loading, failed, busy, onPublish, onDiscard, monthShort, filter, setFilter, all, setAll }) {
   const rows = filterTitles(titles.rows, filter);
   const shown = all ? rows : rows.slice(0, TITLES_LIMIT);
   const countOf = { all: titles.counts.all, live: titles.counts.live, review: titles.counts.review, drafts: titles.counts.drafts, needs: titles.counts.needs };
@@ -139,7 +146,7 @@ export function Titles({ titles, loading, failed, busy, onPublish, monthShort, f
         <p className="dash-empty pad">{loading ? 'Loading your titles…' : failed ? 'Your titles couldn’t be loaded. Reload the page to try again.' : filter === 'all' ? DASH_WORDS.noTitles : 'Nothing in this group.'}</p>
       ) : (
         <ul className="dash-rows">
-          {shown.map((row) => <TitleRow key={row.key} row={row} busy={busy} onPublish={onPublish} />)}
+          {shown.map((row) => <TitleRow key={row.key} row={row} busy={busy} onPublish={onPublish} onDiscard={onDiscard} />)}
         </ul>
       )}
       {rows.length > TITLES_LIMIT && (
@@ -208,13 +215,115 @@ export function Latest({ rows, loading }) {
           {rows.map((row) => (
             <li key={row.key}>
               <Link href={row.href} className="dash-latest-row">
-                <span className="dash-latest-text">{row.text}{row.amount && <span className="dash-latest-amount"> · {row.amount}</span>}</span>
+                <span className="dash-latest-text">
+                  {row.text}{row.amount && <span className="dash-latest-amount"> · {row.amount}</span>}
+                  {row.quote && <span className="dash-quote">{row.quote}</span>}
+                </span>
                 <span className="dash-latest-when">{row.when}</span>
               </Link>
             </li>
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+// The shortcuts under Submit a title: one per kind of title, then a pitch.
+export function Start({ items }) {
+  if (!items || items.length === 0) return null;
+  return (
+    <nav className="dash-start" aria-label={DASH_WORDS.start}>
+      <span className="dash-k dash-start-k">{DASH_WORDS.start}</span>
+      <div className="dash-start-row">
+        {items.map((item) => <Link key={item.key} href={item.href} className="dash-pill">{item.label}</Link>)}
+      </div>
+    </nav>
+  );
+}
+
+// An invite to be paid for a title, with its two answers. Drawn only
+// while one waits; the notification and the email open it at #get-paid.
+export function GetPaid({ invites, busy, errors, onAnswer }) {
+  if (!invites || invites.length === 0) return null;
+  return (
+    <section id="get-paid" className="dash-card dash-getpaid" aria-labelledby="dash-getpaid-h">
+      <h2 id="dash-getpaid-h" className="dash-k accent">{DASH_WORDS.getPaid}{invites.length > 1 ? ` · ${invites.length}` : ''}</h2>
+      <ul className="dash-invites">
+        {invites.map((inv) => {
+          const mine = typeof busy === 'string' && busy.startsWith(`invite:${inv.id}:`);
+          return (
+            <li key={inv.key} className="dash-invite">
+              <h3 className="dash-invite-title">{inv.headline}</h3>
+              <div className="dash-need-sub">{inv.asked}</div>
+              {inv.body.length > 0 && (
+                <ul className="dash-invite-body">
+                  {inv.body.map((line) => (
+                    <li key={line.text}>
+                      {line.payouts ? <>To receive it, set up payouts under <Link href="/creator/money#payouts" className="dash-inline-link">Money</Link>.</> : line.text}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {errors && errors[inv.id] && <p className="dash-error" role="alert">{errors[inv.id]}</p>}
+              <div className="dash-invite-acts">
+                <button type="button" className="dash-btn gold" disabled={mine} onClick={() => onAnswer(inv, 'accept')}>{busy === `invite:${inv.id}:accept` ? DASH_WORDS.accepting : DASH_WORDS.accept}</button>
+                <button type="button" className="dash-btn" disabled={mine} onClick={() => onAnswer(inv, 'decline')}>{busy === `invite:${inv.id}:decline` ? DASH_WORDS.declining : DASH_WORDS.notNow}</button>
+              </div>
+              <p className="dash-fine">{inv.foot}</p>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+// The titles whose earnings come to this account.
+export function PaidTo({ rows, busy, error, onStop }) {
+  if (!rows || rows.length === 0) return null;
+  return (
+    <section className="dash-card dash-paidto" aria-labelledby="dash-paidto-h">
+      <h2 id="dash-paidto-h" className="dash-k">{DASH_WORDS.paidToYou}{rows.length > 1 ? ` · ${rows.length}` : ''}</h2>
+      <ul className="dash-needs-list">
+        {rows.map((row) => (
+          <li key={row.key} className="dash-need">
+            <div className="dash-need-text">
+              {row.href ? <Link href={row.href} className="dash-need-title dash-paidto-title">{row.title}</Link> : <div className="dash-need-title">{row.title}</div>}
+              {row.meta && <div className="dash-need-sub">{row.meta}</div>}
+              {!row.canStop && row.locked && <div className="dash-need-sub">{row.locked}</div>}
+            </div>
+            {row.canStop && (
+              <button type="button" className="dash-quiet" disabled={busy === `stop:${row.key}`} onClick={() => onStop(row)}>{busy === `stop:${row.key}` ? DASH_WORDS.stopping : DASH_WORDS.stop}</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {error && <p className="dash-error" role="alert">{error}</p>}
+    </section>
+  );
+}
+
+// Who is behind the money: counts, and names only where a member chose
+// to share theirs.
+export function Supporters({ card }) {
+  if (!card) return null;
+  return (
+    <section className="dash-card dash-supporters" aria-labelledby="dash-supporters-h">
+      <h2 id="dash-supporters-h" className="dash-k">{DASH_WORDS.supporters}</h2>
+      <dl className="dash-facts">
+        {card.rows.map((row) => (
+          <div key={row.key} className="dash-fact">
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      {card.names.length > 0 && (
+        <p className="dash-names"><span className="dash-names-k">{card.namesLabel}</span> {card.names.join(', ')}{card.more ? ` ${card.more}` : ''}</p>
+      )}
+      <p className="dash-fine">{card.note}</p>
+      <Link href={card.href} className="dash-link">{DASH_WORDS.openSupporters} →</Link>
     </section>
   );
 }

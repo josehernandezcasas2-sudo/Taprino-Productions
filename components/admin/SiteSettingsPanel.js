@@ -344,7 +344,7 @@ export default function SiteSettingsPanel() {
           <Link href="/university" className="account-quicklink">Film University</Link>
           <Link href="/admin/university" className="account-quicklink">Edit Film University</Link>
           <Link href="/apply" className="account-quicklink">Apply (creator)</Link>
-          <Link href="/creator" className="account-quicklink">Creator Studio</Link>
+          <Link href="/creator/dashboard" className="account-quicklink">Creator Dashboard</Link>
           <Link href="/creator/my-work" className="account-quicklink">Your work</Link>
         </div>
       </div>

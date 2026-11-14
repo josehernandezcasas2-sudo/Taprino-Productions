@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useMemo, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import ReportButton from '../../components/ReportButton';
 import { Avatar } from '../../components/crew/CrewBits';
 import { LocationShell, Crumbs, HostedChip, StatusPill, MonthCalendar, thisMonth, todayIso, daysBetween, hoursLabel, fmtRange } from '../../components/locations/LocationBits';
@@ -179,7 +179,7 @@ export default function ListingPage(props) {
               <div className="crew-panel loc-req">
                 <span className="crew-eyebrow">Request to book</span>
                 <p className="crew-muted" style={{ margin: '0.4rem 0 0.7rem' }}>Pick dates, say what you’re shooting, pay the posted rate or make an offer. Nothing is charged until the host accepts.</p>
-                <SignInButton mode="modal"><button type="button" className="crew-btn primary" style={{ width: '100%' }}>Sign in to request dates</button></SignInButton>
+                <SignInHere><button type="button" className="crew-btn primary" style={{ width: '100%' }}>Sign in to request dates</button></SignInHere>
               </div>
             ))}
 

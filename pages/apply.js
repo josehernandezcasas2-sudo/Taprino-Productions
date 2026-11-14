@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { SignInButton, useUser } from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
+import SignInHere from '../components/SignInHere';
 import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import { getOwnApplication } from '../lib/creatorApplications';
@@ -341,7 +342,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
             <span className="apl-status-tag">Creator Studio</span>
             <div className="apl-status-title">You already have Creator Studio.</div>
             <p>No need to apply. Submit films, shorts and everything else there, and track their review.</p>
-            <div className="apl-actions"><Link href="/creator" className="apl-btn">Open Creator Studio</Link></div>
+            <div className="apl-actions"><Link href="/creator/dashboard" className="apl-btn">Open your Dashboard</Link></div>
           </div>
         )}
 
@@ -386,7 +387,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
                   ) : preview ? (
                     <button type="button" className="apl-btn-ghost" onClick={() => setError('Preview: the upload is off.')}>Browse files</button>
                   ) : pendingFile ? (
-                    <SignInButton mode="modal"><button type="button" className="apl-btn-ghost">Sign in to start the upload</button></SignInButton>
+                    <SignInHere><button type="button" className="apl-btn-ghost">Sign in to start the upload</button></SignInHere>
                   ) : (
                     <label className="apl-btn-ghost">
                       Browse files
@@ -461,7 +462,7 @@ export default function Apply({ mainGenres, isSignedIn, isSubscriber, email, isA
                     <span>A free account, so the application is yours and the reply finds you.</span>
                     {preview
                       ? <button type="button" className="apl-btn-ghost small" onClick={() => setError('Preview: this opens sign-in for a real visitor.')}>Sign in or create one</button>
-                      : <SignInButton mode="modal"><button type="button" className="apl-btn-ghost small">Sign in or create one</button></SignInButton>}
+                      : <SignInHere><button type="button" className="apl-btn-ghost small">Sign in or create one</button></SignInHere>}
                   </>
                 )}
               </div>
@@ -570,7 +571,7 @@ function StatusCard({ app, upload, busy, onReapply, reapplying, onReplace, onRes
         {app.decisionNote && <p><strong>A note from us:</strong> {app.decisionNote}</p>}
         <div className="apl-actions">
           {live && <Link href={app.episodeHref} className="apl-btn">View the page</Link>}
-          <Link href="/creator" className={live ? 'apl-btn-secondary' : 'apl-btn'}>Open Creator Studio</Link>
+          <Link href="/creator/dashboard" className={live ? 'apl-btn-secondary' : 'apl-btn'}>Open your Dashboard</Link>
         </div>
       </div>
     );

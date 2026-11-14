@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import PayoutsCard from '../../components/creator/PayoutsCard';
 import { LocationShell, Crumbs, StatusPill, MonthCalendar, thisMonth, todayIso } from '../../components/locations/LocationBits';
 import { getAccountContext } from '../../lib/accountContext';
@@ -108,7 +108,7 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
           <span className="crew-eyebrow">Connect · Locations</span>
           <h1>Your places</h1>
           <p>List a place, answer requests, see what you’ve earned. Sign in to start.</p>
-          <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+          <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
         </div>
       </LocationShell>
     );

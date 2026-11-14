@@ -31,7 +31,7 @@ const PAGES = [
   `/episode/${IDS.film}`,
   `/episode/${IDS.nbS1E1}`,
   `/podcasts/${IDS.podcast}`,
-  '/creator',
+  '/creator/dashboard',
   `/creator/show/${IDS.nightBus}`,
   '/admin',
   '/admin/shows',
@@ -111,7 +111,7 @@ const BROWSER_PAGES = [
   ['signedOut', '/stream'],
   ['signedOut', `/series/${IDS.nightBus}`],
   ['signedOut', `/episode/${IDS.film}`],
-  ['mara', '/creator'],
+  ['mara', '/creator/dashboard'],
   ['mara', `/creator/show/${IDS.nightBus}`],
   ['admin', '/admin/shows'],
   ['admin', `/admin/shows/${IDS.nightBus}`]

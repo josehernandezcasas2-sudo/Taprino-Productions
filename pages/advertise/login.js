@@ -48,7 +48,7 @@ export default function AdManagerLogin() {
             Manage your ad account, submit new ads, and track performance — separate from any
             streaming or creator account on {SITE.name}.
           </p>
-          <SignInButton mode="modal" forceRedirectUrl="/advertise/dashboard">
+          <SignInButton mode="modal" forceRedirectUrl="/advertise/dashboard" signUpForceRedirectUrl="/advertise/dashboard">
             <button className="unlock-btn" style={{ width: '100%' }}>Sign in</button>
           </SignInButton>
           <p style={{ marginTop: '1.2rem', fontSize: '0.82rem', color: 'var(--ink-faint)' }}>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import Link from 'next/link';
@@ -7,6 +7,8 @@ import AvatarPhoto from './AvatarPhoto';
 import { tipQuote, parseTipAmount, validateTipInput, MAX_NOTE_CHARS, MIN_TIP_CENTS, DEFAULT_TIP_MAX_CENTS, TIP_PRESETS_CENTS } from '../lib/tipRules';
 import { dollars } from '../lib/purchaseRules';
 import { SITE } from '../lib/siteConfig';
+import { stayHereProps, tipTask } from '../lib/resumeTaskRules';
+import { rememberTask, takeTask } from '../lib/resumeTask';
 
 // Tips, the fan's side (mockup 2026-10-24, decisions the same day): the
 // sheet, the buttons that open it, the end-of-episode card and the banner
@@ -137,21 +139,38 @@ export function TipSheet({ tipping, initialAmountCents = 500, onClose }) {
 
 // Opens the sheet; signed-out viewers get the sign-in modal first. Renders
 // nothing when the creator can't be tipped. `children` is the label.
+//
+// Signing in (or creating an account) from that box ends on this page,
+// and the sheet then opens by itself (2026-11-14, lib/resumeTaskRules.js):
+// the button leaves a mark before it opens the box, and the first Tip
+// button on screen for the same creator takes it once the page is signed
+// in. A page can hold several (the episode page has three); a hidden one
+// never takes it.
 export function TipButton({ tipping, isSignedIn, className = '', presetCents = 500, children, title }) {
   const router = useRouter();
   const { openSignIn } = useClerk();
   const [open, setOpen] = useState(false);
-  if (!tipping || !tipping.enabled) return null;
+  const buttonRef = useRef(null);
+  const enabled = Boolean(tipping && tipping.enabled);
+  const task = enabled && tipping.creatorId ? tipTask(tipping.creatorId) : '';
+  useEffect(() => {
+    if (!isSignedIn || !task) return;
+    const el = buttonRef.current;
+    if (!el || el.offsetParent === null) return;
+    if (takeTask(task)) setOpen(true);
+  }, [isSignedIn, task]);
+  if (!enabled) return null;
   function click() {
     if (!isSignedIn) {
-      openSignIn({ redirectUrl: router.asPath });
+      if (task) rememberTask(task);
+      openSignIn(stayHereProps(router.asPath));
       return;
     }
     setOpen(true);
   }
   return (
     <>
-      <button type="button" className={className} onClick={click} title={title}>{children || `Tip ${short(tipping.creatorName)}`}</button>
+      <button ref={buttonRef} type="button" className={className} onClick={click} title={title}>{children || `Tip ${short(tipping.creatorName)}`}</button>
       {open && <TipSheet tipping={tipping} initialAmountCents={presetCents} onClose={() => setOpen(false)} />}
     </>
   );

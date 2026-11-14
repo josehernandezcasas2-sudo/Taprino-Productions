@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import ProductionShell, { shellProps } from '../../components/productions/ProductionShell';
 import { ProductionCard } from '../../components/productions/ProductionBits';
 import { getAccountContext } from '../../lib/accountContext';
@@ -70,7 +70,7 @@ export default function ProductionsPage(props) {
         </div>
         {isSignedIn
           ? <Link href="/productions/new" className="crew-btn primary">+ Start a production</Link>
-          : <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to start one</button></SignInButton>}
+          : <SignInHere><button type="button" className="crew-btn primary">Sign in to start one</button></SignInHere>}
       </div>
       <div className="crew-subnav" role="tablist">
         <Link href="/crew" className="crew-tab">Find people</Link>

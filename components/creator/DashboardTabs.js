@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { dashboardTabs } from '../../lib/creatorDashboardRules';
 
 // The row of tabs across the creator pages (2026-11-14, with the
-// Dashboard): Overview · Your work · Numbers · Money · Pitches, and
-// Creator Studio until Jose decides whether the Dashboard replaces it.
+// Dashboard): Overview · Your work · Numbers · Money · Pitches. (Creator
+// Studio's hub had a tab until the Dashboard took its place the same day.)
 // Which tabs a person gets is lib/creatorDashboardRules.js dashboardTabs;
 // someone with only Overview (a host on the Money page) gets no row.
 //

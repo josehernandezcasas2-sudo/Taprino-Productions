@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import Head from 'next/head';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../components/SignInHere';
 import { getAccountContext } from '../lib/accountContext';
 import { getOwnAdAccount } from '../lib/adAccounts';
 import { getSiteSettings } from '../lib/siteSettings';
@@ -82,9 +82,9 @@ export default function Advertise({ isSignedIn, isSubscriber, email, isAdmin, is
         {!isSignedIn && (
           <div className="account-card" style={{ maxWidth: 'none' }}>
             <p style={{ marginBottom: '1rem' }}>Sign in to create an ad account and submit ads for review.</p>
-            <SignInButton mode="modal">
+            <SignInHere>
               <button className="unlock-btn">Sign in</button>
-            </SignInButton>
+            </SignInHere>
           </div>
         )}
 

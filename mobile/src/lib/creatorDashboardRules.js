@@ -7,7 +7,7 @@
 //   submissions  GET /api/creator/my-submissions  → { submissions }
 //   shows        GET /api/show?mine=1             → { shows }
 //   drafts       GET /api/creator/drafts          → { drafts }
-//   invites      GET /api/payees/mine             → { invites }
+//   payees       GET /api/payees/mine             → { invites, paidFor }
 //   money        GET /api/creator/money?period=   (with its `dashboard` block)
 //   numbers      GET /api/creator/analytics?days=30&compare=1
 //
@@ -49,6 +49,25 @@ export const DASH_WORDS = {
   earnedNote: 'Earned per title is its title sales plus its ad share. Member support, tips and backing are paid to you as a creator, not to one title: they are in the money card.',
   adShareNote: 'Ad share for a month’s plays is credited on the 1st of the next month.',
   teamOnly: 'This account is on the team but isn’t a creator account, so it has no titles of its own. A full admin can give it Creator Studio.',
+  start: 'Start something',
+  startHelp: 'Three steps: the file (it uploads while you type), a few words about it, artwork. Saved as a draft as you go.',
+  getPaid: 'Get paid',
+  accept: 'Accept',
+  accepting: 'Accepting…',
+  notNow: 'Not now',
+  declining: 'Telling them…',
+  payoutsLine: 'To receive it, set up payouts under Money.',
+  paidToYou: 'Paid to you',
+  stop: 'Stop getting it…',
+  stopping: 'Stopping…',
+  supporters: 'Supporters',
+  openSupporters: 'Who supports you',
+  discard: 'Discard',
+  discarding: 'Discarding…',
+  discardAsk: 'Discard this draft? Its uploaded file is deleted too.',
+  discardFailed: 'Could not discard it.',
+  tryAgain: 'Something went wrong. Try again.',
+  offline: 'Couldn’t reach the site. Check the connection and try again.',
   makePublicAsk: (name) => `Make ${name} public?\n\nIts approved episodes go on the site now, and the ones approved later go live as they’re approved. This is one-way: a public show only comes down if you remove it.`
 };
 
@@ -64,9 +83,9 @@ export function canAddTitles(role) {
   return Boolean(role && (role.isCreator || role.isAdmin));
 }
 
-// The row of tabs across the creator pages. `studio`: Creator Studio keeps
-// a tab until Jose decides whether the Dashboard replaces it.
-export function dashboardTabs(role, { studio = true } = {}) {
+// The row of tabs across the creator pages. (Creator Studio's hub had a
+// tab here until the Dashboard took its place, 2026-11-14.)
+export function dashboardTabs(role) {
   const out = [{ key: 'overview', label: 'Overview', href: DASHBOARD_PATH }];
   if (!seesDashboard(role)) return out;
   // The other pages are a creator's (an admin is one): each sends anyone
@@ -77,7 +96,6 @@ export function dashboardTabs(role, { studio = true } = {}) {
   out.push({ key: 'numbers', label: 'Numbers', href: '/creator/analytics' });
   out.push({ key: 'money', label: 'Money', href: '/creator/money' });
   out.push({ key: 'pitches', label: 'Pitches', href: '/creator/pitch/dashboard' });
-  if (studio) out.push({ key: 'studio', label: 'Creator Studio', href: '/creator' });
   return out;
 }
 
@@ -361,7 +379,7 @@ export function dashboardTitles({ submissions = null, shows = null, drafts = nul
       kind: 'show',
       id: sh.id,
       title: text(sh.name) || 'Untitled show',
-      meta: [sh.kind === 'podcast' ? 'Podcast' : 'Series', text(sh.countLine)].filter(Boolean).join(' · '),
+      meta: [sh.kind === 'podcast' ? 'Podcast' : 'Series', text(sh.countLine), sh.staged && sh.staged.any ? 'a change is waiting for approval' : ''].filter(Boolean).join(' · '),
       state,
       stateLabel: text(sh.statusLabel) || STATE_LABEL[state],
       href: sh.href || showHref(sh.id),
@@ -443,6 +461,7 @@ export function dashboardTitles({ submissions = null, shows = null, drafts = nul
       ...NO_NUMBERS,
       note: `${draftFileLine(d)}.`,
       action: { kind: 'link', label: 'Continue', href },
+      secondary: { kind: 'discard', label: DASH_WORDS.discard, draftId: d.id },
       needs: false,
       sortAt: d.updatedAt || d.createdAt || ''
     });
@@ -463,6 +482,8 @@ export function dashboardTitles({ submissions = null, shows = null, drafts = nul
       ...NO_NUMBERS,
       note: 'Not sent for review yet.',
       action: { kind: 'link', label: 'Open the show', href },
+      // One draft can go from here; several are sorted out on the show page.
+      secondary: list.length === 1 && list[0].id ? { kind: 'discard', label: DASH_WORDS.discard, draftId: list[0].id } : null,
       needs: false,
       sortAt: list.map((d) => d.updatedAt || d.createdAt || '').sort().pop() || ''
     });
@@ -514,25 +535,16 @@ function fixLabel(why) {
   return 'Open';
 }
 
-// What is waiting on the creator, most pressing first: an invite to be
-// paid, a show ready to go public, each title's own reason, a show's
-// numbering, then payouts not set up while money waits.
-export function dashboardNeeds({ submissions = null, shows = null, invites = null, money = null, limit = NEEDS_LIMIT } = {}) {
+// What is waiting on the creator, most pressing first: a show ready to go
+// public, each title's own reason, a show's numbering, then payouts not
+// set up while money waits. (An invite to be paid has its own card with
+// its two buttons: dashboardInvites.)
+export function dashboardNeeds({ submissions = null, shows = null, money = null, limit = NEEDS_LIMIT } = {}) {
   const subs = Array.isArray(submissions) ? submissions.filter(Boolean) : [];
   const showList = Array.isArray(shows) ? shows.filter((sh) => sh && sh.id && sh.kind !== 'vertical') : [];
   const byId = new Map(subs.map((s) => [s.id, s]));
   const showById = new Map(showList.map((sh) => [sh.id, sh]));
   const rows = [];
-
-  for (const inv of Array.isArray(invites) ? invites : []) {
-    if (!inv || !inv.id) continue;
-    rows.push({
-      key: `invite:${inv.id}`,
-      title: text(inv.headline) || 'Get paid for a title?',
-      sub: [text(inv.inviterName), inv.sentLabel ? `asked on ${inv.sentLabel}` : ''].filter(Boolean).join(' '),
-      action: { kind: 'link', label: 'Answer', href: '/creator#get-paid' }
-    });
-  }
 
   const ready = new Map();
   const titleNeeds = [];
@@ -711,7 +723,8 @@ export function dashboardLatest({ money = null, submissions = null, now = Date.n
     else if (l.kind === 'member_share') words = [lane, text(l.detail)].filter(Boolean).join(' · ');
     else if (l.lane === 'member_support') words = [text(l.label) || lane, text(l.detail)].filter(Boolean).join(' · ');
     else words = [lane, text(l.label) !== lane ? text(l.label) : ''].filter(Boolean).join(' · ');
-    out.push({ key: `money:${l.id}`, at: l.at, text: words, amount: l.kind === 'tip' ? '' : dollars(l.cents), href: '/creator/money' });
+    const note = l.kind === 'tip' ? text(l.note) : '';
+    out.push({ key: `money:${l.id}`, at: l.at, text: words, amount: l.kind === 'tip' ? '' : dollars(l.cents), quote: note ? `“${note}”` : '', href: '/creator/money' });
   }
   const since = now - 30 * 24 * 3600000;
   const subs = Array.isArray(submissions) ? submissions.filter(Boolean) : [];
@@ -727,10 +740,121 @@ export function dashboardLatest({ money = null, submissions = null, now = Date.n
     if (s.status === 'rejected') words = `${name}: not this time`;
     else if (sid && s.seriesStatus === 'pending') words = `${name} was approved`;
     else words = `${name} went live`;
-    out.push({ key: `title:${s.id}`, at: s.reviewedAt, text: words, amount: '', href: sid ? showHref(sid, `ep-${s.id}`) : '/creator/my-work' });
+    out.push({ key: `title:${s.id}`, at: s.reviewedAt, text: words, amount: '', quote: '', href: sid ? showHref(sid, `ep-${s.id}`) : '/creator/my-work' });
   }
   out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return out.slice(0, Math.max(1, Math.floor(n(limit)) || LATEST_LIMIT)).map((row) => ({ ...row, when: whenLabel(row.at, now) }));
+}
+
+// --- start something -------------------------------------------------------------
+
+// The shortcuts under Submit a title: one per kind of title (the caller
+// hands in lib/submitRules.js SUBMIT_TYPES, so this file keeps its one
+// import), then a pitch.
+export function dashboardStart(types) {
+  const out = [];
+  for (const t of Array.isArray(types) ? types : []) {
+    if (!t || !t.value || !text(t.label)) continue;
+    out.push({ key: String(t.value), label: text(t.label), href: `/creator/submit?type=${encodeURIComponent(t.value)}` });
+  }
+  out.push({ key: 'pitch', label: 'Pitch a project', href: '/creator/pitch/new' });
+  return out;
+}
+
+// "“The Long Quiet” is in." after the three steps (?submitted=, &show=).
+export function submittedFlash(title, showId = null) {
+  const name = text(title);
+  if (!name) return null;
+  return {
+    strong: `“${name}” is in.`,
+    rest: 'It’s in review now, and it goes live when it’s approved. A file still uploading carries on while you look around.',
+    link: text(showId) ? { label: 'Open the show page', href: showHref(text(showId)) } : null
+  };
+}
+
+// --- who gets paid ---------------------------------------------------------------
+
+// An invite to be paid for a title: who asked, what accepting means, and
+// the two answers (POST /api/payees/invites/<id> { action }).
+export function dashboardInvites(invites) {
+  const out = [];
+  for (const inv of Array.isArray(invites) ? invites : []) {
+    if (!inv || !inv.id) continue;
+    const who = text(inv.inviterName) || 'Someone on Studio Tapa';
+    out.push({
+      key: `invite:${inv.id}`,
+      id: inv.id,
+      headline: text(inv.headline) || 'Get paid for a title?',
+      asked: `${who} asked${inv.sentLabel ? ` on ${inv.sentLabel}` : ''}`,
+      body: (Array.isArray(inv.body) ? inv.body : []).map(text).filter(Boolean).map((line) => ({ text: line, payouts: line === DASH_WORDS.payoutsLine })),
+      foot: `Not now tells ${who} you said no. They can ask again.`,
+      inviterName: who
+    });
+  }
+  return out;
+}
+
+// What the page says once an invite is answered: { text, payouts } —
+// `payouts` when the money can't reach them until payouts are set up.
+export function inviteAnswered(action, data, inviterName) {
+  const accept = action === 'accept';
+  const words = data && text(data.words);
+  return { text: words || (accept ? 'Done.' : `${text(inviterName) || 'They'} was told.`), payouts: accept && Boolean(data) && data.payoutsReady === false };
+}
+
+// The titles whose earnings come to this account, each with the question
+// "Stop getting it…" asks (POST /api/payees { action: 'step_down' }).
+export function dashboardPaidFor(paidFor) {
+  const out = [];
+  for (const t of Array.isArray(paidFor) ? paidFor : []) {
+    if (!t || !t.titleId || !t.titleType) continue;
+    const name = text(t.title) || 'A title';
+    const what = t.titleType === 'series' ? name : `“${name}”`;
+    const back = t.titleType === 'series' ? 'whoever runs it' : t.showId ? 'the show’s paid account' : 'whoever uploaded it';
+    out.push({
+      key: `${t.titleType}:${t.titleId}`,
+      titleType: t.titleType,
+      titleId: t.titleId,
+      title: name,
+      href: text(t.href) || null,
+      meta: [text(t.scopeWords), t.sinceLabel ? `since ${t.sinceLabel}` : ''].filter(Boolean).join(' · '),
+      canStop: Boolean(t.canStepDown),
+      locked: t.canStepDown ? '' : text(t.lockedLine),
+      ask: `Stop getting the earnings of ${what}? They go back to ${back} from now on; what’s already credited to you stays yours.`
+    });
+  }
+  return out;
+}
+
+// --- supporters ------------------------------------------------------------------
+
+const NAMES_SHOWN = 6;
+
+// Who is behind the money: counts, and names only where a member chose to
+// share theirs (the money page's own rule).
+export function dashboardSupporters(money) {
+  const s = money && money.supporters ? money.supporters : null;
+  if (!s) return null;
+  const rows = [
+    { key: 'picked', label: 'Picked you in their lineup', value: count(s.picked) },
+    { key: 'watching', label: 'By watching this month', value: count(s.watching) },
+    { key: 'backers', label: 'Backed a pitch', value: count(s.backers) },
+    { key: 'buyers', label: 'Bought a title', value: count(s.buyers) }
+  ];
+  if (n(s.tippers) > 0) rows.push({ key: 'tippers', label: 'Tipped you', value: count(s.tippers) });
+  const names = (Array.isArray(s.names) ? s.names : []).map((x) => text(x && x.displayName)).filter(Boolean);
+  const shown = names.slice(0, NAMES_SHOWN);
+  const more = names.length - shown.length;
+  return {
+    rows,
+    empty: rows.every((r) => r.value === '0'),
+    // Drawn as a list under "Shared their name", then the note.
+    names: shown,
+    more: more > 0 ? `and ${count(more)} more` : '',
+    namesLabel: 'Shared their name',
+    note: shown.length ? 'Everyone else is counted, not named.' : 'Members are counted, not named, unless they chose to share their name in Artist Support.',
+    href: '/creator/money#supporters'
+  };
 }
 
 // --- also yours ------------------------------------------------------------------

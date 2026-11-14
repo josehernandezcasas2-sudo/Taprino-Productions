@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import PlaceSearch from '../../components/crew/PlaceSearch';
 import { Avatar } from '../../components/crew/CrewBits';
 import { LocationShell, HostedChip, fmtRange } from '../../components/locations/LocationBits';
@@ -107,7 +107,7 @@ export default function LocationsDirectory({ mainGenres, isSignedIn, isSubscribe
         </div>
         {isSignedIn
           ? <div className="crew-actions"><Link href="/locations/mine" className="crew-btn">Your places</Link><Link href="/locations/new" className="crew-btn primary">+ List a place</Link></div>
-          : <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to list a place</button></SignInButton>}
+          : <SignInHere><button type="button" className="crew-btn primary">Sign in to list a place</button></SignInHere>}
       </div>
 
       <div className="loc-find">

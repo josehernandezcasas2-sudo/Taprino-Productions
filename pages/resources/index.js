@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
@@ -201,7 +201,7 @@ function PartnerCard({ p, isSignedIn }) {
           ) : p.canReveal ? (
             <button type="button" className="crew-btn sm primary" disabled={busy} onClick={reveal}>{busy ? 'Opening…' : 'Show the code'}</button>
           ) : !isSignedIn && p.codeGate !== 'public' ? (
-            <SignInButton mode="modal"><button type="button" className="crew-btn sm">Sign in for the code</button></SignInButton>
+            <SignInHere><button type="button" className="crew-btn sm">Sign in for the code</button></SignInHere>
           ) : (
             <span className="res-locked"><span className="crew-chip mute">🔒 {p.gateLabel}</span><span className="crew-mono">{p.gateHint}{p.codeGate === 'card' ? <> <Link href="/crew/card">Set up your card</Link>.</> : p.codeGate === 'production' ? <> <Link href="/productions/new">Start one</Link>.</> : null}</span></span>
           )}

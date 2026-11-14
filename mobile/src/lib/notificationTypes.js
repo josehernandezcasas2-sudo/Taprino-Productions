@@ -28,7 +28,7 @@ export const ROUTE_KINDS = Object.freeze({
   episode: '/episode/<episodeId>',
   series: '/series/<seriesId>',
   show: '/creator/show/<seriesId>',
-  creator: '/creator',
+  creator: '/creator/dashboard',
   apply: '/apply',
   money: '/creator/money',
   account: '/account',

@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../../components/SignInHere';
 import ProductionShell, { shellProps } from '../../../components/productions/ProductionShell';
 import { StatusPill, PersonLine, fmtRange, fmtDay } from '../../../components/productions/ProductionBits';
 import { Avatar } from '../../../components/crew/CrewBits';
@@ -125,7 +125,7 @@ export default function ProductionPage(props) {
           {!canEdit && isMember && (
             <button type="button" className="crew-btn sm ghost" disabled={busy} onClick={async () => { if (window.confirm('Take yourself off this production? Your credit on it goes too.')) { const r = await api(`/api/productions/${p.id}/members`, { op: 'leave' }); if (r) router.replace(router.asPath); } }}>Take me off this</button>
           )}
-          {!isSignedIn && <SignInButton mode="modal"><button type="button" className="crew-btn sm">Sign in</button></SignInButton>}
+          {!isSignedIn && <SignInHere><button type="button" className="crew-btn sm">Sign in</button></SignInHere>}
         </div>
       </header>
 

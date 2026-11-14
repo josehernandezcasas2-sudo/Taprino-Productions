@@ -10,7 +10,7 @@ import { isTitleId } from '../../lib/titleIds';
 // stay in the tree for one round, like CreatorSubmissionForm.
 export async function getServerSideProps({ query }) {
   const sid = typeof query.series === 'string' ? query.series : '';
-  const destination = sid && isTitleId(sid) ? `/creator/show/${encodeURIComponent(sid)}` : '/creator';
+  const destination = sid && isTitleId(sid) ? `/creator/show/${encodeURIComponent(sid)}` : '/creator/dashboard';
   return { redirect: { destination, statusCode: 308 } };
 }
 

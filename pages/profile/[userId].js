@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import BackButton from '../../components/BackButton';
 import { ShareIcon, CheckIcon, VideoCameraIcon, ImageIcon, TipIcon, usePlayerIconOverrides } from '../../components/PlayerIcons';
 import PostMenu from '../../components/PostMenu';
@@ -370,9 +370,9 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
               {isOwnProfile ? (
                 <Link href="/account" className="profile-action-btn">Edit profile</Link>
               ) : !isSignedIn ? (
-                <SignInButton mode="modal">
+                <SignInHere>
                   <button type="button" className="profile-action-btn profile-action-btn-primary">Follow</button>
-                </SignInButton>
+                </SignInHere>
               ) : (
                 <button
                   type="button"
@@ -387,7 +387,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
               {!isOwnProfile && (
                 isSignedIn
                   ? <Link href={`/messages?to=${encodeURIComponent(profile.userId)}&kind=profile&label=${encodeURIComponent(profile.displayName)}`} className="profile-action-btn">Message</Link>
-                  : <SignInButton mode="modal"><button type="button" className="profile-action-btn">Message</button></SignInButton>
+                  : <SignInHere><button type="button" className="profile-action-btn">Message</button></SignInHere>
               )}
               {/* Tips: gold like the creator badge, only once this creator's
                   Stripe account can take charges (lib/tips.js getTipping). */}

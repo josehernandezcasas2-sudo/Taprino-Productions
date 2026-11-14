@@ -31,10 +31,11 @@ t('who sees the tab: creators and the team', () => {
 });
 
 t('the tabs: a creator gets them all, a sub-admin Overview alone', () => {
-  assert.deepEqual(R.dashboardTabs({ isCreator: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches', 'studio']);
-  assert.deepEqual(R.dashboardTabs({ isCreator: true }, { studio: false }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches']);
+  // Creator Studio's hub is gone: the Dashboard took its place (2026-11-14).
+  assert.deepEqual(R.dashboardTabs({ isCreator: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches']);
+  assert.ok(!R.dashboardTabs({ isCreator: true }).some((x) => x.href === '/creator'));
   assert.deepEqual(R.dashboardTabs({ canAccessAdmin: true }).map((x) => x.key), ['overview']);
-  assert.deepEqual(R.dashboardTabs({ isAdmin: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches', 'studio']);
+  assert.deepEqual(R.dashboardTabs({ isAdmin: true }).map((x) => x.key), ['overview', 'work', 'numbers', 'money', 'pitches']);
   assert.equal(R.dashboardTabs({ isCreator: true })[0].href, '/creator/dashboard');
   assert.deepEqual(R.dashboardTabs({}).map((x) => x.key), ['overview']);
 });
@@ -121,14 +122,14 @@ const money = {
     backing: { monthCents: 6937, pitches: [{ id: 'p1', title: 'Harbor Lights: season one', allRaisedCents: 124000, goalCents: 500000 }, { id: 'p2', title: 'Small one', allRaisedCents: 5000, goalCents: null }] },
     bookings: { shows: false, monthCents: 0 }
   },
-  supporters: { picked: 31, watching: 15 },
+  supporters: { picked: 31, watching: 15, backers: 8, buyers: 1204, tippers: 0, names: [{ displayName: 'Dee Park' }, { displayName: ' Ana R. ' }, { displayName: '' }] },
   link: { linkPath: '/@mara', joined: 12, active: 9, bonusMonthCents: 900 },
   dashboard: {
     months: [{ period: '2026-06', cents: 11800 }, { period: '2026-07', cents: 16400 }, { period: '2026-08', cents: 20300 }, { period: '2026-09', cents: 25100 }, { period: '2026-10', cents: 31660 }, { period: '2026-11', cents: 41260, current: true }],
     previous: { period: '2026-10', cents: 31660 },
     byTitle: { 'episode:nb-e1': { salesCents: 1680, adsCents: 1500 }, 'episode:nb-e4': { salesCents: 0, adsCents: 640 }, 'series:night-bus': { salesCents: 2000, adsCents: 0 }, 'episode:last-fare': { salesCents: 3593, adsCents: 600 }, 'episode:first-stop': { salesCents: 0, adsCents: 310 } },
     latest: [
-      { id: 'tip:t1', at: '2026-11-14T16:00:00Z', lane: 'tips', kind: 'tip', label: 'A fan', detail: '“Loved the ending.”', cents: 475, amountCents: 500 },
+      { id: 'tip:t1', at: '2026-11-14T16:00:00Z', lane: 'tips', kind: 'tip', label: 'A fan', detail: '“Loved the ending.”', cents: 475, amountCents: 500, note: 'Loved the ending.' },
       { id: 'sale:s1', at: '2026-11-13T12:00:00Z', lane: 'sales', kind: 'sale', label: 'The Last Fare', detail: '$4.99 · a buyer', cents: 357 },
       { id: 'backing:d1', at: '2026-11-08T12:00:00Z', lane: 'backing', kind: 'backing', label: 'Harbor Lights: season one', detail: 'Dee Park backed $25.00', cents: 2375 },
       { id: 'ledger:l1', at: '2026-11-07T12:00:00Z', lane: 'member_support', kind: 'member_share', label: 'Member share', detail: 'A member · picked you', cents: 200 },
@@ -242,9 +243,19 @@ t('rows that are not live say where they stand instead of numbers', () => {
   assert.equal(d1.meta, 'Saved just now');
   assert.equal(d1.note, 'The file is processing.');
   assert.deepEqual(d1.action, { kind: 'link', label: 'Continue', href: '/creator/submit?draft=d1' });
+  // A draft can be discarded from its row; a show's drafts only when there is one.
+  assert.deepEqual(d1.secondary, { kind: 'discard', label: 'Discard', draftId: 'd1' });
   const ds = row('drafts:harbor-lights');
   assert.equal(ds.title, 'Harbor Lights · 2 drafts');
   assert.equal(ds.action.href, '/creator/show/harbor-lights');
+  assert.equal(ds.secondary, null);
+  const lone = R.dashboardTitles({ submissions: [], shows, drafts: [drafts.find((d) => d.form && d.form.seriesId)], now: NOW }).rows.find((r) => r.kind === 'drafts');
+  assert.equal(lone.title, 'Harbor Lights · 1 draft');
+  assert.deepEqual(lone.secondary, { kind: 'discard', label: 'Discard', draftId: lone.secondary.draftId });
+  assert.ok(lone.secondary.draftId);
+  // A show with a change waiting says so beside its count.
+  const staged = R.dashboardTitles({ submissions: [], shows: [{ ...shows[0], staged: { any: true } }], now: NOW }).rows[0];
+  assert.match(staged.meta, / · a change is waiting for approval$/);
   const old = row('title:old-cut');
   assert.equal(old.state, 'declined');
   assert.equal(old.note, 'Not this time: the audio drops out');
@@ -279,23 +290,23 @@ t('the filters', () => {
   assert.deepEqual(R.TITLE_FILTERS.map((f) => f.key), ['all', 'live', 'review', 'drafts', 'needs']);
 });
 
-t('needs you: an invite, a show ready to go public, each title’s reason, numbering, payouts', () => {
-  const invites = [{ id: 'inv1', headline: 'Get paid for Depot Stories?', inviterName: 'Pat Lee', sentLabel: 'Nov 12' }];
+t('needs you: a show ready to go public, each title’s reason, numbering, payouts', () => {
   const noPay = { ...money, top: { ...money.top, nextPayout: { willPay: false, reason: 'set up payouts' } } };
-  const all = R.dashboardNeeds({ submissions, shows, invites, money: noPay, limit: 20 });
-  assert.deepEqual(all.rows.map((r) => r.key), ['invite:inv1', 'ready:harbor-lights', 'title:last-fare', 'title:old-cut', 'numbering:night-bus:gap:S2 E3 is missing', 'payouts']);
-  assert.deepEqual(all.rows[0], { key: 'invite:inv1', title: 'Get paid for Depot Stories?', sub: 'Pat Lee asked on Nov 12', action: { kind: 'link', label: 'Answer', href: '/creator#get-paid' } });
-  assert.deepEqual(all.rows[1], { key: 'ready:harbor-lights', title: 'Harbor Lights is ready to go public', sub: '1 episode approved', action: { kind: 'publish', label: 'Make it public', showId: 'harbor-lights', name: 'Harbor Lights' } });
-  assert.deepEqual(all.rows[2], { key: 'title:last-fare', title: 'The Last Fare', sub: 'No captions yet', action: { kind: 'link', label: 'Add captions', href: '/creator/my-work?attention=1' } });
-  assert.equal(all.rows[3].action.label, 'See why');
-  assert.deepEqual(all.rows[4].action, { kind: 'link', label: 'Open the show', href: '/creator/show/night-bus' });
-  assert.equal(all.rows[4].title, 'Night Bus: S2 E3 is missing');
-  assert.deepEqual(all.rows[5], { key: 'payouts', title: 'Set up payouts', sub: '$187.40 is waiting for a bank account', action: { kind: 'link', label: 'Set up payouts', href: '/creator/money#payouts' } });
-  assert.equal(all.total, 6);
+  const all = R.dashboardNeeds({ submissions, shows, money: noPay, limit: 20 });
+  // An invite to be paid is not a row here: it has its own card with its two buttons.
+  assert.deepEqual(all.rows.map((r) => r.key), ['ready:harbor-lights', 'title:last-fare', 'title:old-cut', 'numbering:night-bus:gap:S2 E3 is missing', 'payouts']);
+  assert.deepEqual(all.rows[0], { key: 'ready:harbor-lights', title: 'Harbor Lights is ready to go public', sub: '1 episode approved', action: { kind: 'publish', label: 'Make it public', showId: 'harbor-lights', name: 'Harbor Lights' } });
+  assert.deepEqual(all.rows[1], { key: 'title:last-fare', title: 'The Last Fare', sub: 'No captions yet', action: { kind: 'link', label: 'Add captions', href: '/creator/my-work?attention=1' } });
+  assert.equal(all.rows[2].action.label, 'See why');
+  assert.deepEqual(all.rows[3].action, { kind: 'link', label: 'Open the show', href: '/creator/show/night-bus' });
+  assert.equal(all.rows[3].title, 'Night Bus: S2 E3 is missing');
+  assert.deepEqual(all.rows[4], { key: 'payouts', title: 'Set up payouts', sub: '$187.40 is waiting for a bank account', action: { kind: 'link', label: 'Set up payouts', href: '/creator/money#payouts' } });
+  assert.equal(all.total, 5);
   assert.equal(all.more, 0);
-  const capped = R.dashboardNeeds({ submissions, shows, invites, money: noPay });
-  assert.equal(capped.rows.length, 5);
+  const capped = R.dashboardNeeds({ submissions, shows, money: noPay, limit: 4 });
+  assert.equal(capped.rows.length, 4);
   assert.equal(capped.more, 1);
+  assert.ok(!JSON.stringify(all).includes('/creator#'), 'nothing points at the old hub');
   assert.deepEqual(R.dashboardNeeds({}), { rows: [], total: 0, more: 0 });
   // A show someone else must open can't be made public from here.
   const locked = R.dashboardNeeds({ submissions: [], shows: [{ ...shows[1], makePublic: { ok: false } }] });
@@ -377,6 +388,8 @@ t('latest: money lines and titles going live, newest first', () => {
   ]);
   assert.equal(rows[2].href, '/creator/show/night-bus#ep-nb-e4');
   assert.equal(rows[0].href, '/creator/money');
+  // A tip's note is quoted under it (the route leaves a hidden one out); nothing else has one.
+  assert.deepEqual(rows.map((r) => r.quote), ['“Loved the ending.”', '', '', '', '', '']);
   assert.equal(R.dashboardLatest({ money, submissions, now: NOW, limit: 2 }).length, 2);
   assert.deepEqual(R.dashboardLatest({}), []);
   // A title turned down in the last 30 days; an approval inside a private show is not "live".
@@ -393,6 +406,93 @@ t('also yours: the pitch that raised most, and the link', () => {
   assert.equal(R.dashboardLink({ link: null }), null);
   assert.deepEqual(R.periodOptions(money), [{ value: '2026-11', label: 'November 2026' }, { value: '2026-10', label: 'October 2026' }, { value: '2026-09', label: 'September 2026' }]);
   assert.deepEqual(R.periodOptions(null, NOW), [{ value: '2026-11', label: 'November 2026' }]);
+});
+
+t('start something: a shortcut per kind of title, then a pitch', () => {
+  const start = R.dashboardStart([{ value: 'movie', label: 'Film' }, { value: 'series', label: 'Series episode' }, { value: '', label: 'No value' }, null]);
+  assert.deepEqual(start, [
+    { key: 'movie', label: 'Film', href: '/creator/submit?type=movie' },
+    { key: 'series', label: 'Series episode', href: '/creator/submit?type=series' },
+    { key: 'pitch', label: 'Pitch a project', href: '/creator/pitch/new' }
+  ]);
+  assert.deepEqual(R.dashboardStart(null).map((x) => x.key), ['pitch']);
+  assert.deepEqual(R.submittedFlash(' The Long Quiet ', 'night-bus'), {
+    strong: '“The Long Quiet” is in.',
+    rest: 'It’s in review now, and it goes live when it’s approved. A file still uploading carries on while you look around.',
+    link: { label: 'Open the show page', href: '/creator/show/night-bus' }
+  });
+  assert.equal(R.submittedFlash('A film').link, null);
+  assert.equal(R.submittedFlash(''), null);
+});
+
+t('get paid: an invite with its two answers, and what the page says after', () => {
+  const invites = [
+    { id: 'inv1', headline: 'Get paid for Depot Stories?', inviterName: 'Pat Lee', sentLabel: 'Nov 12', body: ['Its earnings would come to you from the day you accept.', 'To receive it, set up payouts under Money.', ''] },
+    { headline: 'No id' },
+    { id: 'inv2' }
+  ];
+  const rows = R.dashboardInvites(invites);
+  assert.deepEqual(rows.map((r) => r.key), ['invite:inv1', 'invite:inv2']);
+  assert.deepEqual(rows[0], {
+    key: 'invite:inv1',
+    id: 'inv1',
+    headline: 'Get paid for Depot Stories?',
+    asked: 'Pat Lee asked on Nov 12',
+    body: [{ text: 'Its earnings would come to you from the day you accept.', payouts: false }, { text: 'To receive it, set up payouts under Money.', payouts: true }],
+    foot: 'Not now tells Pat Lee you said no. They can ask again.',
+    inviterName: 'Pat Lee'
+  });
+  assert.equal(rows[1].headline, 'Get paid for a title?');
+  assert.equal(rows[1].asked, 'Someone on Studio Tapa asked');
+  assert.deepEqual(R.dashboardInvites(null), []);
+  assert.deepEqual(R.inviteAnswered('accept', { words: 'Depot Stories pays you from now on.', payoutsReady: false }, 'Pat Lee'), { text: 'Depot Stories pays you from now on.', payouts: true });
+  assert.deepEqual(R.inviteAnswered('accept', { payoutsReady: true }, 'Pat Lee'), { text: 'Done.', payouts: false });
+  assert.deepEqual(R.inviteAnswered('decline', {}, 'Pat Lee'), { text: 'Pat Lee was told.', payouts: false });
+  assert.deepEqual(R.inviteAnswered('decline', { words: 'Pat Lee was told you said no.', payoutsReady: false }, 'Pat Lee'), { text: 'Pat Lee was told you said no.', payouts: false });
+});
+
+t('paid to you: each title with what stopping asks', () => {
+  const rows = R.dashboardPaidFor([
+    { titleType: 'series', titleId: 'depot', title: 'Depot Stories', href: '/creator/show/depot', scopeWords: 'the whole show', sinceLabel: 'Nov 9', canStepDown: true, lockedLine: null, showId: null },
+    { titleType: 'episode', titleId: 'nb-e2', title: 'Transfer', href: null, scopeWords: 'Night Bus · S1 E2', sinceLabel: null, canStepDown: false, lockedLine: 'On hold while a payment is disputed.', showId: 'night-bus' },
+    { titleType: 'episode', titleId: 'solo', title: 'Solo', scopeWords: 'a title of its own', canStepDown: true },
+    { titleType: 'episode' }
+  ]);
+  assert.deepEqual(rows.map((r) => r.key), ['series:depot', 'episode:nb-e2', 'episode:solo']);
+  assert.deepEqual(rows[0], {
+    key: 'series:depot', titleType: 'series', titleId: 'depot', title: 'Depot Stories', href: '/creator/show/depot', meta: 'the whole show · since Nov 9', canStop: true, locked: '',
+    ask: 'Stop getting the earnings of Depot Stories? They go back to whoever runs it from now on; what’s already credited to you stays yours.'
+  });
+  assert.equal(rows[1].canStop, false);
+  assert.equal(rows[1].locked, 'On hold while a payment is disputed.');
+  assert.equal(rows[1].meta, 'Night Bus · S1 E2');
+  assert.equal(rows[1].ask, 'Stop getting the earnings of “Transfer”? They go back to the show’s paid account from now on; what’s already credited to you stays yours.');
+  assert.match(rows[2].ask, /They go back to whoever uploaded it from now on/);
+  assert.deepEqual(R.dashboardPaidFor(undefined), []);
+});
+
+t('supporters: counts, and names only where a member shared theirs', () => {
+  const card = R.dashboardSupporters(money);
+  assert.deepEqual(card.rows, [
+    { key: 'picked', label: 'Picked you in their lineup', value: '31' },
+    { key: 'watching', label: 'By watching this month', value: '15' },
+    { key: 'backers', label: 'Backed a pitch', value: '8' },
+    { key: 'buyers', label: 'Bought a title', value: '1,204' }
+  ]);
+  assert.equal(card.empty, false);
+  assert.deepEqual(card.names, ['Dee Park', 'Ana R.']);
+  assert.equal(card.more, '');
+  assert.equal(card.namesLabel, 'Shared their name');
+  assert.equal(card.note, 'Everyone else is counted, not named.');
+  assert.equal(card.href, '/creator/money#supporters');
+  const many = R.dashboardSupporters({ supporters: { picked: 9, tippers: 3, names: 'abcdefgh'.split('').map((x) => ({ displayName: `Member ${x}` })) } });
+  assert.equal(many.rows[4].label, 'Tipped you');
+  assert.equal(many.names.length, 6);
+  assert.equal(many.more, 'and 2 more');
+  const none = R.dashboardSupporters({ supporters: { picked: 0, watching: 0, backers: 0, buyers: 0, names: [] } });
+  assert.equal(none.empty, true);
+  assert.equal(none.note, 'Members are counted, not named, unless they chose to share their name in Artist Support.');
+  assert.equal(R.dashboardSupporters(null), null);
 });
 
 console.log(`${n} passed`);

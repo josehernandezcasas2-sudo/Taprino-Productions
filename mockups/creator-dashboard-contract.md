@@ -115,3 +115,47 @@ What changed between this agreement and the code, and the choices made on the wa
 - `hrefToRoute` keeps the query on `/creator/submit` and Your work (Continue on a draft opened an empty form before, from a notification too) and knows `/creator/analytics` as Your numbers.
 - "Open Money" is the money card's link in the app (the app's Money screen has no CSV). The loading and "couldn't load" lines are the website's, copied; "Also yours", "Retry", "Month", "Not yet" and "% watched" are the app's own.
 - Verified with check:refs, lint, both exports, the unit tests and a browser harness of the real screen files (react-native-web, 82 checks). Not on a device.
+
+## 9. The Dashboard takes over from Creator Studio (2026-11-14, second round)
+
+Jose, after seeing Creator Studio beside the built Dashboard: "yes lets add the sections to the dashobard, lets flesh it out too" and "i want them to be able to sign up and sign in but maintain within what they were doing". No migration, no new route.
+
+### 9.1 What moves onto the Dashboard
+
+The four pieces that lived only in Creator Studio's hub, plus the fleshing out. Every word, row and number comes from `lib/creatorDashboardRules.js` (both copies), as before.
+
+| Piece | Rule | Where it is drawn |
+| --- | --- | --- |
+| The shortcuts under Submit a title (Film, Short, Series episode, Podcast, Snippet, Bonus content, Pitch a project) | `dashboardStart(SUBMIT_TYPES)` → `[{ key, label, href }]`; `DASH_WORDS.start`, `startHelp` | a "Start something" strip under the row of tabs |
+| Discard on a draft | a title row's `secondary: { kind: 'discard', label, draftId }` (a loose draft; a show's drafts only when there is one); `DASH_WORDS.discardAsk`, `discarding`, `discardFailed` | beside Continue on the row; `DELETE /api/creator/drafts { id }`, then the drafts are read again |
+| An invite to be paid: Accept / Not now | `dashboardInvites(invites)` → `[{ key, id, headline, asked, body: [{ text, payouts }], foot, inviterName }]`; `inviteAnswered(action, data, inviterName)` → `{ text, payouts }`; `DASH_WORDS.getPaid`, `accept`, `accepting`, `notNow`, `declining`, `payoutsLine` | the "Get paid" card, first on a phone and at the top of the right column on a wide screen, only while an invite waits; `POST /api/payees/invites/<id> { action: 'accept' \| 'decline' }`; a 409 or 404 reads the list again; a body line with `payouts: true` links Money → `/creator/money#payouts` |
+| Paid to you, Stop getting it… | `dashboardPaidFor(paidFor)` → `[{ key, titleType, titleId, title, href, meta, canStop, locked, ask }]`; `DASH_WORDS.paidToYou`, `stop`, `stopping` | a "Paid to you" card (only when there is one); the question is `row.ask`; `POST /api/payees { action: 'step_down', type, id }` |
+| After the three steps | `submittedFlash(title, showId)` → `{ strong, rest, link }` | a flash under the tabs when the address carries `?submitted=<title>` (and `&show=<id>`) |
+| Supporters | `dashboardSupporters(money)` → `{ rows: [{ key, label, value }], empty, names, more, namesLabel, note, href }` | a card: the rows, then `namesLabel` + the names (+ `more`), then `note`, then a link to `href` (`DASH_WORDS.openSupporters`) |
+| A tip's note | `dashboardLatest` rows carry `quote` ('' when none) | under the row's text in Latest |
+| A change waiting on a show | the show row's `meta` ends "· a change is waiting for approval" | already drawn (it is the meta line) |
+
+`dashboardNeeds` no longer lists invites (the card has the buttons) and no longer takes `invites`. `dashboardTabs(role)` has no Creator Studio tab and no `studio` option.
+
+### 9.2 Creator Studio's hub is retired
+
+- Website: `/creator` forwards to `/creator/dashboard` (query kept; old notification links `/creator#get-paid` still land on the page). Every link that meant the hub points at the Dashboard; back pills read "Dashboard".
+- App: `mobile/src/app/creator/index.js` becomes a forward to `/creator/dashboard` (params kept); `hrefToRoute('/creator…')` answers the Dashboard; the top bar's "Creator Studio" row and the dead `BottomNav` row go; back pills `{ href: '/creator/dashboard', label: 'Dashboard' }`; the submit screen returns to `/creator/dashboard?submitted=…`.
+- The words "Creator Studio" stay where they name the creator access itself ("Give them Creator Studio", "You already have Creator Studio"), not a place to go.
+
+### 9.3 Signing in or up mid-task
+
+Rules: `lib/resumeTaskRules.js` (pure, no imports; the app's copy word for word; `node scripts/test-resume-task.mjs`).
+
+- Website: every button that opens Clerk's sign-in from a page passes `stayHereProps(router.asPath)` (`forceRedirectUrl` + `signUpForceRedirectUrl`), a sign-up button `stayHereSignUpProps`; `components/SignInHere.js` wraps `<SignInButton mode="modal">`. Tip, Own and the paywall's plans leave a mark (`lib/resumeTask.js`, sessionStorage) and carry on once signed in: the Tip sheet opens, Checkout starts, the plans open.
+- App: a signed-out action opens the Account screen's sign-in card (as before, `router.push('/account')`, no mark in the address). When that card's Sign in or Create a free account finishes and the card was not opened as the general way in (`?signin=general`), the app goes back to the screen the person came from (`router.back()` when there is one). Tip and Own leave a mark in memory (`mobile/src/lib/resumeTask.js`) and carry on when their screen is focused again signed in. General entries still land a creator or a team member on the Dashboard.
+
+### 9.4 As built (2026-11-14)
+
+- Everything in 9.1 to 9.3 is built, website and app. On a wide screen the website follows its two columns with a closing row across both (Supporters, the pitch, the link) so neither column runs far past the other; the phone and the app keep one column in the order of 9.1.
+- What Clerk's box does after a sign-in or a sign-up was read in its own library (the site loads `@clerk/clerk-js` major 5; 5.128.2 and 6.43.1 were read): a force redirect given as a prop wins over everything, so every button names both outcomes. `node scripts/test-sign-in-here.mjs` reads the source and fails on a button that doesn't.
+- The app goes back from the sign-in card only when the card is the Account screen's own (`/account`); the card standing in for another screen (Your purchases, Membership, a show page) stays and that screen loads. Leaving the card without signing in forgets what the person had pressed. The episode, series and profile screens read their page again once signed in, since they take "signed in" from that read.
+- The app's forward and the three steps use `router.dismissTo`, not a replace: back down to the Dashboard when it is in the stack, in the current screen's place when it isn't.
+- Not in the rules, written in the screens: "Done." when a step-down answers without words, the two Alerts' button labels, "Nothing earned in these six months yet.", and the sentence after Make it public.
+- Found and fixed on the way: the app's full-screen Tip sheet closing with the player's controls; the bottom bar's Dashboard tab pushing a second Dashboard; `/creator/pitch/new` opening the website from the app.
+- Checks: `dev/test-rig/checks/creator-dashboard.mjs` (section 8), `dev/test-rig/checks/sign-in-here.mjs`, `scripts/test-creator-dashboard.mjs`, `scripts/test-resume-task.mjs`, `scripts/test-sign-in-here.mjs`; the app by its exports and a harness, not on a device.

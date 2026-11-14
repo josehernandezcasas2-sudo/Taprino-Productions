@@ -4,6 +4,8 @@ import { useRouter } from 'next/router';
 import { useClerk } from '@clerk/nextjs';
 import { dollars } from '../lib/purchaseRules';
 import { SITE } from '../lib/siteConfig';
+import { buyParts, buyTask, stayHereProps } from '../lib/resumeTaskRules';
+import { rememberTask, useResumeTask } from '../lib/resumeTask';
 
 // Buy to own, the viewer's side (mockup 2026-10-19: "Own this title" on
 // the episode page, "Own the whole series" on the series page, the
@@ -16,14 +18,25 @@ const fmtDay = (iso) => (iso ? new Date(iso).toLocaleDateString('en-US', { month
 
 // Starts Stripe Checkout for a title; signed-out viewers get the sign-in
 // modal first (the API refuses them anyway). Returns { buy, busy, error }.
+//
+// Signing in (or creating an account) from that box ends on this page and
+// Checkout then starts by itself (2026-11-14, lib/resumeTaskRules.js): the
+// purchase is remembered before the box opens and carried on once the
+// page is signed in. If the title turns out to be theirs already, the
+// server says so and nothing is charged.
 export function useBuyTitle({ isSignedIn }) {
   const router = useRouter();
   const { openSignIn } = useClerk();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
+  useResumeTask('buy:', isSignedIn, (task) => {
+    const parts = buyParts(task);
+    if (parts) buy(parts.type, parts.id);
+  });
   async function buy(type, id) {
     if (!isSignedIn) {
-      openSignIn({ redirectUrl: router.asPath });
+      rememberTask(buyTask(type, id));
+      openSignIn(stayHereProps(router.asPath));
       return;
     }
     setBusy(true);

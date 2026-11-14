@@ -1032,7 +1032,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   const stageProps = isAdminMode ? { className: 'show-room-stage is-admin' } : { id: 'main-content', className: 'show-room-stage' };
   const backLink = isAdminMode
     ? <Link href="/admin/shows" className="acct-back show-room-back"><BackArrowIcon size={14} /> All shows</Link>
-    : <Link href="/creator" className="acct-back show-room-back"><BackArrowIcon size={14} /> Creator Studio</Link>;
+    : <Link href="/creator/dashboard" className="acct-back show-room-back"><BackArrowIcon size={14} /> Dashboard</Link>;
 
   if (phase.state !== 'ready' || !view) {
     return (

@@ -2,7 +2,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../../components/SignInHere';
 import HeaderNav from '../../../components/HeaderNav';
 import MobileTabBar from '../../../components/MobileTabBar';
 import Footer from '../../../components/Footer';
@@ -208,7 +208,7 @@ function Board({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCreator
         </div>
         {isSignedIn
           ? <Link href="/crew/calls/new" className="crew-btn primary">+ Post a call</Link>
-          : <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to post a call</button></SignInButton>}
+          : <SignInHere><button type="button" className="crew-btn primary">Sign in to post a call</button></SignInHere>}
       </div>
       <div className="crew-subnav" role="tablist">
         <Link href="/crew" className="crew-tab">Find people</Link>
@@ -425,7 +425,7 @@ function CallDetail({ data, viewerId, isSignedIn, isAdmin, onChange }) {
 
       {/* ----- responder side ----- */}
       {!isPoster && call.status === 'open' && !isSignedIn && (
-        <div className="crew-actions"><SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in to respond</button></SignInButton></div>
+        <div className="crew-actions"><SignInHere><button type="button" className="crew-btn primary">Sign in to respond</button></SignInHere></div>
       )}
       {!isPoster && canRespond && (
         <form className="cc-form" onSubmit={respond}>
@@ -621,7 +621,7 @@ function PostCall({ mainGenres, isSignedIn, isSubscriber, email, isAdmin, isCrea
           <span className="crew-eyebrow">Crew Call</span>
           <h1>Post a call</h1>
           <p>Say who you need, when, where and how it pays. Everyone whose working card matches gets told.</p>
-          <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+          <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
         </div>
       ) : (
         <div className="crew-card-grid">

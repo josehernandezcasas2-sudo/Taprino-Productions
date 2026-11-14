@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import ProductionShell, { shellProps } from '../../components/productions/ProductionShell';
 import ProductionForm from '../../components/productions/ProductionForm';
 import { getAccountContext } from '../../lib/accountContext';
@@ -26,7 +26,7 @@ export default function NewProduction(props) {
           <span className="crew-eyebrow">Productions</span>
           <h1>Start a production</h1>
           <p>Give the shoot a page: post calls for it, book places under it, keep the call sheet, and hand out credits when it’s released.</p>
-          <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+          <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
         </div>
       ) : (
         <div className="crew-card-grid">

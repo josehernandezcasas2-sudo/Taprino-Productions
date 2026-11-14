@@ -1,7 +1,7 @@
 import Head from 'next/head';
 import Link from 'next/link';
 import { useState } from 'react';
-import { SignInButton } from '@clerk/nextjs';
+import SignInHere from '../../components/SignInHere';
 import HeaderNav from '../../components/HeaderNav';
 import MobileTabBar from '../../components/MobileTabBar';
 import Footer from '../../components/Footer';
@@ -184,7 +184,7 @@ export default function CrewCardPage({ mainGenres, isSignedIn, isSubscriber, ema
             <span className="crew-eyebrow">Connect · Crew Call</span>
             <h1>Your working card</h1>
             <p>Everyone with an account gets one: what you do, what gear you have, where you’re based and how far you’ll go, whether you’re free. People find you by role, gear and distance.</p>
-            <SignInButton mode="modal"><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInButton>
+            <SignInHere><button type="button" className="crew-btn primary">Sign in or create an account</button></SignInHere>
           </div>
         ) : (
           <>

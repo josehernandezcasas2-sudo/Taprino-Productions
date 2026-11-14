@@ -20,11 +20,17 @@
 //   5. A phone (390): nothing runs off the side, Needs you comes before
 //      Your titles, the tab bar has the Dashboard tab and every label
 //      fits (six items for an admin, down to a 320px screen).
-//   6. The other creator pages carry the row of tabs, Creator Studio and
-//      Your work now have the tab bar, and the Account menu no longer
-//      lists My Work, Your Numbers or Money for people with the tab.
+//   6. The other creator pages carry the row of tabs, Your work now has
+//      the tab bar, and the Account menu no longer lists My Work, Your
+//      Numbers or Money for people with the tab.
 //   7. A sub-admin who is not a creator: the page says so and draws no
 //      section as zeros. A viewer has no Dashboard tab.
+//   8. What came over from Creator Studio's hub when the Dashboard took
+//      its place (the same day): /creator forwards here with its query,
+//      the line after the three steps, the shortcuts under Submit a
+//      title, an invite to be paid with Accept and Not now (#get-paid),
+//      Paid to you with Stop getting it…, Discard on a draft; and the
+//      Supporters card and a tip's note in Latest.
 //
 // View counts: the rig runs with Upstash blank, so views read zero and
 // the page says counting isn't switched on. To check real numbers, run
@@ -104,7 +110,15 @@ const episode = (id, extra) => ({
   src, video_type: 'html5', video_provider: 'cloudflare', ads_enabled: true, deletion_requested: false, moderation_hold: false, submitted_by: USERS.mara, status: 'approved', reviewed_at: ago(2), released_at: ago(2), created_at: ago(3), thumbnail: null, poster: null, ...extra
 });
 
+const PAY = { accept: `ck-dash-pay-a-${RUN}`, decline: `ck-dash-pay-b-${RUN}` };
+const PAY_IDS = Object.values(PAY).map(q).join(', ');
+
 function cleanup() {
+  sql(`delete from public.payee_invites where title_id in (${PAY_IDS})`);
+  sql(`delete from public.title_payees where title_id in (${PAY_IDS})`);
+  sql(`delete from public.audit_log where target_id in (${PAY_IDS})`);
+  sql(`delete from public.notifications where message like ${q(`%Dash pay film%${RUN}%`)}`);
+  sql(`delete from public.episodes where id in (${PAY_IDS})`);
   sql(`delete from public.creator_ledger where created_by = ${q(TAG)}`);
   sql(`delete from public.creator_tips where stripe_payment_intent_id like ${q(`pi_${TAG}_%`)}`);
   sql(`delete from public.purchases where stripe_payment_intent_id like ${q(`pi_${TAG}_%`)}`);
@@ -146,6 +160,12 @@ function seed() {
   // approved episode (ready to go public) for the Make it public button.
   insert('episodes', episode(ID.review, { title: 'The Depot', status: 'pending', reviewed_at: null, released_at: null, series_id: IDS.nightBus, season: 2, series_order: 7, created_at: ago(2) }));
   insert('creator_drafts', { user_id: USERS.mara, form: { title: `Dash check draft ${RUN}`, checkTag: TAG } });
+  insert('creator_drafts', { user_id: USERS.mara, form: { title: `Dash check discard ${RUN}`, checkTag: TAG } });
+  // Two films of Dee's, each with an invite for Mara to be paid for it.
+  Object.values(PAY).forEach((id, i) => {
+    insert('episodes', episode(id, { title: `Dash pay film ${i + 1} ${RUN}`, content_type: 'movie', submitted_by: USERS.dee, artist: 'Dee Park' }));
+    insert('payee_invites', { title_type: 'episode', title_id: id, invitee_id: USERS.mara, invited_by: USERS.dee, status: 'pending', created_at: ago(1) });
+  });
   insert('series', { id: ID.show, name: `Dash Check Show ${RUN}`, description: 'A show for the dashboard check.', creator_id: USERS.mara, status: 'pending', kind: 'series', submitted_by_user_id: USERS.mara, created_at: ago(4), deletion_requested: false, moderation_hold: false });
   insert('episodes', episode(ID.showEp, { title: 'Pilot', series_id: ID.show, season: 1, series_order: 1 }));
 }
@@ -266,7 +286,9 @@ await runCheck('creator-dashboard', async () => {
       await pg.waitForTimeout(600);
       ok('nothing runs off the side', (await overflowPx(pg)) <= 0, `${await overflowPx(pg)}px`);
       const cols = await pg.evaluate(() => { const box = (s) => { const r = document.querySelector(s).getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top + window.scrollY), b: Math.round(r.bottom + window.scrollY) }; }; return { titles: box('.dash-titles'), views: box('.dash-views-card'), latest: box('.dash-latest'), needs: box('.dash-needs'), money: box('.dash-money'), months: box('.dash-months-card') }; });
-      ok('two columns: titles, views and Latest on the left; Needs you, money and the six months on the right', cols.titles.l === cols.views.l && cols.views.l === cols.latest.l && cols.needs.l === cols.money.l && cols.money.l === cols.months.l && cols.needs.l > cols.titles.l && cols.views.t - cols.titles.b < 40 && cols.money.t - cols.needs.b < 40 && Math.abs(cols.titles.t - cols.needs.t) < 2, JSON.stringify(cols));
+      // The right column starts level with Your titles: with Get paid while an invite waits, else with Needs you.
+      const rightTop = await pg.evaluate(() => Math.round(document.querySelector('.dash-cols .dash-col:last-child > *').getBoundingClientRect().top + window.scrollY));
+      ok('two columns: titles, views and Latest on the left; Needs you, money and the six months on the right', cols.titles.l === cols.views.l && cols.views.l === cols.latest.l && cols.needs.l === cols.money.l && cols.money.l === cols.months.l && cols.needs.l > cols.titles.l && cols.views.t - cols.titles.b < 40 && cols.money.t - cols.needs.b < 40 && Math.abs(cols.titles.t - rightTop) < 2, `${JSON.stringify(cols)} right column from ${rightTop}`);
       ok('the head', (await pg.locator('.dash-h1').innerText()) === 'Your work and what it earns.' && /^CREATOR DASHBOARD · /i.test(await pg.locator('.dash-kicker').innerText()));
       const rail = await pg.evaluate(() => {
         const items = [...document.querySelectorAll('.tabbar .tabbar-item')].map((el) => ({ text: el.innerText.trim().toUpperCase(), active: el.classList.contains('active'), tag: el.tagName, href: el.getAttribute('href') }));
@@ -276,7 +298,7 @@ await runCheck('creator-dashboard', async () => {
       const dashTab = rail.find((x) => x.text === 'DASHBOARD');
       ok('the Dashboard tab is a link to the page, and the lit one', dashTab && dashTab.tag === 'A' && dashTab.href === '/creator/dashboard' && dashTab.active && rail.filter((x) => x.active).length === 1, JSON.stringify(dashTab));
       const tabs = await pg.locator('.dash-tabs .dash-tab').allInnerTexts();
-      ok('the row of tabs', tabs.join('|') === 'Overview|Your work|Numbers|Money|Pitches|Creator Studio', tabs.join('|'));
+      ok('the row of tabs: Creator Studio’s is gone', tabs.join('|') === 'Overview|Your work|Numbers|Money|Pitches', tabs.join('|'));
       ok('Overview is the current tab', (await pg.locator('.dash-tab.on').innerText()) === 'Overview' && (await pg.locator('.dash-tab[aria-current="page"]').count()) === 1);
 
       const tiles = await pg.evaluate(() => [...document.querySelectorAll('.dash-tile')].map((el) => ({ k: el.querySelector('.dash-tile-k').innerText, v: el.querySelector('.dash-tile-v').innerText, sub: el.querySelector('.dash-tile-sub').innerText })));
@@ -352,7 +374,8 @@ await runCheck('creator-dashboard', async () => {
         ok('with no counting the views card says so instead of drawing an empty chart', /isn’t switched on/.test(await pg.locator('.dash-views-card').innerText()) && (await pg.locator('.dash-chart').count()) === 0);
       }
       const latest = await pg.locator('.dash-latest-text').allInnerTexts();
-      ok('Latest starts with the newest thing, the tip', latest.length >= 3 && /^A fan tipped you \$5\.00$/.test(latest[0]), latest.join(' | '));
+      ok('Latest starts with the newest thing, the tip, with the fan’s note under it', latest.length >= 3 && /^A fan tipped you \$5\.00\s+“Loved the ending\.”$/.test(latest[0]), latest.join(' | '));
+      ok('…and only the tip with a note has one', (await pg.locator('.dash-latest .dash-quote').count()) === 1);
       ok('the pitch card: raised so far of the goal', /\$1,240 raised of \$5,000/.test(await pg.locator('.dash-pitch').innerText()), await pg.locator('.dash-pitch').innerText());
       ok('the link card', (await pg.locator('.dash-link-url').innerText()).endsWith('/@' + ((await roleOf(MARA)).profileHref || '').split('/').pop()) || (await pg.locator('.dash-yourlink').count()) === 1);
       await shot(pg, 'dashboard-1280', { fullPage: true });
@@ -394,10 +417,10 @@ await runCheck('creator-dashboard', async () => {
       const order = await pp.evaluate(() => ['.dash-tiles', '.dash-needs', '.dash-titles', '.dash-money', '.dash-views-card', '.dash-latest'].map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top + window.scrollY)));
       ok('the order: numbers, Needs you, Your titles, Money, Views, Latest', order.every((y, i) => i === 0 || y > order[i - 1]), order.join(' < '));
       ok('the numbers are two across', await pp.evaluate(() => { const t = [...document.querySelectorAll('.dash-tile')].map((el) => el.getBoundingClientRect()); return Math.abs(t[0].top - t[1].top) < 2 && t[2].top > t[0].bottom - 2 && Math.abs(t[2].top - t[3].top) < 2; }));
-      ok('a live row keeps its money and its views; the detail and the small line make way', await pp.evaluate(() => {
+      ok('a live row keeps its money, its sales and ads split and its views; the small line makes way', await pp.evaluate(() => {
         const row = [...document.querySelectorAll('.dash-rows .dash-row.state-live')].find((el) => el.querySelector('.dash-row-title').innerText === 'Night Bus');
         const vis = (sel) => { const el = row.querySelector(sel); return Boolean(el && el.getBoundingClientRect().width > 0); };
-        return vis('.dash-earned .dash-num') && vis('.dash-views .dash-num') && vis('.dash-unit') && !vis('.dash-detail') && !vis('.dash-watched') && !vis('.dash-open');
+        return vis('.dash-earned .dash-num') && vis('.dash-views .dash-num') && vis('.dash-unit') && vis('.dash-detail') && !vis('.dash-watched') && !vis('.dash-open');
       }));
       const tapTargets = await pp.evaluate(() => ['.dash-filter', '.dash-need-act', '.dash-tab', '.dash-period select', '.dash-head-btn'].map((s) => [s, Math.round(Math.min(...[...document.querySelectorAll(s)].map((el) => el.getBoundingClientRect().height)))]));
       ok('everything to tap is at least 44px tall', tapTargets.every(([, h]) => h >= 44), JSON.stringify(tapTargets));
@@ -449,12 +472,12 @@ await runCheck('creator-dashboard', async () => {
       // ---- 6. the other creator pages -------------------------------------------------
       section('6. the other creator pages');
       const other = await b.open(MARA, 1280);
-      for (const [href, current, hadBar] of [['/creator', 'Creator Studio', false], ['/creator/my-work', 'Your work', false], ['/creator/analytics', 'Numbers', true], ['/creator/money', 'Money', true], ['/creator/pitch/dashboard', 'Pitches', false]]) {
+      for (const [href, current, hadBar] of [['/creator/my-work', 'Your work', false], ['/creator/analytics', 'Numbers', true], ['/creator/money', 'Money', true], ['/creator/pitch/dashboard', 'Pitches', false]]) {
         await goto(other.page, href);
         await other.page.locator('.dash-tabs').waitFor({ timeout: 30000 });
         const cur = await other.page.locator('.dash-tab.on').innerText();
         const count = await other.page.locator('.dash-tab').count();
-        ok(`${href} carries the tabs with ${current} current`, cur === current && count === 6, `${cur} of ${count}`);
+        ok(`${href} carries the tabs with ${current} current`, cur === current && count === 5, `${cur} of ${count}`);
         const lit = await other.page.evaluate(() => [...document.querySelectorAll('.tabbar .tabbar-item.active')].map((el) => el.innerText.trim().toUpperCase()));
         ok(`${href} has the tab bar${hadBar ? '' : ' (it had none)'}, with Dashboard lit`, lit.join('|') === 'DASHBOARD', lit.join('|'));
         ok(`${href} doesn’t run off the side`, (await overflowPx(other.page)) <= 0, `${await overflowPx(other.page)}px`);
@@ -464,12 +487,99 @@ await runCheck('creator-dashboard', async () => {
       ok('a tab goes where it says', true);
       await other.ctx.close();
       const otherPhone = await b.open(MARA, 390);
-      for (const href of ['/creator', '/creator/my-work', '/creator/money']) {
+      for (const href of ['/creator/my-work', '/creator/money']) {
         await goto(otherPhone.page, href);
         await otherPhone.page.locator('.dash-tabs').waitFor({ timeout: 30000 });
         ok(`${href} at 390: the tabs scroll inside their own row, the page doesn’t`, (await overflowPx(otherPhone.page)) <= 0 && (await otherPhone.page.evaluate(() => getComputedStyle(document.querySelector('.dash-tabs')).overflowX)) === 'auto', `${await overflowPx(otherPhone.page)}px`);
       }
       await otherPhone.ctx.close();
+
+      // ---- 8. what came over from Creator Studio's hub -----------------------------------
+      section('8. the Dashboard in Creator Studio’s place');
+      const fwd = await page('/creator?submitted=Check%20film&show=' + encodeURIComponent(IDS.nightBus), MARA);
+      const fwdTo = new URL(fwd.headers.get('location') || '/', 'http://rig.test');
+      ok('/creator forwards to the Dashboard and keeps its query', fwd.status === 307 && fwdTo.pathname === '/creator/dashboard' && fwdTo.searchParams.get('submitted') === 'Check film' && fwdTo.searchParams.get('show') === IDS.nightBus, `${fwd.status} ${fwd.headers.get('location')}`);
+      const fwdOut = await page('/creator', SIGNED_OUT);
+      ok('…for a signed-out visitor too (the Dashboard then sends them to sign in)', fwdOut.status === 307 && fwdOut.headers.get('location') === '/creator/dashboard', `${fwdOut.status} ${fwdOut.headers.get('location')}`);
+      const mineApi = (await json('/api/payees/mine', MARA)).body;
+      ok('the payees route lists the two invites', Array.isArray(mineApi.invites) && mineApi.invites.filter((i) => Object.values(PAY).includes(i.titleId) || /Dash pay film/.test(i.headline || '')).length === 2, JSON.stringify((mineApi.invites || []).map((i) => i.headline)));
+
+      const hub = await b.open(MARA, 1280);
+      const hp = hub.page;
+      await goto(hp, `/creator?submitted=Check%20film&show=${encodeURIComponent(IDS.nightBus)}#get-paid`);
+      await hp.locator('.dash-getpaid .dash-invite').first().waitFor({ timeout: 30000 });
+      await hp.waitForFunction(() => !document.querySelector('.dash-tile .dash-skel') && document.querySelector('.dash-lane'), null, { timeout: 30000 });
+      ok('the old address lands on the Dashboard', new URL(hp.url()).pathname === '/creator/dashboard', hp.url());
+      const sentText = await hp.locator('.dash-flash').first().innerText();
+      ok('the line after the three steps, with the way to the show', /^“Check film” is in\. It’s in review now/.test(sentText) && (await hp.locator('.dash-flash a', { hasText: 'Open the show page' }).getAttribute('href')) === `/creator/show/${IDS.nightBus}`, sentText);
+      await hp.waitForFunction(() => !window.location.search, null, { timeout: 10000 }).catch(() => {});
+      ok('…and the address is cleared so a reload doesn’t say it again, keeping #get-paid', new URL(hp.url()).search === '' && new URL(hp.url()).hash === '#get-paid', hp.url());
+      await hp.waitForTimeout(900);
+      const jump = await hp.evaluate(() => { const r = document.getElementById('get-paid').getBoundingClientRect(); return { top: Math.round(r.top), h: window.innerHeight, focus: document.activeElement ? document.activeElement.innerText : '' }; });
+      ok('#get-paid brings the card into view with Accept ready', jump.top >= 0 && jump.top < jump.h && jump.focus === 'Accept', JSON.stringify(jump));
+
+      const pills = await hp.locator('.dash-start .dash-pill').allInnerTexts();
+      ok('Start something: a shortcut per kind of title, then a pitch', pills.join('|') === 'Film|Short|Series episode|Podcast|Snippet|Bonus content|Pitch a project', pills.join('|'));
+      const pillHrefs = await hp.locator('.dash-start .dash-pill').evaluateAll((els) => els.map((el) => el.getAttribute('href')));
+      ok('…each opens the three steps for its kind', pillHrefs[0] === '/creator/submit?type=movie' && pillHrefs[2] === '/creator/submit?type=series' && pillHrefs[6] === '/creator/pitch/new', pillHrefs.join(' '));
+      ok('Needs you no longer repeats the invites', !(await hp.locator('.dash-needs').innerText()).includes('Get paid for'));
+
+      const cards = await hp.evaluate(() => { const box = (s) => { const el = document.querySelector(s); if (!el) return null; const r = el.getBoundingClientRect(); return { l: Math.round(r.left), t: Math.round(r.top + window.scrollY) }; }; return { getpaid: box('.dash-getpaid'), needs: box('.dash-needs'), money: box('.dash-money'), supporters: box('.dash-supporters'), titles: box('.dash-titles') }; });
+      ok('Get paid is the first card of the right column, above Needs you', cards.getpaid && cards.getpaid.l === cards.needs.l && cards.getpaid.t < cards.needs.t && cards.getpaid.l > cards.titles.l, JSON.stringify(cards));
+      const invText = await hp.locator('.dash-getpaid').innerText();
+      ok('an invite says who asked and what Not now does', /Dee[^\n]* asked on /.test(invText) && /Not now tells Dee[^\n]* you said no\. They can ask again\./.test(invText) && (await hp.locator('.dash-getpaid .dash-invite').count()) === 2, invText.slice(0, 300));
+
+      const inviteOf = (film) => hp.locator('.dash-getpaid .dash-invite', { hasText: film });
+      const statusOf = (id) => (rows(`select status from public.payee_invites where title_id = ${q(id)}`)[0] || {}).status;
+      await inviteOf(`Dash pay film 2 ${RUN}`).locator('button', { hasText: 'Not now' }).click();
+      await hp.waitForFunction(() => document.querySelectorAll('.dash-getpaid .dash-invite').length === 1, null, { timeout: 30000 });
+      ok('Not now: the invite is declined and leaves the card', statusOf(PAY.decline) === 'declined' && (await hp.locator('.dash-flash').last().innerText()).length > 0, `${statusOf(PAY.decline)} · ${await hp.locator('.dash-flash').last().innerText()}`);
+      await inviteOf(`Dash pay film 1 ${RUN}`).locator('button', { hasText: 'Accept' }).click();
+      await hp.locator('.dash-paidto .dash-need', { hasText: `Dash pay film 1 ${RUN}` }).waitFor({ timeout: 30000 });
+      const paidNow = (rows(`select paid_to from public.episodes where id = ${q(PAY.accept)}`)[0] || {}).paid_to;
+      ok('Accept: the title pays this account now, the card is gone and it is listed under Paid to you', statusOf(PAY.accept) === 'accepted' && paidNow === USERS.mara && (await hp.locator('.dash-getpaid').count()) === 0, `${statusOf(PAY.accept)} · paid_to ${paidNow}`);
+      ok('…and the page says so', (await hp.locator('.dash-flash').last().innerText()).length > 0, await hp.locator('.dash-flash').last().innerText());
+      const dialogs = [];
+      hp.on('dialog', (d) => { dialogs.push(d.message()); d.accept(); });
+      await hp.locator('.dash-paidto .dash-need', { hasText: `Dash pay film 1 ${RUN}` }).locator('button', { hasText: 'Stop getting it' }).click();
+      await hp.waitForFunction((name) => ![...document.querySelectorAll('.dash-paidto .dash-need')].some((el) => el.innerText.includes(name)), `Dash pay film 1 ${RUN}`, { timeout: 30000 });
+      const paidAfter = (rows(`select paid_to from public.episodes where id = ${q(PAY.accept)}`)[0] || {}).paid_to;
+      ok('Stop getting it… asks first, then the earnings go back', dialogs.length === 1 && /^Stop getting the earnings of “Dash pay film 1 /.test(dialogs[0]) && /what’s already credited to you stays yours\.$/.test(dialogs[0]) && paidAfter !== USERS.mara, `${dialogs[0]} · paid_to ${paidAfter}`);
+
+      await hp.locator('.dash-filter', { hasText: 'Drafts' }).click();
+      const draftRow = hp.locator('.dash-rows .dash-row', { hasText: `Dash check discard ${RUN}` });
+      await draftRow.waitFor({ timeout: 30000 });
+      ok('a draft’s row has Continue and Discard', (await draftRow.locator('a', { hasText: 'Continue' }).count()) === 1 && (await draftRow.locator('button', { hasText: 'Discard' }).count()) === 1);
+      await draftRow.locator('button', { hasText: 'Discard' }).click();
+      await hp.waitForFunction((name) => ![...document.querySelectorAll('.dash-rows .dash-row-title')].some((el) => el.innerText === name), `Dash check discard ${RUN}`, { timeout: 30000 });
+      const left = rows(`select form->>'title' as title from public.creator_drafts where form->>'checkTag' = ${q(TAG)}`).map((r) => r.title);
+      ok('Discard asks first, then the draft is gone and the other one stays', dialogs.length === 2 && dialogs[1] === 'Discard this draft? Its uploaded file is deleted too.' && left.length === 1 && left[0] === `Dash check draft ${RUN}`, `${dialogs[1]} · ${left.join(', ')}`);
+      await hp.locator('.dash-filter', { hasText: 'All' }).click();
+
+      const sup = await hp.locator('.dash-supporters').innerText();
+      ok('Supporters: who is behind the money, counted', /Picked you in their lineup/.test(sup) && /By watching this month/.test(sup) && /Backed a pitch\s+\d+/.test(sup) && /Bought a title\s+\d+/.test(sup) && /counted, not named/.test(sup), sup.replace(/\s+/g, ' '));
+      ok('…with the way to the money page’s list', (await hp.locator('.dash-supporters a.dash-link').getAttribute('href')) === '/creator/money#supporters');
+      ok('nothing runs off the side with the new cards', (await overflowPx(hp)) <= 0, `${await overflowPx(hp)}px`);
+      ok('no page errors', hub.errors.length === 0, hub.errors.join(' | '));
+      await shot(hp, 'dashboard-moved-1280', { fullPage: true });
+      await hub.ctx.close();
+
+      // The same on a phone: Get paid first, the shortcuts scroll in their row.
+      sql(`update public.payee_invites set status = 'pending', decided_at = null where title_id = ${q(PAY.decline)}`);
+      const hubPhone = await b.open(MARA, 390);
+      const hq = hubPhone.page;
+      await goto(hq, '/creator/dashboard');
+      await hq.locator('.dash-getpaid .dash-invite').first().waitFor({ timeout: 30000 });
+      await hq.waitForFunction(() => !document.querySelector('.dash-tile .dash-skel') && document.querySelector('.dash-lane'), null, { timeout: 30000 });
+      await hq.waitForTimeout(600);
+      const phoneOrder = await hq.evaluate(() => ['.dash-start', '.dash-tiles', '.dash-getpaid', '.dash-needs', '.dash-titles', '.dash-money', '.dash-supporters', '.dash-latest'].map((s) => Math.round(document.querySelector(s).getBoundingClientRect().top + window.scrollY)));
+      ok('a phone: the shortcuts, the numbers, Get paid, Needs you, Your titles, Money, Supporters, Latest', phoneOrder.every((y, i) => i === 0 || y > phoneOrder[i - 1]), phoneOrder.join(' < '));
+      ok('…nothing runs off the side, and the shortcuts scroll inside their own row', (await overflowPx(hq)) <= 0 && (await hq.evaluate(() => { const el = document.querySelector('.dash-start-row'); return el.scrollWidth > el.clientWidth && getComputedStyle(el).overflowX === 'auto'; })), `${await overflowPx(hq)}px`);
+      const taps = await hq.evaluate(() => ['.dash-pill', '.dash-invite-acts .dash-btn'].map((s) => [s, Math.round(Math.min(...[...document.querySelectorAll(s)].map((el) => el.getBoundingClientRect().height)))]));
+      ok('…and the new things to tap are at least 40px tall', taps.every(([, h]) => h >= 40), JSON.stringify(taps));
+      await shot(hq, 'dashboard-moved-390', { fullPage: true });
+      ok('no page errors on the phone', hubPhone.errors.length === 0, hubPhone.errors.join(' | '));
+      await hubPhone.ctx.close();
 
       // ---- 7. a sub-admin and a viewer ---------------------------------------------------
       section('7. a sub-admin, a viewer');

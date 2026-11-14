@@ -141,7 +141,7 @@ export default function NewShowPage({ displayName, mainGenres, isSignedIn, isSub
       </Head>
       <HeaderNav mainGenres={mainGenres} isSignedIn={isSignedIn} isSubscriber={isSubscriber} email={email} isAdmin={isAdmin} isCreator={isCreator} />
       <main id="main-content" className="apl new-show">
-        <Link href="/creator" className="acct-back new-show-back"><BackArrowIcon size={14} /> Creator Studio</Link>
+        <Link href="/creator/dashboard" className="acct-back new-show-back"><BackArrowIcon size={14} /> Dashboard</Link>
         <div className="apl-head">
           <div className="apl-eyebrow">New show</div>
           <h1 className="apl-h1">Start a show</h1>
