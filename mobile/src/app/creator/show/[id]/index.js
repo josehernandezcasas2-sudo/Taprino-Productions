@@ -24,6 +24,10 @@ import MoveSheet from '../../../../components/show/MoveSheet';
 import { PlaceExtraSheet, RemoveEpisodeSheet } from '../../../../components/show/RowSheets';
 import PayeeCard from '../../../../components/show/PayeeCard';
 import { extraKindLabel } from '../../../../lib/extraKinds';
+import { SHOW_TABS } from '../../../../lib/titleDashRules';
+import ShowOverview from '../../../../components/show/ShowOverview';
+import { TabRow } from '../../../../components/work/WorkBits';
+import { hrefToRoute } from '../../../../components/PushListener';
 
 // The show page in the app (the series revamp, slice 5; spec "App — New
 // show, Show page, Episode editor" and "The app"; the website's
@@ -45,7 +49,10 @@ import { extraKindLabel } from '../../../../lib/extraKinds';
 // which keeps going while the creator moves around the app.
 //
 // Params: id; created=1 (New show just made it); ep=<episode id> or
-// draft=<draft id> (scroll to that row and flash it).
+// draft=<draft id> (scroll to that row and flash it); tab=overview opens
+// the Overview (2026-11-15: the show page's row of two tabs, Overview ·
+// Episodes; components/show/ShowOverview.js). It still opens on Episodes,
+// the room as it was, so every older link lands where it did.
 
 const POLL_MS = 20000;
 const TOAST_MS = 8000;
@@ -797,6 +804,7 @@ function ShowScreen() {
   }
 
   // --- the screen -----------------------------------------------------------------------------
+  const tab = params.tab === 'overview' ? 'overview' : 'episodes';
   const dashboard = !isLoaded ? null : { isSignedIn: Boolean(isSignedIn) };
   const back = { href: '/creator/dashboard', label: 'Dashboard' };
 
@@ -918,6 +926,18 @@ function ShowScreen() {
       overlay={<RoomToast toast={toast} onClose={() => say(null)} />}
     >
       <View ref={bodyRef} collapsable={false} style={sx.body} onLayout={(e) => { bodyY.current = e.nativeEvent.layout.y; }}>
+        <TabRow tabs={SHOW_TABS} current={tab} onPick={(key) => router.setParams({ tab: key })} label="This show" />
+        {tab === 'overview' ? (
+          <ShowOverview
+            view={view}
+            getToken={getToken}
+            onOpen={(href) => {
+              const where = hrefToRoute(href);
+              if (where && where.route) router.push(where.route);
+            }}
+          />
+        ) : (
+        <>
         {createdNote ? (
           <View style={sx.flash} accessibilityLiveRegion="polite">
             <CheckIcon size={15} color={colors.ok} />
@@ -1009,6 +1029,8 @@ function ShowScreen() {
         {!(vertical && !team) ? (
           <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />
         ) : null}
+        </>
+        )}
       </View>
 
       {sheet && sheet.kind === 'row' && sheetRow ? (
