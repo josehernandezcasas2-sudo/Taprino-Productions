@@ -8,6 +8,7 @@ import {
   ActionSheet, ArrowDownIcon, ArrowUpIcon, ChevronIcon, KebabIcon, LinkText, Pill, PlusIcon, SendIcon, SmallButton, UploadIcon,
   ago, minutesOf, ss
 } from './ShowBits';
+import { REMOVAL_WORDS, askBackFor, removedState } from '../../lib/removalRules';
 
 // A season of the show page in the app (the series revamp, slice 5; the
 // website's components/show/SeasonSection.js): the header (the label, the
@@ -137,7 +138,9 @@ function NumberBadge({ row, editable, onCommit }) {
 function EpisodeRow({ row, index, count, ctx, actions }) {
   const isDraft = row.kind === 'draft';
   const upload = isDraft ? (ctx.uploads || {})[row.id] || null : null;
-  const pill = rowPill(row, { showPublic: ctx.showPublic, upload: upload ? { status: upload.status, pct: upload.pct } : null });
+  // A removed title reads where it stands (migration 124).
+  const removed = !isDraft ? removedState(row) : null;
+  const pill = removed ? { label: removed.label, tone: 'neutral', key: 'withdrawn' } : rowPill(row, { showPublic: ctx.showPublic, upload: upload ? { status: upload.status, pct: upload.pct } : null });
   const openable = ctx.canOpen(row);
   const reorderable = ctx.canReorder && row.inRunningOrder !== false && row.status !== 'rejected' && !row.withdrawnAt;
   const thumb = row.thumbnail || ctx.showStill || ctx.showPoster || null;
@@ -336,6 +339,12 @@ export function rowMenuItems(row, ctx, actions) {
   } else if (!isDraft && row.mine && !row.deletionRequested && !row.withdrawnAt) {
     items.push({ divider: true });
     items.push({ key: 'remove', label: 'Remove…', icon: <TrashIcon size={15} color={colors.danger} />, danger: true, onPress: () => actions.askRemove(row) });
+  } else if (!isDraft && row.mine && row.withdrawnAt && actions.askBack) {
+    // Removed on its own (migration 124): ask to bring it back, or take
+    // that request back.
+    const ask = askBackFor(row, { showWithdrawn: Boolean(ctx.showRemoved) });
+    if (ask && ask.ok) items.push({ key: 'restore', label: REMOVAL_WORDS.askBackMenu, icon: <UploadIcon size={15} color={colors.ink} />, onPress: () => actions.askBack(row) });
+    else if (ask && ask.key === 'asked') items.push({ key: 'cancel_restore', label: REMOVAL_WORDS.cancelAsk, icon: <UploadIcon size={15} color={colors.ink} />, onPress: () => actions.cancelAskBack(row) });
   }
   return items;
 }

@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import AdminEditEpisodeModal from '../AdminEditEpisodeModal';
 import ManualEpisodeForm from '../ManualEpisodeForm';
 import { isTitleId } from '../../lib/titleIds';
+import { REMOVAL_WORDS, shortDay } from '../../lib/removalRules';
 
 // Content library and its queues: every episode (search + edit), the
 // homepage hero pool, pending artwork, pending edits, deletion
@@ -43,6 +44,8 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
   const [deletions, setDeletions] = useState(null);
   const [deletionActionLoading, setDeletionActionLoading] = useState(null);
   const [deletionError, setDeletionError] = useState(null);
+  // "Delete now…" (a full admin, migration 124): the row whose reason box is open.
+  const [deleteNow, setDeleteNow] = useState(null); // { type, id, title, reason, confirmName }
   const [orphans, setOrphans] = useState(null);
   const [orphanActionLoading, setOrphanActionLoading] = useState(null);
   const [orphanError, setOrphanError] = useState(null);
@@ -95,7 +98,7 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
       const data = await res.json();
       if (res.ok) setDeletions(data);
     } catch (err) {
-      setDeletions({ episodes: [], series: [] });
+      setDeletions({ episodes: [], series: [], held: [] });
     }
   }
 
@@ -192,8 +195,38 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
     () => Promise.all([loadPendingArtwork(), loadOrphans(), loadLibrary(librarySearch)]));
   const resolveEdit = (type, id, decision, seen) => postDecision('/api/admin/resolve-edit', { type, id, decision, ...(seen ? { seen } : {}) }, setEditActionLoading, setEditError, `${type}-${id}`,
     () => Promise.all([loadPendingEdits(), loadLibrary(librarySearch)]));
-  const resolveDeletion = (type, id, decision) => postDecision('/api/admin/resolve-deletion', { type, id, decision }, setDeletionActionLoading, setDeletionError, `${type}-${id}`,
-    () => Promise.all([loadDeletions(), loadLibrary(librarySearch), loadOrphans()]));
+  const resolveDeletion = (type, id, decision, extra = {}) => postDecision('/api/admin/resolve-deletion', { type, id, decision, ...extra }, setDeletionActionLoading, setDeletionError, `${type}-${id}`,
+    async () => { setDeleteNow(null); await Promise.all([loadDeletions(), loadLibrary(librarySearch), loadOrphans()]); });
+  // Delete now… opens a reason box under its row (and, for a show, its
+  // name typed back).
+  const deleteNowBox = (type, id, title) => (deleteNow && deleteNow.type === type && deleteNow.id === id ? (
+    <div className="adm-delete-now" style={{ marginTop: '0.6rem', display: 'grid', gap: '0.45rem' }}>
+      <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--ink-dim)' }}>{REMOVAL_WORDS.deleteNowHelp}</p>
+      <label htmlFor={`del-now-${type}-${id}`} style={{ fontSize: '0.78rem' }}>{REMOVAL_WORDS.deleteNowReason}</label>
+      <textarea id={`del-now-${type}-${id}`} rows={2} maxLength={1000} value={deleteNow.reason} onChange={(e) => setDeleteNow((d) => ({ ...d, reason: e.target.value }))} style={{ width: '100%', boxSizing: 'border-box' }} />
+      {type === 'series' && (
+        <>
+          <label htmlFor={`del-now-name-${id}`} style={{ fontSize: '0.78rem' }}>Type the show’s name</label>
+          <input id={`del-now-name-${id}`} type="text" autoComplete="off" placeholder={title} value={deleteNow.confirmName} onChange={(e) => setDeleteNow((d) => ({ ...d, confirmName: e.target.value }))} />
+        </>
+      )}
+      <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className="account-btn-primary"
+          style={{ width: 'auto', background: 'var(--danger)' }}
+          disabled={deletionActionLoading === `${type}-${id}` || !deleteNow.reason.trim() || (type === 'series' && deleteNow.confirmName.trim().toLowerCase() !== String(title || '').trim().toLowerCase())}
+          onClick={() => resolveDeletion(type, id, 'delete_now', { reason: deleteNow.reason.trim(), ...(type === 'series' ? { confirmName: deleteNow.confirmName.trim() } : {}) })}
+        >
+          {deletionActionLoading === `${type}-${id}` ? 'Deleting…' : 'Delete it for good'}
+        </button>
+        <button type="button" className="account-btn-secondary" style={{ width: 'auto' }} onClick={() => setDeleteNow(null)}>Cancel</button>
+      </div>
+    </div>
+  ) : null);
+  const deleteNowButton = (type, id, title) => (
+    <button type="button" className="account-btn-secondary" style={{ width: 'auto', color: 'var(--danger)' }} disabled={deletionActionLoading === `${type}-${id}`} onClick={() => setDeleteNow({ type, id, title, reason: '', confirmName: '' })}>{REMOVAL_WORDS.deleteNow}</button>
+  );
   const cleanupOrphan = (orphanId) => postDecision('/api/admin/cleanup-orphan', { orphanId }, setOrphanActionLoading, setOrphanError, orphanId, () => loadOrphans());
   const dismissOrphan = (orphanId) => postDecision('/api/admin/orphaned-media', { orphanId }, setOrphanActionLoading, setOrphanError, `dismiss-${orphanId}`, () => loadOrphans());
   const openShow = (id, hash = '') => (
@@ -363,7 +396,11 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
       <div id="library-deletions" className="account-card">
         <div className="account-eyebrow">Pending deletions</div>
         <h3>Episode and series removal requests</h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>These are already hidden from the site. Confirming permanently deletes the row; denying restores it.</p>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+          {deletions && deletions.holdReady
+            ? 'These are already hidden from the site. Confirming takes it off for good: anything bought is kept for its buyers, the rest is deleted 30 days later (or kept for later, when its owner asked) unless they ask for it back. A full admin can delete one now — for abuse or a legal reason. Denying restores it.'
+            : 'These are already hidden from the site. Confirming permanently deletes the row; denying restores it.'}
+        </p>
         {deletionError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{deletionError}</p>}
         {!deletions ? <p>Loading…</p> : deletions.episodes.length === 0 && deletions.series.length === 0 ? <p className="adm-empty">Nothing pending right now.</p> : (
           <>
@@ -371,15 +408,19 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
               <div key={`episode-${e.id}`} style={rowStyle}>
                 {kindTag('Episode', 'var(--signal-amber)')}
                 <h4 style={{ margin: '0 0 0.3rem' }}>{e.title}{e.artist ? ` — by ${e.artist}` : ''}</h4>
-                <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {e.reason}</p>
-                {decideButtons(deletionActionLoading === `episode-${e.id}`, () => resolveDeletion('episode', e.id, 'confirm'), () => resolveDeletion('episode', e.id, 'deny'), '🗑 Confirm delete', 'Deny — restore it')}
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>Reason: {e.reason}{e.keep ? ' · they asked us to keep the files for later' : ''}</p>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {decideButtons(deletionActionLoading === `episode-${e.id}`, () => resolveDeletion('episode', e.id, 'confirm'), () => resolveDeletion('episode', e.id, 'deny'), e.confirmLabel || '🗑 Confirm delete', 'Deny — restore it')}
+                  {e.canDeleteNow && deleteNowButton('episode', e.id, e.title)}
+                </div>
+                {deleteNowBox('episode', e.id, e.title)}
               </div>
             ))}
             {deletions.series.map((s) => (
               <div key={`series-${s.id}`} style={rowStyle}>
                 {kindTag('Series', 'var(--brass)')}
                 <h4 style={{ margin: '0 0 0.3rem' }}>{s.name}</h4>
-                <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>Reason: {s.reason}</p>
+                <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}>Reason: {s.reason}{s.keep ? ' · they asked us to keep the files for later' : ''}</p>
                 <p style={{ margin: '0 0 0.6rem', fontSize: '0.78rem', color: 'var(--ink-dim)' }}>A show is removed from its page, where you can see what goes with it and what stays for its buyers.</p>
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
                   {openShow(s.id, '#removal')}
@@ -387,6 +428,24 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
                     {deletionActionLoading === `series-${s.id}` ? 'Working…' : 'Deny — restore it'}
                   </button>
                 </div>
+              </div>
+            ))}
+          </>
+        )}
+        {deletions && deletions.held && deletions.held.length > 0 && (
+          <>
+            <h4 style={{ margin: '1.2rem 0 0.2rem' }}>Off the site, files kept</h4>
+            <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--ink-dim)' }}>Removed and not bought: the daily clean-up deletes each one on its date unless its owner asks for it back (Review → Bring back).</p>
+            {deletions.held.map((h) => (
+              <div key={`held-${h.type}-${h.id}`} style={rowStyle}>
+                {kindTag(h.type === 'series' ? 'Series' : 'Episode', 'var(--ink-dim)')}
+                <h4 style={{ margin: '0 0 0.3rem' }}>{h.title}{h.artist ? ` — by ${h.artist}` : ''}</h4>
+                <p style={{ margin: '0 0 0.6rem', fontSize: '0.85rem' }}>{h.label}{h.removedAt ? ` · removed ${shortDay(h.removedAt)}` : ''}{h.asked ? ' · its owner asked for it back' : ''}</p>
+                <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap' }}>
+                  {h.href && openShow(h.id, '#removal')}
+                  {h.canDeleteNow && deleteNowButton(h.type, h.id, h.title)}
+                </div>
+                {deleteNowBox(h.type, h.id, h.title)}
               </div>
             ))}
           </>

@@ -27,7 +27,9 @@ const ICON = {
   extract_audio: HeadphonesIcon,
   channels: TvIcon,
   cancel_removal: UndoIcon,
-  remove: TrashIcon
+  remove: TrashIcon,
+  restore: UndoIcon,
+  cancel_restore: UndoIcon
 };
 
 export default function WorkRow({ row, icons = {}, menuOpen, onToggleMenu, onCloseMenu, onAction, busy = {}, note = null, copied = false }) {
@@ -35,7 +37,7 @@ export default function WorkRow({ row, icons = {}, menuOpen, onToggleMenu, onClo
   const inShow = row.kind !== 'title';
   const iconFor = (key) => {
     const Icon = key === 'open' ? (inShow ? PencilIcon : BarChartIcon) : ICON[key];
-    const srcKey = { open: inShow ? 'pencil' : 'bar_chart', edit_full: 'pencil', edit_submission: 'pencil', edit_words: 'pencil', view: 'external_link', copy: 'link', sell: 'ticket', payee: 'account', artwork: 'image', video: 'clapperboard', captions: 'chat', extract_audio: 'headphones', channels: 'tv', cancel_removal: 'undo', remove: 'trash' }[key];
+    const srcKey = { open: inShow ? 'pencil' : 'bar_chart', edit_full: 'pencil', edit_submission: 'pencil', edit_words: 'pencil', view: 'external_link', copy: 'link', sell: 'ticket', payee: 'account', artwork: 'image', video: 'clapperboard', captions: 'chat', extract_audio: 'headphones', channels: 'tv', cancel_removal: 'undo', remove: 'trash', restore: 'undo', cancel_restore: 'undo' }[key];
     return Icon ? <Icon size={16} src={icons[srcKey]} /> : null;
   };
 
@@ -51,7 +53,7 @@ export default function WorkRow({ row, icons = {}, menuOpen, onToggleMenu, onClo
       return { ...it, checked: Boolean(m.on), detail: busy.channels ? 'Saving…' : m.detail, keepOpen: true, onSelect: () => { if (!busy.channels) onAction('channels', row); } };
     }
     if (m.key === 'extract_audio' && busy.extracting) return { ...it, label: `Extracting the audio…${busy.extractPercent != null ? ` ${Math.round(busy.extractPercent)}%` : ''}`, disabled: true };
-    if (m.key === 'cancel_removal' && busy.cancelling) return { ...it, label: 'Cancelling…', disabled: true };
+    if ((m.key === 'cancel_removal' || m.key === 'cancel_restore') && busy.cancelling) return { ...it, label: 'Cancelling…', disabled: true };
     return { ...it, onSelect: () => onAction(m.key, row) };
   });
 

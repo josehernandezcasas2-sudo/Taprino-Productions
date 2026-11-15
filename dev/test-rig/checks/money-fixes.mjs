@@ -421,8 +421,12 @@ async function removalDecidedMonth() {
   insert('ad_impression_days', { ad_id: AD_PLAYS[1], episode_id: EP, surface: 'vod', day: new Date().toISOString().slice(0, 10), impressions: 40, credit_cents: 800 });
   // The 1st's run decided that month (the maker left out then, say).
   insert('audit_log', { admin_id: 'check', action: 'ad_share_month', target_type: 'ad_share', target_id: decided, details: MARK });
-  const r = await call('/api/admin/resolve-deletion', { who: ADMIN, method: 'POST', body: { type: 'episode', id: EP, decision: 'confirm' } });
-  ok('the removal is confirmed → 200', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+  // Since migration 124 a confirmation holds the title 30 days (nothing is
+  // deleted, so no ad share is settled yet); the deletion path — the one
+  // the clean-up takes too — is a full admin's "Delete now".
+  const held124 = hasColumn('episodes', 'purge_after');
+  const r = await call('/api/admin/resolve-deletion', { who: ADMIN, method: 'POST', body: held124 ? { type: 'episode', id: EP, decision: 'delete_now', reason: `Money-fixes check ${RUN}` } : { type: 'episode', id: EP, decision: 'confirm' } });
+  ok(`the removal is ${held124 ? 'deleted now' : 'confirmed'} → 200`, r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
   const lines = rows(`select period, cents from public.creator_ledger where kind = 'ad_share' and episode_id = ${q(EP)} order by period`);
   ok('only the current month is credited; the decided month is left as it was decided', lines.length === 1 && lines[0].period === thisMonth() && lines[0].cents > 0, lines);
 }

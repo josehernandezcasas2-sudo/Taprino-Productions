@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminReviewAdModal from '../AdminReviewAdModal';
 import { cssUrl } from '../../lib/cssUrl';
+import { REMOVAL_WORDS } from '../../lib/removalRules';
 
-const KIND_LABEL = { submission: 'Episode', ad: 'Ad', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application' };
+const KIND_LABEL = { submission: 'Episode', ad: 'Ad', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application', restore: REMOVAL_WORDS.queueKind };
 
 // A show episode's eyebrow, by where its show stands (lib/reviewQueue.js
 // meta.show.stage).
@@ -196,7 +197,8 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     const meta = item.meta || {};
     const showInfo = item.kind === 'submission' ? meta.show || null : null;
     const eyebrow = showInfo ? STAGE_EYEBROW[showInfo.stage] || STAGE_EYEBROW.private : null;
-    const blocked = item.kind === 'submission' ? meta.blocked || null : item.kind === 'application' && meta.canAccept === false ? meta.acceptBlocker || 'A full admin accepts an application.' : null;
+    const isRestore = item.kind === 'restore';
+    const blocked = item.kind === 'submission' || isRestore ? meta.blocked || null : item.kind === 'application' && meta.canAccept === false ? meta.acceptBlocker || 'A full admin accepts an application.' : null;
     const tierNow = tiers[item.id] || (item.kind === 'submission' ? (meta.tier === 'premium' ? 'premium' : 'free') : 'free');
     // A submission's Approve says which file it was looking at (meta.seen):
     // a file replaced since answers 409 and the queue reloads.
@@ -219,7 +221,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
             <button type="button" className="rq-btn" onClick={() => setReviewingAd(item)} disabled={busy}>Review…</button>
           ) : (
             <button type="button" className="rq-btn rq-btn-ok" onClick={() => decide(item, 'approve', approveExtra)} disabled={busy || Boolean(blocked)} title={blocked || (isApplication ? (meta.masterReady ? 'Puts it live now and grants Creator Studio' : 'Grants Creator Studio') : undefined)}>
-              {busy ? 'Working…' : isApplication ? (meta.masterReady ? 'Accept · live' : 'Accept') : 'Approve'}
+              {busy ? 'Working…' : isApplication ? (meta.masterReady ? 'Accept · live' : 'Accept') : isRestore ? REMOVAL_WORDS.approve : 'Approve'}
             </button>
           )}
           <button type="button" className="rq-btn" onClick={() => toggleOpen(item)}>{openId === key ? 'Close' : 'Open'}</button>
@@ -271,18 +273,18 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
             {item.kind !== 'ad' && (
               rejectingId === key || holdingId === key ? (
                 <div>
-                  <input className="rq-reason" type="text" placeholder={holdingId === key ? 'The one thing to fix (they read this)' : 'Reason (shown to the submitter)'} value={reason} onChange={(e) => setReason(e.target.value)} />
+                  <input className="rq-reason" type="text" placeholder={holdingId === key ? 'The one thing to fix (they read this)' : isRestore ? REMOVAL_WORDS.denyPlaceholder : 'Reason (shown to the submitter)'} value={reason} onChange={(e) => setReason(e.target.value)} />
                   <div className="rq-acts" style={{ justifyContent: 'flex-start' }}>
                     {holdingId === key
                       ? <button type="button" className="rq-btn" onClick={() => decide(item, 'hold', { reason })} disabled={busy || !reason.trim()}>Send the hold</button>
-                      : <button type="button" className="rq-btn rq-btn-danger" onClick={() => decide(item, 'reject', { reason })} disabled={busy || !reason.trim()}>{isApplication ? 'Confirm decline' : 'Confirm rejection'}</button>}
+                      : <button type="button" className="rq-btn rq-btn-danger" onClick={() => decide(item, 'reject', { reason })} disabled={busy || !reason.trim()}>{isApplication ? 'Confirm decline' : isRestore ? REMOVAL_WORDS.denyConfirm : 'Confirm rejection'}</button>}
                     <button type="button" className="rq-btn" onClick={() => { setRejectingId(null); setHoldingId(null); setReason(''); }}>Cancel</button>
                   </div>
                 </div>
               ) : (
                 <div className="rq-acts" style={{ justifyContent: 'flex-start' }}>
                   {isApplication && <button type="button" className="rq-btn" onClick={() => { setHoldingId(key); setReason(''); }} disabled={busy}>Hold…</button>}
-                  <button type="button" className="rq-btn rq-btn-danger" onClick={() => { setRejectingId(key); setReason(''); }} disabled={busy}>{isApplication ? 'Decline…' : 'Reject…'}</button>
+                  <button type="button" className="rq-btn rq-btn-danger" onClick={() => { setRejectingId(key); setReason(''); }} disabled={busy}>{isApplication ? 'Decline…' : isRestore ? REMOVAL_WORDS.deny : 'Reject…'}</button>
                 </div>
               )
             )}
@@ -296,7 +298,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     <div>
       {!compact && (
         <div className="rq-filters">
-          {[['all', 'All', counts.total], ['application', 'Applications', counts.application], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['channel', 'Channel uploads', counts.channel], ['location', 'Places', counts.location], ['price', 'Prices', counts.price]].map(([k, label, n]) => (
+          {[['all', 'All', counts.total], ['application', 'Applications', counts.application], ['submission', 'Episodes', counts.submission], ['ad', 'Ads', counts.ad], ['channel', 'Channel uploads', counts.channel], ['location', 'Places', counts.location], ['price', 'Prices', counts.price], ['restore', REMOVAL_WORDS.queueKind, counts.restore]].map(([k, label, n]) => (
             <button key={k} type="button" className={`rq-chip ${filter === k ? 'is-active' : ''}`} onClick={() => setFilter(k)}>
               {label}{n ? ` ${n}` : ''}
             </button>
@@ -342,15 +344,15 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
 const HIDDEN_META = new Set(['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen', 'canAccept', 'acceptBlocker']);
 
 function FragmentRow({ k, v }) {
-  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
+  const label = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', proofUrl: 'Proof', listingUrl: 'Listing', hostSays: 'Host says', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file', removedBecause: 'Removed because', removedOn: 'Removed on', filesGo: 'Files deleted on', kept: 'Kept', comesBackAs: 'Comes back', page: 'Admin page' }[k] || k.replace(/([A-Z])/g, ' $1').replace(/^./, (c) => c.toUpperCase());
   let value = v;
   if (k === 'hasCaptions') value = v ? 'Yes' : 'No';
   if (k === 'durationSeconds') value = `${Math.floor(v / 60)}:${String(Math.round(v % 60)).padStart(2, '0')}`;
   if (k === 'budgetTotalCents') value = `$${(v / 100).toFixed(2)}`;
   if (k === 'master') value = FILE_WORDS[v] || v;
   // A proof document or the listing itself opens in a new tab.
-  if (typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) && (k === 'proofUrl' || k === 'listingUrl' || k === 'clickUrl' || k === 'filesLink')) {
-    return (<><span>{label}</span><div><a href={v} target="_blank" rel="noreferrer">{k === 'proofUrl' ? 'Open the proof ↗' : k === 'listingUrl' ? 'Open the listing ↗' : k === 'filesLink' ? 'Open their link ↗' : v}</a></div></>);
+  if (typeof v === 'string' && /^(https?:\/\/|\/)/.test(v) && (k === 'proofUrl' || k === 'listingUrl' || k === 'clickUrl' || k === 'filesLink' || k === 'page')) {
+    return (<><span>{label}</span><div><a href={v} target="_blank" rel="noreferrer">{k === 'proofUrl' ? 'Open the proof ↗' : k === 'listingUrl' ? 'Open the listing ↗' : k === 'filesLink' ? 'Open their link ↗' : k === 'page' ? 'Open the show ↗' : v}</a></div></>);
   }
   return (<><span>{label}</span><div>{String(value)}</div></>);
 }

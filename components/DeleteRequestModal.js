@@ -1,9 +1,17 @@
 import { useState } from 'react';
+import { REMOVAL_WORDS } from '../lib/removalRules';
 
 // Generic on purpose — same modal serves both "delete this episode" and
 // "delete this series" by passing a different itemLabel and onConfirm.
-export default function DeleteRequestModal({ itemLabel, onClose, onConfirm }) {
+//
+// Since migration 124 (removals held a month; lib/removalRules.js) it says
+// what happens once we confirm, and offers the one checkbox, off by
+// default: "Keep the files so I can bring it back later". `keepChoice`
+// shows it (false before 124); `bought` says instead that the title's
+// buyers keep it. onConfirm(reason, { keep }).
+export default function DeleteRequestModal({ itemLabel, onClose, onConfirm, keepChoice = false, bought = false }) {
   const [reason, setReason] = useState('');
+  const [keep, setKeep] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
 
@@ -16,7 +24,7 @@ export default function DeleteRequestModal({ itemLabel, onClose, onConfirm }) {
     setSaving(true);
     setError(null);
     try {
-      await onConfirm(reason.trim());
+      await onConfirm(reason.trim(), { keep: keepChoice && !bought && keep });
     } catch (err) {
       setError(err.message);
       setSaving(false);
@@ -34,10 +42,20 @@ export default function DeleteRequestModal({ itemLabel, onClose, onConfirm }) {
           &ldquo;{itemLabel}&rdquo; will be hidden from the site right away. An admin still has to confirm the actual
           removal — you can cancel this request any time before then.
         </p>
+        {keepChoice && (
+          <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>{bought ? REMOVAL_WORDS.boughtNote : REMOVAL_WORDS.holdNote}</p>
+        )}
 
         <form onSubmit={handleSubmit}>
           <label>Reason — required</label>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} rows={3} required style={{ width: '100%', boxSizing: 'border-box' }} />
+
+          {keepChoice && !bought && (
+            <label className="removal-keep">
+              <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+              <span>{REMOVAL_WORDS.keepLabel}</span>
+            </label>
+          )}
 
           {error && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{error}</p>}
 

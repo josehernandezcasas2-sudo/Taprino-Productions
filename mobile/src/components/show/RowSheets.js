@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { colors, fonts, inkTint, oliveTint } from '../../lib/theme';
 import { Sheet, SmallButton, ss } from './ShowBits';
 import { extraKindLabel } from '../../lib/extraKinds';
+import { KeepFilesField } from '../removal/RemovalBits';
 
 // Two small sheets of the show page in the app (the series revamp, slice
 // 5; the website's RemoveEpisodeSheet and "Place <extra>" RoomSheet in
@@ -13,6 +14,8 @@ import { extraKindLabel } from '../../lib/extraKinds';
 // site at once.
 export function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }) {
   const [reason, setReason] = useState('');
+  // "Keep the files so I can bring it back later" (migration 124).
+  const [keep, setKeep] = useState(false);
   return (
     <Sheet
       title={`Remove ${row.displayTitle || 'this episode'}?`}
@@ -22,7 +25,7 @@ export function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }
         <>
           {error ? <Text style={ss.error}>{error}</Text> : null}
           <View style={ss.sheetActions}>
-            <SmallButton tone="danger" label={busy ? 'Asking…' : 'Ask us to remove it'} busy={busy} disabled={!reason.trim()} onPress={() => onSubmit(reason.trim())} />
+            <SmallButton tone="danger" label={busy ? 'Asking…' : 'Ask us to remove it'} busy={busy} disabled={!reason.trim()} onPress={() => onSubmit(reason.trim(), { keep: Boolean(row.removalReady && keep) })} />
             <SmallButton label="Keep it" onPress={onClose} />
           </View>
         </>
@@ -33,6 +36,7 @@ export function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }
         <Text style={ss.sheetLabel}>Why?</Text>
         <TextInput style={[ss.input, ss.textarea]} multiline maxLength={1000} value={reason} onChangeText={setReason} placeholder="A line for us" placeholderTextColor={colors.inkFaint} autoFocus />
       </View>
+      {row.removalReady ? <KeepFilesField checked={keep} onChange={setKeep} /> : null}
     </Sheet>
   );
 }

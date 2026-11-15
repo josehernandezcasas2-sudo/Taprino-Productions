@@ -9,6 +9,7 @@ import { payeeShowIds } from '../../../lib/payees';
 import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
+import { has124, isTeamRemoved } from '../../../lib/removalRules';
 
 // A creator's own titles, every status, for Creator Studio's piles, Your
 // work (web + app) and the app's hub. Filtered by the signed-in account,
@@ -76,6 +77,22 @@ function showsInPlayOrder(rows) {
     if (placed.has(r.seriesId)) continue;
     placed.add(r.seriesId);
     out.push(...sortEpisodes(byShow.get(r.seriesId)));
+  }
+  return out;
+}
+
+// Which of these titles (and their shows) someone owns, for the removal
+// box's words ("People who bought it keep it"): completed or disputed
+// purchases. Fails soft to "nobody" — it only chooses a sentence; the
+// removal itself reads the buyers strictly (lib/titleRemoval.js).
+async function boughtIds(supabase, episodeIds, seriesIds) {
+  const out = new Set();
+  for (const [type, ids] of [['episode', episodeIds], ['series', seriesIds]]) {
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data, error } = await supabase.from('purchases').select('target_id').eq('target_type', type).in('status', ['completed', 'disputed']).in('target_id', ids.slice(i, i + 100));
+      if (error) break;
+      for (const r of data || []) out.add(`${type}:${r.target_id}`);
+    }
   }
   return out;
 }
@@ -159,10 +176,11 @@ export default async function handler(req, res) {
   for (const ep of rows) if (ep.series_id) (rowsByShow[ep.series_id] = rowsByShow[ep.series_id] || []).push(ep);
 
   const now = Date.now();
-  const [states, pendingStates, holds] = await Promise.all([
+  const [states, pendingStates, holds, bought] = await Promise.all([
     Promise.all(rows.map((ep) => (stillChanging(ep, now) ? cloudflareStatus(cloudflareUidFromUrl(ep.src)) : null))),
     Promise.all(rows.map((ep) => (ep.pending_src ? cloudflareStatus(cloudflareUidFromUrl(ep.pending_src)) : null))),
-    holdReasons(supabase, rows.filter((ep) => ep.moderation_hold).map((ep) => ep.id))
+    holdReasons(supabase, rows.filter((ep) => ep.moderation_hold).map((ep) => ep.id)),
+    boughtIds(supabase, rows.filter((ep) => ep.status === 'approved' || ep.withdrawn_at).map((ep) => ep.id), seriesIds).catch(() => new Set())
   ]);
 
   const enriched = rows.map((ep, i) => {
@@ -275,6 +293,22 @@ export default async function handler(req, res) {
       deletionReason: ep.deletion_reason ?? null,
       deletionRequestedAt: ep.deletion_requested_at ?? null,
       withdrawnAt: ep.withdrawn_at ?? null,
+      // Removals held a month, titles brought back (migration 124;
+      // lib/removalRules.js): removalReady is false before 124 (the "keep
+      // the files" box is hidden and nothing can be asked back); purgeAfter
+      // = when a removed title's files go; keepAfterRemoval = kept for
+      // later; restoreRequestedAt / restoreReason = asked back, waiting on
+      // the team; teamRemoved = only a full admin can bring it back;
+      // showWithdrawn = it came off with its show; bought = someone owns it
+      // (the removal box says they keep it).
+      removalReady: has124(ep),
+      purgeAfter: ep.purge_after ?? null,
+      keepAfterRemoval: ep.keep_after_removal === true,
+      restoreRequestedAt: ep.restore_requested_at ?? null,
+      restoreReason: ep.restore_reason ?? null,
+      teamRemoved: Boolean(ep.withdrawn_at) && isTeamRemoved(ep),
+      showWithdrawn: Boolean(seriesById[payShowOf.get(ep.id) || ep.series_id] && seriesById[payShowOf.get(ep.id) || ep.series_id].withdrawn_at),
+      bought: bought.has(`episode:${ep.id}`) || Boolean(ep.series_id && bought.has(`series:${ep.series_id}`)),
       cloudflareState: cf ? cf.state || null : null,
       cloudflareError: cf && cf.state === 'error' ? (cf.errorReasonText || cf.errorReasonCode || null) : null
     };

@@ -24,7 +24,8 @@
 // (scripts/test-title-dash.mjs checks it).
 import { compareEpisodes } from './showRules.js';
 import { displayTitle, dayLabel, count, dollars, currentPeriod, DASH_WORDS } from './creatorDashboardRules.js';
-import { isLiveTitle, titlePill, titleNeed, titleWaiting, priceWords, runtimeWords, publicPath, notesBoxShows } from './workListRules.js';
+import { isLiveTitle, titlePill, titleNeed, titleWaiting, priceWords, runtimeWords, publicPath, notesBoxShows, removedWords } from './workListRules.js';
+import { REMOVAL_WORDS, askBackFor, teamStartedRemoval } from './removalRules.js';
 
 export const TITLE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -204,6 +205,8 @@ export function titleDashboard({ title = null, detail = null, money = null, pric
   if (s.reviewedAt && s.status === 'approved') history.push({ at: s.reviewedAt, what: live ? 'Approved and live' : 'Approved' });
   if (s.reviewedAt && s.status === 'rejected') history.push({ at: s.reviewedAt, what: s.rejectionReason ? `Sent back: ${text(s.rejectionReason)}` : 'Sent back' });
   if (s.deletionRequestedAt) history.push({ at: s.deletionRequestedAt, what: s.deletionReason ? `You asked us to remove it: “${text(s.deletionReason)}”` : 'You asked us to remove it' });
+  if (s.withdrawnAt) history.push({ at: s.withdrawnAt, what: 'Taken off the site' });
+  if (s.restoreRequestedAt) history.push({ at: s.restoreRequestedAt, what: 'You asked to bring it back' });
   history.sort((a, b) => String(b.at).localeCompare(String(a.at)));
 
   return {
@@ -242,8 +245,25 @@ export function titleDashboard({ title = null, detail = null, money = null, pric
       payee: s.deletionRequested ? null : { key: 'payee', label: 'Who gets paid' }
     },
     channels: { on: Boolean(s.channelOptIn), locked: Boolean(s.deletionRequested || s.held), lockedWhy: s.deletionRequested ? 'Locked while its removal is requested.' : s.held ? 'Locked while it’s pulled.' : '' },
-    removal: s.withdrawnAt ? null : s.deletionRequested ? { key: 'cancel_removal', label: 'Cancel the removal request', line: s.deletionReason ? `You asked us to remove it: “${text(s.deletionReason)}”` : 'You asked us to remove it.' } : { key: 'remove', label: 'Ask to remove it…', line: 'We confirm it soon. Anyone who bought it keeps it.' }
+    removal: removalCard(s)
   };
+}
+
+// The removal card: ask to remove it, cancel the request, or — removed
+// (migration 124) — where it stands and Ask to bring it back (take the
+// request back while it waits; nothing when only the team can).
+// { key, label, line, heading } — key null when there is no button.
+function removalCard(s) {
+  if (s.withdrawnAt) {
+    const ask = askBackFor(s);
+    const line = removedWords(s);
+    if (ask && ask.ok) return { key: 'restore', label: REMOVAL_WORDS.askBackMenu, line, heading: 'Removed' };
+    if (ask && ask.key === 'asked') return { key: 'cancel_restore', label: REMOVAL_WORDS.cancelAsk, line, heading: REMOVAL_WORDS.waitingBack };
+    return { key: null, label: '', line, heading: 'Removed' };
+  }
+  if (s.deletionRequested && teamStartedRemoval(s)) return { key: null, label: '', line: REMOVAL_WORDS.teamCancel, heading: 'The team is removing it' };
+  if (s.deletionRequested) return { key: 'cancel_removal', label: 'Cancel the removal request', line: s.deletionReason ? `You asked us to remove it: “${text(s.deletionReason)}”` : 'You asked us to remove it.', heading: 'Removal requested' };
+  return { key: 'remove', label: 'Ask to remove it…', line: s.removalReady ? (s.bought ? 'We confirm it soon. People who bought it keep it.' : 'We confirm it soon, then keep its files for 30 days in case you change your mind.') : 'We confirm it soon. Anyone who bought it keeps it.', heading: 'Remove it' };
 }
 
 function titleDetails(s, { canEditAll }) {

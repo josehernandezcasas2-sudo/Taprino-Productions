@@ -31,6 +31,8 @@ import {
   CheckIcon, LinkText, PlusIcon, RoomToast, SmallButton, UploadIcon, askUs, episodeEditorRoute, episodePublicRoute,
   shortDate, showRoute, ss, submitRoute, useRoomToast
 } from './ShowBits';
+import { removedState, teamStartedRemoval } from '../../lib/removalRules';
+import { KeepFilesField } from '../removal/RemovalBits';
 
 // The episode editor in the app (the series revamp, slice 5; spec "App —
 // New show, Show page, Episode editor"; the website's components/show/
@@ -225,7 +227,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [removal, setRemoval] = useState({ open: false, reason: '' });
+  const [removal, setRemoval] = useState({ open: false, reason: '', keep: false });
   const [seasonPos, setSeasonPos] = useState({});
   const [anchorEpisodes, setAnchorEpisodes] = useState(null);
   const [takenNext, setTakenNext] = useState(null);
@@ -599,7 +601,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   async function askRemoval(action) {
     setBusy('removal');
     setError(null);
-    const r = await call('POST', `${epPath}/removal`, action === 'cancel' ? { action: 'cancel' } : { action: 'request', reason: removal.reason.trim() });
+    const r = await call('POST', `${epPath}/removal`, action === 'cancel' ? { action: 'cancel' } : { action: 'request', reason: removal.reason.trim(), ...(ep.removalReady && removal.keep ? { keep: true } : {}) });
     setBusy(null);
     if (!r.ok) {
       setError(r.error);
@@ -711,7 +713,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
         <Banner
           level="neutral"
           title={`Removal requested${ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}`}
-          action={viewer.isUploader ? <CancelButton busy={busy === 'removal'} onPress={() => askRemoval('cancel')} /> : null}
+          action={viewer.isUploader && !teamStartedRemoval(ep) ? <CancelButton busy={busy === 'removal'} onPress={() => askRemoval('cancel')} /> : null}
         >
           {ep.deletionReason ? <Text style={ss.p}>{ep.deletionReason}</Text> : null}
           <Text style={ss.small}>Nothing can change while it waits.</Text>
@@ -1117,8 +1119,12 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           ) : null}
 
           <View style={ss.card}>
-            {ep.deletionRequested ? (
-              <Text style={ss.small}>Removal requested{ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}. {viewer.isUploader ? <LinkText disabled={busy === 'removal'} onPress={() => askRemoval('cancel')}>Cancel removal</LinkText> : null}</Text>
+            {ep.withdrawnAt && removedState(ep) ? (
+              // Removed (migration 124): where it stands; it's asked back from
+              // its row on the show page or Your work.
+              <Text style={ss.small}>{removedState(ep).label}. {removedState(ep).line}</Text>
+            ) : ep.deletionRequested ? (
+              <Text style={ss.small}>Removal requested{ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}. {viewer.isUploader && !teamStartedRemoval(ep) ? <LinkText disabled={busy === 'removal'} onPress={() => askRemoval('cancel')}>Cancel removal</LinkText> : null}</Text>
             ) : !removalOpen ? (
               <Text style={ss.small}>Withdrawn and kept for its buyers.</Text>
             ) : !viewer.isUploader ? (
@@ -1128,14 +1134,15 @@ function EpisodeMode({ showId, initial, auth, sent }) {
                 <FieldHead label="Why remove it?" />
                 <EdInput multiline value={removal.reason} maxLength={1000} placeholder="A line for us — the reason is required." onChangeText={(t) => setRemoval((x) => ({ ...x, reason: t }))} accessibilityLabel="Why remove it?" />
                 <Text style={ss.small}>{live ? 'It is hidden from the site right away while we look.' : 'We look at it and take it down.'}</Text>
+                {ep.removalReady ? <KeepFilesField checked={Boolean(removal.keep)} onChange={(v) => setRemoval((x) => ({ ...x, keep: v }))} /> : null}
                 <View style={ss.wrap}>
                   <SmallButton tone="danger" label={busy === 'removal' ? 'Asking…' : 'Ask to remove it'} busy={busy === 'removal'} disabled={!removal.reason.trim()} onPress={() => askRemoval('request')} />
-                  <LinkText onPress={() => setRemoval({ open: false, reason: '' })}>Keep it</LinkText>
+                  <LinkText onPress={() => setRemoval({ open: false, reason: '', keep: false })}>Keep it</LinkText>
                 </View>
               </View>
             ) : (
               <View style={{ gap: 6 }}>
-                <SmallButton tone="danger" label="Remove this episode…" icon={<TrashIcon size={14} color={colors.danger} />} onPress={() => setRemoval({ open: true, reason: '' })} />
+                <SmallButton tone="danger" label="Remove this episode…" icon={<TrashIcon size={14} color={colors.danger} />} onPress={() => setRemoval({ open: true, reason: '', keep: false })} />
                 <Text style={ss.small}>{live ? 'It is hidden from the site right away while we look.' : 'We look at it and take it down.'}</Text>
               </View>
             )}

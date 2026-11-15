@@ -267,8 +267,9 @@ function TitleScreen() {
           </View>
           {dash.removal ? (
             <View style={w.card}>
+              {dash.removal.heading ? <Text style={w.small}>{dash.removal.heading}</Text> : null}
               <Text style={w.small}>{dash.removal.line}</Text>
-              <ActButton label={dash.removal.label} danger={dash.removal.key === 'remove'} busy={busyKey === dash.removal.key} onPress={() => run(dash.removal.key)} />
+              {dash.removal.key ? <ActButton label={dash.removal.label} danger={dash.removal.key === 'remove'} busy={busyKey === dash.removal.key} onPress={() => run(dash.removal.key)} /> : null}
             </View>
           ) : null}
         </>

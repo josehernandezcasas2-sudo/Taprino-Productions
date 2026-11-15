@@ -158,7 +158,10 @@ t('the readers and routes use the rules (source checks)', () => {
   assert.doesNotMatch(src('pages/api/creator/list-series.js'), /isAdmin: canAccessAdmin/);
   assert.match(src('lib/showRoute.js'), /const canAccessAdmin = isTitleTeam\(rc\)/);
   const resolve = src('pages/api/admin/resolve-deletion.js');
-  assert.ok(resolve.indexOf("asked.deletion_requested !== true") < resolve.indexOf('hasBuyersIncludingSeries(type, id)'), 'the request is checked before any side effect');
+  // Since migration 124's round (lib/titleRemoval.js) the buyers are read
+  // strictly (strictEpisodeBuyers): still only after the request is checked.
+  assert.ok(resolve.indexOf("asked.deletion_requested !== true") > 0 && resolve.indexOf("row.deletion_requested !== true") > 0, 'the request is read');
+  assert.ok(resolve.indexOf("row.deletion_requested !== true") < resolve.indexOf('strictEpisodeBuyers(row)'), 'the request is checked before any side effect');
   assert.match(src('lib/audioUpload.js'), /audioFileName\(userId,/);
   assert.match(src('lib/videoOwnership.js'), /\.is\(check\.owner, null\)/, 'ownerless rows count as someone else’s');
 });

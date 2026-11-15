@@ -28,6 +28,8 @@ import { SHOW_TABS } from '../../../../lib/titleDashRules';
 import ShowOverview from '../../../../components/show/ShowOverview';
 import { TabRow } from '../../../../components/work/WorkBits';
 import { hrefToRoute } from '../../../../components/PushListener';
+import { RestoreSheet } from '../../../../components/removal/RemovalBits';
+import { REMOVAL_WORDS, askBackFor, removedState } from '../../../../lib/removalRules';
 
 // The show page in the app (the series revamp, slice 5; spec "App — New
 // show, Show page, Episode editor" and "The app"; the website's
@@ -140,6 +142,7 @@ function ShowScreen() {
   const [confirm, setConfirm] = useState(null);
   const [extraSeasons, setExtraSeasons] = useState([]);
   const [sheet, setSheet] = useState(null);
+  const [askBack, setAskBack] = useState(null); // { type, id, title, line }: Ask to bring it back (migration 124)
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheetError, setSheetError] = useState(null);
   const [flashId, setFlashId] = useState(null);
@@ -564,6 +567,15 @@ function ShowScreen() {
       ]);
     },
     askRemove: (row) => { setSheetError(null); setSheet({ kind: 'remove', row }); },
+    // A removed episode (migration 124): ask to bring it back, or take the
+    // request back.
+    askBack: (row) => setAskBack({ type: 'episode', id: row.id, title: row.displayTitle || row.title || 'This episode', line: (removedState(row) || {}).label || '' }),
+    cancelAskBack: async (row) => {
+      const r = await call('POST', `/api/show/episode/${encodeURIComponent(row.id)}/restore`, { action: 'cancel' });
+      if (!r.ok) return say({ tone: 'warn', title: 'Not taken back', lines: [r.error] });
+      say({ tone: 'ok', title: 'Request taken back' }, 4000);
+      return load({ quiet: true });
+    },
     viewPublic: (row) => router.push(episodePublicRoute(row.id))
   };
 
@@ -727,9 +739,9 @@ function ShowScreen() {
       } }
     ]);
   }
-  async function askRemoval(action, reason) {
+  async function askRemoval(action, reason, { keep = false } = {}) {
     setBusy('removal');
-    const r = await call('POST', `${showPath(showId)}/removal`, action === 'request' ? { action, reason } : { action });
+    const r = await call('POST', `${showPath(showId)}/removal`, action === 'request' ? { action, reason, ...(keep ? { keep: true } : {}) } : { action });
     setBusy(null);
     if (!r.ok) return say({ tone: 'warn', title: action === 'request' ? 'Not asked' : 'Not cancelled', lines: [r.error] });
     say({ tone: 'ok', title: action === 'request' ? 'Removal requested' : 'Removal cancelled', lines: [action === 'request' ? 'It left the site; we confirm it soon.' : 'It’s back as it was.'] }, 6000);
@@ -772,12 +784,32 @@ function ShowScreen() {
     const id = (p.episodeIds || [])[0];
     if (id) flash(String(id), String(id));
   }
-  async function submitRemoval(reason) {
+  // Ask to bring the show or an episode back (the sheet's confirm: a thrown
+  // line shows in it), and take the show's request back.
+  async function sendAskBack(reason) {
+    const target = askBack;
+    if (!target) return;
+    const path = target.type === 'series' ? `${showPath(target.id)}/restore` : `/api/show/episode/${encodeURIComponent(target.id)}/restore`;
+    const r = await call('POST', path, { action: 'request', reason });
+    if (!r.ok) throw new Error(r.error || 'Could not send the request.');
+    setAskBack(null);
+    say({ tone: 'ok', title: 'Asked', lines: [REMOVAL_WORDS.askBackSent] }, 6000);
+    load({ quiet: true });
+  }
+  async function cancelShowAskBack() {
+    setBusy('restore');
+    const r = await call('POST', `${showPath(showId)}/restore`, { action: 'cancel' });
+    setBusy(null);
+    if (!r.ok) return say({ tone: 'warn', title: 'Not taken back', lines: [r.error] });
+    say({ tone: 'ok', title: 'Request taken back' }, 4000);
+    return load({ quiet: true });
+  }
+  async function submitRemoval(reason, { keep = false } = {}) {
     const row = sheet && sheet.row;
     if (!row) return;
     setSheetBusy(true);
     setSheetError(null);
-    const r = await call('POST', `/api/show/episode/${encodeURIComponent(row.id)}/removal`, { action: 'request', reason });
+    const r = await call('POST', `/api/show/episode/${encodeURIComponent(row.id)}/removal`, { action: 'request', reason, ...(keep ? { keep: true } : {}) });
     setSheetBusy(false);
     if (!r.ok) {
       setSheetError(r.error);
@@ -872,6 +904,8 @@ function ShowScreen() {
     showStill: show.art ? show.art.thumbnail : null,
     showPoster: show.art ? show.art.poster : null,
     showPublic: Boolean(show.isPublic),
+    // A removed show (migration 124): its episodes come back with it.
+    showRemoved: Boolean(show.removal && show.removal.removed),
     isOwner,
     team,
     canRun,
@@ -914,7 +948,15 @@ function ShowScreen() {
     ...(extraRemovable ? [
       { divider: true },
       { key: 'remove', label: 'Remove…', danger: true, icon: <TrashIcon size={15} color={colors.danger} />, onPress: () => { setSheetError(null); setSheet({ kind: 'remove', row: sheet.extra }); } }
-    ] : [])
+    ] : []),
+    // Removed on its own (migration 124): ask for it back.
+    ...(() => {
+      const x = sheet.extra;
+      const ask = x.mine && x.withdrawnAt ? askBackFor(x, { showWithdrawn: Boolean(show.removal && show.removal.removed) }) : null;
+      if (ask && ask.ok) return [{ key: 'restore', label: REMOVAL_WORDS.askBackMenu, icon: <PencilIcon size={15} color={colors.ink} />, onPress: () => { setSheet(null); setAskBack({ type: 'episode', id: x.id, title: x.displayTitle || 'This extra', line: (removedState(x) || {}).label || '' }); } }];
+      if (ask && ask.key === 'asked') return [{ key: 'cancel_restore', label: REMOVAL_WORDS.cancelAsk, icon: <PencilIcon size={15} color={colors.ink} />, onPress: () => { setSheet(null); rowActions.cancelAskBack(x); } }];
+      return [];
+    })()
   ], sheet.extra) : null;
 
   return (
@@ -963,6 +1005,8 @@ function ShowScreen() {
           onMakePublic={makePublic}
           onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null}
           onResubmit={canRun ? resubmit : null}
+          onAskBack={isOwner || viewer.isAdmin ? () => setAskBack({ type: 'series', id: showId, title: show.name || 'This show', line: show.removal && show.removal.removed ? show.removal.removed.label : '' }) : null}
+          onCancelAskBack={isOwner || viewer.isAdmin ? cancelShowAskBack : null}
           busy={busy}
         />
 
@@ -1027,7 +1071,7 @@ function ShowScreen() {
           <ChannelsCard view={view} canEdit={canRun} locked={held ? 'Locked while it’s pulled.' : removal ? 'Locked while its removal is requested.' : null} busy={busy === 'channels'} onToggle={toggleChannels} />
         ) : null}
         {!(vertical && !team) ? (
-          <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />
+          <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason, opts) => askRemoval('request', reason, opts)} onCancel={() => askRemoval('cancel')} />
         ) : null}
         </>
         )}
@@ -1077,6 +1121,7 @@ function ShowScreen() {
       {sheet && sheet.kind === 'remove' && sheetRow ? (
         <RemoveEpisodeSheet row={sheetRow} live={sheetRow.status === 'approved' && show.isPublic} busy={sheetBusy} error={sheetError} onSubmit={submitRemoval} onClose={() => { setSheet(null); setSheetError(null); }} />
       ) : null}
+      <RestoreSheet visible={Boolean(askBack)} title={askBack ? askBack.title : ''} line={askBack ? askBack.line : ''} onClose={() => setAskBack(null)} onConfirm={sendAskBack} />
       {sheet && sheet.kind === 'place' ? (
         <PlaceExtraSheet extra={sheet.extra} showId={showId} episodes={flat.filter((r) => r.kind === 'episode' && r.status !== 'rejected')} busy={sheetBusy} error={sheetError} onPlace={placeExtra} onClose={() => { setSheet(null); setSheetError(null); }} />
       ) : null}

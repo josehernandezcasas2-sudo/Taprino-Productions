@@ -27,6 +27,8 @@ import StagedChangesCard from './admin/StagedChangesCard';
 import RemovalCard from './admin/RemovalCard';
 import HistoryCard from './admin/HistoryCard';
 import PayeeCard from './PayeeCard';
+import RestoreRequestModal from '../RestoreRequestModal';
+import { REMOVAL_WORDS, removedState } from '../../lib/removalRules';
 import { extraKindLabel } from '../../lib/extraKinds';
 
 // The show page — one control room for a series or a podcast (the series
@@ -153,6 +155,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
   const [dropSeason, setDropSeason] = useState(null);
   const [extraSeasons, setExtraSeasons] = useState([]);
   const [sheet, setSheet] = useState(null);
+  const [askBack, setAskBack] = useState(null); // { type, id, title, line }: Ask to bring it back (migration 124)
   const [sheetBusy, setSheetBusy] = useState(false);
   const [sheetError, setSheetError] = useState(null);
   const [flashId, setFlashId] = useState(null);
@@ -613,6 +616,17 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       return load({ quiet: true });
     },
     askRemove: (row) => setSheet({ kind: 'remove', row }),
+    // A removed episode (migration 124): ask to bring it back, or take the
+    // request back.
+    askBack: (row) => setAskBack({ type: 'episode', id: row.id, title: row.displayTitle || row.title || 'This episode', line: (removedState(row) || {}).label || '' }),
+    cancelAskBack: async (row) => {
+      setBusyRow(row.id);
+      const r = await callApi('POST', `/api/show/episode/${encodeURIComponent(row.id)}/restore`, { action: 'cancel' });
+      setBusyRow(null);
+      if (!r.ok) return say({ tone: 'warn', title: 'Not taken back', lines: [r.error] });
+      say({ tone: 'ok', title: 'Request taken back' }, 4000);
+      return load({ quiet: true });
+    },
     // A live episode's price (slice 3b: whoever runs the show prices its
     // episodes, a contributor's included).
     sell: async (row) => {
@@ -742,7 +756,10 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       load({ quiet: true });
     },
     decideRemoval: async (row, decision) => {
-      if (decision === 'confirm' && !window.confirm(`Remove ${row.displayTitle || 'this episode'} for good? Anyone who bought it keeps it.`)) return;
+      const askWords = row.removalReady
+        ? `Take ${row.displayTitle || 'this episode'} off the site? ${row.keepAfterRemoval ? 'Its files are kept until its owner asks for it back.' : 'Its files are kept 30 days, then deleted for good.'} Anyone who bought it keeps it.`
+        : `Remove ${row.displayTitle || 'this episode'} for good? Anyone who bought it keeps it.`;
+      if (decision === 'confirm' && !window.confirm(askWords)) return;
       setBusyRow(row.id);
       setNote(row.id, null);
       const r = await callApi('POST', '/api/admin/resolve-deletion', { type: 'episode', id: row.id, decision });
@@ -755,7 +772,11 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       say({
         tone: 'ok',
         title: decision !== 'confirm' ? `${row.displayTitle || 'It'} stays up` : r.data && r.data.withdrawn ? `${row.displayTitle || 'It'} is off the site` : `${row.displayTitle || 'It'} is removed`,
-        lines: decision === 'confirm' && r.data && r.data.withdrawn ? ['Someone bought it, so it’s kept for them.'] : []
+        lines: decision !== 'confirm' || !r.data ? []
+          : r.data.outcome === 'buyers' ? ['Someone bought it, so it’s kept for them.']
+            : r.data.outcome === 'later' ? ['Its files are kept until its owner asks for it back.']
+              : r.data.outcome === 'hold' ? ['Its files are kept 30 days, then deleted for good.']
+                : r.data.withdrawn ? ['Someone bought it, so it’s kept for them.'] : []
       }, 5000);
       load({ quiet: true });
     }
@@ -867,9 +888,9 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     say({ tone: 'ok', title: `${show.name} is public`, lines: ['Its approved episodes are on the site; the next ones go live as they’re approved.'] }, 8000);
     load({ quiet: true });
   }
-  async function askRemoval(action, reason) {
+  async function askRemoval(action, reason, { keep = false } = {}) {
     setBusy('removal');
-    const r = await callApi('POST', `/api/show/${encodeURIComponent(showId)}/removal`, action === 'request' ? { action, reason } : { action });
+    const r = await callApi('POST', `/api/show/${encodeURIComponent(showId)}/removal`, action === 'request' ? { action, reason, ...(keep ? { keep: true } : {}) } : { action });
     setBusy(null);
     if (!r.ok) return say({ tone: 'warn', title: action === 'request' ? 'Not asked' : 'Not cancelled', lines: [r.error] });
     say({ tone: 'ok', title: action === 'request' ? 'Removal requested' : 'Removal cancelled', lines: [action === 'request' ? 'It left the site; we confirm it soon.' : 'It’s back as it was.'] }, 6000);
@@ -975,12 +996,32 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     say({ tone: 'ok', title: `${d.code} · ${d.displayTitle} is a draft`, lines: [kind === 'podcast' ? 'Send it for review from its row.' : 'Cloudflare is fetching the file; send it for review once it’s ready.'] }, 6000);
     load({ quiet: true, drafts: true });
   }
-  async function submitRemoval(reason) {
+  // Ask to bring a removed show or episode back (RestoreRequestModal's
+  // confirm, which shows a thrown line), and take a show's request back.
+  async function sendAskBack(reason) {
+    const target = askBack;
+    if (!target) return;
+    const path = target.type === 'series' ? `/api/show/${encodeURIComponent(target.id)}/restore` : `/api/show/episode/${encodeURIComponent(target.id)}/restore`;
+    const r = await callApi('POST', path, { action: 'request', reason });
+    if (!r.ok) throw new Error(r.error || 'Could not send the request.');
+    setAskBack(null);
+    say({ tone: 'ok', title: 'Asked', lines: [REMOVAL_WORDS.askBackSent] }, 6000);
+    load({ quiet: true });
+  }
+  async function cancelShowAskBack() {
+    setBusy('restore');
+    const r = await callApi('POST', `/api/show/${encodeURIComponent(showId)}/restore`, { action: 'cancel' });
+    setBusy(null);
+    if (!r.ok) return say({ tone: 'warn', title: 'Not taken back', lines: [r.error] });
+    say({ tone: 'ok', title: 'Request taken back' }, 4000);
+    return load({ quiet: true });
+  }
+  async function submitRemoval(reason, { keep = false } = {}) {
     const row = sheet && sheet.row;
     if (!row) return;
     setSheetBusy(true);
     setSheetError(null);
-    const r = await callApi('POST', `/api/show/episode/${encodeURIComponent(row.id)}/removal`, { action: 'request', reason });
+    const r = await callApi('POST', `/api/show/episode/${encodeURIComponent(row.id)}/removal`, { action: 'request', reason, ...(keep ? { keep: true } : {}) });
     setSheetBusy(false);
     if (!r.ok) {
       setSheetError(r.error);
@@ -1062,6 +1103,8 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
     showStill: show.art ? show.art.thumbnail : null,
     showPoster: show.art ? show.art.poster : null,
     showPublic: Boolean(show.isPublic),
+    // A removed show (migration 124): its episodes come back with it.
+    showRemoved: Boolean(show.removal && show.removal.removed),
     isOwner,
     team,
     canRun,
@@ -1158,12 +1201,22 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
               </div>
             )
           ) : (
-            <ShowStatusCard view={view} contributor={contributor} onProblem={onProblem} onMakePublic={makePublic} onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null} onResubmit={canRun ? resubmit : null} busy={busy} />
+            <ShowStatusCard
+              view={view}
+              contributor={contributor}
+              onProblem={onProblem}
+              onMakePublic={makePublic}
+              onCancelRemoval={canRun || viewer.isAdmin ? () => askRemoval('cancel') : null}
+              onResubmit={canRun ? resubmit : null}
+              onAskBack={isOwner || viewer.isAdmin ? () => setAskBack({ type: 'series', id: showId, title: show.name || 'This show', line: show.removal && show.removal.removed ? show.removal.removed.label : '' }) : null}
+              onCancelAskBack={isOwner || viewer.isAdmin ? cancelShowAskBack : null}
+              busy={busy}
+            />
           )}
           {sellable && <SellCard view={view} episodePrices={episodePrices} onOpen={async () => { if (!pricing) { const r = await callApi('GET', `/api/creator/pricing?show=${encodeURIComponent(showId)}`); if (r.ok) setPricing(r.data); } setSellTarget({ type: 'series', id: showId, title: show.name, sub: countLine(view.seasons) }); }} />}
           {!isAdminMode && view.payee && <PayeeCard payee={view.payee} mode="card" onChanged={onPayeeChanged} />}
           {canRun && !(vertical && !team) && <ChannelsCard view={view} canEdit={canRun} locked={held ? 'Locked while it’s pulled.' : removal ? 'Locked while its removal is requested.' : null} busy={busy === 'channels'} onToggle={toggleChannels} />}
-          {!isAdminMode && !(vertical && !team) && <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason) => askRemoval('request', reason)} onCancel={() => askRemoval('cancel')} />}
+          {!isAdminMode && !(vertical && !team) && <RemoveShowCard view={view} canRequest={isOwner || Boolean(viewer.isAdmin)} busy={busy} onRequest={(reason, opts) => askRemoval('request', reason, opts)} onCancel={() => askRemoval('cancel')} />}
         </div>
 
         <div className="show-room-main">
@@ -1286,6 +1339,9 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
       {sheet && sheet.kind === 'remove' && (
         <RemoveEpisodeSheet row={sheet.row} live={sheet.row.status === 'approved' && show.isPublic} busy={sheetBusy} error={sheetError} onSubmit={submitRemoval} onClose={() => { setSheet(null); setSheetError(null); }} />
       )}
+      {askBack && (
+        <RestoreRequestModal itemLabel={askBack.title} line={askBack.line} onClose={() => setAskBack(null)} onConfirm={sendAskBack} />
+      )}
       {sheet && sheet.kind === 'place' && (
         <RoomSheet title={`Place ${sheet.extra.displayTitle}`} eyebrow={extraKindLabel(sheet.extra.extraKind)} onClose={() => { setSheet(null); setSheetError(null); }} foot={sheetError ? <p className="show-ed-error" role="alert">{sheetError}</p> : null}>
           <div className="show-sheet-block">
@@ -1325,6 +1381,7 @@ export default function ShowControlRoom({ showId, mode = 'creator', openEpisodeI
 
 function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }) {
   const [reason, setReason] = useState('');
+  const [keep, setKeep] = useState(false);
   return (
     <RoomSheet
       title={`Remove ${row.displayTitle}?`}
@@ -1334,7 +1391,7 @@ function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }) {
         <>
           {error && <p className="show-ed-error" role="alert">{error}</p>}
           <div className="show-sheet-actions">
-            <button type="button" className="show-danger-btn" disabled={busy || !reason.trim()} onClick={() => onSubmit(reason.trim())}>{busy ? 'Asking…' : 'Ask us to remove it'}</button>
+            <button type="button" className="show-danger-btn" disabled={busy || !reason.trim()} onClick={() => onSubmit(reason.trim(), { keep: Boolean(row.removalReady && keep) })}>{busy ? 'Asking…' : 'Ask us to remove it'}</button>
             <button type="button" className="apl-btn-secondary" onClick={onClose}>Keep it</button>
           </div>
         </>
@@ -1344,6 +1401,15 @@ function RemoveEpisodeSheet({ row, live, busy, error, onSubmit, onClose }) {
         <p className="show-sheet-help">{live ? 'It is hidden from the site right away while we confirm it. Anyone who bought it keeps it.' : 'We confirm it soon; anyone who bought it keeps it.'}</p>
         <label className="show-ed-label" htmlFor="show-remove-ep-reason">Why?</label>
         <textarea id="show-remove-ep-reason" className="show-ed-textarea is-short" rows={3} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A line for us" />
+        {row.removalReady ? (
+          <>
+            <p className="show-sheet-help">{REMOVAL_WORDS.holdNote}</p>
+            <label className="removal-keep">
+              <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+              <span>{REMOVAL_WORDS.keepLabel}</span>
+            </label>
+          </>
+        ) : null}
       </div>
     </RoomSheet>
   );

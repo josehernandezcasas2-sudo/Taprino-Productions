@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { rowPill } from '../../lib/showRules';
 import { ArrowDownIcon, ArrowUpIcon, CheckIcon, ExternalLinkIcon, LockIcon, PencilIcon, TicketIcon, TrashIcon, WarningIcon } from '../PlayerIcons';
 import { ChevronIcon, GripIcon, KebabIcon, SendIcon, ago, bg, bytesShort, minutesOf, pickerKeys } from './roomBits';
+import { CONFIRM_LABEL, REMOVAL_WORDS, askBackFor, removedState } from '../../lib/removalRules';
 
 // A season of the show page (series revamp slice 2; spec Screens, "Show
 // page", boards Main, ShowLaptop, ShowLaptopDrag, ShowStates): the header
@@ -196,7 +197,10 @@ function MetaLine({ parts }) {
 function EpisodeRow({ row, index, count, ctx, actions }) {
   const isDraft = row.kind === 'draft';
   const upload = isDraft ? ctx.uploads[row.id] || null : null;
-  const pill = rowPill(row, { showPublic: ctx.showPublic, upload: upload ? { status: upload.status, pct: upload.pct } : null });
+  // A removed title reads where it stands (migration 124): "Removed ·
+  // deleted on Dec 15", "Waiting on us to bring it back"…
+  const removed = !isDraft ? removedState(row) : null;
+  const pill = removed ? { label: removed.label, tone: 'neutral', key: 'withdrawn' } : rowPill(row, { showPublic: ctx.showPublic, upload: upload ? { status: upload.status, pct: upload.pct } : null });
   const openable = ctx.canOpen(row);
   const reorderable = ctx.canReorder && row.inRunningOrder !== false && row.status !== 'rejected' && !row.withdrawnAt;
   const href = openable ? ctx.paths.episode(row.id, isDraft) : null;
@@ -238,6 +242,12 @@ function EpisodeRow({ row, index, count, ctx, actions }) {
   } else if (!isDraft && row.mine && !row.deletionRequested && !row.withdrawnAt) {
     menu.push({ divider: true });
     menu.push({ key: 'remove', label: 'Remove…', icon: <TrashIcon size={15} />, danger: true, onClick: () => actions.askRemove(row) });
+  } else if (!isDraft && row.mine && removed && actions.askBack) {
+    // Removed on its own (not with its show): ask to bring it back, or take
+    // that request back.
+    const ask = askBackFor(row, { showWithdrawn: Boolean(ctx.showRemoved) });
+    if (ask && ask.ok) menu.push({ key: 'restore', label: REMOVAL_WORDS.askBackMenu, icon: <ArrowUpIcon size={15} />, onClick: () => actions.askBack(row) });
+    else if (ask && ask.key === 'asked') menu.push({ key: 'cancel_restore', label: REMOVAL_WORDS.cancelAsk, icon: <ArrowUpIcon size={15} />, onClick: () => actions.cancelAskBack(row) });
   }
   const pct = upload && (upload.status === 'uploading' || upload.status === 'starting') ? Math.max(2, Math.min(100, upload.pct || 0)) : null;
   const classes = ['show-row', isDraft ? 'is-draft' : '', ctx.openId === row.id ? 'is-open' : '', ctx.flashId === row.id ? 'is-flash' : '', ctx.draggingId === row.id ? 'is-drag-source' : '', busy ? 'is-busy' : ''].filter(Boolean).join(' ');
@@ -371,7 +381,7 @@ function AdminRemovalActions({ row, ctx, actions, busy }) {
     <>
       <div className="show-adm-rowacts">
         <span className="show-adm-rowk">Removal requested</span>
-        <button type="button" className="show-danger-btn show-mini" disabled={!can.deletions || busy} onClick={() => actions.decideRemoval(row, 'confirm')}>Confirm removal</button>
+        <button type="button" className="show-danger-btn show-mini" disabled={!can.deletions || busy} onClick={() => actions.decideRemoval(row, 'confirm')}>{row.removalReady ? (row.keepAfterRemoval ? CONFIRM_LABEL.later : CONFIRM_LABEL.hold) : 'Confirm removal'}</button>
         <button type="button" className="apl-btn-secondary show-mini" disabled={!can.deletions || busy} onClick={() => actions.decideRemoval(row, 'deny')}>Keep it</button>
       </div>
       {!can.deletions && needs.deletions ? <p className="show-adm-need"><LockIcon size={11} /> <span>{needs.deletions}</span></p> : null}

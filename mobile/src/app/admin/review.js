@@ -8,7 +8,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { apiGet, apiPost, freshToken } from '../../lib/api';
 import { colors, fonts, oliveTint, surfaceTint } from '../../lib/theme';
 import { useCaptureBlock } from '../../lib/captureBlock';
-import { KIND_LABEL, approvedFlash, blockedLine, decisionBody, deckItems, deckKind, eyebrowFor, fmtDuration, kickerFor, metaRows, noVideoWords, ownerLine, showOf, slotLine, tierFor } from '../../lib/reviewDeckRules';
+import { KIND_LABEL, RESTORE_WORDS, approveLabel, approvedFlash, blockedLine, decisionBody, rejectLabel, deckItems, deckKind, eyebrowFor, fmtDuration, kickerFor, metaRows, noVideoWords, ownerLine, showOf, slotLine, tierFor } from '../../lib/reviewDeckRules';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
 
@@ -163,14 +163,14 @@ export default function AdminReview() {
       <Modal visible={rejecting || holding} transparent animationType="fade" onRequestClose={() => { setRejecting(false); setHolding(false); }}>
         <Pressable style={styles.backdrop} onPress={() => { setRejecting(false); setHolding(false); }}>
           <Pressable style={styles.sheet} onPress={() => {}}>
-            <Text style={[styles.eyebrow, holding && { color: colors.olive }]}>{holding ? 'Hold' : item && item.kind === 'application' ? 'Decline' : 'Reject'}</Text>
+            <Text style={[styles.eyebrow, holding && { color: colors.olive }]}>{holding ? 'Hold' : item && item.kind === 'application' ? 'Decline' : item && item.kind === 'restore' ? RESTORE_WORDS.denyHeading : 'Reject'}</Text>
             <Text style={styles.sheetTitle}>{item ? item.title : ''}</Text>
-            <Text style={styles.sheetBody}>{holding ? 'The one thing to fix. They read it, replace the file, and it comes back here.' : 'The reason is shown to whoever submitted it.'}</Text>
+            <Text style={styles.sheetBody}>{holding ? 'The one thing to fix. They read it, replace the file, and it comes back here.' : item && item.kind === 'restore' ? RESTORE_WORDS.denyBody : 'The reason is shown to whoever submitted it.'}</Text>
             <TextInput
               style={styles.input}
               value={reason}
               onChangeText={setReason}
-              placeholder={holding ? 'What needs fixing?' : 'What needs to change?'}
+              placeholder={holding ? 'What needs fixing?' : item && item.kind === 'restore' ? RESTORE_WORDS.denyPlaceholder : 'What needs to change?'}
               placeholderTextColor={colors.inkFaint}
               multiline
               autoFocus
@@ -183,7 +183,7 @@ export default function AdminReview() {
                 </Pressable>
               ) : (
                 <Pressable style={[styles.btnDanger, (!reason.trim() || busy) && { opacity: 0.5 }]} disabled={!reason.trim() || busy} onPress={() => decide('reject')}>
-                  {busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.btnDangerText}>{item && item.kind === 'application' ? 'Decline' : 'Reject'}</Text>}
+                  {busy ? <ActivityIndicator color={colors.ink} /> : <Text style={styles.btnDangerText}>{item && item.kind === 'application' ? 'Decline' : item && item.kind === 'restore' ? RESTORE_WORDS.denyConfirm : 'Reject'}</Text>}
                 </Pressable>
               )}
             </View>
@@ -299,10 +299,10 @@ function ReviewCard({ item, getToken, busy, onApprove, onReject, onHold, onSkip,
                   </View>
                 ) : null}
                 <View style={styles.decide}>
-                  <Pressable style={[styles.btnDanger, busy && { opacity: 0.5 }]} disabled={busy} onPress={onReject}><Text style={styles.btnDangerText}>{isApplication ? 'Decline…' : 'Reject…'}</Text></Pressable>
+                  <Pressable style={[styles.btnDanger, busy && { opacity: 0.5 }]} disabled={busy} onPress={onReject}><Text style={styles.btnDangerText}>{rejectLabel(item)}</Text></Pressable>
                   {isApplication ? <Pressable style={[styles.btnHold, busy && { opacity: 0.5 }]} disabled={busy} onPress={onHold}><Text style={styles.btnHoldText}>Hold…</Text></Pressable> : null}
                   <Pressable style={[styles.btnOk, (busy || blocked) && { opacity: 0.5 }]} disabled={busy || Boolean(blocked)} onPress={onApprove} accessibilityState={{ disabled: busy || Boolean(blocked) }} accessibilityHint={blocked || undefined}>
-                    {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.btnOkText}>{isApplication ? (meta.masterReady ? 'Accept · live' : 'Accept') : 'Approve'}</Text>}
+                    {busy ? <ActivityIndicator color={colors.onBrass} /> : <Text style={styles.btnOkText}>{approveLabel(item)}</Text>}
                   </Pressable>
                 </View>
                 {blocked ? <Text style={styles.blocked}>{blocked}</Text> : null}

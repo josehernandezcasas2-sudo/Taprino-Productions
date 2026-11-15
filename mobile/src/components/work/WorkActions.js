@@ -15,6 +15,8 @@ import SellTitleSheet from '../SellTitleSheet';
 import PayeeCard from '../show/PayeeCard';
 import { ChevronIcon, HANDOFF_MS, Sheet, episodeEditorRoute, showRoute, ss } from '../show/ShowBits';
 import { openOnWebsite } from '../show/EditorBits';
+import { KeepFilesField, RestoreSheet } from '../removal/RemovalBits';
+import { REMOVAL_WORDS, removedState } from '../../lib/removalRules';
 import { hrefToRoute } from '../PushListener';
 import {
   ChatIcon, ClapperboardIcon, CloseIcon, ExternalLinkIcon, EyeIcon, HeadphonesIcon, ImageIcon, LinkIcon, PencilIcon, SettingsIcon, TrashIcon, UndoIcon
@@ -44,7 +46,10 @@ import {
 //   extract_audio   POST /api/creator/extract-podcast-audio, polled every 3 s
 //   channels        POST /api/creator/channel-opt-in
 //   cancel_removal  POST /api/creator/request-episode-deletion { action: 'cancel' }
-//   remove          Request deletion (the same route, action 'request')
+//   remove          Request deletion (the same route, action 'request'; with
+//                   "Keep the files so I can bring it back later", migration 124)
+//   restore         Ask to bring it back (POST /api/show/episode/<id>/restore)
+//   cancel_restore  take that request back (the same route, action 'cancel')
 //
 // Kept from before the revamp, which the rules don't name: "Open on the
 // show page" for a show's episode, and the title image (add / replace /
@@ -68,7 +73,7 @@ export function websitePathFor(key, id) {
 // Keys that present something (a box, a sheet, the photo picker, the
 // system browser): after the ⋯ sheet, they wait for it to slide away (iOS
 // won't present while a modal is still closing).
-const PRESENTS = new Set(['edit_full', 'edit_submission', 'edit_words', 'sell', 'remove', 'title_image', 'title_image_remove', 'artwork', 'video', 'captions', 'replace_file']);
+const PRESENTS = new Set(['edit_full', 'edit_submission', 'edit_words', 'sell', 'remove', 'restore', 'title_image', 'title_image_remove', 'artwork', 'video', 'captions', 'replace_file']);
 
 const MENU_ICON = {
   open: ChevronIcon,
@@ -86,7 +91,9 @@ const MENU_ICON = {
   extract_audio: HeadphonesIcon,
   channels: SettingsIcon,
   cancel_removal: UndoIcon,
-  remove: TrashIcon
+  remove: TrashIcon,
+  restore: UndoIcon,
+  cancel_restore: UndoIcon
 };
 const DOLLAR_KEYS = new Set(['sell', 'payee']);
 
@@ -175,8 +182,10 @@ export function useWorkActions({ getToken, router, pricing = null, loadPricing =
   // The server's line when a save found the database without migration 123:
   // the edit box greys "Allow downloads in the app" with it.
   const [downloadsBehind, setDownloadsBehind] = useState(null);
-  const [deleteModal, setDeleteModal] = useState(null); // { id, title }
+  const [deleteModal, setDeleteModal] = useState(null); // { id, title, keepChoice, bought }
   const [deleteReason, setDeleteReason] = useState('');
+  const [deleteKeep, setDeleteKeep] = useState(false);
+  const [restoreModal, setRestoreModal] = useState(null); // { id, title, line }
   const [deleteSaving, setDeleteSaving] = useState(false);
   const [deleteError, setDeleteError] = useState(null);
   const [sellModal, setSellModal] = useState(null); // { type, id, title, sub }
@@ -298,15 +307,38 @@ export function useWorkActions({ getToken, router, pricing = null, loadPricing =
     setDeleteSaving(true);
     setDeleteError(null);
     try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, await freshToken(getToken));
+      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim(), ...(deleteModal.keepChoice && !deleteModal.bought && deleteKeep ? { keep: true } : {}) }, await freshToken(getToken));
       setDeleteModal(null);
       setDeleteReason('');
+      setDeleteKeep(false);
       changed();
     } catch (err) {
       setDeleteError(err.message);
     } finally {
       setDeleteSaving(false);
     }
+  }
+
+  // Ask to bring a removed title back (the sheet's confirm: a thrown line
+  // shows in the sheet), and take that request back.
+  async function askBack(reason) {
+    const id = restoreModal && restoreModal.id;
+    if (!id) return;
+    const r = await showCall('POST', `/api/show/episode/${encodeURIComponent(id)}/restore`, { action: 'request', reason }, getToken);
+    if (!r.ok) throw new Error(r.error || 'Could not send the request.');
+    setRestoreModal(null);
+    if (alive.current) note(id, REMOVAL_WORDS.askBackSent);
+    changed();
+  }
+
+  async function cancelAskBack(id) {
+    fail(id, null);
+    busyOn(id, 'cancel_restore');
+    const r = await showCall('POST', `/api/show/episode/${encodeURIComponent(id)}/restore`, { action: 'cancel' }, getToken);
+    if (!alive.current) return;
+    busyOn(id, null);
+    if (!r.ok) fail(id, r.error || 'Could not take the request back.');
+    changed();
   }
 
   async function cancelDeletion(id) {
@@ -443,7 +475,14 @@ export function useWorkActions({ getToken, router, pricing = null, loadPricing =
       case 'remove':
         setDeleteReason('');
         setDeleteError(null);
-        setDeleteModal({ id: row.id, title: row.title });
+        setDeleteKeep(false);
+        setDeleteModal({ id: row.id, title: row.title, keepChoice: Boolean(s && s.removalReady === true), bought: Boolean(s && s.bought === true) });
+        break;
+      case 'restore':
+        setRestoreModal({ id: row.id, title: row.title, line: (removedState(s || {}) || {}).label || '' });
+        break;
+      case 'cancel_restore':
+        cancelAskBack(row.id);
         break;
       case 'title_image':
         pickTitleImage(s);
@@ -568,6 +607,9 @@ export function useWorkActions({ getToken, router, pricing = null, loadPricing =
                 placeholderTextColor={colors.inkFaint}
                 accessibilityLabel="Reason for the removal"
               />
+              {deleteModal && deleteModal.keepChoice ? (
+                <KeepFilesField checked={deleteKeep} onChange={setDeleteKeep} bought={deleteModal.bought} style={{ marginTop: 8 }} />
+              ) : null}
               {deleteError ? <Text style={wa.errorText} accessibilityRole="alert">{deleteError}</Text> : null}
               <View style={wa.modalActions}>
                 <Pressable style={[wa.primaryBtn, deleteSaving && wa.btnDisabled]} disabled={deleteSaving} onPress={requestDeletion} accessibilityRole="button">
@@ -581,6 +623,9 @@ export function useWorkActions({ getToken, router, pricing = null, loadPricing =
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* Ask to bring it back (migration 124) */}
+      <RestoreSheet visible={Boolean(restoreModal)} title={restoreModal ? restoreModal.title : ''} line={restoreModal ? restoreModal.line : ''} onClose={() => setRestoreModal(null)} onConfirm={askBack} />
     </>
   );
 
