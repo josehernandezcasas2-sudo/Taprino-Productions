@@ -1,56 +1,39 @@
 import { getRoleContext } from '../../../lib/roles';
-import { getSupabase } from '../../../lib/supabase';
-import { uploadCaptionFile } from '../../../lib/captionUpload';
-import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
-import { isPrivateRef, removePrivate } from '../../../lib/privateStorage';
-import { captionsHref } from '../../../lib/episodes';
 import { checkRateLimit } from '../../../lib/rateLimit';
-import { sendError } from '../../../lib/apiErrors';
+import { isTitleId } from '../../../lib/titleIds';
+import { setEpisodeCaptions } from '../../../lib/showPage';
+import { showRouteError } from '../../../lib/showRoute';
 
 export const config = {
   api: { bodyParser: { sizeLimit: '4mb' } }
 };
 
-// A track in the private bucket is deleted outright (the orphan queue
-// only cleans the public artwork bucket); one uploaded before the private
-// bucket existed is recorded as orphaned so it shows up in the admin
-// cleanup queue, matching how replaced artwork and video are handled.
-async function discardOldTrack(existing, reason) {
-  if (!existing.captions_url) return;
-  if (isPrivateRef(existing.captions_url)) {
-    await removePrivate(existing.captions_url).catch(() => {});
-    return;
-  }
-  const path = storagePathFromUrl(existing.captions_url);
-  if (path) {
-    await recordOrphan({ kind: 'storage_image', reference: path, reason }).catch(() => {});
-  }
-}
-
-// Captions apply immediately rather than going through review, unlike
-// artwork. Artwork is staged because it changes what the public sees on the
-// homepage — a caption track only becomes visible to someone who has already
-// chosen to turn captions on, and a wrong or missing one is an accessibility
-// problem worth fixing in seconds rather than in a review cycle.
-// A new track (or none) answers the "captions may be out of date" flag a
-// replaced video sets (migration 118's captions_stale_at), so it clears
-// here; a database without that column saves the track all the same.
-async function updateCaptions(supabase, episodeId, patch) {
-  let res = await supabase.from('episodes').update({ ...patch, captions_stale_at: null }).eq('id', episodeId);
-  if (res.error && /captions_stale_at/.test(res.error.message || '')) {
-    res = await supabase.from('episodes').update(patch).eq('id', episodeId);
-  }
-  return res;
-}
-
+// A title's captions track, by the person who uploaded it (the episode
+// editors' Captions card, web; the app points to the website).
+//
+//   POST { episodeId, captionsBase64, captionsFileName, language, label }
+//   POST { episodeId, remove: true }
+//
+// Tracks go to the private bucket (lib/captionUpload.js) and play through
+// /api/captions/<id>. Until 2026-11-15 a new track applied at once on any
+// title; since then (Jose: "make sure any caption change or anything to
+// change the series/live titles needs review") on a live title it waits in
+// migration 124's pending_fields.captions and viewers keep the live track
+// until someone on the team approves it (lib/stagedChanges.js) — removing
+// the captions waits the same way. On a title in review, declined or
+// pulled it applies at once as before, and a full admin's own change too.
+// Before 124 a change that would wait answers 503 migration-124. The work
+// is lib/showPage.js setEpisodeCaptions.
+//   → { ok, staged, removed?, url?, cueCount?, converted?, message? }
 export default async function handler(req, res) {
+  res.setHeader('Cache-Control', 'private, no-store');
   if (req.method !== 'POST') {
     res.setHeader('Allow', 'POST');
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   const { userId, isCreator, isAdmin } = await getRoleContext(req);
-  if (!isCreator && !isAdmin) {
+  if (!userId || (!isCreator && !isAdmin)) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
   // A track in private storage per call (security round 2).
@@ -58,70 +41,22 @@ export default async function handler(req, res) {
     return res.status(429).json({ error: 'Too many caption changes in a row — give it a little while.' });
   }
 
-  const { episodeId, captionsBase64, captionsFileName, language, label, remove } = req.body || {};
-  if (!episodeId) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const episodeId = body.episodeId === undefined || body.episodeId === null ? '' : String(body.episodeId);
+  if (!episodeId || !isTitleId(episodeId)) {
     return res.status(400).json({ error: 'episodeId is required.' });
   }
 
-  const supabase = getSupabase();
-
-  const { data: existing, error: fetchError } = await supabase
-    .from('episodes')
-    .select('id, title, submitted_by, captions_url')
-    .eq('id', episodeId)
-    .maybeSingle();
-
-  if (fetchError || !existing) {
-    return res.status(404).json({ error: 'Submission not found.' });
-  }
-  if (existing.submitted_by !== userId) {
-    return res.status(403).json({ error: 'That submission does not belong to you.' });
-  }
-
-  // Removing captions.
-  if (remove) {
-    await discardOldTrack(existing, `Caption track removed from "${existing.title}"`);
-    const { error: updateError } = await updateCaptions(supabase, episodeId, { captions_url: null });
-    if (updateError) {
-      return sendError(res, updateError, 'creator/add-captions', 'Could not remove the captions.');
-    }
-    return res.status(200).json({ ok: true, removed: true });
-  }
-
-  if (!captionsBase64) {
-    return res.status(400).json({ error: 'No caption file was provided.' });
-  }
-
-  let uploaded;
   try {
-    uploaded = await uploadCaptionFile({
-      base64: captionsBase64,
-      fileName: captionsFileName,
-      pathPrefix: episodeId
-    });
+    const result = await setEpisodeCaptions(episodeId, {
+      captionsBase64: body.captionsBase64,
+      captionsFileName: body.captionsFileName,
+      language: body.language,
+      label: body.label,
+      remove: body.remove === true
+    }, { userId, isAdmin: isAdmin === true });
+    return res.status(200).json(result);
   } catch (err) {
-    // These messages are written to be read by a creator, not an engineer —
-    // pass them straight through rather than flattening to "upload failed".
-    return sendError(res, err, 'creator/add-captions', 'Could not save the captions.', { plainStatus: 400 });
+    return showRouteError(res, err, 'creator/add-captions', 'Could not save the captions.');
   }
-
-  await discardOldTrack(existing, `Replaced caption track for "${existing.title}"`);
-
-  const { error: updateError } = await updateCaptions(supabase, episodeId, {
-    captions_url: uploaded.url,
-    captions_language: (language || 'en').slice(0, 12),
-    captions_label: (label || 'English').slice(0, 60)
-  });
-
-  if (updateError) {
-    return sendError(res, updateError, 'creator/add-captions', 'Could not save the captions.');
-  }
-
-  return res.status(200).json({
-    ok: true,
-    // Where the track plays from (the gated route), never the stored reference.
-    url: captionsHref({ id: episodeId, captions_url: uploaded.url }),
-    cueCount: uploaded.cueCount,
-    converted: uploaded.converted
-  });
 }

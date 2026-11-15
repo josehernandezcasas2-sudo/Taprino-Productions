@@ -11,7 +11,7 @@ import { PODCASTS_AD_FREE } from '../../lib/adBreakRules';
 import RatingOptions from '../RatingOptions';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
 import {
-  ArtSlot, Banner, EditorFrame, FieldHead, FieldNote, PickButton, SwitchRow, Toast,
+  ArtSlot, Banner, EditorFrame, FieldHead, FieldNote, PickButton, StagedBox, SwitchRow, Toast,
   callApi, isOpen, shortDate, uploadPct, uploadRunning, useBeforeUnload, useDirtyReport, useHeaderOffset, useToast
 } from './EditorBits';
 import { AboutField, NOT_SAVED_WORDS, OneLineField, askHref } from './EpisodeFields';
@@ -105,6 +105,10 @@ function policyCtx(view) {
   return {
     target: 'show',
     isAdmin: Boolean(view.viewer && view.viewer.teamEdits),
+    // A team member's change to a live show (lib/showRules.js
+    // teamLiveMode, 2026-11-15): the route sends who they are.
+    fullAdmin: Boolean(view.viewer && view.viewer.fullAdmin),
+    reviews: Boolean(view.viewer && view.viewer.reviews),
     isRunner: Boolean(view.viewer && view.viewer.isOwner),
     status: view.show.status || 'approved',
     held: Boolean(view.show.held),
@@ -365,6 +369,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
 
   // --- banners -----------------------------------------------------------------
   const st = show.staged || {};
+  const waitingDetails = Array.isArray(st.details) ? st.details : [];
   const stagedList = [
     st.name ? { field: 'name', words: `the name “${st.name}”` } : null,
     st.description ? { field: 'description', words: 'an edited description' } : null,
@@ -373,7 +378,9 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
     st.heroImage ? { field: 'heroImage', words: 'the hero image' } : null,
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'removing the title image' : 'the title image' } : null,
     st.trailer ? { field: 'trailer', words: 'the trailer' } : null,
-    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` }))
+    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` })),
+    // Migration 124 (2026-11-15): the show's details wait too.
+    ...waitingDetails.map((d) => ({ field: d.field, words: `${d.label.toLowerCase()} “${d.proposed}”` }))
   ].filter(Boolean);
   const declined = show.status === 'rejected' && !show.held;
   const banners = (
@@ -487,13 +494,27 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
       </div>
       <OneLineField id="sh-oneline" value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={lockAll('description')} edited={edited('description')} />
       <AboutField id="sh-about" value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={lockAll('description')} edited={edited('description')} placeholder={`Everything else about the ${noun}.`} />
+      {/* The show's details waiting for approval (migration 124): live now
+          beside proposed, each with Cancel. */}
+      {waitingDetails.length > 0 && (
+        <div className="show-ed-card show-ed-waiting">
+          <span className="show-ed-card-k">Waiting for approval</span>
+          {waitingDetails.map((d) => (
+            <StagedBox key={d.field} title={d.label} onCancel={canCancel ? () => cancelStaged(d.field) : null} busy={busy === `cancel-${d.field}`}>
+              <span className="show-ed-staged-live">Live now: <strong>{d.live}</strong></span>
+              <span className="show-ed-staged-live">Proposed: <strong>{d.proposed}</strong></span>
+            </StagedBox>
+          ))}
+          <p className="show-ed-hint">Visitors see what&rsquo;s live until we approve each one.</p>
+        </div>
+      )}
       <div className="apl-grid2 show-ed-grid2 show-ed-year-row">
         <div className="show-ed-field">
-          <FieldHead htmlFor="sh-year" label="Year" />
+          <FieldHead htmlFor="sh-year" label="Year" staged={lockAll('releaseYear').mode === 'staged'} />
           <input id="sh-year" className="show-ed-input" type="text" inputMode="numeric" maxLength={4} value={form.releaseYear} placeholder={String(new Date().getFullYear())} disabled={!isOpen(lockAll('releaseYear'))} onChange={(e) => set('releaseYear', e.target.value.replace(/[^0-9]/g, ''))} />
         </div>
         <div className="show-ed-field">
-          <FieldHead htmlFor="sh-funding" label="Funding link" hint=" optional" />
+          <FieldHead htmlFor="sh-funding" label="Funding link" hint=" optional" staged={lockAll('fundingUrl').mode === 'staged'} />
           <input id="sh-funding" className="show-ed-input" type="url" inputMode="url" maxLength={500} value={form.fundingUrl} placeholder="https://" disabled={!isOpen(lockAll('fundingUrl'))} onChange={(e) => set('fundingUrl', e.target.value)} />
         </div>
       </div>
@@ -553,7 +574,7 @@ function ShowEditorReady({ showId, mode = 'creator', layout = 'page', tab: start
 
       {form.seasons.length > 0 && (
         <div className="show-ed-field show-ed-seasons">
-          <span className="show-ed-label">Season names</span>
+          <span className="show-ed-label">{seasonsPolicy.mode === 'staged' && <ClockIcon size={12} />}<span>Season names</span></span>
           {form.seasons.map((s, i) => (
             <div className="show-ed-season-row" key={s.number}>
               <label htmlFor={`sh-season-${s.number}`}>Season {s.number}</label>

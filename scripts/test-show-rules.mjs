@@ -966,8 +966,14 @@ function suite(R, who) {
       for (const field of ['title', 'poster', 'video', 'trailer', 'tier', 'rating', 'description']) assert.equal(R.fieldPolicy(field, { ...owner, status }), 'direct', `${status} ${field}`);
     }
     const live = { ...owner, status: 'approved' };
-    for (const field of ['genre', 'mainGenre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'channelOptIn', 'captions', 'hasPage', 'season', 'seriesOrder', 'seriesId', 'bonusParent', 'credits']) {
+    for (const field of ['channelOptIn', 'hasPage', 'season', 'seriesOrder', 'seriesId', 'bonusParent']) {
       assert.equal(R.fieldPolicy(field, live), 'direct', field);
+    }
+    // Jose, 2026-11-15: every change to a live title is reviewed — the
+    // details and the captions wait too (migration 124's pending_fields).
+    for (const field of ['genre', 'mainGenre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'captions', 'credits', 'extraKind']) {
+      assert.equal(R.fieldPolicy(field, live), 'staged', field);
+      for (const status of ['draft', 'pending', 'rejected']) assert.equal(R.fieldPolicy(field, { ...owner, status }), 'direct', `${status} ${field}`);
     }
     // Jose, 2026-11-12: descriptions and notes wait for review on a live title.
     for (const field of ['title', 'description', 'pageNotes', 'poster', 'thumbnail', 'titleImage', 'trailer', 'video']) assert.equal(R.fieldPolicy(field, live), 'staged', field);
@@ -996,7 +1002,8 @@ function suite(R, who) {
     assert.equal(R.fieldPolicy('season', runner), 'direct');
     assert.equal(R.fieldPolicy('hasPage', runner), 'direct');
     assert.equal(R.fieldPolicy('bonusParent', runner), 'direct');
-    assert.equal(R.fieldPolicy('credits', runner), 'direct');
+    assert.equal(R.fieldPolicy('credits', runner), 'staged', 'the credits wait on a live title (2026-11-15)');
+    assert.equal(R.fieldPolicy('credits', { ...runner, status: 'pending' }), 'direct');
     assert.equal(R.fieldPolicy('paidTo', runner), 'invite');
     assert.equal(R.fieldPolicy('title', {}), 'locked', 'a stranger');
     assert.equal(R.fieldPolicyLine('seriesOrder', contributor), 'Only the show’s owner can change this');
@@ -1021,8 +1028,10 @@ function suite(R, who) {
 
   tt('fieldPolicy: a show — at once until its first episode is approved, then its name and art wait', () => {
     const runner = { target: 'show', isRunner: true };
-    const art = ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer'];
-    const rest = ['releaseYear', 'fundingUrl', 'channelOptIn', 'seasons', 'defaults', 'credits'];
+    // 2026-11-15: the year, the funding link, the season names and the
+    // credits wait like the name and the art.
+    const art = ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'releaseYear', 'fundingUrl', 'seasons', 'credits'];
+    const rest = ['channelOptIn', 'defaults', 'newestSeasonHero'];
     for (const f of [...art, ...rest]) assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 0 }), 'direct', `new show ${f}`);
     for (const f of art) {
       assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 1 }), 'staged', `ready show ${f}`);
@@ -1032,17 +1041,19 @@ function suite(R, who) {
     assert.equal(R.fieldPolicy('name', { ...runner, status: 'rejected' }), 'direct', 'a declined show is fixed and resubmitted');
     assert.equal(R.fieldPolicy('paidTo', { ...runner, status: 'approved' }), 'invite');
     assert.equal(R.fieldPolicy('kind', { ...runner, status: 'pending', episodeCount: 0 }), 'direct');
+    assert.equal(R.fieldPolicy('kind', { ...runner, status: 'approved', episodeCount: 0 }), 'staged', 'a live show with nothing in it: the kind waits');
     assert.equal(R.fieldPolicy('kind', { ...runner, status: 'pending', episodeCount: 2 }), 'locked');
     assert.equal(R.fieldPolicyLine('kind', { ...runner, status: 'pending', episodeCount: 2 }), 'A show’s kind is set once it has episodes');
     for (const flag of ['held', 'deletionRequested']) assert.equal(R.fieldPolicy('description', { ...runner, status: 'approved', [flag]: true }), 'locked', flag);
     assert.equal(R.fieldPolicy('name', { target: 'show', isUploader: true, status: 'pending' }), 'locked', 'only the runner edits the show');
-    assert.equal(R.fieldPolicy('name', { target: 'show', isAdmin: true, status: 'approved' }), 'direct');
+    assert.equal(R.fieldPolicy('name', { target: 'show', isAdmin: true, fullAdmin: true, status: 'approved' }), 'direct');
     assert.equal(R.fieldPolicy('name', { ...runner }), 'staged', 'a show with no status is live');
   });
 
   tt('fieldPolicyLine: the words under a field', () => {
     const live = { isUploader: true, isRunner: true, status: 'approved' };
-    assert.equal(R.fieldPolicyLine('genre', live), null);
+    assert.equal(R.fieldPolicyLine('channelOptIn', live), null);
+    assert.equal(R.fieldPolicyLine('genre', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('description', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('pageNotes', live), 'Waits for approval; what’s there now stays until then');
     assert.equal(R.fieldPolicyLine('pageNotes', { ...live, held: true }), null, 'a pulled title keeps its notes open');
@@ -1054,6 +1065,78 @@ function suite(R, who) {
     assert.equal(R.fieldPolicyLine('featured', live), 'Ask us about the hero spot');
     assert.equal(R.fieldPolicyLine('paidTo', live), 'They’re asked first; until they accept, the earnings keep going where they go now');
     assert.equal(R.fieldPolicyLine('nonsense', live), 'This can’t be changed here');
+  });
+
+  tt('fieldPolicy: the team on a live title — a full admin at once, a reviewer on someone else\'s at once, their own title the owner\'s way (2026-11-15)', () => {
+    const live = { status: 'approved' };
+    const full = { isAdmin: true, fullAdmin: true, reviews: true };
+    const reviewer = { isAdmin: true, fullAdmin: false, reviews: true };
+    const editor = { isAdmin: true, fullAdmin: false, reviews: false };
+    assert.equal(R.ownTeamTitle({ ...full, isUploader: true }), false, 'a full admin is never held to it');
+    assert.equal(R.ownTeamTitle({ ...reviewer, isRunner: true }), true);
+    assert.equal(R.ownTeamTitle({ isUploader: true }), false, 'not the team');
+    assert.equal(R.teamLiveMode(full), 'direct');
+    assert.equal(R.teamLiveMode(reviewer), 'direct', 'a reviewer on someone else\'s title');
+    assert.equal(R.teamLiveMode(editor), 'locked', 'someone else\'s live title, without review');
+    for (const field of ['genre', 'captions', 'credits', 'title', 'description', 'poster', 'pageNotes', 'trailer', 'video']) {
+      assert.equal(R.fieldPolicy(field, { ...full, ...live }), 'direct', `full ${field}`);
+      assert.equal(R.fieldPolicy(field, { ...full, ...live, isUploader: true }), 'direct', `full, own ${field}`);
+      assert.equal(R.fieldPolicy(field, { ...reviewer, ...live }), 'direct', `reviewer ${field}`);
+      assert.equal(R.fieldPolicy(field, { ...reviewer, ...live, isUploader: true }), 'staged', `own ${field}`);
+      assert.equal(R.fieldPolicy(field, { ...reviewer, ...live, isRunner: true }), 'staged', `own show ${field}`);
+      assert.equal(R.fieldPolicy(field, { ...editor, ...live }), 'locked', `editor ${field}`);
+      assert.equal(R.fieldPolicyLine(field, { ...editor, ...live }), R.TEAM_REVIEW_LINE, `editor ${field} line`);
+      // Not live: at once, as before.
+      for (const status of ['pending', 'rejected', 'draft']) {
+        assert.equal(R.fieldPolicy(field, { ...editor, status }), 'direct', `${status} ${field}`);
+        assert.equal(R.fieldPolicy(field, { ...reviewer, status, isUploader: true }), 'direct', `own, ${status} ${field}`);
+      }
+      for (const flag of ['held', 'showHeld', 'withdrawn', 'deletionRequested']) assert.equal(R.fieldPolicy(field, { ...editor, ...live, [flag]: true }), 'direct', `${flag} ${field}`);
+    }
+    // Someone else's title: Who can watch, the rating, the place and the
+    // switches stay the team's.
+    for (const field of ['tier', 'rating', 'season', 'hasPage', 'paidTo', 'channelOptIn']) assert.equal(R.fieldPolicy(field, { ...editor, ...live }), 'direct', field);
+    // Their own live title: the owner's way — what an owner can't change is refused.
+    for (const field of ['tier', 'rating', 'isOriginal', 'featured']) {
+      assert.equal(R.fieldPolicy(field, { ...reviewer, ...live, isUploader: true }), 'locked', `own ${field}`);
+      assert.equal(R.fieldPolicyLine(field, { ...reviewer, ...live, isUploader: true }), R.OWN_TITLE_LINE, `own ${field} line`);
+      assert.equal(R.fieldPolicy(field, { ...reviewer, status: 'pending', isUploader: true }), 'direct', `own in review ${field}`);
+    }
+    assert.equal(R.fieldPolicy('season', { ...reviewer, ...live, isUploader: true }), 'direct', 'the place is an owner\'s too');
+    assert.equal(R.fieldPolicy('title', { ...reviewer, ...live, isUploader: true, held: true }), 'locked', 'their own pulled title');
+    assert.equal(R.fieldPolicyLine('title', { ...reviewer, ...live, isUploader: true, held: true }), 'Pulled while an admin looks at it');
+    // The flashing-lights warning: an owner can't take it off a live title.
+    assert.equal(R.flashingLightsChange({ ...reviewer, ...live, isUploader: true }, true, false).ok, false);
+    assert.equal(R.flashingLightsChange({ ...reviewer, ...live }, true, false).ok, true, 'someone else\'s: the team\'s');
+    assert.equal(R.flashingLightsChange({ ...full, ...live, isUploader: true }, true, false).ok, true);
+    // A show.
+    const show = { target: 'show', status: 'approved' };
+    assert.equal(R.fieldPolicy('credits', { ...show, ...editor, isRunner: true }), 'staged');
+    assert.equal(R.fieldPolicy('name', { ...show, ...reviewer, isRunner: true }), 'staged');
+    assert.equal(R.fieldPolicy('releaseYear', { ...show, ...reviewer }), 'direct');
+    assert.equal(R.fieldPolicy('seasons', { ...show, ...editor }), 'locked');
+    assert.equal(R.fieldPolicy('seasons', { ...show, ...editor, status: 'pending', approvedEpisodes: 0 }), 'direct', 'a show nobody can see yet');
+    assert.equal(R.fieldPolicy('seasons', { ...show, ...editor, isRunner: true, status: 'pending', approvedEpisodes: 1 }), 'staged');
+    assert.equal(R.fieldPolicy('defaults', { ...show, ...editor }), 'direct');
+    assert.equal(R.fieldPolicyLine('credits', { ...show, ...editor, isRunner: true }), 'Waits for approval; what’s there now stays until then');
+  });
+
+  tt('adsEnabledPolicy / adsEnabledChange: turning ads off applies at once, turning them on waits on a live title', () => {
+    const live = { isUploader: true, isRunner: true, status: 'approved' };
+    assert.deepEqual(R.adsEnabledPolicy(live, true), { mode: 'direct', line: null });
+    assert.deepEqual(R.adsEnabledPolicy(live, false), { mode: 'staged', line: R.ADS_ON_WAITS_LINE });
+    assert.deepEqual(R.adsEnabledPolicy({ ...live, status: 'pending' }, false), { mode: 'direct', line: null });
+    assert.equal(R.adsEnabledPolicy({ ...live, withdrawn: true }, false).mode, 'locked');
+    assert.deepEqual(R.adsEnabledChange(live, true, false), { ok: true, mode: 'direct', value: false });
+    assert.deepEqual(R.adsEnabledChange(live, false, true), { ok: true, mode: 'staged', value: true });
+    assert.deepEqual(R.adsEnabledChange(live, true, true), { ok: true, mode: null, value: true });
+    assert.deepEqual(R.adsEnabledChange({ ...live, status: 'pending' }, false, true), { ok: true, mode: 'direct', value: true });
+    assert.deepEqual(R.adsEnabledChange({ isAdmin: true, fullAdmin: true, status: 'approved' }, false, true), { ok: true, mode: 'direct', value: true });
+    assert.deepEqual(R.adsEnabledChange({ isAdmin: true, status: 'approved', isUploader: true }, false, true), { ok: true, mode: 'staged', value: true });
+    const locked = R.adsEnabledChange({ isUploader: false, status: 'approved' }, false, true);
+    assert.equal(locked.ok, false);
+    assert.equal(locked.code, 'locked');
+    assert.equal(R.adsEnabledChange({ ...live, deletionRequested: true }, true, false).ok, false, 'on its way out: closed both ways');
   });
 
   tt('canMoveTo: reordering inside a show is the runner\'s', () => {

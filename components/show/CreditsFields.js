@@ -70,7 +70,9 @@ function inheritedName(showCredits, key) {
 }
 
 export default function CreditsFields({ idPrefix = 'credits', value, onChange, inherit = false, showCredits = null, makerName = null, makerLabel = 'Made by', policy = null }) {
-  const locked = Boolean(policy) && policy.mode !== 'direct';
+  // On a live title the credits wait for approval (2026-11-15): still
+  // editable then; only a locked one (or an invite) is closed.
+  const locked = Boolean(policy) && (policy.mode === 'locked' || policy.mode === 'invite');
   const setLine = (key, patch) => onChange({ ...value, [key]: { ...value[key], ...patch } });
   const nameOf = (key) => {
     const l = value[key];

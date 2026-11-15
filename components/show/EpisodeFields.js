@@ -207,7 +207,8 @@ export function SameAsShow({ ctx, inShow = true }) {
             <li key={r.key} className={`show-ed-same-row ${isOpenRow ? 'is-open' : ''} ${locked ? 'is-locked' : ''}`}>
               <button type="button" className="show-ed-same-head" aria-expanded={locked ? undefined : isOpenRow ? 'true' : 'false'} disabled={locked} onClick={() => setOpen(isOpenRow ? null : r.key)}>
                 <span className="show-ed-same-text">
-                  <span className="show-ed-label">{r.label}</span>
+                  {/* The clock: on a live title this waits for approval (2026-11-15). */}
+                  <span className="show-ed-label">{r.policy && r.policy.mode === 'staged' ? <ClockIcon size={11} /> : null}{r.label}</span>
                   {r.boxed ? <span className="show-ed-rating-box">{r.value}</span> : r.tier ? <span className={`show-ed-tier ${r.tier === 'premium' ? 'premium' : ''}`}>{r.value}</span> : <span className="show-ed-same-value">{r.value}</span>}
                 </span>
                 {locked ? (
@@ -324,12 +325,12 @@ export function MoreOptions({ idPrefix, form, set, pol, live = false, adFree = f
       <div className="show-ed-more-body">
         <div className="apl-grid2 show-ed-grid2">
           <div className="show-ed-field">
-            <FieldHead htmlFor={`${idPrefix}-runtime`} label="Runtime" hint=" MM:SS" locked={pol('runtime').mode === 'locked'} />
+            <FieldHead htmlFor={`${idPrefix}-runtime`} label="Runtime" hint=" MM:SS" staged={pol('runtime').mode === 'staged'} locked={pol('runtime').mode === 'locked'} />
             <input id={`${idPrefix}-runtime`} className="show-ed-input" type="text" value={form.runtime} placeholder="22:04" maxLength={9} disabled={!isOpen(pol('runtime'))} onChange={(e) => set('runtime', e.target.value)} />
           </div>
           {!adFree && (
             <div className="show-ed-field">
-              <FieldHead htmlFor={`${idPrefix}-breaks`} label="Ad breaks" hint=" MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
+              <FieldHead htmlFor={`${idPrefix}-breaks`} label="Ad breaks" hint=" MM:SS, commas" staged={pol('adBreakSeconds').mode === 'staged'} locked={pol('adBreakSeconds').mode === 'locked'} />
               <input id={`${idPrefix}-breaks`} className="show-ed-input" type="text" value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChange={(e) => set('adBreaksText', e.target.value)} />
             </div>
           )}
@@ -338,7 +339,7 @@ export function MoreOptions({ idPrefix, form, set, pol, live = false, adFree = f
           <p className="show-ed-hint">{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</p>
         ) : (
           <SwitchRow id={`${idPrefix}-ads`} title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
-            Off plays it without ad breaks for everyone.
+            Off plays it without ad breaks for everyone.{pol('adsEnabled').mode === 'staged' && pol('adsEnabled').line ? ` ${pol('adsEnabled').line}.` : ''}
           </SwitchRow>
         )}
         <SwitchRow id={`${idPrefix}-channels`} title="Let channels air it" on={form.channelOptIn} onChange={(v) => set('channelOptIn', v)} disabled={!isOpen(pol('channelOptIn'))} policy={pol('channelOptIn').mode === 'locked' ? pol('channelOptIn') : null}>

@@ -16,7 +16,8 @@ import { isTitleId } from '../../../lib/titleIds';
 import { VIDEO_UID_PATTERN, checkVideoOwnership } from '../../../lib/videoOwnership';
 import { FILE_REVIEW_LINE, OWN_WORK_LINE, approvesOwnWork } from '../../../lib/titleSecurityRules';
 import { checkAudioAddress } from '../../../lib/audioAddress';
-import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, OWN_TITLE_LINE, fieldPolicy, fieldPolicyLine, flashingLightsChange, inRunningOrder, ownTeamCtx, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
+import { LIVE_REVIEW_124_MSG, nextPendingFields, pendingFieldsOf } from '../../../lib/liveReviewRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, payeeRuleLiveNow, payeeShowIds, withPayeeStamps } from '../../../lib/payees';
@@ -73,6 +74,62 @@ const BOOLEAN_FIELDS = ['featured', 'discoverCurated', 'isOriginal', 'hasFlashin
 const PLACE_COLUMNS = ['series_id', 'season', 'series_order', 'status', 'content_type'];
 // lib/showPage.js updateEpisode's limit for an episode's page notes.
 const PAGE_NOTES_MAX = 4000;
+
+// Every change to a live title is reviewed (Jose, 2026-11-15: "make sure
+// any caption change or anything to change the series/live titles needs
+// review"; lib/showRules.js ownTeamTitle / teamLiveMode). This route is the
+// team's, so a full admin's save applies at once as before. Anyone else's,
+// on a title that isn't in review, is decided field by field by the same
+// policy the show editor runs:
+//   - their own title (they uploaded it, or run its show:
+//     lib/titleOwners.js episodeOwnerIds) goes the owner's way — what an
+//     owner's change waits for waits (the details in migration 124's
+//     pending_fields; the title, description and notes, art and a new file
+//     in their pending_* columns), and what an owner can't change at all
+//     (Who can watch, the rating, the status, the dates…) is refused with
+//     OWN_TITLE_LINE;
+//   - someone else's live title: a field that waits on a live title applies
+//     at once only for a reviewer (review_submissions) and is refused
+//     otherwise; a new file is the caller's own upload, so it waits for
+//     another reviewer (pending_src); Who can watch, the rating, the
+//     status, the place and the switches stay the team's.
+// The columns that can wait, by the field policy's name and where they wait.
+const STAGEABLE = {
+  title: { field: 'title', pending: 'pending_title' },
+  description: { field: 'description', pending: 'pending_description' },
+  page_notes: { field: 'pageNotes', pending: 'pending_page_notes', needs: 'pending_page_notes', needsMsg: 'Notes need a database update (migration 122).', code: 'migration-122' },
+  main_genre: { field: 'mainGenre', detail: true },
+  genre: { field: 'genre', detail: true },
+  artist: { field: 'artist', detail: true },
+  release_year: { field: 'releaseYear', detail: true },
+  runtime: { field: 'runtime', detail: true },
+  funding_url: { field: 'fundingUrl', detail: true },
+  ad_break_seconds: { field: 'adBreakSeconds', detail: true },
+  ads_enabled: { field: 'adsEnabled', detail: true },
+  extra_kind: { field: 'extraKind', detail: true },
+  poster: { field: 'poster', pending: 'pending_poster' },
+  thumbnail: { field: 'thumbnail', pending: 'pending_thumbnail' },
+  title_image_url: { field: 'titleImage', pending: 'pending_title_image_url', needs: 'pending_title_image_url', needsMsg: 'Changing a live episode’s title image or trailer needs a database update (migration 120).', code: 'migration-120' },
+  src: { field: 'video', pending: 'pending_src', needs: 'pending_src', needsMsg: 'Replacing a live episode’s file needs a database update (migration 118).', code: 'migration-118' }
+};
+
+// The rest of what this route writes, by the field policy's name, for a
+// team member's own title (the owner's way): a column that isn't here, or
+// in STAGEABLE, is nothing an owner changes (the status, the type, the
+// dates, the audio address, the Discover pick) and is refused.
+const OWNER_FIELDS = {
+  tier: 'tier',
+  rating: 'rating',
+  is_original: 'isOriginal',
+  featured: 'featured',
+  has_flashing_lights: 'hasFlashingLights',
+  downloads_allowed: 'downloadsAllowed',
+  series_id: 'seriesId',
+  season: 'season',
+  series_order: 'seriesOrder',
+  bonus_parent_type: 'bonusParent',
+  bonus_parent_id: 'bonusParent'
+};
 
 function refuse(message, status = 400, extra = null) {
   return Object.assign(new Error(message), { status, ...(extra ? { extra } : {}) });
@@ -428,6 +485,9 @@ async function editEpisode(req, res, roleContext) {
   // own transcoding has to have actually succeeded before this gets wired in.
   let newSrc;
   let newVideoStatus = null;
+  // Who the title belongs to (its uploader, whoever runs its show): a team
+  // member who is one of them goes the owner's way (the policy above).
+  const ownerIds = roleContext.isAdmin === true ? [] : await episodeOwnerIds(existing);
   if (cloudflareVideoUid) {
     if (!roleContext.isAdmin) {
       // A new file on a title that isn't in review is a reviewer's call
@@ -436,7 +496,10 @@ async function editEpisode(req, res, roleContext) {
       // a video someone else uploaded (lib/videoOwnership.js): a sub-admin
       // attaches their own upload, or an untagged one nobody else uses
       // (a file put up through Cloudflare's own dashboard).
-      if (existing.status !== 'pending' && !hasCapability(roleContext, 'review_submissions')) {
+      // Their own title's new file waits for approval like any owner's
+      // (decided below); someone else's needs the review capability, and
+      // waits for another reviewer even then.
+      if (existing.status !== 'pending' && !hasCapability(roleContext, 'review_submissions') && !ownerIds.includes(userId)) {
         return res.status(403).json({ error: FILE_REVIEW_LINE, code: 'review' });
       }
       const owned = await checkVideoOwnership(String(cloudflareVideoUid), { userId, isAdmin: false });
@@ -493,6 +556,62 @@ async function editEpisode(req, res, roleContext) {
     if (taken) throw taken;
   }
 
+  // What each change does on a live title for this account (the policy
+  // above), decided before anything is uploaded: a refusal leaves nothing
+  // behind, and a change that would wait where the database has nowhere
+  // to keep it answers its migration's 503.
+  const liveCtx = roleContext.isAdmin === true ? null : {
+    target: 'episode',
+    isAdmin: true,
+    fullAdmin: false,
+    reviews: hasCapability(roleContext, 'review_submissions'),
+    isUploader: existing.submitted_by === userId,
+    isRunner: ownerIds.includes(userId),
+    status: existing.status || 'approved',
+    held: Boolean(existing.moderation_hold),
+    deletionRequested: Boolean(existing.deletion_requested),
+    withdrawn: Boolean(existing.withdrawn_at)
+  };
+  // In review, the team's change applies at once as before.
+  const ownPath = Boolean(liveCtx && existing.status !== 'pending' && (liveCtx.isUploader || liveCtx.isRunner));
+  const sentence = (line) => (line && !/[.!?]$/.test(line) ? `${line}.` : line || 'That can’t be changed here.');
+  const modeFor = (column, value) => {
+    if (!liveCtx) return 'direct';
+    const entry = STAGEABLE[column];
+    // Turning ads off only takes something away: at once.
+    if (column === 'ads_enabled' && value === false) return 'direct';
+    let field = entry ? entry.field : OWNER_FIELDS[column] || null;
+    let mode;
+    if (!entry && !ownPath) return 'direct';
+    if (column === 'has_flashing_lights') {
+      const verdict = flashingLightsChange(liveCtx, Boolean(existing.has_flashing_lights), value === true);
+      if (!verdict.ok) throw refuse(sentence(verdict.line), 403, { code: 'own-work', field: 'hasFlashingLights' });
+      return 'direct';
+    }
+    if (column === 'downloads_allowed') return 'direct';
+    if (!field) throw refuse(sentence(OWN_TITLE_LINE), 403, { code: 'own-work', field: column });
+    if (column === 'src' && existing.status !== 'pending') {
+      // A new file from anyone but a full admin is their own upload: the
+      // owner's way, waiting for another reviewer on a live title.
+      mode = fieldPolicy('video', ownTeamCtx(liveCtx));
+      field = 'video';
+    } else {
+      mode = fieldPolicy(field, liveCtx);
+    }
+    if (mode === 'locked' || mode === 'invite') throw refuse(sentence(fieldPolicyLine(field, column === 'src' ? ownTeamCtx(liveCtx) : liveCtx)), 403, { code: ownPath ? 'own-work' : 'review', field });
+    if (mode === 'staged') {
+      if (!entry) throw refuse(sentence(OWN_TITLE_LINE), 403, { code: 'own-work', field });
+      if (entry.detail && !Object.prototype.hasOwnProperty.call(existing, 'pending_fields')) throw refuse(LIVE_REVIEW_124_MSG, 503, { code: 'migration-124', field: entry.field });
+      if (entry.needs && !Object.prototype.hasOwnProperty.call(existing, entry.needs)) throw refuse(entry.needsMsg, 503, { code: entry.code, field: entry.field });
+    }
+    return mode;
+  };
+  for (const [column, value] of Object.entries(changed)) modeFor(column, value);
+  if (posterBase64) modeFor('poster');
+  if (thumbnailBase64) modeFor('thumbnail');
+  if (titleImageBase64 || (removeTitleImage && existing.title_image_url)) modeFor('title_image_url');
+  if (newSrc) modeFor('src');
+
   let poster;
   let thumbnail;
   let titleImageUrl;
@@ -527,6 +646,32 @@ async function editEpisode(req, res, roleContext) {
   else if (removeTitleImage && existing.title_image_url) dbUpdates.title_image_url = null;
   if (newSrc) dbUpdates.src = newSrc;
 
+  // The changes that wait (their own live title): moved out of the live
+  // columns into the waiting ones. A waiting file this replaces is no
+  // one's once the save is in.
+  const waited = [];
+  const waitingReplaced = [];
+  const pfChanges = {};
+  for (const column of Object.keys(dbUpdates)) {
+    if (modeFor(column, dbUpdates[column]) !== 'staged') continue;
+    const entry = STAGEABLE[column];
+    const value = dbUpdates[column];
+    delete dbUpdates[column];
+    waited.push(entry.field);
+    if (entry.detail) {
+      pfChanges[entry.field] = value;
+    } else if (column === 'title_image_url') {
+      if (existing.pending_title_image_url) waitingReplaced.push(['image', existing.pending_title_image_url]);
+      dbUpdates.pending_title_image_url = value;
+      dbUpdates.pending_title_image_removal = value === null;
+    } else {
+      if (['poster', 'thumbnail'].includes(column) && existing[entry.pending]) waitingReplaced.push(['image', existing[entry.pending]]);
+      if (column === 'src' && existing.pending_src && cloudflareUidFromUrl(existing.pending_src) !== cloudflareUidFromUrl(value || '')) waitingReplaced.push(['video', existing.pending_src]);
+      dbUpdates[entry.pending] = column === 'page_notes' ? (value || '') : value;
+    }
+  }
+  if (Object.keys(pfChanges).length > 0) dbUpdates.pending_fields = nextPendingFields(existing, 'episode', pfChanges);
+
   // Nothing to write: a save with no change answers as one.
   if (Object.keys(dbUpdates).length === 0) {
     return res.status(200).json({ ok: true, episodeId: existing.id, changed: [] });
@@ -540,7 +685,13 @@ async function editEpisode(req, res, roleContext) {
   const movesShow = affectsPayee;
   let writeResult = null;
   const doWrite = async () => {
-    writeResult = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => q.eq('id', existing.id));
+    // Waiting details are one value per title: written only while they are
+    // what was read (an approval in between isn't undone).
+    writeResult = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => {
+      const w = q.eq('id', existing.id);
+      if (!Object.prototype.hasOwnProperty.call(dbUpdates, 'pending_fields')) return w;
+      return existing.pending_fields === null || existing.pending_fields === undefined ? w.is('pending_fields', null) : w.eq('pending_fields', JSON.stringify(existing.pending_fields)).select('id');
+    });
     if (writeResult.error) throw Object.assign(new Error('edit-episode write'), { editWriteFailed: true });
   };
   let stamped = null;
@@ -572,21 +723,38 @@ async function editEpisode(req, res, roleContext) {
     }
     throw internalError(error, 'edit-episode write');
   }
+  if (Object.prototype.hasOwnProperty.call(dbUpdates, 'pending_fields') && writeResult && Array.isArray(writeResult.data) && writeResult.data.length === 0) {
+    for (const url of [poster, thumbnail, titleImageUrl]) {
+      const path = storagePathFromUrl(url || '');
+      if (path) await recordOrphan({ kind: 'storage_image', reference: path, reason: 'admin edit not saved (changed meanwhile)', context: existing.title });
+    }
+    return res.status(409).json({ error: 'What waits for approval on it changed a moment ago — reload and try again.', code: 'changed' });
+  }
+  for (const [kind, ref] of waitingReplaced) {
+    if (kind === 'video') {
+      const uid = cloudflareUidFromUrl(ref);
+      if (uid) await recordOrphan({ kind: 'cloudflare_video', reference: uid, reason: 'staged video replaced by a newer one', context: existing.title });
+    } else {
+      const path = storagePathFromUrl(ref);
+      if (path) await recordOrphan({ kind: 'storage_image', reference: path, reason: 'staged artwork replaced by a newer one', context: existing.title });
+    }
+  }
 
   // The files this save replaced, recorded only once it's saved (they
   // used to be recorded before the write, so a failed save marked files
   // still in use as orphans).
+  // (A change that waits for approval replaces nothing live yet.)
   const titleImageRemoved = !titleImageUrl && dbUpdates.title_image_url === null;
   const replaced = [
-    { gone: Boolean(poster) && existing.poster, reason: 'artwork replaced by admin (poster)' },
-    { gone: Boolean(thumbnail) && existing.thumbnail, reason: 'artwork replaced by admin (thumbnail)' },
-    { gone: (Boolean(titleImageUrl) || titleImageRemoved) && existing.title_image_url, reason: titleImageRemoved ? 'title image removed by admin (reverted to text title)' : 'artwork replaced by admin (title image)' }
+    { gone: Boolean(poster) && 'poster' in dbUpdates && existing.poster, reason: 'artwork replaced by admin (poster)' },
+    { gone: Boolean(thumbnail) && 'thumbnail' in dbUpdates && existing.thumbnail, reason: 'artwork replaced by admin (thumbnail)' },
+    { gone: (Boolean(titleImageUrl) || titleImageRemoved) && 'title_image_url' in dbUpdates && existing.title_image_url, reason: titleImageRemoved ? 'title image removed by admin (reverted to text title)' : 'artwork replaced by admin (title image)' }
   ];
   for (const { gone, reason } of replaced) {
     const oldPath = gone ? storagePathFromUrl(gone) : null;
     if (oldPath) await recordOrphan({ kind: 'storage_image', reference: oldPath, reason, context: existing.title });
   }
-  if (newSrc) {
+  if (newSrc && dbUpdates.src === newSrc) {
     const oldUid = cloudflareUidFromUrl(existing.src);
     if (oldUid && oldUid !== cloudflareVideoUid) {
       await recordOrphan({ kind: 'cloudflare_video', reference: oldUid, reason: 'video manually replaced by admin', context: existing.title });
@@ -680,7 +848,12 @@ async function editEpisode(req, res, roleContext) {
   // A move into a show someone else runs: before the cut-over its earnings
   // stayed with the uploader; from it they follow the show's paid account
   // (slice 3b) unless the title has its own.
-  const answer = { ok: true, episodeId: existing.id, changed: columns };
+  const answer = { ok: true, episodeId: existing.id, changed: columns.filter((c) => !c.startsWith('pending_')) };
+  // What waits for approval (their own live title): said, and listed.
+  if (waited.length) {
+    answer.staged = waited;
+    answer.stagedNote = 'It’s your own title, so these wait for someone else on the team to approve them.';
+  }
   if (targetShow && targetShow.creator_id && targetShow.creator_id !== existing.submitted_by) {
     answer.showOwner = targetShow.creator_id;
   }
