@@ -27,7 +27,10 @@ export default async function handler(req, res) {
 }
 
 export async function handleLocationsAdmin(req, res, account) {
-  const rc = { userId: account.userId, email: account.email, isAdmin: true };
+  // The caller's own standing (security fixes, 2026-11-15: every
+  // handle_flags caller used to be treated as a full admin here).
+  const fullAdmin = account.isAdmin === true;
+  const rc = { userId: account.userId, email: account.email, isAdmin: fullAdmin };
   try {
     if (req.method === 'GET') {
       const supabase = getSupabase();
@@ -61,9 +64,14 @@ export async function handleLocationsAdmin(req, res, account) {
       const { op, requestId, locationId, reason, outcome, note } = req.body || {};
       // These move money and can't be undone: full admins only, the same
       // as Pitch Room refunds. Sub-admins with handle_flags still see the
-      // page, settle outcomes and pause or remove places.
-      if ((op === 'refund' || op === 'cancel' || op === 'dispute') && !account.isAdmin) {
+      // page, settle outcomes (never their own booking, and only after its
+      // last day: lib/locationRequests.js setOutcome) and pause or remove
+      // places; lifting a pause is a full admin's (it undoes one).
+      if ((op === 'refund' || op === 'cancel' || op === 'dispute') && !fullAdmin) {
         return res.status(403).json({ error: 'Only a full admin can refund or cancel a booking, since that moves money.' });
+      }
+      if (op === 'resume' && !fullAdmin) {
+        return res.status(403).json({ error: 'Only a full admin can put a paused place back on the list.' });
       }
       if (op === 'refund') {
         const result = await refundBooking(rc, requestId, reason);
@@ -77,7 +85,7 @@ export async function handleLocationsAdmin(req, res, account) {
         return res.status(200).json({ dispute: result });
       }
       if (op === 'outcome') {
-        const result = await setOutcome(account.userId, requestId, { outcome, note }, { isAdmin: true });
+        const result = await setOutcome(account.userId, requestId, { outcome, note }, { isAdmin: true, subAdmin: !fullAdmin });
         await recordAudit({ adminId: account.userId, adminEmail: account.email, action: 'location_booking_outcome', targetType: 'location_request', targetId: requestId, details: outcome });
         return res.status(200).json({ request: result });
       }

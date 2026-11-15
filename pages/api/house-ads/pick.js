@@ -1,7 +1,7 @@
 import { pickActiveHouseAd, houseAdBrand } from '../../../lib/houseAds';
 import { signedImpressionPath } from '../../../lib/adImpressionSig';
-import { isTitleId } from '../../../lib/titleIds';
 import { AD_SURFACES } from '../../../lib/adBreakRules';
+import { adShareEpisodeId } from '../../../lib/adShareTitle';
 
 // JSON sibling to vast.js — same underlying pickActiveHouseAd() selection,
 // but returned as plain data for a player to render directly rather than
@@ -15,7 +15,11 @@ import { AD_SURFACES } from '../../../lib/adBreakRules';
 // play earns the title's creator their ad share (migration 103). The
 // episode is signed only with a surface the pixel knows; a reel sends
 // neither and earns nothing. The pixel still refuses a creator's own
-// plays (pages/api/house-ads/impression.js isOwnTitle).
+// plays (pages/api/house-ads/impression.js isOwnTitle). The title is
+// signed only when it's a public, ads-on title that isn't a podcast
+// (lib/adShareTitle.js, security fixes 2026-11-15); any other id gets a
+// receipt with no title, so a script asking for receipts by the thousand
+// earns no ad share.
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 
@@ -26,7 +30,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ad: null });
     }
     const where = typeof surface === 'string' && AD_SURFACES.includes(surface) ? surface : '';
-    const episodeId = where && isTitleId(episode) ? episode : null;
+    const episodeId = where && typeof episode === 'string' ? await adShareEpisodeId(episode) : null;
     return res.status(200).json({
       ad: {
         id: ad.id,

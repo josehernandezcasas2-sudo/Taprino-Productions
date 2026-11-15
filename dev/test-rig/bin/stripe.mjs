@@ -326,9 +326,15 @@ function createSession(p) {
   const amount = items.reduce((s, i) => s + i.amount, 0);
   const tax = taxed ? taxed.reduce((s, t) => s + t.tax, 0) : 0;
   const total = taxed ? taxed.reduce((s, t) => s + t.total, 0) : amount;
+  // expires_at, as the real one: 30 minutes to 24 hours from now, else a day.
+  let expiresAt = now() + 24 * 3600;
+  if (p.expires_at !== undefined && p.expires_at !== null && p.expires_at !== '') {
+    expiresAt = int(p.expires_at);
+    if (!(expiresAt >= now() + 30 * 60 - 5 && expiresAt <= now() + 24 * 3600 + 5)) throw new StripeError(400, 'The `expires_at` timestamp must be between 30 minutes and 24 hours from Checkout Session creation.', { param: 'expires_at' });
+  }
   const id = `cs_test_${rand(40)}`;
   return put({
-    id, object: 'checkout.session', mode, status: 'open', payment_status: mode === 'setup' ? 'no_payment_required' : 'unpaid', livemode: false, created: now(), expires_at: now() + 24 * 3600,
+    id, object: 'checkout.session', mode, status: 'open', payment_status: mode === 'setup' ? 'no_payment_required' : 'unpaid', livemode: false, created: now(), expires_at: expiresAt,
     url: `${SELF}/checkout/${id}`, success_url: p.success_url || null, cancel_url: p.cancel_url || null, return_url: p.return_url || null,
     customer: p.customer || null, customer_email: p.customer_email || null, customer_details: null, client_reference_id: p.client_reference_id || null,
     metadata: p.metadata || {}, currency: 'usd', amount_subtotal: amount, amount_total: total,

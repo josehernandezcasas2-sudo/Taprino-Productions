@@ -76,7 +76,10 @@ test('refundEligibility: within 14 days and under 10% watched, the furthest epis
   assert.equal(refundEligibility({ ...p, watched_max: { e1: 40, e2: 150 } }, { runtimes, now }).reason, 'more than 10% watched');
   assert.equal(refundEligibility(p, { runtimes, now: new Date('2026-11-03') }).reason, 'the 14-day window has closed');
   assert.equal(refundEligibility({ ...p, status: 'refunded' }, { runtimes, now }).reason, 'already refunded');
-  assert.equal(watchedPercent({ e1: 500 }, { e1: 0 }), 0);
+  // An episode watched whose runtime can't be read counts as watched in
+  // full (security fixes, 2026-11-15); no progress stays at 0%.
+  assert.equal(watchedPercent({ e1: 500 }, { e1: 0 }), 100);
+  assert.equal(watchedPercent({ e1: 0 }, { e1: 0 }), 0);
   assert.equal(watchedPercent({ e1: 5000 }, { e1: 1080 }), 100);
 });
 
