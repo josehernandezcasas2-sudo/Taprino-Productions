@@ -31,7 +31,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const result = await importAudioFromUrl(check.url, fileName);
+    // Named for this account (lib/audioUpload.js): only its own titles may
+    // store it (lib/audioAddress.js).
+    const result = await importAudioFromUrl(check.url, fileName, { userId });
     return res.status(200).json({ audioUrl: result.url, audioBytes: result.sizeBytes });
   } catch (err) {
     console.error('import-audio-url error:', err.message);

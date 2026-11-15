@@ -11,7 +11,9 @@ import { invalidateCache } from '../../../lib/redis';
 import { syncStreamProtection } from '../../../lib/streamProtection';
 import { recordOrphan, storagePathFromUrl } from '../../../lib/orphanedMedia';
 import { internalError, sendError } from '../../../lib/apiErrors';
-import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
+import { VIDEO_UID_PATTERN, checkVideoOwnership } from '../../../lib/videoOwnership';
+import { checkAudioAddress } from '../../../lib/audioAddress';
+import { OWN_WORK_LINE, approvesOwnWork } from '../../../lib/titleSecurityRules';
 import { isTitleId } from '../../../lib/titleIds';
 import { createShow, mintTitleId } from '../../../lib/showPage';
 import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, slotCheck } from '../../../lib/showRules';
@@ -235,7 +237,17 @@ async function createManualEpisode(req, res, roleContext) {
   let videoStatus = null;
   let src = null;
   if (hasCloudflareVideo) {
-    videoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
+    // Only a full admin attaches a video someone else uploaded (2026-11-15;
+    // lib/videoOwnership.js): a sub-admin with "Create & edit episodes"
+    // attaches their own upload, or an untagged one nobody else uses (a
+    // file put up through Cloudflare's own dashboard).
+    if (!isAdmin) {
+      const owned = await checkVideoOwnership(String(cloudflareVideoUid), { userId, isAdmin: false });
+      if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
+      videoStatus = owned.video;
+    } else {
+      videoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
+    }
     if (!videoStatus) {
       return res.status(404).json({ error: 'No Cloudflare video found with that ID — check it was copied correctly.' });
     }
@@ -250,6 +262,10 @@ async function createManualEpisode(req, res, roleContext) {
   }
   let trailerSrc = null;
   if (trailerCloudflareUid) {
+    if (!isAdmin) {
+      const ownedTrailer = await checkVideoOwnership(String(trailerCloudflareUid), { userId, isAdmin: false });
+      if (!ownedTrailer.ok) return res.status(ownedTrailer.status).json({ error: `Trailer: ${ownedTrailer.error}` });
+    }
     trailerSrc = cloudflarePlaybackUrl(trailerCloudflareUid);
   }
 
@@ -265,6 +281,20 @@ async function createManualEpisode(req, res, roleContext) {
       return res.status(404).json({ error: `No account found for ${body.creatorEmail} — they need to have signed up already.` });
     }
     submittedBy = creatorUser.id;
+  }
+  // A title of your own created already live skips review: nobody but a
+  // full admin approves their own work (2026-11-15).
+  if (status === 'approved' && approvesOwnWork(roleContext, [submittedBy])) {
+    return res.status(403).json({ error: OWN_WORK_LINE, code: 'own-work' });
+  }
+
+  // A podcast's audio: a sub-admin stores one of our own files — their own
+  // import, or the creator's the title is for — that no other title uses,
+  // never an address typed in (lib/audioAddress.js; 2026-11-15). A full
+  // admin may link audio hosted elsewhere.
+  if (body.audioUrl && !isAdmin) {
+    const audio = await checkAudioAddress(String(body.audioUrl), { owners: [userId, submittedBy] });
+    if (!audio.ok) return res.status(audio.status).json({ error: audio.error, code: 'audio' });
   }
 
   // A stable, URL-safe id derived from the title (two minted in one

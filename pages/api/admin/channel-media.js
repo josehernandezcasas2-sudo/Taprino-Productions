@@ -31,13 +31,13 @@ export default async function handler(req, res) {
     }
     if (req.method === 'POST') {
       const { id, action, reason } = req.body || {};
-      await reviewChannelMedia({ id, action, reason, adminId: roleContext.userId });
+      await reviewChannelMedia({ id, action, reason, adminId: roleContext.userId, isAdmin: roleContext.isAdmin === true });
       await recordAudit({ adminId: roleContext.userId, adminEmail: roleContext.email, action: `${action}_channel_media`, targetType: 'channel_media', targetId: id, details: reason || null });
       return res.status(200).json({ ok: true });
     }
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return res.status(err && err.status === 403 ? 403 : 400).json({ error: err.message });
   }
 }

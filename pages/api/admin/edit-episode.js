@@ -12,7 +12,9 @@ import { syncStreamProtection } from '../../../lib/streamProtection';
 import { internalError, sendError } from '../../../lib/apiErrors';
 import { updateCompat } from '../../../lib/dbCompat';
 import { isTitleId } from '../../../lib/titleIds';
-import { VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
+import { VIDEO_UID_PATTERN, checkVideoOwnership } from '../../../lib/videoOwnership';
+import { FILE_REVIEW_LINE, OWN_WORK_LINE, approvesOwnWork } from '../../../lib/titleSecurityRules';
+import { checkAudioAddress } from '../../../lib/audioAddress';
 import { MAX_EPISODE_NUMBER, inRunningOrder, isPublicShow, masterState, payeeOf, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
@@ -334,6 +336,15 @@ async function editEpisode(req, res, roleContext) {
     if (!sameValue(column, value, existing[column])) changed[column] = value;
   }
 
+  // A podcast's audio: a sub-admin sets one of our own stored files, the
+  // title's uploader's or their own, that no other title uses — never an
+  // address typed in (lib/audioAddress.js; 2026-11-15). A full admin may
+  // link audio hosted elsewhere.
+  if ('audio_url' in changed && changed.audio_url && !roleContext.isAdmin) {
+    const audio = await checkAudioAddress(changed.audio_url, { owners: [userId, existing.submitted_by], selfId: existing.id });
+    if (!audio.ok) return res.status(audio.status).json({ error: audio.error, code: 'audio' });
+  }
+
   // The show it goes into: there, and taking titles.
   let targetShow = null;
   if (changed.series_id) {
@@ -417,7 +428,22 @@ async function editEpisode(req, res, roleContext) {
   let newSrc;
   let newVideoStatus = null;
   if (cloudflareVideoUid) {
-    newVideoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
+    if (!roleContext.isAdmin) {
+      // A new file on a title that isn't in review is a reviewer's call
+      // (2026-11-15): "Create & edit episodes" alone used to swap the file
+      // behind a live title with no review. And only a full admin attaches
+      // a video someone else uploaded (lib/videoOwnership.js): a sub-admin
+      // attaches their own upload, or an untagged one nobody else uses
+      // (a file put up through Cloudflare's own dashboard).
+      if (existing.status !== 'pending' && !hasCapability(roleContext, 'review_submissions')) {
+        return res.status(403).json({ error: FILE_REVIEW_LINE, code: 'review' });
+      }
+      const owned = await checkVideoOwnership(String(cloudflareVideoUid), { userId, isAdmin: false });
+      if (!owned.ok) return res.status(owned.status).json({ error: owned.error });
+      newVideoStatus = owned.video;
+    } else {
+      newVideoStatus = await getCloudflareVideoStatus(cloudflareVideoUid);
+    }
     if (!newVideoStatus) {
       return res.status(404).json({ error: 'No Cloudflare video found with that ID.' });
     }
@@ -432,6 +458,11 @@ async function editEpisode(req, res, roleContext) {
   // number, and a Cloudflare video Cloudflare says is still uploading,
   // processing or failed waits (amendment 3; "unknown" doesn't block).
   const approving = changed.status === 'approved';
+  // Nobody but a full admin approves their own upload (2026-11-15), here as
+  // in the review queue.
+  if (approving && approvesOwnWork(roleContext, [existing.submitted_by])) {
+    return res.status(403).json({ error: OWN_WORK_LINE, code: 'own-work' });
+  }
   if (approving && NUMBERED_TYPES.includes(type) && !next.series_order) {
     return res.status(409).json({ error: 'Give it an episode number before approving it.', code: 'unnumbered' });
   }

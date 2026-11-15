@@ -12,6 +12,7 @@ import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
 import { creditAdShareBeforeDelete } from '../../../lib/adShare';
 import { cancelPendingInvites, refileExtrasUnderShow } from '../../../lib/payees';
 import { seasonArtImages } from '../../../lib/seasonArt';
+import { NO_REMOVAL_LINE, WITHDRAWN_LINE } from '../../../lib/titleSecurityRules';
 
 // Confirming a deletion here removes the database row, but the underlying
 // Cloudflare Stream video and any Supabase Storage images aren't
@@ -49,6 +50,19 @@ export default async function handler(req, res) {
   // show's name typed back; or kept, with the owner told.
   if (type === 'series') {
     try {
+      // A confirmation is for a removal someone asked for: nothing below
+      // runs for a show whose removal isn't requested (2026-11-15; an
+      // admin removes a show nobody asked about from Admin → Shows).
+      if (decision === 'confirm') {
+        const { data: asked, error: askedError } = await getSupabase().from('series').select('id, deletion_requested, withdrawn_at').eq('id', String(id)).maybeSingle();
+        if (askedError) {
+          console.error('resolve-deletion series read:', askedError.message);
+          return res.status(500).json({ error: 'Could not resolve this request.' });
+        }
+        if (!asked) return res.status(404).json({ error: 'That show isn’t there any more.' });
+        if (asked.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: WITHDRAWN_LINE });
+        if (asked.deletion_requested !== true) return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });
+      }
       if (decision === 'deny') {
         await denyShowRemoval(String(id), { note: req.body && req.body.note }, roleContext);
         return res.status(200).json({ ok: true, type, id, decision: 'deny' });
@@ -67,6 +81,22 @@ export default async function handler(req, res) {
   const supabase = getSupabase();
   const table = type === 'episode' ? 'episodes' : 'series';
 
+  // The title as it is now, read before anything happens: a confirmation
+  // (or a denial) is only for a removal someone asked for, and a withdrawn
+  // title (kept for its buyers) keeps its removal (2026-11-15). Until then
+  // confirming a title nobody asked about still credited its ad share
+  // early, withdrew its payee invites, recorded its files as orphans and
+  // told its uploader it was deleted, and on a title with buyers switched
+  // its sales off — the delete itself matched nothing.
+  const { data: asked, error: askedError } = await supabase.from(table).select('id, deletion_requested, withdrawn_at').eq('id', id).maybeSingle();
+  if (askedError) {
+    console.error('resolve-deletion read:', askedError.message);
+    return res.status(500).json({ error: 'Could not resolve this request.' });
+  }
+  if (!asked) return res.status(404).json({ error: 'That isn’t there any more.' });
+  if (asked.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: WITHDRAWN_LINE });
+  if (asked.deletion_requested !== true) return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });
+
   if (decision === 'deny') {
     const nameCol = type === 'episode' ? 'title' : 'name';
     const selectCols = type === 'episode' ? `${nameCol}, submitted_by` : nameCol;
@@ -76,7 +106,8 @@ export default async function handler(req, res) {
       .from(table)
       .update({ deletion_requested: false, deletion_reason: null, deletion_requested_at: null })
       .eq('id', id)
-      .eq('deletion_requested', true);
+      .eq('deletion_requested', true)
+      .is('withdrawn_at', null);
     if (error) {
       console.error('resolve-deletion deny error:', error.message);
       return res.status(500).json({ error: 'Could not deny the deletion request.' });
@@ -96,10 +127,15 @@ export default async function handler(req, res) {
   if (await hasBuyersIncludingSeries(type, id)) {
     const nameCol = type === 'episode' ? 'title' : 'name';
     const { data: kept } = await supabase.from(table).select(`${nameCol}${type === 'episode' ? ', submitted_by' : ''}`).eq('id', id).maybeSingle();
-    const { error: withdrawError } = await supabase.from(table).update({ withdrawn_at: new Date().toISOString() }).eq('id', id).eq('deletion_requested', true);
+    const { data: withdrew, error: withdrawError } = await supabase.from(table).update({ withdrawn_at: new Date().toISOString() }).eq('id', id).eq('deletion_requested', true).is('withdrawn_at', null).select('id');
     if (withdrawError) {
       console.error('resolve-deletion withdraw error:', withdrawError.message);
       return res.status(500).json({ error: 'Could not withdraw this title.' });
+    }
+    // Only the call that withdrew it goes on (the request taken back, or a
+    // second confirmation, in between: nothing is switched off or told).
+    if (!withdrew || withdrew.length === 0) {
+      return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });
     }
     // Nobody new can buy a withdrawn title, so its price comes off too.
     await supabase.from('title_prices').update({ status: 'off', pending_cents: null, sale_percent: null, sale_ends_at: null }).eq('target_type', type).eq('target_id', id);
