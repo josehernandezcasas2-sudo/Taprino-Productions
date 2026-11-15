@@ -9,6 +9,7 @@ import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getRequest } from '../../../lib/locationRequests';
 import { CANCELLATION, dollars, disputeLine } from '../../../lib/locationRules';
 import { TAX_NOTE } from '../../../lib/salesTaxRules';
+import { policyLine } from '../../../lib/bookingPolicyRules';
 import { cssUrl } from '../../../lib/cssUrl';
 
 // One booking request, both sides (mockups/locations-v1.html §3): what
@@ -87,6 +88,9 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
   const idx = stepIndex(r);
   const dead = ['declined', 'expired', 'cancelled'].includes(r.status);
   const paidSide = ['paid', 'done', 'refunded'].includes(r.status);
+  // The cancellation policy that applies: a paid booking's own (round 3,
+  // migration 124), else the listing's now.
+  const policyKey = CANCELLATION[r.cancellationPolicy] ? r.cancellationPolicy : l && CANCELLATION[l.cancellation] ? l.cancellation : null;
 
   return (
     <LocationShell title={`${r.projectTitle || r.shooting} · ${fmtRange(r.startsOn, r.endsOn)}`} {...shell}>
@@ -134,7 +138,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
               <div><span>Host receives</span><span><b>{dollars(r.hostPayoutCents)}</b> after the {r.cutPercent}% cut</span></div>
               {r.refundCents != null && <div><span>Refunded</span><span>{dollars(r.refundCents)}{r.refundReason ? ` · ${r.refundReason}` : ''}</span></div>}
               {r.dispute && <div><span>Payment dispute</span><span>{disputeLine(r.dispute)}</span></div>}
-              {l && <div><span>Cancellation</span><span>{CANCELLATION[l.cancellation].label} · {CANCELLATION[l.cancellation].text}</span></div>}
+              {policyKey && <div><span>Cancellation</span><span>{policyLine({ policy: policyKey, paidUnder: Boolean(r.policyPaidUnder), side })} · {CANCELLATION[policyKey].text}</span></div>}
             </div>
             <span className="crew-mono"><MoneyLine r={r} side={side === 'host' ? 'host' : 'producer'} /></span>
           </section>
@@ -201,7 +205,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
             <ul className="cc-rules">
               <li>The host has 48 hours to accept, counter or decline.</li>
               <li>Paying confirms the dates and unlocks the address and access notes.</li>
-              <li>Cancelling a paid booking refunds under the listing’s policy; a host cancelling refunds everything.</li>
+              <li>Cancelling a paid booking refunds under the policy it was paid under, whatever the listing says later; a host cancelling refunds everything.</li>
               <li>After the last day the host says how it went. As agreed = a credit for the production and the host.</li>
             </ul>
           </section>

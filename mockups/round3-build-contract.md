@@ -182,3 +182,58 @@ switch, the flashing-lights warning turned on, `paidTo` (an invite).
 ## As built
 
 (Filled in after the build.)
+
+**C — the booking's policy and 3-D Secure (builder C, 2026-11-15).** The
+rules are `lib/bookingPolicyRules.js` (pure, no imports; the app's
+`mobile/src/lib/bookingPolicyRules.js` is the file word for word below its
+header; `node scripts/test-booking-policy.mjs`, 15 checks, also reading the
+source of the paths below): `policyInForce` (a paid booking — `paid_at`, or
+status paid/done — follows its stamped policy; anything else, and a booking
+paid before 124, the listing's now), `policyAtPayment` (the Checkout's
+metadata, else the row's stamp, else the listing's), `checkoutStillFits`,
+`policyLine` ("Moderate — the policy you paid under"; the host and the team
+read "it was paid under"), `refundConfirmLine`, `HOST_FORM_NOTE`, and
+`policyChangeNotices` with the agreement's two sentences. **Server**
+(`lib/locationRequests.js`): `createBookingCheckout` reads the listing's
+policy, puts it in the session's and the payment intent's metadata
+(`cancellation_policy`) and on the row, refuses to hand out again an open
+Checkout made under another policy (closes it and makes a new one), and adds
+`payment_method_options.card.request_three_d_secure: 'any'`;
+`completeBookingFromSession` confirms the policy on the row in the same
+guarded update that marks it paid; the refund previews (`getRequest`,
+`listMyRequests`) and `cancelRequest` read the booking's policy (the listing
+is read only for a row without one) and the refund reason names it; the
+request payload carries `cancellationPolicy` + `policyPaidUnder`. A write
+naming the column is made again without it before 124 (PGRST204 / 42703 /
+a column message naming it), so paying works on an older database. The
+team's refunds (`refundBooking`, the admin cancel) are full refunds and read
+no policy; Admin → Locations' booking row names the policy ("Moderate
+cancellation, as paid"). **The notices** are `lib/bookingPolicy.js`
+`tellPolicyChange`, called from `updateListing` after the save when the
+policy really changed (never in the way of the save; imports neither
+`lib/locations.js` nor `lib/locationRequests.js`): open requests (requested /
+countered inside the answer window, accepted with a first day not passed)
+and upcoming paid bookings (status paid, stamped, first day after today),
+one notice each of the new type `location_policy_changed` ("Cancellation
+policy changed", added at the end of both `lib/notificationTypes.js`),
+through `notifyCreator` (bell, push, web push). **Differs from the
+agreement**: (1) the rate limit is "never the same news twice, at most three
+a day per request" (read back from `notifications`; `firstInWindow` per
+request and policy if that read fails) rather than a flat once a day, so a
+host correcting a mistake within the day isn't left announced wrongly; (2) a
+paid booking without a stamp (before 124) isn't told it keeps a policy, since
+its refund still follows the listing; (3) the host's change also closes an
+accepted request's open Checkout made under the old policy, so "it applies
+if you pay from now on" holds (a payment racing the close keeps the policy
+its Checkout showed). **Pages**: the request page (web + app) shows
+`policyLine` + the policy's terms, the cancel confirmation names the policy
+paid under, the host's form (web `pages/locations/new.js`, app
+`mobile/src/app/locations/new.js`) has `HOST_FORM_NOTE` under the radios,
+Terms `#locations` has the sentence plus "your bank may ask you to confirm
+the payment", `TEXT_UPDATED` 2026-11-15. **3-D Secure** on tips
+(`lib/tips.js`), backings (`lib/pitchDonations.js`, both tax splits),
+bookings and title sales (`lib/purchases.js`); memberships untouched. The
+fake Stripe keeps `payment_method_options` on the session and its payment
+intent and refuses a value Stripe doesn't take. Rig check
+`dev/test-rig/checks/booking-policy.mjs` (both halves of 124) — written, not
+run here.

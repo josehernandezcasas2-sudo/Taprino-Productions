@@ -4,6 +4,7 @@ import { Avatar } from '../crew/CrewBits';
 import { HostedChip, fmtRange, hoursLabel } from './LocationBits';
 import { dollars, MAX_ENDORSEMENT_CHARS } from '../../lib/locationRules';
 import { TAX_NOTE } from '../../lib/salesTaxRules';
+import { refundConfirmLine } from '../../lib/bookingPolicyRules';
 
 // Request cards and the action rows both sides use (Your places, Your
 // requests, and the request page itself). `onChange(request)` gets the
@@ -99,8 +100,9 @@ export function ProducerActions({ r, onChange }) {
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
   const cancel = () => {
+    // The refund follows the policy the booking was paid under (round 3).
     const msg = r.status === 'paid' && r.refundPreview
-      ? `Cancel this booking? ${r.refundPreview.cents > 0 ? `${dollars(r.refundPreview.cents)} (${r.refundPreview.percent}%) goes back to your card under the host’s cancellation policy.` : 'No refund inside the cancellation window.'}`
+      ? `Cancel this booking? ${refundConfirmLine({ amount: dollars(r.refundPreview.cents), cents: r.refundPreview.cents, percent: r.refundPreview.percent, policy: r.cancellationPolicy, paidUnder: r.policyPaidUnder })}`
       : 'Cancel this request?';
     if (window.confirm(msg)) run({ action: 'cancel' });
   };

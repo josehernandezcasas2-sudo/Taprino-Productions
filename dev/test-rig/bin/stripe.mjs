@@ -7,7 +7,9 @@
 //   retrieve/create/update; tax_behavior can be set once, from
 //   'unspecified'), customers (create/retrieve/
 //   update/del/list/search), checkout/sessions (create/retrieve/list/
-//   expire; automatic_tax, customer_update, billing_address_collection),
+//   expire; automatic_tax, customer_update, billing_address_collection,
+//   payment_method_options — card.request_three_d_secure any | automatic |
+//   challenge, kept on the session and its payment intent),
 //   billing_portal/sessions, accounts (create/retrieve/update/
 //   list, GET /v1/account = the platform), account_links,
 //   accounts/:id/login_links, subscriptions (list/retrieve/update/cancel),
@@ -332,6 +334,13 @@ function createSession(p) {
     expiresAt = int(p.expires_at);
     if (!(expiresAt >= now() + 30 * 60 - 5 && expiresAt <= now() + 24 * 3600 + 5)) throw new StripeError(400, 'The `expires_at` timestamp must be between 30 minutes and 24 hours from Checkout Session creation.', { param: 'expires_at' });
   }
+  // payment_method_options as the real one takes it: card.request_three_d_secure
+  // (3-D Secure, asked for by the site's one-off payments) is one of three.
+  const pmo = p.payment_method_options && typeof p.payment_method_options === 'object' ? clone(p.payment_method_options) : null;
+  const tds = pmo && pmo.card ? pmo.card.request_three_d_secure : undefined;
+  if (tds !== undefined && !['any', 'automatic', 'challenge'].includes(tds)) {
+    throw new StripeError(400, `Invalid payment_method_options[card][request_three_d_secure]: must be one of any, automatic, or challenge`, { param: 'payment_method_options[card][request_three_d_secure]' });
+  }
   const id = `cs_test_${rand(40)}`;
   return put({
     id, object: 'checkout.session', mode, status: 'open', payment_status: mode === 'setup' ? 'no_payment_required' : 'unpaid', livemode: false, created: now(), expires_at: expiresAt,
@@ -342,13 +351,14 @@ function createSession(p) {
     customer_update: p.customer_update || null, billing_address_collection: p.billing_address_collection || null,
     payment_intent: null, subscription: null, invoice: null, setup_intent: null,
     payment_intent_data: undefined,
+    payment_method_options: pmo,
     _payment_intent_data: p.payment_intent_data || {}, _subscription_data: p.subscription_data || {},
     _line_items: items.map((i, n) => ({ id: newId('li'), object: 'item', amount_total: taxed ? taxed[n].total : i.amount, amount_subtotal: i.amount, amount_tax: taxed ? taxed[n].tax : 0, amount_discount: 0, currency: 'usd', quantity: i.qty, price: i.price, description: i.price._name || null, _tax: taxed ? taxed[n] : null })),
     allow_promotion_codes: bool(p.allow_promotion_codes)
   });
 }
 
-function charge({ amount, customer, metadata = {}, pid = {}, email = null, description = null }) {
+function charge({ amount, customer, metadata = {}, pid = {}, email = null, description = null, pmo = null }) {
   const piId = newId('pi');
   const chId = newId('ch');
   const appFee = int(pid.application_fee_amount, null);
@@ -370,7 +380,8 @@ function charge({ amount, customer, metadata = {}, pid = {}, email = null, descr
   }
   return put({
     id: piId, object: 'payment_intent', amount, amount_received: amount, currency: 'usd', customer: customer || null, status: 'succeeded', latest_charge: chId, metadata: pid.metadata || metadata,
-    application_fee_amount: appFee, transfer_data: td, transfer_group: pid.transfer_group || null, created: now(), livemode: false, payment_method_types: ['card'], description
+    application_fee_amount: appFee, transfer_data: td, transfer_group: pid.transfer_group || null, created: now(), livemode: false, payment_method_types: ['card'], description,
+    payment_method_options: pmo ? clone(pmo) : {}
   });
 }
 
@@ -386,7 +397,7 @@ async function completeSession(id) {
   const events = [];
   const email = s.customer_email || (s.customer && objects.get(s.customer) ? objects.get(s.customer).email : null) || 'buyer@rig.example.com';
   if (s.mode === 'payment') {
-    const pi = charge({ amount: s.amount_total, customer: s.customer, pid: s._payment_intent_data, email, metadata: s.metadata });
+    const pi = charge({ amount: s.amount_total, customer: s.customer, pid: s._payment_intent_data, email, metadata: s.metadata, pmo: s.payment_method_options });
     s.payment_intent = pi.id;
   } else if (s.mode === 'subscription') {
     const customer = ensureCustomer(s);

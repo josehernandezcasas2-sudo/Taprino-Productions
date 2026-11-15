@@ -9,6 +9,7 @@ import { crew, Avatar, Chip } from './CrewBits';
 import SmartImage from './SmartImage';
 import { dollars, fmtRange, fmtDay, hoursLabel, STATUS_LABEL } from '../lib/locationRules';
 import { TAX_NOTE } from '../lib/salesTaxRules';
+import { refundConfirmLine } from '../lib/bookingPolicyRules';
 
 // Pieces shared by the Locations screens (locations/*): mirrors
 // components/locations/LocationBits.js + RequestBits.js on the website.
@@ -219,8 +220,9 @@ export function ProducerActions({ r, token, onChange, onPay }) {
     } catch (err) { setError(err.message); } finally { setBusy(false); }
   };
   const cancel = () => {
+    // The refund follows the policy the booking was paid under (round 3).
     const msg = r.status === 'paid' && r.refundPreview
-      ? (r.refundPreview.cents > 0 ? `${dollars(r.refundPreview.cents)} (${r.refundPreview.percent}%) goes back to your card under the host’s cancellation policy.` : 'No refund inside the cancellation window.')
+      ? refundConfirmLine({ amount: dollars(r.refundPreview.cents), cents: r.refundPreview.cents, percent: r.refundPreview.percent, policy: r.cancellationPolicy, paidUnder: r.policyPaidUnder })
       : 'The host will be told.';
     Alert.alert(r.status === 'paid' ? 'Cancel this booking?' : 'Withdraw this request?', msg, [{ text: 'Keep it', style: 'cancel' }, { text: r.status === 'paid' ? 'Cancel booking' : 'Withdraw', style: 'destructive', onPress: () => run({ action: 'cancel' }) }]);
   };

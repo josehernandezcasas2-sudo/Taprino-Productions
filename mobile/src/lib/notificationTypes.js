@@ -189,7 +189,10 @@ export const NOTIFICATION_TYPES = Object.freeze({
   suspension_lifted: kind('Suspension lifted', 'lock', 'account'),
   // A membership cancelled because a payment for it was disputed
   // (lib/membershipDisputes.js).
-  membership_ended: kind('Membership ended', 'lock', 'account')
+  membership_ended: kind('Membership ended', 'lock', 'account'),
+  // A host changed a place's cancellation policy: it applies to payments
+  // made from now on; a paid booking keeps its own (lib/bookingPolicy.js).
+  location_policy_changed: kind('Cancellation policy changed', 'account', 'location_request')
 });
 
 // What a type nobody registered reads as.

@@ -69,7 +69,7 @@ export async function getServerSideProps({ req, res }) {
 
 // The text was last edited on this date; a Creator Share change saved or
 // scheduled later moves the "updated" date with it.
-const TEXT_UPDATED = '2026-11-14';
+const TEXT_UPDATED = '2026-11-15';
 const FALLBACK_SHARE = { shareCents: { standard: 200, premium: 350, sponsor: 150 }, bonusCents: { standard: 100, premium: 150, sponsor: 50 }, payoutMinimumCents: 2500, referralBonusMonths: 12, adSharePercent: 50 };
 const adPct = (x) => (x && x.adSharePercent != null ? Number(x.adSharePercent) : 50);
 const longDate = (iso) => new Date(iso).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });
@@ -439,7 +439,10 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
       </p>
       <p id="locations">
         <strong>Booking a place.</strong> When you book a place through Locations, sales tax is added at
-        checkout where the law requires it and shown before you pay.
+        checkout where the law requires it and shown before you pay, and your bank may ask you to confirm
+        the payment. A booking keeps the cancellation policy it was paid under. If the host changes the
+        listing&rsquo;s policy later, the change applies only to bookings paid after it, and anyone with an
+        open request or a paid booking is told.
       </p>
 
       <h2 id="buying">15. Buying a title</h2>
