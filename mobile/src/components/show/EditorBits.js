@@ -315,6 +315,27 @@ export function StagedBox({ title, value = null, children = null, onCancel = nul
   );
 }
 
+// A live title's details waiting for approval (migration 124, 2026-11-15:
+// "make sure any caption change or anything to change the series/live
+// titles needs review"): what is live now beside what is proposed, in the
+// server's words (GET …'s staged.details), each with Cancel for whoever
+// may take it back.
+export function WaitingDetails({ details, canCancel = () => false, onCancel, busy = null }) {
+  if (!Array.isArray(details) || details.length === 0) return null;
+  return (
+    <View style={ss.card}>
+      <Text style={ss.cardK}>Waiting for approval</Text>
+      {details.map((d) => (
+        <StagedBox key={d.field} title={d.label} onCancel={canCancel(d.field) && onCancel ? () => onCancel(d.field) : null} busy={busy === `cancel-${d.field}`}>
+          <Text style={ss.small}>Live now: <Text style={ss.strong}>{d.live}</Text></Text>
+          <Text style={ss.small}>Proposed: <Text style={ss.strong}>{d.proposed}</Text></Text>
+        </StagedBox>
+      ))}
+      <Text style={ss.small}>Visitors see what’s live until we approve each one.</Text>
+    </View>
+  );
+}
+
 export function CancelButton({ label = 'Cancel', busy = false, onPress, disabled = false }) {
   return (
     <Pressable style={({ pressed }) => [eb.cancel, pressed && ss.pressed, (busy || disabled) && ss.disabled]} disabled={busy || disabled} onPress={onPress} accessibilityRole="button" hitSlop={6}>

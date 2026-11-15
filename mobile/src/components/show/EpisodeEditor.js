@@ -17,7 +17,7 @@ import DraftEditor from './DraftEditor';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
 import {
   ArtSlot, Banner, CancelButton, ChoiceChips, ClockLine, EdInput, EditorFoot, EditorHead, FieldHead, FieldNote, FootNote,
-  LOCKED_FALLBACK, NEEDS_118, NOT_SAVED_WORDS, PILL_TONE, SaveButton, SectionHead, StagedBox, StatusLine, SwitchRow, UploadLine,
+  LOCKED_FALLBACK, NEEDS_118, NOT_SAVED_WORDS, PILL_TONE, SaveButton, SectionHead, StagedBox, StatusLine, SwitchRow, UploadLine, WaitingDetails,
   isOpen, masterWords, openOnWebsite, useFootSpace, useInFront, useKeyboardShown, useLeaveGuard, useShowAuth
 } from './EditorBits';
 import { AboutField, MoreOptions, OneLineField, PlaceBlock, SameAsShow, StagedLegend, TitleField } from './EpisodeFields';
@@ -31,6 +31,10 @@ import {
   CheckIcon, LinkText, PlusIcon, RoomToast, SmallButton, UploadIcon, askUs, episodeEditorRoute, episodePublicRoute,
   shortDate, showRoute, ss, submitRoute, useRoomToast
 } from './ShowBits';
+
+// A live title's details that wait in migration 124's pending_fields (the
+// website's lib/liveReviewRules.js DETAIL_FIELDS.episode).
+const DETAIL_FIELDS = ['mainGenre', 'genre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'extraKind', 'credits', 'captions'];
 
 // The episode editor in the app (the series revamp, slice 5; spec "App —
 // New show, Show page, Episode editor"; the website's components/show/
@@ -186,13 +190,20 @@ function EpisodeMode({ showId, initial, auth, sent }) {
   const show = data.show;
   const viewer = data.viewer || {};
   const policy = data.policy || {};
-  const pol = useCallback((f) => policy[f] || LOCKED_FALLBACK, [policy]);
+  // A live title's details wait in 124's column (2026-11-15): a 503 seen
+  // at run time locks the ones that would wait with the server's line.
+  const [behind124, setBehind124] = useState(null);
+  const pol = useCallback((f) => {
+    const p = policy[f] || LOCKED_FALLBACK;
+    return behind124 && p.mode === 'staged' && DETAIL_FIELDS.includes(f) ? { mode: 'locked', line: behind124 } : p;
+  }, [policy, behind124]);
   // A 503 seen at run time (the payload said 118 was there, a route said it
   // isn't): the server's own line, and the controls that need it grey.
   const [behind, setBehind] = useState({});
   const noteBehind = useCallback((r) => {
-    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && ['migration-120', 'migration-122', 'migration-123'].includes(r.data.code) ? { code: r.data.code, line: r.error } : null);
+    const m = migrationRefusal(r) || (r && r.status === 503 && r.data && ['migration-120', 'migration-122', 'migration-123', 'migration-124'].includes(r.data.code) ? { code: r.data.code, line: r.error } : null);
     if (m) setBehind((b) => ({ ...b, [m.code]: m.line }));
+    if (m && m.code === 'migration-124') setBehind124(m.line);
     return Boolean(m);
   }, []);
   // The title image and the trailer wait in 120's columns on a live
@@ -661,6 +672,8 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             : show && !show.isPublic ? 'Approved · the show isn’t public yet'
               : `Live${ep.releasedAt || ep.reviewedAt ? ` since ${shortDate(ep.releasedAt || ep.reviewedAt)}` : ''}`;
   const st = ep.staged || {};
+  const waitingDetails = Array.isArray(st.details) ? st.details : [];
+  const stagedCaptions = st.captions || null;
   const stagedFields = [
     st.title ? { field: 'title', words: `title “${st.title}”` } : null,
     st.description ? { field: 'description', words: 'an edited description' } : null,
@@ -672,12 +685,17 @@ function EpisodeMode({ showId, initial, auth, sent }) {
     // other way round, so at most one of these two is there.
     st.titleImageUrl ? { field: 'titleImage', words: 'a new title image' } : st.titleImageRemoval ? { field: 'titleImage', words: 'removing the title image' } : null,
     st.trailer ? { field: 'trailer', words: 'a new trailer' } : null,
-    st.video ? { field: 'video', words: `a new file (${st.video.ready ? 'ready' : masterWords(st.video.state).text.toLowerCase()})` } : null
+    st.video ? { field: 'video', words: `a new file (${st.video.ready ? 'ready' : masterWords(st.video.state).text.toLowerCase()})` } : null,
+    // Migration 124 (2026-11-15): its details and captions wait too.
+    ...waitingDetails.map((d) => ({ field: d.field, words: `${d.label.toLowerCase()} “${d.proposed}”` })),
+    stagedCaptions ? { field: 'captions', words: stagedCaptions.removal ? 'removing the captions' : 'new captions' } : null
   ].filter(Boolean);
   const canAct = viewer.isUploader || viewer.team;
-  // Taking back a waiting change is the uploader's (the team decides it on
-  // the website's admin page, where Deny tells them).
+  // Taking back a waiting change is the uploader's — the credits, the
+  // show's owner's (the team decides it on the website's admin page, where
+  // Deny tells them).
   const canCancel = Boolean(viewer.isUploader);
+  const canCancelField = (field) => (field === 'credits' ? Boolean(viewer.isRunner) : canCancel);
 
   const banners = (
     <>
@@ -686,7 +704,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           {stagedFields.map((s) => (
             <View key={s.field} style={es.bannerItem}>
               <Text style={[ss.p, { flex: 1 }]}>{s.words}</Text>
-              {canCancel ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
+              {canCancelField(s.field) ? <CancelButton busy={busy === `cancel-${s.field}`} onPress={() => cancelStaged(s.field)} /> : null}
             </View>
           ))}
         </Banner>
@@ -890,6 +908,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
 
           <SectionHead label="More info" />
           {live ? <StagedLegend /> : null}
+          <WaitingDetails details={waitingDetails} canCancel={canCancelField} onCancel={cancelStaged} busy={busy} />
           <View style={ss.card}>
             <AboutField
               value={form.about}
@@ -949,6 +968,14 @@ function EpisodeMode({ showId, initial, auth, sent }) {
             ) : (
               <Text style={ss.small}>None yet. Viewers who turn captions on see nothing until you add them.</Text>
             )}
+            {/* On a live title new captions (or their removal) wait for
+                approval (2026-11-15); viewers keep the live ones. */}
+            {stagedCaptions ? (
+              <StagedBox title={stagedCaptions.removal ? 'Removing the captions waits for approval' : 'New captions wait for approval:'} value={stagedCaptions.removal ? null : `${stagedCaptions.label || 'English'} (${stagedCaptions.language || 'en'})`} onCancel={canCancel ? () => cancelStaged('captions') : null} busy={busy === 'cancel-captions'}>
+                <Text style={ss.small}>{ep.captions && ep.captions.has ? 'Viewers keep the live captions until we approve it.' : 'Viewers see none until we approve them.'}</Text>
+              </StagedBox>
+            ) : null}
+            {capPolicy.mode === 'staged' ? <ClockLine>On a live title new captions go to us first; the live ones stay until we approve them.</ClockLine> : null}
             {ep.captions && ep.captions.stale ? (
               <View style={ss.row}><WarningIcon size={12} color={colors.brass} /><Text style={[ss.small, { flex: 1 }]}>The file changed since these were made — check they still line up.</Text></View>
             ) : null}
@@ -992,7 +1019,7 @@ function EpisodeMode({ showId, initial, auth, sent }) {
           </View>
 
           <View style={ss.card}>
-            <FieldHead label="Funding link" hint="optional" locked={pol('fundingUrl').mode === 'locked'} />
+            <FieldHead label="Funding link" hint="optional" staged={pol('fundingUrl').mode === 'staged'} locked={pol('fundingUrl').mode === 'locked'} />
             <EdInput value={form.fundingUrl} placeholder="https://" maxLength={500} keyboardType="url" autoCapitalize="none" autoCorrect={false} disabled={!isOpen(pol('fundingUrl'))} onChangeText={(t) => set('fundingUrl', t)} accessibilityLabel="Funding link" />
             <FieldNote policy={pol('fundingUrl')} edited={edited('fundingUrl')} />
           </View>

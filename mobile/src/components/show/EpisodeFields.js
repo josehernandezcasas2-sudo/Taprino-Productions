@@ -192,7 +192,11 @@ export function SameAsShow({ ctx, inShow = true }) {
                 accessibilityLabel={`${r.label}: ${r.value}`}
               >
                 <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={ss.sheetLabel}>{r.label}</Text>
+                  {/* The clock: on a live title this waits for approval (2026-11-15). */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    {r.policy && r.policy.mode === 'staged' ? <ClockIcon size={11} color={colors.olive} /> : null}
+                    <Text style={ss.sheetLabel}>{r.label}</Text>
+                  </View>
                   {r.boxed ? (
                     <View style={ef.ratingBox}><Text style={ef.ratingText}>{r.value}</Text></View>
                   ) : r.tier ? (
@@ -331,12 +335,12 @@ export function MoreOptions({ form, set, pol, live = false, adFree = false }) {
         <View style={{ gap: 14, marginTop: 4 }}>
           <View style={ef.grid2}>
             <View style={{ flex: 1, gap: 6, minWidth: 130 }}>
-              <FieldHead label="Runtime" hint="MM:SS" locked={pol('runtime').mode === 'locked'} />
+              <FieldHead label="Runtime" hint="MM:SS" staged={pol('runtime').mode === 'staged'} locked={pol('runtime').mode === 'locked'} />
               <EdInput value={form.runtime} placeholder="22:04" maxLength={9} disabled={!isOpen(pol('runtime'))} onChangeText={(t) => set('runtime', t)} accessibilityLabel="Runtime" />
             </View>
             {adFree ? null : (
               <View style={{ flex: 1, gap: 6, minWidth: 130 }}>
-                <FieldHead label="Ad breaks" hint="MM:SS, commas" locked={pol('adBreakSeconds').mode === 'locked'} />
+                <FieldHead label="Ad breaks" hint="MM:SS, commas" staged={pol('adBreakSeconds').mode === 'staged'} locked={pol('adBreakSeconds').mode === 'locked'} />
                 <EdInput value={form.adBreaksText} placeholder="0:00, 10:00" disabled={!isOpen(pol('adBreakSeconds'))} onChangeText={(t) => set('adBreaksText', t)} accessibilityLabel="Ad breaks" />
               </View>
             )}
@@ -345,7 +349,7 @@ export function MoreOptions({ form, set, pol, live = false, adFree = false }) {
             <Text style={ss.small}>{PODCASTS_AD_FREE} No ad of ours plays in one; a sponsor read in your own audio is yours.</Text>
           ) : (
             <SwitchRow title="Ads in it" on={form.adsEnabled} onChange={(v) => set('adsEnabled', v)} disabled={!isOpen(pol('adsEnabled'))} policy={pol('adsEnabled').mode === 'locked' ? pol('adsEnabled') : null}>
-              Off plays it without ad breaks for everyone.
+              Off plays it without ad breaks for everyone.{pol('adsEnabled').mode === 'staged' && pol('adsEnabled').line ? ` ${pol('adsEnabled').line}.` : ''}
             </SwitchRow>
           )}
           <SwitchRow title="Let channels air it" on={form.channelOptIn} onChange={(v) => set('channelOptIn', v)} disabled={!isOpen(pol('channelOptIn'))} policy={pol('channelOptIn').mode === 'locked' ? pol('channelOptIn') : null}>
