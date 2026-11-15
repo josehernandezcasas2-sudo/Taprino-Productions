@@ -98,7 +98,7 @@ t('missing answers read as dashes, never zeros', () => {
 });
 
 const show = {
-  show: { id: 'night-bus-lx3k9a', name: 'Night Bus', staged: { any: false }, creditLines: [{ key: 'maker', label: 'Made by', name: 'Mara Reyes' }] },
+  show: { id: 'night-bus-lx3k9a', name: 'Night Bus', staged: { name: null, titleImageUrl: null, titleImageRemoval: false, seasonArt: [] }, creditLines: [{ key: 'maker', label: 'Made by', name: 'Mara Reyes' }] },
   viewer: { seesWhoIsPaid: true },
   payee: { runsIt: { name: 'Mara Reyes' }, paidTo: { name: 'Mara Reyes' } },
   problems: [{ code: 'captions', level: 'review', words: '1 live episode has no captions' }, { code: 'delay', level: 'info', words: 'Changes reach visitors within a few minutes' }],
@@ -133,6 +133,8 @@ t('a show: episodes in play order with extras last, needs, waiting and people', 
   assert.deepEqual(o.needs.map((x) => x.text), ['1 live episode has no captions']);
   assert.deepEqual(o.waiting.map((x) => x.text), ['S1 E2 The Transfer: a new title', 'S2 E1 Episode 1: in review']);
   assert.deepEqual(o.people.map((p) => `${p.label}: ${p.value}`), ['Runs it: Mara Reyes', 'Earnings go to: Mara Reyes', 'Made by: Mara Reyes']);
+  const staged = R.showOverview({ show: { ...show, show: { ...show.show, staged: { seasonArt: [{ season: 2 }] } } }, now: NOW });
+  assert.equal(staged.waiting[staged.waiting.length - 1].text, 'A change to the show itself');
   const noNumbers = R.showOverview({ show, numbers: null, money: null, now: NOW });
   assert.deepEqual(noNumbers.tiles.map((x) => x.value), ['—', '—', '—', '—']);
 });

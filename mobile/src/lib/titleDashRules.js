@@ -377,8 +377,10 @@ export function showOverview({ show = null, numbers = null, money = null, now = 
     if (st.newVideo) parts.push('a new video');
     if (parts.length) waiting.push({ key: `staged:${r.id}`, text: `${label}: ${parts.join(', ')}` });
   }
+  // GET /api/show/<id>'s show.staged: null / false / [] when nothing waits.
   const sst = show.show.staged || {};
-  if (sst.any === true || ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'seasonArt'].some((k) => Boolean(sst[k]))) waiting.push({ key: 'show', text: 'A change to the show itself' });
+  const waits = (v) => (Array.isArray(v) ? v.length > 0 : Boolean(v));
+  if (sst.any === true || ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'titleImageUrl', 'titleImageRemoval', 'trailer', 'seasonArt'].some((k) => waits(sst[k]))) waiting.push({ key: 'show', text: 'A change to the show itself' });
 
   const people = [];
   const payee = show.payee || null;
