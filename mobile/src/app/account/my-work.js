@@ -1,1315 +1,443 @@
-import { useAuth } from '../../lib/stableAuth';
-import * as Clipboard from 'expo-clipboard';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
-import {
-  ChatIcon, ClapperboardIcon, ClockIcon, CloseIcon, EyeIcon, ExternalLinkIcon,
-  HeadphonesIcon, ImageIcon, LinkIcon, PencilIcon, TrashIcon, UndoIcon, WarningIcon
-} from '../../components/WorkIcons';
-import { apiGet, apiPost, freshToken } from '../../lib/api';
-import { showCall } from '../../lib/showApi';
-import { episodeHasPage, fieldPolicy, fieldPolicyLine, flashingLightsPolicy, needsYou, saveSummary } from '../../lib/showRules';
-import FlashingLightsField from '../../components/FlashingLightsField';
-import DownloadsAllowedField from '../../components/DownloadsAllowedField';
-import { downloadableKind } from '../../lib/downloadRules';
-import { downloadsSwitchFrom, saveAroundDownloads } from '../../lib/downloadLogic';
-import { pickImageAsDataUrl } from '../../components/CreatorBits';
-import { episodeCode, sortEpisodes } from '../../lib/seriesResume';
-import { colors, dangerTint, fonts, inkTint, oliveTint } from '../../lib/theme';
+import { useAuth } from '../../lib/stableAuth';
+import { showCall, showPath } from '../../lib/showApi';
+import { WORK_TABS, WORK_WORDS, buildWorkList } from '../../lib/workListRules';
+import { DASH_WORDS } from '../../lib/creatorDashboardRules';
+import { colors, fonts, inkTint } from '../../lib/theme';
 import TopNav from '../../components/TopNav';
 import SmartImage from '../../components/SmartImage';
-import SellTitleSheet, { priceState, STATE_LABEL as SELL_STATE_LABEL } from '../../components/SellTitleSheet';
-import { ChevronIcon, KindChip, Sheet, StateChip, episodeEditorRoute, showRoute, ss } from '../../components/show/ShowBits';
-import PayeeCard from '../../components/show/PayeeCard';
 import DashboardTabs from '../../components/dashboard/DashboardTabs';
-import { dollars } from '../../lib/purchaseRules';
-import { extraKindLabel } from '../../lib/extraKinds';
+import { ChevronIcon, Pill, showRoute, ss } from '../../components/show/ShowBits';
+import { useWorkActions } from '../../components/work/WorkActions';
+import { ActButton, SectionHead, TitleRow, WorkPill } from '../../components/work/WorkBits';
 
-// The www host: the bare studiotapatv.site 308-redirects there, so a
-// copied link should already be the address it lands on.
-const SITE_ORIGIN = 'https://www.studiotapatv.site';
+// Your work in the app (the revamp of 2026-11-15; the canvas
+// https://claude.ai/artifact/6LuuNpyuaKTS5PkCij8Nfc, board "New · phone",
+// and mockups/work-revamp-contract.md "Builder C"; Jose, 2026-11-14:
+// "lets seperat these, so they each have their own, films and shorts
+// section", "have the sections a drop down so they can continue scrolling
+// down their work", "show the series, then make a drop down to see the
+// rest of the seasons then the rest of the episodes"). Under the
+// Dashboard's row of tabs: the head (Submit a title, New show), the five
+// work tabs with their counts in a sideways row, the search, and the
+// sections that fold — Shows, Films, Shorts, then Extras / Podcast
+// episodes / Other titles / Vertical when there are any. A show is one
+// card that opens to its seasons, a season opens to its episodes; every
+// title is the same row. A title of its own opens its dashboard
+// (/creator/title/<id>), a show's episode its editor.
+//
+// Everything on the page — the tabs and counts, the sections, the cards,
+// each row's pill, meta line, what needs the creator, what waits, its one
+// next step and the words of its ⋯ — comes from lib/workListRules.js
+// buildWorkList, the file the website reads. The ⋯ opens the sheet of
+// components/work/WorkActions.js, which runs every key of the rules' menu
+// (and keeps what the screen did before the revamp: the title image,
+// "Open on the show page", "Allow downloads in the app" in the edit box).
+//
+// Reads, on every visit: GET /api/creator/my-submissions, /api/show?mine=1
+// and /api/creator/pricing. ?status=pending|approved|rejected,
+// ?attention=1 and ?tab=<key> open on that tab (the Dashboard's links).
 
-// The creator path's words (2026-10-31): In review / Live / Not this time.
-const STATUS_LABEL = {
-  pending: { text: 'In review', color: colors.olive },
-  approved: { text: 'Live', color: colors.ok },
-  rejected: { text: 'Not this time', color: colors.danger }
-};
-
-const CF_STATE_LABEL = {
-  pendingupload: 'Waiting on upload',
-  downloading: 'Cloudflare receiving file…',
-  queued: 'Queued for processing',
-  inprogress: 'Processing…',
-  ready: 'Ready to stream',
-  error: 'Processing failed'
-};
-
-const STANDALONE_TYPE_LABELS = { movie: 'Films', short: 'Shorts', vertical: 'Vertical', podcast: 'Podcasts', bonus: 'Extras' };
-const STATUS_FILTERS = ['pending', 'approved', 'rejected'];
-
-// A show row's status pill tones (the website's yw-status classes).
-const ROW_TONE = { pending: colors.olive, rejected: colors.danger, muted: colors.inkFaint, approved: colors.ok };
-// The flags under a show row: what waits (gold), what's wrong (tangerine),
-// what's on its way out (dim).
-const FLAG_TONE = { wait: colors.olive, warn: colors.brass, muted: colors.inkDim };
-
-// The same path is a native screen in the app (episode/[id], podcasts/[id])
-// and the public page on the site (for "Copy public link").
-function publicPathFor(s) {
-  return s.contentType === 'podcast' && s.seriesId ? `/podcasts/${s.seriesId}` : `/episode/${s.id}`;
-}
-function publicUrlFor(s) {
-  return `${SITE_ORIGIN}${publicPathFor(s)}`;
-}
-
-// A film's or a short's notes for its own page (2026-11-08; the website's
-// components/PageNotesField.js): the box shows while the database has the
-// column (my-submissions' pageNotesReady, migration 118) and the title has
-// its own page. The show editor's limits and words.
-const PAGE_NOTES_MAX = 4000;
-function notesBoxShows(s) {
-  if (!s || s.pageNotesReady !== true) return false;
-  return episodeHasPage({ contentType: s.contentType ?? null, seriesId: s.seriesId ?? null, hasPage: typeof s.hasPageChoice === 'boolean' ? s.hasPageChoice : null });
+const STATUS_TAB = { pending: 'review', approved: 'live', rejected: 'declined' };
+const TAB_KEYS = new Set(WORK_TABS.map((t) => t.key));
+const first = (v) => (Array.isArray(v) ? v[0] : v);
+function tabFrom(params) {
+  const tab = first(params.tab);
+  if (TAB_KEYS.has(tab)) return tab;
+  if (first(params.attention) === '1') return 'needs';
+  return STATUS_TAB[first(params.status)] || 'all';
 }
 
-// What the edit box needs about a title of its own: its words now, what
-// waits for approval, and where it stands (the website's editValuesFor).
-function editValuesFor(s) {
-  return {
-    id: s.id,
-    contentType: s.contentType ?? null,
-    title: s.title,
-    description: s.description || '',
-    pageNotes: s.pageNotes || '',
-    notesShown: notesBoxShows(s),
-    status: s.status,
-    held: Boolean(s.held),
-    deletionRequested: Boolean(s.deletionRequested),
-    withdrawnAt: s.withdrawnAt || null,
-    pendingTitle: s.pendingTitle || null,
-    pendingDescription: s.pendingDescription || null,
-    pendingPageNotes: typeof s.pendingPageNotes === 'string' ? s.pendingPageNotes : null,
-    pageNotesWaitReady: s.pageNotesWaitReady !== false,
-    hasFlashingLights: s.hasFlashingLights === true
-  };
-}
+// Which sections, shows and seasons the creator opened or closed, kept for
+// the app's run (the website keeps them in sessionStorage): coming back to
+// the screen finds them as they were left.
+const REMEMBERED = {};
 
-function displayTitle(s) {
-  const own = typeof s.title === 'string' ? s.title.trim() : '';
-  if (own) return own;
-  return s.seriesOrder ? `Episode ${s.seriesOrder}` : 'Untitled';
-}
-
-// "24 min" from the stored runtime ("23:40", "1:02:15"); the text as it is
-// when it isn't a clock.
-function minutes(runtime) {
-  if (runtime === null || runtime === undefined || runtime === '') return null;
-  const parts = String(runtime).split(':').map((x) => Number(x));
-  if (parts.length < 2 || parts.length > 3 || parts.some((x) => !Number.isFinite(x) || x < 0)) return String(runtime);
-  const secs = parts.reduce((acc, x) => acc * 60 + x, 0);
-  if (secs < 60) return `${secs} s`;
-  return `${Math.round(secs / 60)} min`;
-}
-
-function ago(iso) {
-  if (!iso) return '';
-  const h = Math.floor((Date.now() - new Date(iso).getTime()) / 3600000);
-  if (h < 1) return 'just now';
-  if (h < 24) return `${h} h ago`;
-  const d = Math.floor(h / 24);
-  return d === 1 ? 'yesterday' : `${d} days ago`;
-}
-
-// On the site now: approved, not pulled, not on its way out, and in no
-// show or a public one (decision 2: an approved episode of a private show
-// isn't Live yet). An extra has no show status of its own on the row:
-// `show`, the summary of the show it is attached to, answers for it.
-function isLive(s, show) {
-  if (s.status !== 'approved' || s.held || s.deletionRequested) return false;
-  if (s.seriesId) return !s.seriesHeld && (s.seriesStatus === 'approved' || s.seriesStatus == null);
-  return !show || show.isPublic !== false;
-}
-
-// The words on a show row's status pill.
-function showRowStatus(s, live) {
-  if (s.status === 'pending') return { text: 'In review', tone: 'pending' };
-  if (s.status === 'rejected') return { text: 'Not this time', tone: 'rejected' };
-  if (s.held) return { text: 'Pulled', tone: 'rejected' };
-  if (s.deletionRequested) return { text: 'Removal requested', tone: 'muted' };
-  if (s.seriesHeld) return { text: 'Show pulled', tone: 'rejected' };
-  if (!live) return { text: 'Approved · not public yet', tone: 'pending' };
-  return { text: 'Live', tone: 'approved' };
-}
-
-// The lines under a show row: what waits for approval, why it was pulled
-// or sent back, what the file is missing.
-function showRowFlags(s) {
-  const flags = [];
-  if (s.status === 'rejected') flags.push({ key: 'rejected', tone: 'warn', Icon: WarningIcon, text: s.rejectionReason ? `Not this time: ${s.rejectionReason}` : 'Not this time' });
-  if (s.held) flags.push({ key: 'held', tone: 'warn', Icon: WarningIcon, text: s.holdReason ? `Pulled: ${s.holdReason}` : 'Pulled while an admin looks at it' });
-  if (s.deletionRequested) flags.push({ key: 'removal', tone: 'muted', Icon: TrashIcon, text: s.deletionReason ? `Removal requested: ${s.deletionReason}` : 'Removal requested' });
-  if (s.pendingTitle) flags.push({ key: 'title', tone: 'wait', Icon: ClockIcon, text: 'Title change waiting' });
-  if (s.pendingDescription) flags.push({ key: 'desc', tone: 'wait', Icon: ClockIcon, text: 'Description change waiting' });
-  if (typeof s.pendingPageNotes === 'string') flags.push({ key: 'notes', tone: 'wait', Icon: ClockIcon, text: 'Notes change waiting' });
-  if (s.pendingSrc) flags.push({ key: 'video', tone: 'wait', Icon: ClockIcon, text: s.pendingVideoState && s.pendingVideoState !== 'ready' ? 'New video waiting · still processing' : 'New video waiting' });
-  if (s.artworkPending) flags.push({ key: 'art', tone: 'wait', Icon: ClockIcon, text: 'Art waiting for approval' });
-  if (s.cloudflareState === 'error') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, text: 'The file failed to process — replace it' });
-  else if (s.cloudflareState === 'pendingupload') flags.push({ key: 'cf', tone: 'warn', Icon: WarningIcon, text: 'The upload never finished' });
-  if (s.status === 'approved' && s.contentType !== 'podcast' && s.contentType !== 'bonus' && !s.captionsUrl) flags.push({ key: 'captions', tone: 'warn', Icon: ChatIcon, text: 'No captions' });
-  else if (s.captionsStale) flags.push({ key: 'stale', tone: 'warn', Icon: ChatIcon, text: 'Captions may be out of sync' });
-  return flags;
-}
-
-const firstParam = (v) => (Array.isArray(v) ? v[0] : v);
-
-// The action sheet slides away before the next modal (Edit, Delete, Sell)
-// comes up: iOS won't present a modal while another is still closing.
-const SHEET_HANDOFF_MS = 400;
-
-// Mirrors pages/creator/my-work.js — same stats, same grouped, filterable
-// list. Grouped by project: a show's titles sit under the show (the series
-// revamp, slice 5; the website's YourWork board) — a header that opens
-// its show screen ("Open show page →"; the old show menu's Edit show
-// details / Sell the whole series / Add bonus content live on the show
-// screen now), "Season N" sub-headings when it has more than one, rows in
-// play order with their "S1 E3" code, the changes waiting for approval and
-// why a title was pulled, a pencil that opens the episode editor screen,
-// and its extras under it. Films, shorts and Snippets keep their rows: an
-// edit request and a deletion request are built in here; artwork, video
-// and captions open the website. ?status=pending|approved|rejected and
-// ?attention=1 (the hub's piles) set the filters.
 export default function MyWork() {
   const router = useRouter();
   const params = useLocalSearchParams();
-  const { getToken: clerkGetToken } = useAuth();
-  // One getter for the screen's life (Clerk's may change identity).
-  const tokenRef = useRef(clerkGetToken);
-  tokenRef.current = clerkGetToken;
-  const getToken = useCallback((...a) => tokenRef.current(...a), []);
-  const [feedState, setFeedState] = useState({ loading: true, error: null, forbidden: false, submissions: null });
-  // The viewer's shows (GET /api/show?mine=1) for the group headers: art,
-  // kind, where the show stands, its count line and season names. The
-  // headers fall back to what the rows say when it can't load.
-  const [shows, setShows] = useState([]);
-  const paramStatus = firstParam(params.status);
-  const paramAttention = firstParam(params.attention);
-  const [statusFilter, setStatusFilter] = useState(STATUS_FILTERS.includes(paramStatus) ? paramStatus : 'all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [needsAttentionOnly, setNeedsAttentionOnly] = useState(paramAttention === '1');
-  // Opened again from the hub with other filters (the screen stays mounted).
+  const { getToken } = useAuth();
+  const [feed, setFeed] = useState({ loading: true, failed: false, forbidden: false, submissions: null });
+  // The viewer's shows (GET /api/show?mine=1): the cards' art, state,
+  // count line, season names and Make it public. The episodes still sit
+  // under their show when it can't load.
+  const [shows, setShows] = useState(null);
+  // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>".
+  const [pricing, setPricing] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const [tab, setTab] = useState(() => tabFrom(params));
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(() => ({ ...REMEMBERED }));
+  // While a tab or a search is on everything that matches is open; what the
+  // creator folds meanwhile is kept apart and forgotten with the filter.
+  const [filterOpen, setFilterOpen] = useState({});
+  const [cardNote, setCardNote] = useState({}); // show id → { ok, text }
+  const [publishing, setPublishing] = useState(null);
+
+  // Opened again from the Dashboard with another tab (the screen stays mounted).
+  const paramTab = first(params.tab);
+  const paramStatus = first(params.status);
+  const paramAttention = first(params.attention);
   useEffect(() => {
-    if (STATUS_FILTERS.includes(paramStatus)) setStatusFilter(paramStatus);
-    if (paramAttention === '1') setNeedsAttentionOnly(true);
-  }, [paramStatus, paramAttention]);
-  const [actionSheet, setActionSheet] = useState(null); // { type: 'episode' | 'show', item, showId }
-  const [editModal, setEditModal] = useState(null); // { type, currentValues }
-  const [editSaving, setEditSaving] = useState(false);
-  const [editError, setEditError] = useState(null);
-  // The server's line when a save found the database without migration 123:
-  // the edit box greys "Allow downloads in the app" with it.
-  const [downloadsBehind, setDownloadsBehind] = useState(null);
-  const [deleteModal, setDeleteModal] = useState(null); // episode item
-  const [deleteReason, setDeleteReason] = useState('');
-  const [deleteSaving, setDeleteSaving] = useState(false);
-  const [deleteError, setDeleteError] = useState(null);
-  const [copiedId, setCopiedId] = useState(null);
-  const [actionError, setActionError] = useState(null);
-  // What a title image save did, under the list's head.
-  const [titleImageWords, setTitleImageWords] = useState(null);
-  // Buy to own: this creator's prices keyed "episode:<id>" / "series:<id>"
-  // (/api/creator/pricing) and the title the Sell sheet is open for.
-  const [pricing, setPricing] = useState({ prices: {}, settings: {} });
-  const [sellModal, setSellModal] = useState(null); // { type, id, title, sub }
-  // "Who gets paid" for a title of its own (slice 3b): GET /api/payees'
-  // block, drawn by PayeeCard in a sheet (a show's episode opens its
-  // editor instead, where the same card sits under More info).
-  const [payeeSheet, setPayeeSheet] = useState(null); // { id, title, block, error, words }
+    if (paramTab || paramStatus || paramAttention) setTab(tabFrom({ tab: paramTab, status: paramStatus, attention: paramAttention }));
+  }, [paramTab, paramStatus, paramAttention]);
+  useEffect(() => { setFilterOpen({}); }, [tab, query]);
 
-  async function loadPricing() {
-    try {
-      setPricing(await apiGet('/api/creator/pricing', await freshToken(getToken)));
-    } catch (err) {
-      // The rows just show no price.
+  const loadPricing = useCallback(async () => {
+    const r = await showCall('GET', '/api/creator/pricing', undefined, getToken);
+    // The rows just show no price when it can't load.
+    if (r.ok) setPricing(r.data);
+    return r.ok;
+  }, [getToken]);
+
+  // A read on coming back that fails keeps the list already shown.
+  const loadSubmissions = useCallback(async () => {
+    const r = await showCall('GET', '/api/creator/my-submissions', undefined, getToken);
+    if (r.ok && Array.isArray(r.data.submissions)) {
+      setFeed({ loading: false, failed: false, forbidden: false, submissions: r.data.submissions });
+      return;
     }
-  }
+    const forbidden = r.status === 401 || r.status === 403;
+    setFeed((st) => (st.submissions && !forbidden ? { ...st, loading: false } : { loading: false, failed: !forbidden, forbidden, submissions: null }));
+  }, [getToken]);
 
-  // Every request asks Clerk for a fresh token: a token kept from when the
-  // screen opened has expired a minute later (edits/deletion requests then
-  // failed as "signed out").
-  async function loadSubmissions() {
-    try {
-      const token = await freshToken(getToken);
-      const data = await apiGet('/api/creator/my-submissions', token);
-      setFeedState({ loading: false, error: null, forbidden: false, submissions: data.submissions });
-      loadPricing();
-    } catch (err) {
-      const forbidden = /creator access required/i.test(err.message || '');
-      // A read on coming back that fails keeps the list already shown.
-      setFeedState((st) => (st.submissions && !forbidden ? st : { loading: false, error: err.message, forbidden, submissions: null }));
-    }
-  }
-
-  async function loadShows() {
+  const loadShows = useCallback(async () => {
     const r = await showCall('GET', '/api/show?mine=1', undefined, getToken);
     if (r.ok && Array.isArray(r.data.shows)) setShows(r.data.shows);
-  }
+  }, [getToken]);
 
-  // Read on every visit: the pencil and "Edit episode" open the episode
-  // editor and "Open on the show page" the show screen, and what changed
-  // there shows here on the way back (the list stays up meanwhile).
+  const loadAll = useCallback(() => Promise.all([loadSubmissions(), loadShows(), loadPricing()]), [loadSubmissions, loadShows, loadPricing]);
+
+  // Read on every visit: a title's dashboard, the episode editor and the
+  // show page change what is here, and it shows on the way back (the list
+  // stays up meanwhile).
   useFocusEffect(useCallback(() => {
-    loadSubmissions();
-    loadShows();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []));
+    loadAll();
+  }, [loadAll]));
 
-  async function copyPublicLink(s) {
-    try {
-      await Clipboard.setStringAsync(publicUrlFor(s));
-      setCopiedId(s.id);
-      setTimeout(() => setCopiedId((current) => (current === s.id ? null : current)), 2000);
-    } catch {
-      // Not worth surfacing — same reasoning as the website.
+  const actions = useWorkActions({ getToken, router, pricing, loadPricing, onChanged: loadAll });
+
+  const model = useMemo(() => buildWorkList({
+    submissions: feed.submissions,
+    shows,
+    prices: pricing && pricing.prices ? pricing.prices : null,
+    tab,
+    query,
+    canEditAll: false
+  }), [feed.submissions, shows, pricing, tab, query]);
+
+  const filtering = model.filtering;
+  const isOpen = (key, byDefault) => {
+    const map = filtering ? filterOpen : open;
+    return Object.prototype.hasOwnProperty.call(map, key) ? map[key] : byDefault;
+  };
+  const toggle = (key, byDefault) => {
+    const next = !isOpen(key, byDefault);
+    if (filtering) {
+      setFilterOpen((m) => ({ ...m, [key]: next }));
+    } else {
+      REMEMBERED[key] = next;
+      setOpen((m) => ({ ...m, [key]: next }));
     }
+  };
+
+  async function refresh() {
+    setRefreshing(true);
+    await loadAll();
+    setRefreshing(false);
   }
 
-  // The title, description and (a film's) notes: the show editor's own
-  // save, PATCH /api/show/episode/<id> (the website's
-  // components/RequestEditModal.js, 2026-11-12). Only what changed is sent;
-  // the server's field policy decides: on a live title they wait for
-  // approval (the notes in migration 122's column), on one that has never
-  // been live they apply at once. → the words for the done line.
-  // "Allow downloads in the app" rides on the same save and applies at once
-  // in every state of the title. A database without migration 123 refuses
-  // the whole save over it (503 'migration-123'): the box greys with the
-  // server's line and whatever else changed is sent again without it
-  // (mobile/src/lib/downloadLogic.js saveAroundDownloads).
-  async function submitEdit(body) {
-    const cv = editModal.currentValues;
-    const path = `/api/show/episode/${encodeURIComponent(String(cv.id))}`;
-    setEditSaving(true);
-    setEditError(null);
-    try {
-      const { r, behind } = await saveAroundDownloads((b) => showCall('PATCH', path, b, getToken), body);
-      if (behind) setDownloadsBehind(behind);
-      if (!r) return null;
-      if (!r.ok) throw new Error(r.error);
-      const notSaved = Array.isArray(r.data.notSaved) ? r.data.notSaved : [];
-      if (notSaved.length) throw new Error(notSaved.map((n) => n && n.reason).filter(Boolean).join(' ') || 'Some of it didn’t save.');
-      loadSubmissions();
-      return { staged: r.data.staged || [], applied: r.data.applied || [], notices: r.data.notices || [] };
-    } catch (err) {
-      setEditError(err.message);
-      return null;
-    } finally {
-      setEditSaving(false);
-    }
-  }
-
-  // Where "Allow downloads in the app" stands for the title in the edit box
-  // (Your work's list doesn't carry it): the episode editor's own read,
-  // GET /api/show/episode/<id>. The server sends a policy entry for it only
-  // for a title that can be downloaded (never a podcast) — locked with the
-  // migration's line on a database without 123. → { allowed, locked } or
-  // null (no box: a podcast, an older server, or the read failed;
-  // mobile/src/lib/downloadLogic.js downloadsSwitchFrom).
-  async function loadDownloadsSwitch() {
-    const cv = editModal && editModal.currentValues;
-    if (!cv || !cv.id) return null;
-    return downloadsSwitchFrom(await showCall('GET', `/api/show/episode/${encodeURIComponent(String(cv.id))}`, undefined, getToken));
-  }
-
-  // A change waiting for approval taken back (DELETE …/staged?field=).
-  async function cancelWaiting(field) {
-    const cv = editModal.currentValues;
-    setEditError(null);
-    const r = await showCall('DELETE', `/api/show/episode/${encodeURIComponent(String(cv.id))}/staged?field=${encodeURIComponent(field)}`, undefined, getToken);
-    if (!r.ok) {
-      setEditError(r.error);
-      return false;
-    }
-    loadSubmissions();
-    return true;
-  }
-
-  // The title image (2026-11-12: "the goal was that if someone wanted to add
-  // a custom title, they could"): the title set as a picture, a PNG with a
-  // transparent background, picked from the library and saved through the
-  // show editor's own route (on a live title it waits for approval).
-  async function pickTitleImage(s, { remove = false } = {}) {
-    setActionError(null);
-    let img = null;
-    if (!remove) {
-      try {
-        img = await pickImageAsDataUrl({ width: 1200, format: 'png' });
-      } catch (err) {
-        setActionError(err.message);
-        return;
+  // Make it public is one-way, so it asks first, in the Dashboard's words:
+  // the question is the Alert's title, the rest its message.
+  function makePublic(card) {
+    const [question, ...rest] = DASH_WORDS.makePublicAsk(card.makePublic.name).split('\n\n');
+    Alert.alert(question, rest.join('\n\n'), [
+      { text: 'Not yet', style: 'cancel' },
+      {
+        text: WORK_WORDS.makePublic,
+        onPress: async () => {
+          setPublishing(card.id);
+          setCardNote((m) => ({ ...m, [card.id]: null }));
+          const r = await showCall('POST', `${showPath(card.id)}/public`, {}, getToken);
+          setCardNote((m) => ({
+            ...m,
+            [card.id]: r.ok
+              ? { ok: true, text: `${card.makePublic.name} is public. Its approved episodes are on the site; the next ones go live as they’re approved.` }
+              : { ok: false, text: r.error || 'Could not make it public.' }
+          }));
+          await Promise.all([loadShows(), loadSubmissions()]);
+          setPublishing(null);
+        }
       }
-      if (!img) return;
-    }
-    const r = await showCall('PATCH', `/api/show/episode/${encodeURIComponent(String(s.id))}`, remove ? { removeTitleImage: true } : { titleImageBase64: img.base64, titleImageFileName: img.fileName }, getToken);
-    if (!r.ok) {
-      setActionError(r.error);
-      return;
-    }
-    const waits = Array.isArray(r.data.staged) && r.data.staged.some((f) => f === 'titleImage' || f === 'titleImageRemoval');
-    setActionError(null);
-    setTitleImageWords(remove
-      ? (waits ? 'Removing the title image waits for approval.' : 'The title image is removed: the title shows as text.')
-      : (waits ? 'The new title image waits for approval; visitors see the live one until then.' : 'The title image is saved.'));
-    loadSubmissions();
+    ]);
   }
 
-  async function requestDeletion() {
-    if (!deleteReason.trim()) {
-      setDeleteError('A reason is required.');
-      return;
-    }
-    setDeleteSaving(true);
-    setDeleteError(null);
-    try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId: deleteModal.id, action: 'request', reason: deleteReason.trim() }, await freshToken(getToken));
-      setDeleteModal(null);
-      setDeleteReason('');
-      loadSubmissions();
-    } catch (err) {
-      setDeleteError(err.message);
-    } finally {
-      setDeleteSaving(false);
-    }
-  }
+  const openRow = (row) => actions.run('open', row);
 
-  async function openPayee(s) {
-    setPayeeSheet({ id: s.id, title: s.title || 'this title', block: null, error: null, words: null });
-    const r = await showCall('GET', `/api/payees?type=episode&id=${encodeURIComponent(s.id)}`, undefined, getToken);
-    setPayeeSheet((cur) => (cur && cur.id === s.id ? { ...cur, block: r.ok ? r.data.payee || null : null, error: r.ok ? (r.data.payee ? null : 'Couldn’t read who gets paid.') : r.error } : cur));
-  }
-
-  async function cancelDeletion(episodeId) {
-    setActionError(null);
-    try {
-      await apiPost('/api/creator/request-episode-deletion', { episodeId, action: 'cancel' }, await freshToken(getToken));
-      loadSubmissions();
-    } catch (err) {
-      setActionError(err.message);
-    }
-  }
-
-  if (feedState.loading) {
+  function renderSeason(season) {
+    const key = `season:${season.key}`;
+    const seasonOpen = isOpen(key, filtering);
     return (
-      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-        <TopNav />
-        <View style={styles.center}><ActivityIndicator color={colors.brass} /></View>
-      </SafeAreaView>
-    );
-  }
-
-  if (feedState.forbidden) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-        <TopNav />
-        <View style={styles.center}>
-          <Text style={styles.title}>Creator access required</Text>
-          <Text style={styles.note}>This section is only for accounts with creator or admin access.</Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (feedState.error || !feedState.submissions) {
-    return (
-      <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-        <TopNav />
-        <View style={styles.center}><Text style={styles.errorText}>Couldn't load your work: {feedState.error || 'unknown error'}</Text></View>
-      </SafeAreaView>
-    );
-  }
-
-  const submissions = feedState.submissions;
-  const byId = new Map(submissions.map((s) => [s.id, s]));
-  const showById = new Map(shows.map((sh) => [sh.id, sh]));
-
-  // The show a title sits under: its own, or for an extra the show it is
-  // attached to (directly, or through the episode it follows when that
-  // episode is one of these titles).
-  function showIdOf(s) {
-    if (s.seriesId) return s.seriesId;
-    if (s.contentType !== 'bonus') return null;
-    if (s.bonusParentType === 'series' && s.bonusParentId) return s.bonusParentId;
-    if (s.bonusParentType === 'episode' && s.bonusParentId) {
-      const parent = byId.get(s.bonusParentId);
-      return parent && parent.seriesId ? parent.seriesId : null;
-    }
-    return null;
-  }
-  const live = (s) => isLive(s, showIdOf(s) ? showById.get(showIdOf(s)) : null);
-
-  const total = submissions.length;
-  const liveCount = submissions.filter(live).length;
-  const approvedCount = submissions.filter((s) => s.status === 'approved').length;
-  const pendingCount = submissions.filter((s) => s.status === 'pending').length;
-  const reviewedCount = approvedCount + submissions.filter((s) => s.status === 'rejected').length;
-  const approvalRate = reviewedCount > 0 ? Math.round((approvedCount / reviewedCount) * 100) : null;
-  const turnaroundHoursList = submissions
-    .filter((s) => s.reviewedAt && s.createdAt)
-    .map((s) => (new Date(s.reviewedAt).getTime() - new Date(s.createdAt).getTime()) / (1000 * 60 * 60));
-  const avgTurnaroundHours = turnaroundHoursList.length > 0
-    ? Math.round(turnaroundHoursList.reduce((a, b) => a + b, 0) / turnaroundHoursList.length)
-    : null;
-  const missingArtworkCount = submissions.filter((s) => s.status !== 'rejected' && s.missingArtwork).length;
-
-  const query = searchQuery.trim().toLowerCase();
-  const filteredSubmissions = submissions.filter((s) => {
-    if (statusFilter === 'approved' && !live(s)) return false;
-    if (statusFilter !== 'all' && statusFilter !== 'approved' && s.status !== statusFilter) return false;
-    if (query) {
-      const sid = showIdOf(s);
-      const hay = `${displayTitle(s)} ${s.seriesName || ''} ${(sid && showById.get(sid) && showById.get(sid).name) || ''}`.toLowerCase();
-      if (!hay.includes(query)) return false;
-    }
-    if (needsAttentionOnly && !needsYou(s)) return false;
-    return true;
-  });
-
-  // Grouped by project always — a show (series or podcast) gets its own
-  // section with its episodes and its extras, and anything without one
-  // (films, shorts, Snippets) is grouped by content type.
-  const groupsByKey = {};
-  for (const s of filteredSubmissions) {
-    const sid = showIdOf(s);
-    const key = sid ? `series:${sid}` : `type:${s.contentType}`;
-    if (!groupsByKey[key]) {
-      const summary = sid ? showById.get(sid) : null;
-      groupsByKey[key] = {
-        key,
-        isShow: Boolean(sid),
-        showId: sid,
-        summary,
-        label: sid ? ((summary && summary.name) || s.seriesName || 'A show') : (STANDALONE_TYPE_LABELS[s.contentType] || 'Other'),
-        kind: sid ? ((summary && summary.kind) || s.seriesKind || (s.contentType === 'podcast' ? 'podcast' : 'series')) : null,
-        items: []
-      };
-    }
-    groupsByKey[key].items.push(s);
-  }
-  // Shows first (alphabetical), then the standalone groups in the fixed
-  // Films / Shorts / Vertical / Podcasts / Extras order.
-  const typeOrder = Object.keys(STANDALONE_TYPE_LABELS);
-  const projectGroups = Object.values(groupsByKey).sort((a, b) => {
-    if (a.isShow !== b.isShow) return a.isShow ? -1 : 1;
-    if (!a.isShow && !b.isShow) return typeOrder.indexOf(a.items[0].contentType) - typeOrder.indexOf(b.items[0].contentType);
-    return a.label.localeCompare(b.label);
-  });
-
-  function showRowMeta(s) {
-    const parts = [];
-    if (s.cloudflareState && !['ready', 'error', 'pendingupload'].includes(s.cloudflareState)) parts.push(CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState);
-    else if (s.runtime) parts.push(minutes(s.runtime));
-    if (s.contentType === 'bonus') {
-      // What kind of extra (migration 121), when it has one.
-      if (s.extraKind) parts.push(extraKindLabel(s.extraKind));
-      if (s.bonusParentType === 'episode') {
-        const parent = byId.get(s.bonusParentId);
-        parts.push(parent && episodeCode(parent) ? `after ${episodeCode(parent)}` : 'after an episode');
-      } else {
-        parts.push('with the show');
-      }
-    }
-    if (s.status === 'pending') parts.push(`sent ${ago(s.createdAt)}`);
-    if (live(s)) parts.push(`${s.viewCount || 0} view${s.viewCount === 1 ? '' : 's'}`);
-    return parts.filter(Boolean).join(' · ');
-  }
-
-  function renderShowRow(s, group) {
-    const code = s.contentType === 'bonus' ? null : episodeCode(s);
-    const status = showRowStatus(s, live(s));
-    const flags = showRowFlags(s);
-    const meta = showRowMeta(s);
-    const extra = s.contentType === 'bonus';
-    return (
-      <View key={s.id} style={styles.row}>
+      <View key={season.key} style={st.season}>
         <Pressable
-          style={({ pressed }) => [styles.showRowMain, pressed && styles.pressed]}
-          onPress={() => setActionSheet({ type: 'show', item: s, showId: group.showId, onSite: live(s) })}
+          style={({ pressed }) => [st.seasonHead, pressed && ss.pressed]}
+          onPress={() => toggle(key, filtering)}
           accessibilityRole="button"
-          accessibilityLabel={`${code ? `${code}, ` : ''}${displayTitle(s)}, ${status.text}. Options`}
+          accessibilityState={{ expanded: seasonOpen }}
+          accessibilityLabel={[season.label, season.summary, season.needs].filter(Boolean).join(', ')}
         >
-          {s.thumbnail || s.poster ? <SmartImage uri={s.thumbnail || s.poster} style={styles.rowThumb} /> : <View style={styles.rowThumb} />}
-          <View style={styles.rowMain}>
-            <View style={styles.rowTitleLine}>
-              {code ? <Text style={styles.code}>{code}</Text> : null}
-              <Text style={styles.rowTitle} numberOfLines={1}>{displayTitle(s)}</Text>
-            </View>
-            <View style={styles.showMetaLine}>
-              <Text style={[styles.statusPill, { color: ROW_TONE[status.tone] || colors.inkDim }]}>{status.text}</Text>
-              {meta ? <Text style={styles.rowMeta} numberOfLines={1}>{`· ${meta}`}</Text> : null}
-            </View>
-            {flags.map((f) => (
-              <View key={f.key} style={styles.flagLine}>
-                <f.Icon size={11} color={FLAG_TONE[f.tone] || colors.inkDim} />
-                <Text style={[styles.flagText, { color: FLAG_TONE[f.tone] || colors.inkDim }]} numberOfLines={2}>{f.text}</Text>
-              </View>
-            ))}
+          <View style={{ transform: [{ rotate: seasonOpen ? '90deg' : '0deg' }] }}><ChevronIcon size={14} color={colors.inkDim} /></View>
+          <View style={st.seasonText}>
+            <Text style={st.seasonLabel}>{season.label}</Text>
+            <Text style={st.seasonSummary}>
+              {season.summary}
+              {season.needs ? <Text style={st.seasonNeeds}>{` · ${season.needs}`}</Text> : null}
+            </Text>
           </View>
         </Pressable>
-        <Pressable
-          style={({ pressed }) => [styles.editBtn, pressed && styles.pressed]}
-          onPress={() => router.push(episodeEditorRoute(group.showId, s.id))}
-          hitSlop={6}
-          accessibilityRole="button"
-          accessibilityLabel={`${extra ? 'Edit extra' : 'Edit episode'}: ${displayTitle(s)}`}
-        >
-          <PencilIcon size={15} color={colors.ink} />
-        </Pressable>
-      </View>
-    );
-  }
-
-  function renderShowGroup(group) {
-    const sh = group.summary;
-    const episodes = sortEpisodes(group.items.filter((s) => s.contentType !== 'bonus'));
-    const extras = group.items.filter((s) => s.contentType === 'bonus').sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''));
-    const seasons = [...new Set(episodes.map((s) => Number(s.season) || 1))];
-    const labelFor = (n) => {
-      const entry = sh && Array.isArray(sh.seasons) ? sh.seasons.find((x) => x.number === n) : null;
-      return (entry && entry.label) || `Season ${n}`;
-    };
-    const fallbackStatus = group.items.find((s) => s.seriesStatus) || null;
-    const state = sh ? sh.state : fallbackStatus && fallbackStatus.seriesHeld ? 'pulled' : fallbackStatus && fallbackStatus.seriesStatus === 'pending' ? 'review' : fallbackStatus && fallbackStatus.seriesStatus === 'rejected' ? 'declined' : 'live';
-    const statusLabel = sh ? sh.statusLabel : { pulled: 'Pulled', review: 'Not public yet', declined: 'Not this time', live: 'Live' }[state];
-    const poster = (sh && (sh.poster || sh.thumbnail)) || null;
-    const countLine = sh ? sh.countLine : `${episodes.length} episode${episodes.length === 1 ? '' : 's'}${extras.length ? ` · ${extras.length} extra${extras.length === 1 ? '' : 's'}` : ''}`;
-    return (
-      <View key={group.key} style={styles.projectGroup}>
-        <Pressable
-          style={({ pressed }) => [styles.showHead, pressed && styles.pressed]}
-          onPress={() => router.push(showRoute(group.showId))}
-          accessibilityRole="link"
-          accessibilityLabel={`${group.label}. ${statusLabel || ''}. ${countLine}. Open show page`}
-        >
-          {poster ? <SmartImage uri={poster} style={styles.showPoster} /> : <View style={[styles.showPoster, styles.showPosterEmpty]}><Text style={styles.showPosterName} numberOfLines={3}>{group.label}</Text></View>}
-          <View style={styles.projectTitleWrap}>
-            <Text style={styles.projectTitle} numberOfLines={2}>{group.label}</Text>
-            <View style={styles.showChips}>
-              <KindChip kind={group.kind} />
-              {state !== 'live' && statusLabel ? <StateChip state={state} label={statusLabel} /> : null}
-            </View>
-            <Text style={styles.projectSub}>{countLine}</Text>
-            <View style={styles.openRow}>
-              <Text style={styles.openText}>Open show page</Text>
-              <ChevronIcon size={12} color={colors.olive} />
-            </View>
-          </View>
-        </Pressable>
-        {episodes.length > 0 && seasons.length > 1
-          ? seasons.map((n) => (
-            <View key={n}>
-              <Text style={styles.seasonHead} accessibilityRole="header">{labelFor(n)}</Text>
-              {episodes.filter((s) => (Number(s.season) || 1) === n).map((s) => renderShowRow(s, group))}
-            </View>
-          ))
-          : episodes.map((s) => renderShowRow(s, group))}
-        {extras.length > 0 ? (
-          <View>
-            <Text style={styles.seasonHead} accessibilityRole="header">Extras</Text>
-            {extras.map((s) => renderShowRow(s, group))}
+        {seasonOpen && season.rows.length ? (
+          <View style={st.seasonRows}>
+            {season.rows.map((row, i) => <TitleRow key={row.key} row={row} actions={actions} onOpen={openRow} first={i === 0} indent />)}
           </View>
         ) : null}
       </View>
     );
   }
 
-  function renderStandaloneGroup(group) {
-    const pendingInGroup = group.items.filter((s) => s.status === 'pending').length;
-    const missingArtworkInGroup = group.items.filter((s) => s.missingArtwork && s.status !== 'rejected').length;
-    const groupArt = group.items.find((s) => s.thumbnail || s.poster);
+  function renderShow(card) {
+    const key = `show:${card.id}`;
+    const showOpen = card.hasSeasons && isOpen(key, card.openByFilter);
+    const note = cardNote[card.id];
     return (
-      <View key={group.key} style={styles.projectGroup}>
-        <View style={styles.projectHeader}>
-          {groupArt ? <SmartImage uri={groupArt.thumbnail || groupArt.poster} style={styles.projectArt} /> : <View style={styles.projectArt} />}
-          <View style={styles.projectTitleWrap}>
-            <Text style={styles.projectTitle} numberOfLines={1}>{group.label}</Text>
-            <Text style={styles.projectSub}>{group.items.length} title{group.items.length === 1 ? '' : 's'}</Text>
-          </View>
-          <View style={styles.projectBadges}>
-            {pendingInGroup > 0 ? <Text style={[styles.badge, styles.badgePending]}>{pendingInGroup} in review</Text> : null}
-            {missingArtworkInGroup > 0 ? <Text style={[styles.badge, styles.badgeMissing]}>{missingArtworkInGroup} needs artwork</Text> : null}
+      <View key={card.key} style={st.showCard}>
+        <View style={st.showTop}>
+          {card.poster ? <SmartImage uri={card.poster} style={st.poster} /> : <View style={[st.poster, st.posterEmpty]} />}
+          <View style={st.showText}>
+            <View style={st.showChips}>
+              <Text style={st.showName} accessibilityRole="header">{card.name}</Text>
+              <Pill label={card.kindLabel} tone="neutral" />
+              {card.state !== 'live' ? <WorkPill pill={{ label: card.stateLabel, tone: card.stateTone }} /> : null}
+            </View>
+            {card.countLine ? <Text style={st.countLine}>{card.countLine}</Text> : null}
+            {card.needLine || card.restLine ? (
+              <Text style={st.showLines}>
+                {card.needLine ? <Text style={{ color: colors.brass }}>{card.needLine}</Text> : null}
+                {card.needLine && card.restLine ? ' · ' : ''}
+                {card.restLine}
+              </Text>
+            ) : null}
           </View>
         </View>
-        {group.items.map((s) => {
-          const flags = [];
-          if (s.missingArtwork && s.status !== 'rejected') flags.push({ key: 'artwork', Icon: ImageIcon });
-          if (s.contentType !== 'podcast' && !s.captionsUrl && s.status === 'approved') flags.push({ key: 'captions', Icon: ChatIcon });
-          if (s.artworkPending) flags.push({ key: 'pending', Icon: ClockIcon });
-          if (s.pendingTitle) flags.push({ key: 'title', Icon: ClockIcon });
-          if (s.pendingDescription) flags.push({ key: 'desc', Icon: ClockIcon });
-          if (typeof s.pendingPageNotes === 'string') flags.push({ key: 'notes', Icon: ClockIcon });
-          if (s.pendingTitleImageUrl || s.pendingTitleImageRemoval) flags.push({ key: 'titleImage', Icon: ClockIcon });
-          if (s.pendingSrc) flags.push({ key: 'video', Icon: ClockIcon });
-          if (s.deletionRequested) flags.push({ key: 'deletion', Icon: TrashIcon });
-          return (
-            <Pressable key={s.id} style={styles.row} onPress={() => setActionSheet({ type: 'episode', item: s })}>
-              {s.thumbnail ? <SmartImage uri={s.thumbnail} style={styles.rowThumb} /> : <View style={styles.rowThumb} />}
-              <View style={styles.rowMain}>
-                <View style={styles.rowTitleLine}>
-                  <Text style={styles.rowTitle} numberOfLines={1}>{s.title}</Text>
-                  {s.hasVideo ? <ClapperboardIcon size={11} color={colors.inkDim} /> : null}
-                  {s.hasAudio ? <HeadphonesIcon size={11} color={colors.inkDim} /> : null}
-                </View>
-                <Text style={styles.rowMeta} numberOfLines={1}>
-                  {s.cloudflareState && s.cloudflareState !== 'ready' ? (CF_STATE_LABEL[s.cloudflareState] || s.cloudflareState) : (s.runtime || s.description || '')}
-                </Text>
-                {s.status === 'rejected' && s.rejectionReason ? <Text style={styles.rowRejection}>Admin's note: {s.rejectionReason}</Text> : null}
-                {s.held && s.holdReason ? <Text style={styles.rowRejection}>Pulled: {s.holdReason}</Text> : null}
-                {s.deletionRequested ? <Text style={styles.rowRejection}>Deletion reason: {s.deletionReason}</Text> : null}
-                {s.status === 'approved' && pricing.prices[`episode:${s.id}`] ? (() => {
-                  const row = pricing.prices[`episode:${s.id}`];
-                  const st = priceState(row);
-                  return <Text style={[styles.rowPrice, { color: st === 'on' ? colors.ok : st === 'pending' ? colors.olive : colors.inkFaint }]}>{st === 'on' ? `On sale · ${dollars(row.price_cents)}` : st === 'pending' ? `Price in review · ${dollars(row.pending_cents)}` : SELL_STATE_LABEL[st]}</Text>;
-                })() : null}
-              </View>
-              <View style={styles.rowRight}>
-                {s.held && s.status === 'approved'
-                  ? <Text style={[styles.statusPill, { color: colors.danger }]}>Pulled for review</Text>
-                  : <Text style={[styles.statusPill, { color: (STATUS_LABEL[s.status] || {}).color || colors.inkDim }]}>{(STATUS_LABEL[s.status] || {}).text || s.status}</Text>}
-                {s.status === 'approved' ? (
-                  <View style={styles.viewsRow}><EyeIcon size={11} color={colors.inkFaint} /><Text style={styles.viewsText}> {s.viewCount}</Text></View>
-                ) : null}
-                {flags.length > 0 ? (
-                  <View style={styles.flagsRow}>
-                    {flags.map((f) => <f.Icon key={f.key} size={12} color={colors.inkFaint} />)}
-                  </View>
-                ) : null}
-              </View>
+        {note ? <Text style={[st.cardNote, { color: note.ok ? colors.ok : colors.danger }]} accessibilityRole={note.ok ? undefined : 'alert'} accessibilityLiveRegion="polite">{note.text}</Text> : null}
+        {card.makePublic ? (
+          <ActButton label={WORK_WORDS.makePublic} gold busy={publishing === card.id} onPress={() => makePublic(card)} style={st.fullBtn} />
+        ) : null}
+        <View style={st.showBtns}>
+          <Pressable style={({ pressed }) => [st.outlineBtn, pressed && ss.pressed]} onPress={() => router.push(showRoute(card.id))} accessibilityRole="link">
+            <Text style={st.outlineText}>{WORK_WORDS.openShow}</Text>
+          </Pressable>
+          {card.hasSeasons ? (
+            <Pressable
+              style={({ pressed }) => [st.outlineBtn, pressed && ss.pressed]}
+              onPress={() => toggle(key, card.openByFilter)}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: showOpen }}
+            >
+              <View style={{ transform: [{ rotate: showOpen ? '-90deg' : '90deg' }] }}><ChevronIcon size={13} color={colors.ink} /></View>
+              <Text style={st.outlineText}>{showOpen ? WORK_WORDS.hideSeasons : card.openLabel}</Text>
             </Pressable>
-          );
-        })}
+          ) : null}
+        </View>
+        {showOpen ? <View style={st.seasons}>{card.seasons.map(renderSeason)}</View> : null}
       </View>
     );
   }
 
-  return (
-    <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
-      <TopNav />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scroll} keyboardShouldPersistTaps="handled">
-        {/* The Dashboard's row of tabs (2026-11-14). */}
-        <DashboardTabs current="work" style={styles.dashTabs} />
-        <View style={styles.head}>
-          <Text style={styles.eyebrow}>Creator Studio</Text>
-          <Text style={styles.title}>Your work</Text>
-          <Text style={styles.sub}>Everything you've sent us, in review or live. A show's episodes sit under the show.</Text>
-          <Pressable style={styles.primaryBtn} onPress={() => router.push('/creator/submit')}>
-            <Text style={styles.primaryBtnText}>+ Submit a title</Text>
-          </Pressable>
+  function renderSection(section) {
+    const key = `sec:${section.key}`;
+    const sectionOpen = isOpen(key, filtering ? true : section.openByDefault);
+    return (
+      <View key={section.key} style={st.section}>
+        <SectionHead label={section.label} count={section.count} open={sectionOpen} onToggle={() => toggle(key, filtering ? true : section.openByDefault)} />
+        {sectionOpen && section.note ? <Text style={st.sectionNote}>{section.note}</Text> : null}
+        {sectionOpen && section.shows ? <View style={st.shows}>{section.shows.map(renderShow)}</View> : null}
+        {sectionOpen && section.rows ? (
+          <View style={st.rowsCard}>
+            {section.rows.map((row, i) => <TitleRow key={row.key} row={row} actions={actions} onOpen={openRow} first={i === 0} />)}
+          </View>
+        ) : null}
+      </View>
+    );
+  }
+
+  function body() {
+    if (feed.loading && !feed.submissions) {
+      return (
+        <View style={st.stateBox}>
+          <ActivityIndicator color={colors.brass} />
+          <Text style={st.stateText}>{WORK_WORDS.loading}</Text>
         </View>
-
-        <Pressable onPress={() => router.push('/creator/numbers')}>
-          <Text style={styles.analyticsLink}>Want to see how they're doing? View your numbers →</Text>
-        </Pressable>
-
-        {actionError ? <Text style={styles.errorText}>{actionError}</Text> : null}
-        {titleImageWords ? <Text style={styles.okLine} accessibilityLiveRegion="polite">{titleImageWords}</Text> : null}
-
-        {submissions.length === 0 ? (
-          <Text style={styles.note}>
-            Nothing submitted yet — <Text style={styles.link} onPress={() => router.push('/creator/submit')}>submit your first one</Text>.
-          </Text>
-        ) : (
-          <>
-            <View style={styles.statsRow}>
-              <View style={styles.stat}><Text style={styles.statValue}>{total}</Text><Text style={styles.statLabel}>Total</Text></View>
-              <View style={styles.stat}><Text style={styles.statValue}>{pendingCount}</Text><Text style={styles.statLabel}>In review</Text></View>
-              <View style={styles.stat}><Text style={styles.statValue}>{liveCount}</Text><Text style={styles.statLabel}>Live</Text></View>
-              <View style={styles.stat}><Text style={styles.statValue}>{approvalRate === null ? '—' : `${approvalRate}%`}</Text><Text style={styles.statLabel}>Approval rate</Text></View>
-              <View style={styles.stat}><Text style={styles.statValue}>{avgTurnaroundHours === null ? '—' : `${avgTurnaroundHours}h`}</Text><Text style={styles.statLabel}>Avg. review</Text></View>
-            </View>
-
-            {missingArtworkCount > 0 ? (
-              <View style={styles.nudge}>
-                <ImageIcon size={13} color={colors.olive} />
-                <Text style={styles.nudgeText}>
-                  {' '}{missingArtworkCount} title{missingArtworkCount === 1 ? '' : 's'} still missing a poster or a still — a show's episodes take theirs on its show page, a film's from Your work on the website.
-                </Text>
-              </View>
-            ) : null}
-
-            <TextInput
-              style={styles.search}
-              placeholder="Search your titles…"
-              placeholderTextColor={colors.inkFaint}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-              accessibilityLabel="Search your titles"
-            />
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow} contentContainerStyle={styles.pillRowContent}>
-              {['all', ...STATUS_FILTERS].map((f) => (
-                <Pressable key={f} style={[styles.pill, statusFilter === f && styles.pillOn]} onPress={() => setStatusFilter(f)} accessibilityRole="button" accessibilityState={{ selected: statusFilter === f }}>
-                  <Text style={[styles.pillText, statusFilter === f && styles.pillTextOn]}>{f === 'all' ? 'All' : STATUS_LABEL[f].text}</Text>
-                </Pressable>
-              ))}
-              <Pressable style={[styles.pill, needsAttentionOnly && styles.pillOn]} onPress={() => setNeedsAttentionOnly((v) => !v)} accessibilityRole="button" accessibilityState={{ selected: needsAttentionOnly }}>
-                <WarningIcon size={12} color={needsAttentionOnly ? colors.onBrass : colors.ink} />
-                <Text style={[styles.pillText, needsAttentionOnly && styles.pillTextOn]}> Needs attention</Text>
-              </Pressable>
-            </ScrollView>
-
-            {filteredSubmissions.length === 0 ? <Text style={styles.note}>Nothing matches this filter.</Text> : null}
-
-            {projectGroups.map((group) => (group.isShow ? renderShowGroup(group) : renderStandaloneGroup(group)))}
-          </>
-        )}
-      </ScrollView>
-
-      {/* Action sheet — a film's / short's options, or a show episode's */}
-      <Modal visible={!!actionSheet} transparent animationType="slide" onRequestClose={() => setActionSheet(null)}>
-        <Pressable style={styles.sheetBackdrop} onPress={() => setActionSheet(null)}>
-          <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
-            {actionSheet ? <ActionSheetContent
-              actionSheet={actionSheet}
-              onClose={() => setActionSheet(null)}
-              onEdit={(target) => { setActionSheet(null); setEditError(null); setDownloadsBehind(null); setTimeout(() => setEditModal(target), SHEET_HANDOFF_MS); }}
-              onTitleImage={(item, opts) => { setActionSheet(null); setTimeout(() => pickTitleImage(item, opts), SHEET_HANDOFF_MS); }}
-              onDelete={(item) => { setActionSheet(null); setDeleteReason(''); setDeleteError(null); setTimeout(() => setDeleteModal(item), SHEET_HANDOFF_MS); }}
-              onCancelDeletion={(id) => { setActionSheet(null); cancelDeletion(id); }}
-              onCopyLink={copyPublicLink}
-              onOpenPublic={(item) => { setActionSheet(null); router.push(publicPathFor(item)); }}
-              onOpenEditor={(showId, item) => { setActionSheet(null); router.push(episodeEditorRoute(showId, item.id)); }}
-              onOpenShow={(showId, item) => { setActionSheet(null); router.push(showRoute(showId, { ep: item.id })); }}
-              copiedId={copiedId}
-              pricing={pricing}
-              onSell={(target) => { setActionSheet(null); setTimeout(() => setSellModal(target), SHEET_HANDOFF_MS); }}
-              onPayee={(item) => { setActionSheet(null); setTimeout(() => openPayee(item), SHEET_HANDOFF_MS); }}
-            /> : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Buy to own: Sell this title / Run a sale (components/SellTitleSheet.js) */}
-      <Modal visible={!!sellModal} transparent animationType="fade" onRequestClose={() => setSellModal(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setSellModal(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            {sellModal ? <SellTitleSheet
-              target={sellModal}
-              price={pricing.prices[`${sellModal.type}:${sellModal.id}`] || null}
-              blocked={pricing.blocked ? pricing.blocked[`${sellModal.type}:${sellModal.id}`] || null : null}
-              settings={pricing.settings}
-              getToken={() => freshToken(getToken)}
-              onClose={() => setSellModal(null)}
-              onSaved={loadPricing}
-            /> : null}
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Who gets paid for a title of its own (slice 3b) */}
-      {payeeSheet ? (
-        <Sheet title={`Who gets paid for “${payeeSheet.title}”`} onClose={() => setPayeeSheet(null)}>
-          {payeeSheet.words ? <Text style={ss.okText} accessibilityLiveRegion="polite">{payeeSheet.words}</Text> : null}
-          {payeeSheet.error ? <Text style={ss.error}>{payeeSheet.error}</Text> : !payeeSheet.block ? <ActivityIndicator color={colors.olive} /> : (
-            <PayeeCard
-              payee={payeeSheet.block}
-              mode="modal"
-              onChanged={(next, words) => {
-                // (null, null): the block was out of date — read it again.
-                if (!next && !words) openPayee({ id: payeeSheet.id, title: payeeSheet.title });
-                else setPayeeSheet((cur) => (cur ? { ...cur, block: next || cur.block, words } : cur));
-                loadSubmissions();
-              }}
-            />
-          )}
-        </Sheet>
-      ) : null}
-
-      {/* Edit a film's title/description (sent for approval) */}
-      <Modal visible={!!editModal} transparent animationType="fade" onRequestClose={() => setEditModal(null)}>
-        {/* The notes box makes the card tall: it scrolls, and on iOS it
-            rides up with the keyboard so the field being typed in stays in
-            view. */}
-        <KeyboardAvoidingView style={styles.keyboardWrap} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <Pressable style={styles.modalBackdrop} onPress={() => setEditModal(null)}>
-            <Pressable style={[styles.modalCard, styles.modalCardTall]} onPress={(e) => e.stopPropagation()}>
-              {editModal ? <EditModalContent
-                editModal={editModal}
-                saving={editSaving}
-                error={editError}
-                onCancel={() => setEditModal(null)}
-                onSubmit={submitEdit}
-                onCancelWaiting={cancelWaiting}
-                onLoadDownloads={loadDownloadsSwitch}
-                downloadsBehind={downloadsBehind}
-              /> : null}
-            </Pressable>
-          </Pressable>
-        </KeyboardAvoidingView>
-      </Modal>
-
-      {/* Request deletion */}
-      <Modal visible={!!deleteModal} transparent animationType="fade" onRequestClose={() => setDeleteModal(null)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setDeleteModal(null)}>
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalHeaderText}>Request deletion</Text>
-              <Pressable onPress={() => setDeleteModal(null)}><CloseIcon size={16} /></Pressable>
-            </View>
-            {deleteModal ? (
-              <Text style={styles.modalNote}>"{deleteModal.title}" will be hidden from the site right away. An admin still has to confirm the actual removal — you can cancel this request any time before then.</Text>
-            ) : null}
-            <Text style={styles.label}>Reason — required</Text>
-            <TextInput
-              style={styles.textarea}
-              value={deleteReason}
-              onChangeText={setDeleteReason}
-              multiline
-              numberOfLines={3}
-              placeholder=""
-              placeholderTextColor={colors.inkFaint}
-            />
-            {deleteError ? <Text style={styles.errorText}>{deleteError}</Text> : null}
-            <View style={styles.modalActions}>
-              <Pressable style={[styles.primaryBtn, deleteSaving && styles.btnDisabled]} disabled={deleteSaving} onPress={requestDeletion}>
-                <Text style={styles.primaryBtnText}>{deleteSaving ? 'Submitting…' : 'Request deletion'}</Text>
-              </Pressable>
-              <Pressable style={styles.secondaryBtn} onPress={() => setDeleteModal(null)} disabled={deleteSaving}>
-                <Text style={styles.secondaryBtnText}>Cancel</Text>
-              </Pressable>
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </SafeAreaView>
-  );
-}
-
-function ActionSheetContent({ actionSheet, onClose, onEdit, onTitleImage, onDelete, onCancelDeletion, onCopyLink, onOpenPublic, onOpenEditor, onOpenShow, copiedId, pricing, onSell, onPayee }) {
-  const { type, item: s } = actionSheet;
-
-  // A show's episode or extra: the editor and the show screen do the rest
-  // (art, the file, captions, its place, removal).
-  if (type === 'show') {
-    const extra = s.contentType === 'bonus';
-    const price = pricing.prices[`episode:${s.id}`];
+      );
+    }
+    if (feed.forbidden) {
+      return (
+        <View style={st.stateBox}>
+          <Text style={st.stateTitle}>Creator access required</Text>
+          <Text style={st.stateText}>This section is only for accounts with creator or admin access.</Text>
+        </View>
+      );
+    }
+    if (!feed.submissions) {
+      return (
+        <View style={st.stateBox}>
+          <Text style={st.stateText} accessibilityRole="alert">{WORK_WORDS.failed}</Text>
+          <ActButton label={WORK_WORDS.tryAgain} onPress={() => { setFeed((f) => ({ ...f, loading: true })); loadAll(); }} />
+        </View>
+      );
+    }
+    if (model.empty) {
+      return (
+        <View style={st.stateBox}>
+          <Text style={st.stateText}>{WORK_WORDS.nothing}</Text>
+          <ActButton label={`+ ${WORK_WORDS.submit}`} gold onPress={() => router.push('/creator/submit')} />
+        </View>
+      );
+    }
     return (
       <>
-        <Text style={styles.sheetTitle} numberOfLines={1}>{[episodeCode(s), displayTitle(s)].filter(Boolean).join(' · ')}</Text>
-        <Pressable style={styles.sheetRow} onPress={() => onOpenEditor(actionSheet.showId, s)}>
-          <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{extra ? 'Edit extra' : 'Edit episode'}</Text>
-        </Pressable>
-        <Pressable style={styles.sheetRow} onPress={() => onOpenShow(actionSheet.showId, s)}>
-          <ChevronIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Open on the show page</Text>
-        </Pressable>
-        <Pressable style={styles.sheetRow} onPress={() => onOpenEditor(actionSheet.showId, s)} accessibilityHint="Opens its editor; Who gets paid is under More info">
-          <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>Who gets paid</Text>
-        </Pressable>
-        {actionSheet.onSite ? (
-          <>
-            <Pressable style={styles.sheetRow} onPress={() => onOpenPublic(s)}>
-              <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>View page</Text>
-            </Pressable>
-            <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
-              <LinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{copiedId === s.id ? 'Link copied!' : 'Copy link'}</Text>
-            </Pressable>
-            {!extra && s.canPrice !== false ? (
-              <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'episode', id: s.id, title: displayTitle(s), sub: [episodeCode(s), minutes(s.runtime), s.seriesName].filter(Boolean).join(' · ') })}>
-                <Text style={[styles.sheetRowText, styles.dollar]}>$</Text>
-                <Text style={styles.sheetRowText}>{price ? 'Price and sales' : 'Sell'}{price && price.price_cents ? ` · ${dollars(price.price_cents)}` : ''}</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={st.tabsScroll} contentContainerStyle={st.tabs}>
+          {model.tabs.map((t) => {
+            const on = t.key === tab;
+            return (
+              <Pressable
+                key={t.key}
+                style={({ pressed }) => [st.tab, on && st.tabOn, pressed && !on && ss.pressed]}
+                onPress={() => setTab(t.key)}
+                accessibilityRole="button"
+                accessibilityState={{ selected: on }}
+                accessibilityLabel={`${t.label}, ${t.count}`}
+              >
+                <Text style={[st.tabText, on && st.tabTextOn]}>{t.label}</Text>
+                <Text style={[st.tabCount, on && st.tabTextOn]}>{t.count}</Text>
               </Pressable>
-            ) : null}
-          </>
-        ) : null}
-        <Pressable style={styles.sheetCancel} onPress={onClose}><Text style={styles.sheetCancelText}>Close</Text></Pressable>
+            );
+          })}
+        </ScrollView>
+        <TextInput
+          style={st.search}
+          placeholder={WORK_WORDS.search}
+          placeholderTextColor={colors.inkFaint}
+          value={query}
+          onChangeText={setQuery}
+          autoCorrect={false}
+          returnKeyType="search"
+          clearButtonMode="while-editing"
+          accessibilityLabel={WORK_WORDS.search}
+        />
+        {model.nothingMatches ? (
+          <View style={st.stateBox}>
+            <Text style={st.stateText}>{WORK_WORDS.nothingMatches}</Text>
+            <ActButton label={WORK_WORDS.showEverything} onPress={() => { setTab('all'); setQuery(''); }} />
+          </View>
+        ) : model.sections.map(renderSection)}
       </>
     );
   }
 
   return (
-    <>
-      <Text style={styles.sheetTitle} numberOfLines={1}>{s.title}</Text>
-      {s.status === 'approved' ? (
-        <>
-          <Pressable style={styles.sheetRow} onPress={() => onOpenPublic(s)}>
-            <ExternalLinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>View public page</Text>
-          </Pressable>
-          <Pressable style={styles.sheetRow} onPress={() => onCopyLink(s)}>
-            <LinkIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{copiedId === s.id ? 'Link copied!' : 'Copy public link'}</Text>
-          </Pressable>
-          {!s.deletionRequested && !s.held && s.contentType !== 'bonus' && s.canPrice !== false ? (
-            <Pressable style={styles.sheetRow} onPress={() => onSell({ type: 'episode', id: s.id, title: s.title, sub: [s.contentType, s.runtime, s.seriesName].filter(Boolean).join(' · ') })}>
-              <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>{pricing.prices[`episode:${s.id}`] ? 'Price and sales' : 'Sell this title'}</Text>
+    <SafeAreaView style={st.screen} edges={['top', 'bottom']}>
+      <TopNav />
+      <ScrollView
+        style={st.scrollView}
+        contentContainerStyle={st.scroll}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.brass} />}
+      >
+        {/* The Dashboard's row of tabs (2026-11-14). */}
+        <DashboardTabs current="work" style={st.dashTabs} />
+        <View style={st.head}>
+          <Text style={st.eyebrow}>{WORK_WORDS.kicker}</Text>
+          <Text style={st.title} accessibilityRole="header">{WORK_WORDS.heading}</Text>
+          <Text style={st.lede}>{WORK_WORDS.lede}</Text>
+          <View style={st.headBtns}>
+            <Pressable style={({ pressed }) => [st.submit, pressed && ss.pressed]} onPress={() => router.push('/creator/submit')} accessibilityRole="link">
+              <Text style={st.submitText}>{`+ ${WORK_WORDS.submit}`}</Text>
             </Pressable>
-          ) : null}
-        </>
-      ) : null}
-      {!s.deletionRequested ? (
-        <Pressable style={styles.sheetRow} onPress={() => onEdit({ type: 'episode', currentValues: editValuesFor(s) })}>
-          <PencilIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>{notesBoxShows(s) ? 'Edit title, description & notes' : 'Edit title & description'}</Text>
-        </Pressable>
-      ) : null}
-      {/* The title set as a picture (a PNG with a transparent background),
-          drawn in place of the text title on the title's own page. */}
-      {!s.deletionRequested && !s.withdrawnAt && !['podcast', 'vertical'].includes(s.contentType) && !(s.status === 'approved' && s.titleImageWaitReady === false) ? (
-        <>
-          <Pressable style={styles.sheetRow} onPress={() => onTitleImage(s)}>
-            <ImageIcon size={16} color={colors.ink} />
-            <Text style={styles.sheetRowText}>
-              {s.titleImageUrl || s.pendingTitleImageUrl ? 'Replace the title image' : 'Add a title image'}
-              {s.pendingTitleImageUrl || s.pendingTitleImageRemoval ? ' · one waits for approval' : ''}
-            </Text>
-          </Pressable>
-          {s.titleImageUrl && !s.pendingTitleImageRemoval ? (
-            <Pressable style={styles.sheetRow} onPress={() => onTitleImage(s, { remove: true })}>
-              <TrashIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Remove the title image</Text>
+            <Pressable style={({ pressed }) => [st.newShow, pressed && ss.pressed]} onPress={() => router.push('/creator/show/new')} accessibilityRole="link">
+              <Text style={st.outlineText}>{WORK_WORDS.newShow}</Text>
             </Pressable>
-          ) : null}
-        </>
-      ) : null}
-      <Pressable style={styles.sheetRow} onPress={() => onPayee(s)}>
-        <Text style={[styles.sheetRowText, styles.dollar]}>$</Text><Text style={styles.sheetRowText}>Who gets paid</Text>
-      </Pressable>
-      <Pressable style={styles.sheetRow} onPress={() => Linking.openURL(`${SITE_ORIGIN}/creator/my-work`)}>
-        <ImageIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Manage artwork, video &amp; captions (on website)</Text>
-      </Pressable>
-      {s.deletionRequested ? (
-        <Pressable style={styles.sheetRow} onPress={() => onCancelDeletion(s.id)}>
-          <UndoIcon size={16} color={colors.ink} /><Text style={styles.sheetRowText}>Cancel deletion request</Text>
-        </Pressable>
-      ) : (
-        <Pressable style={styles.sheetRow} onPress={() => onDelete(s)}>
-          <TrashIcon size={16} color={colors.danger} /><Text style={[styles.sheetRowText, { color: colors.danger }]}>Request deletion</Text>
-        </Pressable>
-      )}
-      <Pressable style={styles.sheetCancel} onPress={onClose}><Text style={styles.sheetCancelText}>Close</Text></Pressable>
-    </>
-  );
-}
-
-// The title, description and notes box (the website's
-// components/RequestEditModal.js): each field does what the field policy
-// says for a title of the creator's own — on a live title it waits for
-// approval, on one that has never been live it applies at once — the
-// changes already waiting are listed with Cancel and the boxes start from
-// them, only what changed is sent, and the Save label says what goes to
-// review. Before migration 122 a live title's notes have nowhere to wait:
-// the box is greyed with the reason. "Contains flashing lights" (Jose,
-// 2026-11-13) rides on the same save: ticking it applies at once, a live
-// title included; once a live title has it the box is ticked and greyed
-// with "Only the team can remove this warning from a live title."
-// "Allow downloads in the app" (Jose, 2026-11-14; a film or a short has no
-// episode editor in the app, so its switch is here): the box shows once the
-// title's own read has answered, for a title that can be downloaded (never
-// a podcast), and rides on the same save — it applies at once, a live title
-// included. On a database without migration 123 it is greyed with the
-// server's line, from the read or from a save that found out.
-const NOTES_122_LINE = 'Notes need a database update (migration 122).';
-const DONE_WORDS = { title: 'the title', description: 'the description', pageNotes: 'the notes', hasFlashingLights: 'the flashing-lights warning', downloadsAllowed: 'downloads in the app' };
-function listOf(fields) {
-  const named = fields.map((f) => DONE_WORDS[f]).filter(Boolean);
-  return named.length <= 1 ? named.join('') : `${named.slice(0, -1).join(', ')} and ${named[named.length - 1]}`;
-}
-
-function EditModalContent({ editModal, saving, error, onCancel, onSubmit, onCancelWaiting, onLoadDownloads, downloadsBehind = null }) {
-  const cv = editModal.currentValues || {};
-  const isEpisode = editModal.type === 'episode';
-  const waitingStart = {
-    title: typeof cv.pendingTitle === 'string' && cv.pendingTitle.trim() ? cv.pendingTitle : null,
-    description: typeof cv.pendingDescription === 'string' && cv.pendingDescription.trim() ? cv.pendingDescription : null,
-    pageNotes: typeof cv.pendingPageNotes === 'string' ? cv.pendingPageNotes : null
-  };
-  const start = {
-    title: waitingStart.title !== null ? waitingStart.title : cv.title || '',
-    description: waitingStart.description !== null ? waitingStart.description : cv.description || '',
-    pageNotes: waitingStart.pageNotes !== null ? waitingStart.pageNotes : cv.pageNotes || ''
-  };
-  const [nameValue, setNameValue] = useState(start.title);
-  const [description, setDescription] = useState(start.description);
-  const notesShown = isEpisode && cv.notesShown === true;
-  const [notes, setNotes] = useState(start.pageNotes);
-  const startFlashing = cv.hasFlashingLights === true;
-  const [flashing, setFlashing] = useState(startFlashing);
-  // { allowed, locked } once the title's own read has answered; `allow` is
-  // the box. No box until then, nor for a podcast.
-  const downloadable = isEpisode && downloadableKind(cv.contentType);
-  const [downloads, setDownloads] = useState(null);
-  const [allow, setAllow] = useState(true);
-  const loadDownloadsRef = useRef(onLoadDownloads);
-  loadDownloadsRef.current = onLoadDownloads;
-  useEffect(() => {
-    if (!downloadable || !loadDownloadsRef.current) return undefined;
-    let closed = false;
-    Promise.resolve(loadDownloadsRef.current()).then((d) => {
-      if (closed || !d) return;
-      setDownloads(d);
-      setAllow(d.allowed);
-    }).catch(() => {});
-    return () => { closed = true; };
-  }, [downloadable, cv.id]);
-  const downloadsLocked = downloads ? downloadsBehind || downloads.locked : null;
-  const [waiting, setWaiting] = useState(waitingStart);
-  const [cancelling, setCancelling] = useState(null);
-  const [done, setDone] = useState(null);
-
-  const ctx = { isUploader: true, isRunner: true, status: cv.status || 'approved', held: cv.held === true, deletionRequested: cv.deletionRequested === true, withdrawn: Boolean(cv.withdrawnAt) };
-  const notes122 = (f) => f === 'pageNotes' && fieldPolicy(f, ctx) === 'staged' && cv.pageNotesWaitReady === false;
-  const modeOf = (f) => (notes122(f) ? 'locked' : fieldPolicy(f, ctx));
-  const lineOf = (f) => (notes122(f) ? NOTES_122_LINE : fieldPolicyLine(f, ctx));
-  const open = (f) => ['direct', 'staged'].includes(modeOf(f));
-  const flashingPolicy = isEpisode ? flashingLightsPolicy(ctx, startFlashing) : { mode: 'locked', line: null };
-  const changes = [];
-  if (nameValue.trim() !== start.title.trim()) changes.push({ field: 'title', mode: modeOf('title') });
-  if (description.trim() !== start.description.trim()) changes.push({ field: 'description', mode: modeOf('description') });
-  if (notesShown && notes.trim() !== start.pageNotes.trim()) changes.push({ field: 'pageNotes', mode: modeOf('pageNotes') });
-  if (isEpisode && flashing !== startFlashing) changes.push({ field: 'hasFlashingLights', mode: 'direct' });
-  if (downloads && !downloadsLocked && allow !== downloads.allowed) changes.push({ field: 'downloadsAllowed', mode: 'direct' });
-  const summary = saveSummary(changes);
-  const liveRules = ['title', 'description', 'pageNotes'].some((f) => modeOf(f) === 'staged');
-  const anyWaiting = Object.values(waiting).some((v) => v !== null);
-
-  async function send() {
-    const body = {};
-    for (const c of changes) {
-      if (c.field === 'title') body.title = nameValue.trim();
-      if (c.field === 'description') body.description = description.trim();
-      if (c.field === 'pageNotes') body.pageNotes = notes.trim();
-      if (c.field === 'hasFlashingLights') body.hasFlashingLights = flashing;
-      if (c.field === 'downloadsAllowed') body.downloadsAllowed = allow;
-    }
-    const result = await onSubmit(body);
-    if (result) setDone(result);
-  }
-  async function takeBack(field) {
-    setCancelling(field);
-    const okNow = await onCancelWaiting(field);
-    setCancelling(null);
-    if (okNow) setWaiting((w) => ({ ...w, [field]: null }));
-  }
-
-  if (done) {
-    return (
-      <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalHeaderText}>{notesShown ? 'Title, description & notes' : 'Title & description'}</Text>
-          <Pressable onPress={onCancel}><CloseIcon size={16} /></Pressable>
-        </View>
-        <Text style={styles.doneText}>
-          {[
-            done.staged.length ? `Sent for review: ${listOf(done.staged)}. Visitors see what’s live until we approve it.` : null,
-            done.applied.length ? `Saved: ${listOf(done.applied)}.` : null,
-            !done.staged.length && !done.applied.length ? done.notices[0] || 'Saved.' : null,
-            // The rest went through; the downloads box didn't (no migration 123).
-            downloadsBehind ? `Not saved: ${DONE_WORDS.downloadsAllowed}. ${downloadsBehind}` : null
-          ].filter(Boolean).join(' ')}
-        </Text>
-        <Pressable style={styles.primaryBtn} onPress={onCancel}><Text style={styles.primaryBtnText}>Close</Text></Pressable>
-      </ScrollView>
-    );
-  }
-
-  return (
-    <ScrollView keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-      <View style={styles.modalHeader}>
-        <Text style={styles.modalHeaderText}>{notesShown ? 'Title, description & notes' : 'Title & description'}</Text>
-        <Pressable onPress={onCancel}><CloseIcon size={16} /></Pressable>
-      </View>
-      <Text style={styles.modalNote}>
-        {liveRules
-          ? 'It’s live, so these go to Studio Tapa for approval before visitors see them — what’s there now stays until then.'
-          : 'It isn’t live yet, so these apply as soon as you save.'}
-      </Text>
-      {anyWaiting ? (
-        <View style={styles.waitingBox}>
-          <Text style={styles.waitingHead}>Waiting for approval</Text>
-          {['title', 'description', 'pageNotes'].filter((f) => waiting[f] !== null).map((f) => (
-            <View key={f} style={styles.waitingRow}>
-              <Text style={styles.waitingText}>{f === 'pageNotes' && waiting.pageNotes === '' ? 'clearing the notes' : `the new ${f === 'pageNotes' ? 'notes' : f}`}</Text>
-              <Pressable style={[styles.waitingCancel, (cancelling === f || saving) && styles.btnDisabled]} disabled={cancelling === f || saving} onPress={() => takeBack(f)} accessibilityRole="button" accessibilityLabel={`Cancel the waiting ${f === 'pageNotes' ? 'notes' : f}`}>
-                <Text style={styles.waitingCancelText}>{cancelling === f ? '…' : 'Cancel'}</Text>
-              </Pressable>
-            </View>
-          ))}
-          <Text style={styles.waitingFoot}>Visitors see what’s live until we approve it. The boxes below start from what waits.</Text>
-        </View>
-      ) : null}
-      <Text style={styles.label}>{isEpisode ? 'Title' : 'Show name'}</Text>
-      <TextInput style={[styles.input, !open('title') && styles.inputOff]} value={nameValue} onChangeText={setNameValue} editable={open('title')} maxLength={200} />
-      {!open('title') ? <Text style={styles.notesHelp}>{lineOf('title')}</Text> : null}
-      <Text style={styles.label}>Description</Text>
-      <TextInput style={[styles.textarea, !open('description') && styles.inputOff]} value={description} onChangeText={setDescription} multiline numberOfLines={4} maxLength={4000} editable={open('description')} />
-      {!open('description') ? <Text style={styles.notesHelp}>{lineOf('description')}</Text> : null}
-      {notesShown ? (
-        <>
-          <View style={styles.notesLabelRow}>
-            <Text style={[styles.label, styles.notesLabel]}>Notes for the title’s page <Text style={styles.notesHint}>optional · blank lines make paragraphs</Text></Text>
-            <Text style={[styles.notesCount, notes.length > PAGE_NOTES_MAX && styles.notesCountOver]}>{notes.length.toLocaleString('en-US')} / {PAGE_NOTES_MAX.toLocaleString('en-US')}</Text>
           </View>
-          <TextInput
-            style={[styles.textarea, styles.notesInput, !open('pageNotes') && styles.inputOff]}
-            value={notes}
-            onChangeText={setNotes}
-            multiline
-            maxLength={PAGE_NOTES_MAX}
-            editable={open('pageNotes')}
-            placeholder="How it was made, who’s in it, the story behind a scene."
-            placeholderTextColor={colors.inkFaint}
-            accessibilityLabel="Notes for the title’s page"
-          />
-          <Text style={styles.notesHelp}>
-            Shown on the title’s page in place of the description.{' '}
-            {!open('pageNotes') ? lineOf('pageNotes') : modeOf('pageNotes') === 'staged' ? 'Waits for approval like the description.' : 'Saved at once: it isn’t live yet.'}
-          </Text>
-        </>
-      ) : null}
-      {isEpisode ? (
-        <FlashingLightsField
-          checked={flashing}
-          onChange={setFlashing}
-          locked={flashingPolicy.mode === 'locked' ? flashingPolicy.line : null}
-          style={{ marginTop: 12 }}
-        />
-      ) : null}
-      {downloads ? (
-        <DownloadsAllowedField
-          checked={downloadsLocked ? downloads.allowed : allow}
-          onChange={setAllow}
-          locked={downloadsLocked}
-          style={{ marginTop: 6 }}
-        />
-      ) : null}
-      {summary.note ? <Text style={styles.notesHelp}>{summary.note}.</Text> : null}
-      {error ? <Text style={styles.errorText}>{error}</Text> : null}
-      <View style={styles.modalActions}>
-        <Pressable style={[styles.primaryBtn, (saving || changes.length === 0) && styles.btnDisabled]} disabled={saving || changes.length === 0} onPress={send}>
-          <Text style={styles.primaryBtnText}>{saving ? 'Sending…' : summary.label}</Text>
-        </Pressable>
-        <Pressable style={styles.secondaryBtn} onPress={onCancel} disabled={saving}>
-          <Text style={styles.secondaryBtnText}>Cancel</Text>
-        </Pressable>
-      </View>
-    </ScrollView>
+        </View>
+        {body()}
+      </ScrollView>
+      {actions.element}
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  // A show's group (the series revamp, slice 5)
-  pressed: { opacity: 0.75 },
-  showHead: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 10, marginBottom: 6, borderRadius: 12, borderWidth: 1, borderColor: inkTint(0.12), backgroundColor: colors.surface1 },
-  showPoster: { width: 56, height: 84, borderRadius: 6, backgroundColor: colors.surface2 },
-  showPosterEmpty: { borderWidth: 1, borderStyle: 'dashed', borderColor: inkTint(0.25), backgroundColor: 'transparent', alignItems: 'center', justifyContent: 'center', padding: 4 },
-  showPosterName: { fontFamily: fonts.displaySemi, fontSize: 10, lineHeight: 13, color: colors.inkDim, textAlign: 'center' },
-  showChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 4 },
-  openRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 4 },
-  openText: { fontFamily: fonts.mono, fontSize: 10.5, letterSpacing: 0.6, color: colors.olive, textTransform: 'uppercase' },
-  seasonHead: { fontFamily: fonts.mono, fontSize: 10, letterSpacing: 1.2, color: colors.inkDim, textTransform: 'uppercase', marginTop: 12, marginBottom: 2 },
-  showRowMain: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 0 },
-  code: { fontFamily: fonts.mono, fontSize: 10.5, color: colors.olive },
-  showMetaLine: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 2 },
-  flagLine: { flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 3 },
-  flagText: { flex: 1, fontSize: 10.5, lineHeight: 14 },
-  editBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: inkTint(0.2), alignItems: 'center', justifyContent: 'center' },
-  dollar: { color: colors.olive, fontWeight: '700' },
-
+const st = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.surface0 },
   scrollView: { flex: 1 },
-  scroll: { padding: 16, paddingBottom: 120 },
-  center: { flex: 1, backgroundColor: colors.surface0, alignItems: 'center', justifyContent: 'center', padding: 24 },
-  errorText: { color: colors.danger, fontSize: 13, marginTop: 6, marginBottom: 6 },
-  note: { color: colors.inkDim, fontSize: 14, lineHeight: 20, marginTop: 8 },
-  link: { color: colors.olive },
+  scroll: { paddingTop: 16, paddingHorizontal: 16, paddingBottom: 140 },
+  dashTabs: { marginBottom: 18 },
 
-  dashTabs: { marginBottom: 16 },
-  head: { marginBottom: 14 },
-  eyebrow: { color: colors.olive, fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 4 },
-  title: { color: colors.ink, fontSize: 22, fontWeight: '800', marginBottom: 6 },
-  sub: { color: colors.inkDim, fontSize: 13, lineHeight: 19, marginBottom: 14 },
-  primaryBtn: { backgroundColor: colors.brass, borderRadius: 999, paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center', alignSelf: 'flex-start' },
-  primaryBtnText: { color: colors.onBrass, fontSize: 14, fontWeight: '700' },
-  secondaryBtn: { borderRadius: 999, paddingVertical: 12, paddingHorizontal: 18, alignItems: 'center', borderWidth: 1, borderColor: colors.hairline },
-  secondaryBtnText: { color: colors.ink, fontSize: 14, fontWeight: '600' },
-  btnDisabled: { opacity: 0.5 },
+  head: { marginBottom: 18 },
+  eyebrow: { fontFamily: fonts.mono, fontSize: 11, letterSpacing: 1.6, textTransform: 'uppercase', color: colors.olive, marginBottom: 6 },
+  title: { fontFamily: fonts.displayBold, fontSize: 30, lineHeight: 34, color: colors.ink, marginBottom: 6 },
+  lede: { fontFamily: fonts.body, fontSize: 15.5, lineHeight: 22, color: colors.inkDim, marginBottom: 16 },
+  headBtns: { flexDirection: 'row', gap: 8 },
+  submit: { flex: 1, minHeight: 48, borderRadius: 999, backgroundColor: colors.olive, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  submitText: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.oliveShadow },
+  newShow: { minHeight: 48, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.22), alignItems: 'center', justifyContent: 'center', paddingHorizontal: 16 },
 
-  analyticsLink: { color: colors.olive, fontSize: 13, marginBottom: 14 },
+  // the work tabs: a sideways row that runs to the screen's edges
+  tabsScroll: { marginHorizontal: -16, marginBottom: 12 },
+  tabs: { gap: 8, paddingHorizontal: 16 },
+  tab: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.22) },
+  tabOn: { backgroundColor: colors.brass, borderColor: colors.brass },
+  tabText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.inkDim },
+  tabCount: { fontFamily: fonts.monoMedium, fontSize: 12, color: colors.inkDim },
+  tabTextOn: { color: colors.onBrass },
+  search: { minHeight: 44, marginBottom: 22, paddingHorizontal: 16, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.22), backgroundColor: colors.surface2, color: colors.ink, fontFamily: fonts.body, fontSize: 16 },
 
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: 14 },
-  stat: { minWidth: 90, backgroundColor: colors.surface2, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, alignItems: 'center', flexGrow: 1 },
-  statValue: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  statLabel: { color: colors.inkDim, fontSize: 10, marginTop: 2, textAlign: 'center' },
+  // the states
+  stateBox: { gap: 12, paddingVertical: 18, alignItems: 'flex-start' },
+  stateTitle: { fontFamily: fonts.displayBold, fontSize: 18, color: colors.ink },
+  stateText: { fontFamily: fonts.body, fontSize: 15, lineHeight: 21, color: colors.inkDim },
 
-  nudge: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.surface2, borderRadius: 10, padding: 10, marginBottom: 14 },
-  nudgeText: { color: colors.inkDim, fontSize: 12, flex: 1, lineHeight: 17 },
+  // a section
+  section: { marginBottom: 26 },
+  sectionNote: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19, color: colors.inkDim, marginBottom: 10 },
+  shows: { gap: 12, marginTop: 4 },
+  rowsCard: { marginTop: 4, borderRadius: 16, backgroundColor: colors.surface2, overflow: 'hidden' },
 
-  search: { backgroundColor: colors.surface2, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 12, color: colors.ink, fontSize: 14, marginBottom: 10 },
-  pillRow: { marginBottom: 16 },
-  pillRowContent: { gap: 8, paddingRight: 8 },
-  pill: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface2, borderRadius: 999, paddingVertical: 8, paddingHorizontal: 14 },
-  pillOn: { backgroundColor: colors.brass },
-  pillText: { color: colors.ink, fontSize: 12, fontWeight: '600' },
-  pillTextOn: { color: colors.onBrass },
+  // a show's card
+  showCard: { borderRadius: 16, backgroundColor: colors.surface2, padding: 16, gap: 12 },
+  showTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  poster: { width: 44, height: 66, borderRadius: 6, backgroundColor: colors.surface1 },
+  posterEmpty: { borderWidth: 1, borderStyle: 'dashed', borderColor: inkTint(0.3) },
+  showText: { flex: 1, minWidth: 0, gap: 6 },
+  showChips: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  showName: { fontFamily: fonts.displayBold, fontSize: 19, lineHeight: 23, color: colors.ink, flexShrink: 1 },
+  countLine: { fontFamily: fonts.mono, fontSize: 12, color: colors.inkDim },
+  showLines: { fontFamily: fonts.body, fontSize: 14, lineHeight: 19, color: colors.inkDim },
+  cardNote: { fontFamily: fonts.body, fontSize: 13.5, lineHeight: 19 },
+  fullBtn: { alignSelf: 'stretch' },
+  showBtns: { flexDirection: 'row', gap: 8 },
+  outlineBtn: { flex: 1, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 999, borderWidth: 1, borderColor: inkTint(0.22), paddingHorizontal: 10 },
+  outlineText: { fontFamily: fonts.displaySemi, fontSize: 14, color: colors.ink, textAlign: 'center' },
 
-  projectGroup: { marginBottom: 20 },
-  projectHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 8, gap: 10 },
-  projectArt: { width: 44, height: 44, borderRadius: 8, backgroundColor: colors.surface2 },
-  projectTitleWrap: { flex: 1 },
-  projectTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  projectTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', flexShrink: 1 },
-  projectSub: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
-  projectBadges: { gap: 4, alignItems: 'flex-end' },
-  badge: { fontSize: 9, fontWeight: '700', paddingVertical: 2, paddingHorizontal: 6, borderRadius: 999, overflow: 'hidden' },
-  badgePending: { color: colors.olive, backgroundColor: oliveTint(0.15) },
-  badgeMissing: { color: colors.danger, backgroundColor: dangerTint(0.15) },
-
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: colors.hairline },
-  rowThumb: { width: 54, height: 40, borderRadius: 6, backgroundColor: colors.surface2 },
-  rowMain: { flex: 1, minWidth: 0 },
-  rowTitleLine: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  rowTitle: { color: colors.ink, fontSize: 13, fontWeight: '600', flexShrink: 1 },
-  rowMeta: { color: colors.inkFaint, fontSize: 11, marginTop: 1 },
-  rowRejection: { color: colors.danger, fontSize: 10, marginTop: 2 },
-  rowPrice: { fontSize: 10, fontWeight: '700', marginTop: 2 },
-  rowRight: { alignItems: 'flex-end', gap: 3 },
-  statusPill: { fontSize: 10, fontWeight: '700' },
-  viewsRow: { flexDirection: 'row', alignItems: 'center' },
-  viewsText: { color: colors.inkFaint, fontSize: 10 },
-  flagsRow: { flexDirection: 'row', gap: 4 },
-
-  sheetBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
-  sheet: { backgroundColor: colors.surface1, borderTopLeftRadius: 18, borderTopRightRadius: 18, padding: 18, paddingBottom: 30 },
-  sheetTitle: { color: colors.ink, fontSize: 15, fontWeight: '700', marginBottom: 12 },
-  sheetRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
-  sheetRowText: { color: colors.ink, fontSize: 14 },
-  sheetCancel: { marginTop: 8, paddingVertical: 12, alignItems: 'center', borderTopWidth: 1, borderTopColor: colors.hairline },
-  sheetCancelText: { color: colors.inkDim, fontSize: 14, fontWeight: '600' },
-
-  modalBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center', padding: 20 },
-  modalCard: { backgroundColor: colors.surface1, borderRadius: 14, padding: 18, width: '100%', maxWidth: 420 },
-  // The edit card with a notes box can be taller than the screen: it
-  // scrolls (EditModalContent's ScrollView) inside this height.
-  modalCardTall: { maxHeight: '88%' },
-  keyboardWrap: { flex: 1 },
-  notesLabelRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 },
-  notesLabel: { flexShrink: 1 },
-  notesHint: { fontWeight: '400', color: colors.inkFaint },
-  notesCount: { color: colors.inkFaint, fontSize: 11, fontFamily: fonts.mono, marginBottom: 5 },
-  notesCountOver: { color: colors.danger },
-  notesInput: { minHeight: 120 },
-  notesHelp: { color: colors.inkDim, fontSize: 11.5, lineHeight: 16, marginTop: 5 },
-  // The changes already waiting for approval (the website's .req-edit-waiting).
-  waitingBox: { padding: 10, borderRadius: 10, borderWidth: 1, borderColor: oliveTint(0.5), backgroundColor: oliveTint(0.08), marginBottom: 6, gap: 6 },
-  waitingHead: { color: colors.olive, fontSize: 12.5, fontWeight: '600' },
-  waitingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
-  waitingText: { color: colors.ink, fontSize: 13, flex: 1 },
-  waitingCancel: { borderWidth: 1, borderColor: oliveTint(0.65), borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12 },
-  waitingCancelText: { color: colors.olive, fontSize: 12.5 },
-  waitingFoot: { color: colors.inkDim, fontSize: 11.5, lineHeight: 16 },
-  inputOff: { opacity: 0.5 },
-  doneText: { color: colors.ok, fontSize: 14, lineHeight: 20, marginBottom: 14 },
-  okLine: { color: colors.ok, fontSize: 13, lineHeight: 18, marginTop: 6, marginBottom: 6 },
-  modalHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
-  modalHeaderText: { color: colors.ink, fontSize: 16, fontWeight: '700', flexShrink: 1 },
-  modalNote: { color: colors.inkDim, fontSize: 12, lineHeight: 17, marginBottom: 12 },
-  label: { color: colors.inkDim, fontSize: 12, fontWeight: '600', marginBottom: 5, marginTop: 8 },
-  input: { backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 11, color: colors.ink, fontSize: 14 },
-  textarea: { backgroundColor: colors.surface2, borderRadius: 8, paddingVertical: 9, paddingHorizontal: 11, color: colors.ink, fontSize: 14, minHeight: 80, textAlignVertical: 'top' },
-  modalActions: { flexDirection: 'row', gap: 10, marginTop: 14 }
+  // a show's seasons
+  seasons: { gap: 8 },
+  season: { borderRadius: 12, borderWidth: 1, borderColor: inkTint(0.1), overflow: 'hidden' },
+  seasonHead: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12, paddingVertical: 8 },
+  seasonText: { flex: 1, minWidth: 0, gap: 2 },
+  seasonLabel: { fontFamily: fonts.displaySemi, fontSize: 15, color: colors.ink },
+  seasonSummary: { fontFamily: fonts.mono, fontSize: 11.5, lineHeight: 16, color: colors.inkDim },
+  seasonNeeds: { color: colors.brass },
+  seasonRows: { backgroundColor: colors.surface1, borderTopWidth: 1, borderTopColor: inkTint(0.08) }
 });
