@@ -47,3 +47,5 @@ google-service-account.json
 # EAS Update's code-signing private key, if generated inside mobile/
 # (only certs/certificate.pem, the public half, is ever committed)
 eas-keys/
+# *.pem above would also hide the public certificate code signing needs
+!certs/certificate.pem
