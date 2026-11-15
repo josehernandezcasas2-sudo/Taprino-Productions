@@ -64,9 +64,17 @@ async function door() {
   try {
     ok('the door is shut (the middleware has read the switch)', await waitDoor(true));
     const forged = { headers: { 'x-clerk-auth-status': 'signed-out' }, accept: 'text/html' };
-    for (const p of ['/crew/calls/x.css', '/messages/x.css', '/crew/calls/board.js', '/messages/thread.png']) {
+    // The middleware runs on these addresses now (the matcher skips only the
+    // real files in /public), so a signed-out visitor meets the door; a 404
+    // from the page itself is fine too. Never the page.
+    for (const p of ['/crew/calls/x.css', '/messages/x.css', '/crew/calls/board.js', '/messages/thread.png', '/episode/x.css', '/genre/x.png']) {
       const r = await call(p, forged);
-      ok(`${p}, signed out with a forged header: 404, not the page`, r.status === 404, `${r.status} ${r.text.slice(0, 120)}`);
+      const door = r.status === 307 && /\/welcome/.test(r.headers.get('location') || '');
+      ok(`${p}, signed out: the door or 404, never the page`, door || r.status === 404, `${r.status} ${r.text.slice(0, 120)}`);
+    }
+    for (const p of ['/icon.svg', '/logo.svg', '/og-image.png', '/sw.js']) {
+      const r = await call(p, {});
+      ok(`${p}, signed out with the door shut: the file (200)`, r.status === 200, `${r.status} ${r.headers.get('location') || ''}`);
     }
     let r = await page('/crew/calls');
     ok('/crew/calls signed out still goes to the door (307 /welcome)', r.status === 307 && /\/welcome/.test(r.headers.get('location') || ''), `${r.status} ${r.headers.get('location')}`);
