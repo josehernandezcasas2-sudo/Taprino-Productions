@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { cloudflareUidFromUrl, ensureCloudflareAudioDownloadUrl } from '../../../lib/cloudflareUpload';
-import { importAudioFromUrl } from '../../../lib/audioUpload';
+import { cloudflareUidFromUrl, ensureCloudflareAudioDownloadUrl, cloudflareAudioFileUrlForServer } from '../../../lib/cloudflareUpload';
+import { importAudioFromOwnCloudflare } from '../../../lib/audioUpload';
 import { audioRoutePath } from '../../../lib/podcastAudio';
 
 // Polled by the creator's browser after they ask to extract audio from a
@@ -65,7 +65,9 @@ export default async function handler(req, res) {
     // could theoretically be deleted or regenerated later.
     let rehosted;
     try {
-      rehosted = await importAudioFromUrl(result.url, `episode-${episodeId}.m4a`, { userId: episode.submitted_by || userId });
+      const fileUrl = await cloudflareAudioFileUrlForServer(uid);
+      if (!fileUrl) throw new Error('Cloudflare Stream is not configured.');
+      rehosted = await importAudioFromOwnCloudflare(fileUrl, `episode-${episodeId}.m4a`, { userId: episode.submitted_by || userId });
     } catch (err) {
       console.error('extract-podcast-audio rehost error:', err.message);
       return res.status(502).json({ error: `Audio was extracted but could not be moved to storage: ${err.message}` });

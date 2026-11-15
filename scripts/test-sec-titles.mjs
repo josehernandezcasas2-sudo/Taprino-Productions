@@ -53,7 +53,7 @@ t('a withdrawn title keeps its removal', () => {
   assert.deepEqual(removalRefusal({ withdrawn_at: '2026-11-01T00:00:00Z', deletion_requested: true }), { status: 409, code: 'withdrawn', error: WITHDRAWN_LINE });
   assert.equal(removalRefusal({ withdrawn_at: null, deletion_requested: true }), null);
   assert.equal(removalRefusal(null), null);
-  assert.equal(WITHDRAWN_LINE, 'It’s withdrawn and kept for its buyers. Ask us if it should come back.');
+  assert.equal(WITHDRAWN_LINE, 'It’s withdrawn and kept for the people who bought it, so it can’t be changed here.');
   assert.equal(NO_REMOVAL_LINE, 'No removal is requested for this.');
 });
 

@@ -54,7 +54,7 @@ export default async function handler(req, res) {
       const seriesId = typeof req.query.seriesId === 'string' && isTitleId(req.query.seriesId) ? req.query.seriesId : null;
       if (req.query.seriesId !== undefined && !seriesId) return res.status(400).json({ error: 'Which show?' });
       const limit = typeof req.query.limit === 'string' ? req.query.limit : undefined;
-      if (!(await limitPublicRead(req, res, 'creator-drafts-list', { max: 240, windowSeconds: 3600, userId }))) return undefined;
+      if (!(await limitPublicRead(req, res, 'creator-drafts-list', { max: 480, windowSeconds: 3600, userId }))) return undefined;
       return res.status(200).json({ drafts: await listDrafts(userId, { refresh: true, seriesId, limit }) });
     }
 

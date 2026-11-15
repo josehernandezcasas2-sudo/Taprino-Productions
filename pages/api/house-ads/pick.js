@@ -17,9 +17,9 @@ import { adShareEpisodeId } from '../../../lib/adShareTitle';
 // neither and earns nothing. The pixel still refuses a creator's own
 // plays (pages/api/house-ads/impression.js isOwnTitle). The title is
 // signed only when it's a public, ads-on title that isn't a podcast
-// (lib/adShareTitle.js, security fixes 2026-11-15); any other id gets a
-// receipt with no title, so a script asking for receipts by the thousand
-// earns no ad share.
+// (lib/adShareTitle.js, 2026-11-15); any other id gets a receipt with no
+// title. The single-use signed nonce and the rate limits are the other
+// brakes.
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'no-store');
 

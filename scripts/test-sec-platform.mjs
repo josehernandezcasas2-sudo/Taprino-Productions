@@ -30,7 +30,7 @@ t('cssUrl: a plain address is quoted', () => {
 });
 
 t('cssUrl: nothing in the address can end the url() or the declaration', () => {
-  const evil = 'https://x.supabase.co/a.jpg");position:fixed;inset:0;background:url("https://evil.example/fake-sign-in.png';
+  const evil = 'https://x.supabase.co/a.jpg");color:red;--x:url("x';
   const out = cssUrl(evil);
   assert.ok(out.startsWith('url("') && out.endsWith('")'));
   // Every quote inside is escaped, so the string never closes early.
@@ -57,7 +57,7 @@ t('location photos: only the host’s own upload, exactly', () => {
   assert.equal(isOwnLocationPhoto(`${ART}/location-photo-${HOST}-0a1b2c3d4e5f6a7b8c.jpg`, HOST, SB), true);
   assert.equal(isOwnLocationPhoto(`${ART}/location-photo-${HOST}-1729000000000.webp`, HOST, SB), true, 'an older timestamp name');
   const bad = [
-    `${ART}/location-photo-${HOST}-0a1b.jpg");position:fixed;inset:0;background:url("https://evil.example/x.png`,
+    `${ART}/location-photo-${HOST}-0a1b.jpg");color:red;--x:url("x`,
     `${ART}/location-photo-${HOST}-0a1b.jpg?x=1`,
     `${ART}/location-photo-${HOST}-0a1b.jpg#x`,
     `${ART}/location-photo-${HOST}-0a1b.jpg )`,

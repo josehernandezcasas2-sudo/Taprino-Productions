@@ -1,4 +1,5 @@
 import { getAuth } from '@clerk/nextjs/server';
+import { suspendedPlaybackRefusal } from '../../lib/suspensions';
 import { signedSrcForStoredUrl, unsignedFallback } from '../../lib/videoSigning';
 import { playbackGate } from '../../lib/playbackGate';
 import { getAccountContext } from '../../lib/accountContext';
@@ -126,6 +127,10 @@ async function trailerToken(req, res, { episodeId, seriesId }) {
   const budget = userId ? { max: 240, windowSeconds: 3600, userId } : { max: 120, windowSeconds: 3600 };
   if (!(await limitPublicRead(req, res, 'stream-token-trailer', budget))) return undefined;
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
+  // A suspended account's own session gets no video link, a trailer's
+  // included (lib/suspensions.js; the master's half is lib/playbackGate.js).
+  const refused = await suspendedPlaybackRefusal(userId);
+  if (refused) return res.status(refused.status).json(refused.body);
 
   try {
     let stored = null;

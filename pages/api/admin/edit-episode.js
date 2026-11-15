@@ -1,4 +1,5 @@
 import { requireCapability } from '../../../lib/adminAuth';
+import { episodeOwnerIds } from '../../../lib/titleOwners';
 import { hasCapability } from '../../../lib/capabilities';
 import { getSupabase } from '../../../lib/supabase';
 import { uploadArtworkImage } from '../../../lib/artworkUpload';
@@ -460,7 +461,7 @@ async function editEpisode(req, res, roleContext) {
   const approving = changed.status === 'approved';
   // Nobody but a full admin approves their own upload (2026-11-15), here as
   // in the review queue.
-  if (approving && approvesOwnWork(roleContext, [existing.submitted_by])) {
+  if (approving && roleContext.isAdmin !== true && approvesOwnWork(roleContext, await episodeOwnerIds(existing))) {
     return res.status(403).json({ error: OWN_WORK_LINE, code: 'own-work' });
   }
   if (approving && NUMBERED_TYPES.includes(type) && !next.series_order) {

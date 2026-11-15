@@ -1026,9 +1026,12 @@ async function creatorSwitch(ctx) {
   ok('another creator’s title: not theirs (404), unchanged', r.status === 404 && allowed(ID.film) === true, brief(r));
   const flags = await subAdmin('dlflags', ['handle_flags']);
   r = await editor(flags, ID.film);
-  ok('a sub-admin without the episodes capability sees the box greyed with who may change it', r.status === 200 && r.json.policy.downloadsAllowed.mode === 'locked' && /uploaded it or the show’s owner/.test(r.json.policy.downloadsAllowed.line || ''), r.json && r.json.policy && r.json.policy.downloadsAllowed);
+  // Since 2026-11-15 the editors are for the title team only (a full
+  // admin, or review_submissions / manage_episodes): a sub-admin with
+  // neither doesn't open someone else's editor at all.
+  ok('a sub-admin without a title capability doesn’t open someone else’s editor', r.status === 403 || r.status === 404, brief(r));
   r = await patch(flags, ID.film, { downloadsAllowed: false });
-  ok('…and is refused (403 locked)', r.status === 403 && r.json.code === 'locked' && r.json.field === 'downloadsAllowed' && allowed(ID.film) === true, brief(r));
+  ok('…and its save is refused, unchanged', (r.status === 403 || r.status === 404) && allowed(ID.film) === true, brief(r));
   r = await patch(admin, ID.film, { downloadsAllowed: false });
   ok('the team, through the show editor’s save', r.status === 200 && allowed(ID.film) === false, brief(r));
 

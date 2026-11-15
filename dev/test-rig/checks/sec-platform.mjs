@@ -1,9 +1,8 @@
 // node dev/test-rig/checks/sec-platform.mjs — the security fixes of
 // 2026-11-15, platform, uploads and the app (scripts/test-sec-platform.mjs
 // holds the pure rules):
-//   - the beta door can't be walked past through the catch-all pages
-//     (/crew/calls/x.css, /messages/x.css: the middleware skips any address
-//     that ends like a file; the pages now answer 404);
+//   - file-like addresses on the catch-all and dynamic pages meet the
+//     beta door (or a 404), never the page;
 //   - a drafts list asks Cloudflare once per video, remembers the answer
 //     for a minute, leaves a draft a day old alone, marks a video Cloudflare
 //     no longer knows as failed, and a 101st draft is refused;
@@ -130,7 +129,7 @@ async function photos() {
   const own = (h) => `${ART}/location-photo-${host.id}-${h}.jpg`;
   insert('locations', { id: LOC, host_id: host.id, title: `Check place ${RUN}`, kind: 'studio', status: 'listed', verified: true, day_cents: 50000, cleaning_cents: 0, cancellation: 'moderate', city: 'Los Angeles', place_label: 'Echo Park', lat: 34.08, lng: -118.26, address: '123 Check Street', ownership: 'owner' });
   insert('location_photos', { location_id: LOC, url: own('0a1b2c3d4e5f6a7b8c'), sort_order: 0 });
-  const evil = `${own('0a1b2c3d4e5f6a7b8d')}");position:fixed;inset:0;z-index:99999;background:url("https://evil.example/fake-sign-in.png`;
+  const evil = `${own('0a1b2c3d4e5f6a7b8d')}");color:red;--x:url("x`;
   let r = await call(`/api/locations/${LOC}`, { who: host, method: 'PATCH', body: { photos: [{ url: evil }] } });
   ok('a photo address carrying CSS is dropped (400, no photo left)', r.status === 400 && /Add at least one photo/.test((r.json && r.json.error) || ''), `${r.status} ${r.text.slice(0, 160)}`);
   r = await call(`/api/locations/${LOC}`, { who: host, method: 'PATCH', body: { photos: [{ url: `${ART}/location-photo-${USERS.mara}-0a1b2c3d4e5f6a7b8c.jpg` }] } });
@@ -146,9 +145,9 @@ async function photos() {
   insert('location_photos', { location_id: LOC, url: evil, sort_order: 0 });
   r = await page(`/locations/${LOC}`, MARA);
   ok('the listing still opens (200)', r.status === 200, r.status);
-  ok('…its stored address is drawn quoted, every quote inside escaped', r.text.includes('\\&quot;);position:fixed') && !/[^\\]&quot;\);position:fixed/.test(r.text), (r.text.match(/background-image:[^"]{0,220}/) || [''])[0]);
+  ok('…its stored address is drawn quoted, every quote inside escaped', r.text.includes('\\&quot;);color:red') && !/[^\\]&quot;\);color:red/.test(r.text), (r.text.match(/background-image:[^"]{0,220}/) || [''])[0]);
   r = await page('/locations', MARA);
-  ok('the directory too', r.status === 200 && !/[^\\]&quot;\);position:fixed/.test(r.text), r.status);
+  ok('the directory too', r.status === 200 && !/[^\\]&quot;\);color:red/.test(r.text), r.status);
 }
 
 async function appReturn() {

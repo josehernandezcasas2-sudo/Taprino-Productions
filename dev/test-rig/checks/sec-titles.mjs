@@ -32,7 +32,7 @@ const VIEWER = session(USERS.viewer);
 const SUB = session(USERS.sub); // review_submissions + manage_episodes (the seed)
 
 // The lines the site answers with (lib/titleSecurityRules.js).
-const WITHDRAWN_LINE = 'It’s withdrawn and kept for its buyers. Ask us if it should come back.';
+const WITHDRAWN_LINE = 'It’s withdrawn and kept for the people who bought it, so it can’t be changed here.';
 const NO_REMOVAL_LINE = 'No removal is requested for this.';
 const FILE_REVIEW_LINE = 'A reviewer approves a new file on a live title.';
 const OWN_WORK_LINE = 'Someone else on the team approves your own work.';
