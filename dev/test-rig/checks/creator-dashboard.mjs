@@ -328,7 +328,7 @@ await runCheck('creator-dashboard', async () => {
       ok('…earning its episodes’ sales and ad share plus the whole-series sale', nb && nb.earned === dollars(1680 + 2140 + 310 + 2000) && nb.detail === 'sales 36.80 · ads 24.50', JSON.stringify(nb));
       ok('…with its episodes’ views added up', nb && (tracked ? nb.views === sumDays(NIGHT_BUS, 0, 30).toLocaleString('en-US') && nb.spark && /^\d+%$/.test(nb.watched) : nb.views === '0' && !nb.spark), JSON.stringify(nb));
       const film = find('The Long Quiet');
-      ok('the film is its own row with its own money', film && film.earned === dollars(3593 + 600) && film.detail === 'sales 35.93 · ads 6.00' && /Film · 1 h 32/.test(film.meta) && film.href === '/creator/my-work', JSON.stringify(film));
+      ok('the film is its own row with its own money', film && film.earned === dollars(3593 + 600) && film.detail === 'sales 35.93 · ads 6.00' && /Film · 1 h 32/.test(film.meta) && film.href === `/creator/title/${IDS.film}`, JSON.stringify(film));
       ok('…and its own views', film && (tracked ? film.views === sumDays([IDS.film], 0, 30).toLocaleString('en-US') && film.watched === '11%' : film.views === '0'), JSON.stringify(film));
       ok('a live show’s episodes are not rows of their own', !find('First Stop') && !titleRows.some((r) => /Night Bus · S1 E/.test(r.title)));
       const review = find('Night Bus · S2 E7 · The Depot');
@@ -478,6 +478,9 @@ await runCheck('creator-dashboard', async () => {
         const cur = await other.page.locator('.dash-tab.on').innerText();
         const count = await other.page.locator('.dash-tab').count();
         ok(`${href} carries the tabs with ${current} current`, cur === current && count === 5, `${cur} of ${count}`);
+        // The bar learns the role from /api/my-role after the page loads;
+        // on a busy dev server that can take more than the 800 ms goto waits.
+        await other.page.waitForSelector('.tabbar .tabbar-dash.active', { timeout: 15000 }).catch(() => {});
         const lit = await other.page.evaluate(() => [...document.querySelectorAll('.tabbar .tabbar-item.active')].map((el) => el.innerText.trim().toUpperCase()));
         ok(`${href} has the tab bar${hadBar ? '' : ' (it had none)'}, with Dashboard lit`, lit.join('|') === 'DASHBOARD', lit.join('|'));
         ok(`${href} doesn’t run off the side`, (await overflowPx(other.page)) <= 0, `${await overflowPx(other.page)}px`);

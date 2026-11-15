@@ -131,6 +131,10 @@ export default function RootLayout() {
           {/* The creator's Dashboard (2026-11-14): the bottom bar's
               Dashboard tab. It draws the site header itself. */}
           <Stack.Screen name="creator/dashboard" options={{ headerShown: false }} />
+          {/* A title's dashboard (2026-11-15: a film's, a short's, an
+              extra's or a vertical title's own page, from Your work and the
+              Dashboard's rows). It draws the site header and its Back pill. */}
+          <Stack.Screen name="creator/title/[id]" options={{ headerShown: false }} />
           {/* The show page (the series revamp, slice 5): New show, the
               show page, the episode / draft editor and Edit show draw the
               site header and their own Back pill. */}

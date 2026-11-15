@@ -64,6 +64,11 @@ const SHOW_NEW = /^\/creator\/show\/new$/;
 const SHOW_PAGE = new RegExp(`^/creator/show/${SHOW_ID}$`);
 const SHOW_EPISODE = new RegExp(`^/creator/show/${SHOW_ID}/episode/${SHOW_ID}$`);
 const SHOW_EDIT = new RegExp(`^/creator/show/${SHOW_ID}/edit$`);
+// A title's dashboard (2026-11-15: a film's, a short's, an extra's or a
+// vertical title's own page, opened from Your work and the Dashboard's
+// rows) keeps the tab it was asked to open on.
+const CREATOR_TITLE = /^\/creator\/title\/[A-Za-z0-9_-]{1,160}$/;
+const TITLE_KEEP = { tab: /^(overview|details|artwork|video|selling|channels)$/ };
 
 function queryOf(href) {
   const at = href.indexOf('?');
@@ -97,7 +102,9 @@ function showScreen(path, href) {
       try { row = { key: anchor[1], id: decodeURIComponent(anchor[2]) }; } catch { row = null; }
     } else if (q.ep) row = { key: 'ep', id: q.ep };
     else if (q.draft) row = { key: 'draft', id: q.draft };
-    return `/creator/show/${page[1]}${row ? `?${row.key}=${enc(row.id)}` : ''}`;
+    if (row) return `/creator/show/${page[1]}?${row.key}=${enc(row.id)}`;
+    // The show page's Overview tab (2026-11-15); Episodes is the room.
+    return `/creator/show/${page[1]}${q.tab === 'overview' ? '?tab=overview' : ''}`;
   }
   // With no show named it meant the hub, which is the Dashboard now.
   if (path === '/creator/series') return q.series ? `/creator/show/${enc(q.series)}` : '/creator/dashboard';
@@ -116,13 +123,14 @@ const PODCAST_SHOW = /^\/podcasts\/[^/]+$/;
 const PODCAST_KEEP = { preview: /^1$/ };
 // Three creator screens keep what their address asks for (the Dashboard's
 // rows link to them, 2026-11-14): the three-step submit opens the draft or
-// the show, season and number it names; Your work opens on the filter.
+// the show, season and number it names; Your work opens on the filter
+// (and, since its revamp of 2026-11-15, on ?tab=<work tab>).
 // Until then "Continue" on a draft would have opened an empty form. The
 // Dashboard keeps what the three steps hand it when a title is sent
 // (?submitted=<title>&id=<title id>&show=<show id>: "… is in.").
 const SCREEN_KEEP = {
   '/creator/submit': { draft: /^[A-Za-z0-9_-]{1,80}$/, type: /^[a-z]{1,20}$/, series: /^[A-Za-z0-9_-]{1,160}$/, season: /^\d{1,4}$/, number: /^\d{1,5}$/ },
-  '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/ },
+  '/account/my-work': { status: /^(pending|approved|rejected)$/, attention: /^1$/, tab: /^(all|needs|review|live|declined)$/ },
   '/creator/dashboard': { submitted: /^[\s\S]{1,300}$/, id: /^[A-Za-z0-9_-]{1,160}$/, show: /^[A-Za-z0-9_-]{1,160}$/ }
 };
 
@@ -141,6 +149,7 @@ export function hrefToRoute(href) {
   if (target === '/') return { route: '/' };
   if (PUBLIC_TITLE.test(target)) return { route: `${target}${keptQuery(href)}` };
   if (PODCAST_SHOW.test(target)) return { route: `${target}${keptQuery(href, PODCAST_KEEP)}` };
+  if (CREATOR_TITLE.test(target)) return { route: `${target}${keptQuery(href, TITLE_KEEP)}` };
   if (Object.prototype.hasOwnProperty.call(SCREEN_KEEP, target)) return { route: `${target}${keptQuery(href, SCREEN_KEEP[target])}` };
   if (APP_ROUTES.some((re) => re.test(target))) return { route: target };
   return { url: `${API_BASE_URL}${href}` };

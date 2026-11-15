@@ -210,7 +210,7 @@ t('a title in no show carries its own numbers; a flat line is no line', () => {
   assert.equal(lf.watchedPct, 48);
   assert.equal(lf.earnedCents, 4193);
   assert.equal(lf.earnedDetail, 'sales 35.93 · ads 6.00');
-  assert.equal(lf.href, '/creator/my-work');
+  assert.equal(lf.href, '/creator/title/last-fare');
   // Live, and it still needs captions.
   assert.equal(lf.state, 'live');
   assert.equal(lf.needs, true);
@@ -296,7 +296,7 @@ t('needs you: a show ready to go public, each title’s reason, numbering, payou
   // An invite to be paid is not a row here: it has its own card with its two buttons.
   assert.deepEqual(all.rows.map((r) => r.key), ['ready:harbor-lights', 'title:last-fare', 'title:old-cut', 'numbering:night-bus:gap:S2 E3 is missing', 'payouts']);
   assert.deepEqual(all.rows[0], { key: 'ready:harbor-lights', title: 'Harbor Lights is ready to go public', sub: '1 episode approved', action: { kind: 'publish', label: 'Make it public', showId: 'harbor-lights', name: 'Harbor Lights' } });
-  assert.deepEqual(all.rows[1], { key: 'title:last-fare', title: 'The Last Fare', sub: 'No captions yet', action: { kind: 'link', label: 'Add captions', href: '/creator/my-work?attention=1' } });
+  assert.deepEqual(all.rows[1], { key: 'title:last-fare', title: 'The Last Fare', sub: 'No captions yet', action: { kind: 'link', label: 'Add captions', href: '/creator/title/last-fare' } });
   assert.equal(all.rows[2].action.label, 'See why');
   assert.deepEqual(all.rows[3].action, { kind: 'link', label: 'Open the show', href: '/creator/show/night-bus' });
   assert.equal(all.rows[3].title, 'Night Bus: S2 E3 is missing');

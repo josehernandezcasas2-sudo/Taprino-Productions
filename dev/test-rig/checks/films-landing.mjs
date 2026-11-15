@@ -197,13 +197,13 @@ async function notesEditing(b) {
 
   const { ctx, page: pg, errors } = await b.open(MARA, 1280);
   await goto(pg, '/creator/my-work');
-  const menu = pg.locator(`button[aria-label="Options for Check film to edit"]`);
+  const menu = pg.locator(`button[aria-label="More for Check film to edit"]`);
   // Your work loads its list in the browser: wait for it.
   await menu.first().waitFor({ timeout: 30000 }).catch(() => {});
   ok('Your work lists the film with its options', (await menu.count()) === 1);
   await menu.click();
-  const item = pg.locator('[role="menuitem"]', { hasText: 'Edit title, description & notes' });
-  ok('the menu says "Edit title, description & notes"', (await item.count()) === 1);
+  const item = pg.locator('[role="menuitem"]', { hasText: 'Edit title, description and notes' });
+  ok('the menu says "Edit title, description and notes"', (await item.count()) === 1);
   await item.click();
   await pg.locator('#request-edit-notes').waitFor({ timeout: 10000 });
   ok('the box has "Notes for the title’s page"', await pg.locator('#request-edit-notes').isVisible());
