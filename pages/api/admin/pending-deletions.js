@@ -1,7 +1,7 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getSupabase } from '../../../lib/supabase';
 import { hasBuyersIncludingSeries } from '../../../lib/purchases';
-import { CONFIRM_LABEL, confirmOutcome, has124, removedState } from '../../../lib/removalRules';
+import { CONFIRM_LABEL, confirmOutcome, has124, removedState, teamStartedRemoval } from '../../../lib/removalRules';
 
 // The deletion queue (Admin → Library → Pending deletions): removals asked
 // for and not yet confirmed, and — since migration 124 — removals off the
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
   return res.status(200).json({
     holdReady: holdReady === true,
     episodes: episodes.map((e, i) => {
-      const outcome = confirmOutcome({ bought: bought[i], keep: e.keep_after_removal === true, ready: has124(e) });
+      const outcome = confirmOutcome({ bought: bought[i], keep: e.keep_after_removal === true && !teamStartedRemoval(e), ready: has124(e) });
       return {
         id: e.id,
         title: e.title,

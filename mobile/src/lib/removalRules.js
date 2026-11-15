@@ -58,6 +58,8 @@ export const REMOVAL_WORDS = {
   teamOnly: 'The team removed this, so only a full admin can bring it back.',
   teamCancel: 'The team started this removal, so only the team can take it back.',
   withShow: 'It came off with its show: ask to bring the show back instead.',
+  due: 'Its 30 days are up and it’s being deleted, so it can’t be brought back now.',
+  windowEnded: 'its availability window ended — it comes back with no end date',
   keptForBuyers: 'Removed · kept for buyers',
   keptForLater: 'Removed · kept for later',
   deleteNow: 'Delete now…',
@@ -182,15 +184,39 @@ export function removedState(row) {
   return { key: 'buyers', label: REMOVAL_WORDS.keptForBuyers, tone: 'quiet', line: 'It’s off the site. People who bought it keep it.', purgeDay: '' };
 }
 
+// What an admin reads when they try to remove (or keep) something already
+// removed: where it stands, in removedState's words — never "kept for the
+// people who bought from it" for a title that is only held.
+export function alreadyRemovedLine(row) {
+  const st = removedState(row);
+  if (!st || st.key === 'buyers') return 'It was removed already and is kept for the people who bought from it.';
+  if (st.key === 'held') return st.purgeDay ? `It was removed already; its files are deleted for good on ${st.purgeDay}.` : 'It was removed already; its files are deleted for good soon.';
+  if (st.key === 'later') return 'It was removed already; its files are kept until its owner asks for it back.';
+  return 'It was removed already, and its owner asked to bring it back: decide that in the review queue.';
+}
+
+// Whether the hold of a removed title has run out (the clean-up deletes it
+// on its next run): past purge_after. Read only when the caller passes
+// `now`, so a page that leaves it out never changes its answer with the
+// clock.
+function holdRanOut(row, now) {
+  if (now === undefined || now === null) return false;
+  const at = Date.parse(String(pick(row, 'purgeAfter', 'purge_after') || ''));
+  const t = typeof now === 'number' ? now : Date.parse(now);
+  return Number.isFinite(at) && Number.isFinite(t) && at <= t;
+}
+
 // Whether a removed title's owner may ask for it back now, as a page shows
 // it: { ok, key, label?, line } — key 'ask' (ok), 'asked' (waiting on the
 // team), 'with-show' (it came off with its show), 'team' (only a full
-// admin), 'migration' (before 124) — or null for a title that isn't
-// removed. `showWithdrawn` (a row may carry it): its show is removed too.
-export function askBackFor(row, { isAdmin = false, showWithdrawn = null } = {}) {
+// admin), 'due' (its hold ran out: it's being deleted; only with `now`),
+// 'migration' (before 124) — or null for a title that isn't removed.
+// `showWithdrawn` (a row may carry it): its show is removed too.
+export function askBackFor(row, { isAdmin = false, showWithdrawn = null, now = null } = {}) {
   if (!isWithdrawnRow(row)) return null;
   if (!has124(row)) return { ok: false, key: 'migration', line: MIGRATION_124_LINE };
   if (pick(row, 'restoreRequestedAt', 'restore_requested_at')) return { ok: false, key: 'asked', line: REMOVAL_WORDS.askedLine };
+  if (holdRanOut(row, now)) return { ok: false, key: 'due', line: REMOVAL_WORDS.due };
   const withShow = showWithdrawn === null ? row.showWithdrawn === true : showWithdrawn === true;
   if (withShow) return { ok: false, key: 'with-show', line: REMOVAL_WORDS.withShow };
   if (isTeamRemoved(row) && isAdmin !== true) return { ok: false, key: 'team', line: REMOVAL_WORDS.teamOnly };
@@ -201,7 +227,10 @@ export function askBackFor(row, { isAdmin = false, showWithdrawn = null } = {}) 
 // "take back the request" (action 'cancel'): null when it may go ahead,
 // else { status, code, error }. `isOwner`: the viewer may ask for its
 // removal (its uploader; a show's owner). A full admin may always ask.
-export function restoreRefusal(row, { action = 'request', isOwner = false, isAdmin = false, showWithdrawn = false } = {}) {
+// `now` (the server passes it): a title whose hold ran out is being
+// deleted, so it can't be asked back — nothing lands in the middle of the
+// clean-up deleting it.
+export function restoreRefusal(row, { action = 'request', isOwner = false, isAdmin = false, showWithdrawn = false, now = null } = {}) {
   if (!row || typeof row !== 'object') return { status: 404, code: 'missing', error: 'That isn’t there any more.' };
   if (!has124(row)) return { status: 503, code: 'migration-124', error: MIGRATION_124_LINE };
   if (!isOwner && isAdmin !== true) return { status: 403, code: 'who', error: 'Only its owner can ask for it back.' };
@@ -211,6 +240,7 @@ export function restoreRefusal(row, { action = 'request', isOwner = false, isAdm
   if (asked) return { status: 409, code: 'asked', error: 'You already asked; someone on the team looks at it soon.' };
   if (showWithdrawn === true) return { status: 409, code: 'with-show', error: REMOVAL_WORDS.withShow };
   if (isTeamRemoved(row) && isAdmin !== true) return { status: 403, code: 'team', error: REMOVAL_WORDS.teamOnly };
+  if (holdRanOut(row, now)) return { status: 409, code: 'due', error: REMOVAL_WORDS.due };
   return null;
 }
 
@@ -267,9 +297,19 @@ export function purgedMessage(name) {
   return `“${text(name) || 'Your title'}” was deleted for good, ${HOLD_DAYS} days after it was removed.`;
 }
 
+// Whether a title's availability window has ended (available_until in the
+// past): bringing it back clears it, or the next run of the clean-up would
+// flag it for removal again.
+export function windowEnded(availableUntil, now = Date.now()) {
+  const at = Date.parse(String(availableUntil || ''));
+  const t = typeof now === 'number' ? now : Date.parse(now);
+  return Number.isFinite(at) && Number.isFinite(t) && at <= t;
+}
+
 // The words of a request to bring a title back, as the review queue shows
-// it (lib/reviewQueue.js): the subtitle line under its name.
-export function restoreQueueLine({ kind = 'episode', ownerName = '', removedAt = null, purgeAfter = null, keep = false, teamRemoved = false } = {}) {
+// it (lib/reviewQueue.js): the subtitle line under its name. `expired`: its
+// availability window ended (windowEnded), so it comes back with none.
+export function restoreQueueLine({ kind = 'episode', ownerName = '', removedAt = null, purgeAfter = null, keep = false, teamRemoved = false, expired = false } = {}) {
   const parts = [kind === 'series' ? 'Show' : 'Title'];
   if (ownerName) parts.push(`by ${ownerName}`);
   const removed = shortDay(removedAt);
@@ -279,5 +319,6 @@ export function restoreQueueLine({ kind = 'episode', ownerName = '', removedAt =
   else if (keep) parts.push('kept for later');
   else parts.push('kept for buyers');
   if (teamRemoved) parts.push('the team removed it');
+  if (expired) parts.push(REMOVAL_WORDS.windowEnded);
   return parts.join(' · ');
 }

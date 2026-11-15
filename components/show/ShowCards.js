@@ -126,7 +126,7 @@ export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onC
         <h2 className="show-status-head"><TrashIcon size={18} /><span>{removed.label}</span></h2>
         <div className="show-status-body">
           <p>{removed.line}{removal.restoreReason && removed.key === 'asked' ? <> Your note: “{removal.restoreReason}”</> : null}</p>
-          {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration') ? <p className="show-status-why">{ask.line}</p> : null}
+          {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration' || ask.key === 'due') ? <p className="show-status-why">{ask.line}</p> : null}
         </div>
         {!contributor && ask && ask.ok && onAskBack ? (
           <div className="show-status-acts"><button type="button" className="apl-btn show-status-btn" disabled={busy === 'restore'} onClick={onAskBack}>{REMOVAL_WORDS.askBackMenu}</button></div>

@@ -211,4 +211,79 @@ t('a title’s dashboard: the removal card for a removed title', () => {
   assert.match(live.removal.line, /30 days/);
 });
 
+// --- 2026-11-15 review --------------------------------------------------------------------
+
+t('an admin trying to remove (or keep) something already removed reads where it stands', () => {
+  assert.equal(R.alreadyRemovedLine({ ...held, purge_after: null }), 'It was removed already and is kept for the people who bought from it.');
+  assert.equal(R.alreadyRemovedLine({ withdrawn_at: '2026-10-01T00:00:00Z' }), 'It was removed already and is kept for the people who bought from it.', 'before 124');
+  assert.equal(R.alreadyRemovedLine(held), 'It was removed already; its files are deleted for good on Dec 15.');
+  assert.equal(R.alreadyRemovedLine({ ...held, purge_after: null, keep_after_removal: true }), 'It was removed already; its files are kept until its owner asks for it back.');
+  assert.match(R.alreadyRemovedLine({ ...held, restore_requested_at: 'y' }), /asked to bring it back/);
+});
+
+t('once its hold has run out it can’t be asked back (the clean-up may be deleting it)', () => {
+  const after = Date.parse(held.purge_after) + 1000;
+  const before = Date.parse(held.purge_after) - 1000;
+  assert.equal(R.restoreRefusal(held, { isOwner: true, now: after }).code, 'due');
+  assert.equal(R.restoreRefusal(held, { isOwner: true, now: after }).status, 409);
+  assert.equal(R.restoreRefusal(held, { isOwner: true, now: before }), null);
+  assert.equal(R.restoreRefusal(held, { isOwner: true }), null, 'only when the caller passes the time');
+  assert.equal(R.restoreRefusal({ ...held, purge_after: null, keep_after_removal: true }, { isOwner: true, now: after }), null, 'kept for later never runs out');
+  assert.equal(R.restoreRefusal({ ...held, restore_requested_at: 'y' }, { action: 'cancel', isOwner: true, now: after }), null, 'taking a request back is always fine');
+  assert.equal(R.askBackFor(held, { now: after }).key, 'due');
+  assert.equal(R.askBackFor(held, { now: after }).line, R.REMOVAL_WORDS.due);
+  assert.equal(R.askBackFor(held, { now: before }).ok, true);
+  assert.equal(R.askBackFor(held).ok, true, 'a page that leaves the time out never changes its answer with the clock');
+});
+
+t('a title whose availability window ended comes back without one, and the queue says so', () => {
+  assert.equal(R.windowEnded('2026-11-01T00:00:00Z', NOW), true);
+  assert.equal(R.windowEnded('2026-12-01T00:00:00Z', NOW), false);
+  assert.equal(R.windowEnded(null, NOW), false);
+  assert.equal(R.restoreQueueLine({ kind: 'episode', purgeAfter: held.purge_after, expired: true }), 'Title · files go Dec 15 · its availability window ended — it comes back with no end date');
+});
+
+// The server's half, read from the source (the rig check
+// dev/test-rig/checks/removal-hold.mjs runs it against a database).
+const src = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
+
+t('a show’s removal holds what it meets: one moment, one deadline, the extras left where they are', () => {
+  const del = src('lib/showDelete.js');
+  // The plan comes from buyers (cascadePlan), "Delete now" plans by buyers alone.
+  assert.match(del, /const deleteNow = ready && \(mode === 'now' \|\| \(mode === 'purge' && force\)\)/);
+  assert.match(del, /asPlanned = \(r\) => \(deleteNow \? \{ \.\.\.r, withdrawn_at: null \} : r\)/);
+  // The hold returns before the extras are re-filed.
+  assert.ok(del.indexOf("if (mode === 'hold') {\n    return holdShow(") < del.indexOf('refileExtrasUnderShow(episodes.filter'), 'the hold never re-files extras');
+  // Step 1 only takes off what is still up; the moment and deadline come from the claimed show.
+  assert.match(del, /update\(patch\)\.eq\('id', r\.id\)\.is\('withdrawn_at', null\)/);
+  assert.match(del, /moment = fresh\.withdrawn_at/);
+  assert.match(del, /const heldUntil = purgeAfterFrom\(Date\.parse\(moment\)\)/);
+  // "Keep the files" is never taken from a removal the team started.
+  assert.match(del, /const keep = mode === 'hold' && !byAdmin && show\.keep_after_removal === true/);
+  assert.match(del, /const rowKeep = \(r\) => !byAdmin && /);
+  // A show kept at the clean-up only for later reads as kept for later.
+  assert.match(del, /keep_after_removal: true \} : \{\}\) \}\)\.eq\('id', show\.id\)/);
+});
+
+t('the team’s "keep the files": cleared on a deny and on a removal the team starts', () => {
+  const adm = src('lib/showAdmin.js');
+  assert.match(adm, /deletion_requested_at: null, \.\.\.\(has124\(show\) \? \{ keep_after_removal: false \} : \{\}\)/);
+  assert.equal((adm.match(/deletion_requested_at: new Date\(\)\.toISOString\(\), \.\.\.\(has124\(show\) \? \{ keep_after_removal: false \} : \{\}\)/g) || []).length, 2, 'both ways an admin starts one');
+  assert.ok(!adm.includes("'It was removed already and is kept for the people who bought from it.'"), 'the words come from removedState');
+  assert.match(src('pages/api/admin/resolve-deletion.js'), /keep: row\.keep_after_removal === true && !teamStartedRemoval\(row\)/);
+});
+
+t('the clean-up: pages past titles left to their show; checks a row again before any side effect', () => {
+  const tr = src('lib/titleRemoval.js');
+  assert.match(tr, /\.range\(offset, offset \+ PURGE_PAGE - 1\)/);
+  assert.match(tr, /offset \+= stay/);
+  assert.match(tr, /if \(!row \|\| !stillToDelete\(row, mode, asked\)\) return \{ deleted: false, refiled: 0 \}/);
+  assert.ok(tr.indexOf('stillToDelete(row, mode, asked)') < tr.indexOf('creditAdShareBeforeDelete([row]'), 'checked before the ad share');
+  // A show brought back: its owners are everyone whose titles come back with it.
+  assert.match(tr, /if \(type === 'series'\) return showOwnerIds\(row\.id/);
+  assert.match(src('lib/moderation.js'), /owners = await showOwnerIds\(target\.id/);
+  // A request lands only before the hold runs out.
+  assert.match(tr, /purge_after\.is\.null,purge_after\.gt\./);
+});
+
 console.log(`\n${n} removal checks passed`);

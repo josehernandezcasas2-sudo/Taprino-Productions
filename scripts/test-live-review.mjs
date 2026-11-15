@@ -4,15 +4,16 @@
 // (lib/liveReviewRules.js) and the field policy that decides it
 // (lib/showRules.js: FIELD_POLICY, the team's own work, the ads switch).
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import * as L from '../lib/liveReviewRules.js';
 import * as R from '../lib/showRules.js';
 
 let n = 0;
 const t = (name, fn) => { fn(); n += 1; console.log('ok', name); };
 
-t('the fields that wait: an episode\'s details and captions, a show\'s year, link, season names, credits and kind', () => {
+t('the fields that wait: an episode\'s details and captions, a show\'s year, link, season names, credits, kind and defaults', () => {
   assert.deepEqual(L.DETAIL_FIELDS.episode, ['mainGenre', 'genre', 'artist', 'releaseYear', 'runtime', 'fundingUrl', 'adBreakSeconds', 'adsEnabled', 'extraKind', 'credits', 'captions']);
-  assert.deepEqual(L.DETAIL_FIELDS.series, ['releaseYear', 'fundingUrl', 'seasons', 'credits', 'kind']);
+  assert.deepEqual(L.DETAIL_FIELDS.series, ['releaseYear', 'fundingUrl', 'seasons', 'credits', 'kind', 'defaults']);
   // Each one waits on a live title in the field policy, and has a column,
   // a label and a word.
   for (const f of L.DETAIL_FIELDS.episode) {
@@ -25,7 +26,11 @@ t('the fields that wait: an episode\'s details and captions, a show\'s year, lin
   }
   // What stays direct (organises or takes away; nothing new is said).
   for (const f of ['season', 'seriesOrder', 'bonusParent', 'seriesId', 'hasPage', 'channelOptIn']) assert.equal(R.FIELD_POLICY.episode[f].live, 'direct', f);
-  for (const f of ['channelOptIn', 'newestSeasonHero', 'defaults']) assert.equal(R.FIELD_POLICY.show[f].live, 'direct', f);
+  for (const f of ['channelOptIn', 'newestSeasonHero']) assert.equal(R.FIELD_POLICY.show[f].live, 'direct', f);
+  // A show's defaults wait (2026-11-15 review): a live episode that left
+  // its genre or Made by blank shows the show's (lib/showRules.js
+  // inheritedField), so a new default would change it unreviewed.
+  assert.equal(R.FIELD_POLICY.show.defaults.live, 'staged');
   assert.equal(L.isDetailField('episode', 'genre'), true);
   assert.equal(L.isDetailField('show', 'seasons'), true);
   assert.equal(L.isDetailField('series', 'genre'), false);
@@ -149,6 +154,42 @@ t('the ads switch: off at once, on waits', () => {
   assert.deepEqual(R.adsEnabledChange(owner, true, false), { ok: true, mode: 'direct', value: false });
   assert.deepEqual(R.adsEnabledChange(owner, false, true), { ok: true, mode: 'staged', value: true });
   assert.equal(R.adsEnabledPolicy(owner, false).line, R.ADS_ON_WAITS_LINE);
+});
+
+t('the ads switch: the team turns ads off at once, even where it can\'t change the rest (2026-11-15 review)', () => {
+  const editor = { status: 'approved', isAdmin: true, fullAdmin: false, reviews: false };
+  assert.deepEqual(R.adsEnabledChange(editor, true, false), { ok: true, mode: 'direct', value: false });
+  assert.equal(R.adsEnabledChange(editor, false, true).ok, false, 'turning them on is still the reviewers\'');
+  assert.equal(R.adsEnabledPolicy(editor, true).mode, 'direct');
+});
+
+t('a show\'s defaults on a live show: words, back to the live value, approval keeps the internal flag (2026-11-15 review)', () => {
+  assert.equal(L.DETAIL_COLUMNS.defaults, 'defaults');
+  assert.equal(L.DETAIL_LABELS.defaults, 'Defaults for episodes');
+  assert.equal(L.isDetailField('series', 'defaults'), true);
+  assert.equal(L.isDetailField('episode', 'defaults'), false);
+  assert.equal(L.detailWords('defaults', { tier: 'premium', rating: 'TV-14', mainGenre: 'Drama', genre: 'Noir', artist: 'Mara Lee', adsEnabled: false }), 'Tapa + · TV-14 · Drama (Noir) · Made by Mara Lee · No ads');
+  assert.equal(L.detailWords('defaults', { mainGenre: 'Comedy', cutArt: true }), 'Comedy', 'the internal flag never shows');
+  assert.equal(L.detailWords('defaults', {}), 'None set');
+  assert.equal(L.detailWords('defaults', '{"tier":"free"}'), 'Free');
+  // jsonb hands keys back in its own order; "cut the art" isn't a default.
+  assert.equal(L.sameDetail('defaults', { genre: 'Noir', tier: 'free' }, { tier: 'free', genre: 'Noir', cutArt: true }), true);
+  assert.equal(L.sameDetail('defaults', { genre: 'Noir' }, { genre: 'Noir', artist: 'Mara' }), false);
+  assert.equal(L.sameDetail('defaults', null, {}), true);
+  // Waiting, in words, beside the live one.
+  assert.deepEqual(L.waitingDetailWords({ defaults: { artist: 'Mara' }, pending_fields: { defaults: { artist: 'Dee Park' } } }, 'series'), [{ field: 'defaults', label: 'Defaults for episodes', live: 'Made by Mara', proposed: 'Made by Dee Park' }]);
+  // Approved: the waiting defaults, with the live row's "cut the art" flag kept.
+  assert.deepEqual(L.approvedDetailValue('defaults', { artist: 'Dee Park' }, { defaults: { artist: 'Mara', cutArt: true } }), { artist: 'Dee Park', cutArt: true });
+  assert.deepEqual(L.approvedDetailValue('defaults', { artist: 'Dee Park' }, { defaults: '{"artist":"Mara"}' }), { artist: 'Dee Park' });
+  assert.equal(L.approvedDetailValue('releaseYear', 2024, {}), 2024, 'every other field writes what waited');
+  // The policy: a live show's owner waits, a new show applies at once.
+  assert.equal(R.fieldPolicy('defaults', { target: 'show', isRunner: true, status: 'approved' }), 'staged');
+  assert.equal(R.fieldPolicy('defaults', { target: 'show', isRunner: true, status: 'pending', approvedEpisodes: 0 }), 'direct');
+  // The server stages it through the same path as the year (lib/showPage.js updateShow).
+  const page = readFileSync(new URL('../lib/showPage.js', import.meta.url), 'utf8');
+  assert.match(page, /setDetail\('defaults', 'defaults', normalizeShowDefaults\(merged\), live\)/);
+  assert.match(page, /defaults: \{ detail: true \}/, 'the owner can take a waiting set back');
+  assert.match(readFileSync(new URL('../lib/stagedChanges.js', import.meta.url), 'utf8'), /approvedDetailValue\(f, pf\[f\], row\)/);
 });
 
 console.log(`${n} live-review checks passed`);

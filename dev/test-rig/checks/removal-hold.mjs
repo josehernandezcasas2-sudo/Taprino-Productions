@@ -23,7 +23,20 @@
 //   - "Delete now": a full admin, a reason, never anything bought;
 //   - a show: held with everything in it at the same moment, brought back
 //     with it, and deleted with it by the clean-up;
-//   - Your work's route and the deletion queue carry the new fields.
+//   - Your work's route and the deletion queue carry the new fields;
+//   - the review of 2026-11-15: a show removed after one of its titles
+//     (held 30 days on its own, asked back on its own) holds it with the
+//     show — one moment, one deadline, never "kept for buyers" — and brings
+//     it back with the show; the clean-up deletes them together; two
+//     confirmations at once, and a retry after one stopped part-way, leave
+//     one moment; "Delete now" on a show with a held title deletes the
+//     show; "keep the files" is cleared on a deny and never taken by a
+//     removal the team starts; the clean-up reaches a title behind fifty
+//     left to their show; a contributor can't approve their show's
+//     return; a title whose availability window ended comes back without
+//     one; a held show's extras stay where they were filed; an admin's
+//     second try reads where the show stands; a title past its hold can't
+//     be asked back.
 // Before 124: a confirmation deletes at once as before, asking it back and
 // "keep the files" answer 503 migration-124.
 //
@@ -58,8 +71,38 @@ const ID = {
   showE1: `ck-rh-show-e1-${RUN}`,
   showE2: `ck-rh-show-e2-${RUN}`,
   gone: `ck-rh-gone-${RUN}`,
-  goneE1: `ck-rh-gone-e1-${RUN}`
+  goneE1: `ck-rh-gone-e1-${RUN}`,
+  // the review of 2026-11-15
+  mix: `ck-rh-mix-${RUN}`,
+  mixE1: `ck-rh-mix-e1-${RUN}`,
+  mixE2: `ck-rh-mix-e2-${RUN}`,
+  mixE3: `ck-rh-mix-e3-${RUN}`,
+  mixP: `ck-rh-mixp-${RUN}`,
+  mixPE1: `ck-rh-mixp-e1-${RUN}`,
+  mixPE2: `ck-rh-mixp-e2-${RUN}`,
+  race: `ck-rh-race-${RUN}`,
+  raceE1: `ck-rh-race-e1-${RUN}`,
+  raceE2: `ck-rh-race-e2-${RUN}`,
+  retry: `ck-rh-retry-${RUN}`,
+  retryE1: `ck-rh-retry-e1-${RUN}`,
+  retryE2: `ck-rh-retry-e2-${RUN}`,
+  nowShow: `ck-rh-nowshow-${RUN}`,
+  nowShowE1: `ck-rh-nowshow-e1-${RUN}`,
+  nowShowE2: `ck-rh-nowshow-e2-${RUN}`,
+  keepShow: `ck-rh-keepshow-${RUN}`,
+  keepShowE1: `ck-rh-keepshow-e1-${RUN}`,
+  asked: `ck-rh-askedshow-${RUN}`,
+  lonely: `ck-rh-lonely-${RUN}`,
+  contrib: `ck-rh-contrib-${RUN}`,
+  contribE1: `ck-rh-contrib-e1-${RUN}`,
+  contribE2: `ck-rh-contrib-e2-${RUN}`,
+  window: `ck-rh-window-${RUN}`,
+  extraShow: `ck-rh-xshow-${RUN}`,
+  extraShowE1: `ck-rh-xshow-e1-${RUN}`,
+  extraShowX: `ck-rh-xshow-x-${RUN}`,
+  due: `ck-rh-due-${RUN}`
 };
+const MANY = Array.from({ length: 55 }, (_, i) => `ck-rh-many-${String(i).padStart(2, '0')}-${RUN}`);
 const hex = () => crypto.randomBytes(16).toString('hex');
 const VID = { purge: hex(), now: hex(), gone: hex(), pre: hex() };
 const cf = (u) => `https://customer-test.cloudflarestream.com/${u}/manifest/video.m3u8`;
@@ -94,7 +137,7 @@ function cleanup() {
   sql(`delete from public.orphaned_media where reference in (${uids}) or context like ${q(`%${RUN}%`)}`);
   sql(`delete from public.purchases where target_id in (${ids})`);
   sql(`delete from public.title_prices where target_id in (${ids})`);
-  sql(`delete from public.episodes where id in (${ids}) or title like ${q(`Check rh %${RUN}`)}`);
+  sql(`delete from public.episodes where id in (${ids}) or id like ${q(`ck-rh-many-%-${RUN}`)} or title like ${q(`Check rh %${RUN}`)}`);
   sql(`delete from public.series where id in (${ids})`);
 }
 
@@ -345,6 +388,163 @@ async function shows() {
   ok('…/api/series-hub → 200', r.status === 200, r.status);
 }
 
+// ---- the review of 2026-11-15 ---------------------------------------------------------------
+
+const full = (id) => one(`select * from public.episodes where id = ${q(id)}`);
+const fullShow = (id) => one(`select * from public.series where id = ${q(id)}`);
+const same = (a, b) => Boolean(a) && Boolean(b) && Date.parse(a) === Date.parse(b);
+const showName = (id) => one(`select name from public.series where id = ${q(id)}`).name;
+const showEp = (showId, id, n, extra = {}) => base(id, { content_type: 'series', series_id: showId, season: 1, series_order: n, ...extra });
+const ask = (id, reason = `Done ${RUN}`, extra = {}) => call(`/api/show/${id}/removal`, { who: DEE, method: 'POST', body: { action: 'request', reason, ...extra } });
+const confirmShow = (id, who = ADMIN, extra = {}) => call(`/api/admin/show/${id}`, { who, method: 'POST', body: { action: 'remove', confirmName: showName(id), ...extra } });
+const lastMessage = (userId, type, like) => (rows(`select message from public.notifications where user_id = ${q(userId)} and type = ${q(type)} and message like ${q(`%${like}%`)} order by created_at desc limit 1`)[0] || {}).message || '';
+const heldOnItsOwn = (days = 7) => removed(days, { deletion_reason: `My own request ${RUN}`, deletion_requested_at: ago(days + 1), purge_after: new Date(Date.now() + (30 - days) * 86400000).toISOString() });
+
+async function reviewFixes() {
+  section('A show removed after one of its titles: held with it, one moment, one deadline');
+  insert('series', show(ID.mix));
+  insert('episodes', showEp(ID.mix, ID.mixE1, 1));
+  insert('episodes', showEp(ID.mix, ID.mixE2, 2));
+  insert('episodes', showEp(ID.mix, ID.mixE3, 3, heldOnItsOwn(7)));
+  sql(`update public.episodes set restore_requested_at = ${q(ago(0.5))}, restore_reason = 'Back on its own' where id = ${q(ID.mixE3)}`);
+  let r = await call(`/api/admin/show/${ID.mix}`, { who: ADMIN });
+  ok('the admin card: "Remove · keep 30 days" and Delete now (a held title isn’t bought)', r.status === 200 && r.json.removal.confirmLabel === 'Remove · keep 30 days' && r.json.removal.canDeleteNow === true && r.json.removal.plan && r.json.removal.plan.counts.kept === 0, r.json && r.json.removal);
+  r = await ask(ID.mix);
+  ok('its owner asks → 200', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+  r = await confirmShow(ID.mix);
+  let s = fullShow(ID.mix);
+  ok('confirmed → 200, mode hold, a deadline (not kept for buyers)', r.status === 200 && r.json.mode === 'hold' && r.json.held && r.json.held.purgeAfter && r.json.withdrawn.episodes === 0, `${r.status} ${r.text.slice(0, 300)}`);
+  ok('…the show held ~30 days, not kept for later', Boolean(s.withdrawn_at) && s.purge_after && days(s.purge_after) > 29 && s.keep_after_removal === false, s);
+  const e1 = full(ID.mixE1);
+  const e3 = full(ID.mixE3);
+  ok('…its episodes and the title held on its own share the show’s moment and deadline', same(e1.withdrawn_at, s.withdrawn_at) && same(e3.withdrawn_at, s.withdrawn_at) && same(e3.purge_after, s.purge_after) && same(full(ID.mixE2).purge_after, s.purge_after), { s: [s.withdrawn_at, s.purge_after], e1: [e1.withdrawn_at, e1.purge_after], e3: [e3.withdrawn_at, e3.purge_after] });
+  ok('…the title’s own request to come back is closed (the show is asked back instead), its own removal request kept', !e3.restore_requested_at && !same(e3.deletion_requested_at, s.withdrawn_at), e3);
+  const msg = lastMessage(USERS.dee, 'show_deleted', ID.mix.slice(6, 22));
+  ok('…the owner reads when the files go, never "People who bought it keep it"', /until .* in case you change your mind/.test(msg) && !/People who bought it/.test(msg), msg);
+  r = await call(`/api/admin/show/${ID.mix}`, { who: ADMIN });
+  ok('…the admin card: held, not kept for buyers', r.status === 200 && r.json.removal.removed && r.json.removal.removed.key === 'held', r.json && r.json.removal && r.json.removal.removed);
+  r = await confirmShow(ID.mix);
+  ok('…confirming again → 409 with where it stands ("deleted for good on …")', r.status === 409 && /deleted for good on/.test(errOf(r)), `${r.status} ${errOf(r)}`);
+  r = await call('/api/admin/resolve-deletion', { who: ADMIN, method: 'POST', body: { type: 'series', id: ID.mix, decision: 'deny' } });
+  ok('…the deletion queue’s answer reads the same', r.status === 409 && /deleted for good on/.test(errOf(r)), `${r.status} ${errOf(r)}`);
+  r = await call(`/api/show/${ID.mix}/restore`, { who: DEE, method: 'POST', body: { action: 'request' } });
+  ok('the show asked back → 200', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+  r = await call('/api/admin/review-queue', { who: ADMIN, method: 'POST', body: { kind: 'restore', id: `series:${ID.mix}`, decision: 'approve' } });
+  ok('approved → 200, the show and its three titles', r.status === 200 && r.json.brought === 4, `${r.status} ${r.text.slice(0, 200)}`);
+  ok('…E1 and E2 live again', !full(ID.mixE1).withdrawn_at && full(ID.mixE1).deletion_requested === false && !full(ID.mixE2).withdrawn_at, { e1: full(ID.mixE1) });
+  ok('…the title removed on its own is back off the hold, its own removal request waiting again', !full(ID.mixE3).withdrawn_at && !full(ID.mixE3).purge_after && full(ID.mixE3).deletion_requested === true, full(ID.mixE3));
+
+  section('Two confirmations at once, and a retry after one stopped part-way: one moment');
+  insert('series', show(ID.race));
+  insert('episodes', showEp(ID.race, ID.raceE1, 1));
+  insert('episodes', showEp(ID.race, ID.raceE2, 2));
+  await ask(ID.race);
+  const both = await Promise.all([confirmShow(ID.race), confirmShow(ID.race)]);
+  s = fullShow(ID.race);
+  ok('both answer (200, or 409 changed); the show is held once', both.every((x) => x.status === 200 || x.status === 409) && both.some((x) => x.status === 200) && Boolean(s.withdrawn_at) && s.purge_after, both.map((x) => `${x.status} ${x.text.slice(0, 120)}`));
+  ok('…every title carries the show’s moment', same(full(ID.raceE1).withdrawn_at, s.withdrawn_at) && same(full(ID.raceE2).withdrawn_at, s.withdrawn_at) && same(full(ID.raceE2).purge_after, s.purge_after), { s: s.withdrawn_at, e1: full(ID.raceE1).withdrawn_at, e2: full(ID.raceE2).withdrawn_at });
+  ok('…the owner was told once', rows(`select id from public.notifications where user_id = ${q(USERS.dee)} and type = 'show_deleted' and message like ${q(`%${ID.race.slice(6, 22)}%`)}`).length === 1);
+  insert('series', show(ID.retry));
+  insert('episodes', showEp(ID.retry, ID.retryE1, 1));
+  insert('episodes', showEp(ID.retry, ID.retryE2, 2));
+  await ask(ID.retry);
+  // An earlier try took E1 off, then stopped before the show.
+  const earlier = ago(0.02);
+  sql(`update public.episodes set withdrawn_at = ${q(earlier)}, deletion_requested = true, deletion_reason = 'Done', deletion_requested_at = ${q(earlier)}, purge_after = ${q(new Date(Date.parse(earlier) + 30 * 86400000).toISOString())} where id = ${q(ID.retryE1)}`);
+  r = await confirmShow(ID.retry);
+  s = fullShow(ID.retry);
+  ok('the retry → 200, held with a deadline (the row it took off isn’t "kept for buyers")', r.status === 200 && r.json.mode === 'hold' && s.purge_after && r.json.withdrawn.episodes === 0, `${r.status} ${r.text.slice(0, 300)}`);
+  ok('…both titles carry the show’s moment and deadline', same(full(ID.retryE1).withdrawn_at, s.withdrawn_at) && same(full(ID.retryE1).purge_after, s.purge_after) && same(full(ID.retryE2).withdrawn_at, s.withdrawn_at), { s: s.withdrawn_at, e1: full(ID.retryE1).withdrawn_at });
+  await call(`/api/show/${ID.retry}/restore`, { who: DEE, method: 'POST', body: { action: 'request' } });
+  r = await call('/api/admin/review-queue', { who: ADMIN, method: 'POST', body: { kind: 'restore', id: `series:${ID.retry}`, decision: 'approve' } });
+  ok('…brought back together, both live', r.status === 200 && r.json.brought === 3 && !full(ID.retryE1).withdrawn_at && full(ID.retryE1).deletion_requested === false, `${r.status} ${r.text.slice(0, 200)}`);
+
+  section('A held show’s extras stay where they were filed');
+  insert('series', show(ID.extraShow));
+  insert('episodes', showEp(ID.extraShow, ID.extraShowE1, 1));
+  insert('episodes', base(ID.extraShowX, { content_type: 'bonus', bonus_parent_type: 'episode', bonus_parent_id: ID.extraShowE1 }));
+  await ask(ID.extraShow);
+  r = await confirmShow(ID.extraShow);
+  const x = full(ID.extraShowX);
+  ok('held → 200; the extra still hangs after its episode, off the site with the show', r.status === 200 && x.bonus_parent_type === 'episode' && x.bonus_parent_id === ID.extraShowE1 && same(x.withdrawn_at, fullShow(ID.extraShow).withdrawn_at), x);
+
+  section('"Delete now" on a show with a held title deletes the show');
+  insert('series', show(ID.nowShow));
+  insert('episodes', showEp(ID.nowShow, ID.nowShowE1, 1));
+  insert('episodes', showEp(ID.nowShow, ID.nowShowE2, 2, heldOnItsOwn(3)));
+  r = await confirmShow(ID.nowShow, ADMIN, { now: true, reason: `Abuse ${RUN}` });
+  ok('→ 200; the show and both titles are gone', r.status === 200 && !fullShow(ID.nowShow).id && !full(ID.nowShowE1).id && !full(ID.nowShowE2).id, `${r.status} ${r.text.slice(0, 300)}`);
+
+  section('"Keep the files" goes with the request it was asked with');
+  insert('series', show(ID.keepShow));
+  insert('episodes', showEp(ID.keepShow, ID.keepShowE1, 1));
+  r = await ask(ID.keepShow, `Keep them ${RUN}`, { keep: true });
+  ok('asked with "keep the files" → keep_after_removal true', r.status === 200 && fullShow(ID.keepShow).keep_after_removal === true, `${r.status} ${r.text.slice(0, 200)}`);
+  r = await call(`/api/admin/show/${ID.keepShow}`, { who: ADMIN, method: 'POST', body: { action: 'deny_removal', note: 'Keeping it up' } });
+  ok('the team denies it → keep_after_removal cleared', r.status === 200 && fullShow(ID.keepShow).keep_after_removal === false && fullShow(ID.keepShow).deletion_requested === false, `${r.status} ${r.text.slice(0, 200)}`);
+  sql(`update public.series set keep_after_removal = true where id = ${q(ID.keepShow)}`);
+  r = await call(`/api/admin/show/${ID.keepShow}`, { who: ADMIN });
+  ok('…a leftover "keep" on a show nobody asked to remove: the card still reads "Remove · keep 30 days"', r.status === 200 && r.json.removal.confirmLabel === 'Remove · keep 30 days', r.json && r.json.removal && r.json.removal.confirmLabel);
+  r = await confirmShow(ID.keepShow, ADMIN, { reason: `Abuse ${RUN}` });
+  s = fullShow(ID.keepShow);
+  ok('the team removes it → held 30 days, never kept for later', r.status === 200 && s.purge_after && s.keep_after_removal === false && full(ID.keepShowE1).purge_after && full(ID.keepShowE1).keep_after_removal === false, { status: r.status, s });
+
+  section('A contributor can’t approve their show’s return');
+  insert('series', show(ID.contrib));
+  insert('episodes', showEp(ID.contrib, ID.contribE1, 1));
+  insert('episodes', showEp(ID.contrib, ID.contribE2, 2, { submitted_by: USERS.sub, artist: 'Sam Subadmin' }));
+  await ask(ID.contrib);
+  await confirmShow(ID.contrib);
+  await call(`/api/show/${ID.contrib}/restore`, { who: DEE, method: 'POST', body: { action: 'request' } });
+  r = await call('/api/admin/review-queue', { who: SUB });
+  const item = ((r.json && r.json.items) || []).find((i) => i.id === `series:${ID.contrib}`);
+  ok('the queue greys Approve for the reviewer whose episode is in it', item && item.meta && item.meta.blocked, item && item.meta);
+  r = await call('/api/admin/review-queue', { who: SUB, method: 'POST', body: { kind: 'restore', id: `series:${ID.contrib}`, decision: 'approve' } });
+  ok('…their approval → 403 own-work, the show still removed', r.status === 403 && Boolean(fullShow(ID.contrib).withdrawn_at), `${r.status} ${r.text.slice(0, 200)}`);
+  r = await call('/api/admin/review-queue', { who: ADMIN, method: 'POST', body: { kind: 'restore', id: `series:${ID.contrib}`, decision: 'approve' } });
+  ok('…a full admin approves it', r.status === 200 && !fullShow(ID.contrib).withdrawn_at, `${r.status} ${r.text.slice(0, 200)}`);
+
+  section('A title whose availability window ended comes back without one');
+  insert('episodes', base(ID.window, removed(2, { deletion_reason: 'Availability window ended', available_until: ago(3), purge_after: new Date(Date.now() + 25 * 86400000).toISOString() })));
+  r = await call(`/api/show/episode/${ID.window}/restore`, { who: DEE, method: 'POST', body: { action: 'request' } });
+  ok('its owner asks → 200', r.status === 200, `${r.status} ${r.text.slice(0, 200)}`);
+  r = await call('/api/admin/review-queue', { who: ADMIN });
+  const w = ((r.json && r.json.items) || []).find((i) => i.id === `episode:${ID.window}`);
+  ok('the queue card says its window ended and it comes back without one', w && /availability window ended/.test(w.subtitle) && /no end date/.test(w.meta.comesBackAs), w && [w.subtitle, w.meta && w.meta.comesBackAs]);
+  r = await call('/api/admin/review-queue', { who: ADMIN, method: 'POST', body: { kind: 'restore', id: `episode:${ID.window}`, decision: 'approve' } });
+  ok('approved → back, its window cleared', r.status === 200 && !full(ID.window).withdrawn_at && full(ID.window).available_until === null, full(ID.window));
+  r = await call(`/api/episode-page?id=${ID.window}`, { who: MARA });
+  ok('…on the site again (/api/episode-page → 200)', r.status === 200, r.status);
+
+  section('Past its hold: it can’t be asked back');
+  insert('episodes', base(ID.due, removed(31, { purge_after: ago(0.5) })));
+  r = await call(`/api/show/episode/${ID.due}/restore`, { who: DEE, method: 'POST', body: { action: 'request' } });
+  ok('→ 409 due, nothing asked', r.status === 409 && r.json && r.json.code === 'due' && !full(ID.due).restore_requested_at, `${r.status} ${r.text.slice(0, 200)}`);
+
+  section('The clean-up: a show deleted with what it held; titles behind fifty left to their show');
+  insert('series', show(ID.mixP));
+  insert('episodes', showEp(ID.mixP, ID.mixPE1, 1));
+  insert('episodes', showEp(ID.mixP, ID.mixPE2, 2, heldOnItsOwn(10)));
+  await ask(ID.mixP);
+  r = await confirmShow(ID.mixP);
+  ok('a show with a title held on its own is held → 200', r.status === 200 && fullShow(ID.mixP).purge_after, `${r.status} ${r.text.slice(0, 200)}`);
+  sql(`update public.series set purge_after = ${q(ago(0.2))} where id = ${q(ID.mixP)}`);
+  sql(`update public.episodes set purge_after = ${q(ago(0.2))} where id in (${q(ID.mixPE1)}, ${q(ID.mixPE2)})`);
+  // A show asked back with fifty-five titles past their date, left to it,
+  // and one title of its own behind them in line.
+  insert('series', show(ID.asked, removed(31, { purge_after: ago(1), restore_requested_at: ago(0.5) })));
+  const askedAt = fullShow(ID.asked).withdrawn_at;
+  sql(`insert into public.episodes (id, title, description, tier, genre, main_genre, content_type, series_id, season, series_order, artist, runtime, rating, release_year, src, video_type, video_provider, ads_enabled, deletion_requested, deletion_reason, deletion_requested_at, withdrawn_at, purge_after, moderation_hold, submitted_by, status, reviewed_at, released_at, created_at)
+    select id, 'Check rh many ' || ${q(RUN)}, 'Held with its show.', 'free', 'Drama', 'Drama', 'series', ${q(ID.asked)}, 1, n::int, 'Dee Park', '14:00', 'TV-PG', 2026, ${q(cf(uidFor(IDS.short)))}, 'html5', 'cloudflare', false, true, 'Removed with its show', ${q(askedAt)}, ${q(askedAt)}, ${q(ago(2))}, false, ${q(USERS.dee)}, 'approved', ${q(ago(39))}, ${q(ago(39))}, ${q(ago(40))}
+    from unnest(array[${MANY.map(q).join(', ')}]::text[]) with ordinality as m(id, n)`);
+  insert('episodes', base(ID.lonely, removed(31, { purge_after: ago(1) })));
+  r = await runCron();
+  ok('the cron runs → 200', r.status === 200 && r.json.purged && r.json.purged.ready === true, `${r.status} ${r.text.slice(0, 300)}`);
+  ok('the held show went with both its titles, the one held on its own too', !fullShow(ID.mixP).id && !full(ID.mixPE1).id && !full(ID.mixPE2).id, { s: fullShow(ID.mixP), e2: full(ID.mixPE2) });
+  ok('the title behind the fifty-five left to their show was deleted', !full(ID.lonely).id && r.json.purged.leftToShow >= 55, r.json.purged);
+  ok('…the fifty-five are still there, waiting on their show', rows(`select id from public.episodes where id like ${q(`ck-rh-many-%-${RUN}`)}`).length === 55);
+}
+
 await runCheck('removal-hold', async () => {
   cleanup();
   try {
@@ -359,6 +559,7 @@ await runCheck('removal-hold', async () => {
     await cleanUp();
     await deleteNow();
     await shows();
+    await reviewFixes();
   } finally {
     cleanup();
   }

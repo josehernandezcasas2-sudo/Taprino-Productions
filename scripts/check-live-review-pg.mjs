@@ -135,6 +135,25 @@ assert.deepEqual(r.rows[0].seasons, [{ number: 1, name: 'Pilot' }, { number: 2, 
 assert.equal(r.rows[0].kind, 'podcast');
 ok('a show\'s details wait and approve into their columns (seasons an array, credits an object, the kind checked)');
 
+// A show's defaults (2026-11-15 review): they wait in pending_fields too and
+// approve into series.defaults (jsonb), keeping the live row's internal
+// "cut the art" flag; jsonb's own key order never makes a same value read
+// as a change.
+await q(`update series set defaults = $1::jsonb where id = 'night-bus-show'`, [json({ artist: 'Mara Lee', mainGenre: 'Drama', cutArt: true })]);
+const d0 = (await q(`select * from series where id = 'night-bus-show'`)).rows[0];
+assert.equal(L.sameDetail('defaults', { mainGenre: 'Drama', artist: 'Mara Lee' }, d0.defaults), true);
+const dpf = L.nextPendingFields(d0, 'series', { defaults: { mainGenre: 'Drama', artist: 'Dee Park' } });
+r = await q(`update series set pending_fields = $1::jsonb where id = 'night-bus-show' and pending_fields is null returning id`, [json(dpf)]);
+assert.equal(r.rows.length, 1);
+const d1 = (await q(`select * from series where id = 'night-bus-show'`)).rows[0];
+assert.deepEqual(L.waitingDetailWords(d1, 'series'), [{ field: 'defaults', label: 'Defaults for episodes', live: 'Drama · Made by Mara Lee', proposed: 'Drama · Made by Dee Park' }]);
+const approvedDefaults = L.approvedDetailValue('defaults', L.pendingFieldsOf(d1, 'series').defaults, d1);
+r = await q(`update series set defaults = $1::jsonb, pending_fields = $2::jsonb where id = 'night-bus-show' and pending_fields = $3::jsonb returning defaults, pending_fields`, [json(approvedDefaults), L.nextPendingFields(d1, 'series', { defaults: undefined }) === null ? null : json(L.nextPendingFields(d1, 'series', { defaults: undefined })), json(d1.pending_fields)]);
+assert.equal(r.rows.length, 1);
+assert.deepEqual(r.rows[0].defaults, { artist: 'Dee Park', mainGenre: 'Drama', cutArt: true });
+assert.equal(r.rows[0].pending_fields, null);
+ok('a show\'s defaults wait and approve into series.defaults with its "cut the art" flag kept');
+
 // The admin route's own-title path: pending_title, pending_page_notes ('' = clear), pending_src, pending_title_image_removal.
 r = await q(`update episodes set pending_title = 'Transfer (Director''s Cut)', pending_page_notes = '', pending_src = 'https://customer-x.cloudflarestream.com/abcdef0123456789abcdef0123456789/manifest/video.m3u8', pending_title_image_url = null, pending_title_image_removal = true, pending_fields = $1::jsonb where id = 'transfer-lx3k9a' and pending_fields is null returning id`, [json({ mainGenre: 'Horror' })]);
 assert.equal(r.rows.length, 1);
