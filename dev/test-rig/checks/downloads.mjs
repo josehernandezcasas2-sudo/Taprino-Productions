@@ -1274,8 +1274,11 @@ async function before123() {
   ok('…and through the Library’s save', r.status === 503 && r.json.code === 'migration-123', brief(r));
   r = await call(`/api/admin/library?id=${encodeURIComponent(ID.film)}`, web(admin));
   ok('the Library’s row: no such column yet (the modal leaves the checkbox out)', r.status === 200 && r.json.episodes[0].downloadsAllowedReady === false && r.json.episodes[0].downloadsAllowed === true, r.json && r.json.episodes && r.json.episodes[0] && r.json.episodes[0].downloadsAllowedReady);
-  r = await call(`/api/show/episode/${encodeURIComponent(ID.film)}`, { ...web(MARA), method: 'PATCH', body: { genre: 'Mystery' } });
-  ok('every other save of the editor works as before', r.status === 200 && r.json.applied.includes('genre'), brief(r));
+  // A live film's genre waits for review since migration 124 (and answers
+  // 503 migration-124 before it); the page switch is a save that still
+  // goes through on a database before 123.
+  r = await call(`/api/show/episode/${encodeURIComponent(ID.film)}`, { ...web(MARA), method: 'PATCH', body: { hasPage: true } });
+  ok('every other save of the editor works as before', r.status === 200, brief(r));
   r = await call('/api/creator/my-submissions', web(MARA));
   const mineRow = ((r.json && r.json.submissions) || []).find((x) => x.id === ID.film) || null;
   ok('Your work’s row: allowed, no such column yet (its edit boxes grey the switch with the migration’s line)', r.status === 200 && mineRow && mineRow.downloadsAllowed === true && mineRow.downloadsAllowedReady === false, mineRow && { a: mineRow.downloadsAllowed, ready: mineRow.downloadsAllowedReady });

@@ -59,6 +59,10 @@ const submitBody = (title, extraFields) => ({ contentType: 'bonus', seriesId: ID
 
 async function afterHttp() {
   section('After 121: what is stored, who may set it');
+  // On a live title the kind waits for review since 2026-11-15 (migration
+  // 124, dev/test-rig/checks/live-review.mjs): these two are put in review
+  // while their words are checked, and back live for the payloads below.
+  sql(`update public.episodes set status = 'pending' where id in (${q(ID.mara)}, ${q(ID.dee)})`);
   let r = await patch(MARA, ID.mara, { extraKind: 'Making of' });
   ok('"Making of" → stored as making-of', r.status === 200 && kindOf(ID.mara) === 'making-of', `${r.status} ${kindOf(ID.mara)} ${r.text.slice(0, 200)}`);
   ok('the save says it applied at once', r.json && Array.isArray(r.json.applied) && r.json.applied.includes('extraKind'), r.json && r.json.applied);
@@ -87,6 +91,7 @@ async function afterHttp() {
   ok('the team’s change applies at once', r.status === 200 && kindOf(ID.mara) === 'commentary', `${r.status} ${kindOf(ID.mara)}`);
   r = await patch(MARA, ID.mara, { extraKind: 'making-of' });
   ok('back to Making-of for the payloads', r.status === 200 && kindOf(ID.mara) === 'making-of');
+  sql(`update public.episodes set status = 'approved' where id in (${q(ID.mara)}, ${q(ID.dee)})`);
 
   section('After 121: what the pages and payloads say');
   r = await call(`/api/series-hub?id=${encodeURIComponent(IDS.nightBus)}`);
