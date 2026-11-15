@@ -345,10 +345,14 @@ async function boxes(b) {
     await goto(pg, '/creator/my-work');
 
     // --- Edit submission (a title still in review)
-    const pencil = pg.locator('.submission-row, .yw-row, li, article, div', { has: pg.locator('button[title="Edit"]') }).filter({ hasText: 'Check box film in review' }).last().locator('button[title="Edit"]');
-    await pencil.first().waitFor({ timeout: 30000 }).catch(() => {});
-    ok('the title in review has its Edit button', (await pencil.count()) >= 1, await pencil.count());
-    await pencil.first().click();
+    // Since the revamp (2026-11-15) the box opens from the row's ⋯ menu.
+    const more = pg.locator('button[aria-label="More for Check box film in review"]');
+    await more.first().waitFor({ timeout: 30000 }).catch(() => {});
+    ok('the title in review has its ⋯ menu', (await more.count()) >= 1, await more.count());
+    await more.first().click();
+    const editItem = pg.locator('[role="menuitem"]', { hasText: 'Edit the submission' });
+    ok('…with Edit the submission in it', (await editItem.count()) === 1, await editItem.count());
+    await editItem.click();
     const box = pg.locator('.modal-card.ebx');
     await box.waitFor({ timeout: 10000 });
     ok('"Edit submission" opens as a dialog', (await box.getAttribute('role')) === 'dialog' && ((await box.locator('.ebx-title').textContent()) || '').trim() === 'Edit submission');
@@ -418,7 +422,7 @@ async function boxes(b) {
 
     // --- Title & description (a live title)
     await goto(pg, '/creator/my-work');
-    const menu = pg.locator('button[aria-label="Options for Check box film live"]');
+    const menu = pg.locator('button[aria-label="More for Check box film live"]');
     await menu.first().waitFor({ timeout: 30000 }).catch(() => {});
     ok('the live title has its options', (await menu.count()) === 1, await menu.count());
     await menu.click();
@@ -460,9 +464,10 @@ async function boxSideways(b) {
   const { ctx, page: pg, errors } = await b.open(MARA, 390);
   await pg.setViewportSize({ width: 844, height: 390 });
   await goto(pg, '/creator/my-work');
-  const pencil = pg.locator('div', { has: pg.locator('button[title="Edit"]') }).filter({ hasText: 'Check box film in review' }).last().locator('button[title="Edit"]');
-  await pencil.first().waitFor({ timeout: 30000 }).catch(() => {});
-  await pencil.first().tap();
+  const more = pg.locator('button[aria-label="More for Check box film in review"]');
+  await more.first().waitFor({ timeout: 30000 }).catch(() => {});
+  await more.first().tap();
+  await pg.locator('[role="menuitem"]', { hasText: 'Edit the submission' }).tap();
   await pg.locator('.modal-card.ebx').waitFor({ timeout: 10000 });
   const frame = await pg.evaluate(() => {
     const r = (sel) => { const x = document.querySelector(sel).getBoundingClientRect(); return { top: x.top, bottom: x.bottom }; };

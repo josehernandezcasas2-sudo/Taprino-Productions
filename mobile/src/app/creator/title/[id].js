@@ -3,6 +3,7 @@ import { Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
 import { TITLE_WORDS, titleDashboard } from '../../../lib/titleDashRules';
+import { workShowIdOf } from '../../../lib/workListRules';
 import { colors, fonts, inkTint, okTint, oliveTint } from '../../../lib/theme';
 import { AccountFrame } from '../../../components/account/AccountBits';
 import SmartImage from '../../../components/SmartImage';
@@ -81,11 +82,14 @@ function TitleScreen() {
 
   const list = dataOf(boxes.subs) && Array.isArray(boxes.subs.data.submissions) ? boxes.subs.data.submissions : null;
   const s = list ? list.find((x) => x && x.id === id) || null : null;
-  // A show's episode is worked on in its editor.
-  const inShow = Boolean(s && s.seriesId && s.contentType !== 'vertical');
+  // A show's episode, or an extra filed under a show, is worked on in its
+  // editor (the website does the same, with the same rule).
+  const byId = useMemo(() => new Map((list || []).map((x) => [x.id, x])), [list]);
+  const showId = s ? workShowIdOf(s, byId) : null;
+  const inShow = Boolean(showId && s && s.contentType !== 'vertical' && s.seriesKind !== 'vertical');
   useEffect(() => {
-    if (inShow) router.replace(episodeEditorRoute(s.seriesId, s.id));
-  }, [inShow]); // eslint-disable-line react-hooks/exhaustive-deps
+    if (inShow) router.replace(episodeEditorRoute(showId, s.id));
+  }, [inShow, showId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const pricing = dataOf(boxes.pricing);
   const dash = useMemo(() => titleDashboard({

@@ -1160,9 +1160,11 @@ async function thePages(ctx) {
     const allowedNow = (id) => rows(`select downloads_allowed as a from public.episodes where id = ${q(id)}`)[0].a;
     v = await b.open(MARA, 1280);
     const workStatus = await goto(v.page, '/creator/my-work');
-    const reviewRow = v.page.locator('.work-episode-row', { hasText: titleOf(ID.review) });
-    await reviewRow.waitFor({ timeout: 60000 }).catch(() => {});
-    await reviewRow.locator('button[title="Edit"]').click();
+    // Since the revamp (2026-11-15) the boxes open from the row's ⋯ menu.
+    const reviewMore = v.page.getByRole('button', { name: `More for ${titleOf(ID.review)}` });
+    await reviewMore.waitFor({ timeout: 60000 }).catch(() => {});
+    await reviewMore.click();
+    await v.page.getByRole('menuitem', { name: /Edit the submission/ }).click();
     const inReview = v.page.locator('#edit-submission-downloads');
     await inReview.waitFor({ timeout: 30000 }).catch(() => {});
     ok('Your work, a short still in review: its edit box has “Allow downloads in the app”, ticked', workStatus === 200 && (await inReview.count()) === 1 && (await inReview.isChecked()) && !(await inReview.isDisabled()) && (await v.page.locator('label[for="edit-submission-downloads"]').innerText()).includes(DOWNLOADS_ALLOWED_LABEL), workStatus);
@@ -1171,7 +1173,7 @@ async function thePages(ctx) {
     await v.page.waitForFunction(() => !document.querySelector('#edit-submission-downloads'), null, { timeout: 30000 }).catch(() => {});
     ok('…unticking it and saving switches downloads off for the title', allowedNow(ID.review) === false, allowedNow(ID.review));
     const openMenu = async (id) => {
-      await v.page.getByRole('button', { name: `Options for ${titleOf(id)}` }).click();
+      await v.page.getByRole('button', { name: `More for ${titleOf(id)}` }).click();
       await v.page.getByRole('menuitem', { name: /Edit title/ }).click();
     };
     await openMenu(ID.teen);

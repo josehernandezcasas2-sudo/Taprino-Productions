@@ -196,6 +196,16 @@ async function afterBrowser(b) {
     const y = await b.open(MARA, 1280);
     await goto(y.page, '/creator/my-work');
     await y.page.waitForTimeout(1500);
+    // Since the revamp (2026-11-15) a show's extras sit in its folded
+    // Extras: open every show and every season, once the list is in.
+    await y.page.waitForSelector('.wk-show', { timeout: 60000 }).catch(() => {});
+    // (one at a time: each click adds buttons, so a list taken first goes stale)
+    for (const sel of ['.wk-show-acts button[aria-expanded="false"]', '.wk-season-btn[aria-expanded="false"]']) {
+      for (let i = 0; i < 20 && (await y.page.locator(sel).count()) > 0; i += 1) {
+        await y.page.locator(sel).first().click().catch(() => {});
+        await y.page.waitForTimeout(150);
+      }
+    }
     ok('Your work says Music video on the extra', (await y.page.locator('body').innerText()).includes('Music video'));
     ok('Your work: no page errors', y.errors.length === 0, y.errors);
     await y.ctx.close();

@@ -478,6 +478,9 @@ await runCheck('creator-dashboard', async () => {
         const cur = await other.page.locator('.dash-tab.on').innerText();
         const count = await other.page.locator('.dash-tab').count();
         ok(`${href} carries the tabs with ${current} current`, cur === current && count === 5, `${cur} of ${count}`);
+        // The bar learns the role from /api/my-role after the page loads;
+        // on a busy dev server that can take more than the 800 ms goto waits.
+        await other.page.waitForSelector('.tabbar .tabbar-dash.active', { timeout: 15000 }).catch(() => {});
         const lit = await other.page.evaluate(() => [...document.querySelectorAll('.tabbar .tabbar-item.active')].map((el) => el.innerText.trim().toUpperCase()));
         ok(`${href} has the tab bar${hadBar ? '' : ' (it had none)'}, with Dashboard lit`, lit.join('|') === 'DASHBOARD', lit.join('|'));
         ok(`${href} doesn’t run off the side`, (await overflowPx(other.page)) <= 0, `${await overflowPx(other.page)}px`);
