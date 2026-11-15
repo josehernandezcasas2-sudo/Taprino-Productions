@@ -198,6 +198,15 @@ async function door() {
     ok('signed out, door shut: still forwards to the app', f.status === 302 && f.location === `${APP}?kind=tip&status=paid&id=abc`, f);
   } finally {
     sql(`update public.site_settings set private_beta = ${saved && saved.private_beta === true ? 'true' : 'false'} where id = 1`);
+    // Wait until the middleware has seen the door open again, so the next
+    // check doesn't meet a door that still reads as shut.
+    if (!(saved && saved.private_beta === true)) {
+      for (let i = 0; i < 60; i += 1) {
+        const open = await call('/api/creator/money', { accept: 'application/json' });
+        if (!(open.status === 401 && open.json && open.json.privateBeta)) break;
+        await new Promise((res) => setTimeout(res, 1000));
+      }
+    }
   }
 }
 
