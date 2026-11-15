@@ -282,10 +282,14 @@ async function createManualEpisode(req, res, roleContext) {
     }
     submittedBy = creatorUser.id;
   }
-  // A title of your own created already live skips review: nobody but a
-  // full admin approves their own work (2026-11-15).
-  if (status === 'approved' && approvesOwnWork(roleContext, [submittedBy])) {
-    return res.status(403).json({ error: OWN_WORK_LINE, code: 'own-work' });
+  // Created already live skips review: nobody but a full admin approves
+  // their own work (2026-11-15). A title added here carries a file the
+  // person adding it attached (their own upload, or an untagged one), so
+  // it is their work whoever it is credited to and whichever show it goes
+  // in: anyone but a full admin adds it in review, and someone else on
+  // the team approves it.
+  if (status === 'approved' && (roleContext.isAdmin !== true || approvesOwnWork(roleContext, [submittedBy]))) {
+    return res.status(403).json({ error: `${OWN_WORK_LINE} Add it as In review.`, code: 'own-work' });
   }
 
   // A podcast's audio: a sub-admin stores one of our own files — their own

@@ -55,7 +55,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'The fallback upload method only supports files under 200MB — try the regular upload method for anything larger.' });
     }
     try {
-      const { uploadUrl, uid } = await createCloudflareBasicUploadUrl({ creator: userId });
+      const { uploadUrl, uid } = await createCloudflareBasicUploadUrl({ creator: userId, requireSignedURLs: true });
       return res.status(200).json({ uploadUrl, uid, method: 'basic' });
     } catch (err) {
       console.error('get-upload-url (basic) error:', err.message);

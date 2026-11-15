@@ -61,10 +61,14 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { email, interest } = req.body || {};
-  if (typeof email !== 'string' || !email.includes('@')) {
+  const { email: rawEmail, interest: rawInterest } = req.body || {};
+  // Bounded before anything is stored (2026-11-15): an address is at most
+  // 254 characters, an interest a short label (Notion's select options).
+  const email = typeof rawEmail === 'string' ? rawEmail.trim() : '';
+  if (!email || email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ error: 'A real email address is required.' });
   }
+  const interest = typeof rawInterest === 'string' && rawInterest.trim() ? rawInterest.trim().replace(/[,\u0000-\u001f]/g, ' ').slice(0, 60) : null;
 
   const allowed = await checkRateLimit(rateLimitKeyForRequest(req, 'subscribe'), 10, 600);
   if (!allowed) {

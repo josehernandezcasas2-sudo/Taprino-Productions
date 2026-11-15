@@ -65,7 +65,11 @@ export default async function handler(req, res) {
         if (v && v.uid) {
           if (!VIDEO_UID_PATTERN.test(String(v.uid))) return { status: 400, error: 'That doesn’t look like a video id from this site.' };
           if (!isAdmin) {
-            const owned = await checkVideoOwnership(String(v.uid), { userId });
+            // Tagged uploads only (2026-11-15): every draft's video comes
+            // through those two routes, which tag it; an untagged uid can
+            // only be someone else's, and discarding a draft deletes its
+            // video.
+            const owned = await checkVideoOwnership(String(v.uid), { userId, allowUntagged: false });
             if (!owned.ok) return { status: owned.status, error: owned.error };
           }
         }

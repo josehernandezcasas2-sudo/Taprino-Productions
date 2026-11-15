@@ -1,6 +1,8 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { recordWatched, removeWatchHistoryEntry } from '../../lib/watchHistory';
 import { applyCors } from '../../lib/cors';
+import { checkRateLimit } from '../../lib/rateLimit';
+import { isTitleId } from '../../lib/titleIds';
 
 export default async function handler(req, res) {
   applyCors(req, res);
@@ -17,15 +19,18 @@ export default async function handler(req, res) {
 
   if (req.method === 'POST') {
     const { episodeId } = req.body || {};
-    if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
-    await recordWatched(userId, episodeId);
+    if (!episodeId || !isTitleId(String(episodeId))) return res.status(400).json({ error: 'episodeId is required.' });
+    // A title is finished once in a while, never hundreds of times an hour
+    // (2026-11-15): what's watched steers a member's share to creators.
+    if (!(await checkRateLimit(`watch-history:${userId}`, 120, 3600))) return res.status(429).json({ error: 'Slow down a little.' });
+    await recordWatched(userId, String(episodeId));
     return res.status(200).json({ ok: true });
   }
 
   if (req.method === 'DELETE') {
     const { episodeId } = req.body || {};
-    if (!episodeId) return res.status(400).json({ error: 'episodeId is required.' });
-    await removeWatchHistoryEntry(userId, episodeId);
+    if (!episodeId || !isTitleId(String(episodeId))) return res.status(400).json({ error: 'episodeId is required.' });
+    await removeWatchHistoryEntry(userId, String(episodeId));
     return res.status(200).json({ ok: true });
   }
 

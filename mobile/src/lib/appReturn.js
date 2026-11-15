@@ -25,16 +25,23 @@ export const RETURN_STATUSES = ['paid', 'cancelled', 'back', 'expired'];
 const MAX_LENGTH = 400;
 // A build: studiotapatv://checkout-return (two or three slashes).
 const BUILD_RE = /^studiotapatv:\/\/\/?checkout-return\/?(\?[A-Za-z0-9._~%=&-]*)?$/;
-// Expo Go: exp://<host[:port]>[/path]/--/checkout-return, the address the
-// running bundle was loaded from: an EAS Update (u.expo.dev) or the PC on
-// the same network (a private address: 10.x, 172.16–31.x, 192.168.x,
-// 127.0.0.1 or localhost). Only those hosts (2026-11-15): with any host
-// allowed, a link on our own domain could open someone else's project in
-// Expo Go. A tunnel address (`expo start --tunnel`, *.exp.direct) is
-// refused, so the in-app browser keeps the website's pages there.
+// Expo Go: exp://<host[:port]>[/path]/--/checkout-return — this project on
+// Expo's update host (exp://u.expo.dev/<EXPO_PROJECT_ID>/--/…, the address
+// the app sends from an EAS Update on an iPhone: appReturnAddressFor) or
+// the PC on the same network (a private address: 10.x, 172.16–31.x,
+// 192.168.x, 127.0.0.1 or localhost). Nothing else (2026-11-15): with any
+// host, or any project on u.expo.dev, allowed, a link on our own domain
+// could open someone else's project in Expo Go. A tunnel address
+// (`expo start --tunnel`, *.exp.direct) and an update's own address
+// (u.expo.dev/update/<id>, Android) are refused, so the in-app browser
+// keeps the website's pages there.
+export const EXPO_PROJECT_ID = '217f9775-b623-406f-bbfa-54fbe11eeefa';
 const OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
-const EXPO_GO_HOST = `(?:u\\.expo\\.dev|localhost|127\\.0\\.0\\.1|10\\.${OCTET}\\.${OCTET}\\.${OCTET}|192\\.168\\.${OCTET}\\.${OCTET}|172\\.(?:1[6-9]|2\\d|3[01])\\.${OCTET}\\.${OCTET})`;
-const EXPO_GO_RE = new RegExp(`^exps?:\\/\\/${EXPO_GO_HOST}(:\\d{1,5})?(\\/[A-Za-z0-9._~%-]+)*\\/--\\/checkout-return\\/?(\\?[A-Za-z0-9._~%=&-]*)?$`);
+const LAN_HOST = `(?:localhost|127\\.0\\.0\\.1|10\\.${OCTET}\\.${OCTET}\\.${OCTET}|192\\.168\\.${OCTET}\\.${OCTET}|172\\.(?:1[6-9]|2\\d|3[01])\\.${OCTET}\\.${OCTET})`;
+const TAIL = '\\/--\\/checkout-return\\/?(\\?[A-Za-z0-9._~%=&-]*)?$';
+const LAN_RE = new RegExp(`^exps?:\\/\\/${LAN_HOST}(:\\d{1,5})?(\\/[A-Za-z0-9._~%-]+)*${TAIL}`);
+const PROJECT_RE = new RegExp(`^exps?:\\/\\/u\\.expo\\.dev\\/${EXPO_PROJECT_ID}${TAIL}`);
+const EXPO_GO_RE = { test: (v) => LAN_RE.test(v) || PROJECT_RE.test(v) };
 const ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
 // The app's address, or null when it isn't one of ours.
@@ -42,6 +49,20 @@ export function appReturnUrl(raw) {
   if (typeof raw !== 'string' || !raw || raw.length > MAX_LENGTH) return null;
   if (BUILD_RE.test(raw) || EXPO_GO_RE.test(raw)) return raw;
   return null;
+}
+
+// The address the app sends as `appReturn`: expo-linking's own
+// (`created`), except in Expo Go loaded from an EAS Update on an iPhone,
+// where that is the update's address (a new one every publish, refused
+// above) — there the project's fixed address takes its place. An iPhone's
+// auth session hands the address back by its scheme alone, so it never
+// has to open anything. Android's Expo Go keeps its own (the system
+// really routes the link), which the server refuses: the browser then
+// keeps the website's pages, as before the way back existed.
+export function appReturnAddressFor({ created, os, inExpoGo }) {
+  if (typeof created !== 'string' || !created) return null;
+  if (inExpoGo && os === 'ios' && /^exps?:\/\/u\.expo\.dev\//.test(created)) return `exp://u.expo.dev/${EXPO_PROJECT_ID}/--/${APP_RETURN_PATH}`;
+  return created;
 }
 
 function cleanParams({ kind, status, id } = {}) {

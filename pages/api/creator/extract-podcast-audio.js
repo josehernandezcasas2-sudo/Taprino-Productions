@@ -70,7 +70,7 @@ export default async function handler(req, res) {
       rehosted = await importAudioFromOwnCloudflare(fileUrl, `episode-${episodeId}.m4a`, { userId: episode.submitted_by || userId });
     } catch (err) {
       console.error('extract-podcast-audio rehost error:', err.message);
-      return res.status(502).json({ error: `Audio was extracted but could not be moved to storage: ${err.message}` });
+      return res.status(502).json({ error: 'The audio was made but couldn’t be moved into storage just now. Try again in a minute.' });
     }
     const { error: updateError } = await supabase.from('episodes').update({ audio_url: rehosted.url }).eq('id', episodeId);
     if (updateError) {

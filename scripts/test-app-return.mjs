@@ -24,8 +24,7 @@ const GOOD = [
   'studiotapatv:///checkout-return',
   'exp://192.168.1.20:8081/--/checkout-return',
   'exp://u.expo.dev/217f9775-b623-406f-bbfa-54fbe11eeefa/--/checkout-return',
-  'exp://u.expo.dev/update/0a1b2c3d-1111-2222-3333-444455556666/--/checkout-return',
-  'exp://u.expo.dev/217f9775/--/checkout-return?runtime-version=1.1.0&channel-name=preview',
+  'exp://u.expo.dev/217f9775-b623-406f-bbfa-54fbe11eeefa/--/checkout-return?runtime-version=1.1.0&channel-name=preview',
   // The PC on the same network (2026-11-15: only private addresses).
   'exp://10.0.0.5:8081/--/checkout-return',
   'exp://172.16.4.2:8081/--/checkout-return',
@@ -62,10 +61,25 @@ const BAD = [
   'exp://192.169.1.1/--/checkout-return',
   'exp://127.0.0.2/--/checkout-return',
   'exp://256.0.0.1/--/checkout-return',
-  'exp://[::1]:8081/--/checkout-return'
+  'exp://[::1]:8081/--/checkout-return',
+  // Only this project on Expo's update host (2026-11-15): another project,
+  // or an update's own address, could be anyone's.
+  'exp://u.expo.dev/00000000-0000-0000-0000-000000000000/--/checkout-return',
+  'exp://u.expo.dev/update/0a1b2c3d-1111-2222-3333-444455556666/--/checkout-return',
+  'exp://u.expo.dev/217f9775/--/checkout-return?runtime-version=1.1.0&channel-name=preview',
+  'exp://u.expo.dev/217f9775-b623-406f-bbfa-54fbe11eeefa/x/--/checkout-return'
 ];
 
 for (const [label, lib] of [['web', web], ['app', app]]) {
+  t(`${label}: the address the app sends — this project's in Expo Go on an iPhone, its own otherwise`, () => {
+    const PROJECT = `exp://u.expo.dev/${lib.EXPO_PROJECT_ID}/--/checkout-return`;
+    assert.equal(lib.appReturnAddressFor({ created: 'exp://u.expo.dev/update/0a1b/--/checkout-return', os: 'ios', inExpoGo: true }), PROJECT);
+    assert.equal(lib.appReturnUrl(PROJECT), PROJECT);
+    assert.equal(lib.appReturnAddressFor({ created: 'exp://u.expo.dev/update/0a1b/--/checkout-return', os: 'android', inExpoGo: true }), 'exp://u.expo.dev/update/0a1b/--/checkout-return');
+    assert.equal(lib.appReturnAddressFor({ created: 'exp://192.168.1.2:8081/--/checkout-return', os: 'ios', inExpoGo: true }), 'exp://192.168.1.2:8081/--/checkout-return');
+    assert.equal(lib.appReturnAddressFor({ created: 'studiotapatv://checkout-return', os: 'ios', inExpoGo: false }), 'studiotapatv://checkout-return');
+    assert.equal(lib.appReturnAddressFor({ created: null, os: 'ios', inExpoGo: true }), null);
+  });
   t(`${label}: the app's own addresses are accepted`, () => {
     for (const u of GOOD) assert.equal(lib.appReturnUrl(u), u, u);
   });

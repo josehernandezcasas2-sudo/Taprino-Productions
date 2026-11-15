@@ -95,7 +95,9 @@ export default async function handler(req, res) {
       const unchanged = current && current.handle && current.handle.toLowerCase() === handle.toLowerCase();
       // A reserved handle is the team's to take; someone who already has
       // one keeps it.
-      const reservedOk = isReservedHandle(handle) && (unchanged || (await getRoleContext(req)).canAccessAdmin);
+      // A handle that reads as the site or its staff: a full admin only
+      // (2026-11-15; any team account could take one before).
+      const reservedOk = isReservedHandle(handle) && (unchanged || (await getRoleContext(req)).isAdmin === true);
       const problem = reservedOk ? null : handleError(handle);
       if (problem) return res.status(400).json({ error: problem });
       if (!unchanged && await isHandleTaken(handle, userId)) {

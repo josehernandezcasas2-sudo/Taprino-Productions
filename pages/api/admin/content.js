@@ -43,7 +43,7 @@ export default async function handler(req, res) {
     if (b.op === 'flag') {
       await flagContent({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, reason: b.reason, note: b.note, emailOwner: b.emailOwner !== false });
     } else if (b.op === 'decide') {
-      decided = await decide({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, action: b.action, note: b.note });
+      decided = await decide({ adminId: rc.userId, targetType: b.targetType, targetId: b.targetId, action: b.action, note: b.note, rc });
     } else if (b.op === 'reporter') {
       await setReporterStatus({ userId: b.userId, status: b.status, adminId: rc.userId });
     } else {

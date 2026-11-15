@@ -41,7 +41,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { uid } = await createCloudflareVideoFromUrl({ url: check.url, fileName, creator: userId });
+    const { uid } = await createCloudflareVideoFromUrl({ url: check.url, fileName, creator: userId, requireSignedURLs: true });
     return res.status(200).json({ uid });
   } catch (err) {
     console.error('import-video-url error:', err.message);

@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { hasCapability } from '../../../lib/capabilities';
 import { recordAudit } from '../../../lib/auditLog';
+import { sendError } from '../../../lib/apiErrors';
 import { listChannelMedia, reviewChannelMedia, getChannelMediaSrc } from '../../../lib/channelMedia';
 import { signedSrcForStoredUrl } from '../../../lib/videoSigning';
 import { applyCors } from '../../../lib/cors';
@@ -38,6 +39,6 @@ export default async function handler(req, res) {
     res.setHeader('Allow', 'GET, POST');
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err) {
-    return res.status(err && err.status === 403 ? 403 : 400).json({ error: err.message });
+    return sendError(res, err, 'admin/channel-media', 'Could not do that just now.', { plainStatus: 400 });
   }
 }

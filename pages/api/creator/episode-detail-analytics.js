@@ -67,7 +67,9 @@ export default async function handler(req, res) {
     owns = (await paidEpisodeIds(userId).catch(() => [])).includes(episode.id);
   }
   if (!owns) {
-    return res.status(403).json({ error: 'You can only view analytics for your own work.' });
+    // The same answer as a title that doesn't exist (2026-11-15), so the
+    // route can't be used to find out which unreleased ids exist.
+    return res.status(404).json({ error: 'Episode not found.' });
   }
 
   // "Since it was uploaded" in days, capped at 365 for the same reason

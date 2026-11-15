@@ -1,4 +1,5 @@
 import { requireScheduler } from '../../../lib/scheduleRequest';
+import { sendError } from '../../../lib/apiErrors';
 import { getSupabase } from '../../../lib/supabase';
 import { listChannelSchedule, addEpisodeToSchedule, moveScheduleItem, removeFromSchedule, restartChannelLoop } from '../../../lib/channelSchedule';
 import { parseRuntimeToSeconds } from '../../../lib/videoMetadata';
@@ -43,7 +44,7 @@ export default async function handler(req, res) {
       }))
     });
   } catch (err) {
-    return res.status(400).json({ error: err.message });
+    return sendError(res, err, 'schedule/loop', 'Could not update the loop.', { plainStatus: 400 });
   }
 }
 

@@ -2,7 +2,8 @@ import { Alert, AppState, Platform } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { APP_RETURN_PATH, readCheckoutReturn } from './appReturn';
+import { APP_RETURN_PATH, appReturnAddressFor, readCheckoutReturn } from './appReturn';
+import Constants from 'expo-constants';
 
 // A page in the in-app browser that the screen waits on — Stripe Checkout
 // (Own, Tip, a membership, backing, a booking, crew pay), the subscription
@@ -124,8 +125,16 @@ export function openInAppBrowser(url) {
 // The app's own address for the way back (lib/appReturn.js): sent with
 // the request that makes the Stripe page, so the server sends the browser
 // here when the person is done.
+// In Expo Go on an iPhone loaded from an EAS Update, the project's fixed
+// address instead of the update's own (appReturnAddressFor; the server
+// takes only this project's).
+function inExpoGo() {
+  return Constants.executionEnvironment === 'storeClient' || Constants.appOwnership === 'expo';
+}
 export function appReturnAddress() {
-  try { return Linking.createURL(APP_RETURN_PATH); } catch { return null; }
+  let created = null;
+  try { created = Linking.createURL(APP_RETURN_PATH); } catch { return null; }
+  return appReturnAddressFor({ created, os: Platform.OS, inExpoGo: inExpoGo() });
 }
 
 // A Stripe page that comes back to the app by itself (Jose, 2026-11-13:

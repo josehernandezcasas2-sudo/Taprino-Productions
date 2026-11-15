@@ -37,7 +37,8 @@ export default async function handler(req, res) {
     });
   } catch (err) {
     clearTimeout(timeout);
-    return res.status(502).json({ error: err.name === 'AbortError' ? 'That feed took too long to respond.' : `Could not reach that feed: ${err.message}` });
+    console.error('rss-preview fetch:', err && err.message);
+    return res.status(502).json({ error: err.name === 'AbortError' ? 'That feed took too long to respond.' : 'Couldn’t reach that feed. Check the link is a public RSS address.' });
   }
 
   if (!response.ok) {
