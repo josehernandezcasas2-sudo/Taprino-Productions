@@ -12117,6 +12117,221 @@ a.prod-day:hover { background: var(--surface-3); }
 }
 
 /* === Your work, revamped (2026-11-15; builder A; .wk-*) === */
+/* Your work (/creator/my-work), revamped from the canvas
+   https://claude.ai/artifact/6LuuNpyuaKTS5PkCij8Nfc (boards "New · laptop"
+   and "New · phone"; the agreement is mockups/work-revamp-contract.md):
+   the work tabs and the search, sections that fold from their heading, a
+   show as one card that opens to its seasons and a season to its
+   episodes, one row design for every title, and a ⋯ menu that closes on a
+   click away, Escape and after an action. The page is pages/creator/
+   my-work.js with components/creator/work/*. Every button is 40px tall
+   (44 on a touch screen or a phone); colours are the :root tokens. */
+.stage.wk { display: block; padding: 2.4rem 1.5rem 3.5rem; --wk-line: color-mix(in srgb, var(--ink) 10%, transparent); --wk-hair: color-mix(in srgb, var(--ink) 6%, transparent); --wk-edge: color-mix(in srgb, var(--ink) 22%, transparent); --wk-red: color-mix(in srgb, var(--danger) 70%, var(--ink)); }
+.wk [hidden] { display: none !important; }
+.wk :focus-visible { outline: 2px solid var(--olive); outline-offset: 2px; }
+
+/* The head: the kicker, the heading, the lede and the two buttons. */
+.wk-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem 1.5rem; margin-bottom: 1.5rem; }
+.wk-head-text { min-width: 0; }
+.wk-kicker { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--brass); }
+.wk-h1 { margin: 0.5rem 0 0.4rem; font-family: var(--font-body); font-weight: 600; font-size: 2.5rem; line-height: 1.1; }
+.wk-lede { margin: 0; font-size: 1rem; line-height: 1.45; color: var(--ink-dim); }
+.wk-head-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
+.wk-head-btn.apl-btn, .wk-head-btn.apl-btn-secondary { height: 44px; padding: 0 1.2rem; font-weight: 600; font-size: 0.95rem; }
+
+/* The work tabs (aria-pressed) and the search box; they wrap on a phone. */
+.wk-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; margin-bottom: 1.75rem; }
+.wk-tabs { display: flex; flex-wrap: wrap; gap: 0.5rem; flex: 999 1 420px; min-width: 0; }
+.wk-tab { display: inline-flex; align-items: center; gap: 0.5rem; height: 40px; padding: 0 0.9rem; border-radius: 999px; border: 1px solid var(--wk-edge); background: transparent; color: var(--ink-dim); font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; cursor: pointer; white-space: nowrap; }
+.wk-tab:hover { color: var(--ink); border-color: var(--olive); }
+.wk-tab.on { background: var(--brass); border-color: var(--brass); color: var(--surface-0); }
+.wk-tab-n { font-family: var(--font-mono); font-weight: 500; font-size: 0.75rem; }
+.wk-search { flex: 1 1 240px; min-width: 0; }
+.wk-search input { width: 100%; height: 40px; padding: 0 0.9rem; border-radius: 999px; border: 1px solid var(--wk-edge); background: var(--surface-2); color: var(--ink); font-family: var(--font-body); font-size: 0.95rem; }
+.wk-search input::placeholder { color: var(--ink-faint); }
+.wk-search input:focus { border-color: var(--olive); }
+
+/* A section: its heading folds it (chevron, label, count, a hairline). */
+.wk-sec { margin-bottom: 2rem; }
+.wk-sec-h { display: flex; align-items: center; gap: 0.6rem; margin: 0 0 0.75rem; font-size: inherit; }
+.wk-sec-btn { display: inline-flex; align-items: center; gap: 0.5rem; height: 40px; padding: 0 0.75rem 0 0.25rem; border: 0; border-radius: 8px; background: transparent; color: var(--ink-dim); font-family: var(--font-mono); font-weight: 500; font-size: 0.75rem; letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer; }
+.wk-sec-btn:hover { color: var(--ink); }
+.wk-sec-n { color: var(--ink-faint); }
+.wk-sec-rule { flex: 1; height: 1px; background: var(--wk-line); }
+.wk-sec-note { margin: -0.25rem 0 0.75rem; font-size: 0.9rem; line-height: 1.4; color: var(--ink-dim); }
+.wk-chev { display: inline-flex; flex: none; transition: transform 160ms ease; }
+.wk-chev.open { transform: rotate(90deg); }
+.wk-chev.down { transform: rotate(90deg); }
+.wk-chev.down.open { transform: rotate(-90deg); }
+
+/* Cards. Nothing here clips (no overflow: hidden), so a ⋯ menu always shows whole. */
+.wk-card { background: var(--surface-2); border-radius: 16px; }
+.wk-list { padding: 0.25rem 0; }
+.wk-state { margin: 0; padding: 2.5rem 1.25rem; text-align: center; color: var(--ink-dim); font-size: 1rem; }
+.wk-state p { margin: 0 0 1rem; }
+p.wk-state { margin: 0; }
+
+/* Buttons. */
+.wk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; height: 40px; padding: 0 1rem; border-radius: 999px; border: 1px solid var(--wk-edge); background: transparent; color: var(--ink); font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.wk-btn:hover { border-color: var(--olive); color: var(--ink); }
+.wk-btn.gold { border-color: var(--olive); background: var(--olive); color: var(--olive-shadow); }
+.wk-btn.gold:hover { background: var(--olive-bright); border-color: var(--olive-bright); color: var(--olive-shadow); }
+.wk-btn.outline { border-color: var(--olive); color: var(--olive); }
+.wk-btn.outline:hover { background: rgba(var(--olive-rgb), 0.12); color: var(--olive-bright); }
+.wk-btn:disabled { opacity: 0.6; cursor: progress; }
+
+/* Chips and pills: Series / Podcast, where a show or a title stands. */
+.wk-chip, .wk-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; border: 1px solid transparent; font-family: var(--font-mono); font-weight: 500; font-size: 0.6875rem; letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap; line-height: 1.45; }
+/* A pill longer than its column ("Approved · not public yet" on a small phone) wraps rather than pushing the page sideways. */
+.wk-pill, .wk-chip { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.wk-chip.kind-series { color: var(--sky); border-color: color-mix(in srgb, var(--sky) 60%, transparent); }
+.wk-chip.kind-podcast { color: var(--mint); border-color: color-mix(in srgb, var(--mint) 60%, transparent); }
+.wk-chip.tone-live, .wk-pill.tone-live { color: var(--ok); background: rgba(var(--ok-rgb), 0.16); }
+.wk-chip.tone-ready, .wk-chip.tone-review, .wk-pill.tone-review { color: var(--olive); background: rgba(var(--olive-rgb), 0.16); }
+.wk-chip.tone-declined, .wk-pill.tone-declined { color: var(--wk-red); background: rgba(var(--danger-rgb), 0.16); }
+.wk-chip.tone-quiet, .wk-pill.tone-quiet { color: var(--ink-dim); background: color-mix(in srgb, var(--ink) 8%, transparent); }
+.wk-need-text { color: var(--brass); }
+
+/* A show. */
+.wk-show { background: var(--surface-2); border-radius: 16px; margin-bottom: 1rem; }
+.wk-show:last-child { margin-bottom: 0; }
+.wk-show-head { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem; padding: 1rem 1.25rem; }
+.wk-poster { flex: none; width: 44px; aspect-ratio: 2 / 3; border-radius: 6px; background: var(--surface-1) center / cover no-repeat; }
+.wk-poster.empty { border: 1px dashed color-mix(in srgb, var(--ink) 30%, transparent); }
+.wk-show-info { flex: 999 1 280px; min-width: 0; }
+.wk-show-title { display: flex; flex-wrap: wrap; align-items: center; gap: 0.35rem 0.6rem; }
+.wk-show-name { margin: 0; font-family: var(--font-body); font-weight: 600; font-size: 1.3rem; line-height: 1.2; overflow-wrap: anywhere; }
+.wk-show-count { margin: 0.4rem 0 0; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-dim); }
+.wk-show-lines { margin: 0.25rem 0 0; font-size: 0.875rem; line-height: 1.4; color: var(--ink-dim); }
+.wk-show-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
+.wk-seasons { padding-bottom: 0.4rem; }
+.wk-season { border-top: 1px solid color-mix(in srgb, var(--ink) 8%, transparent); }
+.wk-season-btn { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; width: 100%; min-height: 52px; padding: 0.5rem 1.25rem; border: 0; background: transparent; color: var(--ink); text-align: left; font-family: inherit; cursor: pointer; }
+@media (hover: hover) { .wk-season-btn:hover { background: color-mix(in srgb, var(--ink) 4%, transparent); } }
+.wk-season-btn:focus-visible { outline-offset: -2px; }
+.wk-season-name { display: inline-flex; align-items: center; gap: 0.6rem; color: var(--ink-dim); }
+.wk-season-label { font-family: var(--font-display); font-weight: 600; font-size: 0.95rem; color: var(--ink); }
+.wk-season-sum { margin-left: auto; font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-dim); }
+.wk-season-rows { padding-bottom: 0.25rem; }
+
+/* A row: the link (thumbnail + words), the notes, the next step, the ⋯. */
+.wk-row { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "link next more" "notes next more" "alert alert alert"; align-items: center; padding: 0.75rem 1.25rem; }
+.wk-row + .wk-row { border-top: 1px solid var(--wk-hair); }
+.wk-row.in-show { padding-left: 2.9rem; }
+.wk-row-link { grid-area: link; display: flex; align-items: center; gap: 0.875rem; min-width: 0; color: var(--ink); text-decoration: none; border-radius: 8px; }
+.wk-row-link:hover { color: var(--ink); }
+.wk-row-link:hover .wk-row-name { text-decoration: underline; text-decoration-color: var(--olive); text-underline-offset: 3px; }
+.wk-row-link:focus-visible { outline-offset: 4px; }
+.wk-thumb { flex: none; display: flex; align-items: center; justify-content: center; width: 88px; aspect-ratio: 16 / 9; border-radius: 6px; background: var(--surface-1) center / cover no-repeat; color: var(--ink-faint); }
+.wk-thumb.empty { box-shadow: inset 0 0 0 1px rgba(var(--olive-rgb), 0.55); }
+.wk-row-text { display: block; min-width: 0; }
+.wk-row-title { display: block; font-family: var(--font-display); font-weight: 600; font-size: 1rem; line-height: 1.3; overflow-wrap: anywhere; }
+.wk-code { margin-right: 0.5rem; font-family: var(--font-mono); font-weight: 500; font-size: 0.75rem; color: var(--ink-dim); }
+.wk-row-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem; margin-top: 0.25rem; }
+.wk-meta { font-family: var(--font-body); font-size: 0.875rem; color: var(--ink-dim); }
+.wk-row-notes { grid-area: notes; min-width: 0; padding-left: calc(88px + 0.875rem); }
+.wk-note { display: flex; align-items: flex-start; gap: 0.4rem; margin: 0.4rem 0 0; font-family: var(--font-body); font-size: 0.875rem; line-height: 1.35; overflow-wrap: anywhere; }
+.wk-note svg, .wk-note img { flex: none; margin-top: 1px; }
+.wk-note.need { color: var(--brass); }
+.wk-note.wait { color: var(--olive); }
+.wk-note.quiet { color: var(--ink-dim); }
+.wk-row-next { grid-area: next; margin-left: 0.875rem; }
+.wk-next { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 1rem; border-radius: 999px; border: 1px solid var(--olive); background: transparent; color: var(--olive); font-family: var(--font-display); font-weight: 600; font-size: 0.875rem; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.wk-next:hover { background: rgba(var(--olive-rgb), 0.12); color: var(--olive-bright); }
+.wk-next:disabled { opacity: 0.6; cursor: progress; }
+.wk-row-more { grid-area: more; margin-left: 0.625rem; }
+.wk-row-alert, .wk-show-alert { padding: 0.5rem 0.75rem; border-radius: 8px; border: 1px solid rgba(var(--danger-rgb), 0.4); background: rgba(var(--danger-rgb), 0.1); color: var(--wk-red); font-size: 0.875rem; line-height: 1.4; overflow-wrap: anywhere; }
+.wk-row-alert { grid-area: alert; margin: 0.6rem 0 0; }
+.wk-show-alert { margin: 0 1.25rem 1rem; }
+.wk-row-alert.ok, .wk-show-alert.ok { border-color: rgba(var(--ok-rgb), 0.4); background: rgba(var(--ok-rgb), 0.1); color: var(--ok); }
+
+/* The ⋯ and its menu: under the button (or above it when there is more
+   room there), never taller than the room it has (--wk-menu-max, measured
+   by components/creator/work/WorkMenu.js), scrolling by itself. */
+.wk-more-wrap { position: relative; }
+.wk-more { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border-radius: 999px; border: 1px solid var(--wk-edge); background: transparent; color: var(--ink); cursor: pointer; }
+.wk-more:hover { border-color: var(--olive); }
+.wk-more.on { background: color-mix(in srgb, var(--ink) 12%, transparent); }
+.wk-menu { position: absolute; right: 0; top: calc(100% + 6px); z-index: 15; width: max-content; min-width: 264px; max-width: min(340px, calc(100vw - 2rem)); max-height: var(--wk-menu-max, none); overflow-y: auto; overscroll-behavior: contain; padding: 6px; background: var(--surface-1); border: 1px solid color-mix(in srgb, var(--ink) 16%, transparent); border-radius: 12px; box-shadow: 0 16px 34px rgba(0, 0, 0, 0.45); }
+.wk-menu[data-place="up"] { top: auto; bottom: calc(100% + 6px); }
+/* A soft edge where items carry on past the top or the bottom (the header
+   panels' technique: the two "local" covers ride with the items and hide
+   the shadows drawn on the menu itself once the list is at that end). */
+.wk-menu {
+  overflow-x: hidden;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--ink) 22%, transparent) transparent;
+  background:
+    linear-gradient(var(--surface-1) 35%, transparent) top / 100% 22px no-repeat local,
+    linear-gradient(transparent, var(--surface-1) 65%) bottom / 100% 22px no-repeat local,
+    linear-gradient(rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0)) top / 100% 12px no-repeat scroll,
+    linear-gradient(rgba(0, 0, 0, 0), rgba(0, 0, 0, 0.42)) bottom / 100% 12px no-repeat scroll,
+    var(--surface-1);
+}
+.wk-menu-item { display: flex; align-items: center; gap: 0.625rem; width: 100%; min-height: 40px; padding: 0 0.625rem; border: 0; border-radius: 8px; background: transparent; color: var(--ink); font-family: var(--font-display); font-weight: 500; font-size: 0.875rem; line-height: 1.25; text-align: left; text-decoration: none; cursor: pointer; }
+.wk-menu-item:focus-visible { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+@media (hover: hover) { .wk-menu-item:hover { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); } }
+.wk-menu-item:focus-visible { outline-offset: -2px; }
+.wk-menu-item:disabled { opacity: 0.6; cursor: progress; }
+.wk-menu-item.danger, .wk-menu-item.danger:hover { color: var(--wk-red); }
+.wk-menu-icon { display: inline-flex; flex: none; width: 16px; justify-content: center; }
+.wk-menu-label { flex: 1 1 auto; min-width: 0; padding: 0.55rem 0; }
+.wk-menu-detail { flex: none; margin-left: auto; padding-left: 0.6rem; font-family: var(--font-mono); font-size: 0.75rem; color: var(--ink-dim); }
+.wk-menu-detail.on, .wk-menu-detail.price { color: var(--ok); }
+.wk-menu-sep { height: 1px; margin: 6px 4px; background: var(--wk-line); }
+
+@media (prefers-reduced-motion: reduce) {
+  .wk-chev { transition: none; }
+}
+
+/* A touch screen: 44px targets. */
+@media (pointer: coarse) {
+  .wk-tab, .wk-btn, .wk-next, .wk-sec-btn, .wk-search input { height: 44px; }
+  .wk-more { width: 44px; height: 44px; }
+  .wk-menu-item { min-height: 44px; font-size: 0.9375rem; }
+}
+
+/* A phone (the "New · phone" board). */
+@media (max-width: 640px) {
+  .stage.wk { padding: 1.25rem 1rem 2.5rem; }
+  .wk-head { gap: 0.9rem; margin-bottom: 1.1rem; }
+  .wk-h1 { font-size: 2rem; }
+  .wk-head-acts { width: 100%; gap: 0.5rem; }
+  .wk-head-acts .apl-btn { flex: 1 1 auto; }
+  .wk-bar { gap: 0.75rem; margin-bottom: 1.4rem; }
+  .wk-tabs { flex-basis: 100%; }
+  .wk-tab, .wk-btn, .wk-next, .wk-sec-btn { height: 44px; }
+  .wk-search { flex-basis: 100%; }
+  .wk-search input { height: 44px; padding: 0 1rem; font-size: 1rem; }
+  .wk-sec { margin-bottom: 1.75rem; }
+  .wk-sec-h { margin-bottom: 0.5rem; }
+  .wk-sec-btn { padding-left: 0; }
+
+  .wk-show { margin-bottom: 0.75rem; }
+  .wk-show-head { align-items: flex-start; padding: 1rem; }
+  .wk-show-info { flex: 1 1 0; }
+  .wk-show-name { font-size: 1.25rem; }
+  .wk-show-acts { flex: 1 1 100%; gap: 0.5rem; margin-top: 0.15rem; }
+  .wk-show-acts .wk-btn { flex: 1 1 0; height: 44px; padding: 0 0.6rem; }
+  .wk-show-acts .wk-public { flex-basis: 100%; font-size: 0.9375rem; }
+  .wk-show-alert { margin: 0 1rem 1rem; }
+  .wk-season-btn { padding: 0.5rem 1rem; }
+
+  .wk-row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "link more" "notes notes" "next next" "alert alert"; align-items: start; padding: 0.875rem 0.5rem 0.875rem 1rem; }
+  .wk-row.in-show { padding-left: 1.75rem; }
+  .wk-row-link { align-items: flex-start; gap: 0.75rem; }
+  .wk-thumb { width: 80px; }
+  .wk-row-title { line-height: 1.25; }
+  .wk-row-notes { padding-left: 0; margin-right: 0.5rem; }
+  .wk-note { margin-top: 0.6rem; }
+  .wk-row-next { margin: 0.6rem 0.5rem 0 0; }
+  .wk-next { width: 100%; height: 44px; }
+  .wk-row-more { margin-left: 0.25rem; }
+  .wk-more { width: 44px; height: 44px; border-color: transparent; }
+  .wk-row-alert { margin-right: 0.5rem; }
+  .wk-menu { min-width: 272px; }
+  .wk-menu-item { min-height: 44px; font-size: 0.9375rem; }
+}
 /* === end Your work === */
 
 /* The submit page's Place block (step 2). */
