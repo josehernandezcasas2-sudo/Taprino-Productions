@@ -161,14 +161,17 @@ export default clerkMiddleware(async (auth, req, event) => {
 });
 
 export const config = {
-  // Matches Clerk's own published recommended pattern exactly, rather than
-  // a hand-rolled simplification — this matters because it explicitly
-  // force-includes API routes as a separate rule, not just relying on the
-  // general "skip static files" pattern to happen to also cover them. The
-  // API routes are exactly where the sensitive checks live (wishlist,
-  // checkout, portal session), so this isn't a place to improvise.
+  // Every page and API route, and nothing else: Next's own files under
+  // /_next, the dev overlay's /__nextjs routes, and the static files that
+  // really are in /public (a browser asks for /favicon.ico whether or not
+  // it exists). Until 2026-11-15 this was Clerk's suggested pattern, which
+  // skips any address with a file extension in it, though a dynamic page
+  // can answer such an address too.
+  // A new file in /public that a signed-out visitor needs while the door
+  // is shut goes in this list. API routes are matched by the second rule
+  // as before.
   matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
+    '/((?!_next|__nextjs|favicon\\.ico|icon\\.svg|logo\\.svg|og-image\\.png|push-badge\\.png|push-icon\\.png|sw\\.js).*)',
     '/(api|trpc)(.*)'
   ]
 };
