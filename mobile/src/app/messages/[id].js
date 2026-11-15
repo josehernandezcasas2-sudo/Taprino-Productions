@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Keyboard, KeyboardAvoidingView, Platform, Pre
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../lib/stableAuth';
-import { apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
+import { apiGet, apiPatch, apiPost, freshToken, pathId } from '../../lib/api';
 import { colors, fonts } from '../../lib/theme';
 import { bumpUnread } from '../../lib/useUnread';
 import { Avatar, Chip } from '../../components/CrewBits';
@@ -26,7 +26,8 @@ function fmtTime(iso) {
 
 export default function Conversation() {
   const router = useRouter();
-  const { id, to, kind, label } = useLocalSearchParams();
+  const { id: rawId, to, kind, label } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const isNew = id === 'new';

@@ -27,13 +27,13 @@ export async function getServerSideProps({ req, res, params }) {
   // posted and immediately checks their own profile can be served an
   // edge-cached copy from before their post existed, for up to five
   // minutes (longer under stale-while-revalidate).
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
   }
-  res.setHeader('Vary', 'Cookie');
+  res.setHeader('Vary', 'Cookie, Authorization');
 
   const data = await getProfileHubData(params.userId, req);
   if (!data) return { notFound: true };

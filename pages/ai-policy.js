@@ -18,12 +18,12 @@ import { getSecuritySwitches, getSecurityRow } from '../lib/securitySwitches';
 // Every claim below describes something the code actually does; when a
 // measure changes, change the sentence that describes it.
 export async function getServerSideProps({ req, res }) {
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=600, stale-while-revalidate=3600');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
   // Card 01 follows Admin → AI security's "Block AI answer engines"
   // (lib/securitySwitches.js, migration 119).

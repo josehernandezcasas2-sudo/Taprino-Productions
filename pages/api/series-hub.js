@@ -44,7 +44,7 @@ export default async function handler(req, res) {
   const data = await getSeriesHubData(id, req, { season, preview, followKind: false });
   if (!data) return res.status(404).json({ error: 'Not found' });
 
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || Boolean(req.headers.authorization);
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization) || Boolean(req.headers.authorization);
   res.setHeader('Cache-Control', preview || data.preview ? 'private, no-store' : hasSession ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=300, stale-while-revalidate=600');
 
   return res.status(200).json({

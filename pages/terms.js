@@ -28,12 +28,12 @@ export async function getServerSideProps({ req, res }) {
   // changes maybe a few times a year, so signed-out visitors — which
   // includes every crawler, and the AdSense reviewer — can hold a copy for
   // an hour and revalidate in the background for a day after that.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
 
   const [account, episodes, share, tipSettings, siteSettings] = await Promise.all([getAccountContext(req), getPublicEpisodes(), getShareSettings().catch(() => null), getTipSettings().catch(() => null), getSiteSettings().catch(() => null)]);

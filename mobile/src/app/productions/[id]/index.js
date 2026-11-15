@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View 
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
-import { apiGet, apiPost, apiPatch, apiPut, apiDelete, freshToken } from '../../../lib/api';
+import { apiGet, apiPost, apiPatch, apiPut, apiDelete, freshToken, pathId } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
@@ -15,7 +15,8 @@ import { StatusPill, DayForm, OWNER_STATUSES, STATUS, fmtRange, prod } from '../
 // from here; the crew open the call sheet from here.
 export default function ProductionScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);

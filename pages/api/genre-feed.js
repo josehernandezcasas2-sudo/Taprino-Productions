@@ -28,7 +28,7 @@ export default async function handler(req, res) {
   if (!(await limitPublicRead(req, res, 'genre-feed'))) return undefined;
   // Signed in (the app sends its token), the series hero carries where
   // this viewer picks the show up, so the answer is theirs alone.
-  const hasSession = Boolean(req.headers.authorization) || Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean(req.headers.authorization) || Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   res.setHeader('Cache-Control', hasSession ? 'private, no-cache, no-store, must-revalidate' : 'public, s-maxage=300, stale-while-revalidate=600');
 
   const { genre } = req.query;

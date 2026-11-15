@@ -13,6 +13,13 @@ export function cleanVia(raw) {
   return /^[A-Za-z0-9_.-]+$/.test(v) ? v : '';
 }
 
+// A link counts only on the profile it names: /profile/<handle>?via=<handle>.
+export function viaMatchesProfile(rawVia, profileSegment) {
+  const via = cleanVia(rawVia).toLowerCase();
+  const seg = cleanVia(String(profileSegment || '')).toLowerCase();
+  return Boolean(via) && via === seg;
+}
+
 export async function rememberVia(raw) {
   const via = cleanVia(raw);
   if (!via) return;

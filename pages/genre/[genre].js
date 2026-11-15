@@ -33,12 +33,12 @@ export async function getServerSideProps({ req, params, res }) {
   // public only for signed-out visitors, since this response otherwise
   // carries personal account data (email, admin status) that a shared
   // cache must never serve to a different visitor.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
 
   // Next has already decoded the segment; a second decode threw on any

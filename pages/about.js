@@ -21,12 +21,12 @@ export async function getServerSideProps({ req, res }) {
   // background for a day after that. A signed-in visitor still needs a
   // real header (their name, admin link, tier), so their copy is never
   // cached.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=3600, stale-while-revalidate=86400');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
 
   const account = await getAccountContext(req);

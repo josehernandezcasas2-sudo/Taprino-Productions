@@ -30,13 +30,13 @@ export async function getServerSideProps({ req, res }) {
   // is the most-visited page in the app and had no Cache-Control at all,
   // so every request (including every anonymous one that could safely
   // share a cached response) was hitting getServerSideProps fresh.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=300');
   }
-  res.setHeader('Vary', 'Cookie');
+  res.setHeader('Vary', 'Cookie, Authorization');
 
   const account = await getAccountContext(req);
   // The nearby rows are personal when the viewer has a place on their

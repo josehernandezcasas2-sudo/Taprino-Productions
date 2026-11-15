@@ -126,3 +126,10 @@ export async function apiDelete(path, body, token) {
   if (!res.ok) throw await failed(res);
   return res.json();
 }
+
+// A route parameter put into an API path (2026-11-15): encoded, so a
+// crafted link can never point the signed-in request at another path.
+export function pathId(value) {
+  const v = Array.isArray(value) ? value[0] : value;
+  return encodeURIComponent(String(v == null ? '' : v));
+}

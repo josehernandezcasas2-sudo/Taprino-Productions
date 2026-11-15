@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
-import { apiGet, apiPatch, apiPost, apiDelete, freshToken, API_BASE_URL } from '../../../lib/api';
+import { apiGet, apiPatch, apiPost, apiDelete, freshToken, API_BASE_URL, pathId } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew, Chip } from '../../../components/CrewBits';
@@ -18,7 +18,8 @@ const fmtDate = (d) => (d ? new Date(`${d}T12:00:00`).toLocaleDateString('en-US'
 
 export default function DistributionScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [busy, setBusy] = useState(false);

@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { openCheckout, appReturnAddress } from '../../lib/inAppBrowser';
 import BackItGlyph from '../../components/BackItGlyph';
 import Svg, { Path } from 'react-native-svg';
-import { apiDelete, apiGet, apiPatch, apiPost, freshToken } from '../../lib/api';
+import { apiDelete, apiGet, apiPatch, apiPost, freshToken, pathId } from '../../lib/api';
 import { colors, fonts, absoluteFill } from '../../lib/theme';
 import { TAX_NOTE } from '../../lib/salesTaxRules';
 import SmartImage from '../../components/SmartImage';
@@ -66,7 +66,8 @@ function countComments(list) {
 // back/save/share buttons (no native header), a funding card with the
 // big numbers, then numbered sections in the site's mono-eyebrow voice.
 export default function PitchDetail() {
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams();
+  const id = pathId(rawId);
   const router = useRouter();
   const { getToken } = useAuth();
   const insets = useSafeAreaInsets();

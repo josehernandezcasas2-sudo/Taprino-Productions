@@ -48,6 +48,9 @@ export default async function handler(req, res) {
     const session = await getStripe().checkout.sessions.create({
       mode: 'payment',
       payment_method_types: ['card'],
+      // The bank confirms the card where it can (2026-11-15), as every
+      // other one-off payment on the site.
+      payment_method_options: { card: { request_three_d_secure: 'any' } },
       // Dynamic price_data rather than a fixed STRIPE_PRICE_ID — unlike
       // the subscription checkout, the amount here is whatever the
       // advertiser chooses, not a fixed plan price.

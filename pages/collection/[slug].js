@@ -21,12 +21,12 @@ import { contentTypeTag } from '../../lib/contentTypeTags';
 // /collection/leaving-soon are the only two valid slugs; anything else
 // 404s via notFound below rather than silently rendering an empty page.
 export async function getServerSideProps({ req, params, res }) {
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
 
   const data = await getCollectionFeedData(params.slug, req);

@@ -3,7 +3,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
-import { apiGet, apiPatch, freshToken } from '../../../lib/api';
+import { apiGet, apiPatch, freshToken, pathId } from '../../../lib/api';
 import { colors } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import { crew } from '../../../components/CrewBits';
@@ -12,7 +12,8 @@ import { ProductionForm } from '../../../components/ProductionBits';
 // Edit a production's details (pages/productions/<id>/edit on the web).
 export default function EditProduction() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, production: null, projects: [] });
   const [busy, setBusy] = useState(false);

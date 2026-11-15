@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../../lib/stableAuth';
-import { apiGet, apiPut, apiDelete, freshToken } from '../../../../lib/api';
+import { apiGet, apiPut, apiDelete, freshToken, pathId } from '../../../../lib/api';
 import { colors } from '../../../../lib/theme';
 import TopNav from '../../../../components/TopNav';
 import SmartImage from '../../../../components/SmartImage';
@@ -15,7 +15,8 @@ import { StatusPill, DayForm, fmtDay, prod } from '../../../../components/Produc
 // rules when the place is a Studio Tapa listing. Crew, owner, admins.
 export default function CallSheetScreen() {
   const router = useRouter();
-  const { id, n } = useLocalSearchParams();
+  const { id: rawId, n } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { isLoaded, isSignedIn, getToken } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const [dayNo, setDayNo] = useState(Number(n) || 1);

@@ -5,7 +5,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useAuth } from '../../../lib/stableAuth';
 import * as WebBrowser from 'expo-web-browser';
 import { openCheckout, appReturnAddress } from '../../../lib/inAppBrowser';
-import { absoluteUrl, apiGet, apiPatch, apiPost, freshToken } from '../../../lib/api';
+import { absoluteUrl, apiGet, apiPatch, apiPost, freshToken, pathId } from '../../../lib/api';
 import { colors, fonts } from '../../../lib/theme';
 import TopNav from '../../../components/TopNav';
 import ReportSheet from '../../../components/ReportSheet';
@@ -21,7 +21,8 @@ const payDollars = (cents) => `$${((cents || 0) / 100).toLocaleString('en-US', {
 
 export default function CallScreen() {
   const router = useRouter();
-  const { id } = useLocalSearchParams();
+  const { id: rawId } = useLocalSearchParams();
+  const id = pathId(rawId);
   const { isLoaded, isSignedIn, getToken, userId } = useAuth();
   const signedIn = Boolean(isLoaded && isSignedIn);
   const tokenRef = useRef(null);

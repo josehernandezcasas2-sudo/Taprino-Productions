@@ -29,7 +29,7 @@ import { SITE } from '../lib/siteConfig';
 // handbook that lived here (what we take → rights → form → next steps;
 // the "what we take" cards survive at the foot of the page).
 export async function getServerSideProps({ req, res, query }) {
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession || query.preview) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {

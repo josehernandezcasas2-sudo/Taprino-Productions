@@ -14,7 +14,7 @@ import { CrewCardView, TierChip, crew } from '../../components/CrewBits';
 import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { PerformerFacts } from '../../components/CastingBits';
 import { TipButton } from '../../components/TipSheet';
-import { rememberVia } from '../../lib/referral';
+import { rememberVia, viaMatchesProfile } from '../../lib/referral';
 import { useCaptureBlock } from '../../lib/captureBlock';
 import { useRereadWhenSignedIn } from '../../lib/resumeTask';
 
@@ -89,8 +89,12 @@ export default function PublicProfile() {
   const { userId: profileUserId, via } = useLocalSearchParams();
   const router = useRouter();
   // Opened from a creator's link (?via=<handle>): remember who sent them,
-  // for "Did a creator send you?" at checkout (lib/referral.js).
-  useEffect(() => { if (via) rememberVia(String(via)); }, [via]);
+  // for "Did a creator send you?" at checkout (lib/referral.js) — only on
+  // that creator's own profile, as the website does (middleware.js,
+  // 2026-11-15): a link to anyone's profile naming someone else isn't one.
+  useEffect(() => {
+    if (via && viaMatchesProfile(String(via), String(profileUserId || ''))) rememberVia(String(via));
+  }, [via, profileUserId]);
   const { getToken } = useAuth();
   const [state, setState] = useState({ loading: true, error: null, data: null });
   const [following, setFollowing] = useState(false);

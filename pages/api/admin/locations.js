@@ -35,8 +35,10 @@ export async function handleLocationsAdmin(req, res, account) {
     if (req.method === 'GET') {
       const supabase = getSupabase();
       const [pending, requests, listed, paused, reports, disputes] = await Promise.all([
-        listPendingListings(),
-        listRequestsForAdmin(),
+        // Places waiting for review carry their proof and address: the
+        // review queue is a full admin's, so a sub-admin gets none here.
+        fullAdmin ? listPendingListings() : Promise.resolve([]),
+        listRequestsForAdmin({ fullAdmin }),
         searchListings({ sort: 'new' }, { viewerId: null }),
         supabase.from('locations').select('id, title, kind, host_id, place_label, status, shoots_count, cover_url').eq('status', 'paused').order('updated_at', { ascending: false }).limit(100),
         supabase.from('content_reports').select('target_id').eq('target_type', 'location').eq('status', 'open'),

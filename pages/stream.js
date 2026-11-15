@@ -43,12 +43,12 @@ export async function getServerSideProps({ req, res }) {
   // just that case captures most of the invocation saving with none of the
   // exposure. The Vary header is what keeps the two populations in
   // separate cache entries.
-  const hasSession = Boolean(req.headers.cookie && /__session|__clerk/.test(req.headers.cookie));
+  const hasSession = Boolean((req.headers.cookie && /__session|__clerk/.test(req.headers.cookie)) || req.headers.authorization);
   if (hasSession) {
     res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   } else {
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-    res.setHeader('Vary', 'Cookie');
+    res.setHeader('Vary', 'Cookie, Authorization');
   }
 
   // getAccountContext and getViewCounts are both independent of the four
