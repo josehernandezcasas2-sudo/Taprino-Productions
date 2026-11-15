@@ -8,6 +8,7 @@ import { getAccountContext } from '../../lib/accountContext';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { getListing } from '../../lib/locations';
 import { LOCATION_TYPES, FEATURE_GROUPS, CANCELLATION, PERMIT_HELP, OWNERSHIP, MAX_PHOTOS, DEFAULT_CUT_PERCENT, splitBooking, dollars } from '../../lib/locationRules';
+import { HOST_FORM_NOTE } from '../../lib/bookingPolicyRules';
 import { SITE } from '../../lib/siteConfig';
 
 const SITE_NAME = SITE.name;
@@ -266,6 +267,8 @@ export default function ListAPlace({ mainGenres, isSignedIn, isSubscriber, email
                   <label key={k} className={`loc-radio${form.cancellation === k ? ' on' : ''}`}><input type="radio" name="cancellation" checked={form.cancellation === k} onChange={() => set({ cancellation: k })} /><b>{v.label}</b><span>{v.text}</span></label>
                 ))}
               </div>
+              {/* A change reaches only payments made after it (round 3). */}
+              <p className="crew-mono" style={{ margin: 0 }}>{HOST_FORM_NOTE}</p>
             </div>
             <label className="crew-field"><span>House rules</span><textarea className="crew-input" rows={4} value={form.rules} onChange={(e) => set({ rules: e.target.value })} placeholder="Shoes off on the terrazzo. Quiet outside after 9pm. Nothing taped to the wood. Generator in the driveway only." maxLength={2000} /></label>
           </section>

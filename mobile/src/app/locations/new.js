@@ -10,6 +10,7 @@ import SmartImage from '../../components/SmartImage';
 import { crew, Chip, PlaceBox } from '../../components/CrewBits';
 import { pickImage, uploadPicked, uploadPickedFull, resolveToken, loc, Req } from '../../components/LocationBits';
 import { splitBooking, dollars, DEFAULT_CUT_PERCENT, MAX_PHOTOS } from '../../lib/locationRules';
+import { HOST_FORM_NOTE } from '../../lib/bookingPolicyRules';
 
 // List a place (pages/locations/new on the web), or edit one
 // (?edit=<id>). The same seven sections, one save. Vocabularies come
@@ -230,6 +231,7 @@ export default function ListAPlace() {
                   <Text style={crew.rowText}>{form.cancellation === k ? '● ' : '○ '}{v.label}</Text><Text style={crew.mono}>{v.text}</Text>
                 </Pressable>
               ))}
+              <Text style={crew.mono}>{HOST_FORM_NOTE}</Text>
               <TextInput style={[crew.input, { minHeight: 80, textAlignVertical: 'top' }]} value={form.rules} onChangeText={(v) => set({ rules: v })} placeholder="House rules: shoes off, quiet after 9pm, nothing taped to the wood." placeholderTextColor={colors.inkFaint} multiline maxLength={2000} />
             </View>
 

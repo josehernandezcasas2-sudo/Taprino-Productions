@@ -321,6 +321,13 @@ set. `POST /v1/products/<id>` takes `tax_code` (txcd_ + 8 digits);
 with `reverse_transfer` reverses it in proportion to the refund over the
 whole charge, tax included.
 
+**3-D Secure** (round 3, 2026-11-15). A Checkout session keeps
+`payment_method_options` as sent (`card.request_three_d_secure` must be
+`any`, `automatic` or `challenge`, else a 400 like the real API) and its
+payment intent carries the same, so a check can read what a Checkout was
+created with (`checks/booking-policy.mjs`). No challenge is ever shown: the
+hosted page pays as before.
+
 `GET /__tax` answers the state (`{ tax: {…} }`); `POST /__tax` merges `{ rate?, codeRates?,
 refuse?, active?, defaultBehavior?, defaultCode?, registrations?,
 invoiceShape?, replaceCodeRates? }`: `rate` in percent (`8.25`), `codeRates` per code

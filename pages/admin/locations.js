@@ -5,6 +5,7 @@ import { adminPageProps } from '../../lib/adminPage';
 import { StatusChip } from '../../components/locations/RequestBits';
 import { fmtRange } from '../../components/locations/LocationBits';
 import { dollars } from '../../lib/locationRules';
+import { policyLabel } from '../../lib/bookingPolicyRules';
 import { cssUrl } from '../../lib/cssUrl';
 
 // Locations, admin side (migration 086). New places are approved from
@@ -167,7 +168,7 @@ function BookingRow({ r, busy, onRefund, showNote, children }) {
         <span><Link href={`/locations/requests/${r.id}`}>{r.projectTitle || r.shooting}</Link> · {fmtRange(r.startsOn, r.endsOn)} <span className="crew-mono">· {r.listing ? <Link href={`/locations/${r.listing.id}`}>{r.listing.title}</Link> : 'a place'} · <Link href={r.producer.profilePath}>{r.producer.displayName}</Link> → <Link href={r.host.profilePath}>{r.host.displayName}</Link></span></span>
         <StatusChip r={r} />
       </div>
-      <span className="crew-mono">Producer paid {dollars(r.chargedCents || r.totalChargedCents)}{r.taxCents ? ` (incl. ${dollars(r.taxCents)} sales tax)` : ''} · host receives {dollars(r.hostPayoutCents)} · cut {dollars(r.platformCutCents)}{r.refundCents != null ? ` · refunded ${dollars(r.refundCents)}${r.refundReason ? ` (${r.refundReason})` : ''}` : ''}{r.paidAt ? ` · paid ${new Date(r.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</span>
+      <span className="crew-mono">Producer paid {dollars(r.chargedCents || r.totalChargedCents)}{r.taxCents ? ` (incl. ${dollars(r.taxCents)} sales tax)` : ''} · host receives {dollars(r.hostPayoutCents)} · cut {dollars(r.platformCutCents)}{r.refundCents != null ? ` · refunded ${dollars(r.refundCents)}${r.refundReason ? ` (${r.refundReason})` : ''}` : ''}{r.paidAt ? ` · paid ${new Date(r.paidAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}{r.cancellationPolicy ? ` · ${policyLabel(r.cancellationPolicy)} cancellation${r.policyPaidUnder ? ', as paid' : ''}` : ''}</span>
       {showNote && r.outcomeNote && <p className="loc-reqcard-msg" style={{ margin: 0 }}><b style={{ color: 'var(--danger)' }}>{r.outcome.replace('_', ' ')}:</b> “{r.outcomeNote}”</p>}
       <span className="crew-actions">
         {children}

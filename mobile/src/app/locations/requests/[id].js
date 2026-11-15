@@ -12,6 +12,7 @@ import { crew, Chip, Avatar } from '../../../components/CrewBits';
 import { StatusChip, MoneyLine, HostAnswer, ProducerActions, OutcomeForm, EndorseForm, HostedChip, KV, loc } from '../../../components/LocationBits';
 import { dollars, fmtRange, hoursLabel, disputeLine } from '../../../lib/locationRules';
 import { TAX_NOTE } from '../../../lib/salesTaxRules';
+import { policyLine } from '../../../lib/bookingPolicyRules';
 
 // One booking request, both sides (pages/locations/requests/<id> on the
 // web). Once paid, the producer sees the street address here. Paying
@@ -49,7 +50,11 @@ export default function RequestScreen() {
   const l = r ? r.listing : null;
   const dead = r ? ['declined', 'expired', 'cancelled'].includes(r.status) : false;
   const paidSide = r ? ['paid', 'done', 'refunded'].includes(r.status) : false;
-  const policy = l && state.rules ? state.rules.cancellation[l.cancellation] : null;
+  // The cancellation policy that applies: a paid booking's own (round 3,
+  // migration 124), else the listing's now; the words from the rules both
+  // sides share (lib/bookingPolicyRules.js), the explanation from the API's.
+  const policyKey = r ? (r.cancellationPolicy || (l ? l.cancellation : null)) : null;
+  const policyText = policyKey && state.rules && state.rules.cancellation[policyKey] ? state.rules.cancellation[policyKey].text : null;
 
   return (
     <SafeAreaView style={crew.screen} edges={['top', 'bottom']}>
@@ -90,7 +95,7 @@ export default function RequestScreen() {
               <KV k="Host receives" v={`${dollars(r.hostPayoutCents)} after ${r.cutPercent}%`} />
               {r.refundCents != null ? <KV k="Refunded" v={`${dollars(r.refundCents)}${r.refundReason ? ` · ${r.refundReason}` : ''}`} /> : null}
               {r.dispute ? <KV k="Payment dispute" v={disputeLine(r.dispute)} /> : null}
-              {policy ? <KV k="Cancellation" v={`${policy.label} · ${policy.text}`} /> : null}
+              {policyKey ? <KV k="Cancellation" v={`${policyLine({ policy: policyKey, paidUnder: Boolean(r.policyPaidUnder), side })}${policyText ? ` · ${policyText}` : ''}`} /> : null}
               <MoneyLine r={r} side={side === 'host' ? 'host' : 'producer'} />
             </View>
 
