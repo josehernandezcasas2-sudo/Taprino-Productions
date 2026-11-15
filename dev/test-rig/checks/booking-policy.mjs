@@ -28,6 +28,8 @@
 //     day per request, never the same news twice; a save that keeps the
 //     policy tells nobody; a request made later is told;
 //     the host's form and the Terms say it;
+//     a listing whose policy can't be read stops the payment (503, nothing
+//     stamped; the review of 2026-11-15), and Pay works once it reads;
 //   before 124 (RIG_MIGRATE_TO=123 RIG_REBUILD=1 dev/test-rig/start.sh):
 //     paying works (the row's write is made again without the column), the
 //     host's change tells the open request but not the paid booking, whose
@@ -48,7 +50,7 @@ const SUPA = process.env.RIG_SUPABASE_TLS === '0' ? FAKES.supabase : FAKES.supab
 const ART = `${SUPA}/storage/v1/object/public/episode-art`;
 const LOC = crypto.randomUUID();
 const PITCH = crypto.randomUUID();
-const REQ = { paidFirst: crypto.randomUUID(), paysAfter: crypto.randomUUID(), open: crypto.randomUUID(), late: crypto.randomUUID(), past: crypto.randomUUID(), later: crypto.randomUUID() };
+const REQ = { paidFirst: crypto.randomUUID(), paysAfter: crypto.randomUUID(), open: crypto.randomUUID(), late: crypto.randomUUID(), past: crypto.randomUUID(), later: crypto.randomUUID(), readFail: crypto.randomUUID() };
 const PLACE = `Check policy place ${RUN}`;
 const people = [];
 const sessions = [];
@@ -191,6 +193,25 @@ async function after124() {
   const gotB = reqRow(REQ.paysAfter);
   ok('the Strict booking cancelled 10–11 days out: half back', r.status === 200 && gotB.status === 'refunded' && Number(gotB.refund_cents) === wantB, `${r.status} ${JSON.stringify({ s: gotB.status, c: gotB.refund_cents, wantB })}`);
   ok('…its reason names Strict', /50% under the Strict cancellation policy/.test(gotB.refund_reason || ''), gotB.refund_reason);
+
+  // The review of 2026-11-15: the listing's policy read failing used to
+  // fall back to Moderate and stamp it on the Checkout and the booking.
+  section('A listing that can’t be read stops the payment');
+  const failOne = await member('polreadfail');
+  insert('location_requests', requestRow(REQ.readFail, failOne.id, 15));
+  let blocked = null;
+  try {
+    // Every column of the place stays readable but its policy.
+    sql('revoke select on public.locations from service_role');
+    sql(`do $$ declare cols text; begin select string_agg(quote_ident(column_name), ', ') into cols from information_schema.columns where table_schema = 'public' and table_name = 'locations' and column_name <> 'cancellation'; execute format('grant select (%s) on public.locations to service_role', cols); end $$`);
+    blocked = await openCheckout(REQ.readFail, failOne);
+  } finally {
+    sql('grant select on public.locations to service_role');
+  }
+  ok('Pay → 503 "Couldn’t open the payment just now…", nothing stamped', blocked && blocked.r.status === 503 && /Couldn’t open the payment just now/.test((blocked.r.json && blocked.r.json.error) || '') && !reqRow(REQ.readFail).cancellation_policy && !reqRow(REQ.readFail).stripe_checkout_session_id, blocked && `${blocked.r.status} ${blocked.r.text.slice(0, 200)}`);
+  const listed = (rows(`select cancellation from public.locations where id = ${q(LOC)}`)[0] || {}).cancellation;
+  const readsAgain = await openCheckout(REQ.readFail, failOne);
+  ok('…once it reads again, Pay opens a Checkout under the listing’s policy', readsAgain.r.status === 200 && readsAgain.sid && (await stripeSession(readsAgain.sid)).metadata.cancellation_policy === listed && reqRow(REQ.readFail).cancellation_policy === listed, `${readsAgain.r.status} ${listed}`);
 
   section('A host flipping the policy back and forth');
   for (const pol of ['moderate', 'strict', 'moderate']) {
