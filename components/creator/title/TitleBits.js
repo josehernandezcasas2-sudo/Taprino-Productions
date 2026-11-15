@@ -4,6 +4,7 @@ import { pageNotesBoxShows } from '../../PageNotesField';
 import { CheckIcon, ClockIcon, WarningIcon } from '../../PlayerIcons';
 import { TITLE_WORDS } from '../../../lib/titleDashRules';
 import { count } from '../../../lib/creatorDashboardRules';
+import { cssUrl } from '../../../lib/cssUrl';
 
 // The pieces a title's dashboard (/creator/title/<id>) and a show's
 // Overview (/creator/show/<id>?tab=overview) share (2026-11-15; the build
@@ -64,7 +65,7 @@ export function editValuesFor(s) {
 }
 
 export function bg(url) {
-  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+  return url ? { backgroundImage: cssUrl(url) } : undefined;
 }
 
 // The four numbers. `loading` holds the keys whose route hasn't answered

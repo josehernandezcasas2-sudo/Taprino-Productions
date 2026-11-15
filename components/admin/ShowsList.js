@@ -4,6 +4,7 @@ import { useRouter } from 'next/router';
 import { ADMIN_SHOW_FILTERS, capLine } from '../../lib/showAdminRules';
 import { CheckIcon, CloseIcon, LockIcon, PlusIcon, SearchIcon } from '../PlayerIcons';
 import CreateShowForm from './CreateShowForm';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Admin → Shows, the list (the series revamp, slice 3a §5.4): every series
 // and podcast newest first, a search by name or the owner's name or email,
@@ -17,7 +18,7 @@ import CreateShowForm from './CreateShowForm';
 const STATE_CHIP = { live: 'state-live', ready: 'state-ready', review: 'state-private', drafts: 'state-private', empty: 'state-private', pulled: 'state-pulled', removal: 'state-removal', declined: 'state-declined' };
 
 function bg(url) {
-  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+  return url ? { backgroundImage: cssUrl(url) } : undefined;
 }
 
 export default function ShowsList({ account, mainGenres = [] }) {

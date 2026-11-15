@@ -37,7 +37,9 @@ export default async function handler(req, res) {
     if (req.method === 'POST') {
       const save = SAVERS[body.type];
       if (!save) return res.status(400).json({ error: 'type must be topic, course, module, lesson or file.' });
-      const saved = await save(body);
+      // The caller's role travels with it: a lesson's or example's video
+      // checks who may attach which video (lib/university.js videoSrcFor).
+      const saved = await save(body, { caller: roleContext });
       await recordAudit({
         adminId: roleContext.userId,
         adminEmail: roleContext.email,
@@ -71,7 +73,8 @@ export default async function handler(req, res) {
   } catch (err) {
     console.error('admin/university error:', err.message);
     const missingTable = /uni_(topics|courses|modules|lessons|files|progress)/.test(err.message || '') && /not find|does not exist|schema cache/i.test(err.message || '');
-    return res.status(missingTable ? 500 : 400).json({
+    const refusal = Number(err && err.status) >= 400 && Number(err.status) < 500 ? Number(err.status) : 400;
+    return res.status(missingTable ? 500 : refusal).json({
       error: missingTable ? 'Run migrations 078 and 081 (supabase/migrations) in the Supabase SQL Editor first.' : err.message || 'Something went wrong.'
     });
   }

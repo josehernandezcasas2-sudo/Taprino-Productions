@@ -38,7 +38,10 @@ export default async function handler(req, res) {
     for (const raw of data || []) {
       // An open application's upload state comes from Cloudflare while it
       // isn't final; the signed master is there to watch in place.
-      const a = isOpenStatus(raw.status) ? await refreshVideoState(raw) : raw;
+      // Cloudflare's answer is remembered for a minute per video, and a row
+      // whose upload hasn't moved in a day isn't asked about (lib/
+      // videoRefreshRules.js), so reloading the page costs no more calls.
+      const a = isOpenStatus(raw.status) ? await refreshVideoState(raw, { listing: true }) : raw;
       const media = isOpenStatus(a.status) ? await signedMediaFor(a) : null;
       applications.push({ ...a, rights_holds: rightsVerdict(a.rights_answers).holds, media });
     }

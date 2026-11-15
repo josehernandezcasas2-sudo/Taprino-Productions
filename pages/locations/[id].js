@@ -12,6 +12,7 @@ import { getOwnCard } from '../../lib/crewCards';
 import { getSupabase } from '../../lib/supabase';
 import { ownerProductions, ownReleaseOptions } from '../../lib/productions';
 import { FEATURES, CANCELLATION, PERMIT_HELP, quoteFor, splitBooking, dollars, dayCount, hoursBetween, MIN_BOOKING_CENTS, MAX_BOOKING_CENTS, MAX_DAYS, DEFAULT_CUT_PERCENT } from '../../lib/locationRules';
+import { cssUrl } from '../../lib/cssUrl';
 
 // One place (mockups/locations-v1.html §2): gallery, the facts a scout
 // wants, availability, the host, and the request panel. The host sees
@@ -116,10 +117,10 @@ export default function ListingPage(props) {
       <div className="loc-lp">
         <div>
           <div className="loc-gallery">
-            <div className="loc-gallery-main" style={{ backgroundImage: `url(${photos[photo].url})` }}>{photos[photo].caption && <span className="loc-card-k">{photos[photo].caption}</span>}</div>
+            <div className="loc-gallery-main" style={{ backgroundImage: cssUrl(photos[photo].url) }}>{photos[photo].caption && <span className="loc-card-k">{photos[photo].caption}</span>}</div>
             {photos.length > 1 && (
               <div className="loc-gallery-thumbs">
-                {photos.map((p, i) => <button key={p.url} type="button" className={i === photo ? 'on' : ''} style={{ backgroundImage: `url(${p.url})` }} onClick={() => setPhoto(i)} aria-label={p.caption || `Photo ${i + 1}`} />)}
+                {photos.map((p, i) => <button key={p.url} type="button" className={i === photo ? 'on' : ''} style={{ backgroundImage: cssUrl(p.url) }} onClick={() => setPhoto(i)} aria-label={p.caption || `Photo ${i + 1}`} />)}
               </div>
             )}
           </div>
@@ -379,7 +380,7 @@ function ShotHere({ l, isSignedIn, viewerId, isAdmin, releases }) {
         <div className="shot-grid">
           {approved.map((c) => (
             <Link key={c.id} href={c.href} className="shot-tile">
-              <span className="shot-tile-poster" style={c.poster ? { backgroundImage: `url(${c.poster})` } : undefined} />
+              <span className="shot-tile-poster" style={c.poster ? { backgroundImage: cssUrl(c.poster) } : undefined} />
               <span className="shot-tile-title">{c.title}</span>
               <span className="crew-mono">{c.contentType === 'series' ? 'Series' : c.contentType === 'movie' ? 'Film' : c.contentType === 'podcast' ? 'Podcast' : 'Short'}{c.year ? ` · ${c.year}` : ''}{c.viaBooking ? ' · booked here' : ''}</span>
             </Link>

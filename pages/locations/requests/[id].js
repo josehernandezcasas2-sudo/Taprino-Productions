@@ -9,6 +9,7 @@ import { getPublicEpisodes } from '../../../lib/publicEpisodes';
 import { getRequest } from '../../../lib/locationRequests';
 import { CANCELLATION, dollars, disputeLine } from '../../../lib/locationRules';
 import { TAX_NOTE } from '../../../lib/salesTaxRules';
+import { cssUrl } from '../../../lib/cssUrl';
 
 // One booking request, both sides (mockups/locations-v1.html §3): what
 // was asked, the money, where it stands, and the next action for
@@ -190,7 +191,7 @@ export default function RequestPage({ mainGenres, isSignedIn, isSubscriber, emai
           {l && (
             <section className="crew-panel crew-wc-side">
               <h3>The place</h3>
-              <Link href={`/locations/${l.id}`} className="loc-row-thumb" style={l.coverUrl ? { backgroundImage: `url(${l.coverUrl})`, width: '100%', aspectRatio: '16 / 10' } : { width: '100%', aspectRatio: '16 / 10' }} aria-label={l.title} />
+              <Link href={`/locations/${l.id}`} className="loc-row-thumb" style={l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl), width: '100%', aspectRatio: '16 / 10' } : { width: '100%', aspectRatio: '16 / 10' }} aria-label={l.title} />
               <Link href={`/locations/${l.id}`} className="loc-reqcard-t">{l.title}</Link>
               <span className="crew-mono">{l.kindLabel} · {l.place ? l.place.label : ''} · {l.rateLine}</span>
             </section>

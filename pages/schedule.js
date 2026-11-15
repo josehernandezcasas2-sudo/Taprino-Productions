@@ -17,6 +17,7 @@ import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
 import { useUpload } from '../contexts/UploadContext';
+import { cssUrl } from '../lib/cssUrl';
 
 // The channel scheduler: admins, sub-admins with "manage the channel
 // schedule", and Content Schedulers (only for channels assigned to them).
@@ -791,7 +792,7 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
           return (
             <div key={s.id} className={`sch-item ${isPicked('series', s.id) ? 'picked' : ''}`}>
               <button type="button" className="sch-item-main" onClick={() => setPicked(isPicked('series', s.id) ? null : item)} {...drag(item)}>
-                <span className="sch-thumb" style={s.thumbnail ? { backgroundImage: `url(${s.thumbnail})` } : undefined} />
+                <span className="sch-thumb" style={s.thumbnail ? { backgroundImage: cssUrl(s.thumbnail) } : undefined} />
                 <span className="sch-item-text">
                   <b>{s.name}</b>
                   <small>{s.episodes.length} episode{s.episodes.length === 1 ? '' : 's'} · drops in at one episode ({dur(defaultSeriesLength(s.episodes, 0))})</small>
@@ -830,7 +831,7 @@ function Library({ library, media, reloadMedia, channelId, setError, layer, canL
           return (
             <div key={t.id} className={`sch-item ${isPicked('title', t.id) ? 'picked' : ''}`}>
               <button type="button" className="sch-item-main" onClick={() => setPicked(isPicked('title', t.id) ? null : item)} {...drag(item)}>
-                <span className="sch-thumb" style={t.thumbnail ? { backgroundImage: `url(${t.thumbnail})` } : undefined} />
+                <span className="sch-thumb" style={t.thumbnail ? { backgroundImage: cssUrl(t.thumbnail) } : undefined} />
                 <span className="sch-item-text">
                   <b>{t.title}</b>
                   <small>{t.adBreaks ? `air ${dur(t.durationSeconds)} · ${dur(t.runtimeSeconds)} + ${dur(t.durationSeconds - t.runtimeSeconds)} ads · ${t.adBreaks.length} break${t.adBreaks.length === 1 ? '' : 's'}` : dur(t.durationSeconds)}{t.contentType ? ` · ${t.contentType === 'movie' ? 'film' : t.contentType}` : ''}</small>
@@ -967,7 +968,7 @@ function Uploads({ media, reload, channelId, setError, picked, setPicked, drag }
               {...(ready ? drag(item) : {})}
               style={ready ? undefined : { cursor: 'default' }}
             >
-              <span className="sch-thumb" style={m.thumbnail ? { backgroundImage: `url(${m.thumbnail})` } : undefined} />
+              <span className="sch-thumb" style={m.thumbnail ? { backgroundImage: cssUrl(m.thumbnail) } : undefined} />
               <span className="sch-item-text">
                 <b>{m.title}</b>
                 <small>{m.kindLabel}{m.durationSeconds ? ` · ${dur(m.durationSeconds)}` : ' · processing'}</small>

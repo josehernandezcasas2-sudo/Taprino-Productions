@@ -4,6 +4,7 @@ import { cloudflarePlaybackUrl, signedSrcForStoredUrl } from '../../../lib/cloud
 import { applyCors } from '../../../lib/cors';
 import { checkVideoOwnership } from '../../../lib/videoOwnership';
 import { unsignedFallback } from '../../../lib/videoSigning';
+import { suspendedPlaybackRefusal } from '../../../lib/suspensions';
 
 // A signed playback URL for an uploaded self-tape (migration 106). Only
 // the call's poster, the performer who sent it, or an admin can open it.
@@ -20,6 +21,9 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   const account = await getRoleContext(req).catch(() => ({ userId: null, isAdmin: false }));
   if (!account.userId) return res.status(401).json({ error: 'Sign in first.' });
+  // A suspended account's own session gets no video link (lib/playbackGate.js).
+  const refused = await suspendedPlaybackRefusal(account.userId);
+  if (refused) return res.status(refused.status).json(refused.body);
   const callId = String(req.query.callId || '');
   const responseId = String(req.query.responseId || '');
   if (!/^[0-9a-f-]{36}$/i.test(callId) || !/^[0-9a-f-]{36}$/i.test(responseId)) return res.status(404).json({ error: 'Not found.' });

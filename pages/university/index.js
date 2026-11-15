@@ -6,6 +6,7 @@ import { continueFrom } from '../../lib/universityRules';
 import { useProgress } from '../../lib/universityProgress';
 import UniversityShell, { accountFromProps } from '../../components/university/UniversityShell';
 import { CourseCard, DepartmentChips, FileRow } from '../../components/university/LessonBits';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Film University — the course catalogue (mockups/film-university-v3.html,
 // signed off 2026-10-10). "Continue" first when something's been started,
@@ -52,7 +53,7 @@ export default function UniversityHome(props) {
 
       {cont && (
         <section className="uni-cont" aria-label="Continue">
-          <Link href={cont.lesson.href || `/university/${cont.course.slug}/${cont.lesson.slug}`} className="uni-cont-thumb" style={cont.course.coverUrl ? { backgroundImage: `url(${cont.course.coverUrl})` } : undefined}>
+          <Link href={cont.lesson.href || `/university/${cont.course.slug}/${cont.lesson.slug}`} className="uni-cont-thumb" style={cont.course.coverUrl ? { backgroundImage: cssUrl(cont.course.coverUrl) } : undefined}>
             <span className="uni-thumb-badge">Lesson {cont.index} of {cont.total}</span>
           </Link>
           <div>

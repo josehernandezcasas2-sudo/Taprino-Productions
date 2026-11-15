@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import VideoPlayer from '../VideoPlayer';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Shared pieces for the Film University pages (pages/university/*).
 
@@ -9,7 +10,7 @@ export function LessonThumb({ lesson, small = false }) {
   const cls = `uni-thumb${small ? ' uni-thumb-sm' : ''}${reading ? ' uni-thumb-doc' : ''}`;
   if (lesson.thumbnailUrl) {
     return (
-      <span className={cls} style={{ backgroundImage: `url(${lesson.thumbnailUrl})` }}>
+      <span className={cls} style={{ backgroundImage: cssUrl(lesson.thumbnailUrl) }}>
         {!reading && lesson.duration && <span className="uni-thumb-badge">▶ {lesson.duration}</span>}
         {reading && <span className="uni-thumb-badge">¶ Reading{lesson.documentPages ? ` · ${lesson.documentPages} p` : ''}</span>}
       </span>
@@ -31,7 +32,7 @@ export function CourseCard({ course, doneCount = 0 }) {
   const pct = course.lessonCount ? Math.round((doneCount / course.lessonCount) * 100) : 0;
   return (
     <Link href={course.href} className="uni-course">
-      <span className="uni-course-cover" style={course.coverUrl ? { backgroundImage: `url(${course.coverUrl})` } : { background: `linear-gradient(160deg, ${course.accentColor}66, var(--surface-2))` }} />
+      <span className="uni-course-cover" style={course.coverUrl ? { backgroundImage: cssUrl(course.coverUrl) } : { background: `linear-gradient(160deg, ${course.accentColor}66, var(--surface-2))` }} />
       <span className="uni-course-body">
         <span className="uni-eyebrow uni-eyebrow-olive">
           {course.topicName} · <span className={`uni-lvl${course.level === 'start' ? ' start' : ''}`}>{course.levelLabel}</span>
@@ -80,7 +81,7 @@ export function FileRow({ file, showCourse = false, onPlay, compact = false }) {
   const meta = [showCourse ? file.topicName : null, file.meta, file.lessonTitle && !compact ? `“${file.lessonTitle}”` : null].filter(Boolean).join(' · ');
   const body = (
     <>
-      {file.thumbnailUrl ? <span className="uni-file-thumb" style={{ backgroundImage: `url(${file.thumbnailUrl})` }} /> : <FileIcon file={file} />}
+      {file.thumbnailUrl ? <span className="uni-file-thumb" style={{ backgroundImage: cssUrl(file.thumbnailUrl) }} /> : <FileIcon file={file} />}
       <span className="uni-file-body">
         <span className="uni-file-title">{file.title}</span>
         <span className="uni-meta">{meta}</span>

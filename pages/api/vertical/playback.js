@@ -4,6 +4,7 @@ import { signedSrcForStoredUrl, unsignedFallback } from '../../../lib/videoSigni
 import { playbackGate } from '../../../lib/playbackGate';
 import { limitPublicRead } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { suspendedPlaybackRefusal } from '../../../lib/suspensions';
 
 // Signs whatever stored src a deck item has (free, premium, or a user
 // post). A video that doesn't demand signed URLs yet plays either way;
@@ -47,6 +48,10 @@ export default async function handler(req, res) {
   // endpoint can tell them apart — they live in a separate table with no
   // tier/entitlement concept, always free.
   if (episodeId.startsWith('post:')) {
+    // A suspended account's own session gets no video link (the episode
+    // branch below has it from playbackGate).
+    const refused = await suspendedPlaybackRefusal(account.userId);
+    if (refused) return res.status(refused.status).json(refused.body);
     const post = await findPost(episodeId.slice(5));
     if (!post || post.kind !== 'video') return res.status(404).json({ error: 'Not found.' });
     return res.status(200).json({ src: await playable(post.videoSrc) });

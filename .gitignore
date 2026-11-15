@@ -8,6 +8,13 @@
 /.env.*
 !/.env.local.example
 
+# Signing and publishing keys (2026-11-15): EAS Update's code-signing
+# private key (`expo-updates codesigning:generate --key-output-directory
+# ../eas-keys` from mobile/ writes it here) and the Play service account,
+# wherever a tool drops them.
+eas-keys/
+google-service-account.json
+
 # Next.js build output
 .next/
 out/

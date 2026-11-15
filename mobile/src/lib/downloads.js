@@ -494,6 +494,14 @@ function artNameFor(id, url) {
   const m = /\.(jpe?g|png|webp)(?:$|[?#])/i.exec(String(url).split('?')[0]);
   return `${id}.art.${m ? m[1].toLowerCase().replace('jpeg', 'jpg') : 'jpg'}`;
 }
+function originOf(u) {
+  const m = String(u || '').match(/^(https?:\/\/[^/?#]+)/i);
+  return m ? m[1].toLowerCase() : '';
+}
+function sameOrigin(a, b) {
+  const x = originOf(a);
+  return Boolean(x) && x === originOf(b);
+}
 async function fetchExtras(id) {
   const it = index.items[id];
   if (!it) return;
@@ -503,7 +511,9 @@ async function fetchExtras(id) {
       const url = absoluteUrl(it.artUrl);
       const name = artNameFor(id, url);
       // The site's own routes want the session; a public picture doesn't.
-      const own = url.startsWith(API_BASE_URL);
+      // The exact origin, never a prefix (https://site.example.evil.com
+      // starts with https://site.example), as adSlots.js onOwnHost does.
+      const own = sameOrigin(url, API_BASE_URL);
       const token = own ? await freshToken(session.getToken) : null;
       await File.downloadFileAsync(url, fileOf(name), { idempotent: true, headers: token ? { Authorization: `Bearer ${token}` } : undefined });
       if (index.items[id]) { patch(id, { art: name }); saveSoon(); emit(); } else removeFile(name);

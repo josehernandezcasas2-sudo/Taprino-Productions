@@ -41,6 +41,7 @@ import { AiSealChip } from '../../components/AiSeal';
 
 import Footer from '../../components/Footer';
 import { viewingTermsTaken, takeViewingTerms } from '../../lib/viewingTerms';
+import { cssUrl } from '../../lib/cssUrl';
 
 // The player's trailer gets at most one fresh link per half minute
 // (refreshTrailerSrc in the page).
@@ -134,7 +135,7 @@ function EpisodeStrip({ heading, items, seeAllHref, seeAllLabel = 'See all', ico
           const className = `ep-strip-card ${it.current ? 'is-current' : ''} ${it.watched && !it.current ? 'is-watched' : ''} ${openable ? '' : 'is-static'}`;
           const inner = (
             <>
-              <span className="ep-strip-thumb" style={it.thumbnail ? { backgroundImage: `url(${it.thumbnail})` } : undefined}>
+              <span className="ep-strip-thumb" style={it.thumbnail ? { backgroundImage: cssUrl(it.thumbnail) } : undefined}>
                 {it.current ? (
                   <span className="ep-strip-pill now">{currentLabel}</span>
                 ) : it.watched ? (
@@ -949,7 +950,7 @@ export default function EpisodePage({ episode: episodeProp, isSubscriber, adFree
               className="ep-upnext"
               aria-label={`Up next: ${episodeCode(upNext) ? `${episodeCode(upNext)} · ` : ''}${upNext.title}`}
             >
-              <span className="ep-upnext-thumb" style={upNext.thumbnail ? { backgroundImage: `url(${upNext.thumbnail})` } : undefined}>
+              <span className="ep-upnext-thumb" style={upNext.thumbnail ? { backgroundImage: cssUrl(upNext.thumbnail) } : undefined}>
                 <PlayIcon size={22} src={iconOverrides.play} />
                 {upNext.runtime && <span className="ep-upnext-dur">{minutesLabel(upNext.runtime)}</span>}
               </span>

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { DASH_WORDS, TITLE_FILTERS, TITLES_LIMIT, count, dollars, filterTitles } from '../../../lib/creatorDashboardRules';
 import { Spark } from './DashCharts';
+import { cssUrl } from '../../../lib/cssUrl';
 
 // The Dashboard's sections (2026-11-14). Each takes what
 // lib/creatorDashboardRules.js built and draws it: no number or sentence
@@ -10,7 +11,7 @@ import { Spark } from './DashCharts';
 // Supporters and a tip's note in Latest came with them.
 
 function bg(url) {
-  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+  return url ? { backgroundImage: cssUrl(url) } : undefined;
 }
 
 function Chevron() {

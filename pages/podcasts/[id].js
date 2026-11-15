@@ -15,6 +15,7 @@ import { useRouter } from 'next/router';
 import { takeViewingTerms } from '../../lib/viewingTerms';
 import { useWatchProgress } from '../../lib/useWatchProgress';
 import PreviewBar, { PreviewFootnote } from '../../components/PreviewBar';
+import { cssUrl } from '../../lib/cssUrl';
 
 export async function getServerSideProps({ req, res, params, query }) {
   // ?preview=1: the owner's private preview of a show that isn't public
@@ -118,7 +119,7 @@ export default function PodcastShow({ isSignedIn, isSubscriber, email, isAdmin, 
         )}
 
         <div className="show-header">
-          <div className="show-header-art" style={(show.poster || show.thumbnail) ? { backgroundImage: `url(${show.poster || show.thumbnail})` } : {}} />
+          <div className="show-header-art" style={(show.poster || show.thumbnail) ? { backgroundImage: cssUrl(show.poster || show.thumbnail) } : {}} />
           <div className="show-header-info">
             <div className="hero-eyebrow">Podcast</div>
             <h1>{show.name}</h1>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import AdminReviewAdModal from '../AdminReviewAdModal';
+import { cssUrl } from '../../lib/cssUrl';
 
 const KIND_LABEL = { submission: 'Episode', ad: 'Ad', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application' };
 
@@ -202,7 +203,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
     const approveExtra = item.kind === 'submission' ? { tierOverride: tierNow, ...(meta.seen ? { seen: meta.seen } : {}) } : isApplication ? { tierOverride: tierNow } : {};
     return (
       <div key={key} className={`rq-row ${inGroup ? 'rq-row-in-group' : ''}`}>
-        <div className="rq-thumb" style={item.media.poster ? { backgroundImage: `url("${String(item.media.poster).replace(/"/g, '%22')}")` } : undefined}>
+        <div className="rq-thumb" style={item.media.poster ? { backgroundImage: cssUrl(item.media.poster) } : undefined}>
           {!item.media.poster && KIND_LABEL[item.kind].split(' ')[0]}
         </div>
         <div>
@@ -238,7 +239,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
                             : null}
             {showInfo && (
               <div className="rq-show">
-                <span className="rq-show-poster" style={showInfo.poster ? { backgroundImage: `url("${String(showInfo.poster).replace(/"/g, '%22')}")` } : undefined} aria-hidden="true" />
+                <span className="rq-show-poster" style={showInfo.poster ? { backgroundImage: cssUrl(showInfo.poster) } : undefined} aria-hidden="true" />
                 <div className="rq-show-body">
                   <span className={`rq-kind ${eyebrow ? eyebrow.tone : ''}`}>{eyebrow ? eyebrow.text : 'Show'}</span>
                   <strong className="rq-show-name">{showInfo.name || 'A show'} <em>{showInfo.kind === 'podcast' ? 'Podcast' : showInfo.kind === 'vertical' ? 'Vertical' : 'Series'}</em></strong>
@@ -309,7 +310,7 @@ export default function ReviewQueue({ limit = null, compact = false, defaultCpmC
       ) : withGroups(shown).map((block) => (block.group && block.items.length > 1 ? (
         <section key={`group-${block.group.id}-${block.items[0].id}`} className="rq-group" aria-label={block.group.name || 'A show'}>
           <header className="rq-group-head">
-            <span className="rq-group-poster" style={block.group.poster ? { backgroundImage: `url("${String(block.group.poster).replace(/"/g, '%22')}")` } : undefined} aria-hidden="true" />
+            <span className="rq-group-poster" style={block.group.poster ? { backgroundImage: cssUrl(block.group.poster) } : undefined} aria-hidden="true" />
             <div className="rq-group-text">
               <strong>{block.group.name || 'A show'}</strong>
               <span>{groupLine(block)}</span>

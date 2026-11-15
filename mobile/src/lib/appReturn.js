@@ -26,8 +26,15 @@ const MAX_LENGTH = 400;
 // A build: studiotapatv://checkout-return (two or three slashes).
 const BUILD_RE = /^studiotapatv:\/\/\/?checkout-return\/?(\?[A-Za-z0-9._~%=&-]*)?$/;
 // Expo Go: exp://<host[:port]>[/path]/--/checkout-return, the address the
-// running bundle was loaded from (a LAN address or u.expo.dev).
-const EXPO_GO_RE = /^exps?:\/\/[A-Za-z0-9.-]+(:\d{1,5})?(\/[A-Za-z0-9._~%-]+)*\/--\/checkout-return\/?(\?[A-Za-z0-9._~%=&-]*)?$/;
+// running bundle was loaded from: an EAS Update (u.expo.dev) or the PC on
+// the same network (a private address: 10.x, 172.16–31.x, 192.168.x,
+// 127.0.0.1 or localhost). Only those hosts (2026-11-15): with any host
+// allowed, a link on our own domain could open someone else's project in
+// Expo Go. A tunnel address (`expo start --tunnel`, *.exp.direct) is
+// refused, so the in-app browser keeps the website's pages there.
+const OCTET = '(?:25[0-5]|2[0-4]\\d|1\\d\\d|[1-9]?\\d)';
+const EXPO_GO_HOST = `(?:u\\.expo\\.dev|localhost|127\\.0\\.0\\.1|10\\.${OCTET}\\.${OCTET}\\.${OCTET}|192\\.168\\.${OCTET}\\.${OCTET}|172\\.(?:1[6-9]|2\\d|3[01])\\.${OCTET}\\.${OCTET})`;
+const EXPO_GO_RE = new RegExp(`^exps?:\\/\\/${EXPO_GO_HOST}(:\\d{1,5})?(\\/[A-Za-z0-9._~%-]+)*\\/--\\/checkout-return\\/?(\\?[A-Za-z0-9._~%=&-]*)?$`);
 const ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
 // The app's address, or null when it isn't one of ours.

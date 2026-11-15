@@ -2,6 +2,7 @@ import { getAuth } from '@clerk/nextjs/server';
 import { getLessonPlayback, getFilePlayback } from '../../../lib/university';
 import { limitPublicRead } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
+import { suspendedPlaybackRefusal } from '../../../lib/suspensions';
 
 // Mints a fresh signed playback URL for one video lesson ({ lessonId }) or
 // one video example ({ fileId }), the lesson-side twin of
@@ -24,6 +25,10 @@ export default async function handler(req, res) {
   // from a script collecting every lesson video (lib/rateLimit.js).
   const { userId } = getAuth(req);
   if (!(await limitPublicRead(req, res, 'university-token', { max: userId ? 240 : 60, windowSeconds: 3600, userId }))) return undefined;
+  // A suspended account's own session gets no video link (lib/playbackGate.js
+  // does the same for titles).
+  const refused = await suspendedPlaybackRefusal(userId);
+  if (refused) return res.status(refused.status).json(refused.body);
   try {
     const playback = lessonId ? await getLessonPlayback(lessonId) : await getFilePlayback(fileId);
     if (!playback) return res.status(404).json({ error: 'Not found' });

@@ -9,6 +9,8 @@ import { signedSrcForStoredUrl, unsignedFallback } from '../../../lib/videoSigni
 import { airToEpisode } from '../../../lib/adPlanRules';
 import { applyCors } from '../../../lib/cors';
 import { limitPublicRead } from '../../../lib/rateLimit';
+import { getAuth } from '@clerk/nextjs/server';
+import { suspendedPlaybackRefusal } from '../../../lib/suspensions';
 
 // Hands one viewer a playable URL for whatever is airing on a channel right
 // now — and only that. This is what lets premium titles air on channels
@@ -30,6 +32,13 @@ export default async function handler(req, res) {
   if (!(await limitPublicRead(req, res, 'channel-play', { max: 60, windowSeconds: 60 }))) return;
 
   try {
+  // A suspended account's own session gets no video link, live or not
+  // (lib/playbackGate.js does the same for titles; a read error lets it
+  // through, as there).
+  const { userId: viewerId } = getAuth(req);
+  const refused = await suspendedPlaybackRefusal(viewerId);
+  if (refused) return res.status(refused.status).json(refused.body);
+
   const channel = await resolvePublicChannel((req.body || {}).channel);
   if (!channel) return res.status(404).json({ error: 'No such channel.' });
 

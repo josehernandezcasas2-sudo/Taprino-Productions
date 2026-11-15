@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../lib/roles';
 import { getSupabase } from '../../lib/supabase';
-import { checkRateLimit, rateLimitKeyForRequest } from '../../lib/rateLimit';
+import { checkRateLimit, rateLimitKeyForRequest, limitPublicRead } from '../../lib/rateLimit';
 import { sendEmail } from '../../lib/notify';
 import { isHttpUrl } from '../../lib/safeUrl';
 import {
@@ -35,6 +35,12 @@ export default async function handler(req, res) {
   const role = await getRoleContext(req);
 
   if (req.method === 'GET') {
+    // A signed-in read asks Cloudflare where the master's upload stands
+    // (lib/creatorApplications.js refreshVideoState), on the allowance
+    // playback tokens are minted through: per account, about one every
+    // 15 s (the page polls every 6 s, at most 100 times, while Cloudflare
+    // receives or processes the file).
+    if (role.userId && !(await limitPublicRead(req, res, 'apply-read', { max: 240, windowSeconds: 3600, userId: role.userId }))) return undefined;
     const application = role.userId ? await getOwnApplication(role.userId) : null;
     return res.status(200).json({
       isSignedIn: Boolean(role.userId),

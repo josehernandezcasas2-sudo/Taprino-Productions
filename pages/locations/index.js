@@ -10,6 +10,7 @@ import { getOwnCard } from '../../lib/crewCards';
 import { searchListings } from '../../lib/locations';
 import { LOCATION_TYPES, FILTER_CHIPS } from '../../lib/locationRules';
 import { WITHIN_CHOICES } from '../../lib/crewOptions';
+import { cssUrl } from '../../lib/cssUrl';
 
 // The Locations directory (mockups/locations-v1.html §1): place +
 // radius + dates up top, type chips with counts, feature/budget chips,
@@ -180,7 +181,7 @@ function ListingCard({ l, from }) {
   const cover = l.coverUrl || (l.photos[0] && l.photos[0].url);
   return (
     <Link href={`/locations/${l.id}`} className="loc-card">
-      <span className="loc-card-ph" style={cover ? { backgroundImage: `url(${cover})` } : undefined}>
+      <span className="loc-card-ph" style={cover ? { backgroundImage: cssUrl(cover) } : undefined}>
         <span className="loc-card-k">{l.photoCount} {l.photoCount === 1 ? 'photo' : 'photos'}</span>
         {from && l.openOnDates && <span className="loc-card-pin">Open {fmtRange(from)}</span>}
       </span>

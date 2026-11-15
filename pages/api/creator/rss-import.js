@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
-import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
+import { validateRemoteVideoUrl, isOwnMediaHost, OWN_MEDIA_HOST_ERROR } from '../../../lib/urlValidation';
 import { importAudioFromUrl } from '../../../lib/audioUpload';
 import { checkRateLimit } from '../../../lib/rateLimit';
 import { internalError, sendError } from '../../../lib/apiErrors';
@@ -233,6 +233,10 @@ async function importFeed(req, res, { userId, email, isAdmin }) {
       const urlCheck = validateRemoteVideoUrl(item.audioUrl);
       if (!urlCheck.ok) {
         results.failed.push({ title: label, error: urlCheck.error, season: item.season, number: item.seriesOrder });
+        continue;
+      }
+      if (isOwnMediaHost(urlCheck.url, { supabaseUrl: process.env.SUPABASE_URL || '' })) {
+        results.failed.push({ title: label, error: OWN_MEDIA_HOST_ERROR, season: item.season, number: item.seriesOrder });
         continue;
       }
       const { url: audioUrl } = await importAudioFromUrl(urlCheck.url, `${(item.title || 'episode').slice(0, 60)}.mp3`, { userId });

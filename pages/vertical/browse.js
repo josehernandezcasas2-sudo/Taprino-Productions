@@ -7,6 +7,7 @@ import MobileTabBar from '../../components/MobileTabBar';
 import { getVerticalSeriesBrowseData } from '../../lib/verticalSeriesBrowse';
 import { getAccountContext } from '../../lib/accountContext';
 import { SITE } from '../../lib/siteConfig';
+import { cssUrl } from '../../lib/cssUrl';
 
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
@@ -81,7 +82,7 @@ export default function BrowseVerticalSeries({ series, mainGenres = [], isSigned
               <Link key={s.id} href={`/vertical/discover?series=${s.id}`} className="reel-browse-card">
                 <div
                   className="reel-browse-card-art"
-                  style={{ backgroundImage: s.thumbnail ? `url(${s.thumbnail})` : undefined }}
+                  style={{ backgroundImage: s.thumbnail ? cssUrl(s.thumbnail) : undefined }}
                 />
                 <div className="reel-browse-card-title">{s.name}</div>
                 <div className="reel-browse-card-count">{s.episodeCount} episode{s.episodeCount === 1 ? '' : 's'}</div>

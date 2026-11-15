@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Small pieces the show page (the control room, components/show/
 // ShowControlRoom.js) shares between its parts: the room's own glyphs, the
@@ -80,7 +81,7 @@ export function bytesShort(bytes) {
 }
 
 export function bg(url) {
-  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+  return url ? { backgroundImage: cssUrl(url) } : undefined;
 }
 
 // Tab and Shift+Tab go round inside an open sheet (it is aria-modal: the
