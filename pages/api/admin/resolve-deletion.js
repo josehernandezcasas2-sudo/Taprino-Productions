@@ -6,8 +6,8 @@ import { isTitleId } from '../../../lib/titleIds';
 import { ShowError } from '../../../lib/showPage';
 import { showRouteError } from '../../../lib/showRoute';
 import { denyShowRemoval, removeShow } from '../../../lib/showAdmin';
-import { NO_REMOVAL_LINE, WITHDRAWN_LINE } from '../../../lib/titleSecurityRules';
-import { confirmOutcome, deleteNowRefusal, has124 } from '../../../lib/removalRules';
+import { NO_REMOVAL_LINE } from '../../../lib/titleSecurityRules';
+import { alreadyRemovedLine, confirmOutcome, deleteNowRefusal, has124, teamStartedRemoval } from '../../../lib/removalRules';
 import { deleteEpisodeNow, holdEpisodeRemoval, strictEpisodeBuyers } from '../../../lib/titleRemoval';
 
 // The deletion queue's decisions (Admin → Library → Pending deletions, the
@@ -76,7 +76,7 @@ export default async function handler(req, res) {
       // runs for a show whose removal isn't requested (2026-11-15; an
       // admin removes a show nobody asked about from Admin → Shows).
       if (decision !== 'delete_now') {
-        if (asked.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: WITHDRAWN_LINE });
+        if (asked.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: alreadyRemovedLine(asked) });
         if (asked.deletion_requested !== true) return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });
       }
       if (decision === 'deny') {
@@ -108,7 +108,7 @@ export default async function handler(req, res) {
   }
   if (!row) return res.status(404).json({ error: 'That isn’t there any more.' });
   if (decision !== 'delete_now') {
-    if (row.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: WITHDRAWN_LINE });
+    if (row.withdrawn_at) return res.status(409).json({ code: 'withdrawn', error: alreadyRemovedLine(row) });
     if (row.deletion_requested !== true) return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });
   }
 
@@ -142,7 +142,8 @@ export default async function handler(req, res) {
 
     // Confirm: kept for its buyers, held 30 days, kept for later — or,
     // before migration 124, deleted at once as it always was.
-    const outcome = confirmOutcome({ bought, keep: row.keep_after_removal === true, ready: has124(row) });
+    // "Keep the files" is the owner's: never on a removal the team started.
+    const outcome = confirmOutcome({ bought, keep: row.keep_after_removal === true && !teamStartedRemoval(row), ready: has124(row) });
     if (outcome === 'delete') {
       const out = await deleteEpisodeNow(row, { mode: 'confirm', actor });
       if (!out.deleted) return res.status(409).json({ code: 'not-requested', error: NO_REMOVAL_LINE });

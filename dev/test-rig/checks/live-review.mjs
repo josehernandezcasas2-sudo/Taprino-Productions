@@ -273,6 +273,34 @@ async function showDetails() {
   r = await call(`/api/show/${encodeURIComponent(ID.show)}`, { who: MARA, method: 'PATCH', body: { releaseYear: 2027 } });
   r = await call(`/api/show/${encodeURIComponent(ID.show)}/staged?field=releaseYear`, { who: MARA, method: 'DELETE' });
   ok('the owner takes a waiting year back', r.status === 200 && show().pending_fields === null && show().release_year === 2025, brief(r));
+
+  // The review of 2026-11-15: a live episode that left its specific genre
+  // blank shows the show's default (lib/showRules.js inheritedField), so a
+  // new default waits like the year.
+  section('A live show’s defaults wait too');
+  sql(`update public.episodes set genre = null where id = ${q(ID.showEp)}`);
+  sql(`update public.series set defaults = '{"genre":"Show Noir","cutArt":true}'::jsonb where id = ${q(ID.show)}`);
+  let epPage = await call(`/api/episode-page?id=${encodeURIComponent(ID.showEp)}`, { who: DEE });
+  ok('the episode shows the show’s genre', epPage.status === 200 && epPage.json.episode && epPage.json.episode.genre === 'Show Noir', epPage.json && epPage.json.episode && epPage.json.episode.genre);
+  r = await call(`/api/show/${encodeURIComponent(ID.show)}`, { who: MARA, method: 'PATCH', body: { defaults: { genre: `Changed ${RUN}` } } });
+  s = show();
+  ok('PATCH the defaults → 200, staged; the live defaults (and the cut-art flag) stand', r.status === 200 && (r.json.staged || []).includes('defaults') && pf(s).defaults && pf(s).defaults.genre === `Changed ${RUN}` && !('cutArt' in pf(s).defaults) && s.defaults.genre === 'Show Noir' && s.defaults.cutArt === true, brief(r));
+  epPage = await call(`/api/episode-page?id=${encodeURIComponent(ID.showEp)}`, { who: DEE });
+  ok('…the live episode still shows the live default', epPage.status === 200 && epPage.json.episode.genre === 'Show Noir', epPage.json && epPage.json.episode && epPage.json.episode.genre);
+  r = await call(`/api/show/${encodeURIComponent(ID.show)}`, { who: MARA, method: 'PATCH', body: { defaults: { genre: 'Show Noir' } } });
+  ok('the same value as live takes it back', r.status === 200 && show().pending_fields === null, brief(r));
+  r = await call(`/api/show/${encodeURIComponent(ID.show)}`, { who: MARA, method: 'PATCH', body: { defaults: { genre: `Changed ${RUN}` } } });
+  r = await call(`/api/admin/show/${encodeURIComponent(ID.show)}`, { who: ADMIN });
+  const dItem = ((r.json && r.json.staged) || []).find((i) => i.target === 'series' && i.field === 'defaults');
+  ok('the admin show page lists it in words', dItem && dItem.current === 'Show Noir' && dItem.proposed === `Changed ${RUN}`, dItem);
+  const pe = await pendingEdit(ID.showEp);
+  ok('…and the Library’s pending edits name the show’s waiting defaults', pe.status === 200 && pe.series && (pe.series.details || []).some((d) => d.field === 'defaults' && d.proposed === `Changed ${RUN}`), pe.series);
+  r = await call(`/api/admin/show/${encodeURIComponent(ID.show)}`, { who: ADMIN, method: 'POST', body: { action: 'staged', decision: 'approve', items: [{ target: dItem.target, id: dItem.id, field: dItem.field, seen: dItem.seen }] } });
+  s = show();
+  ok('approved → the new default is live, the cut-art flag kept, nothing waits', r.status === 200 && s.defaults.genre === `Changed ${RUN}` && s.defaults.cutArt === true && s.pending_fields === null, { status: r.status, defaults: s.defaults, pf: s.pending_fields });
+  epPage = await call(`/api/episode-page?id=${encodeURIComponent(ID.showEp)}`, { who: DEE });
+  ok('…the episode shows it now', epPage.status === 200 && epPage.json.episode.genre === `Changed ${RUN}`, epPage.json && epPage.json.episode && epPage.json.episode.genre);
+  sql(`update public.series set defaults = '{}'::jsonb where id = ${q(ID.show)}`);
 }
 
 async function team() {
@@ -284,6 +312,16 @@ async function team() {
   r = await patchEp(EDITOR, ID.live, { genre: 'Romance' });
   ok('a sub-admin without review → 403 with the line', r.status === 403 && errOf(r).replace(/\.$/, '') === TEAM_REVIEW_LINE.replace(/\.$/, ''), brief(r));
   ok('…unchanged', ep(ID.live).genre === 'Mystery');
+  // The review of 2026-11-15: turning ads off only takes something away,
+  // so it applies at once for them too (the show editor, as the Library's
+  // route always did).
+  sql(`update public.episodes set ads_enabled = true where id = ${q(ID.live)}`);
+  r = await editor(EDITOR, ID.live);
+  ok('…the ads switch, on, is open to them in the editor', r.status === 200 && r.json.policy && r.json.policy.adsEnabled && r.json.policy.adsEnabled.mode === 'direct', r.json && r.json.policy && r.json.policy.adsEnabled);
+  r = await patchEp(EDITOR, ID.live, { adsEnabled: false });
+  ok('…turning ads off applies at once', r.status === 200 && ep(ID.live).ads_enabled === false && (r.json.applied || []).includes('adsEnabled'), brief(r));
+  r = await patchEp(EDITOR, ID.live, { adsEnabled: true });
+  ok('…turning them back on is still refused', r.status === 403 && ep(ID.live).ads_enabled === false, brief(r));
   r = await editor(REVIEWER, ID.subOwn);
   ok('their own live title: the editor says the details wait and Who can watch is closed', r.status === 200 && r.json.policy.genre.mode === 'staged' && r.json.policy.tier.mode === 'locked', r.json && r.json.policy && { g: r.json.policy.genre, t: r.json.policy.tier });
   r = await patchEp(REVIEWER, ID.subOwn, { genre: 'Their own genre' });

@@ -136,7 +136,7 @@ export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onC
           <Text style={cs.statusTitle} accessibilityRole="header">{removed.label}</Text>
         </View>
         <Text style={ss.p}>{removed.line}{removal.restoreReason && removed.key === 'asked' ? ` Your note: “${removal.restoreReason}”` : ''}</Text>
-        {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration') ? <Text style={ss.small}>{ask.line}</Text> : null}
+        {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration' || ask.key === 'due') ? <Text style={ss.small}>{ask.line}</Text> : null}
         {!contributor && ask && ask.ok && onAskBack ? <SmallButton label={REMOVAL_WORDS.askBackMenu} tone="primary" busy={busy === 'restore'} onPress={onAskBack} /> : null}
         {!contributor && ask && ask.key === 'asked' && onCancelAskBack ? <SmallButton label={busy === 'restore' ? 'Taking it back…' : REMOVAL_WORDS.cancelAsk} busy={busy === 'restore'} onPress={onCancelAskBack} /> : null}
       </View>

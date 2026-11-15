@@ -1029,9 +1029,10 @@ function suite(R, who) {
   tt('fieldPolicy: a show — at once until its first episode is approved, then its name and art wait', () => {
     const runner = { target: 'show', isRunner: true };
     // 2026-11-15: the year, the funding link, the season names and the
-    // credits wait like the name and the art.
-    const art = ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'releaseYear', 'fundingUrl', 'seasons', 'credits'];
-    const rest = ['channelOptIn', 'defaults', 'newestSeasonHero'];
+    // credits wait like the name and the art — and the defaults (a live
+    // episode that left its genre or Made by blank shows the show's).
+    const art = ['name', 'description', 'poster', 'thumbnail', 'heroImage', 'titleImage', 'trailer', 'releaseYear', 'fundingUrl', 'seasons', 'credits', 'defaults'];
+    const rest = ['channelOptIn', 'newestSeasonHero'];
     for (const f of [...art, ...rest]) assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 0 }), 'direct', `new show ${f}`);
     for (const f of art) {
       assert.equal(R.fieldPolicy(f, { ...runner, status: 'pending', approvedEpisodes: 1 }), 'staged', `ready show ${f}`);
@@ -1117,7 +1118,11 @@ function suite(R, who) {
     assert.equal(R.fieldPolicy('seasons', { ...show, ...editor }), 'locked');
     assert.equal(R.fieldPolicy('seasons', { ...show, ...editor, status: 'pending', approvedEpisodes: 0 }), 'direct', 'a show nobody can see yet');
     assert.equal(R.fieldPolicy('seasons', { ...show, ...editor, isRunner: true, status: 'pending', approvedEpisodes: 1 }), 'staged');
-    assert.equal(R.fieldPolicy('defaults', { ...show, ...editor }), 'direct');
+    // The defaults wait on a live show (2026-11-15 review): someone else's,
+    // for a team member who only edits episodes, is closed like the year.
+    assert.equal(R.fieldPolicy('defaults', { ...show, ...editor }), 'locked');
+    assert.equal(R.fieldPolicy('defaults', { ...show, ...reviewer }), 'direct');
+    assert.equal(R.fieldPolicy('defaults', { ...show, ...editor, isRunner: true }), 'staged', 'their own show: the owner\'s way');
     assert.equal(R.fieldPolicyLine('credits', { ...show, ...editor, isRunner: true }), 'Waits for approval; what’s there now stays until then');
   });
 
@@ -1137,6 +1142,17 @@ function suite(R, who) {
     assert.equal(locked.ok, false);
     assert.equal(locked.code, 'locked');
     assert.equal(R.adsEnabledChange({ ...live, deletionRequested: true }, true, false).ok, false, 'on its way out: closed both ways');
+    // The team turns ads off at once whatever else the title holds closed
+    // to them (2026-11-15 review): a sub-admin who only edits episodes, on
+    // someone else's live title, where turning them on is refused.
+    const editor = { isAdmin: true, fullAdmin: false, reviews: false, status: 'approved' };
+    assert.equal(R.fieldPolicy('adsEnabled', editor), 'locked', 'a detail of someone else\'s live title is closed to them');
+    assert.deepEqual(R.adsEnabledChange(editor, true, false), { ok: true, mode: 'direct', value: false });
+    assert.deepEqual(R.adsEnabledPolicy(editor, true), { mode: 'direct', line: null }, 'the switch is open while it is on');
+    assert.equal(R.adsEnabledChange(editor, false, true).ok, false, 'turning them on stays refused');
+    assert.equal(R.adsEnabledPolicy(editor, false).mode, 'locked');
+    assert.deepEqual(R.adsEnabledChange({ ...editor, isUploader: true }, true, false), { ok: true, mode: 'direct', value: false }, 'their own title too');
+    assert.deepEqual(R.adsEnabledChange({ ...editor, held: true }, true, false), { ok: true, mode: 'direct', value: false }, 'even a pulled one');
   });
 
   tt('canMoveTo: reordering inside a show is the runner\'s', () => {
@@ -1325,7 +1341,7 @@ function suite(R, who) {
     assert.equal(R.cascadePlan(show, eps, [{ id: 'y1', contentType: 'bonus', bonusParentType: 'series', bonusParentId: 'other-show' }, { id: 'y2', contentType: 'bonus', bonusParentType: 'episode', bonusParentId: 'zz' }], { titles: { y1: 1, y2: 1 } }).show.action, 'delete');
     // An extra filed in the show itself with buyers keeps the show.
     assert.equal(R.cascadePlan(show, eps, extras, { titles: { x1: 1 } }).show.action, 'withdraw');
-    assert.deepEqual(one.counts, { episodes: 3, extras: 2, kept: 2, deleted: 3, seriesBuyers: 0, channelSlots: 1 });
+    assert.deepEqual(one.counts, { episodes: 3, extras: 2, kept: 2, keptOther: 0, deleted: 3, seriesBuyers: 0, channelSlots: 1 });
     // A whole-series purchase keeps the show, every episode and the extras filed in it.
     const series = R.cascadePlan(show, eps, extras, { series: 4 });
     assert.equal(series.show.action, 'withdraw');
@@ -1341,6 +1357,45 @@ function suite(R, who) {
     assert.equal(R.cascadePlan(show, [], [{ id: 'x' }], {}).words, 'Night Bus and its 1 extra');
     assert.equal(R.cascadePlan(show, [], [], {}).words, 'Night Bus (nothing in it yet)');
     assert.equal(R.cascadePlan({ id: 's' }, [], [], { series: 1 }).words, 'This show (nothing in it yet) · 1 person bought the whole series, so it will be kept for them');
+  });
+
+  tt('cascadePlan: a title only held or kept for later isn\'t bought (2026-11-15 review)', () => {
+    const show = { id: 'night-bus', name: 'Night Bus' };
+    // E3 was removed on its own a week ago and is held 30 days; then the
+    // whole show is removed. Nobody bought anything.
+    const held = ep('e3', 3, 1, { withdrawnAt: '2026-11-08T10:00:00Z', purgeAfter: '2026-12-08T10:00:00Z', keepAfterRemoval: false });
+    const plan = R.cascadePlan(show, [ep('e1', 1), ep('e2', 2), held], [], {});
+    assert.deepEqual(plan.rows.map((r) => [r.id, r.action, r.keptFor]), [['e1', 'delete', null], ['e2', 'delete', null], ['e3', 'delete', null]], 'held with the show, not kept for buyers');
+    assert.equal(plan.show.action, 'delete');
+    assert.equal(plan.show.keptFor, null);
+    assert.equal(plan.counts.kept, 0);
+    assert.equal(plan.words, 'Night Bus and its 3 episodes');
+    // The database shape, and one kept for later.
+    const later = { id: 'e4', series_id: 'night-bus', content_type: 'series', withdrawn_at: '2026-11-01T00:00:00Z', purge_after: null, keep_after_removal: true };
+    assert.equal(R.cascadePlan(show, [later], [], {}).rows[0].action, 'delete');
+    assert.equal(R.cascadePlan(show, [later], [], {}).show.action, 'delete');
+    // Bought in the meantime: kept for its buyers, and the show with it.
+    const bought = R.cascadePlan(show, [ep('e1', 1), held], [], { titles: { e3: 1 } });
+    assert.deepEqual(bought.rows.map((r) => [r.id, r.action, r.keptFor]), [['e1', 'delete', null], ['e3', 'withdraw', 'buyers']]);
+    assert.equal(bought.show.keptFor, 'buyers');
+    // A withdrawn row with neither date nor "keep" (kept for its buyers, or
+    // withdrawn before migration 124) stays as it is.
+    const old = R.cascadePlan(show, [ep('w', 1, 1, { withdrawnAt: '2026-10-01' })], [], {});
+    assert.equal(old.rows[0].keptFor, 'buyers');
+    assert.equal(old.counts.kept, 1);
+    // The clean-up keeps what it names for another reason: never counted as
+    // bought, but the show stays with it.
+    const purge = R.cascadePlan(show, [ep('e1', 1), { ...held, purgeAfter: null, keepAfterRemoval: true }], [], {}, { keep: { e3: 'later' } });
+    assert.deepEqual(purge.rows.map((r) => [r.id, r.action, r.keptFor]), [['e1', 'delete', null], ['e3', 'withdraw', 'later']]);
+    assert.equal(purge.counts.kept, 0);
+    assert.equal(purge.counts.keptOther, 1);
+    assert.equal(purge.counts.deleted, 1);
+    assert.deepEqual(purge.show, { id: 'night-bus', action: 'withdraw', keptFor: 'later' });
+    assert.equal(purge.words, 'Night Bus and its 2 episodes · 1 title is kept for later, and the show with it');
+    assert.equal(purge.adminWords, '2 episodes · 0 extras · 0 with buyers (kept for them) · 1 kept for later or asked back · the show is kept (a title in it is kept for later)');
+    assert.equal(R.cascadePlan(show, [held], [], {}, { keep: { e3: 'asked' } }).rows[0].keptFor, 'asked');
+    // Bought wins over the caller's reason.
+    assert.equal(R.cascadePlan(show, [held], [], { titles: { e3: 2 } }, { keep: { e3: 'later' } }).rows[0].keptFor, 'buyers');
   });
 
   tt('showState: the chip and the headline', () => {

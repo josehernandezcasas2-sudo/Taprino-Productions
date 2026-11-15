@@ -17,7 +17,7 @@ function isMissingColumn(error) {
 // read is refused rather than put live unseen. Each read is tried with the
 // newest columns first and again without them on an older database.
 const EPISODE_LIVE = 'genre, main_genre, artist, release_year, runtime, funding_url, ad_break_seconds, ads_enabled, extra_kind, credits, captions_url, captions_label, captions_language, series_id';
-const SERIES_LIVE = 'release_year, funding_url, seasons, credits, kind';
+const SERIES_LIVE = 'release_year, funding_url, seasons, credits, kind, defaults';
 
 export default async function handler(req, res) {
   res.setHeader('Cache-Control', 'private, no-store');

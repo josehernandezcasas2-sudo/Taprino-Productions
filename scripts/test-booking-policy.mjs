@@ -245,4 +245,19 @@ test('the pages say it: the request page, the host’s form, the Terms (website 
   assert.match(section, /A booking keeps the cancellation policy it was paid under\. If the host changes the listing&rsquo;s policy later, the change applies only to bookings paid after it, and anyone with an open request or a paid booking is told\./);
 });
 
+test('a listing that can’t be read stops the payment; a policy change closes a bounded number of Checkouts (2026-11-15 review)', () => {
+  const req = read('lib/locationRequests.js');
+  const at = req.indexOf("from('locations').select('title, cancellation')");
+  assert.ok(at > 0);
+  const after = req.slice(at - 100, at + 600);
+  assert.match(after, /error: locError/);
+  assert.match(after, /fail\('Couldn’t open the payment just now\. Try again in a minute\.', 503\)/);
+  assert.ok(after.indexOf('fail(') < after.indexOf('policyAtPayment('), 'refused before a policy is chosen');
+  const bp = read('lib/bookingPolicy.js');
+  assert.match(bp, /const MAX_CLOSE = 20;/);
+  assert.match(bp, /toClose\.slice\(0, MAX_CLOSE\)/);
+  assert.match(bp, /inBatches\(notices, NOTICES_AT_ONCE/);
+  assert.doesNotMatch(bp, /for \(const r of rows\) \{\n\s+if \(r\.status === 'accepted' && r\.stripe_checkout_session_id\) \{\n\s+await closeOpenCheckout/, 'no unbounded loop of Stripe calls');
+});
+
 console.log(`\n${passed} booking-policy checks passed`);
