@@ -282,8 +282,10 @@ t('the clean-up: pages past titles left to their show; checks a row again before
   // A show brought back: its owners are everyone whose titles come back with it.
   assert.match(tr, /if \(type === 'series'\) return showOwnerIds\(row\.id/);
   assert.match(src('lib/moderation.js'), /owners = await showOwnerIds\(target\.id/);
-  // A request lands only before the hold runs out.
-  assert.match(tr, /purge_after\.is\.null,purge_after\.gt\./);
+  // A request lands only before the hold runs out — two plain filters
+  // (PostgREST refuses an or() on an update).
+  assert.match(tr, /row\.purge_after \? q\.gt\('purge_after', new Date\(now\)\.toISOString\(\)\) : q\.is\('purge_after', null\)/);
+  assert.doesNotMatch(tr, /\.or\(`purge_after/);
 });
 
 console.log(`\n${n} removal checks passed`);
