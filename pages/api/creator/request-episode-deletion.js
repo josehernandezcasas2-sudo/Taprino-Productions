@@ -10,6 +10,8 @@ import { setEpisodeRemoval } from '../../../lib/showPage';
 // lib/publicEpisodes.js / lib/episodes.js), since a creator asking for
 // their own content to come down shouldn't have to wait on a review
 // cycle for that part — only the permanent row removal waits on an admin.
+// `keep: true` (migration 124): "Keep the files so I can bring it back
+// later" — once confirmed, the daily clean-up never deletes it.
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -27,7 +29,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Creator access required.' });
   }
 
-  const { episodeId, action, reason } = req.body || {};
+  const { episodeId, action, reason, keep } = req.body || {};
   if (!episodeId) {
     return res.status(400).json({ error: 'episodeId is required.' });
   }
@@ -56,7 +58,7 @@ export default async function handler(req, res) {
   // (lib/showPage.js setEpisodeRemoval, POST /api/show/episode/[id]/removal);
   // this route keeps its checks and its answers for Your work and the app.
   try {
-    await setEpisodeRemoval(existing.id, { action, reason: String(reason || '') }, { userId, isAdmin }, { strict: false });
+    await setEpisodeRemoval(existing.id, { action, reason: String(reason || ''), keep: keep === true }, { userId, isAdmin }, { strict: false });
   } catch (err) {
     return sendError(res, err, 'creator/request-episode-deletion', 'Could not save your request.');
   }

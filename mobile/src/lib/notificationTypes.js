@@ -192,7 +192,14 @@ export const NOTIFICATION_TYPES = Object.freeze({
   membership_ended: kind('Membership ended', 'lock', 'account'),
   // A host changed a place's cancellation policy: it applies to payments
   // made from now on; a paid booking keeps its own (lib/bookingPolicy.js).
-  location_policy_changed: kind('Cancellation policy changed', 'account', 'location_request')
+  location_policy_changed: kind('Cancellation policy changed', 'account', 'location_request'),
+
+  // Removals held a month, titles brought back (migration 124,
+  // lib/titleRemoval.js, lib/showDelete.js): deleted for good after its
+  // hold, brought back, or kept off the site.
+  title_purged: kind('Deleted for good', 'clapperboard', 'creator'),
+  title_restored: kind('Brought back', 'clapperboard', 'creator'),
+  restore_denied: kind('Kept off the site', 'clapperboard', 'creator')
 });
 
 // What a type nobody registered reads as.

@@ -19,7 +19,8 @@ import {
 //   GET → the admin cards' data (getAdminShow)
 //   POST { action, … } → approve | reject | fix_numbering | staged | hold |
 //     take_down | restore | owner (email, earnings: 'keep' | 'move' — slice
-//     3b) | grant_creator | remove | deny_removal | tell_savers
+//     3b) | grant_creator | remove (now: true = Delete now, migration 124) |
+//     deny_removal | tell_savers
 const STAGED_MAX = 50;
 
 function hasOwn(o, k) {
@@ -108,7 +109,8 @@ export default async function handler(req, res) {
       case 'grant_creator':
         return res.status(200).json(await grantOwnerCreator(id, rc));
       case 'remove':
-        return res.status(200).json(await removeShow(id, { confirmName: body.confirmName, reason: body.reason }, rc));
+        // now: true = "Delete now" (a full admin; lib/showAdmin.js removeShow).
+        return res.status(200).json(await removeShow(id, { confirmName: body.confirmName, reason: body.reason, now: body.now === true }, rc));
       case 'deny_removal':
         return res.status(200).json(await denyShowRemoval(id, { note: body.note }, rc));
       case 'tell_savers':

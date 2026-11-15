@@ -7,11 +7,13 @@ import { getAllSeries } from '../../lib/series';
 import { getPublicEpisodes } from '../../lib/publicEpisodes';
 import { buildWorkList, copyLinkFor, runtimeWords, WORK_TABS, WORK_WORDS } from '../../lib/workListRules';
 import { DASH_WORDS } from '../../lib/creatorDashboardRules';
+import { REMOVAL_WORDS } from '../../lib/removalRules';
 import HeaderNav from '../../components/HeaderNav';
 import EditSubmissionModal from '../../components/EditSubmissionModal';
 import AdminEditEpisodeModal from '../../components/AdminEditEpisodeModal';
 import ArtworkModal from '../../components/ArtworkModal';
 import DeleteRequestModal from '../../components/DeleteRequestModal';
+import RestoreRequestModal from '../../components/RestoreRequestModal';
 import CaptionUploadModal from '../../components/CaptionUploadModal';
 import ReplaceVideoModal from '../../components/ReplaceVideoModal';
 import RequestEditModal from '../../components/RequestEditModal';
@@ -279,6 +281,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [fullEditSubmission, setFullEditSubmission] = useState(null);
   const [artworkSubmission, setArtworkSubmission] = useState(null);
   const [deletingSubmission, setDeletingSubmission] = useState(null);
+  const [restoringSubmission, setRestoringSubmission] = useState(null); // { s, line }: Ask to bring it back
   const [captionSubmission, setCaptionSubmission] = useState(null);
   const [replacingVideoSubmission, setReplacingVideoSubmission] = useState(null);
   const [editRequestTarget, setEditRequestTarget] = useState(null); // { type, currentValues }
@@ -287,7 +290,7 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
   const [payeeTarget, setPayeeTarget] = useState(null); // { id, title }
 
   // When a box closes, the focus goes back to what opened it.
-  const anyBox = Boolean(editingSubmission || fullEditSubmission || artworkSubmission || deletingSubmission || captionSubmission || replacingVideoSubmission || editRequestTarget || sellTarget || payeeTarget);
+  const anyBox = Boolean(editingSubmission || fullEditSubmission || artworkSubmission || deletingSubmission || restoringSubmission || captionSubmission || replacingVideoSubmission || editRequestTarget || sellTarget || payeeTarget);
   const opener = useRef(null);
   const boxWasOpen = useRef(false);
   useEffect(() => {
@@ -379,16 +382,52 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
     }
   }
 
-  async function requestEpisodeDeletion(reason) {
+  // `keep` (migration 124): "Keep the files so I can bring it back later".
+  async function requestEpisodeDeletion(reason, { keep = false } = {}) {
     const res = await fetch('/api/creator/request-episode-deletion', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ episodeId: deletingSubmission.id, action: 'request', reason })
+      body: JSON.stringify({ episodeId: deletingSubmission.id, action: 'request', reason, ...(keep ? { keep: true } : {}) })
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || 'Could not submit the request.');
     setDeletingSubmission(null);
     loadSubmissions();
+  }
+
+  // Ask to bring a removed title back (migration 124): the box's confirm,
+  // which shows a thrown line itself; and taking the request back.
+  async function askToBringBack(reason) {
+    const id = restoringSubmission.s.id;
+    const res = await fetch(`/api/show/episode/${encodeURIComponent(id)}/restore`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'request', reason })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not send the request.');
+    setRestoringSubmission(null);
+    noteRow(id, { ok: true, text: REMOVAL_WORDS.askBackSent });
+    loadSubmissions();
+  }
+
+  async function cancelAskBack(episodeId) {
+    setCancelBusy(episodeId);
+    noteRow(episodeId, null);
+    try {
+      const res = await fetch(`/api/show/episode/${encodeURIComponent(episodeId)}/restore`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'cancel' })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not take the request back.');
+      await loadSubmissions();
+    } catch (err) {
+      noteRow(episodeId, { ok: false, text: offline(err) ? DASH_WORDS.offline : err.message });
+    } finally {
+      setCancelBusy(null);
+    }
   }
 
   async function cancelEpisodeDeletion(episodeId) {
@@ -449,6 +488,8 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
       case 'channels': setChannelOptIn('episode', s.id, !s.channelOptIn); break;
       case 'cancel_removal': cancelEpisodeDeletion(s.id); break;
       case 'remove': openBox(() => setDeletingSubmission(s)); break;
+      case 'restore': openBox(() => setRestoringSubmission({ s, line: row.pill.label })); break;
+      case 'cancel_restore': cancelAskBack(s.id); break;
       default: break;
     }
   }
@@ -647,6 +688,17 @@ export default function MyWork({ isSignedIn, isSubscriber, email, isAdmin, isCre
           itemLabel={deletingSubmission.title}
           onClose={() => setDeletingSubmission(null)}
           onConfirm={requestEpisodeDeletion}
+          keepChoice={deletingSubmission.removalReady === true}
+          bought={deletingSubmission.bought === true}
+        />
+      )}
+
+      {restoringSubmission && (
+        <RestoreRequestModal
+          itemLabel={restoringSubmission.s.title || 'This title'}
+          line={restoringSubmission.line}
+          onClose={() => setRestoringSubmission(null)}
+          onConfirm={askToBringBack}
         />
       )}
 

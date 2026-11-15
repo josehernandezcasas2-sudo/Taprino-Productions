@@ -11,6 +11,8 @@ import {
 } from './ShowBits';
 import { PaidLine } from './PayeeCard';
 import { extraKindLabel } from '../../lib/extraKinds';
+import { REMOVAL_WORDS, removedState, teamStartedRemoval } from '../../lib/removalRules';
+import { KeepFilesField } from '../removal/RemovalBits';
 
 // The show page's cards in the app (the series revamp, slice 5; the
 // website's components/show/ShowCards.js): the show card, the status card,
@@ -114,10 +116,31 @@ function agoWords(iso) {
 // (lib/showRules.js showState), what it means, its buttons (Make it
 // public, Cancel request, Resubmit) and the problem lines (showProblems),
 // each leading to its row.
-export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onCancelRemoval, onResubmit, busy }) {
+export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onCancelRemoval, onResubmit, onAskBack, onCancelAskBack, busy }) {
   const router = useRouter();
   const show = view.show;
   const noun = show.kind === 'podcast' ? 'show' : 'series';
+  // A removed show (migration 124): where it stands, and Ask to bring it
+  // back (or take that request back) — the website's words.
+  const removal = show.removal || null;
+  if (removal && removal.removed) {
+    const removed = removal.removed;
+    const ask = removal.ask || null;
+    const t = TONE.neutral;
+    return (
+      <View style={[cs.status, { borderColor: t.border, backgroundColor: t.bg }]} accessibilityLabel="Where the show stands">
+        <View style={cs.statusHead}>
+          <View style={cs.statusIcon}><TrashIcon size={18} color={t.fg} /></View>
+          <Text style={cs.statusTitle} accessibilityRole="header">{removed.label}</Text>
+        </View>
+        <Text style={ss.p}>{removed.line}{removal.restoreReason && removed.key === 'asked' ? ` Your note: “${removal.restoreReason}”` : ''}</Text>
+        {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration') ? <Text style={ss.small}>{ask.line}</Text> : null}
+        {!contributor && ask && ask.ok && onAskBack ? <SmallButton label={REMOVAL_WORDS.askBackMenu} tone="primary" busy={busy === 'restore'} onPress={onAskBack} /> : null}
+        {!contributor && ask && ask.key === 'asked' && onCancelAskBack ? <SmallButton label={busy === 'restore' ? 'Taking it back…' : REMOVAL_WORDS.cancelAsk} busy={busy === 'restore'} onPress={onCancelAskBack} /> : null}
+      </View>
+    );
+  }
+  const teamRemoving = Boolean(show.deletion && show.deletion.requested && teamStartedRemoval({ deletionReason: show.deletion.reason }));
   const state = show.state;
   const problems = (view.problems || []).filter((p) => p.code !== 'delay');
   const delay = (view.problems || []).some((p) => p.code === 'delay');
@@ -155,8 +178,10 @@ export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onC
     body = <Text style={ss.p}>You can still replace the file (the new one comes to us first), add captions and edit page notes. <Text style={ss.link} onPress={() => askUs(`Pulled: ${show.name}`)}>Email us</Text></Text>;
   } else if (state === 'removal') {
     icon = <TrashIcon size={18} color={tone.fg} />;
-    body = <Text style={ss.p}>Nothing on the {noun} can be changed while the request is open.{show.deletion && show.deletion.reason ? ` Your reason: “${show.deletion.reason}”` : ''}</Text>;
-    acts = !contributor && onCancelRemoval ? <SmallButton label={busy === 'removal' ? 'Cancelling…' : 'Cancel request'} busy={busy === 'removal'} onPress={onCancelRemoval} /> : null;
+    body = teamRemoving
+      ? <Text style={ss.p}>Nothing on the {noun} can be changed while the team removes it. {REMOVAL_WORDS.teamCancel}</Text>
+      : <Text style={ss.p}>Nothing on the {noun} can be changed while the request is open.{show.deletion && show.deletion.reason ? ` Your reason: “${show.deletion.reason}”` : ''}</Text>;
+    acts = !contributor && onCancelRemoval && !teamRemoving ? <SmallButton label={busy === 'removal' ? 'Cancelling…' : 'Cancel request'} busy={busy === 'removal'} onPress={onCancelRemoval} /> : null;
   } else if (state === 'declined') {
     icon = <WarningIcon size={18} color={tone.fg} />;
     body = <Text style={ss.p}>{show.decisionNote ? <Text><Text style={ss.strong}>Their note:</Text> {show.decisionNote} </Text> : null}Fix what it needs and press Resubmit; it comes back as not public yet.</Text>;
@@ -247,13 +272,18 @@ export function ChannelsCard({ view, canEdit, locked, busy, onToggle }) {
 export function RemoveShowCard({ view, canRequest, busy, onRequest, onCancel }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [keep, setKeep] = useState(false);
   const show = view.show;
   const deletion = show.deletion || {};
+  const removal = show.removal || {};
+  // Removed already: the status card says where it stands.
+  if (removal.removed) return null;
   if (deletion.requested) {
+    const teamRemoving = teamStartedRemoval({ deletionReason: deletion.reason });
     return (
       <View style={ss.wrap}>
-        <Text style={ss.small}>Removal requested{deletion.at ? ` on ${shortDate(deletion.at)}` : ''}</Text>
-        {canRequest ? <LinkText disabled={busy === 'removal'} onPress={onCancel}>{busy === 'removal' ? 'Cancelling…' : 'Cancel'}</LinkText> : null}
+        <Text style={ss.small}>{teamRemoving ? 'The team is removing it' : 'Removal requested'}{deletion.at ? ` on ${shortDate(deletion.at)}` : ''}</Text>
+        {canRequest && !teamRemoving ? <LinkText disabled={busy === 'removal'} onPress={onCancel}>{busy === 'removal' ? 'Cancelling…' : 'Cancel'}</LinkText> : null}
       </View>
     );
   }
@@ -272,9 +302,10 @@ export function RemoveShowCard({ view, canRequest, busy, onRequest, onCancel }) 
       <Text style={ss.small}>It leaves the site as soon as you ask; we confirm it. Anything someone bought stays theirs.</Text>
       <Text style={ss.sheetLabel}>Why?</Text>
       <TextInput style={[ss.input, ss.textarea]} multiline maxLength={1000} value={reason} onChangeText={setReason} placeholder="A line for us" placeholderTextColor={colors.inkFaint} />
+      {removal.ready ? <KeepFilesField checked={keep} onChange={setKeep} bought={Boolean(removal.bought)} /> : null}
       <View style={ss.wrap}>
-        <SmallButton label={busy === 'removal' ? 'Asking…' : 'Ask us to remove it'} tone="danger" disabled={!reason.trim()} busy={busy === 'removal'} onPress={() => onRequest(reason.trim())} />
-        <LinkText onPress={() => { setOpen(false); setReason(''); }}>Keep it</LinkText>
+        <SmallButton label={busy === 'removal' ? 'Asking…' : 'Ask us to remove it'} tone="danger" disabled={!reason.trim()} busy={busy === 'removal'} onPress={() => onRequest(reason.trim(), { keep: Boolean(removal.ready && !removal.bought && keep) })} />
+        <LinkText onPress={() => { setOpen(false); setReason(''); setKeep(false); }}>Keep it</LinkText>
       </View>
     </View>
   );

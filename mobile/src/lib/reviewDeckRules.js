@@ -5,7 +5,34 @@
 
 // The kinds the deck draws. The old 'series' kind (a show ready to go
 // public) is gone: Make it public is the owner's (decision 2).
-export const KIND_LABEL = { submission: 'Episode', ad: 'Ad', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application' };
+// 'restore' (migration 124): a removed title or show its owner asked to
+// bring back (lib/titleRemoval.js); the words are lib/removalRules.js's
+// REMOVAL_WORDS (queueKind, approve, deny, denyConfirm, denyPlaceholder),
+// copied here since this file imports nothing.
+export const KIND_LABEL = { submission: 'Episode', ad: 'Ad', channel: 'Channel upload', location: 'Place', price: 'Price', application: 'Application', restore: 'Bring back' };
+
+// The buttons' and the reason sheet's words, by kind.
+export const RESTORE_WORDS = {
+  approve: 'Bring it back',
+  deny: 'Deny…',
+  denyConfirm: 'Confirm the denial',
+  denyHeading: 'Deny',
+  denyBody: 'It stays off the site. The note goes to its owner.',
+  denyPlaceholder: 'A note for the owner (they read this)'
+};
+
+export function approveLabel(item) {
+  const meta = (item && item.meta) || {};
+  if (item && item.kind === 'application') return meta.masterReady ? 'Accept · live' : 'Accept';
+  if (item && item.kind === 'restore') return RESTORE_WORDS.approve;
+  return 'Approve';
+}
+
+export function rejectLabel(item) {
+  if (item && item.kind === 'application') return 'Decline…';
+  if (item && item.kind === 'restore') return RESTORE_WORDS.deny;
+  return 'Reject…';
+}
 
 // A show episode's eyebrow, by where its show stands (lib/reviewQueue.js
 // meta.show.stage). `tone` names a theme colour: ok, danger, faint or plain.
@@ -23,7 +50,7 @@ export const FILE_WORDS = { ready: 'ready', audio: 'audio', external: 'ready (it
 // and an application's acceptBlocker, which is the line under Accept).
 export const HIDDEN_META = ['blocked', 'masterReady', 'openOnShowPage', 'tier', 'seen', 'canAccept', 'acceptBlocker'];
 
-const LABELS = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file' };
+const LABELS = { contentType: 'Type', hasCaptions: 'Captions', durationSeconds: 'Duration', budgetTotalCents: 'Budget', clickUrl: 'Click URL', accountContactEmail: 'Advertiser', proofUrl: 'Proof', proofNote: 'Proof note', hostSays: 'Host says', listingUrl: 'Listing', filesLink: 'Their files', goesLive: 'Accept means', approvedCount: 'Approved episodes', position: 'Place', master: 'The file', removedBecause: 'Removed because', removedOn: 'Removed on', filesGo: 'Files deleted on', kept: 'Kept', comesBackAs: 'Comes back', page: 'Admin page' };
 
 // ?kind= as the deck reads it: a kind it doesn't know (an old
 // ?kind=series link) shows everything.
@@ -66,7 +93,7 @@ export function eyebrowFor(item) {
 export function blockedLine(item) {
   const meta = item && item.meta;
   if (!meta) return null;
-  if (item.kind === 'submission') return meta.blocked ? String(meta.blocked) : null;
+  if (item.kind === 'submission' || item.kind === 'restore') return meta.blocked ? String(meta.blocked) : null;
   if (item.kind === 'application' && meta.canAccept === false) return meta.acceptBlocker ? String(meta.acceptBlocker) : 'A full admin accepts an application.';
   return null;
 }

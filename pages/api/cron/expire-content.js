@@ -3,6 +3,7 @@ import { getRoleContext } from '../../../lib/roles';
 import { getSupabase } from '../../../lib/supabase';
 import { recordAudit } from '../../../lib/auditLog';
 import { runSaverStep } from '../../../lib/seriesDrop';
+import { purgeHeldTitles } from '../../../lib/titleRemoval';
 
 // Runs daily via vercel.json's cron config, which Vercel authenticates
 // automatically: set CRON_SECRET as an env var and Vercel sends
@@ -14,12 +15,17 @@ import { runSaverStep } from '../../../lib/seriesDrop';
 // this admin panel: run it once from the browser console to test, rather
 // than waiting a day for the schedule to fire.
 //
-// Deliberately does NOT delete anything itself. It only sets
-// deletion_requested = true, which is the exact same flag the existing
-// admin-initiated deletion flow already uses — so an expired episode lands
-// in the same /admin pending-deletions queue, reviewed the same way,
-// confirm-or-deny, by a person. This is a scheduling trigger, not a
-// scheduled deletion.
+// An availability window that ended is NOT deleted here: the run only sets
+// deletion_requested = true, the same flag the creator's own request uses
+// — so an expired episode lands in the /admin pending-deletions queue,
+// reviewed the same way, confirm-or-deny, by a person.
+//
+// What it does delete (migration 124, 2026-11-15): a removal a person
+// already confirmed whose 30-day hold has run out (purge_after), nobody
+// asking for it back — through the same path an immediate deletion takes
+// (lib/titleRemoval.js purgeHeldTitles: ad share credited first, extras
+// re-filed, files to Orphaned media, the row deleted, the owner told),
+// at most 50 a day. Before 124 that step finds no column and does nothing.
 function sameSecret(a, b) {
   const x = Buffer.from(a);
   const y = Buffer.from(b);
@@ -86,6 +92,16 @@ export default async function handler(req, res) {
     }
   }
 
+  // Then the removals whose hold ran out. A failure here never undoes the
+  // flagging above, and the savers' step runs whatever it did.
+  let purged = null;
+  try {
+    purged = await purgeHeldTitles({ now: Date.now(), limit: 50 });
+  } catch (err) {
+    console.error('expire-content purge:', err && err.message ? err.message : err);
+    purged = { ready: true, shows: 0, episodes: 0, keptForBuyers: 0, leftToShow: 0, failed: 1, names: [] };
+  }
+
   // Then the daily step that tells people who saved a show about its new
   // episodes (lib/seriesDrop.js: capped, it keeps its place for tomorrow).
   // A failure here never undoes the flagging above.
@@ -98,7 +114,10 @@ export default async function handler(req, res) {
     savers = { shows: 0, checked: 0, sent: 0, finished: false, failed: true };
   }
 
-  if (flagged.length > 0 || (savers && (savers.shows > 0 || savers.failed))) {
+  const purgeWords = purged && purged.ready && (purged.shows || purged.episodes || purged.keptForBuyers || purged.failed)
+    ? ` · deleted after their hold: ${purged.shows} show(s), ${purged.episodes} title(s)${purged.names.length ? ` (${purged.names.slice(0, 20).join(', ')})` : ''}${purged.keptForBuyers ? `, ${purged.keptForBuyers} kept for buyers` : ''}${purged.failed ? `, ${purged.failed} failed (tried again tomorrow)` : ''}`
+    : '';
+  if (flagged.length > 0 || purgeWords || (savers && (savers.shows > 0 || savers.failed))) {
     await recordAudit({
       // audit_log.admin_id is not null: the scheduled run signs as 'cron'
       // (as creator-payouts does), or Postgres refused the line every night.
@@ -107,9 +126,9 @@ export default async function handler(req, res) {
       action: 'auto_flag_expired_content',
       targetType: 'lifecycle',
       targetId: 'batch',
-      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
+      details: `${flagged.length} item(s)${flagged.length ? `: ${flagged.map((f) => f.title).join(', ')}` : ''}${purgeWords}${savers ? ` · savers: ${savers.failed ? 'failed' : `${savers.shows} show(s), ${savers.checked} checked, ${savers.sent} emailed${savers.finished ? '' : ', more tomorrow'}`}` : ''}`
     });
   }
 
-  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, savers });
+  return res.status(200).json({ ok: true, flaggedCount: flagged.length, flagged, purged, savers });
 }

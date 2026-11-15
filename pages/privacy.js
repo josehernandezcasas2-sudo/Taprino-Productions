@@ -2,6 +2,7 @@ import { getAccountContext } from '../lib/accountContext';
 import { getPublicEpisodes } from '../lib/publicEpisodes';
 import LegalLayout from '../components/LegalLayout';
 import { SITE, SITE_ADDRESS } from '../lib/siteConfig';
+import { HOLD_DAYS } from '../lib/removalRules';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // Written to match what this codebase actually does, so it is accurate rather
@@ -51,7 +52,7 @@ export default function Privacy({ account }) {
   return (
     <LegalLayout
       title="Privacy Policy"
-      updated="November 14, 2026"
+      updated="November 15, 2026"
       account={account}
       summary={
         <>
@@ -230,7 +231,10 @@ export default function Privacy({ account }) {
         account, watch history, wishlist, and the record of your phones and downloads within 30 days —
         except records we&rsquo;re required to keep, such as payment records for tax purposes. Anonymous view counters and daily totals
         expire on their own after roughly 400 days. Submitted work is kept while it&rsquo;s published;
-        creators can request removal.
+        creators can request removal. Once a removal is confirmed the title comes off the site at once;
+        if nobody bought it we keep its files for {HOLD_DAYS} days in case its creator wants it back,
+        then delete them — or longer, if the creator asked us to keep them for later. A title people
+        bought is kept for them.
       </p>
 
       <h2>Your rights</h2>

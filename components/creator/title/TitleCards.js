@@ -45,11 +45,13 @@ export function DetailsTab({ dash, run, busy, error }) {
       </section>
       {removal && (
         <section className={`dash-card td-card td-removal${removal.key === 'remove' ? '' : ' asked'}`} aria-labelledby="td-removal-h">
-          <h2 id="td-removal-h" className="td-h2">{removal.key === 'remove' ? 'Remove it' : 'Removal requested'}</h2>
+          <h2 id="td-removal-h" className="td-h2">{removal.heading || (removal.key === 'remove' ? 'Remove it' : 'Removal requested')}</h2>
           <p className="td-sub">{removal.line}</p>
-          <div className="td-acts">
-            <ActButton action={removal} run={run} busy={busy} where="removal" icon={removal.key === 'remove' ? TrashIcon : UndoIcon} tone={removal.key === 'remove' ? 'danger' : 'gold'} />
-          </div>
+          {removal.key && (
+            <div className="td-acts">
+              <ActButton action={removal} run={run} busy={busy} where="removal" icon={removal.key === 'remove' ? TrashIcon : UndoIcon} tone={removal.key === 'remove' ? 'danger' : 'gold'} />
+            </div>
+          )}
           <ActionError error={error} where="removal" />
         </section>
       )}

@@ -26,6 +26,7 @@ import FlashingLightsField from '../FlashingLightsField';
 import DownloadsAllowedField from '../DownloadsAllowedField';
 import { downloadableKind } from '../../lib/downloadRules';
 import { extraKindChoice, extraKindFromChoice, extraKindLabel } from '../../lib/extraKinds';
+import { REMOVAL_WORDS, removedState, teamStartedRemoval } from '../../lib/removalRules';
 
 // The episode editor (series revamp slice 2; spec Screens, "Episode
 // editor"; boards EditorBasics, EditorMoreInfo, EditorPlace, ShowLaptop).
@@ -216,7 +217,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(null);
   const [moveOpen, setMoveOpen] = useState(false);
-  const [removal, setRemoval] = useState({ open: false, reason: '' });
+  const [removal, setRemoval] = useState({ open: false, reason: '', keep: false });
   const [caps, setCaps] = useState({ file: null, language: 'en', label: 'English' });
   const [seasonPos, setSeasonPos] = useState({});
   const [anchorEpisodes, setAnchorEpisodes] = useState(null);
@@ -572,7 +573,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   async function askRemoval(action) {
     setBusy('removal');
     setError(null);
-    const r = await callApi('POST', `/api/show/episode/${encodeURIComponent(ep.id)}/removal`, action === 'cancel' ? { action: 'cancel' } : { action: 'request', reason: removal.reason.trim() });
+    const r = await callApi('POST', `/api/show/episode/${encodeURIComponent(ep.id)}/removal`, action === 'cancel' ? { action: 'cancel' } : { action: 'request', reason: removal.reason.trim(), ...(ep.removalReady && removal.keep ? { keep: true } : {}) });
     setBusy(null);
     if (!r.ok) {
       setError(r.error);
@@ -713,7 +714,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
         <Banner
           level="neutral"
           title={`Removal requested${ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}`}
-          action={viewer.isUploader ? <button type="button" className="show-ed-cancel" disabled={busy === 'removal'} onClick={() => askRemoval('cancel')}>{busy === 'removal' ? '…' : 'Cancel'}</button> : null}
+          action={viewer.isUploader && !teamStartedRemoval(ep) ? <button type="button" className="show-ed-cancel" disabled={busy === 'removal'} onClick={() => askRemoval('cancel')}>{busy === 'removal' ? '…' : 'Cancel'}</button> : null}
         >
           {ep.deletionReason ? <p>{ep.deletionReason}</p> : null}
           <p className="show-ed-banner-sub">Nothing can change while it waits.</p>
@@ -1111,8 +1112,12 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       {inShow && <p className="show-ed-quiet">Turning it into an extra isn’t built yet — <a href={askHref(`Make “${title}” an extra`)}>ask us</a>.</p>}
 
       <div className="show-ed-remove">
-        {ep.deletionRequested ? (
-          <p className="show-ed-hint">Removal requested{ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}. {viewer.isUploader ? <button type="button" className="show-ed-link" disabled={busy === 'removal'} onClick={() => askRemoval('cancel')}>Cancel removal</button> : null}</p>
+        {ep.withdrawnAt && removedState(ep) ? (
+          // Removed (migration 124): where it stands; it's asked back from
+          // its row on the show page or Your work.
+          <p className="show-ed-hint">{removedState(ep).label}. {removedState(ep).line}</p>
+        ) : ep.deletionRequested ? (
+          <p className="show-ed-hint">Removal requested{ep.deletionRequestedAt ? ` on ${shortDate(ep.deletionRequestedAt)}` : ''}. {viewer.isUploader && !teamStartedRemoval(ep) ? <button type="button" className="show-ed-link" disabled={busy === 'removal'} onClick={() => askRemoval('cancel')}>Cancel removal</button> : null}</p>
         ) : !removalOpen ? null : !viewer.isUploader ? (
           <p className="show-ed-line locked">Only the person who uploaded it can ask for it to be removed.</p>
         ) : removal.open ? (
@@ -1120,14 +1125,23 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
             <FieldHead htmlFor="ep-removal" label="Why remove it?" />
             <textarea id="ep-removal" className="show-ed-textarea" rows={3} maxLength={1000} value={removal.reason} onChange={(e) => setRemoval((x) => ({ ...x, reason: e.target.value }))} placeholder="A line for us — the reason is required." />
             <p className="show-ed-hint">{live ? 'It is hidden from the site right away while we look.' : 'We look at it and take it down.'}</p>
+            {ep.removalReady ? (
+              <>
+                <p className="show-ed-hint">{REMOVAL_WORDS.holdNote}</p>
+                <label className="removal-keep">
+                  <input type="checkbox" checked={Boolean(removal.keep)} onChange={(e) => setRemoval((x) => ({ ...x, keep: e.target.checked }))} />
+                  <span>{REMOVAL_WORDS.keepLabel}</span>
+                </label>
+              </>
+            ) : null}
             <div className="show-ed-row-acts">
               <button type="button" className="show-ed-danger" disabled={busy === 'removal' || !removal.reason.trim()} onClick={() => askRemoval('request')}>{busy === 'removal' ? 'Asking…' : 'Ask to remove it'}</button>
-              <button type="button" className="show-ed-link" onClick={() => setRemoval({ open: false, reason: '' })}>Keep it</button>
+              <button type="button" className="show-ed-link" onClick={() => setRemoval({ open: false, reason: '', keep: false })}>Keep it</button>
             </div>
           </div>
         ) : (
           <>
-            <button type="button" className="show-ed-danger" onClick={() => setRemoval({ open: true, reason: '' })}><TrashIcon size={14} /> Remove this episode…</button>
+            <button type="button" className="show-ed-danger" onClick={() => setRemoval({ open: true, reason: '', keep: false })}><TrashIcon size={14} /> Remove this episode…</button>
             <p className="show-ed-hint">{live ? 'It is hidden from the site right away while we look.' : 'We look at it and take it down.'}</p>
           </>
         )}

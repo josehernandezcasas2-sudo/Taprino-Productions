@@ -183,6 +183,80 @@ switch, the flashing-lights warning turned on, `paidTo` (an invite).
 
 (Filled in after the build.)
 
+### A — removals held a month, titles brought back (builder A)
+
+Built as agreed, website and app, no new migration. **The rules** are
+`lib/removalRules.js` (pure, no imports; `mobile/src/lib/removalRules.js` word
+for word; `scripts/test-removal.mjs`, 18 checks): `HOLD_DAYS`, `has124` (read off
+a `select('*')` row, or a route row's `removalReady`), `confirmOutcome` /
+`CONFIRM_LABEL`, `removedState` (held / later / buyers / asked, with the pill
+words), `askBackFor` / `restoreRefusal` (owner or full admin; team-removed →
+full admin only; an episode that came off with its show → ask for the show),
+`purgeDue`, `deleteNowRefusal`, `teamStartedRemoval` / `cancelRemovalRefusal`,
+the owner's messages and the queue line. **The server** is `lib/titleRemoval.js`:
+`deleteEpisodeNow` (the one deletion path for an episode — ad share first,
+invites, extras re-filed, files orphaned, private captions removed, guarded
+delete — used by a pre-124 confirm, "Delete now" and the clean-up),
+`holdEpisodeRemoval`, `purgeHeldTitles` (shows first, then titles; 50 a run; a
+title whose show is itself held or asked back is left to the show; a title
+someone owns is kept for them instead), `requestRestore`, `restoreQueueItems` /
+`decideRestore`. `lib/showDelete.js` `deleteShowCascade` gained `mode`
+(`now` as before, `hold`, `purge`) and `force` ("Delete now" on a held show),
+plus `showHasBuyers`; `lib/showAdmin.js` `removeShow` takes `now` and holds by
+default after 124, `getAdminShow`'s `removal` carries `holdReady`, `outcome`,
+`confirmLabel`, `removed`, `canDeleteNow`. Routes: `/api/admin/resolve-deletion`
+(rewritten: `confirm` / `deny` / `delete_now`, buyers read strictly through
+`strictEpisodeBuyers`), new `POST /api/show/episode/[id]/restore` and
+`POST /api/show/[id]/restore` (`request` with an optional note, or `cancel`),
+`keep` on the three removal routes, `/api/admin/pending-deletions` (labels,
+`canDeleteNow`, a "held" list), `/api/admin/show/[id]` `remove` with `now`, the
+cron's purge step in `/api/cron/expire-content`, the review queue's kind
+`restore` (`lib/reviewQueue.js`; id `episode:<id>` / `series:<id>`). Fields:
+`/api/creator/my-submissions` (`removalReady`, `purgeAfter`, `keepAfterRemoval`,
+`restoreRequestedAt`, `restoreReason`, `teamRemoved`, `showWithdrawn`, `bought`),
+the show payload's `show.removal`, the room's rows and the episode editor,
+`listShowSummaries`' `removed`. UI: `components/DeleteRequestModal.js` (the
+checkbox and the words), new `components/RestoreRequestModal.js`, Your work's
+rules and rows, the title dashboard, `ShowStatusCard` / `RemoveShowCard` /
+`RemoveEpisodeSheet` / `SeasonSection` / the Extras shelf / both episode
+editors, the admin `RemovalCard` (the outcome label, "Delete now instead",
+Delete now on a held show), `LibraryPanel`'s deletion queue (Confirm's label,
+Delete now…, "Off the site, files kept"), `components/admin/ReviewQueue.js`
+("Bring back" chip and cards). App: `mobile/src/components/removal/RemovalBits.js`
+(`KeepFilesField`, `RestoreSheet`), `WorkActions` (`restore`, `cancel_restore`,
+the checkbox), the show screen, `ShowCards`, `RowSheets`, `SeasonSection`, the
+episode editor, the title screen, the review deck (`reviewDeckRules.js`
+`approveLabel` / `rejectLabel` / `RESTORE_WORDS`). Terms section 5 (`#removal-hold`)
+and Privacy "How long we keep it", `TEXT_UPDATED` 2026-11-15. Notification types
+`title_purged`, `title_restored`, `restore_denied` (both copies, at the end).
+History reads the new audit actions (`lib/showAdminRules.js` `JSON_DETAIL_ACTIONS`).
+Rig check `dev/test-rig/checks/removal-hold.mjs` (not run here).
+
+**Added from the lead's note**: an owner's cancel of a removal the team started
+(`deletion_reason` "Removed by an admin: …", e.g. one that stopped part-way) —
+and a repeat request, which would overwrite that reason on the non-strict route —
+is refused 403 `team-removal` in `setShowRemoval` and `setEpisodeRemoval` (a full
+admin may; the team denies it from the admin side); every Cancel button for
+such a removal is hidden (web and app).
+
+**Differs from the agreement, and why**: (1) a full admin may ask for any
+removed title back through the owner's routes (that is how a team-removed one
+comes back: a full admin asks, a full admin approves) — there is no separate
+"bring back now" button; (2) an approval of a show brings back what was
+withdrawn at the same moment as the show (`withdrawn_at` equal), and a title
+that had its own removal request before keeps that request (it goes back to the
+deletion queue) instead of going live; (3) the hold also keeps a show's drafts
+(deleted with the show at the clean-up); (4) "Delete now" is refused on a show
+with anything bought in it at all (the agreement's "never on anything bought"
+read strictly), and on a title kept for its buyers; (5) a restore approval of a
+title taken down by moderation clears the withdrawal but not the take-down (that
+stays moderation's Restore); (6) `scripts/test-sec-titles.mjs`'s source check and
+`dev/test-rig/checks/money-fixes.mjs` (which needs a real deletion; it uses
+"Delete now" after 124) were updated to the new route; (7) the show page reads
+124's columns for its withdrawn rows in a small extra read
+(`mergeRemovalColumns` in `lib/showPage.js`) rather than in `selectEpisodes`'
+column tiers, so builder B's 124 tier there doesn't collide.
+
 **C — the booking's policy and 3-D Secure (builder C, 2026-11-15).** The
 rules are `lib/bookingPolicyRules.js` (pure, no imports; the app's
 `mobile/src/lib/bookingPolicyRules.js` is the file word for word below its

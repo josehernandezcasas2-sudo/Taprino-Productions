@@ -6,6 +6,7 @@ import { BanIcon, ChevronIcon, KebabIcon, NoEyeIcon, bg, minutesOf } from './roo
 import { shortDate } from './EditorBits';
 import { PayeeLine } from './PayeeCard';
 import { extraKindLabel } from '../../lib/extraKinds';
+import { REMOVAL_WORDS, askBackFor, removedState, teamStartedRemoval } from '../../lib/removalRules';
 
 // The show page's cards (series revamp slice 2; spec Screens, "Show page",
 // boards Main, ShowStates, ShowLaptop): the show card, the status card, the
@@ -109,9 +110,32 @@ export function ShowCard({ view, canEdit, onEdit, onCancelStaged, busy }) {
 // showState), what it means, its buttons (Make it public, Preview, Cancel
 // request, Resubmit), and the problem lines (showProblems), each leading
 // to its row.
-export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onCancelRemoval, onResubmit, busy }) {
+export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onCancelRemoval, onResubmit, onAskBack, onCancelAskBack, busy }) {
   const show = view.show;
   const noun = show.kind === 'podcast' ? 'show' : 'series';
+  // A removed show (migration 124): where it stands, and Ask to bring it
+  // back (or take that request back) — lib/removalRules.js.
+  const removal = show.removal || null;
+  if (removal && removal.removed) {
+    const removed = removal.removed;
+    const ask = removal.ask || null;
+    return (
+      <section className="show-status level-neutral" aria-label="Where the show stands">
+        <h2 className="show-status-head"><TrashIcon size={18} /><span>{removed.label}</span></h2>
+        <div className="show-status-body">
+          <p>{removed.line}{removal.restoreReason && removed.key === 'asked' ? <> Your note: “{removal.restoreReason}”</> : null}</p>
+          {ask && !ask.ok && (ask.key === 'team' || ask.key === 'migration') ? <p className="show-status-why">{ask.line}</p> : null}
+        </div>
+        {!contributor && ask && ask.ok && onAskBack ? (
+          <div className="show-status-acts"><button type="button" className="apl-btn show-status-btn" disabled={busy === 'restore'} onClick={onAskBack}>{REMOVAL_WORDS.askBackMenu}</button></div>
+        ) : null}
+        {!contributor && ask && ask.key === 'asked' && onCancelAskBack ? (
+          <div className="show-status-acts"><button type="button" className="apl-btn-secondary show-status-btn" disabled={busy === 'restore'} onClick={onCancelAskBack}>{busy === 'restore' ? 'Taking it back…' : REMOVAL_WORDS.cancelAsk}</button></div>
+        ) : null}
+      </section>
+    );
+  }
+  const teamRemoving = Boolean(show.deletion && show.deletion.requested && teamStartedRemoval({ deletionReason: show.deletion.reason }));
   const state = show.state;
   const problems = (view.problems || []).filter((p) => p.code !== 'delay');
   const delay = (view.problems || []).some((p) => p.code === 'delay');
@@ -148,8 +172,10 @@ export function ShowStatusCard({ view, contributor, onProblem, onMakePublic, onC
     body = <p>You can still replace the file (the new one comes to us first), add captions and edit page notes. <a href={askHref(`Pulled: ${show.name}`)}>Email us</a></p>;
   } else if (state === 'removal') {
     icon = <TrashIcon size={18} />;
-    body = <p>Nothing on the {noun} can be changed while the request is open.{show.deletion && show.deletion.reason ? <> Your reason: “{show.deletion.reason}”</> : null}</p>;
-    acts = !contributor && onCancelRemoval ? <div className="show-status-acts"><button type="button" className="apl-btn-secondary show-status-btn" disabled={busy === 'removal'} onClick={onCancelRemoval}>{busy === 'removal' ? 'Cancelling…' : 'Cancel request'}</button></div> : null;
+    body = teamRemoving
+      ? <p>Nothing on the {noun} can be changed while the team removes it. {REMOVAL_WORDS.teamCancel}</p>
+      : <p>Nothing on the {noun} can be changed while the request is open.{show.deletion && show.deletion.reason ? <> Your reason: “{show.deletion.reason}”</> : null}</p>;
+    acts = !contributor && onCancelRemoval && !teamRemoving ? <div className="show-status-acts"><button type="button" className="apl-btn-secondary show-status-btn" disabled={busy === 'removal'} onClick={onCancelRemoval}>{busy === 'removal' ? 'Cancelling…' : 'Cancel request'}</button></div> : null;
   } else if (state === 'declined') {
     icon = <WarningIcon size={18} />;
     body = <p>{show.decisionNote ? <><strong>Their note:</strong> {show.decisionNote} </> : null}Fix what it needs and press Resubmit; it comes back as not public yet.</p>;
@@ -255,14 +281,19 @@ export function ChannelsCard({ view, canEdit, locked, busy, onToggle }) {
 export function RemoveShowCard({ view, canRequest, busy, onRequest, onCancel }) {
   const [open, setOpen] = useState(false);
   const [reason, setReason] = useState('');
+  const [keep, setKeep] = useState(false);
   const show = view.show;
   const noun = show.kind === 'podcast' ? 'show' : 'show';
   const deletion = show.deletion || {};
+  const removal = show.removal || {};
+  // Removed already: the status card says where it stands.
+  if (removal.removed) return null;
   if (deletion.requested) {
+    const teamRemoving = teamStartedRemoval({ deletionReason: deletion.reason });
     return (
       <p className="show-remove-line">
-        Removal requested{deletion.at ? ` on ${shortDate(deletion.at)}` : ''}
-        {canRequest && <> · <button type="button" className="apl-link" disabled={busy === 'removal'} onClick={onCancel}>{busy === 'removal' ? 'Cancelling…' : 'Cancel'}</button></>}
+        {teamRemoving ? 'The team is removing it' : 'Removal requested'}{deletion.at ? ` on ${shortDate(deletion.at)}` : ''}
+        {canRequest && !teamRemoving && <> · <button type="button" className="apl-link" disabled={busy === 'removal'} onClick={onCancel}>{busy === 'removal' ? 'Cancelling…' : 'Cancel'}</button></>}
       </p>
     );
   }
@@ -273,11 +304,18 @@ export function RemoveShowCard({ view, canRequest, busy, onRequest, onCancel }) 
       <p className="show-side-k is-danger" id="show-remove-k">Remove this {noun}</p>
       <p className="show-remove-words">{view.cascade ? view.cascade.words : show.name}</p>
       <p className="show-remove-sub">It leaves the site as soon as you ask; we confirm it. Anything someone bought stays theirs.</p>
+      {removal.ready ? <p className="show-remove-sub">{removal.bought ? REMOVAL_WORDS.boughtNote : REMOVAL_WORDS.holdNote}</p> : null}
       <label className="show-ed-label" htmlFor="show-remove-reason">Why?</label>
       <textarea id="show-remove-reason" className="show-ed-textarea is-short" rows={3} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} placeholder="A line for us" />
+      {removal.ready && !removal.bought ? (
+        <label className="removal-keep">
+          <input type="checkbox" checked={keep} onChange={(e) => setKeep(e.target.checked)} />
+          <span>{REMOVAL_WORDS.keepLabel}</span>
+        </label>
+      ) : null}
       <div className="show-remove-acts">
-        <button type="button" className="show-danger-btn" disabled={!reason.trim() || busy === 'removal'} onClick={() => onRequest(reason.trim())}>{busy === 'removal' ? 'Asking…' : 'Ask us to remove it'}</button>
-        <button type="button" className="apl-link" onClick={() => { setOpen(false); setReason(''); }}>Keep it</button>
+        <button type="button" className="show-danger-btn" disabled={!reason.trim() || busy === 'removal'} onClick={() => onRequest(reason.trim(), { keep: Boolean(removal.ready && !removal.bought && keep) })}>{busy === 'removal' ? 'Asking…' : 'Ask us to remove it'}</button>
+        <button type="button" className="apl-link" onClick={() => { setOpen(false); setReason(''); setKeep(false); }}>Keep it</button>
       </div>
     </section>
   );
@@ -308,7 +346,14 @@ export function ExtrasShelf({ view, ctx, actions }) {
                         // Extras follow their show (Jose, 2026-11-06): whoever
                         // runs it prices a live extra, a contributor's too.
                         ctx.canSell && x.status === 'approved' && !x.held && !x.deletionRequested && !x.withdrawnAt ? { label: ctx.priceOf(x.id) ? 'Price and sales' : 'Sell…', onClick: () => actions.sell(x) } : null,
-                        x.mine && !x.deletionRequested ? { label: 'Remove…', danger: true, onClick: () => actions.askRemove(x) } : null
+                        x.mine && !x.deletionRequested ? { label: 'Remove…', danger: true, onClick: () => actions.askRemove(x) } : null,
+                        // Removed on its own (migration 124): ask for it back.
+                        (() => {
+                          const ask = x.mine && x.withdrawnAt && actions.askBack ? askBackFor(x, { showWithdrawn: Boolean(ctx.showRemoved) }) : null;
+                          if (ask && ask.ok) return { label: REMOVAL_WORDS.askBackMenu, onClick: () => actions.askBack(x) };
+                          if (ask && ask.key === 'asked') return { label: REMOVAL_WORDS.cancelAsk, onClick: () => actions.cancelAskBack(x) };
+                          return null;
+                        })()
                       ]}
                     />
                   )}
@@ -319,7 +364,7 @@ export function ExtrasShelf({ view, ctx, actions }) {
                   {x.extraKind ? <span className="show-extra-kind">{extraKindLabel(x.extraKind)}</span> : null}
                   <span className="show-extra-tag">{tag}</span>
                   {minutesOf(x.runtime) ? <span>{minutesOf(x.runtime)}</span> : null}
-                  {x.status === 'pending' ? <span className="tone-wait">in review</span> : x.status === 'rejected' ? <span className="tone-warn">not this time</span> : null}
+                  {removedState(x) ? <span className="tone-wait">{removedState(x).label}</span> : x.status === 'pending' ? <span className="tone-wait">in review</span> : x.status === 'rejected' ? <span className="tone-warn">not this time</span> : null}
                 </div>
               </li>
             );

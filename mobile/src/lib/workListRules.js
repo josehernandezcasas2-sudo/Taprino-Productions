@@ -26,6 +26,7 @@
 import { needsYou, compareEpisodes, episodeHasPage } from './showRules.js';
 import { extraKindLabel } from './extraKinds.js';
 import { displayTitle, runtimeLabel, dayLabel, count, dollars } from './creatorDashboardRules.js';
+import { REMOVAL_WORDS, askBackFor, removedState, teamStartedRemoval } from './removalRules.js';
 
 export const WORK_TABS = [
   { key: 'all', label: 'All' },
@@ -109,8 +110,13 @@ export function isLiveTitle(s, show = null) {
 // The pill on a row: { label, tone } with tone live | review | declined | quiet.
 export function titlePill(s, live) {
   if (s.status === 'pending') return { label: 'In review', tone: 'review' };
-  if (s.status === 'rejected') return { label: 'Not this time', tone: 'declined' };
-  if (s.withdrawnAt) return { label: 'Withdrawn', tone: 'quiet' };
+  if (s.status === 'rejected' && !s.withdrawnAt) return { label: 'Not this time', tone: 'declined' };
+  // Removed (migration 124): "Removed · deleted on Dec 15", "Removed · kept
+  // for later", "Removed · kept for buyers", "Waiting on us to bring it back".
+  if (s.withdrawnAt) {
+    const st = removedState(s);
+    return { label: st ? st.label : 'Withdrawn', tone: st ? st.tone : 'quiet' };
+  }
   if (s.deletionRequested) return { label: 'Removal requested', tone: 'quiet' };
   if (s.held) return { label: 'Pulled', tone: 'declined' };
   if (s.seriesHeld) return { label: 'Show pulled', tone: 'declined' };
@@ -164,8 +170,20 @@ export function notesBoxShows(s) {
 
 // The line under a title whose removal the creator asked for.
 export function removalWords(s) {
+  if (teamStartedRemoval(s)) return `The team is removing it. ${REMOVAL_WORDS.teamCancel}`;
   const why = text(s && s.deletionReason);
   return why ? `You asked us to remove it: “${why}”` : 'You asked us to remove it.';
+}
+
+// The line under a removed title: where it stands, and why it can't be
+// asked back from here when it can't (the team removed it; it came off
+// with its show).
+export function removedWords(s) {
+  const st = removedState(s);
+  if (!st) return '';
+  const ask = askBackFor(s);
+  const extra = ask && !ask.ok && (ask.key === 'team' || ask.key === 'with-show') ? ` ${ask.line}` : '';
+  return `${st.line}${extra}`;
 }
 
 // The price on a live title: "on sale $4.99", "on sale $3.99 · 20% off",
@@ -212,8 +230,14 @@ function metaFor(s, { live, byId, price, inShow, now }) {
 // artwork, captions, cancel_removal, open. A show's episode does its fixing
 // in the episode editor, so its button opens the editor.
 function nextStepFor(s, { inShow, live }) {
-  if (s.deletionRequested && !inShow) return { key: 'cancel_removal', label: 'Cancel the request' };
-  if (s.deletionRequested || s.withdrawnAt) return null;
+  // Removed: Ask to bring it back while it can be (nothing while it waits).
+  if (s.withdrawnAt) {
+    const ask = askBackFor(s);
+    return ask && ask.ok ? { key: 'restore', label: REMOVAL_WORDS.askBack } : null;
+  }
+  // A removal the team started isn't the creator's to cancel.
+  if (s.deletionRequested && !inShow && !teamStartedRemoval(s)) return { key: 'cancel_removal', label: 'Cancel the request' };
+  if (s.deletionRequested) return null;
   const broken = s.cloudflareState === 'error' || s.cloudflareState === 'pendingupload';
   if (inShow) {
     if (s.status === 'rejected' || s.held || broken) return { key: 'open', label: 'Fix it' };
@@ -251,9 +275,14 @@ function menuFor(s, { inShow, live, price, canEditAll, now }) {
   }
   if (s.contentType === 'podcast' && s.hasVideo && !s.hasAudio && !gone) out.push({ key: 'extract_audio', label: 'Extract the audio' });
   if (!inShow && s.contentType !== 'bonus' && !gone) out.push({ key: 'channels', label: 'Channels can air it', on: Boolean(s.channelOptIn), detail: s.channelOptIn ? 'On' : 'Off' });
-  if (!inShow) {
-    if (s.deletionRequested) out.push({ key: 'cancel_removal', label: 'Cancel the removal request' });
-    else if (!s.withdrawnAt) out.push({ key: 'remove', label: 'Ask to remove it…', tone: 'danger' });
+  if (s.withdrawnAt) {
+    const ask = askBackFor(s);
+    if (ask && ask.ok) out.push({ key: 'restore', label: REMOVAL_WORDS.askBackMenu });
+    else if (ask && ask.key === 'asked') out.push({ key: 'cancel_restore', label: REMOVAL_WORDS.cancelAsk });
+  } else if (!inShow) {
+    if (s.deletionRequested) {
+      if (!teamStartedRemoval(s)) out.push({ key: 'cancel_removal', label: 'Cancel the removal request' });
+    } else out.push({ key: 'remove', label: 'Ask to remove it…', tone: 'danger' });
   }
   return out;
 }
@@ -280,7 +309,7 @@ function rowFor(s, ctx) {
     pill: titlePill(s, live),
     meta: metaFor(s, { live, byId, price, inShow, now }),
     need: titleNeed(s),
-    waiting: s.deletionRequested ? removalWords(s) : live || s.status === 'approved' ? titleWaiting(s) : '',
+    waiting: s.withdrawnAt ? removedWords(s) : s.deletionRequested ? removalWords(s) : live || s.status === 'approved' ? titleWaiting(s) : '',
     next: nextStepFor(s, { inShow, live }),
     menu: menuFor(s, { inShow, live, price, canEditAll, now }),
     href: inShow ? episodeEditorHref(sid, s.id) : titleDashHref(s.id),
@@ -383,8 +412,12 @@ export function buildWorkList({ submissions = null, shows = null, prices = null,
     const needCount = allEpisodes.concat(allExtras).filter((r) => r.needs).length;
     const reviewCount = allEpisodes.filter((r) => r.status === 'pending').length;
     const waitingCount = allEpisodes.concat(allExtras).filter((r) => r.waiting).length;
-    const state = (sh && sh.state) || 'live';
+    // A removed show (migration 124) reads where it stands: "Removed ·
+    // deleted on Dec 15" and so on; its show page asks for it back.
+    const removed = sh && sh.removed && typeof sh.removed === 'object' ? sh.removed : null;
+    const state = removed ? 'removed' : (sh && sh.state) || 'live';
     let needLine = needCount ? `${needCount} ${needCount === 1 ? 'needs' : 'need'} you` : '';
+    if (removed) needLine = '';
     if (state === 'ready') needLine = 'Approved and private. Nobody can see it until you make it public.';
     else if (state === 'pulled') needLine = 'Pulled while an admin looks at it.';
     else if (state === 'declined') needLine = (sh && text(sh.headline)) || 'The team sent it back.';
@@ -399,12 +432,12 @@ export function buildWorkList({ submissions = null, shows = null, prices = null,
       kind: sh && sh.kind === 'podcast' ? 'podcast' : 'series',
       kindLabel: sh && sh.kind === 'podcast' ? 'Podcast' : 'Series',
       state,
-      stateLabel: (sh && text(sh.statusLabel)) || 'Live',
-      stateTone: SHOW_TONE[state] || 'review',
+      stateLabel: removed ? removed.label : (sh && text(sh.statusLabel)) || 'Live',
+      stateTone: removed ? removed.tone : SHOW_TONE[state] || 'review',
       poster: (sh && (sh.poster || sh.thumbnail)) || null,
       countLine: (sh && text(sh.countLine)) || [plural(allEpisodes.length, 'episode', 'episodes'), allExtras.length ? plural(allExtras.length, 'extra', 'extras') : ''].filter(Boolean).join(' · '),
       needLine,
-      restLine: state === 'ready' || state === 'pulled' || state === 'declined' ? '' : restLine,
+      restLine: removed ? removed.line : state === 'ready' || state === 'pulled' || state === 'declined' ? '' : restLine,
       needs: showNeedsYou || needCount > 0,
       makePublic: state === 'ready' && sh && sh.makePublic && sh.makePublic.ok ? { name } : null,
       href: showPageHref(sid),

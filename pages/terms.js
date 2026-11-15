@@ -7,6 +7,7 @@ import { dollars } from '../lib/artistSupportRules';
 import { getTipSettings } from '../lib/tips';
 import { getSiteSettings } from '../lib/siteSettings';
 import { CHECKIN_DAYS, GRACE_DAYS, KEEP_AFTER_END_DAYS, MAX_DEVICES, MAX_TITLES_PER_DEVICE, MEMBER_MAX_DAYS } from '../lib/downloadRules';
+import { HOLD_DAYS } from '../lib/removalRules';
 
 // TEMPLATE — NOT LEGAL ADVICE.
 // The creator licensing section (§5) is the part that most needs a lawyer's
@@ -187,6 +188,17 @@ export default function Terms({ account, share, tipCutPercent = 5, tipCutMaxCent
         <strong>You can withdraw it.</strong> Request removal and we&rsquo;ll take it down within 30
         days. Copies already in circulation off-platform, and material already printed or scheduled
         in marketing, may take longer to fully disappear.
+      </p>
+      <p id="removal-hold">
+        <strong>What happens to the files.</strong> Once we confirm a removal, the title comes off
+        the site at once. If nobody bought it, we keep its files for {HOLD_DAYS} days so you can ask
+        to bring it back, then delete them for good; if you tick &ldquo;Keep the files so I can bring
+        it back later&rdquo; when you ask, we keep them until you ask for it back or close your
+        account. People who bought a title keep it, as section 15 says, so we keep what they bought
+        for them. A removed title comes back when you ask and our team approves it, as it was, with
+        selling switched off until you price it again; a title we removed ourselves comes back only if
+        a full admin of the team agrees. We may delete a title at once, without the {HOLD_DAYS}-day
+        hold, for abuse or a legal reason, but never one someone bought.
       </p>
       <p>
         <strong>Downloads in the app.</strong> Where we offer downloads (section 4), Premium and

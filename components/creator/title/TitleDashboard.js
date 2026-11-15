@@ -7,6 +7,7 @@ import EditSubmissionModal from '../../EditSubmissionModal';
 import AdminEditEpisodeModal from '../../AdminEditEpisodeModal';
 import ArtworkModal from '../../ArtworkModal';
 import DeleteRequestModal from '../../DeleteRequestModal';
+import RestoreRequestModal from '../../RestoreRequestModal';
 import CaptionUploadModal from '../../CaptionUploadModal';
 import ReplaceVideoModal from '../../ReplaceVideoModal';
 import RequestEditModal from '../../RequestEditModal';
@@ -131,11 +132,32 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
     }
   }
 
-  // DeleteRequestModal's confirm: it shows a thrown error itself.
-  async function requestRemoval(reason) {
-    await post('/api/creator/request-episode-deletion', { episodeId: id, action: 'request', reason });
+  // DeleteRequestModal's confirm: it shows a thrown error itself. `keep`
+  // (migration 124): keep the files so it can come back later.
+  async function requestRemoval(reason, { keep = false } = {}) {
+    await post('/api/creator/request-episode-deletion', { episodeId: id, action: 'request', reason, ...(keep ? { keep: true } : {}) });
     setBox(null);
     reloadSubs();
+  }
+
+  // Ask to bring a removed title back (RestoreRequestModal's confirm), or
+  // take that request back.
+  async function askBack(reason) {
+    await post(`/api/show/episode/${encodeURIComponent(id)}/restore`, { action: 'request', reason });
+    setBox(null);
+    reloadSubs();
+  }
+  async function cancelAskBack(where = 'removal') {
+    setBusy('cancel_restore');
+    setError(null);
+    try {
+      await post(`/api/show/episode/${encodeURIComponent(id)}/restore`, { action: 'cancel' });
+      reloadSubs();
+    } catch (err) {
+      setError({ where, text: err.message || 'Could not take the request back.' });
+    } finally {
+      setBusy(null);
+    }
   }
 
   // Cloudflare pulls the audio out of the video; this checks in every 3 s.
@@ -189,7 +211,11 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
       case 'edit_submission':
       case 'edit_words':
       case 'remove':
+      case 'restore':
         setBox({ kind: key, s: title });
+        break;
+      case 'cancel_restore':
+        cancelAskBack(where);
         break;
       case 'replace_file':
         setBox({ kind: 'video', s: title });
@@ -345,7 +371,10 @@ export default function TitleDashboard({ id, isAdmin = false, isCreator = false,
         <CaptionUploadModal submission={s} onClose={close} onSaved={reloadSubs} />
       )}
       {box && box.kind === 'remove' && (
-        <DeleteRequestModal itemLabel={s.title} onClose={close} onConfirm={requestRemoval} />
+        <DeleteRequestModal itemLabel={s.title} onClose={close} onConfirm={requestRemoval} keepChoice={s.removalReady === true} bought={s.bought === true} />
+      )}
+      {box && box.kind === 'restore' && (
+        <RestoreRequestModal itemLabel={head.title} line={head.pill.label} onClose={close} onConfirm={askBack} />
       )}
       {box && box.kind === 'payee' && (
         <PayeeModal type="episode" id={s.id} title={head.title} onClose={close} onChanged={() => { reloadSubs(); reloadPricing(); }} />

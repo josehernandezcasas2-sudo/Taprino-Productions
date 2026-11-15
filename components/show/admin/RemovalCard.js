@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/router';
 import { AdmCard, ErrorLine, NeedLine, dayWords, onEscape, useOpener } from './adminBits';
+import { REMOVAL_WORDS } from '../../../lib/removalRules';
 
 function same(a, b) {
   return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase() && String(a || '').trim() !== '';
@@ -19,6 +20,8 @@ export default function RemovalCard({ admin, onAction, onDone, say }) {
   const [note, setNote] = useState('');
   const [open, setOpen] = useState(false);
   const [denyOpen, setDenyOpen] = useState(false);
+  // "Delete now…" (a full admin, migration 124): deleted for good at once.
+  const [now, setNow] = useState(false);
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState(null);
   const show = admin.show || {};
@@ -40,7 +43,9 @@ export default function RemovalCard({ admin, onAction, onDone, say }) {
   async function remove() {
     setBusy('remove');
     setError(null);
-    const r = await onAction('remove', { confirmName: typed.trim(), reason: requested ? undefined : reason.trim() });
+    const r = await onAction('remove', now
+      ? { confirmName: typed.trim(), reason: reason.trim(), now: true }
+      : { confirmName: typed.trim(), reason: requested ? undefined : reason.trim() });
     if (!r.ok) {
       setBusy(null);
       setError(r.error);
@@ -74,23 +79,61 @@ export default function RemovalCard({ admin, onAction, onDone, say }) {
     onDone();
   }
 
-  const canRemove = requested ? Boolean(can.deletions) : Boolean(can.removeUnrequested);
+  const canRemove = now ? Boolean(can.fullAdmin) : requested ? Boolean(can.deletions) : Boolean(can.removeUnrequested);
   const off = requested ? (can.deletions ? null : needs.deletions) : can.removeUnrequested ? null : needs.fullAdmin || 'A full admin does this.';
   const matches = same(typed, name);
+  // What confirming does (migration 124): "Remove · keep 30 days", "…kept
+  // for buyers", "…kept for later"; before 124, deleted at once.
+  const removeLabel = now ? 'Delete it for good' : removal.holdReady && removal.confirmLabel ? removal.confirmLabel : 'Remove the show';
+  const removed = removal.removed || null;
 
   const confirmBlock = (
     <div className="show-adm-form">
       {plan && plan.adminWords ? <p className="show-adm-plan">{plan.adminWords}</p> : removal.buyersUnknown ? <p className="show-adm-line tone-warn">We couldn’t check who bought from it just now, so it can’t be removed yet. Reload in a minute.</p> : null}
+      {removal.holdReady && !now ? <p className="show-adm-line">{removal.keepAfterRemoval ? 'Its owner asked us to keep the files: it comes off the site and nothing is deleted until they ask for it back.' : 'It comes off the site at once; what nobody bought is kept 30 days in case its owner asks for it back, then deleted for good.'}</p> : null}
+      {now ? (
+        <>
+          <p className="show-adm-line tone-warn">{REMOVAL_WORDS.deleteNowHelp}</p>
+          {requested || withdrawnAt ? (
+            <>
+              <label className="show-ed-label" htmlFor="show-adm-now-why">{REMOVAL_WORDS.deleteNowReason}</label>
+              <textarea id="show-adm-now-why" className="show-ed-textarea is-short" rows={2} maxLength={1000} value={reason} onChange={(e) => setReason(e.target.value)} />
+            </>
+          ) : null}
+        </>
+      ) : null}
       <label className="show-ed-label" htmlFor="show-adm-remove-name">Type the show’s name to remove it</label>
       <input id="show-adm-remove-name" className="show-ed-input" type="text" autoComplete="off" value={typed} placeholder={name} disabled={!canRemove} onChange={(e) => setTyped(e.target.value)} />
-      <button type="button" className="show-danger-btn show-adm-wide" disabled={!canRemove || !matches || (!requested && !reason.trim()) || Boolean(busy)} onClick={remove}>{busy === 'remove' ? 'Removing…' : 'Remove the show'}</button>
+      <button type="button" className="show-danger-btn show-adm-wide" disabled={!canRemove || !matches || ((now || !requested) && !reason.trim()) || Boolean(busy)} onClick={remove}>{busy === 'remove' ? 'Removing…' : removeLabel}</button>
+      {removal.canDeleteNow && !withdrawnAt ? (
+        <label className="removal-keep">
+          <input type="checkbox" checked={now} onChange={(e) => setNow(e.target.checked)} />
+          <span>Delete now instead (a full admin; for abuse or a legal reason)</span>
+        </label>
+      ) : null}
     </div>
   );
 
   return (
     <AdmCard id="removal" k="Remove this show" className="show-adm-removal">
       {withdrawnAt ? (
-        <p className="show-adm-line">Removed{dayWords(withdrawnAt) ? ` on ${dayWords(withdrawnAt)}` : ''} — kept for the people who bought from it. It’s off the site, and nothing more needs deciding here.</p>
+        <>
+          <p className="show-adm-line">
+            {removed && removed.key !== 'buyers'
+              ? `${removed.label}${dayWords(withdrawnAt) ? ` (removed ${dayWords(withdrawnAt)})` : ''}. ${removal.restoreRequestedAt ? 'Its owner asked to bring it back: decide it in Review → Bring back.' : 'It comes back only if its owner asks and someone on the team approves it.'}`
+              : `Removed${dayWords(withdrawnAt) ? ` on ${dayWords(withdrawnAt)}` : ''} — kept for the people who bought from it. It’s off the site, and nothing more needs deciding here.`}
+          </p>
+          {removed && removed.key !== 'buyers' && can.fullAdmin ? (
+            !now ? (
+              <button type="button" className="show-remove-open" onClick={() => { setNow(true); setTyped(''); setReason(''); }}>{REMOVAL_WORDS.deleteNow}</button>
+            ) : (
+              <div onKeyDown={onEscape(() => setNow(false))}>
+                {confirmBlock}
+                <button type="button" className="apl-link" onClick={() => { setNow(false); setTyped(''); setReason(''); }}>Cancel</button>
+              </div>
+            )
+          ) : null}
+        </>
       ) : requested ? (
         <>
           <p className="show-adm-line">

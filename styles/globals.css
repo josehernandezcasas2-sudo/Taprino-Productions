@@ -2084,6 +2084,13 @@ button { font-family: inherit; cursor: pointer; }
   padding: 0.2rem 0.4rem;
 }
 .modal-close:hover { color: var(--ink); }
+/* "Keep the files so I can bring it back later" (a removal request, since
+   migration 124): one checkbox under the reason, off by default. */
+.removal-keep {
+  display: flex; align-items: flex-start; gap: 0.55rem;
+  margin-top: 0.8rem; font-size: 0.85rem; line-height: 1.45; color: var(--ink); cursor: pointer;
+}
+.removal-keep input { margin: 0.15rem 0 0; width: 1.05rem; height: 1.05rem; flex: none; accent-color: var(--brass); }
 
 /* Your work's two edit boxes — "Edit submission" (a title still in review,
    components/EditSubmissionModal.js) and "Title & description" (a live
