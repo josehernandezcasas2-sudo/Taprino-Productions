@@ -23,7 +23,7 @@
 //
 // The app's mobile/src/lib/workListRules.js is this file word for word
 // (scripts/test-work-list.mjs checks it).
-import { needsYou, compareEpisodes } from './showRules.js';
+import { needsYou, compareEpisodes, episodeHasPage } from './showRules.js';
 import { extraKindLabel } from './extraKinds.js';
 import { displayTitle, runtimeLabel, dayLabel, count, dollars } from './creatorDashboardRules.js';
 
@@ -154,6 +154,20 @@ export function titleWaiting(s) {
   return `Waiting for approval: ${list}`;
 }
 
+// Whether the title's edit box has the notes field (components/PageNotesField.js
+// pageNotesBoxShows says the same): the notes belong to a title with a page of
+// its own, on a database that has the column.
+export function notesBoxShows(s) {
+  if (!s || s.pageNotesReady !== true) return false;
+  return episodeHasPage({ contentType: s.contentType ?? null, seriesId: s.seriesId ?? null, hasPage: typeof s.hasPageChoice === 'boolean' ? s.hasPageChoice : null });
+}
+
+// The line under a title whose removal the creator asked for.
+export function removalWords(s) {
+  const why = text(s && s.deletionReason);
+  return why ? `You asked us to remove it: “${why}”` : 'You asked us to remove it.';
+}
+
 // The price on a live title: "on sale $4.99", "on sale $3.99 · 20% off",
 // "price in review $0.99", or ''.
 export function priceWords(row, now = Date.now()) {
@@ -222,7 +236,7 @@ function menuFor(s, { inShow, live, price, canEditAll, now }) {
   if (!inShow && !gone) {
     if (canEditAll) out.push({ key: 'edit_full', label: 'Edit full details' });
     else if (s.status === 'pending') out.push({ key: 'edit_submission', label: 'Edit the submission' });
-    else out.push({ key: 'edit_words', label: 'Edit title and description' });
+    else out.push({ key: 'edit_words', label: notesBoxShows(s) ? 'Edit title, description and notes' : 'Edit title and description' });
   }
   if (live) {
     out.push({ key: 'view', label: 'View its page' });
@@ -266,7 +280,7 @@ function rowFor(s, ctx) {
     pill: titlePill(s, live),
     meta: metaFor(s, { live, byId, price, inShow, now }),
     need: titleNeed(s),
-    waiting: live || s.status === 'approved' ? titleWaiting(s) : '',
+    waiting: s.deletionRequested ? removalWords(s) : live || s.status === 'approved' ? titleWaiting(s) : '',
     next: nextStepFor(s, { inShow, live }),
     menu: menuFor(s, { inShow, live, price, canEditAll, now }),
     href: inShow ? episodeEditorHref(sid, s.id) : titleDashHref(s.id),
@@ -376,7 +390,8 @@ export function buildWorkList({ submissions = null, shows = null, prices = null,
     else if (state === 'declined') needLine = (sh && text(sh.headline)) || 'The team sent it back.';
     const showChange = Boolean(sh && sh.staged && sh.staged.any);
     const restLine = [reviewCount ? `${reviewCount} in review` : '', waitingCount ? `${plural(waitingCount, 'change', 'changes')} waiting` : '', showChange ? 'a change to the show waiting' : ''].filter(Boolean).join(' · ');
-    const seasonCount = numbers.length;
+    const seasonCount = seasons.filter((x) => x.number !== null).length;
+    const hasExtras = seasons.some((x) => x.number === null);
     showCards.push({
       key: `show:${sid}`,
       id: sid,
@@ -395,7 +410,7 @@ export function buildWorkList({ submissions = null, shows = null, prices = null,
       href: showPageHref(sid),
       seasons,
       hasSeasons: seasons.length > 0,
-      openLabel: seasonCount <= 1 ? (seasons.length && seasons[0].number === null ? 'Show the extras' : 'Show the season') : `Show ${seasonCount} seasons`,
+      openLabel: seasonCount === 0 ? 'Show the extras' : seasonCount === 1 ? (hasExtras ? 'Show the season and extras' : 'Show the season') : `Show ${seasonCount} seasons${hasExtras ? ' and extras' : ''}`,
       // While a tab or a search is on, a show opens to what matches.
       openByFilter: filtering && seasons.some((x) => x.rows.length > 0)
     });

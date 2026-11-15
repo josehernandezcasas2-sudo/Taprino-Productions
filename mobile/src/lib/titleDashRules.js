@@ -24,7 +24,7 @@
 // (scripts/test-title-dash.mjs checks it).
 import { compareEpisodes } from './showRules.js';
 import { displayTitle, dayLabel, count, dollars, currentPeriod, DASH_WORDS } from './creatorDashboardRules.js';
-import { isLiveTitle, titlePill, titleNeed, titleWaiting, priceWords, runtimeWords, publicPath } from './workListRules.js';
+import { isLiveTitle, titlePill, titleNeed, titleWaiting, priceWords, runtimeWords, publicPath, notesBoxShows } from './workListRules.js';
 
 export const TITLE_TABS = [
   { key: 'overview', label: 'Overview' },
@@ -264,7 +264,7 @@ function titleDetails(s, { canEditAll }) {
   if (!s.deletionRequested && !s.withdrawnAt) {
     if (canEditAll) action = { key: 'edit_full', label: 'Edit full details' };
     else if (s.status === 'pending') action = { key: 'edit_submission', label: 'Edit the submission' };
-    else action = { key: 'edit_words', label: 'Edit title and description' };
+    else action = { key: 'edit_words', label: notesBoxShows(s) ? 'Edit title, description and notes' : 'Edit title and description' };
   }
   return { rows, action, note: s.status === 'approved' && !canEditAll ? 'On a live title a new title, description or notes wait for the team’s approval; the rest applies when you save. Who can watch and the rating stay with the team.' : '' };
 }

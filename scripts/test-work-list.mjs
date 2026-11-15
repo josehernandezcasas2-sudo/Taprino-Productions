@@ -73,7 +73,7 @@ t('a show: seasons with their labels, counts and needs, extras last; episodes op
   assert.equal(nbCard.seasons[0].summary, '2 episodes');
   assert.equal(nbCard.seasons[0].needs, '1 needs you');
   assert.equal(nbCard.seasons[1].summary, '2 episodes · 1 in review');
-  assert.equal(nbCard.openLabel, 'Show 2 seasons');
+  assert.equal(nbCard.openLabel, 'Show 2 seasons and extras');
   assert.equal(nbCard.needLine, '2 need you');
   assert.equal(nbCard.restLine, '1 in review');
   const e1 = nbCard.seasons[0].rows[0];
@@ -105,6 +105,7 @@ t('a row of its own: pill, meta with the price, next step and the menu in words'
   assert.equal(lw.menu.find((x) => x.key === 'channels').detail, 'Off');
   const echo = films[2];
   assert.equal(echo.pill.label, 'Removal requested');
+  assert.equal(echo.waiting, 'You asked us to remove it: “Recut”');
   assert.deepEqual(echo.next, { key: 'cancel_removal', label: 'Cancel the request' });
   assert.ok(!echo.menu.some((x) => x.key === 'remove'));
   const shorts = m.sections.find((s) => s.key === 'shorts').rows;
@@ -150,6 +151,22 @@ t('nothing yet, and missing answers draw nothing rather than breaking', () => {
   const m = R.buildWorkList({ submissions: subs, shows: null, prices: null, now: NOW });
   // Without the show summaries the episodes still sit under their show.
   assert.equal(m.sections[0].shows[0].name, 'Night Bus');
+});
+
+t('the edit box says notes only for a title with a page of its own', () => {
+  assert.equal(R.notesBoxShows({ contentType: 'movie', pageNotesReady: true }), true);
+  assert.equal(R.notesBoxShows({ contentType: 'movie', pageNotesReady: false }), false);
+  assert.equal(R.notesBoxShows({ contentType: 'bonus', pageNotesReady: true }), false);
+  assert.equal(R.notesBoxShows({ contentType: 'bonus', pageNotesReady: true, hasPageChoice: true }), true);
+  const m = R.buildWorkList({ submissions: [{ ...base, id: 'notes-d1', title: 'Notes', pageNotesReady: true }], shows: [], now: NOW });
+  assert.equal(m.sections[0].rows[0].menu[1].label, 'Edit title, description and notes');
+});
+
+t('the seasons button says what opens', () => {
+  const one = R.buildWorkList({ submissions: [{ ...base, ...nb, id: 'one-e1', title: 'A', season: 1, seriesOrder: 1 }], shows: [shows[0]], now: NOW });
+  assert.equal(one.sections[0].shows[0].openLabel, 'Show the season');
+  const onlyExtras = R.buildWorkList({ submissions: [subs[4]], shows: [shows[0]], now: NOW });
+  assert.equal(onlyExtras.sections[0].shows[0].openLabel, 'Show the extras');
 });
 
 t('the small helpers', () => {
