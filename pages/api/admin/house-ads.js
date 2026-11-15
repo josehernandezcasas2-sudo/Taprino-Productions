@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { uploadHouseAdVideo } from '../../../lib/houseAdUpload';
 import { normalizeUrl } from '../../../lib/normalizeUrl';
 import { getCloudflareVideoStatus, ensureCloudflareDownloadUrl } from '../../../lib/cloudflareUpload';
+import { houseAdVideoRefusal } from '../../../lib/houseAdVideo';
 import { recordAudit } from '../../../lib/auditLog';
 import { sendError } from '../../../lib/apiErrors';
 
@@ -52,8 +53,12 @@ export default async function handler(req, res) {
       // trusting a client-supplied URL. The browser only ever learned a
       // uid and polled a status endpoint for it — the actual playable URL
       // is looked up fresh here, so there's no way a crafted request could
-      // point a house ad at an arbitrary external file.
-      const videoStatus = await getCloudflareVideoStatus(cloudflareUid);
+      // point a house ad at an arbitrary external file. Nor at a video
+      // something else on the site uses (lib/houseAdVideo.js): its MP4
+      // would go out in the ad's VAST.
+      const refused = await houseAdVideoRefusal(cloudflareUid);
+      if (refused) return res.status(refused.status).json({ error: refused.error });
+      const videoStatus = await getCloudflareVideoStatus(cloudflareUid, { fresh: true });
       if (!videoStatus || !videoStatus.readyToStream) {
         return res.status(400).json({ error: 'That video isn\u2019t finished processing yet — wait for it to say "ready" before submitting.' });
       }

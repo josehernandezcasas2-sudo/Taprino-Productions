@@ -3,6 +3,7 @@ import Link from 'next/link';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import { fmtClock, STATUS_LABELS } from '../../lib/adPlanRules';
+import { cssUrl } from '../../lib/cssUrl';
 
 // The way into the Episode Ad Curator: every approved episode, its plan
 // state (default / draft / ready for air), air length and breaks, and a
@@ -55,7 +56,7 @@ export default function AdminAdPlans({ account, mainGenres, apiPath = '/api/admi
             {shown.map((e) => (
               <div key={e.id} className="crew-panel crew-rhead">
                 <span style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', minWidth: 0 }}>
-                  <span className="loc-row-thumb" style={{ width: 56, flex: 'none', ...(e.thumbnail ? { backgroundImage: `url(${e.thumbnail})` } : {}) }} />
+                  <span className="loc-row-thumb" style={{ width: 56, flex: 'none', ...(e.thumbnail ? { backgroundImage: cssUrl(e.thumbnail) } : {}) }} />
                   <span style={{ minWidth: 0 }}>
                     <b style={{ fontFamily: 'var(--font-display)' }}>{e.seriesName ? `${e.seriesName} · ` : ''}{e.label ? `${e.label} ` : ''}{e.title}</b>
                     <span className="crew-mono" style={{ display: 'block' }}>

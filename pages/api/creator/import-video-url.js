@@ -1,6 +1,6 @@
 import { getRoleContext } from '../../../lib/roles';
 import { createCloudflareVideoFromUrl } from '../../../lib/cloudflareUpload';
-import { validateRemoteVideoUrl } from '../../../lib/urlValidation';
+import { validateRemoteVideoUrl, isOwnMediaHost, OWN_MEDIA_HOST_ERROR } from '../../../lib/urlValidation';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../lib/rateLimit';
 
 // Starts a server-side import: Cloudflare fetches the file at `videoUrl`
@@ -35,6 +35,9 @@ export default async function handler(req, res) {
   const check = validateRemoteVideoUrl(videoUrl);
   if (!check.ok) {
     return res.status(400).json({ error: check.error });
+  }
+  if (isOwnMediaHost(check.url, { supabaseUrl: process.env.SUPABASE_URL || '' })) {
+    return res.status(400).json({ error: OWN_MEDIA_HOST_ERROR });
   }
 
   try {

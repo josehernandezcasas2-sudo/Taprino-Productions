@@ -8,6 +8,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
+import { cssUrl } from '../lib/cssUrl';
 
 export async function getServerSideProps({ req, res }) {
   // Same split as /stream, /type and the rest: this page renders the
@@ -70,7 +71,7 @@ export default function Podcasts({ isSignedIn, isSubscriber, email, isAdmin, isC
           <div className="show-grid">
             {shows.map((show) => (
               <Link key={show.id} href={`/podcasts/${show.id}`} className="show-card">
-                <div className="show-art" style={show.art ? { backgroundImage: `url(${show.art})` } : {}}>
+                <div className="show-art" style={show.art ? { backgroundImage: cssUrl(show.art) } : {}}>
                   {show.hasAudio && !show.hasVideo && <span className="show-media-tag">🎧 Audio</span>}
                   {show.hasVideo && !show.hasAudio && <span className="show-media-tag">📹 Video</span>}
                   {show.hasAudio && show.hasVideo && <span className="show-media-tag">🎧📹 Both</span>}

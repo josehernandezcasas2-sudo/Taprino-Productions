@@ -20,6 +20,7 @@ import { formatRuntimeLong } from '../lib/videoMetadata';
 import { BookmarkIcon, HeartIcon, usePlayerIconOverrides } from '../components/PlayerIcons';
 
 import Footer from '../components/Footer';
+import { cssUrl } from '../lib/cssUrl';
 export async function getServerSideProps({ req, res }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
   const account = await getAccountContext(req);
@@ -227,7 +228,7 @@ export default function Wishlist({ isSignedIn, isSubscriber, wishlist, mainGenre
                     <Link href={`/pitches/${p.id}`} className="poster-card free">
                       <div
                         className="poster-art"
-                        style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
+                        style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail), backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
                       >
                         {p.tag && <span className="poster-badge">{p.tag}</span>}
                         {!p.thumbnail && '◈'}

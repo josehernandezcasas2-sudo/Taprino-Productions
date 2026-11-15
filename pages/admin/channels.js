@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Admin-only: you create channels and decide who maintains them.
 export async function getServerSideProps(ctx) {
@@ -153,7 +154,7 @@ function ChannelCard({ channel: c, candidates, busy, onEdit, onDelete, onAssign,
   const assignable = candidates.filter((p) => !c.schedulerIds.includes(p.id));
   return (
     <div className="chadm-card">
-      <div className="chadm-img" style={c.image_url ? { backgroundImage: `url(${c.image_url})` } : undefined}>
+      <div className="chadm-img" style={c.image_url ? { backgroundImage: cssUrl(c.image_url) } : undefined}>
         {!c.image_url && <span>{c.name}</span>}
       </div>
       <div className="chadm-top">
@@ -293,7 +294,7 @@ function ChannelForm({ channel, nextNumber, busy, onCancel, onSave }) {
       <div className="chadm-field">
         <span>Channel image · 16:9, shown on the channel card</span>
         <div className="chadm-upload">
-          {imagePreview ? <div className="chadm-img chadm-img-sm" style={{ backgroundImage: `url(${imagePreview})` }} /> : <div className="chadm-img chadm-img-sm"><span>—</span></div>}
+          {imagePreview ? <div className="chadm-img chadm-img-sm" style={{ backgroundImage: cssUrl(imagePreview) }} /> : <div className="chadm-img chadm-img-sm"><span>—</span></div>}
           <input id="ch-image" type="file" accept="image/png,image/jpeg,image/webp" onChange={(e) => pickFile(e, 'image')} />
           {imagePreview && <button type="button" className="chadm-linkbtn" onClick={() => { setImage(null); setClearImage(true); }}>Remove</button>}
         </div>

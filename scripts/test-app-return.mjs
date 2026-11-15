@@ -25,8 +25,13 @@ const GOOD = [
   'exp://192.168.1.20:8081/--/checkout-return',
   'exp://u.expo.dev/217f9775-b623-406f-bbfa-54fbe11eeefa/--/checkout-return',
   'exp://u.expo.dev/update/0a1b2c3d-1111-2222-3333-444455556666/--/checkout-return',
-  'exps://abc-anonymous-8081.exp.direct/--/checkout-return',
-  'exp://u.expo.dev/217f9775/--/checkout-return?runtime-version=1.1.0&channel-name=preview'
+  'exp://u.expo.dev/217f9775/--/checkout-return?runtime-version=1.1.0&channel-name=preview',
+  // The PC on the same network (2026-11-15: only private addresses).
+  'exp://10.0.0.5:8081/--/checkout-return',
+  'exp://172.16.4.2:8081/--/checkout-return',
+  'exp://172.31.255.254/--/checkout-return',
+  'exp://localhost:8081/--/checkout-return',
+  'exp://127.0.0.1:8081/--/checkout-return'
 ];
 const BAD = [
   null, undefined, '', 42, {},
@@ -42,7 +47,22 @@ const BAD = [
   'exp://u.expo.dev/x/--/checkout-return?a=b c',
   'exp://user@host/--/checkout-return',
   `exp://u.expo.dev/${'a'.repeat(420)}/--/checkout-return`,
-  'studiotapatv://checkout-return\nLocation: https://evil.example'
+  'studiotapatv://checkout-return\nLocation: https://evil.example',
+  // Expo Go on any other host (2026-11-15): a link on our own domain would
+  // otherwise open someone else's project in Expo Go.
+  'exp://evil.example/--/checkout-return',
+  'exp://evil.example:8081/x/--/checkout-return',
+  'exps://abc-anonymous-8081.exp.direct/--/checkout-return',
+  'exp://u.expo.dev.evil.example/--/checkout-return',
+  'exp://evil-u.expo.dev/--/checkout-return',
+  'exp://10.0.0.5.evil.example/--/checkout-return',
+  'exp://8.8.8.8/--/checkout-return',
+  'exp://172.32.0.1/--/checkout-return',
+  'exp://172.15.0.1/--/checkout-return',
+  'exp://192.169.1.1/--/checkout-return',
+  'exp://127.0.0.2/--/checkout-return',
+  'exp://256.0.0.1/--/checkout-return',
+  'exp://[::1]:8081/--/checkout-return'
 ];
 
 for (const [label, lib] of [['web', web], ['app', app]]) {
@@ -81,7 +101,7 @@ for (const [label, lib] of [['web', web], ['app', app]]) {
   });
   t(`${label}: appReturnHref joins onto an address that already has a query`, () => {
     assert.equal(lib.appReturnHref(GOOD[0], { kind: 'tip', status: 'paid', id: 'abc' }), 'studiotapatv://checkout-return?kind=tip&status=paid&id=abc');
-    assert.equal(lib.appReturnHref(GOOD[6], { kind: 'membership', status: 'paid' }), `${GOOD[6]}&kind=membership&status=paid`);
+    assert.equal(lib.appReturnHref(GOOD.find((u) => u.includes("?")), { kind: 'membership', status: 'paid' }), `${GOOD.find((u) => u.includes("?"))}&kind=membership&status=paid`);
     assert.equal(lib.appReturnHref('https://evil.example', { kind: 'tip' }), null);
   });
   t(`${label}: the round trip reads back what happened`, () => {
@@ -131,7 +151,7 @@ t('route: an app address is followed with what happened', () => {
   assert.equal(r.headers['cache-control'], 'private, no-store');
 });
 t('route: anything else goes home', () => {
-  for (const app of ['https://evil.example/', '//evil.example', 'javascript:alert(1)', undefined]) {
+  for (const app of ['https://evil.example/', '//evil.example', 'javascript:alert(1)', 'exp://evil.example/--/checkout-return', 'exp://evil.example:8081/x/--/checkout-return', undefined]) {
     const r = run('GET', { app, kind: 'tip', status: 'paid' });
     assert.equal(r.statusCode, 302);
     assert.equal(r.headers.location, '/');

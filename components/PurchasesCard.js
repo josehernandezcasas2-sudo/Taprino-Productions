@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { dollars } from '../lib/purchaseRules';
 import { SITE } from '../lib/siteConfig';
+import { cssUrl } from '../lib/cssUrl';
 
 // "Your purchases" on /account (mockup 2026-10-19): every title the
 // account owns, with the self-serve refund while it's allowed
@@ -72,7 +73,7 @@ export default function PurchasesCard({ apiPath = '/api/purchases', forceOpen = 
         {items.map((it) => (
           <div key={it.id} className={`purch-row${it.withdrawn ? ' gone' : ''}`}>
             <Link href={it.href} className="purch-main">
-              <span className="purch-thumb" style={it.poster ? { backgroundImage: `url(${it.poster})` } : undefined} />
+              <span className="purch-thumb" style={it.poster ? { backgroundImage: cssUrl(it.poster) } : undefined} />
               <span className="purch-text">
                 <b>{it.title}{it.type === 'series' ? ' · the series' : ''}</b>
                 <span>{[it.creatorName, it.type === 'series' ? `${it.episodeCount} episode${it.episodeCount === 1 ? '' : 's'} · new ones included` : (KIND[it.contentType] || it.contentType), it.type !== 'series' ? mins(it.runtimeSeconds) : null].filter(Boolean).join(' · ')}</span>

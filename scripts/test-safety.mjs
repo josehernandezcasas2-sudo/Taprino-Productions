@@ -23,7 +23,12 @@ t('cross-site writes: our own pages, the app and Stripe pass', () => {
   assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/messages', origin: 'https://studiotapatv.site', host: site }, prod), false);
   assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/messages', origin: null, host: site }, prod), false, 'the native app sends no Origin');
   assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/webhook', origin: 'https://evil.example', host: site }, prod), false);
-  assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/cron/creator-payouts', origin: 'https://evil.example', host: site }, prod), false);
+  // The cron's own requests (a GET, or a POST with no Origin) pass; a
+  // cross-site POST to it is refused like any other write (2026-11-15).
+  assert.equal(crossSiteWriteRefused({ method: 'GET', pathname: '/api/cron/creator-payouts', origin: null, host: site }, prod), false);
+  assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/cron/creator-payouts', origin: null, host: site }, prod), false);
+  assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/cron/creator-payouts', origin: `https://${site}`, host: site }, prod), false);
+  assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/cron/creator-payouts', origin: 'https://evil.example', host: site }, prod), true);
   assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/x', origin: 'https://tapa-git-x.vercel.app', host: site }, { production: true, env: { VERCEL_BRANCH_URL: 'tapa-git-x.vercel.app' } }), false);
   assert.equal(crossSiteWriteRefused({ method: 'POST', pathname: '/api/x', origin: 'http://localhost:3000', host: 'localhost:3000' }, { production: false, env: {} }), false);
 });

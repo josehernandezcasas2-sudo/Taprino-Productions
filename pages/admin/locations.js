@@ -5,6 +5,7 @@ import { adminPageProps } from '../../lib/adminPage';
 import { StatusChip } from '../../components/locations/RequestBits';
 import { fmtRange } from '../../components/locations/LocationBits';
 import { dollars } from '../../lib/locationRules';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Locations, admin side (migration 086). New places are approved from
 // the review queue (dashboard / /admin/review, kind "Place"); this page
@@ -133,7 +134,7 @@ export default function LocationsAdmin({ account, mainGenres, apiPath = '/api/ad
                   {data.listings.map((l) => (
                     <div key={l.id} className="crew-panel crew-rhead">
                       <span style={{ display: 'flex', gap: '0.6rem', alignItems: 'center', minWidth: 0 }}>
-                        <span className="loc-row-thumb" style={{ width: 56, flex: 'none', ...(l.coverUrl ? { backgroundImage: `url(${l.coverUrl})` } : {}) }} />
+                        <span className="loc-row-thumb" style={{ width: 56, flex: 'none', ...(l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl) } : {}) }} />
                         <span><Link href={`/locations/${l.id}`}>{l.title}</Link> <span className="crew-mono">· {l.kindLabel} · {l.place || '—'}{l.host ? <> · by <Link href={l.host.profilePath}>{l.host.displayName}</Link></> : ''} · {l.status}{l.verified ? ' · ✓ verified' : ''}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}{l.reports ? <b style={{ color: 'var(--danger)' }}> · {l.reports} {l.reports === 1 ? 'report' : 'reports'}</b> : ''}</span></span>
                       </span>
                       <span className="crew-actions">

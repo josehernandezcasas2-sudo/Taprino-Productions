@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 import Link from 'next/link';
 import { BackArrowIcon, InfoIcon } from './PlayerIcons';
+import { cssUrl } from '../lib/cssUrl';
 
 // The pieces of Pitch Room Discover's elevator (pages/pitches/discover.js):
 // the cab (interior + sliding doors),
@@ -223,7 +224,7 @@ export function ElevatorCard({ pitch, flipped, onFlip, onSwipe, disabled }) {
         <div className="elev-card-face elev-card-front">
         <div
           className={`elev-card-surface elev-card-front-surface ${pitch.thumbnail ? '' : 'elev-card-front-blank'}`}
-          style={{ backgroundImage: pitch.thumbnail ? `url(${pitch.thumbnail})` : undefined }}
+          style={{ backgroundImage: pitch.thumbnail ? cssUrl(pitch.thumbnail) : undefined }}
           role="button"
           tabIndex={flipped ? -1 : 0}
           aria-label={`${pitch.title} — turn the card over for details`}

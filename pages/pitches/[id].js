@@ -17,6 +17,7 @@ import { TAX_NOTE } from '../../lib/salesTaxRules';
 // The person's account-page photo over the letter circle at their saved
 // focal point and zoom, same as the header and profile page.
 import { AvatarImg } from '../../components/AvatarPhoto';
+import { cssUrl } from '../../lib/cssUrl';
 
 export async function getServerSideProps({ req, res, params }) {
   const data = await getPitchDetailData(params.id, req);
@@ -611,9 +612,9 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-section-label">Photos</div>
             <div className="pitch-photo-row">
               {pitch.photos.map((url, i) => (
-                // Quoted, with anything that could close the url() or the
-                // declaration taken out (security round, 2026-10-26).
-                <div key={i} className="pitch-photo-item" style={{ backgroundImage: `url("${String(url).replace(/["\\()\n\r;]/g, '')}")` }} />
+                // Quoted and escaped (lib/cssUrl.js), so nothing in the
+                // address can close the url() or the declaration.
+                <div key={i} className="pitch-photo-item" style={{ backgroundImage: cssUrl(url) }} />
               ))}
             </div>
           </>
@@ -652,7 +653,7 @@ export default function PitchDetail({ isSignedIn, isSubscriber, email, isAdmin, 
             <div className="pitch-grid" style={{ marginBottom: '1rem' }}>
               {similar.map((p) => (
                 <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
                     {p.tag && <span className="pitch-tag">{p.tag}</span>}
                   </div>
                   <div className="pitch-info">

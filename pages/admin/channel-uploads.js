@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import AdminShell from '../../components/AdminShell';
 import { adminPageProps } from '../../lib/adminPage';
 import Link from 'next/link';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Review queue for channel-only uploads (bumpers, station IDs, promos,
 // shows). Same permission as reviewing creator submissions.
@@ -109,7 +110,7 @@ export default function ChannelUploads({ account, mainGenres }) {
           {media && media.map((m) => (
             <div key={m.id} className="cu-card">
               <div className="cu-top">
-                <div className="cu-thumb" style={m.thumbnail ? { backgroundImage: `url(${m.thumbnail})` } : undefined} />
+                <div className="cu-thumb" style={m.thumbnail ? { backgroundImage: cssUrl(m.thumbnail) } : undefined} />
                 <div style={{ minWidth: 0 }}>
                   <h3>{m.title}</h3>
                   <div className="cu-meta">{m.kindLabel} · {dur(m.durationSeconds)} · uploaded {new Date(m.createdAt).toLocaleDateString()}</div>

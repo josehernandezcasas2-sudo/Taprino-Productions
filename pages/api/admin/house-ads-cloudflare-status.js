@@ -1,5 +1,6 @@
 import { requireCapability } from '../../../lib/adminAuth';
 import { getCloudflareVideoStatus, ensureCloudflareDownloadUrl } from '../../../lib/cloudflareUpload';
+import { houseAdVideoRefusal } from '../../../lib/houseAdVideo';
 
 // Polled by the admin's browser after a house-ad video finishes uploading
 // to Cloudflare, until a plain MP4 is ready to attach to the ad. Drives a
@@ -26,6 +27,11 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'uid is required.' });
   }
 
+  // This poll turns on the video's downloadable MP4: only for the ad's own
+  // upload, never a video something else on the site uses (lib/houseAdVideo.js).
+  const refused = await houseAdVideoRefusal(uid);
+  if (refused) return res.status(refused.status).json({ error: refused.error });
+
   const videoStatus = await getCloudflareVideoStatus(uid);
   if (!videoStatus) {
     return res.status(404).json({ error: 'No video found with that ID.' });
@@ -51,7 +57,8 @@ export default async function handler(req, res) {
     }
     return res.status(200).json({ stage: 'preparing_download', percentComplete: download.percentComplete });
   } catch (err) {
+    // Cloudflare's own text is logged, not shown (lib/apiErrors.js's rule).
     console.error('house-ads-cloudflare-status error:', err.message);
-    return res.status(200).json({ stage: 'error', error: err.message });
+    return res.status(200).json({ stage: 'error', error: 'Cloudflare couldn’t make the downloadable version. Try again in a minute.' });
   }
 }

@@ -19,6 +19,7 @@ import { CrewCardView } from '../../components/crew/CrewBits';
 import TierChip from '../../components/crew/TierChip';
 import { AiSealChip, AiSealCard } from '../../components/AiSeal';
 import { TipButton, TippedBanner } from '../../components/TipSheet';
+import { cssUrl } from '../../lib/cssUrl';
 
 export async function getServerSideProps({ req, res, params }) {
   // Signed-in requests skip the shared cache entirely — same rule as
@@ -268,8 +269,8 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
       >
         {imageSrc ? (
           <>
-            <div className="profile-post-tile-backdrop" style={{ backgroundImage: `url(${imageSrc})` }} />
-            <div className="profile-post-tile-fg" style={{ backgroundImage: `url(${imageSrc})` }} />
+            <div className="profile-post-tile-backdrop" style={{ backgroundImage: cssUrl(imageSrc) }} />
+            <div className="profile-post-tile-fg" style={{ backgroundImage: cssUrl(imageSrc) }} />
           </>
         ) : (
           <span className="profile-post-tile-caption">&ldquo;{post.caption}&rdquo;</span>
@@ -520,7 +521,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                       <div className="loc-prof-grid">
                         {locations.listings.map((l) => (
                           <Link key={l.id} href={`/locations/${l.id}`} className="loc-prof-card">
-                            <span className="loc-prof-ph" style={l.coverUrl ? { backgroundImage: `url(${l.coverUrl})` } : undefined} />
+                            <span className="loc-prof-ph" style={l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl) } : undefined} />
                             <span className="loc-prof-t">{l.title}</span>
                             <span className="crew-mono">{l.kindLabel}{l.place ? ` · ${l.place.split(',')[0]}` : ''} · {l.rateLine}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</span>
                           </Link>
@@ -599,7 +600,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 <div className="profile-work-grid">
                   {creditedWork.map((item) => (
                     <Link key={`${item.type}-${item.id}`} href={workHref(item)} className="profile-work-item">
-                      <div className="profile-work-poster" style={item.poster ? { backgroundImage: `url(${item.poster})` } : undefined} />
+                      <div className="profile-work-poster" style={item.poster ? { backgroundImage: cssUrl(item.poster) } : undefined} />
                       <div className="profile-work-title">{item.title}</div>
                       <div className="profile-work-type">{workTypeLabel(item)}{item.role ? ` · ${item.role}` : ''}</div>
                     </Link>
@@ -614,7 +615,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 <div className="pitch-grid">
                   {pitches.map((p) => (
                     <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
                         {p.tag && <span className="pitch-tag">{p.tag}</span>}
                       </div>
                       <div className="pitch-info">
@@ -632,7 +633,7 @@ export default function PublicProfile({ profile, canonicalPath, creditedWork, pi
                 <div className="pitch-grid">
                   {backedPitches.map((p) => (
                     <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                      <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
                         {p.tag && <span className="pitch-tag">{p.tag}</span>}
                       </div>
                       <div className="pitch-info">

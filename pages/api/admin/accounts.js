@@ -1,6 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { recordAudit } from '../../../lib/auditLog';
 import { listSuspensions, searchAccounts, getAccountCard, suspendAccount, liftSuspension } from '../../../lib/suspensions';
+import { sendError } from '../../../lib/apiErrors';
 
 // /admin/accounts (migration 102; lib/suspensions.js). Full admins only:
 // a suspension locks a person out.
@@ -58,7 +59,8 @@ export default async function handler(req, res) {
     }
     return res.status(400).json({ error: 'Unknown action.' });
   } catch (err) {
-    console.error('admin/accounts error:', err.message);
-    return res.status(400).json({ error: err.message || 'Something went wrong.' });
+    // A validation line reaches the admin; a database or Stripe error is
+    // logged and answered plainly (lib/apiErrors.js).
+    return sendError(res, err, 'admin/accounts', 'Something went wrong.', { plainStatus: 400 });
   }
 }

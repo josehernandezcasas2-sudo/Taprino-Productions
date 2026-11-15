@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { usePodcastPlayer } from '../contexts/PodcastPlayerContext';
 import { PlayIcon, PauseIcon, SkipBackIcon, SkipForwardIcon, CloseIcon, usePlayerIconOverrides } from './PlayerIcons';
+import { cssUrl } from '../lib/cssUrl';
 
 function formatTime(seconds) {
   if (!isFinite(seconds) || seconds < 0) return '0:00';
@@ -33,7 +34,7 @@ export default function PodcastMiniPlayer() {
   return (
     <div className="mini-player" role="region" aria-label="Podcast player">
       <Link href={`/podcasts/${currentEpisode.showId}`} className="mini-player-art-link">
-        <div className="mini-player-art" style={currentEpisode.showArt ? { backgroundImage: `url(${currentEpisode.showArt})` } : {}} />
+        <div className="mini-player-art" style={currentEpisode.showArt ? { backgroundImage: cssUrl(currentEpisode.showArt) } : {}} />
       </Link>
       <div className="mini-player-info">
         <div className="t">{currentEpisode.title}</div>

@@ -26,6 +26,7 @@ import ExtraKindField from '../../components/ExtraKindField';
 import PageNotesField from '../../components/PageNotesField';
 import { WarningIcon } from '../../components/PlayerIcons';
 import { SITE } from '../../lib/siteConfig';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Creator Studio's submit, three steps (2026-10-31, from the creator-path
 // canvas): the file (it starts uploading the moment it's dropped and keeps
@@ -129,7 +130,7 @@ function initialForm(draft, initialType, initialSeriesId, initialSeason, initial
 }
 
 function bgImage(url) {
-  return url ? { backgroundImage: `url("${String(url).replace(/"/g, '%22')}")` } : undefined;
+  return url ? { backgroundImage: cssUrl(url) } : undefined;
 }
 
 // The show kinds a type files into; a kind unknown (a database before

@@ -11,6 +11,7 @@ import HeaderNav from '../components/HeaderNav';
 import MobileTabBar from '../components/MobileTabBar';
 import Footer from '../components/Footer';
 import { SITE } from '../lib/siteConfig';
+import { cssUrl } from '../lib/cssUrl';
 
 export async function getServerSideProps({ req, res }) {
   const data = await getPitchRoomData(req);
@@ -218,7 +219,7 @@ export default function PitchRoom({ isSignedIn, isSubscriber, email, isAdmin, is
               const remaining = daysLeft(p);
               return (
                 <Link key={p.id} href={`/pitches/${p.id}`} className="pitch-card">
-                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: `url(${p.thumbnail})` } : {}}>
+                  <div className="pitch-thumb" style={p.thumbnail ? { backgroundImage: cssUrl(p.thumbnail) } : {}}>
                     {p.tag && <span className="pitch-tag">{p.tag}</span>}
                     <button
                       className="pitch-save"

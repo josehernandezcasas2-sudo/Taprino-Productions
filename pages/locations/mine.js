@@ -11,6 +11,7 @@ import { getOwnListings } from '../../lib/locations';
 import { listMyRequests } from '../../lib/locationRequests';
 import { pendingClaimsForHost } from '../../lib/locationCredits';
 import { CANCELLATION } from '../../lib/locationRules';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Your locations (/locations/mine): every place you've listed with its
 // status, pause / resume / remove, the days you've blocked, and the
@@ -157,7 +158,7 @@ export default function MyLocations({ mainGenres, isSignedIn, isSubscriber, emai
             {listings.length === 0 && <div className="crew-empty">No places yet. <Link href="/locations/new">List the first one</Link>.</div>}
             {listings.map((l) => (
               <div key={l.id} className="loc-row">
-                <Link href={`/locations/${l.id}`} className="loc-row-thumb" style={l.coverUrl ? { backgroundImage: `url(${l.coverUrl})` } : undefined} aria-label={l.title} />
+                <Link href={`/locations/${l.id}`} className="loc-row-thumb" style={l.coverUrl ? { backgroundImage: cssUrl(l.coverUrl) } : undefined} aria-label={l.title} />
                 <div style={{ minWidth: 0 }}>
                   <div className="loc-row-title"><Link href={`/locations/${l.id}`}>{l.title}</Link><StatusPill status={l.status} />{l.verified && <span className="crew-chip ok">✓ verified</span>}</div>
                   <div className="crew-mono">{l.kindLabel} · {l.place ? l.place.label : 'no place'} · {l.rateLine}{l.cleaningCents ? ` · ${(l.cleaningCents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })} cleaning` : ''} · {CANCELLATION[l.cancellation].label} cancellation · {l.photos.length} {l.photos.length === 1 ? 'photo' : 'photos'}{l.shootsCount ? ` · hosted ${l.shootsCount}` : ''}</div>

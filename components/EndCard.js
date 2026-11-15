@@ -3,6 +3,7 @@ import { CloseIcon, SkipForwardIcon, usePlayerIconOverrides } from './PlayerIcon
 import { tierBadge } from '../lib/tierBadge';
 import { parseRuntimeToSeconds } from '../lib/videoMetadata';
 import { PLAY_NOW_LABEL, STAY_LABEL, playingInLabel } from '../lib/endCardRules';
+import { cssUrl } from '../lib/cssUrl';
 
 // The end card over the player once a title plays out (Jose, 2026-10-30;
 // the boards on the After Play canvas): the last frame dims, what just
@@ -110,7 +111,7 @@ export default function EndCard({ card, onGo, onStay, layout = 'compact' }) {
 
       {target && (
         <a className="tp-endcard-main" href={target.href} onClick={(e) => go(e, target.href, target)} aria-label={`${target.kicker}: ${target.title}${timed ? `. ${playingInLabel(left)}` : ''}. ${PLAY_NOW_LABEL}`}>
-          <span className="tp-endcard-art" style={target.thumbnail ? { backgroundImage: `url(${target.thumbnail})` } : undefined}>
+          <span className="tp-endcard-art" style={target.thumbnail ? { backgroundImage: cssUrl(target.thumbnail) } : undefined}>
             {timed && (
               <span className="tp-endcard-ring" aria-hidden="true">
                 <svg viewBox="0 0 72 72">

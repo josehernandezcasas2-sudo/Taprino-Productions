@@ -4,6 +4,7 @@ import { useUpload } from '../contexts/UploadContext';
 import { readVideoDuration, formatRuntime } from '../lib/videoMetadata';
 import { shrinkImage } from './locations/LocationBits';
 import { PlusIcon, VideoCameraIcon, ImageIcon, CloseIcon } from './PlayerIcons';
+import { cssUrl } from '../lib/cssUrl';
 
 const MAX_VIDEO_SECONDS = 5 * 60;
 const MAX_CAPTION_LENGTH = 2200;
@@ -249,7 +250,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
             <div
               className="create-post-dropzone create-post-dropzone-photo"
               onClick={() => imageInputRef.current && imageInputRef.current.click()}
-              style={imagePreview ? { backgroundImage: `url(${imagePreview})` } : undefined}
+              style={imagePreview ? { backgroundImage: cssUrl(imagePreview) } : undefined}
             >
               {!imagePreview ? (
                 <div className="create-post-dropzone-empty">
@@ -339,7 +340,7 @@ export default function CreatePostModal({ onClose, onPosted }) {
                 <div
                   className="create-post-dropzone create-post-dropzone-thumbnail"
                   onClick={() => thumbnailInputRef.current && thumbnailInputRef.current.click()}
-                  style={thumbnailPreview ? { backgroundImage: `url(${thumbnailPreview})` } : undefined}
+                  style={thumbnailPreview ? { backgroundImage: cssUrl(thumbnailPreview) } : undefined}
                 >
                   {!thumbnailPreview ? (
                     <div className="create-post-dropzone-empty">

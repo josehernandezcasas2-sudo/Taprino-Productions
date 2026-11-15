@@ -43,3 +43,7 @@ yarn-error.*
 
 # Google Play service account key (written by the Android build workflow, never committed)
 google-service-account.json
+
+# EAS Update's code-signing private key, if generated inside mobile/
+# (only certs/certificate.pem, the public half, is ever committed)
+eas-keys/

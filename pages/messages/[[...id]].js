@@ -14,6 +14,7 @@ import { MAX_MESSAGE_CHARS, CONTEXT_KINDS, CONTEXT_LABELS } from '../../lib/mess
 import { getPublicProfile, placeholderProfile, profilePath, looksLikeUserId } from '../../lib/userProfiles';
 import { REPORT_REASONS } from '../../lib/reportReasons';
 import { SITE } from '../../lib/siteConfig';
+import { segmentsRefused } from '../../lib/pageSegments';
 
 // Messages (Crew Call step 2, mockup signed off 2026-10-09): the inbox on
 // the left, one conversation on the right; on a phone it's one or the
@@ -26,6 +27,9 @@ const INBOX_POLL_MS = 30000;
 
 export async function getServerSideProps({ req, res, params, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // One segment at most, and never one that looks like a file: the
+  // middleware skips those addresses (lib/pageSegments.js).
+  if (segmentsRefused(params && params.id)) return { notFound: true };
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   const base = {
     mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],

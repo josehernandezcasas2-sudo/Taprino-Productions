@@ -1,7 +1,7 @@
 import { getRoleContext } from '../../../lib/roles';
 import { listDrafts, getDraft, saveDraft, patchDraft, deleteDraft } from '../../../lib/creatorDrafts';
 import { checkVideoOwnership, VIDEO_UID_PATTERN } from '../../../lib/videoOwnership';
-import { checkRateLimit } from '../../../lib/rateLimit';
+import { checkRateLimit, limitPublicRead } from '../../../lib/rateLimit';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
@@ -39,7 +39,14 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
+      // Each read may ask Cloudflare where an upload stands (lib/
+      // creatorDrafts.js), on the allowance playback tokens are minted
+      // through: per account, a list read about every 15 s (the show page
+      // polls every 20 s while files process) and a single draft about
+      // every 6 s (the draft editor polls every 15 s, the upload queue
+      // reads each file's draft once).
       if (req.query.id) {
+        if (!(await limitPublicRead(req, res, 'creator-drafts-one', { max: 600, windowSeconds: 3600, userId }))) return undefined;
         const draft = await getDraft(userId, String(req.query.id));
         if (!draft) return res.status(404).json({ error: 'No such draft.' });
         return res.status(200).json({ draft });
@@ -47,6 +54,7 @@ export default async function handler(req, res) {
       const seriesId = typeof req.query.seriesId === 'string' && isTitleId(req.query.seriesId) ? req.query.seriesId : null;
       if (req.query.seriesId !== undefined && !seriesId) return res.status(400).json({ error: 'Which show?' });
       const limit = typeof req.query.limit === 'string' ? req.query.limit : undefined;
+      if (!(await limitPublicRead(req, res, 'creator-drafts-list', { max: 240, windowSeconds: 3600, userId }))) return undefined;
       return res.status(200).json({ drafts: await listDrafts(userId, { refresh: true, seriesId, limit }) });
     }
 

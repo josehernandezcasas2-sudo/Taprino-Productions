@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FLAG_REASONS } from '../../lib/reportReasons';
 import { queueTileCounts, reviewQueueKeys } from '../../lib/moderationRules';
 import { SITE } from '../../lib/siteConfig';
+import { cssUrl } from '../../lib/cssUrl';
 
 // Every title from every user, plus flags, viewer reports and reporters.
 // Admins, and sub-admins with "See everyone's content" (read) or "Flag
@@ -213,7 +214,7 @@ export default function AdminContent({ account, mainGenres }) {
                       <tr key={key} className={r.held ? 'held' : rep && rep.tier === 'yellow' ? 'warn' : ''}>
                         <td>
                           <div className="ac-title">
-                            <span className="ac-thumb" style={r.thumbnail ? { backgroundImage: `url(${r.thumbnail})` } : undefined} />
+                            <span className="ac-thumb" style={r.thumbnail ? { backgroundImage: cssUrl(r.thumbnail) } : undefined} />
                             <span><b>{r.title}</b>{r.sub && <small>{r.sub}</small>}</span>
                           </div>
                         </td>

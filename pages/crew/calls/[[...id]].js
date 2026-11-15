@@ -22,6 +22,7 @@ import { PAY_TYPES, PAY_HINT, MAX_SPOTS, MAX_ENDORSEMENT_CHARS, URGENT_WITHIN_HO
 import { payDollars, crewPayQuote, MIN_CREW_PAY_CENTS, MAX_CREW_PAY_CENTS } from '../../../lib/crewPayRules';
 import { getCrewPayCutPercent } from '../../../lib/crewPay';
 import { SITE } from '../../../lib/siteConfig';
+import { segmentsRefused } from '../../../lib/pageSegments';
 
 // The Crew Call board (step 3, mockup signed off 2026-10-10).
 //   /crew/calls           the board: filters on the left, calls, one open
@@ -34,6 +35,9 @@ const DEFAULT_WITHIN = 50;
 
 export async function getServerSideProps({ req, res, params, query }) {
   res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+  // One segment at most, and never one that looks like a file: the
+  // middleware skips those addresses (lib/pageSegments.js).
+  if (segmentsRefused(params && params.id)) return { notFound: true };
   const [account, episodes] = await Promise.all([getAccountContext(req), getPublicEpisodes()]);
   const base = {
     mainGenres: [...new Set(episodes.map((e) => e.mainGenre).filter(Boolean))],

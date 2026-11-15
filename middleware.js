@@ -15,10 +15,11 @@ import { crossSiteWriteRefused } from './lib/cors';
 //
 // Two additions:
 //
-// 1. Creator Share referrals (lib/creatorShare.js): a visit carrying
-//    ?via=<handle> — which is what /@handle redirects to — remembers who
-//    sent the visitor in a 30-day cookie, last click wins. Checkout reads
-//    it to stamp the subscription with the referrer.
+// 1. Creator Share referrals (lib/creatorShare.js): a visit to a
+//    creator's profile carrying ?via=<their handle> — which is what
+//    /@handle redirects to — remembers who sent the visitor in a 30-day
+//    cookie, last click wins. Checkout reads it to stamp the subscription
+//    with the referrer.
 //
 // 2. The private beta door (lib/privateBetaRules.js): while the door is
 //    shut (Admin → Security's switch, site_settings.private_beta from
@@ -75,6 +76,19 @@ const VIA_COOKIE = 'tapa_via';
 const VIA_MAX_AGE = 30 * 24 * 60 * 60;
 const READ_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
+// /profile/<segment> (one segment) whose segment is the handle in ?via=.
+function viaMatchesProfile(pathname, via) {
+  const m = /^\/profile\/([^/]+)\/?$/.exec(pathname || '');
+  if (!m) return false;
+  let seg = m[1];
+  try {
+    seg = decodeURIComponent(seg);
+  } catch (err) {
+    return false;
+  }
+  return seg.replace(/^@+/, '').toLowerCase() === via.toLowerCase();
+}
+
 export default clerkMiddleware(async (auth, req, event) => {
   const { pathname, search, searchParams } = req.nextUrl;
   // Served from this isolate's copy; a stale one is refreshed in the
@@ -124,9 +138,13 @@ export default clerkMiddleware(async (auth, req, event) => {
     }
   }
 
+  // Only where the /@handle link lands — that creator's own profile,
+  // /profile/<handle>?via=<handle> (next.config.js) — never from a ?via=
+  // on any other address, which let any link overwrite the 30-day
+  // referral cookie (cookie stuffing; 2026-11-15).
   const raw = searchParams.get('via');
   const via = raw ? raw.trim().replace(/^@+/, '').slice(0, 64) : '';
-  const setVia = via && /^[A-Za-z0-9_.-]+$/.test(via);
+  const setVia = Boolean(via) && /^[A-Za-z0-9_.-]+$/.test(via) && viaMatchesProfile(pathname, via);
 
   if (!res) res = NextResponse.next();
   res.headers.set('X-Robots-Tag', tag);
