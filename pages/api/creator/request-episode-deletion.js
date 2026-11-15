@@ -3,6 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { applyCors } from '../../../lib/cors';
 import { sendError } from '../../../lib/apiErrors';
 import { setEpisodeRemoval } from '../../../lib/showPage';
+import { showRouteError } from '../../../lib/showRoute';
 
 // This never deletes a row — it only flags one for an admin to act on
 // (see pages/api/admin/resolve-deletion.js). Setting deletion_requested
@@ -60,7 +61,8 @@ export default async function handler(req, res) {
   try {
     await setEpisodeRemoval(existing.id, { action, reason: String(reason || ''), keep: keep === true }, { userId, isAdmin }, { strict: false });
   } catch (err) {
-    return sendError(res, err, 'creator/request-episode-deletion', 'Could not save your request.');
+    // The editor's own answers, codes included (team-removal, withdrawn…).
+    return showRouteError(res, err, 'creator/request-episode-deletion', 'Could not save your request.');
   }
 
   return res.status(200).json({ ok: true, episodeId, deletionRequested: action === 'request' });
