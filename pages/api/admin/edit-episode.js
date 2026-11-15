@@ -690,7 +690,7 @@ async function editEpisode(req, res, roleContext) {
     writeResult = await updateCompat(supabase, 'episodes', dbUpdates, ['released_at'], (q) => {
       const w = q.eq('id', existing.id);
       if (!Object.prototype.hasOwnProperty.call(dbUpdates, 'pending_fields')) return w;
-      return existing.pending_fields === null || existing.pending_fields === undefined ? w.is('pending_fields', null) : w.eq('pending_fields', JSON.stringify(existing.pending_fields)).select('id');
+      return (existing.pending_fields === null || existing.pending_fields === undefined ? w.is('pending_fields', null) : w.eq('pending_fields', JSON.stringify(existing.pending_fields))).select('id');
     });
     if (writeResult.error) throw Object.assign(new Error('edit-episode write'), { editWriteFailed: true });
   };
