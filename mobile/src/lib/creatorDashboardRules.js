@@ -278,6 +278,11 @@ function showHref(id, anchor) {
   return `/creator/show/${encodeURIComponent(id)}${anchor ? `#${anchor}` : ''}`;
 }
 
+// A title of its own opens its dashboard (2026-11-15).
+function titleHref(id) {
+  return `/creator/title/${encodeURIComponent(id)}`;
+}
+
 function draftFileLine(d) {
   if (d && d.video) {
     return d.video.state === 'uploading' ? 'The upload stopped' : d.video.state === 'processing' ? 'The file is processing' : d.video.state === 'ready' ? 'Ready to send' : 'The file failed to process';
@@ -427,7 +432,7 @@ export function dashboardTitles({ submissions = null, shows = null, drafts = nul
       meta: [TYPE_WORD[s.contentType] || 'Title', runtimeLabel(s.runtime)].filter(Boolean).join(' · '),
       state,
       stateLabel: STATE_LABEL[state],
-      href: sid ? showHref(sid, `ep-${s.id}`) : '/creator/my-work',
+      href: sid ? showHref(sid, `ep-${s.id}`) : titleHref(s.id),
       poster: s.poster || s.thumbnail || null,
       ...(state === 'live' ? numbersOf(st, haveNumbers, haveMoney) : NO_NUMBERS),
       note,
@@ -584,7 +589,7 @@ export function dashboardNeeds({ submissions = null, shows = null, money = null,
       key: `title:${s.id}`,
       title: sid ? [showName, code, numbered ? '' : own].filter(Boolean).join(' · ') : own,
       sub: why,
-      action: { kind: 'link', label: fixLabel(why), href: sid ? showHref(sid, `ep-${s.id}`) : '/creator/my-work?attention=1' }
+      action: { kind: 'link', label: fixLabel(why), href: sid ? showHref(sid, `ep-${s.id}`) : titleHref(s.id) }
     });
   }
 
@@ -740,7 +745,7 @@ export function dashboardLatest({ money = null, submissions = null, now = Date.n
     if (s.status === 'rejected') words = `${name}: not this time`;
     else if (sid && s.seriesStatus === 'pending') words = `${name} was approved`;
     else words = `${name} went live`;
-    out.push({ key: `title:${s.id}`, at: s.reviewedAt, text: words, amount: '', quote: '', href: sid ? showHref(sid, `ep-${s.id}`) : '/creator/my-work' });
+    out.push({ key: `title:${s.id}`, at: s.reviewedAt, text: words, amount: '', quote: '', href: sid ? showHref(sid, `ep-${s.id}`) : titleHref(s.id) });
   }
   out.sort((a, b) => String(b.at).localeCompare(String(a.at)));
   return out.slice(0, Math.max(1, Math.floor(n(limit)) || LATEST_LIMIT)).map((row) => ({ ...row, when: whenLabel(row.at, now) }));

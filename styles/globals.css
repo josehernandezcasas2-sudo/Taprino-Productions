@@ -12116,6 +12116,9 @@ a.prod-day:hover { background: var(--surface-3); }
   .yw-gear, .yw-gear-space { width: 30px; }
 }
 
+/* === Your work, revamped (2026-11-15; builder A; .wk-*) === */
+/* === end Your work === */
+
 /* The submit page's Place block (step 2). */
 .sub-place { gap: 0.95rem; margin-bottom: 0; }
 .sub-place-show { display: flex; align-items: center; gap: 0.55rem; font-family: var(--font-mono); font-size: 0.68rem; color: var(--ink-dim); }
@@ -14064,3 +14067,6 @@ a.tabbar-item { text-decoration: none; }
   .tabbar.six .tabbar-caret { display: none; }
   .tabbar.six .tabbar-item.tabbar-add { width: 42px; height: 42px; margin: -16px 0.15rem 0; }
 }
+
+/* === Title dashboard and a show's Overview (2026-11-15; builder B; .td-*) === */
+/* === end Title dashboard === */
