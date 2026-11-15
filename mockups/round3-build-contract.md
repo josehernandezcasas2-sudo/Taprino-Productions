@@ -181,8 +181,6 @@ switch, the flashing-lights warning turned on, `paidTo` (an invite).
 
 ## As built
 
-(Filled in after the build.)
-
 ### A — removals held a month, titles brought back (builder A)
 
 Built as agreed, website and app, no new migration. **The rules** are
