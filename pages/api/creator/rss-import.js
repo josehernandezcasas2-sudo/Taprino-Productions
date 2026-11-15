@@ -235,7 +235,7 @@ async function importFeed(req, res, { userId, email, isAdmin }) {
         results.failed.push({ title: label, error: urlCheck.error, season: item.season, number: item.seriesOrder });
         continue;
       }
-      const { url: audioUrl } = await importAudioFromUrl(urlCheck.url, `${(item.title || 'episode').slice(0, 60)}.mp3`);
+      const { url: audioUrl } = await importAudioFromUrl(urlCheck.url, `${(item.title || 'episode').slice(0, 60)}.mp3`, { userId });
 
       const row = {
         id: mintTitleId(item.title || 'episode', { fallback: 'episode' }),

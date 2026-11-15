@@ -3,7 +3,7 @@ import { getSupabase } from '../../../lib/supabase';
 import { creatorOwnsSeries } from '../../../lib/series';
 import { internalError, sendError } from '../../../lib/apiErrors';
 import { isTitleId } from '../../../lib/titleIds';
-import { MAX_EPISODE_NUMBER, flashingLightsChange, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
+import { MAX_EPISODE_NUMBER, canMoveTo, flashingLightsChange, holdsSlot, slotCheck, slotTakenBody, titleRunnerOf } from '../../../lib/showRules';
 import { syncNumberTitles } from '../../../lib/numberTitles';
 import { anchoredExtras, cancelPendingInvites, noticeEarningsMoved, withPayeeStamps } from '../../../lib/payees';
 import { wellFormedBody } from '../../../lib/wellFormed';
@@ -229,16 +229,32 @@ async function editSubmission(req, res) {
   let movingExtras = [];
   let fromShow = null;
   let toShow = null;
+  const readShow = async (sid) => {
+    if (!sid || !isTitleId(String(sid))) return null;
+    const { data, error: showError } = await supabase.from('series').select('*').eq('id', sid).maybeSingle();
+    if (showError) throw internalError(showError, 'edit-submission show');
+    return data || null;
+  };
+  if (showMove) {
+    [fromShow, toShow] = await Promise.all([readShow(existing.series_id), readShow(dbUpdates.series_id)]);
+  }
+  // A move between shows (or out of one) follows the show page's rule
+  // (lib/showRules.js canMoveTo; 2026-11-15): a creator moves only a title
+  // they uploaded, out of a show they run and into one of their own — never
+  // a title between owners. This route used to let an uploader take a
+  // pending episode out of someone else's show.
+  if (showMove && !isAdmin && existing.content_type !== 'bonus') {
+    const asMoved = { ...existing, content_type: effectiveContentType };
+    if (toShow) {
+      const verdict = canMoveTo(asMoved, toShow, { userId, isAdmin: false }, { sourceShow: fromShow });
+      if (!verdict.ok) return res.status(403).json({ error: verdict.reason, code: verdict.code });
+    } else if (existing.series_id && (fromShow ? fromShow.creator_id || null : null) !== userId) {
+      return res.status(403).json({ error: 'Only an admin can move a title between owners.', code: 'owners' });
+    }
+  }
   if (showMove && existing.content_type !== 'bonus') {
     movingExtras = await anchoredExtras({ episodeIds: [existing.id] });
     if (movingExtras.length) {
-      const readShow = async (sid) => {
-        if (!sid || !isTitleId(String(sid))) return null;
-        const { data, error: showError } = await supabase.from('series').select('*').eq('id', sid).maybeSingle();
-        if (showError) throw internalError(showError, 'edit-submission show');
-        return data || null;
-      };
-      [fromShow, toShow] = await Promise.all([readShow(existing.series_id), readShow(dbUpdates.series_id)]);
       if (!isAdmin && movingExtras.some((x) => titleRunnerOf(x, fromShow) !== userId)) {
         return res.status(403).json({ error: 'Extras filed after it would move with it, and they aren’t yours to move. Ask an admin.', code: 'extras' });
       }

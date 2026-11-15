@@ -65,7 +65,7 @@ export default async function handler(req, res) {
     // could theoretically be deleted or regenerated later.
     let rehosted;
     try {
-      rehosted = await importAudioFromUrl(result.url, `episode-${episodeId}.m4a`);
+      rehosted = await importAudioFromUrl(result.url, `episode-${episodeId}.m4a`, { userId: episode.submitted_by || userId });
     } catch (err) {
       console.error('extract-podcast-audio rehost error:', err.message);
       return res.status(502).json({ error: `Audio was extracted but could not be moved to storage: ${err.message}` });
