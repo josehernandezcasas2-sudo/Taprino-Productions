@@ -126,7 +126,8 @@ async function afterHttp() {
   r = await call('/api/show', { who: MARA });
   ok('GET /api/show → extraKind.ready true', r.status === 200 && r.json && r.json.extraKind && r.json.extraKind.ready === true, r.json && r.json.extraKind);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.mara)}`, { who: MARA });
-  ok('the editor read: extraKind + policy direct', r.status === 200 && r.json && r.json.episode && r.json.episode.extraKind === 'making-of' && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === 'direct', r.json && r.json.policy && r.json.policy.extraKind);
+  // A live extra's kind waits for review since migration 124.
+  ok('the editor read: extraKind + policy (waits on a live extra)', r.status === 200 && r.json && r.json.episode && r.json.episode.extraKind === 'making-of' && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === (hasColumn('episodes', 'pending_fields') ? 'staged' : 'direct'), r.json && r.json.policy && r.json.policy.extraKind);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.dee)}`, { who: MARA });
   ok('the editor read for the owner on Dee’s extra: the kind is locked', r.status === 200 && r.json && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === 'locked', r.json && r.json.policy && r.json.policy.extraKind);
 
@@ -159,6 +160,9 @@ async function afterHttp() {
 
 async function afterBrowser(b) {
   section('After 121: the editor’s chips (390)');
+  // The editor's words are checked on the extra in review (a live one's
+  // kind waits since migration 124); it goes back live for the cards.
+  sql(`update public.episodes set status = 'pending' where id in (${q(ID.mara)}, ${q(ID.dee)})`);
   const { ctx, page: pg, errors } = await b.open(MARA, 390);
   const st = await goto(pg, `/creator/show/${IDS.nightBus}/episode/${ID.mara}`);
   ok('the extra’s editor page → 200', st === 200, st);
@@ -186,6 +190,7 @@ async function afterBrowser(b) {
   ok('no overflow on the editor', (await overflowPx(pg)) <= 0);
   ok('no page errors in the editor', errors.length === 0, errors);
   await ctx.close();
+  sql(`update public.episodes set status = 'approved' where id in (${q(ID.mara)}, ${q(ID.dee)})`);
 
   section('After 121: the cards print the kind (browser)');
   {
@@ -218,8 +223,10 @@ async function afterBrowser(b) {
 
   section('After 121: 40 wide characters on the series page cards');
   const wide = 'Ｗ'.repeat(40);
+  sql(`update public.episodes set status = 'pending' where id = ${q(ID.dee)}`);
   const r = await patch(DEE, ID.dee, { extraKind: wide });
   ok('40 full-width characters stored', r.status === 200 && kindOf(ID.dee) === wide, kindOf(ID.dee));
+  sql(`update public.episodes set status = 'approved' where id = ${q(ID.dee)}`);
   for (const width of [390, 1280]) {
     const o = await b.open(SIGNED_OUT, width);
     await goto(o.page, `/series/${IDS.nightBus}`);
