@@ -1,5 +1,7 @@
 import { getAuth } from '@clerk/nextjs/server';
 import { listCalls, createCall } from '../../../../lib/crewCalls';
+import { getRoleContext } from '../../../../lib/roles';
+import { hasCapability } from '../../../../lib/capabilities';
 import { crewCallRules } from '../../../../lib/crewCallRules';
 import { checkRateLimit, rateLimitKeyForRequest } from '../../../../lib/rateLimit';
 import { applyCors } from '../../../../lib/cors';
@@ -22,6 +24,14 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       if (!(await checkRateLimit(rateLimitKeyForRequest(req, 'crew-calls'), 120, 60))) return res.status(429).json({ error: 'Slow down a little.' });
       const { q, role, pay, remote, lat, lng, within, matches, project, production, urgent, kind, mine, closed } = req.query;
+      // One production's calls: a production that isn't public lists them
+      // only for its owner, its crew and the team (lib/crewCalls.js), so the
+      // team is asked only then.
+      let isTeam = false;
+      if (production && userId) {
+        const rc = await getRoleContext(req).catch(() => null);
+        isTeam = Boolean(rc && (rc.isAdmin || hasCapability(rc, 'handle_flags')));
+      }
       const result = await listCalls({
         q: q || '',
         role: role || null,
@@ -36,7 +46,7 @@ export default async function handler(req, res) {
         kind: kind || null,
         mine: mine === '1',
         includeClosed: closed === '1'
-      }, { viewerId: userId || null });
+      }, { viewerId: userId || null, isAdmin: isTeam });
       return res.status(200).json({ ...result, rules: crewCallRules() });
     }
     if (req.method === 'POST') {

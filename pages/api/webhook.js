@@ -10,6 +10,7 @@ import { completePurchaseFromSession, failPurchaseFromSession, refundPurchaseFro
 import { completeTipFromSession, failTipFromSession, refundTipFromCharge } from '../../lib/tips';
 import { completeCrewPayFromSession, failCrewPayFromSession, refundCrewPayFromCharge, releasePendingCrewPay, syncCrewPayReversal } from '../../lib/crewPay';
 import { openDispute, closeDispute } from '../../lib/paymentDisputes';
+import { cancelMembershipForDispute } from '../../lib/membershipDisputes';
 import { getSupabase } from '../../lib/supabase';
 import { verifyStripeEvent } from '../../lib/stripeWebhook';
 import { securityAlert } from '../../lib/securityAlerts';
@@ -245,6 +246,10 @@ export async function handleStripeEvent(event) {
       // that haven't been paid out yet (lib/creatorShare.js).
       const dispute = event.data.object;
       await run('reverseMembershipCharge (dispute)', () => reverseMembershipCharge({ id: dispute.charge, payment_intent: dispute.payment_intent }, 'disputed'));
+      // ...and ends the membership, so the access it paid for goes with the
+      // money (security fixes, 2026-11-15; lib/membershipDisputes.js). One
+      // already cancelled is left alone.
+      await run('cancelMembershipForDispute', () => cancelMembershipForDispute(dispute));
       // A disputed ad-credit purchase: the credits come off the balance.
       const disputedPi = typeof dispute.payment_intent === 'string' ? dispute.payment_intent : dispute.payment_intent && dispute.payment_intent.id;
       // The disputed amount comes on top of what refunds already took
