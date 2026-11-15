@@ -127,7 +127,7 @@ async function afterHttp() {
   ok('GET /api/show → extraKind.ready true', r.status === 200 && r.json && r.json.extraKind && r.json.extraKind.ready === true, r.json && r.json.extraKind);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.mara)}`, { who: MARA });
   // A live extra's kind waits for review since migration 124.
-  ok('the editor read: extraKind + policy (waits on a live extra)', r.status === 200 && r.json && r.json.episode && r.json.episode.extraKind === 'making-of' && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === (hasColumn('episodes', 'pending_fields') ? 'staged' : 'direct'), r.json && r.json.policy && r.json.policy.extraKind);
+  ok('the editor read: extraKind + policy (waits on a live extra)', r.status === 200 && r.json && r.json.episode && r.json.episode.extraKind === 'making-of' && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === (hasColumn('episodes', 'pending_fields') ? 'staged' : 'locked'), r.json && r.json.policy && r.json.policy.extraKind);
   r = await call(`/api/show/episode/${encodeURIComponent(ID.dee)}`, { who: MARA });
   ok('the editor read for the owner on Dee’s extra: the kind is locked', r.status === 200 && r.json && r.json.policy && r.json.policy.extraKind && r.json.policy.extraKind.mode === 'locked', r.json && r.json.policy && r.json.policy.extraKind);
 

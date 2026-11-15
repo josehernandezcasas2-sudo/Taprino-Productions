@@ -115,7 +115,7 @@ function trackPath(ref) {
 
 async function cleanup() {
   const ids = Object.values(ID).map(q).join(', ');
-  const refs = rows(`select captions_url, pending_fields from public.episodes where id in (${ids})`);
+  const refs = rows(`select captions_url${hasColumn('episodes', 'pending_fields') ? ', pending_fields' : ''} from public.episodes where id in (${ids})`);
   sql(`delete from public.notifications where episode_id in (${ids}) or message like '%Check live review%${RUN}%'`);
   sql(`delete from public.audit_log where target_id in (${ids})`);
   sql(`delete from public.orphaned_media where context like '%Check live review%${RUN}%' or reference in (${Object.values(VID).map(q).join(', ')})`);
