@@ -163,6 +163,9 @@ function rowMeta(row, ctx, upload) {
   if (st.poster || st.thumbnail || st.titleImage) parts.push({ wait: 'Art waiting for approval' });
   if (st.trailer) parts.push({ wait: 'New trailer waiting' });
   if (st.newVideo) parts.push({ wait: 'New file waiting' });
+  // Migration 124: its details or captions waiting.
+  if (Array.isArray(st.details) && st.details.includes('captions')) parts.push({ wait: 'Captions change waiting' });
+  if (Array.isArray(st.details) && st.details.some((f) => f !== 'captions')) parts.push({ wait: 'Details change waiting' });
   const review = ctx.admin && row.status === 'pending' ? ctx.admin.rows[row.id] || null : null;
   if (review && review.editedAt) parts.push(`edited ${ago(review.editedAt)}`);
   // What stops Approve, unless the line above already says it (a file that

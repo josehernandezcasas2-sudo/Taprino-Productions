@@ -311,3 +311,54 @@ fake Stripe keeps `payment_method_options` on the session and its payment
 intent and refuses a value Stripe doesn't take. Rig check
 `dev/test-rig/checks/booking-policy.mjs` (both halves of 124) — written, not
 run here.
+
+### B. Every change to a live title is reviewed (builder B)
+
+`FIELD_POLICY` (both copies of `lib/showRules.js`) moves an episode's
+`mainGenre`, `genre`, `artist`, `releaseYear`, `runtime`, `fundingUrl`,
+`adBreakSeconds`, `adsEnabled`, `extraKind`, `credits`, `captions` and a show's
+`releaseYear`, `fundingUrl`, `seasons`, `credits`, `kind` to `staged`; the ads
+switch goes by direction (`adsEnabledPolicy` / `adsEnabledChange`, off at
+once). What waits, and how it reads, is the new pure `lib/liveReviewRules.js`
+(`DETAIL_FIELDS`, `pendingFieldsOf`, `nextPendingFields` — null once nothing
+waits, as 124's object check wants —, `detailWords` / `waitingDetailWords` for
+"Live now → Proposed", `sameDetail`). A waiting captions track is `{ ref,
+label, language }` (the agreement's "its reference", with the label and
+language that go live with it) or `''`. Server: `lib/showPage.js`
+`updateEpisode` / `updateShow` / the season menu's rename (`seasonsAction`) /
+`cancelEpisodeStaged` / `cancelShowStaged` (a detail is taken back by whoever
+may change it; a waiting track's file is deleted), the editor payloads
+(`staged.details`, `staged.captions`, `migration.episodes124` /
+`shows124`, the show page's row flags), and the new `setEpisodeCaptions`
+behind `pages/api/creator/add-captions.js`; every write of `pending_fields` is
+guarded by the whole object as read. `lib/stagedChanges.js` lists them (the
+admin show page reads the episodes' `pending_fields` itself, as
+`selectEpisodes` doesn't) in the text group (manage_episodes), with `seen`
+marks, and decides them: approve writes each column (captions: the track
+swaps, `captions_stale_at` clears, the old private file is deleted), deny
+drops them (a waiting track's file deleted). The Library's Pending edits
+(`pending-edits` → `resolve-edit`), `queue-counts`, Admin → Shows' "Changes
+waiting" and Your work's row data (`pendingDetails`, names only) count them.
+Before 124 a change that would wait answers 503 `migration-124` and the
+editors grey the field with that line. Web: the episode and show editors'
+"Waiting for approval" card (Live now → Proposed, Cancel), banner lines,
+captions card, clocks on waiting fields, credits editable while they wait;
+the app's editors the same (`WaitingDetails` in its EditorBits).
+**Who (as built, with the lead's additions of 2026-11-15):** a full admin
+applies at once; a team member's **own** title (uploader, or runs its show)
+goes the owner's way for every field (`ownTeamTitle` / `ownTeamCtx`: what
+waits for an owner waits, what an owner can't change — Who can watch, the
+rating, the status, the dates — is refused with `OWN_TITLE_LINE`; the
+flashing-lights warning likewise); on **someone else's** live title a field
+that waits applies at once only for a reviewer and is refused otherwise
+(`TEAM_REVIEW_LINE`; the agreement named only reviewers as applying at once,
+so a manage_episodes-only sub-admin is refused rather than staged — a staged
+change they could approve themselves through the Library's text group would
+not be a review); a new video or trailer attached by anyone but a full admin
+on a title that isn't in review waits (`pending_src` / `pending_trailer_src`),
+and `decideStaged` refuses its approval to whoever Cloudflare tags as its
+uploader. `/api/admin/edit-episode` runs the same policy column by column (its
+waiting changes go to `pending_fields` / `pending_*`, the answer says
+`staged`). Tested by `scripts/test-show-rules.mjs`, `scripts/test-live-review.mjs`,
+`scripts/check-live-review-pg.mjs` (PGlite, 124) and the rig check
+`dev/test-rig/checks/live-review.mjs` (not run by the builder).

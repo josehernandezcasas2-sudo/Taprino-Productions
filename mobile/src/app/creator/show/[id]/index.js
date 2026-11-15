@@ -506,7 +506,9 @@ function ShowScreen() {
         noteBehind(r);
         return say({ tone: 'warn', title: 'Not renamed', lines: [r.error] });
       }
-      say({ tone: 'ok', title: r.data.label ? `It reads “${r.data.label}”` : `Season ${season} has no name now` }, 4000);
+      // On a live show a new name waits for approval (2026-11-15).
+      if (r.data.staged) say({ tone: 'ok', title: 'Sent for approval', lines: [r.data.message || 'The live name stays until it’s approved.'] }, 5000);
+      else say({ tone: 'ok', title: r.data.label ? `It reads “${r.data.label}”` : `Season ${season} has no name now` }, 4000);
       return load({ quiet: true });
     },
     askRenumber: (season) => {

@@ -16,7 +16,7 @@ import { ClockIcon, WarningIcon } from '../WorkIcons';
 import CreditsFields, { creditsFormBody, creditsFormKey, creditsToForm } from './CreditsFields';
 import {
   ArtSlot, Banner, CancelButton, ChoiceChips, EdInput, EditorFoot, EditorHead, FieldHead, FieldNote, FootNote, NEEDS_118, NOT_SAVED_WORDS,
-  SaveButton, StagedBox, SwitchRow, TabRow, UploadLine, isOpen, useFootSpace, useKeyboardShown, useLeaveGuard, useShowAuth
+  SaveButton, StagedBox, SwitchRow, TabRow, UploadLine, WaitingDetails, isOpen, useFootSpace, useKeyboardShown, useLeaveGuard, useShowAuth
 } from './EditorBits';
 import { AboutField, OneLineField } from './EpisodeFields';
 import { PaidLine } from './PayeeCard';
@@ -105,6 +105,10 @@ function policyCtx(view) {
   return {
     target: 'show',
     isAdmin: Boolean(view.viewer && view.viewer.teamEdits),
+    // A team member's change to a live show (mobile/src/lib/showRules.js
+    // teamLiveMode, 2026-11-15): the route sends who they are.
+    fullAdmin: Boolean(view.viewer && view.viewer.fullAdmin),
+    reviews: Boolean(view.viewer && view.viewer.reviews),
     isRunner: Boolean(view.viewer && view.viewer.isOwner),
     status: view.show.status || 'approved',
     held: Boolean(view.show.held),
@@ -384,6 +388,7 @@ function ShowEditorReady({ initial, startTab, auth }) {
 
   // --- banners -----------------------------------------------------------------
   const st = show.staged || {};
+  const waitingDetails = Array.isArray(st.details) ? st.details : [];
   const stagedList = [
     st.name ? { field: 'name', words: `the name “${st.name}”` } : null,
     st.description ? { field: 'description', words: 'an edited description' } : null,
@@ -392,7 +397,9 @@ function ShowEditorReady({ initial, startTab, auth }) {
     st.heroImage ? { field: 'heroImage', words: 'the hero image' } : null,
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'removing the title image' : 'the title image' } : null,
     st.trailer ? { field: 'trailer', words: 'the trailer' } : null,
-    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` }))
+    ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt-${w.number}`, season: w.number, words: w.image ? `the Season ${w.number} art` : `removing the Season ${w.number} art` })),
+    // Migration 124 (2026-11-15): the show's details wait too.
+    ...waitingDetails.map((d) => ({ field: d.field, words: `${d.label.toLowerCase()} “${d.proposed}”` }))
   ].filter(Boolean);
   const declined = show.status === 'rejected' && !show.held;
   const banners = (
@@ -477,13 +484,14 @@ function ShowEditorReady({ initial, startTab, auth }) {
         </View>
         <OneLineField value={form.oneLine} onChange={(v) => set('oneLine', v)} policy={lockAll('description')} edited={edited('description')} />
         <AboutField value={form.about} onChange={(v) => set('about', v)} max={aboutMax} policy={lockAll('description')} edited={edited('description')} placeholder={`Everything else about the ${noun}.`} />
+        <WaitingDetails details={waitingDetails} canCancel={() => canCancel} onCancel={cancelStaged} busy={busy} />
         <View style={se.grid2}>
           <View style={{ flex: 1, gap: 6, minWidth: 110 }}>
-            <FieldHead label="Year" />
+            <FieldHead label="Year" staged={lockAll('releaseYear').mode === 'staged'} />
             <EdInput value={form.releaseYear} keyboardType="number-pad" maxLength={4} placeholder={String(new Date().getFullYear())} disabled={!isOpen(lockAll('releaseYear'))} onChangeText={(t) => set('releaseYear', t.replace(/[^0-9]/g, ''))} accessibilityLabel="Year" />
           </View>
           <View style={{ flex: 2, gap: 6, minWidth: 180 }}>
-            <FieldHead label="Funding link" hint="optional" />
+            <FieldHead label="Funding link" hint="optional" staged={lockAll('fundingUrl').mode === 'staged'} />
             <EdInput value={form.fundingUrl} keyboardType="url" autoCapitalize="none" autoCorrect={false} maxLength={500} placeholder="https://" disabled={!isOpen(lockAll('fundingUrl'))} onChangeText={(t) => set('fundingUrl', t)} accessibilityLabel="Funding link" />
           </View>
         </View>
@@ -528,7 +536,10 @@ function ShowEditorReady({ initial, startTab, auth }) {
 
       {form.seasons.length > 0 ? (
         <View style={ss.card}>
-          <Text style={ss.cardK}>Season names</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+            {seasonsPolicy.mode === 'staged' ? <ClockIcon size={12} color={colors.olive} /> : null}
+            <Text style={ss.cardK}>Season names</Text>
+          </View>
           {form.seasons.map((s, i) => (
             <View key={s.number} style={se.seasonRow}>
               <Text style={se.seasonLabel}>Season {s.number}</Text>

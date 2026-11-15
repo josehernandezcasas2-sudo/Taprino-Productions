@@ -1872,25 +1872,30 @@ export const FIELD_POLICY = {
     titleImage: { live: 'staged', who: 'uploader' },
     trailer: { live: 'staged', who: 'uploader' },
     video: { live: 'staged', who: 'uploader' },
-    genre: { live: 'direct', who: 'uploader' },
-    mainGenre: { live: 'direct', who: 'uploader' },
-    artist: { live: 'direct', who: 'uploader' },
-    releaseYear: { live: 'direct', who: 'uploader' },
-    runtime: { live: 'direct', who: 'uploader' },
-    fundingUrl: { live: 'direct', who: 'uploader' },
-    adBreakSeconds: { live: 'direct', who: 'uploader' },
-    adsEnabled: { live: 'direct', who: 'uploader' },
+    // Jose, 2026-11-15: "make sure any caption change or anything to
+    // change the series/live titles needs review" — on a live title the
+    // details wait too (episodes.pending_fields, migration 124), the
+    // captions included. Turning ads on waits; turning them off only takes
+    // something away and applies at once (adsEnabledChange below).
+    genre: { live: 'staged', who: 'uploader' },
+    mainGenre: { live: 'staged', who: 'uploader' },
+    artist: { live: 'staged', who: 'uploader' },
+    releaseYear: { live: 'staged', who: 'uploader' },
+    runtime: { live: 'staged', who: 'uploader' },
+    fundingUrl: { live: 'staged', who: 'uploader' },
+    adBreakSeconds: { live: 'staged', who: 'uploader' },
+    adsEnabled: { live: 'staged', who: 'uploader' },
     channelOptIn: { live: 'direct', who: 'uploader' },
-    captions: { live: 'direct', who: 'uploader' },
+    captions: { live: 'staged', who: 'uploader' },
     pageNotes: { live: 'staged', who: 'uploader' },
     // What kind of extra (migration 121): a label, like the other details.
-    extraKind: { live: 'direct', who: 'uploader' },
+    extraKind: { live: 'staged', who: 'uploader' },
     hasPage: { live: 'direct', who: 'either' },
     season: { live: 'direct', who: 'runner' },
     seriesOrder: { live: 'direct', who: 'runner' },
     bonusParent: { live: 'direct', who: 'either' },
     seriesId: { live: 'direct', who: 'uploader' },
-    credits: { live: 'direct', who: 'runner' },
+    credits: { live: 'staged', who: 'runner' },
     paidTo: { live: 'invite', who: 'runner' },
     tier: { live: 'locked', who: 'uploader' },
     rating: { live: 'locked', who: 'uploader' },
@@ -1910,14 +1915,19 @@ export const FIELD_POLICY = {
     trailer: { live: 'staged', who: 'runner' },
     // Waits like the name once an episode is approved (2026-11-12).
     description: { live: 'staged', who: 'runner' },
-    releaseYear: { live: 'direct', who: 'runner' },
-    fundingUrl: { live: 'direct', who: 'runner' },
+    // The year, the funding link, the season names, the credits and the
+    // kind wait for review on a live show (2026-11-15, migration 124's
+    // series.pending_fields); the channels switch, the newest-season switch
+    // and the defaults (only future episodes take them, and those are
+    // reviewed) apply at once.
+    releaseYear: { live: 'staged', who: 'runner' },
+    fundingUrl: { live: 'staged', who: 'runner' },
     channelOptIn: { live: 'direct', who: 'runner' },
-    seasons: { live: 'direct', who: 'runner' },
+    seasons: { live: 'staged', who: 'runner' },
     defaults: { live: 'direct', who: 'runner' },
-    credits: { live: 'direct', who: 'runner' },
+    credits: { live: 'staged', who: 'runner' },
     paidTo: { live: 'invite', who: 'runner' },
-    kind: { live: 'direct', who: 'runner' }
+    kind: { live: 'staged', who: 'runner' }
   }
 };
 
@@ -1945,24 +1955,86 @@ function episodeLive(ctx) {
   return st === null || st === 'approved';
 }
 
+// The team on a title (Jose, 2026-11-15: "make sure any caption change or
+// anything to change the series/live titles needs review"). ctx.isAdmin is
+// "acts as the team" (a full admin, or a sub-admin who edits episodes);
+// ctx.fullAdmin a full admin; ctx.reviews holds review_submissions;
+// ctx.isUploader / ctx.isRunner say the title is theirs.
+//   - A full admin's change applies at once.
+//   - Their own title (they uploaded it, or run its show): they are its
+//     owner, and their change goes the owner's way (ownTeamCtx) — it waits
+//     for review where an owner's waits, and where an owner can't change
+//     it at all (Who can watch, the rating…) it is refused with
+//     OWN_TITLE_LINE: nobody but a full admin puts their own change live
+//     unreviewed.
+//   - Someone else's live title: a field that waits on a live title
+//     applies at once for a reviewer, and is refused otherwise
+//     (TEAM_REVIEW_LINE); the rest (Who can watch, the place, the
+//     switches) stays the team's, at once.
+export const TEAM_REVIEW_LINE = 'A reviewer changes someone else’s live title';
+export const OWN_TITLE_LINE = 'Someone else on the team changes this on your own title';
+
+export function ownTeamTitle(ctx = {}) {
+  return ctx.isAdmin === true && ctx.fullAdmin !== true && (ctx.isUploader === true || ctx.isRunner === true);
+}
+
+// The owner's context for a team member on their own title: both the
+// uploader and the runner (the team may touch any field; only the review
+// is the owner's).
+export function ownTeamCtx(ctx = {}) {
+  return { ...ctx, isAdmin: false, isUploader: true, isRunner: true, ownTeam: true };
+}
+
+// A team member's change to a field that waits on someone else's live
+// title: 'direct' for a full admin or a reviewer, else 'locked'.
+export function teamLiveMode(ctx = {}) {
+  if (ctx.fullAdmin === true) return 'direct';
+  if (ctx.isUploader === true || ctx.isRunner === true) return 'staged';
+  return ctx.reviews === true ? 'direct' : 'locked';
+}
+
+// Whether the title is live in the sense a waiting change needs: an
+// approved episode (no status reads as approved) that isn't pulled,
+// withdrawn or on its way out; a show once an episode of it is approved,
+// not pulled or on its way out. A title that isn't live takes the team's
+// change at once, as before.
+function liveForReview(target, ctx) {
+  if (ctx.held === true || ctx.deletionRequested === true) return false;
+  if (target === 'show') {
+    const st = text(ctx.status) || 'approved';
+    return st === 'approved' || (st === 'pending' && Number(ctx.approvedEpisodes) > 0);
+  }
+  return episodeLive(ctx) && ctx.showHeld !== true && ctx.withdrawn !== true;
+}
+
 // What a change to `field` does now. ctx = { target: 'episode' | 'show',
-// isAdmin, isRunner (the show's owner; a standalone title's uploader),
-// isUploader, status (an episode: draft | pending | approved | rejected; a
-// show: pending | approved | rejected), held, showHeld, deletionRequested,
-// withdrawn, approvedEpisodes (a show's), episodeCount (a show's) }.
-// An admin's change is always direct. A draft, an episode in review or a
+// isAdmin (acts as the team), fullAdmin, reviews, isRunner (the show's
+// owner; a standalone title's uploader), isUploader, status (an episode:
+// draft | pending | approved | rejected; a show: pending | approved |
+// rejected), held, showHeld, deletionRequested, withdrawn,
+// approvedEpisodes (a show's), episodeCount (a show's) }.
+// The team's change is direct, except to a field that waits on a live
+// title (teamLiveMode, 2026-11-15). A draft, an episode in review or a
 // declined one takes everything at once; a live one follows the table. A
 // show takes everything at once until its first episode is approved, then
 // its name and art wait as on a live show. Pulled, being removed or
 // withdrawn: locked (amendment 22's few exceptions aside).
 export function fieldPolicy(field, ctx = {}) {
   const target = ctx.target === 'show' ? 'show' : 'episode';
-  if (ctx.isAdmin === true) return 'direct';
+  if (ctx.isAdmin === true) {
+    // Their own title: the owner's way (ownTeamTitle above).
+    if (ownTeamTitle(ctx)) return fieldPolicy(field, ownTeamCtx(ctx));
+    // Someone else's: at once, except a field that waits on a live title
+    // (teamLiveMode above).
+    const teamEntry = FIELD_POLICY[target][field];
+    if (teamEntry && teamEntry.live === 'staged' && liveForReview(target, ctx)) return teamLiveMode(ctx);
+    return 'direct';
+  }
   const entry = FIELD_POLICY[target][field];
   if (!entry || !mayChange(entry.who, ctx)) return 'locked';
   if (target === 'show') {
     if (ctx.held === true || ctx.deletionRequested === true) return 'locked';
-    if (field === 'kind') return Number(ctx.episodeCount) > 0 ? 'locked' : 'direct';
+    if (field === 'kind' && Number(ctx.episodeCount) > 0) return 'locked';
     if (entry.live === 'invite') return 'invite';
     const st = text(ctx.status) || 'approved';
     if (st === 'rejected') return 'direct';
@@ -1982,6 +2054,15 @@ export function fieldPolicyLine(field, ctx = {}) {
   if (policy === 'direct') return null;
   if (policy === 'staged') return field === 'video' ? 'The new file goes to an admin; the current one keeps playing until then' : 'Waits for approval; what’s there now stays until then';
   if (policy === 'invite') return 'They’re asked first; until they accept, the earnings keep going where they go now';
+  if (ownTeamTitle(ctx)) {
+    // Closed on their own title: the owner's reason when it's the title's
+    // state, else the own-work line.
+    if (ctx.withdrawn === true) return 'Withdrawn and kept for its buyers';
+    if (ctx.deletionRequested === true) return 'Removal requested — cancel it to make changes';
+    if (ctx.held === true || ctx.showHeld === true) return 'Pulled while an admin looks at it';
+    return OWN_TITLE_LINE;
+  }
+  if (ctx.isAdmin === true) return TEAM_REVIEW_LINE;
   const target = ctx.target === 'show' ? 'show' : 'episode';
   const entry = FIELD_POLICY[target][field];
   if (!entry) return 'This can’t be changed here';
@@ -2015,6 +2096,8 @@ export const FLASHING_LIGHTS_LOCKED = 'Only the team can remove this warning fro
 // all (ticked on a live title, or not the uploader's), 'direct' otherwise —
 // an unticked box can always be ticked by its uploader.
 export function flashingLightsPolicy(ctx = {}, current = false) {
+  // A team member on their own title goes the owner's way (2026-11-15).
+  if (ownTeamTitle(ctx)) return flashingLightsPolicy(ownTeamCtx(ctx), current);
   if (ctx.isAdmin === true) return { mode: 'direct', line: null };
   if (ctx.isUploader !== true) return { mode: 'locked', line: 'Only the person who uploaded it can change this' };
   if (current !== true) return { mode: 'direct', line: null };
@@ -2034,12 +2117,42 @@ export function flashingLightsChange(ctx = {}, current = false, next = current) 
   const was = current === true;
   const want = next === true;
   if (want === was) return { ok: true, change: null };
+  if (ownTeamTitle(ctx)) return flashingLightsChange(ownTeamCtx(ctx), current, next);
   if (ctx.isAdmin === true) return { ok: true, change: want };
   if (ctx.isUploader !== true) return { ok: false, status: 403, code: 'locked', line: 'Only the person who uploaded it can change this' };
   if (want) return { ok: true, change: true };
   const p = flashingLightsPolicy(ctx, true);
   if (p.mode === 'locked') return { ok: false, status: 403, code: 'locked', line: p.line };
   return { ok: true, change: false };
+}
+
+// --- ads on a live title (2026-11-15) ---------------------------------------
+
+// Turning a live title's ads on waits for review (it changes what viewers
+// get and starts ad share); turning them off only takes something away, so
+// it applies at once, as the flashing-lights warning turned on does.
+export const ADS_ON_WAITS_LINE = 'Turning ads on waits for approval; turning them off applies at once';
+
+// What the switch does now for this viewer, from `current` (the stored
+// value: true unless switched off). → { mode, line }: 'staged' only when
+// the switch is off on a live title (turning it on waits).
+export function adsEnabledPolicy(ctx = {}, current = true) {
+  const mode = fieldPolicy('adsEnabled', ctx);
+  if (mode === 'staged') return current === false ? { mode: 'staged', line: ADS_ON_WAITS_LINE } : { mode: 'direct', line: null };
+  return { mode, line: mode === 'direct' ? null : fieldPolicyLine('adsEnabled', ctx) };
+}
+
+// A save's change to the switch: `next` against `current`. → { ok: true,
+// mode: 'direct' | 'staged' | null (nothing to write), value }, or { ok:
+// false, status: 403, code: 'locked', line }.
+export function adsEnabledChange(ctx = {}, current = true, next = current) {
+  const was = current !== false;
+  const want = next === true;
+  if (want === was) return { ok: true, mode: null, value: was };
+  const mode = fieldPolicy('adsEnabled', ctx);
+  if (mode === 'locked' || mode === 'invite') return { ok: false, status: 403, code: 'locked', line: fieldPolicyLine('adsEnabled', ctx) || 'That can’t be changed here' };
+  if (mode === 'staged' && !want) return { ok: true, mode: 'direct', value: false };
+  return { ok: true, mode, value: want };
 }
 
 // --- moving a title between shows (decisions 7, 13, 19) ----------------------

@@ -10,6 +10,7 @@ import { FLAG_REASONS } from '../../../lib/reportReasons';
 import { applyCors } from '../../../lib/cors';
 import { normalizeExtraKind } from '../../../lib/extraKinds';
 import { has124, isTeamRemoved } from '../../../lib/removalRules';
+import { waitingDetails } from '../../../lib/liveReviewRules';
 
 // A creator's own titles, every status, for Creator Studio's piles, Your
 // work (web + app) and the app's hub. Filtered by the signed-in account,
@@ -275,6 +276,9 @@ export default async function handler(req, res) {
       // answer 503 migration-122).
       pendingPageNotes: typeof ep.pending_page_notes === 'string' ? ep.pending_page_notes : null,
       pageNotesWaitReady: Object.prototype.hasOwnProperty.call(ep, 'pending_page_notes'),
+      // Which of a live title's details (or its captions) wait for review
+      // (migration 124's pending_fields; field names only, never the values).
+      pendingDetails: waitingDetails(ep, 'episode'),
       // A new title image (or its removal) waiting on a live title
       // (migration 120), for the artwork box.
       pendingTitleImageUrl: ep.pending_title_image_url ?? null,

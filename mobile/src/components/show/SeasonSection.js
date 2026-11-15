@@ -67,6 +67,9 @@ export function rowMeta(row, ctx, upload) {
   if (typeof st.pageNotes === 'string') add('Notes change waiting', 'wait');
   if (st.poster || st.thumbnail || st.titleImage) add('Art waiting for approval', 'wait');
   if (st.newVideo) add('New file waiting', 'wait');
+  // Migration 124: its details or captions waiting.
+  if (Array.isArray(st.details) && st.details.includes('captions')) add('Captions change waiting', 'wait');
+  if (Array.isArray(st.details) && st.details.some((f) => f !== 'captions')) add('Details change waiting', 'wait');
   if (row.hasPageChoice === true) add('its own page');
   if (row.tier && ctx.defaultTier && row.tier !== ctx.defaultTier) add(row.tier === 'free' ? 'free' : ctx.premiumWord);
   if (row.uploaderName) add(`uploaded by ${row.uploaderName}`);

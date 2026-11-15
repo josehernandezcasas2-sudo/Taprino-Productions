@@ -553,12 +553,12 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       return;
     }
     setCaps({ file: null, language: caps.language, label: caps.label });
-    showToast({ title: 'Captions saved', lines: [r.data.converted ? 'Converted from SRT.' : null, r.data.cueCount ? `${r.data.cueCount} lines.` : null].filter(Boolean) });
+    showToast({ title: r.data.staged ? 'Captions sent for approval' : 'Captions saved', lines: [r.data.staged ? r.data.message : null, r.data.converted ? 'Converted from SRT.' : null, r.data.cueCount ? `${r.data.cueCount} lines.` : null].filter(Boolean) });
     await reload({});
   }
 
   async function removeCaptions() {
-    if (!window.confirm('Remove the captions from this episode?')) return;
+    if (!window.confirm(pol('captions').mode === 'staged' ? 'Ask to remove the captions from this episode? They stay until we approve it.' : 'Remove the captions from this episode?')) return;
     setBusy('captions');
     const r = await callApi('POST', '/api/creator/add-captions', { episodeId: ep.id, remove: true });
     setBusy(null);
@@ -566,7 +566,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       setError(r.error);
       return;
     }
-    showToast({ title: 'Captions removed' });
+    showToast({ title: r.data.staged ? 'Removal sent for approval' : 'Captions removed', lines: r.data.staged && r.data.message ? [r.data.message] : [] });
     await reload({});
   }
 
@@ -660,6 +660,8 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
           : ep.status === 'rejected' ? 'Not this time'
             : show && !show.isPublic ? 'Approved · the show isn’t public yet'
               : `Live${ep.releasedAt || ep.reviewedAt ? ` since ${shortDate(ep.releasedAt || ep.reviewedAt)}` : ''}`;
+  const waitingDetails = (ep.staged && Array.isArray(ep.staged.details)) ? ep.staged.details : [];
+  const stagedCaptions = ep.staged && ep.staged.captions ? ep.staged.captions : null;
   const stagedFields = [
     ep.staged && ep.staged.title ? { field: 'title', words: `title “${ep.staged.title}”` } : null,
     ep.staged && ep.staged.description ? { field: 'description', words: 'an edited description' } : null,
@@ -672,12 +674,17 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
     ep.staged && ep.staged.titleImageUrl ? { field: 'titleImage', words: 'a new title image' } : null,
     ep.staged && !ep.staged.titleImageUrl && ep.staged.titleImageRemoval ? { field: 'titleImage', words: 'removing the title image' } : null,
     ep.staged && ep.staged.trailer ? { field: 'trailer', words: 'a new trailer' } : null,
-    ep.staged && ep.staged.video ? { field: 'video', words: `a new file (${ep.staged.video.ready ? 'ready' : masterWords(ep.staged.video.state).text.toLowerCase()})` } : null
+    ep.staged && ep.staged.video ? { field: 'video', words: `a new file (${ep.staged.video.ready ? 'ready' : masterWords(ep.staged.video.state).text.toLowerCase()})` } : null,
+    // Migration 124 (2026-11-15): its details and captions wait too.
+    ...waitingDetails.map((d) => ({ field: d.field, words: `${d.label.toLowerCase()} “${d.proposed}”` })),
+    stagedCaptions ? { field: 'captions', words: stagedCaptions.removal ? 'removing the captions' : 'new captions' } : null
   ].filter(Boolean);
   const canAct = viewer.isUploader || viewer.team;
-  // Taking back a waiting change is the uploader's: the team decides it
-  // under Waiting for approval on the admin page, where Deny tells them.
+  // Taking back a waiting change is the uploader's (the credits, the
+  // show's owner's): the team decides it under Waiting for approval on the
+  // admin page, where Deny tells them.
   const canCancel = Boolean(viewer.isUploader);
+  const canCancelField = (field) => (field === 'credits' ? Boolean(viewer.isRunner) : canCancel);
 
   const banners = (
     <>
@@ -687,7 +694,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
             {stagedFields.map((s) => (
               <li key={s.field}>
                 <span>{s.words}</span>
-                {canCancel && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
+                {canCancelField(s.field) && <button type="button" className="show-ed-cancel" disabled={busy === `cancel-${s.field}`} onClick={() => cancelStaged(s.field)}>{busy === `cancel-${s.field}` ? '…' : 'Cancel'}</button>}
               </li>
             ))}
           </ul>
@@ -873,6 +880,20 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
   const moreInfo = (
     <>
       {live && <StagedLegend />}
+      {/* A live title's details waiting for approval (migration 124):
+          what is live now beside what is proposed, each with Cancel. */}
+      {waitingDetails.length > 0 && (
+        <div className="show-ed-card show-ed-waiting">
+          <span className="show-ed-card-k">Waiting for approval</span>
+          {waitingDetails.map((d) => (
+            <StagedBox key={d.field} title={d.label} onCancel={canCancelField(d.field) ? () => cancelStaged(d.field) : null} busy={busy === `cancel-${d.field}`}>
+              <span className="show-ed-staged-live">Live now: <strong>{d.live}</strong></span>
+              <span className="show-ed-staged-live">Proposed: <strong>{d.proposed}</strong></span>
+            </StagedBox>
+          ))}
+          <p className="show-ed-hint">Visitors see what&rsquo;s live until we approve each one.</p>
+        </div>
+      )}
       <AboutField
         id="ep-about"
         value={form.about}
@@ -946,15 +967,22 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       ) : null}
 
       <div className="show-ed-card show-ed-captions">
-        <span className="show-ed-card-k">Captions</span>
+        <span className="show-ed-label">{capPolicy.mode === 'staged' && <ClockIcon size={12} />}<span>Captions</span></span>
         {ep.captions && ep.captions.has ? (
           <div className="show-ed-cap-row">
-            <div className="show-ed-cap-text"><strong>{ep.captions.label || 'English'}</strong><span>{ep.captions.language || 'en'} · applies at once</span></div>
-            {captionsOpen && <button type="button" className="show-ed-mini" disabled={busy === 'captions'} onClick={removeCaptions}>Remove</button>}
+            <div className="show-ed-cap-text"><strong>{ep.captions.label || 'English'}</strong><span>{ep.captions.language || 'en'} · {capPolicy.mode === 'staged' ? 'live now' : 'applies at once'}</span></div>
+            {captionsOpen && !(stagedCaptions && stagedCaptions.removal) && <button type="button" className="show-ed-mini" disabled={busy === 'captions'} onClick={removeCaptions}>Remove</button>}
           </div>
         ) : (
           <p className="show-ed-hint">None yet. Viewers who turn captions on see nothing until you add them.</p>
         )}
+        {/* On a live title new captions (or their removal) wait for approval
+            (2026-11-15); viewers keep the live ones until then. */}
+        {stagedCaptions ? (
+          <StagedBox title={stagedCaptions.removal ? 'Removing the captions waits for approval' : 'New captions wait for approval:'} value={stagedCaptions.removal ? null : `${stagedCaptions.label || 'English'} (${stagedCaptions.language || 'en'})`} onCancel={canCancel ? () => cancelStaged('captions') : null} busy={busy === 'cancel-captions'}>
+            <span className="show-ed-staged-live">{ep.captions && ep.captions.has ? 'Viewers keep the live captions until we approve it.' : 'Viewers see none until we approve them.'}</span>
+          </StagedBox>
+        ) : null}
         {ep.captions && ep.captions.stale && <p className="show-ed-line"><WarningIcon size={12} /> The file changed since these were made — check they still line up.</p>}
         {captionsOpen ? (
           <>
@@ -967,7 +995,8 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
                 <div className="show-ed-field"><label className="show-ed-label" htmlFor="ep-cap-label">Label</label><input id="ep-cap-label" className="show-ed-input" type="text" value={caps.label} maxLength={40} onChange={(e) => setCaps((c) => ({ ...c, label: e.target.value }))} /></div>
               </div>
             )}
-            {caps.file && <button type="button" className="apl-btn-secondary" disabled={busy === 'captions'} onClick={uploadCaptions}>{busy === 'captions' ? 'Saving…' : 'Save the captions'}</button>}
+            {caps.file && <button type="button" className="apl-btn-secondary" disabled={busy === 'captions'} onClick={uploadCaptions}>{busy === 'captions' ? 'Saving…' : capPolicy.mode === 'staged' ? 'Send the captions for approval' : 'Save the captions'}</button>}
+            {capPolicy.mode === 'staged' ? <p className="show-ed-line"><ClockIcon size={12} /> On a live title new captions go to us first; the live ones stay until we approve them.</p> : null}
           </>
         ) : (
           <p className="show-ed-line locked">{!viewer.isUploader ? 'Only the person who uploaded it can change the captions' : capPolicy.line}</p>
@@ -1000,7 +1029,7 @@ function EpisodeMode({ showId, episodeId, mode = 'creator', layout = 'page', onC
       </div>
 
       <div className="show-ed-field">
-        <FieldHead htmlFor="ep-funding" label="Funding link" hint=" optional" locked={pol('fundingUrl').mode === 'locked'} />
+        <FieldHead htmlFor="ep-funding" label="Funding link" hint=" optional" staged={pol('fundingUrl').mode === 'staged'} locked={pol('fundingUrl').mode === 'locked'} />
         <input id="ep-funding" className="show-ed-input" type="url" inputMode="url" value={form.fundingUrl} placeholder="https://" maxLength={500} disabled={!isOpen(pol('fundingUrl'))} onChange={(e) => set('fundingUrl', e.target.value)} />
         <FieldNote policy={pol('fundingUrl')} edited={edited('fundingUrl')} />
       </div>

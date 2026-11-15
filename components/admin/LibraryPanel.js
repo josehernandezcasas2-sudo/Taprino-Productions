@@ -363,26 +363,31 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
 
       <div id="library-edits" className="account-card">
         <div className="account-eyebrow">Pending edits</div>
-        <h3>Title, description &amp; notes changes awaiting approval</h3>
-        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>A creator requested a change to something already live. Denying leaves the current text untouched; approving replaces it.</p>
+        <h3>Changes to live titles awaiting approval</h3>
+        <p style={{ fontSize: '0.8rem', color: 'var(--ink-dim)' }}>A change to something already live: its title, description, notes, details or captions. Denying leaves what&rsquo;s live untouched; approving replaces it.</p>
         {editError && <p style={{ color: 'var(--danger)', fontSize: '0.85rem' }}>{editError}</p>}
         {!pendingEdits ? <p>Loading…</p> : pendingEdits.episodes.length === 0 && pendingEdits.series.length === 0 ? <p className="adm-empty">Nothing pending right now.</p> : (
           <>
             {pendingEdits.episodes.map((e) => (
               <div key={`episode-${e.id}`} style={rowStyle}>
                 {kindTag('Episode', 'var(--signal-amber)')}
+                {!e.pendingTitle && <h4 style={{ margin: '0 0 0.3rem' }}>{e.currentTitle}</h4>}
                 {e.pendingTitle && <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}><strong>Title:</strong> {e.currentTitle} <span style={{ color: 'var(--ink-dim)' }}>→</span> {e.pendingTitle}</p>}
                 {e.pendingDescription && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}><strong>Description:</strong> {e.currentDescription} <span>→</span> {e.pendingDescription}</p>}
                 {/* Notes for the title's page (migration 122): '' waiting = clear them. */}
                 {typeof e.pendingPageNotes === 'string' && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)', whiteSpace: 'pre-line' }}><strong>Page notes:</strong> {e.currentPageNotes || <em>none</em>} <span>→</span> {e.pendingPageNotes === '' ? <em>clear the notes</em> : e.pendingPageNotes}</p>}
+                {/* Its details and captions (migration 124), live now → proposed. */}
+                <DetailLines details={e.details} />
                 {decideButtons(editActionLoading === `episode-${e.id}`, () => resolveEdit('episode', e.id, 'approve', e.seen), () => resolveEdit('episode', e.id, 'deny', e.seen))}
               </div>
             ))}
             {pendingEdits.series.map((s) => (
               <div key={`series-${s.id}`} style={rowStyle}>
                 {kindTag('Show / series', 'var(--brass)')}
+                {!s.pendingName && <h4 style={{ margin: '0 0 0.3rem' }}>{s.currentName}</h4>}
                 {s.pendingName && <p style={{ margin: '0 0 0.3rem', fontSize: '0.85rem' }}><strong>Name:</strong> {s.currentName} <span style={{ color: 'var(--ink-dim)' }}>→</span> {s.pendingName}</p>}
                 {s.pendingDescription && <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}><strong>Description:</strong> {s.currentDescription} <span>→</span> {s.pendingDescription}</p>}
+                <DetailLines details={s.details} />
                 <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
                   {decideButtons(editActionLoading === `series-${s.id}`, () => resolveEdit('series', s.id, 'approve', s.seen), () => resolveEdit('series', s.id, 'deny', s.seen))}
                   {openShow(s.id)}
@@ -489,6 +494,21 @@ export default function LibraryPanel({ allSeries: initialAllSeries }) {
           onSaved={() => { closeEdit(); loadLibrary(librarySearch); loadOrphans(); queueChanged(); }}
         />
       )}
+    </>
+  );
+}
+
+// A live title's waiting details (migration 124: lib/liveReviewRules.js
+// waitingDetailWords), one line each: what is live → what is proposed.
+function DetailLines({ details }) {
+  if (!Array.isArray(details) || details.length === 0) return null;
+  return (
+    <>
+      {details.map((d) => (
+        <p key={d.field} style={{ margin: '0 0 0.3rem', fontSize: '0.8rem', color: 'var(--ink-dim)' }}>
+          <strong>{d.label}:</strong> {d.live} <span>→</span> {d.proposed}
+        </p>
+      ))}
     </>
   );
 }

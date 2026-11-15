@@ -278,6 +278,11 @@ export default function AdminEditEpisodeModal({ episode, allSeries, standaloneEp
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not save changes.');
+      // A sub-admin's own live title (2026-11-15): their change waits for
+      // someone else on the team, like any owner's — said before closing.
+      if (Array.isArray(data.staged) && data.staged.length && typeof window !== 'undefined') {
+        window.alert(`${data.stagedNote || 'These wait for approval.'} Waiting: ${data.staged.join(', ')}.`);
+      }
       onSaved();
     } catch (err) {
       setError(err.message);

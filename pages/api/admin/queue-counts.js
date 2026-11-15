@@ -73,7 +73,10 @@ const EPISODE_120_FLAGS = 'pending_title_image_url, pending_title_image_removal,
 const EPISODE_120_WANTED = ['pending_title_image_url.not.is.null', 'pending_title_image_removal.eq.true', 'pending_trailer_src.not.is.null'];
 
 async function episodesNeedingSomeone(supabase) {
-  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}, pending_page_notes`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED, 'pending_page_notes.not.is.null'].join(','));
+  // Migration 124: a live title's details and captions waiting
+  // (pending_fields) count as edits, like a waiting title.
+  let res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}, pending_page_notes, pending_fields`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED, 'pending_page_notes.not.is.null', 'pending_fields.not.is.null'].join(','));
+  if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}, pending_page_notes`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED, 'pending_page_notes.not.is.null'].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src, ${EPISODE_120_FLAGS}`).or([...EPISODE_WANTED, 'pending_src.not.is.null', ...EPISODE_120_WANTED].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(`${EPISODE_FLAGS}, pending_src`).or([...EPISODE_WANTED, 'pending_src.not.is.null'].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('episodes').select(EPISODE_FLAGS).or(EPISODE_WANTED.join(','));
@@ -89,7 +92,8 @@ async function episodesNeedingSomeone(supabase) {
 // the Library's queues don't list it, so it is never in `artwork`. Read
 // without the column before 122.
 async function seriesNeedingSomeone(supabase) {
-  let res = await supabase.from('series').select(`${SERIES_FLAGS}, pending_season_art`).or([...SERIES_WANTED, 'pending_season_art.not.is.null'].join(','));
+  let res = await supabase.from('series').select(`${SERIES_FLAGS}, pending_season_art, pending_fields`).or([...SERIES_WANTED, 'pending_season_art.not.is.null', 'pending_fields.not.is.null'].join(','));
+  if (res.error && isMissingColumn(res.error)) res = await supabase.from('series').select(`${SERIES_FLAGS}, pending_season_art`).or([...SERIES_WANTED, 'pending_season_art.not.is.null'].join(','));
   if (res.error && isMissingColumn(res.error)) res = await supabase.from('series').select(SERIES_FLAGS).or(SERIES_WANTED.join(','));
   if (res.error) {
     console.error('queue-counts series:', res.error.message);
@@ -106,10 +110,12 @@ async function seriesNeedingSomeone(supabase) {
 function stagedCounts(episodes, series, showOf = new Map()) {
   const removal = (r) => r.deletion_requested === true && !has(r.withdrawn_at);
   const epArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_title_image_url) || r.pending_title_image_removal === true || has(r.pending_trailer_src);
-  const epText = (r) => has(r.pending_title) || has(r.pending_description) || typeof r.pending_page_notes === 'string';
+  // Waiting details (migration 124): a non-empty pending_fields object.
+  const detailsWaiting = (r) => Boolean(r.pending_fields && typeof r.pending_fields === 'object' && Object.keys(r.pending_fields).length > 0);
+  const epText = (r) => has(r.pending_title) || has(r.pending_description) || typeof r.pending_page_notes === 'string' || detailsWaiting(r);
   const epVideo = (r) => has(r.pending_src);
   const seArt = (r) => has(r.pending_poster) || has(r.pending_thumbnail) || has(r.pending_trailer_src) || has(r.pending_hero_image) || has(r.pending_title_image_url) || r.pending_title_image_removal === true;
-  const seText = (r) => has(r.pending_name) || has(r.pending_description);
+  const seText = (r) => has(r.pending_name) || has(r.pending_description) || detailsWaiting(r);
   // Season art waiting (migration 122): a non-empty list.
   const seSeasons = (r) => Array.isArray(r.pending_season_art) && r.pending_season_art.length > 0;
   const inShow = (r) => has(r.series_id);

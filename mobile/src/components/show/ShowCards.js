@@ -50,7 +50,9 @@ export function ShowCard({ view, canEdit, onEdit, onView, onCancelStaged, busy, 
     ...(Array.isArray(st.seasonArt) ? st.seasonArt : []).map((w) => ({ field: `seasonArt:${w.number}`, words: w.image ? `New Season ${w.number} art waiting` : `Season ${w.number} art removal waiting` })),
     st.titleImageUrl || st.titleImageRemoval ? { field: 'titleImage', words: st.titleImageRemoval ? 'Title image removal waiting' : 'New title image waiting' } : null,
     st.trailer ? { field: 'trailer', words: 'New trailer waiting' } : null,
-    st.description ? { field: 'description', words: 'New description waiting' } : null
+    st.description ? { field: 'description', words: 'New description waiting' } : null,
+    // Migration 124 (2026-11-15): the show's details waiting.
+    ...(Array.isArray(st.details) ? st.details : []).map((d) => ({ field: d.field, words: `New ${d.label.toLowerCase()} waiting: ${d.proposed}` }))
   ].filter(Boolean);
   const poster = art.poster ? (
     <SmartImage uri={art.poster} style={cs.poster} resizeMode="cover" />
