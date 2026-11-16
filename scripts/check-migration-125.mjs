@@ -31,7 +31,7 @@ const refused = async (db, sql, params, code, why) => {
 };
 
 const db = await buildDb(124);
-for (const [t, c] of [['crew_payments', 'refund_due_at'], ['crew_payments', 'contest_note'], ['purchases', 'refund_started_at']]) {
+for (const [t, c] of [['crew_payments', 'refund_due_at'], ['crew_payments', 'contest_note'], ['purchases', 'refund_started_at'], ['push_tokens', 'clerk_session_id'], ['web_push_subscriptions', 'clerk_session_id']]) {
   assert.equal(await col(db, t, c), null, `${t}.${c} isn't there before 125`);
 }
 ok('none of 125’s columns exist before it runs');
@@ -67,7 +67,13 @@ assert.match((await col(db, 'crew_payments', 'contested_at')).note || '', /full 
 const started = await col(db, 'purchases', 'refund_started_at');
 assert.equal(started.data_type, 'timestamp with time zone');
 assert.match(started.note || '', /Migration 125/);
-ok('the ten crew-pay columns and purchases.refund_started_at, with their types and comments');
+for (const t of ['push_tokens', 'web_push_subscriptions']) {
+  const info = await col(db, t, 'clerk_session_id');
+  assert.ok(info, `${t}.clerk_session_id exists`);
+  assert.equal(info.data_type, 'text');
+  assert.match(info.note || '', /Migration 125/);
+}
+ok('the ten crew-pay columns, purchases.refund_started_at and the two push session columns, with their types and comments');
 
 const before = (await db.query('select status, refund_due_at, contested_at from public.crew_payments where id = $1', [pay])).rows[0];
 assert.deepEqual([before.status, before.refund_due_at, before.contested_at], ['held', null, null]);
@@ -98,7 +104,8 @@ const REPORT = SQL.slice(SQL.indexOf('-- What 125 changed'));
 const row = (await db.query(REPORT)).rows[0];
 assert.equal(Number(row.crew_payment_columns_expect_10), 10);
 assert.equal(Number(row.purchase_column_expect_1), 1);
-ok('the closing report reads 10 / 1');
+assert.equal(Number(row.push_columns_expect_2), 2);
+ok('the closing report reads 10 / 1 / 2');
 
 await db.exec(SQL);
 const again = (await db.query('select refund_kind, contest_note, contest_decision from public.crew_payments where id = $1', [pay])).rows[0];

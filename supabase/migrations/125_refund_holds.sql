@@ -1,6 +1,7 @@
 -- 125 — A refund the poster asks for on secured crew pay waits three
 -- days so the crew member can say the job happened; a self refund of a
--- bought title can't race a download (written 2026-11-16).
+-- bought title can't race a download; notifications stop for a sign-in
+-- that was ended elsewhere (written 2026-11-16).
 --
 -- Jose, 2026-11-16: "Yes, hold the money for any disputes" (round 3's open
 -- decision: a no-show or a cancellation on paid crew work refunded the
@@ -25,12 +26,17 @@
 --       A buyer's own refund is being made: a download of what the
 --       purchase covers is refused while it is set, and the refund looks
 --       for downloads only after setting it, so the two can't both win.
+--   * push_tokens.clerk_session_id / web_push_subscriptions.clerk_session_id
+--       The sign-in a phone or browser registered under. When that sign-in
+--       is ended or revoked (signed out from another device, say), the
+--       phone or browser stops getting that account's notifications.
 --
 -- Columns only; no row changes and nothing anyone sees changes. Safe to
 -- run more than once. Before it has run the code reads every one of these
 -- as absent: a refund the poster asks for is not made at all (the money
--- stays held and the studio is emailed to settle it), and a self refund
--- checks downloads as it did before.
+-- stays held and the studio is emailed to settle it), a self refund
+-- checks downloads as it did before, and notifications go to every
+-- registered phone and browser as they did before.
 
 begin;
 
@@ -73,6 +79,11 @@ create index if not exists crew_payments_refund_due_idx on public.crew_payments 
 alter table public.purchases add column if not exists refund_started_at timestamptz;
 comment on column public.purchases.refund_started_at is 'A buyer''s own refund is in flight: downloads of what this purchase covers are refused while it is set. Migration 125.';
 
+alter table public.push_tokens add column if not exists clerk_session_id text;
+alter table public.web_push_subscriptions add column if not exists clerk_session_id text;
+comment on column public.push_tokens.clerk_session_id is 'The Clerk sign-in this phone registered under; an ended or revoked sign-in disables the token. Null = registered before 125. Migration 125.';
+comment on column public.web_push_subscriptions.clerk_session_id is 'The Clerk sign-in this browser subscribed under; an ended or revoked sign-in disables it. Null = subscribed before 125. Migration 125.';
+
 -- PostgREST reads the new columns at once.
 notify pgrst, 'reload schema';
 
@@ -81,4 +92,5 @@ commit;
 -- What 125 changed (one row).
 select
   (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'crew_payments' and column_name in ('refund_due_at', 'refund_kind', 'refund_asked_cents', 'refund_asked_by', 'refund_asked_at', 'contested_at', 'contest_note', 'contest_decision', 'contest_decided_at', 'contest_decided_by')) as crew_payment_columns_expect_10,
-  (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'purchases' and column_name = 'refund_started_at') as purchase_column_expect_1;
+  (select count(*) from information_schema.columns where table_schema = 'public' and table_name = 'purchases' and column_name = 'refund_started_at') as purchase_column_expect_1,
+  (select count(*) from information_schema.columns where table_schema = 'public' and table_name in ('push_tokens', 'web_push_subscriptions') and column_name = 'clerk_session_id') as push_columns_expect_2;

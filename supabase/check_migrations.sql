@@ -302,7 +302,7 @@ with want(m, k, x) as (values
   (124, 'c', 'series.keep_after_removal'),
   (125, 'c', 'crew_payments.contest_decided_at'),
   (125, 'c', 'purchases.refund_started_at'),
-  (125, 'k', 'crew_payments_contest_decision_check')
+  (125, 'c', 'push_tokens.clerk_session_id')
 ), got as (
   select m, k, x, case k
     when 't' then to_regclass('public.' || quote_ident(x)) is not null
