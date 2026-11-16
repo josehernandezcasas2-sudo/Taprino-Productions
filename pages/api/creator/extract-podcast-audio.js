@@ -28,7 +28,9 @@ import { sendError } from '../../../lib/apiErrors';
 //     gets the last answer this instance saw, else "in progress";
 //   - one copy at a time per episode: the call that claims it copies, any
 //     other answers 202 "already in progress" and polls on. The claim
-//     outlives the copy's own clock and is given back when the copy fails.
+//     outlives the copy's own clock and is given back when the copy is
+//     saved or fails; a call that claims it after a copy was saved reads
+//     the row again first and finds the audio there.
 const POLLS_PER_HOUR = 800;
 const POLL_GAP_SECONDS = 5;
 const COPY_CLAIM_SECONDS = 300;
@@ -114,6 +116,7 @@ export default async function handler(req, res) {
         return res.status(500).json({ error: 'Something went wrong. Please try again.' });
       }
       if (again && again.audio_url) {
+        await releaseWindow(claim);
         return res.status(200).json({ status: 'ready', audioUrl: audioRoutePath(episodeId, again.audio_url) });
       }
       // Cloudflare bills every play of a /downloads/audio file the same way
@@ -140,10 +143,10 @@ export default async function handler(req, res) {
         console.error('extract-podcast-audio save error:', updateError.message);
         return res.status(500).json({ error: 'Audio was extracted but could not be saved — try again.' });
       }
+      await releaseWindow(claim);
       if (!saved || saved.length === 0) {
         const { data: now } = await supabase.from('episodes').select('audio_url').eq('id', episodeId).maybeSingle();
         if (now && now.audio_url) return res.status(200).json({ status: 'ready', audioUrl: audioRoutePath(episodeId, now.audio_url) });
-        await releaseWindow(claim);
         return res.status(404).json({ error: 'Episode not found.' });
       }
       return res.status(200).json({ status: 'ready', audioUrl: audioRoutePath(episodeId, rehosted.url) });
