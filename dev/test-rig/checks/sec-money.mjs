@@ -179,7 +179,15 @@ async function selfRefunds() {
   ok('before any download: refundable', itemOf(items, dl) && itemOf(items, dl).refund.ok === true, itemOf(items, dl));
   insert('downloads', { user_id: buyer3.id, device_id: `ck-sec-phone-${RUN}`, episode_id: ID.dl, basis: 'owned', status: 'active', renewed_at: new Date().toISOString() });
   items = await library(buyer3);
-  ok('a phone asked but no link went out yet (no date): still refundable', itemOf(items, dl) && itemOf(items, dl).refund.ok === true, itemOf(items, dl) && itemOf(items, dl).refund);
+  // Since migration 125 (2026-11-16) a download still being started counts:
+  // its link may go out any moment, and the refund reads the downloads only
+  // after claiming the purchase (dev/test-rig/checks/round-nov16.mjs). Before
+  // it, only a copy with its date did.
+  if (hasColumn('purchases', 'refund_started_at')) {
+    ok('a phone asked but no link went out yet (no date): counts as a download being started (no Refund)', itemOf(items, dl) && itemOf(items, dl).refund.ok === false && itemOf(items, dl).refund.reason === 'downloaded to watch offline', itemOf(items, dl) && itemOf(items, dl).refund);
+  } else {
+    ok('a phone asked but no link went out yet (no date): still refundable', itemOf(items, dl) && itemOf(items, dl).refund.ok === true, itemOf(items, dl) && itemOf(items, dl).refund);
+  }
   sql(`update public.downloads set licensed_until = ${q(new Date(Date.now() + 30 * 86400000).toISOString())}, status = 'removed' where user_id = ${q(buyer3.id)} and episode_id = ${q(ID.dl)}`);
   items = await library(buyer3);
   ok('a link went out (the copy has its date, removed since): no Refund, and the card says why', itemOf(items, dl) && itemOf(items, dl).refund.ok === false && itemOf(items, dl).refund.reason === 'downloaded to watch offline', itemOf(items, dl) && itemOf(items, dl).refund);

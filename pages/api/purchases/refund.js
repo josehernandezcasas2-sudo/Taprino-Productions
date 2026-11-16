@@ -1,11 +1,13 @@
 import { getAccountContext } from '../../../lib/accountContext';
-import { refundPurchase } from '../../../lib/purchases';
+import { PurchaseError, refundPurchase } from '../../../lib/purchases';
 import { recordAudit } from '../../../lib/auditLog';
 import { applyCors } from '../../../lib/cors';
 
 // POST { purchaseId }: the buyer refunds themselves — within the window
 // and under the watch limit (lib/purchaseRules.js refundEligibility);
-// anything else is refused with the reason.
+// anything else is refused with the reason. A refund already on its way
+// answers 409 { code: 'refunding' } (migration 125: the refund claims the
+// purchase before it looks for downloads, so the two can't both win).
 export default async function handler(req, res) {
   applyCors(req, res);
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -25,6 +27,7 @@ export default async function handler(req, res) {
     recordAudit({ adminId: account.userId, adminEmail: account.email || null, action: 'purchase_self_refund', targetType: 'purchase', targetId: purchaseId, details: out.alreadyRefunded ? 'already refunded' : `refund ${out.refundId}` }).catch(() => {});
     return res.status(200).json({ ok: true, alreadyRefunded: Boolean(out.alreadyRefunded) });
   } catch (err) {
+    if (err instanceof PurchaseError) return res.status(err.status).json({ error: err.message, ...(err.code ? { code: err.code } : {}) });
     if (err.status) return res.status(err.status).json({ error: err.message });
     console.error('purchases/refund error:', err.message);
     return res.status(500).json({ error: 'The refund didn’t go through. Try again, or email us.' });
